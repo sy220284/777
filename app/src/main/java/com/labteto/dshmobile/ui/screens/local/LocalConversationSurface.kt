@@ -54,7 +54,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -196,6 +195,7 @@ internal class LocalConversationSurfaceArgs(
 @Composable
 internal fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
+    drafts: com.labteto.dshmobile.uicontract.ConversationDraftUiPort,
     workActions: LocalWorkFeatureUiActions? = null,
     onOpenWorkArtifact: (String) -> Unit = {},
     readRequest: Long = 0L,
@@ -426,20 +426,15 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     }
     var temperatureSaving by remember(state.sessionId) { mutableStateOf(false) }
     var temperatureSaveFailed by remember(state.sessionId) { mutableStateOf(false) }
-    val drafts = rememberSaveable(
-        saver = listSaver(
-            save = { cache -> cache.save() },
-            restore = { saved -> LocalSessionDraftCache.restore(saved) },
-        ),
-    ) { LocalSessionDraftCache() }
+    val draftValues by drafts.drafts.collectAsStateWithLifecycle()
     LaunchedEffect(composerHandoff, state.sessionId) {
         if (composerHandoff.size == 2 && composerHandoff[0] == state.sessionId) {
-            val previous = drafts[state.sessionId].orEmpty()
-            drafts.putBoundedLocalDraft(state.sessionId, listOf(composerHandoff[1], previous).filter(String::isNotBlank).joinToString("\n\n"))
+            val previous = draftValues[state.sessionId].orEmpty()
+            drafts.updateDraft(state.sessionId, listOf(composerHandoff[1], previous).filter(String::isNotBlank).joinToString("\n\n"))
             onConsumeComposerHandoff()
         }
     }
-    val input = drafts[state.sessionId].orEmpty()
+    val input = draftValues[state.sessionId].orEmpty()
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
     var showMediaStudio by rememberSaveable(state.sessionId) { mutableStateOf(false) }
@@ -945,7 +940,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     item {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
                             EmptyLocalHarness { suggestion ->
-                                drafts.putBoundedLocalDraft(state.sessionId, suggestion)
+                                drafts.updateDraft(state.sessionId, suggestion)
                             }
                         }
                     }
@@ -1044,8 +1039,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             result = transcriptItem.result,
                             viewModel = mediaStudioViewModel,
                             onInsertText = { text ->
-                                val previous = drafts[state.sessionId].orEmpty()
-                                drafts.putBoundedLocalDraft(
+                                val previous = draftValues[state.sessionId].orEmpty()
+                                drafts.updateDraft(
                                     state.sessionId,
                                     listOf(previous, text).filter(String::isNotBlank).joinToString("\n\n"),
                                 )
@@ -1194,7 +1189,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 sendFeedback.rejectReason == LocalSendRejectReason.UNCONFIGURED,
             stateError = state.error,
             restoreRequest = state.messages.lastOrNull { it.role == "user" }?.content,
-            onRestoreRequest = { drafts.putBoundedLocalDraft(state.sessionId, it) },
+            onRestoreRequest = { drafts.updateDraft(state.sessionId, it) },
             onSwitchModelSource = {
                 if (state.modelProfiles.isNotEmpty()) showModelPicker = true else onConfigure()
             },
@@ -1224,7 +1219,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     key = { suggestion -> suggestion.label + "|" + suggestion.text },
                 ) { suggestion ->
                     SyMaterialSurface(
-                        onClick = { drafts.putBoundedLocalDraft(state.sessionId, suggestion.text) },
+                        onClick = { drafts.updateDraft(state.sessionId, suggestion.text) },
                         shape = DsShapes.pillFull,
                         tier = SyMaterialTier.L4_OVERLAY,
                         border = BorderStroke(1.dp, colors.border),
@@ -1265,7 +1260,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             activeModelProfile = activeModelProfile,
             input = input,
             attachments = attachments,
-            onInputChange = { drafts.putBoundedLocalDraft(state.sessionId, it) },
+            onInputChange = { drafts.updateDraft(state.sessionId, it) },
             onRemoveAttachment = { index -> attachments.removeAt(index) },
             onClearAttachments = attachments::clear,
             onOpenAttachmentPicker = { showAttachmentPicker = true },
@@ -1493,7 +1488,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             state.replySuggestions.filter { it.text.isNotBlank() }.forEach { suggestion ->
                 SyMaterialSurface(
                     onClick = {
-                        drafts.putBoundedLocalDraft(state.sessionId, suggestion.text)
+                        drafts.updateDraft(state.sessionId, suggestion.text)
                         showReplySuggestions = false
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -1645,8 +1640,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 initialPrompt = mediaInitialPrompt,
                 initialKind = com.labteto.dshmobile.local.model.LocalMediaKind.valueOf(mediaInitialKind),
                 onInsertTranscript = { transcription ->
-                    val previous = drafts[state.sessionId].orEmpty()
-                    drafts.putBoundedLocalDraft(
+                    val previous = draftValues[state.sessionId].orEmpty()
+                    drafts.updateDraft(
                         state.sessionId,
                         listOf(previous, transcription).filter(String::isNotBlank).joinToString("\n\n"),
                     )
@@ -1669,8 +1664,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     if (memberName.isBlank()) R.string.local_team_lead_followup_request else R.string.local_team_lead_recover_request,
                     memberName,
                 )
-                val previous = drafts[state.sessionId].orEmpty()
-                drafts.putBoundedLocalDraft(state.sessionId, listOf(request, previous).filter(String::isNotBlank).joinToString("\n\n"))
+                val previous = draftValues[state.sessionId].orEmpty()
+                drafts.updateDraft(state.sessionId, listOf(request, previous).filter(String::isNotBlank).joinToString("\n\n"))
                 teamDispatchSelected = true
                 showTeamPanel = false
             },

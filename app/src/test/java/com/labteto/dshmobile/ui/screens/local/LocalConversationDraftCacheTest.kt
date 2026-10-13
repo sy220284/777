@@ -43,4 +43,35 @@ class LocalConversationDraftCacheTest {
 
         assertTrue(drafts.save().isEmpty())
     }
+    @Test
+    fun renderersShareOneOwnerAndSessionDraftsStaySeparate() {
+        val owner = LocalSessionDraftCache()
+        val v6: com.labteto.dshmobile.uicontract.ConversationDraftUiPort = owner
+        val next: com.labteto.dshmobile.uicontract.ConversationDraftUiPort = owner
+        v6.updateDraft("chat", "unfinished question")
+        next.updateDraft("work", "unfinished task")
+
+        assertEquals("unfinished question", next.drafts.value["chat"])
+        assertEquals("unfinished task", v6.drafts.value["work"])
+        next.updateDraft("chat", "")
+        assertFalse(v6.drafts.value.containsKey("chat"))
+        assertEquals("unfinished task", v6.drafts.value["work"])
+    }
+
+    @Test
+    fun savedStateRestoresRecencyAndOnlyPersistsSubsequentEdits() {
+        val owner = LocalSessionDraftCache()
+        repeat(12) { owner.updateDraft("session-$it", "draft-$it") }
+        owner.updateDraft("session-0", "edited")
+        val writes = mutableListOf<List<String>>()
+        val recreated = LocalSessionDraftCache.restore(owner.save(), writes::add)
+        assertTrue(writes.isEmpty())
+        assertEquals(owner.drafts.value, recreated.drafts.value)
+
+        recreated.updateDraft("new-session", "new draft")
+        assertEquals("edited", recreated.drafts.value["session-0"])
+        assertFalse(recreated.drafts.value.containsKey("session-1"))
+        assertEquals(recreated.save(), writes.single())
+    }
+
 }

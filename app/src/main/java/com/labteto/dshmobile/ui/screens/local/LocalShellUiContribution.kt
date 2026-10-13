@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun localShellFeatureUiContribution(
     shell: LocalHarnessShellState,
+    drafts: com.labteto.dshmobile.uicontract.ConversationDraftUiPort,
     state: StateFlow<LocalConversationSurfaceState>,
     activeModelProfile: LocalModelProfile?,
     sendFeedback: LocalSendFeedbackState,
@@ -69,6 +70,7 @@ internal fun localShellFeatureUiContribution(
         check(page == LocalFeaturePage.HOME) { "Shell received non-HOME route: $page" }
         LocalConversationSurface(
             state = surface,
+            drafts = drafts,
             readRequest = readerRequest,
             onReaderDismissed = {
                 if (readerOpenedFromDrawer) {

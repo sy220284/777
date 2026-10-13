@@ -54,7 +54,7 @@ adb shell am start -n com.sy220284.dshmobile.debug/com.labteto.dshmobile.MainAct
 
 `UiPackManifest.checkCompatibility` 检查契约版本、必要 Scene、能力、窗口、无障碍和暗色声明。单测确认此切片包无法通过全应用覆盖检查。声明支持无障碍和窗口类型只是契约声明，不等于已通过设备验收。
 
-自动审批政策、设备批准租期及问答继续由现有 Owner 处理，尚未纳入新强类型命令。本批仍缺双包共享草稿、阅读锚点、附件、审批参数大字布局、账号撤销和进程恢复的完整用户旅程证据。不能按“能编译”宣布插拔完成，也不能绕过 S2 出口直接全量迁移。
+自动审批政策、设备批准租期及问答继续由现有 Owner 处理，尚未纳入新强类型命令。双包草稿现由 Host 单一 UI 状态 Owner 持有，V6 和 Next 共用强类型端口；通过 SavedStateHandle 保留 Android 保存状态恢复，继续沿用原有 12 会话 LRU，未新增业务持久化或执行账本。保存状态恢复不等于强停/崩溃后的完整业务恢复。本批仍缺阅读锚点、附件、审批参数大字布局、账号撤销和进程恢复的完整用户旅程证据。不能按“能编译”宣布插拔完成，也不能绕过 S2 出口直接全量迁移。
 
 ## 旧 22 项问题的唯一去向
 
@@ -76,7 +76,7 @@ adb shell am start -n com.sy220284.dshmobile.debug/com.labteto.dshmobile.MainAct
 - `:ui-contract:test`：3 项测试通过，失败/错误/跳过均为 0。`:ui-host:compileDebugKotlin`、`:ui-pack-next:compileDebugKotlin` 已通过。
 - 组合至 7c7a5c88 后，Run 38429460247（86629c0b）：全部 JVM 单测、ARM64 optimized APK/lint、x86 Debug/测试/optimized APK 构建通过。Android 16 运行 248 项，MCP 文案断言因列表和详情同时匹配而失败；已限定到详情文本，未削弱健康状态断言。独立包的两项渲染交互测试属于显式夹具验证。
 - 完整 CI Run 38434973184（c5f3e6c9，组合基线 7c7a5c88）全部通过：静态、架构、官方夹具、全部 JVM 单测、ARM64/x86 APK、lint、Android 16/17 仪器化及启动检查、57 张截图输出。真实当前 Codex 与 App 的双包业务验收仍未完成。
-- 主线随后 #698/#701 更新至 f2aeac62：已撤回退役运行中心相关修复，移除三项现行 Scene 要求，保留历史索引。此最新组合需要重新验证；旧 head 的绿色 CI 不代表最新组合已通过。本地全量编译耗时较长，已停止。
+- 主线随后 #698/#701 更新至 f2aeac62：已撤回退役运行中心相关修复，移除三项现行 Scene 要求，保留历史索引。Run 38439855781（f860ff02）最终完整矩阵通过；Android 17 首轮既有用量详情测试出现 5 秒等待超时，同 head 第二次通过，未修改断言或超时。后续共享草稿改动仍需重新验证。
 - 首次完整 CI（Run 38416556578）：静态和架构通过；单测和构建被独立包解析出的旧 Lifecycle/Tracing 元数据校验阻断，尚未运行到测试。独立包补充与项目已核验版本一致的依赖约束及 Coroutine Android 依赖，不关闭校验、不添加旧版散列。Android 17 镜像下载同时出现 Zip 损坏，未记录设备通过。修正后重跑。
 - 构建排障：新模块脱离 App 后曾解析到未缓存的 Activity 旧版；Host SDK 已去掉无用 UI 依赖，验证包使用项目固定 Activity 版本；未联网补齐。
 - 首轮 App 构建：KSP 报 `No fir element was found for KtParameter`，失败，没有据此声称单测通过；已对最终依赖图重新执行。

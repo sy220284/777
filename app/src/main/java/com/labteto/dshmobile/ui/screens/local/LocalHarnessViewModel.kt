@@ -41,6 +41,7 @@ import kotlinx.coroutines.withContext
 
 @HiltViewModel
 class LocalHarnessViewModel @Inject constructor(
+    private val savedStateHandle: androidx.lifecycle.SavedStateHandle,
     private val runtime: LocalUiRuntime,
     private val uiPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val chatUi: LocalChatUiFacade,
@@ -139,6 +140,11 @@ class LocalHarnessViewModel @Inject constructor(
         scope = viewModelScope,
     )
     internal val transcriptHistory = transcriptHistoryController.history
+    val conversationDraftUiPort: com.labteto.dshmobile.uicontract.ConversationDraftUiPort =
+        LocalSessionDraftCache.restore(savedStateHandle.get<List<String>>("conversation_drafts").orEmpty()) {
+            savedStateHandle["conversation_drafts"] = ArrayList(it)
+        }
+
     private val conversationUiState = LocalConversationUiStateStore(appContext)
     val pinnedSessionIds = conversationUiState.pinnedSessionIds
     val sessionTitleOverrides = conversationUiState.sessionTitleOverrides

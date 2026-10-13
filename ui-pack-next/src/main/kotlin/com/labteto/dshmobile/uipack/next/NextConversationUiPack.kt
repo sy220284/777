@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.uicontract.ChatUiCommand
+import com.labteto.dshmobile.uicontract.ConversationDraftUiPort
 import com.labteto.dshmobile.uicontract.ChatUiPort
 import com.labteto.dshmobile.uicontract.UiAccessibility
 import com.labteto.dshmobile.uicontract.UiCapabilityId
@@ -64,7 +65,13 @@ object NextConversationUiPack : ConversationUiPack {
     )
 
     @Composable
-    override fun Render(chat: ChatUiPort, work: WorkConversationUiPort, workMode: Boolean, onClose: () -> Unit) {
+    override fun Render(
+        drafts: ConversationDraftUiPort,
+        chat: ChatUiPort,
+        work: WorkConversationUiPort,
+        workMode: Boolean,
+        onClose: () -> Unit,
+    ) {
         val initialChat = remember(chat) { chat.snapshot() }
         val initialWork = remember(work) { work.snapshot() }
         val chatSnapshot by chat.snapshots.collectAsStateWithLifecycle(initialValue = initialChat)
@@ -77,7 +84,8 @@ object NextConversationUiPack : ConversationUiPack {
         val error = if (workMode) workSnapshot.error else chatSnapshot.error
         val status = if (workMode) workSnapshot.status else chatSnapshot.status
         val approval = workSnapshot.approval.takeIf { workMode }
-        var draft by rememberSaveable(identity?.sessionId) { mutableStateOf("") }
+        val draftValues by drafts.drafts.collectAsStateWithLifecycle()
+        val draft = draftValues[identity?.sessionId].orEmpty()
         var receipt by rememberSaveable(identity?.sessionId) { mutableStateOf<String?>(null) }
         val accepted = stringResource(R.string.next_accepted)
         val enqueued = stringResource(R.string.next_enqueued)
@@ -152,14 +160,14 @@ object NextConversationUiPack : ConversationUiPack {
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     if (!send.available) send.reason?.let { Text(rejectionLabels.getValue(it)) }
                     receipt?.let { Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
-                    OutlinedTextField(value = draft, onValueChange = { draft = it }, modifier = Modifier.fillMaxWidth(),
+                    OutlinedTextField(value = draft, onValueChange = { text -> identity?.let { drafts.updateDraft(it.sessionId, text) } }, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.next_input)) }, maxLines = 5)
                     Button(enabled = send.available && draft.isNotBlank() && identity != null, onClick = {
                         val target = identity ?: return@Button
                         val result = if (workMode) work.submit(WorkConversationUiCommand.SendText(target, draft))
                             else chat.submit(ChatUiCommand.SendText(target, draft))
                         show(result)
-                        if (result == UiCommandReceipt.Accepted || result == UiCommandReceipt.Queued) draft = ""
+                        if (result == UiCommandReceipt.Accepted || result == UiCommandReceipt.Queued) drafts.updateDraft(target.sessionId, "")
                     }) { Text(stringResource(if (phase == UiExecutionPhase.IDLE) R.string.next_send else R.string.next_queue)) }
                 }
             }

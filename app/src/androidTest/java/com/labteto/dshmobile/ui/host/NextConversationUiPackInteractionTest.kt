@@ -30,6 +30,7 @@ import org.junit.Test
 /** Renderer/contract tests with explicit fixtures, not proof of real model/tool completion. */
 class NextConversationUiPackInteractionTest {
     @get:Rule val compose = createComposeRule()
+    private val drafts = com.labteto.dshmobile.ui.screens.local.LocalSessionDraftCache()
     private val identity = UiSessionIdentity("session", "activation", 0, "profile", null)
     private inner class Chat : ChatUiPort {
         override val snapshots = MutableStateFlow(ChatSceneSnapshot(identity, UiSceneStatus.EMPTY,
@@ -57,7 +58,7 @@ class NextConversationUiPackInteractionTest {
     @Test fun rejectionKeepsDraftAndAcceptanceClearsItUsingTheCapturedIdentity() {
         val chat = Chat()
         val work = Work()
-        compose.setContent { NextConversationUiPack.Render(chat, work, workMode = false, onClose = {}) }
+        compose.setContent { NextConversationUiPack.Render(drafts, chat, work, workMode = false, onClose = {}) }
         compose.onNode(hasSetTextAction()).performTextInput("retain draft")
         compose.onNodeWithText("发送").performClick()
         compose.onNode(hasSetTextAction()).assertTextContains("retain draft")
@@ -73,7 +74,7 @@ class NextConversationUiPackInteractionTest {
     @Test fun approvalOnlySubmitsTheExistingPendingIdentityAndDisplaysOwnerRejection() {
         val chat = Chat()
         val work = Work()
-        compose.setContent { NextConversationUiPack.Render(chat, work, workMode = true, onClose = {}) }
+        compose.setContent { NextConversationUiPack.Render(drafts, chat, work, workMode = true, onClose = {}) }
         compose.onNodeWithText("{path:report}").assertIsDisplayed()
         compose.onNodeWithText("批准本次操作").performClick()
         compose.runOnIdle {
@@ -81,4 +82,32 @@ class NextConversationUiPackInteractionTest {
         }
         compose.onNodeWithText("这项审批已结束", substring = true).assertIsDisplayed()
     }
+    @Test fun reenteringThePackKeepsTheHostDraftAndSessionSwitchDoesNotMixText() {
+        val chat = Chat()
+        val work = Work()
+        val visible = androidx.compose.runtime.mutableStateOf(true)
+        drafts.updateDraft(identity.sessionId, "host draft")
+        compose.setContent {
+            if (visible.value) NextConversationUiPack.Render(drafts, chat, work, workMode = false, onClose = {})
+        }
+        compose.onNode(hasSetTextAction()).assertTextContains("host draft")
+        compose.runOnIdle { visible.value = false }
+        compose.onNode(hasSetTextAction()).assertDoesNotExist()
+        compose.runOnIdle {
+            drafts.updateDraft(identity.sessionId, "edited outside pack")
+            visible.value = true
+        }
+        compose.onNode(hasSetTextAction()).assertTextContains("edited outside pack")
+        compose.runOnIdle {
+            chat.snapshots.value = chat.snapshots.value.copy(identity = identity.copy(sessionId = "other"))
+        }
+        compose.onNode(hasSetTextAction()).performTextInput("other draft")
+        compose.runOnIdle {
+            assertEquals("edited outside pack", drafts.drafts.value[identity.sessionId])
+            assertEquals("other draft", drafts.drafts.value["other"])
+            chat.snapshots.value = chat.snapshots.value.copy(identity = identity)
+        }
+        compose.onNode(hasSetTextAction()).assertTextContains("edited outside pack")
+    }
+
 }

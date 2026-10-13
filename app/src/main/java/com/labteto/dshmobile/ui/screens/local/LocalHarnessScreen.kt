@@ -531,6 +531,7 @@ fun LocalHarnessScreen(
 
     val featureContributions = listOf(
         localShellFeatureUiContribution(
+            drafts = viewModel.conversationDraftUiPort,
             shell = shell,
             state = activeConversationState,
             activeModelProfile = activeModelProfile,

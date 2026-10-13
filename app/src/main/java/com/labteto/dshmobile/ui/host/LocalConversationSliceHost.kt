@@ -26,6 +26,7 @@ internal fun LocalConversationSliceHost(
     }
     BackHandler(onBack = onClose)
     NextConversationUiPack.Render(
+        drafts = viewModel.conversationDraftUiPort,
         chat = viewModel.chatUiPort,
         work = viewModel.workConversationUiPort,
         workMode = shell.usageMode == LocalUsageMode.WORK,

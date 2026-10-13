@@ -11,6 +11,7 @@ interface ConversationUiPack {
 
     @Composable
     fun Render(
+        drafts: com.labteto.dshmobile.uicontract.ConversationDraftUiPort,
         chat: ChatUiPort,
         work: WorkConversationUiPort,
         workMode: Boolean,
