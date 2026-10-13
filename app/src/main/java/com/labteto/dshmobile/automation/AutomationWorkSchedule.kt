@@ -8,15 +8,34 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
 
+/** New/edited typed schedules use one anchored calendar/interval engine in either mode. */
+internal fun automationDispatchPolicy(
+    type: AutomationScheduleType,
+    recurringMinutes: Long?,
+): AutomationDispatchPolicy? = when {
+    recurringMinutes == null -> null
+    type == AutomationScheduleType.LEGACY -> AutomationDispatchPolicy.PERIODIC
+    else -> AutomationDispatchPolicy.CHAINED
+}
+
+/**
+ * A null policy belongs to an existing task written by an older APK.
+ * Preserve its exact WorkManager ownership until the next explicit schedule edit.
+ * This prevents two workers racing across an application update/restart.
+ */
 internal fun usesChainedAutomationScheduling(task: AutomationTask): Boolean =
-    task.scheduleType == AutomationScheduleType.MONTHLY ||
-        (task.mode == AutomationMode.CHAT && task.scheduleType in setOf(
-            AutomationScheduleType.INTERVAL,
-            AutomationScheduleType.DAILY,
-            AutomationScheduleType.WEEKLY,
-            AutomationScheduleType.SILENCE,
-            AutomationScheduleType.WINDOW,
-        ))
+    when (task.dispatchPolicy) {
+        AutomationDispatchPolicy.CHAINED -> true
+        AutomationDispatchPolicy.PERIODIC -> false
+        null -> task.scheduleType == AutomationScheduleType.MONTHLY ||
+            (task.mode == AutomationMode.CHAT && task.scheduleType in setOf(
+                AutomationScheduleType.INTERVAL,
+                AutomationScheduleType.DAILY,
+                AutomationScheduleType.WEEKLY,
+                AutomationScheduleType.SILENCE,
+                AutomationScheduleType.WINDOW,
+            ))
+    }
 
 internal fun automationWorkName(id: String, generation: Long): String =
     if (generation == 0L) "harness-automation-$id" else "harness-automation-$id-g$generation"
