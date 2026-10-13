@@ -86,7 +86,7 @@ private fun decodePlanState(data: JsonObject): List<String>? {
         if (!item.isString) return null
         decoded += item.contentOrNull ?: return null
     }
-    return decoded.take(20)
+    return decoded.take(MAX_WORK_PLAN_ITEMS)
 }
 
 private fun decodeTodoState(data: JsonObject): List<LocalTodoItem>? {
@@ -101,9 +101,9 @@ private fun decodeTodoState(data: JsonObject): List<LocalTodoItem>? {
         val content = contentValue.contentOrNull?.trim().orEmpty()
         val status = statusValue.contentOrNull.orEmpty()
         if (content.isEmpty() || status !in allowed) return null
-        decoded += LocalTodoItem(content.take(500), status)
+        decoded += LocalTodoItem(content.take(MAX_WORK_TODO_CHARS), status)
     }
-    return decoded.take(50)
+    return decoded.take(MAX_WORK_TODO_ITEMS)
 }
 
 private fun decodeWorkGoal(fields: JsonObject, sequence: Long): LocalGoal? = runCatching {
