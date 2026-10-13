@@ -250,6 +250,51 @@ private fun materialDarkScheme(c: DsColors) = darkColorScheme(
 )
 
 /**
+ * Single palette resolution path shared by the app theme and JVM regression tests.
+ * DsColors remains a host preference projection; production surfaces use [controls].
+ */
+internal data class V6ThemeProjection(
+    val dark: Boolean,
+    val page: DsColors,
+    val controls: com.shenyan.designsystem.foundation.SyColors,
+    val isDefaultAccent: Boolean,
+)
+
+internal fun resolveV6ThemePalette(
+    preference: ThemePreference,
+    accentKey: String?,
+    systemDark: Boolean,
+): V6ThemeProjection {
+    val dark = when (preference) {
+        ThemePreference.LIGHT -> false
+        ThemePreference.DARK, ThemePreference.MATTE_BLACK -> true
+        ThemePreference.SYSTEM -> systemDark
+    }
+    val base = when (preference) {
+        ThemePreference.LIGHT -> DsThemeTokens.light
+        ThemePreference.DARK -> DsThemeTokens.dark
+        ThemePreference.MATTE_BLACK -> DsThemeTokens.matteBlack
+        ThemePreference.SYSTEM -> if (systemDark) DsThemeTokens.dark else DsThemeTokens.light
+    }
+    val palette = AccentPalettes.of(accentKey)
+    val canonical = com.shenyan.designsystem.foundation.ShenyanPalettes.forMode(
+        when (preference) {
+            ThemePreference.LIGHT -> com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
+            ThemePreference.DARK -> com.shenyan.designsystem.foundation.ShenyanMode.DARK
+            ThemePreference.MATTE_BLACK -> com.shenyan.designsystem.foundation.ShenyanMode.MATTE
+            ThemePreference.SYSTEM -> if (systemDark)
+                com.shenyan.designsystem.foundation.ShenyanMode.DARK
+                else com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
+        }
+    )
+    val defaultAccent = palette.key == AccentPalettes.DEFAULT.key
+    val page = (if (defaultAccent) base else base.withAccent(palette, dark))
+        .harmonizeV6(canonical, preserveAccent = !defaultAccent)
+    val controls = if (defaultAccent) canonical else canonical.withV6Accent(page)
+    return V6ThemeProjection(dark, page, controls, defaultAccent)
+}
+
+/**
  * The 777 UI theme. It keeps platform light/dark behavior while applying the current interaction
  * palette and the user's optional appearance overrides.
  */
@@ -265,34 +310,10 @@ fun DshTheme(
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
-    val reducedMotion = rememberSyReducedMotion()
-    val dark = when (preference) {
-        ThemePreference.LIGHT -> false
-        ThemePreference.DARK, ThemePreference.MATTE_BLACK -> true
-        ThemePreference.SYSTEM -> systemDark
-    }
-    val ds = when (preference) {
-        ThemePreference.LIGHT -> DsThemeTokens.light
-        ThemePreference.DARK -> DsThemeTokens.dark
-        ThemePreference.MATTE_BLACK -> DsThemeTokens.matteBlack
-        ThemePreference.SYSTEM -> if (systemDark) DsThemeTokens.dark else DsThemeTokens.light
-    }
-    // 旧 celadon 持久值由 AccentPalettes.of 跟随流体杏默认；显式色卡覆盖 accent 家族
-    val palette = AccentPalettes.of(accentKey)
-    val canonicalPalette = com.shenyan.designsystem.foundation.ShenyanPalettes.forMode(
-        when (preference) {
-            ThemePreference.LIGHT -> com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
-            ThemePreference.DARK -> com.shenyan.designsystem.foundation.ShenyanMode.DARK
-            ThemePreference.MATTE_BLACK -> com.shenyan.designsystem.foundation.ShenyanMode.MATTE
-            ThemePreference.SYSTEM -> if (systemDark)
-                com.shenyan.designsystem.foundation.ShenyanMode.DARK
-                else com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
-        }
-    )
-    val themed = (if (palette.key == AccentPalettes.DEFAULT.key) ds else ds.withAccent(palette, dark))
-        .harmonizeV6(canonicalPalette, preserveAccent = palette.key != AccentPalettes.DEFAULT.key)
-    val controlPalette = if (palette.key == AccentPalettes.DEFAULT.key) canonicalPalette
-        else canonicalPalette.withV6Accent(themed)
+    val projected = resolveV6ThemePalette(preference, accentKey, systemDark)
+    val dark = projected.dark
+    val themed = projected.page
+    val controlPalette = projected.controls
     val scheme = if (dark) materialDarkScheme(themed) else materialLightScheme(themed)
     val currentDensity = LocalDensity.current
     val clampedTextScale = textScale.coerceIn(AppDisplayLimits.MIN_READING_SCALE, AppDisplayLimits.MAX_READING_SCALE)
@@ -351,7 +372,7 @@ fun DshTheme(
                         reduceTransparency = preference == ThemePreference.MATTE_BLACK,
                     ) {
                         // Preserve user-defined accent and reading accessibility controls.
-                        val resolvedScheme = if (palette.key == AccentPalettes.DEFAULT.key)
+                        val resolvedScheme = if (projected.isDefaultAccent)
                             MaterialTheme.colorScheme else scheme
                         MaterialTheme(
                             colorScheme = resolvedScheme,

@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.shenyan.designsystem.foundation.SyMotion
 
 /**
  * The app's motion vocabulary. Screens reach for these instead of inlining `tween(…)` so that
@@ -21,9 +22,10 @@ import androidx.compose.ui.unit.dp
  * The house rule: motion explains a change, it does not decorate one. Continuous motion is reserved
  * for genuine loading or a genuinely live running state; completed and failed states settle immediately.
  */
+/** Specific animation specs retained for screen-level semantics; shared timings come from V6 SyMotion. */
 object DsAnimations {
     private val fluidEase = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
-    val modal: FiniteAnimationSpec<Float> = tween(280, easing = fluidEase)
+    val modal: FiniteAnimationSpec<Float> = tween(SyMotion.dialogMs, easing = fluidEase)
     val progress: FiniteAnimationSpec<Float> = tween(340, easing = fluidEase)
     val pushOffset: Dp = 20.dp
     /** Quick and settled — direct manipulation should feel tactile without visible rebound. */
@@ -39,7 +41,7 @@ object DsAnimations {
     )
 
     /** Press feedback on buttons, pills and icon buttons. */
-    val pressScale: AnimationSpec<Float> = tween(80, easing = fluidEase)
+    val pressScale: AnimationSpec<Float> = tween(SyMotion.pressMs, easing = fluidEase)
 
     /**
      * Disclosure and dock expansion. Deliberately springy-but-unbouncy: content growing downward
@@ -63,14 +65,14 @@ object DsAnimations {
     val chevron: AnimationSpec<Float> = tween(150, easing = FastOutSlowInEasing)
 
     /** Tab and content swaps. Short — a long swap on a large list costs a full relayout. */
-    val tabSwap: FiniteAnimationSpec<Float> = tween(380, easing = fluidEase)
+    val tabSwap: FiniteAnimationSpec<Float> = tween(SyMotion.sheetMs, easing = fluidEase)
 
     /** Reference component spec: glass tab thumb and 18dp underline settle in 200ms. */
-    val tabBackground: FiniteAnimationSpec<Color> = tween(200, easing = fluidEase)
-    val tabIndicator: FiniteAnimationSpec<Dp> = tween(200, easing = fluidEase)
+    val tabBackground: FiniteAnimationSpec<Color> = tween(SyMotion.selectMs, easing = fluidEase)
+    val tabIndicator: FiniteAnimationSpec<Dp> = tween(SyMotion.selectMs, easing = fluidEase)
 
     /** Reference list entry: 360ms reveal; 80ms between items, capped at ten cards. */
-    val cascade: FiniteAnimationSpec<Float> = tween(360, easing = fluidEase)
+    val cascade: FiniteAnimationSpec<Float> = tween(SyMotion.pushMs, easing = fluidEase)
     const val cascadeStaggerMs = 80L
     const val cascadeMaxItems = 10
 
@@ -93,7 +95,7 @@ object DsAnimations {
     val fade: FiniteAnimationSpec<Float> = tween(fadeDuration, easing = FastOutSlowInEasing)
 
     /** Panel slide-in, faster than the platform default so it keeps up with a drag. */
-    val panelSlide: FiniteAnimationSpec<IntOffset> = tween(380, easing = fluidEase)
+    val panelSlide: FiniteAnimationSpec<IntOffset> = tween(SyMotion.sheetMs, easing = fluidEase)
 
     /** Full-page hierarchy transition. Short enough to preserve direct manipulation on a phone. */
     val pageSlide: FiniteAnimationSpec<IntOffset> = tween(480, easing = fluidEase)
@@ -110,11 +112,11 @@ object DsAnimations {
 
     /** Feature hierarchy pop mirrors push but settles a touch faster. */
     val featurePageBackward: FiniteAnimationSpec<IntOffset> =
-        tween(380, easing = fluidEase)
+        tween(SyMotion.sheetMs, easing = fluidEase)
 
     /** Switching between drawer peers is mostly a cross-fade with only a tiny positional cue. */
     val featurePagePeer: FiniteAnimationSpec<IntOffset> =
-        tween(380, easing = fluidEase)
+        tween(SyMotion.sheetMs, easing = fluidEase)
 
     /** Incoming page opacity: finishes before the larger geometry motion. */
     val featurePageEnterFade: FiniteAnimationSpec<Float> =
@@ -137,13 +139,13 @@ object DsAnimations {
     val semanticPulse = tween<Float>(900, easing = FastOutSlowInEasing)
 
     /** Scale animation duration for press effects */
-    const val scaleDuration = 80
+    const val scaleDuration = SyMotion.pressMs
 
     /** Fade animation duration for opacity changes */
     const val fadeDuration = 150
 
     /** Standard transition duration for layout changes */
-    const val transitionDuration = 200
+    const val transitionDuration = SyMotion.toolExpandMs
 
     /** Scale values for interactive elements */
     object Scale {

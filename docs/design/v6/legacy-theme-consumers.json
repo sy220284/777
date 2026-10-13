@@ -1,6 +1,6 @@
 {
-  "description": "V6 remaining active legacy DsTheme.colors consumers, strictly no new paths. Reduce this list as callers migrate to LocalSyColors.",
-  "base": "main f7d59d0d",
+  "description": "V6 frozen retired DsTheme.colors usage baseline (empty). Any new production UI consumer fails the design-system gate.",
+  "base": "PR #679 migrated production usage to zero",
   "verifiedDate": "2026-10-13",
   "remainingProductionFiles": []
 }

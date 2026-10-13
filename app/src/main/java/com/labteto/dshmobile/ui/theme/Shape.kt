@@ -12,7 +12,7 @@ import com.shenyan.designsystem.foundation.SyMetric
  *
  * Screens consume semantic names so page code does not invent local radii.
  */
-/** Compatibility names; radius tokens belong to the canonical V6 SyMetric. */
+/** V6 semantic shape aliases: standard radii delegate to SyMetric; chat tail, sheet and capsule shapes carry distinct screen-specific semantics. Not a second palette or material renderer. */
 object DsShapes {
     val buttonCapsule = RoundedCornerShape(SyMetric.radiusControl)
     val buttonSmall = RoundedCornerShape(12.dp)
