@@ -1454,14 +1454,20 @@ function S04Usage(){
 }
 
 function S05Immersive(){
- return `<div style="height:100%;display:flex;align-items:center;justify-content:center">
-  <div style="text-align:center;max-width:380px">
-   <div class="av av-1" style="width:64px;height:64px;font-size:26px;margin:0 auto 14px">昀</div>
-   <div style="font-size:20px;font-weight:600;margin-bottom:9px">沈昀 · 23:07</div>
-   <div style="font-size:15px;color:var(--ink2);line-height:1.8;margin-bottom:20px">好。等你。</div>
-   <div class="btn" onclick="goto('01')">↗ 恢复侧边栏</div>
+ return `<article class="v6-reader" style="padding:18px 12px 36px;max-width:100%;line-height:1.85">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:26px">
+   <button class="btn" type="button" onclick="goto('01')" aria-label="返回当前会话">‹ 返回聊天</button>
+   <span class="muted" style="font-size:12px">阅读模式 · 沈昀</span>
   </div>
- </div>`;
+  <p class="muted" style="font-size:11px;letter-spacing:.13em;margin-bottom:9px">一段正在继续的对话</p>
+  <h1 style="font-size:23px;line-height:1.45;letter-spacing:-.02em;font-weight:600;margin:0 0 20px">等你回来，我们再慢慢说。</h1>
+  <div class="bar" aria-hidden="true" style="max-width:120px;height:3px;margin-bottom:25px"><i style="width:62%"></i></div>
+  <p style="font-size:16px;line-height:1.95;margin-bottom:22px">窗边的光一点点变淡。沈昀把手边的书合上，听见你说起下午没有处理完的事情，并没有立刻催促。</p>
+  <p style="font-size:16px;line-height:1.95;margin-bottom:22px">“好，等你。”他轻轻点头。你们之间有过许多这样的时刻：并不是每一句话都急着得到回应，沉默也可以让彼此安心。</p>
+  <blockquote style="border-left:3px solid var(--acc);margin:22px 0;padding:8px 0 8px 18px;color:var(--ink2);font-size:17px;line-height:1.85">有些重要的对话，不需要一次说完。</blockquote>
+  <p style="font-size:16px;line-height:1.95;margin-bottom:25px">夜色渐深，屏幕另一头还留着那句简短的回应。你随时可以返回聊天，继续你们刚刚停下的故事。</p>
+  <button class="btn pri" type="button" style="min-height:48px;width:100%;justify-content:center" onclick="goto('01')">回到这段对话</button>
+ </article>`;
 }
 
 function S06Gallery(){
