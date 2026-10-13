@@ -27,6 +27,7 @@ MODEL_HISTORY_BUFFER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/mod
 RUNTIME_DEFAULTS = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt"
 TRANSCRIPT_HISTORY_LOADER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryLoader.kt"
 MODEL_REQUEST_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt"
+MODEL_REQUEST_CONFIGURATION = ROOT / "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRequestConfiguration.kt"
 RUNTIME_STATE_STORE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt"
 TOOL_EXECUTION_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt"
 AGENT_RUN_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalAgentRunCoordinator.kt"
@@ -141,7 +142,7 @@ def snapshot_cursor_contract(source: str) -> bool:
     return re.search(r"\bboundary\s*=\s*" + re.escape(boundary.group("id")) + r"\b", args) is not None
 
 
-def frozen_model_route_contract(source: str) -> bool:
+def frozen_model_route_contract(source: str, config_source: str = "") -> bool:
     body = kotlin_function_body(source, "complete")
     if body is None:
         return False
@@ -150,15 +151,39 @@ def frozen_model_route_contract(source: str) -> bool:
         body,
     )
     if profile is None:
-        frozen = re.search(r"\bval\s+(?P<id>[A-Za-z_]\w*)\s*=\s*freezeRequestConfiguration\s*\(", body)
-        helper = kotlin_function_body(source, "freezeRequestConfiguration")
-        if frozen is None or helper is None:
+        frozen = re.search(
+            r"\bval\s+(?P<id>[A-Za-z_]\w*)\s*=\s*(?P<name>freezeRequestConfiguration|freezeLocalModelRequestConfiguration)\s*\(",
+            body,
+        )
+        if frozen is None:
             return False
-        helper_profile = re.search(r"\bval\s+(?P<id>[A-Za-z_]\w*)\s*=\s*profile\s*\?:\s*modelGateway\s*\.\s*profileForRoute\s*\(", helper)
+        external = frozen.group("name") == "freezeLocalModelRequestConfiguration"
+        if external:
+            # The Model Capability accepts only caller-projected facts, never aggregate Feature state.
+            if not re.search(r"\bselection\s*=\s*LocalModelRequestSelection\s*\(", body[frozen.end():]):
+                return False
+            if re.search(r"\bLocalHarnessState\b", config_source):
+                return False
+        helper = kotlin_function_body(config_source if external else source, frozen.group("name"))
+        if helper is None:
+            return False
+        helper_profile = re.search(
+            r"\bval\s+(?P<id>[A-Za-z_]\w*)\s*=\s*profile\s*\?:\s*modelGateway\s*\.\s*profileForRoute\s*\(",
+            helper,
+        )
         if helper_profile is None:
             return False
-        helper_surface = re.search(r"\bval\s+(?P<id>[A-Za-z_]\w*)\s*=\s*" + re.escape(helper_profile.group("id")) + r"\s*\.\s*toRunModelSurface\s*\(\s*\)", helper[helper_profile.end():])
-        if helper_surface is None or not re.search(r"return\s+FrozenRequestConfiguration\s*\(\s*" + re.escape(helper_profile.group("id")) + r"\s*,\s*" + re.escape(helper_surface.group("id")) + r"\b", helper):
+        helper_surface = re.search(
+            r"\bval\s+(?P<id>[A-Za-z_]\w*)\s*=\s*" + re.escape(helper_profile.group("id"))
+            + r"\s*\.\s*toRunModelSurface\s*\(\s*\)",
+            helper[helper_profile.end():],
+        )
+        result_type = "FrozenLocalModelRequestConfiguration" if external else "FrozenRequestConfiguration"
+        if helper_surface is None or not re.search(
+            r"return\s+" + result_type + r"\s*\(\s*" + re.escape(helper_profile.group("id"))
+            + r"\s*,\s*" + re.escape(helper_surface.group("id")) + r"\b",
+            helper,
+        ):
             return False
         surface = re.search(r"\bval\s+(?P<id>[A-Za-z_]\w*)\s*=\s*" + re.escape(frozen.group("id")) + r"\s*\.\s*surface\b", body[frozen.end():])
         if surface is None:
@@ -204,6 +229,7 @@ model_history_buffer = strip_comments(read(MODEL_HISTORY_BUFFER))
 runtime_defaults = strip_comments(read(RUNTIME_DEFAULTS))
 transcript_history_loader = strip_comments(read(TRANSCRIPT_HISTORY_LOADER))
 model_request_coordinator = strip_comments(read(MODEL_REQUEST_COORDINATOR))
+model_request_configuration = strip_comments(read(MODEL_REQUEST_CONFIGURATION))
 runtime_state_store = strip_comments(read(RUNTIME_STATE_STORE))
 tool_execution_coordinator = strip_comments(read(TOOL_EXECUTION_COORDINATOR))
 agent_run_coordinator = strip_comments(read(AGENT_RUN_COORDINATOR))
@@ -486,13 +512,13 @@ for required_tool_boundary in (
             + required_tool_boundary
         )
 
-if "modelGateway.profileForRoute(" not in model_request_coordinator:
+if "modelGateway.profileForRoute(" not in model_request_coordinator + model_request_configuration:
     violations.append(
         "model request must resolve the route into a frozen profile before retries/recovery"
     )
 # Exactly-once invocation is a behavioral contract covered by model-request tests;
 # do not freeze the source-level number of calls across valid refactors.
-if not frozen_model_route_contract(model_request_coordinator):
+if not frozen_model_route_contract(model_request_coordinator, model_request_configuration):
     violations.append(
         "model route/profile must freeze before request recovery and retry orchestration"
     )
@@ -604,6 +630,30 @@ if "--self-test" in sys.argv:
     assert not frozen_model_route_contract(model_stage_ok.replace("selected, surface, null", "selected, mutableSurface, null"))
     assert not frozen_model_route_contract(model_stage_ok.replace("val fixed = frozen.surface", "val fixed = other.surface"))
     assert not frozen_model_route_contract(model_stage_ok.replace("surface = fixed", "surface = mutableSurface"))
+    model_external_ok = """suspend fun complete(profile: Profile?): Reply {
+        val frozen = freezeLocalModelRequestConfiguration(
+            selection = LocalModelRequestSelection(sessionId, id, model, baseUrl, usageMode),
+            profile = profile,
+        )
+        val fixed = frozen.surface
+        return modelStepRuntime.recover(initialMessages = listOf()) {
+            requestRuntime.complete(surface = fixed, messages = emptyList())
+        }
+    }"""
+    model_external_helper = """internal suspend fun freezeLocalModelRequestConfiguration(
+        selection: LocalModelRequestSelection,
+        profile: Profile?,
+    ): FrozenLocalModelRequestConfiguration {
+        val selected = profile ?: modelGateway.profileForRoute(selection.activeProfileId, selection.model, selection.baseUrl)
+        val surface = selected.toRunModelSurface()
+        return FrozenLocalModelRequestConfiguration(selected, surface, null)
+    }"""
+    assert frozen_model_route_contract(model_external_ok, model_external_helper)
+    assert not frozen_model_route_contract(model_external_ok.replace("selection = LocalModelRequestSelection", "selection = other"), model_external_helper)
+    assert not frozen_model_route_contract(model_external_ok, model_external_helper.replace("selected, surface, null", "selected, mutableSurface, null"))
+    assert not frozen_model_route_contract(model_external_ok, model_external_helper.replace("selected.toRunModelSurface()", "profile.toRunModelSurface()"))
+    assert not frozen_model_route_contract(model_external_ok.replace("surface = fixed", "surface = mutableSurface"), model_external_helper)
+    assert not frozen_model_route_contract(model_external_ok, model_external_helper + "\\nclass Bad { val state: LocalHarnessState? = null }")
     print("[architecture-3] execution guard self-test passed")
     sys.exit(0)
 

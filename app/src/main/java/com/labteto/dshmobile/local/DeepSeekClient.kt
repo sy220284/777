@@ -1,9 +1,10 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.local.io.NetworkInputTooLargeException
-import com.labteto.dshmobile.local.io.readBoundedLine
 
 import com.labteto.dshmobile.local.model.DeepSeekTokenUsage
+import com.labteto.dshmobile.local.model.ModelStreamLineReader
+import com.labteto.dshmobile.local.model.ModelStreamLimitException
+import com.labteto.dshmobile.local.model.ModelStreamLimitKind
 import com.labteto.dshmobile.local.model.LocalModelAdmissionState
 import com.labteto.dshmobile.local.model.LocalModelAdmissionTracker
 import com.labteto.dshmobile.local.model.LocalModelDelta
@@ -260,31 +261,26 @@ class DeepSeekClient @Inject constructor(
                 val fallback = StringBuilder()
                 val toolCalls = linkedMapOf<Int, StreamToolCall>()
                 var streamUsage: JsonObject? = null
-                var totalBytes = 0
-                var sawStreamData = false
+                                var sawStreamData = false
                 var sawTerminalFrame = false
                 // Response 统一由 withCancellableModelResponse 收尾，避免成功后 reader.close()
                 // 的连接异常覆盖已完成结果并触发重复请求。
-                val reader = responseBody.charStream().buffered()
+                val reader = ModelStreamLineReader(responseBody.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_MODEL_RESPONSE_BYTES)
                 run {
                     while (true) {
                         val line = try {
-                            readBoundedLine(reader, MAX_SSE_LINE_CHARS)
-                        } catch (failure: NetworkInputTooLargeException) {
+                            reader.readLine()
+                        } catch (failure: ModelStreamLimitException) {
                             throw LocalModelException(
                                 code = "MODEL_RESPONSE_TOO_LARGE",
-                                message = "模型流式响应单行超过安全上限",
+                                message = if (failure.kind == ModelStreamLimitKind.LINE) {
+                                    "模型流式响应单行超过安全上限"
+                                } else {
+                                    "模型流式响应超过 16777216 字节上限"
+                                },
                                 retryable = false,
                             )
                         } ?: break
-                        totalBytes += line.toByteArray(Charsets.UTF_8).size + 1
-                        if (totalBytes > MAX_MODEL_RESPONSE_BYTES) {
-                            throw LocalModelException(
-                                code = "MODEL_RESPONSE_TOO_LARGE",
-                                message = "模型流式响应超过 ${MAX_MODEL_RESPONSE_BYTES} 字节上限",
-                                retryable = false,
-                            )
-                        }
                         if (!line.startsWith("data:")) {
                             if (line.isNotBlank()) fallback.append(line)
                             continue
