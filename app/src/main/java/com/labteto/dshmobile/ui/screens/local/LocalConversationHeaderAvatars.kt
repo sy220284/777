@@ -20,7 +20,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.local.chat.LocalGroupChatMember
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
@@ -28,15 +27,15 @@ import kotlinx.coroutines.withContext
 
 @Composable
 internal fun GroupChatMemberAvatar(member: LocalGroupChatMember, active: Boolean) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val portrait by produceState<ImageBitmap?>(null, member.portraitPath) {
         value = withContext(Dispatchers.IO) { decodePersonaPortraitBitmap(member.portraitPath, maxEdgePx = 256) }
     }
     Surface(
         modifier = Modifier.size(24.dp),
         shape = CircleShape,
-        color = if (active) colors.characterAccentTertiary else Color.Transparent,
-        border = if (active) BorderStroke(1.dp, colors.characterAccent) else null,
+        color = if (active) colors.lilac.copy(alpha = .18f) else Color.Transparent,
+        border = if (active) BorderStroke(1.dp, colors.lilac) else null,
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (portrait != null) {
@@ -51,7 +50,7 @@ internal fun GroupChatMemberAvatar(member: LocalGroupChatMember, active: Boolean
                 Text(
                     member.displayName.trim().take(1).ifBlank { "·" },
                     style = DsType.caption11.withReadingWeight(),
-                    color = if (active) colors.characterAccent else colors.labelSecondary,
+                    color = if (active) colors.lilac else colors.textSecondary,
                     maxLines = 1,
                 )
             }
@@ -65,7 +64,7 @@ internal fun LocalPersonaHeaderAvatar(
     portraitPath: String,
     presetAssetPath: String? = null,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val context = LocalContext.current
     val portrait by produceState<ImageBitmap?>(null, portraitPath, presetAssetPath) {
         value = withContext(Dispatchers.IO) {
@@ -81,8 +80,8 @@ internal fun LocalPersonaHeaderAvatar(
     Surface(
         modifier = Modifier.size(34.dp),
         shape = CircleShape,
-        color = colors.characterAccentTertiary,
-        border = BorderStroke(1.dp, colors.borderL1),
+        color = colors.lilac.copy(alpha = .18f),
+        border = BorderStroke(1.dp, colors.border),
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (portrait != null) {
@@ -97,7 +96,7 @@ internal fun LocalPersonaHeaderAvatar(
                 Text(
                     name.trim().take(1).ifBlank { "·" },
                     style = DsType.small13Strong.withReadingWeight(),
-                    color = colors.characterAccent,
+                    color = colors.lilac,
                 )
             }
         }

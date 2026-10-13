@@ -21,7 +21,6 @@ import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -51,7 +50,7 @@ internal fun LocalWorkCapabilitySheet(
     onConfigureModel: (() -> Unit)? = null,
     onConfigureDevice: (() -> Unit)? = null,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SyResponsiveSheet(
         title = stringResource(R.string.work_capability_title),
         onDismiss = onDismiss,
@@ -75,7 +74,7 @@ internal fun LocalWorkCapabilitySheet(
             )
         },
     ) {
-        Text(stringResource(R.string.work_capability_hint), style = DsType.std14.withReadingWeight(), color = colors.labelSecondary)
+        Text(stringResource(R.string.work_capability_hint), style = DsType.std14.withReadingWeight(), color = colors.textSecondary)
         SyTextField(
             value = prompt, onValueChange = onPromptChange,
             label = { Text(stringResource(R.string.work_handoff_task)) }, enabled = !switching,
@@ -88,10 +87,10 @@ internal fun LocalWorkCapabilitySheet(
             modifier = Modifier.fillMaxWidth(),
             maxLines = 6,
         )
-        Text(stringResource(R.string.work_handoff_scope), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+        Text(stringResource(R.string.work_handoff_scope), style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
         if (selectableMessages.isNotEmpty() || hasEarlierMessages) {
             Text(stringResource(R.string.work_handoff_select_messages),
-                style = DsType.std14.withReadingWeight(), color = colors.labelPrimary)
+                style = DsType.std14.withReadingWeight(), color = colors.text)
             if (selectableMessages.size > 12 || hasEarlierMessages) {
                 SyTextField(
                     value = messageSearch, onValueChange = onMessageSearchChange,
@@ -105,7 +104,7 @@ internal fun LocalWorkCapabilitySheet(
             )
             if (visible.isEmpty() && messageSearch.isNotBlank()) {
                 Text(stringResource(R.string.work_handoff_no_matches),
-                    style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+                    style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
             }
             visible.forEach { message ->
                 val checked = message.id in selectedMessageIds
@@ -128,7 +127,7 @@ internal fun LocalWorkCapabilitySheet(
                             message.handoffAttachmentNames().joinToString("、").take(100)
                         }
                     Text("$speaker · $itemPreview",
-                        style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+                        style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
                 }
             }
             if (hasEarlierMessages && onLoadEarlierMessages != null) {
@@ -144,7 +143,7 @@ internal fun LocalWorkCapabilitySheet(
         }
         if (capabilities.isNotEmpty()) {
             Text(stringResource(R.string.work_capability_readiness_title),
-                style = DsType.std14.withReadingWeight(), color = colors.labelPrimary)
+                style = DsType.std14.withReadingWeight(), color = colors.text)
             capabilities.forEach { item ->
                 val name = when (item.kind) {
                     LocalTaskCapabilityKind.GITHUB -> R.string.work_capability_readiness_github
@@ -176,7 +175,7 @@ internal fun LocalWorkCapabilitySheet(
                 }
                 Text(stringResource(R.string.work_capability_readiness_row,
                     stringResource(name), statusLabel),
-                    style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+                    style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
             }
             if (onConfigureCapabilities != null && capabilities.any {
                     it.kind != LocalTaskCapabilityKind.MODEL &&
@@ -228,6 +227,6 @@ internal fun LocalWorkCapabilitySheet(
                 )
             }
         }
-        if (failed) Text(stringResource(R.string.work_capability_failed), style = DsType.small13.withReadingWeight(), color = colors.error)
+        if (failed) Text(stringResource(R.string.work_capability_failed), style = DsType.small13.withReadingWeight(), color = colors.dangerInk)
     }
 }

@@ -26,7 +26,6 @@ import com.labteto.dshmobile.local.model.visibleAssistantText
 import com.labteto.dshmobile.local.model.forSurface
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.flow.StateFlow
@@ -82,7 +81,7 @@ internal fun LocalStreamingChatTurn(
                 Text(
                     stringResource(R.string.local_chat_replying),
                     style = DsType.small13.withReadingWeight(),
-                    color = DsTheme.colors.labelTertiary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                 )
             }
         }
@@ -141,7 +140,7 @@ internal fun LocalStreamingWorkPreview(
                     else R.string.local_work_process_preparing,
                 ),
                 style = DsType.small13.withReadingWeight(),
-                color = DsTheme.colors.labelTertiary,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
             )
         }
         if (visiblePreview) {

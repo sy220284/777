@@ -38,7 +38,6 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberHapticTickFeedback
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlin.math.roundToInt
@@ -89,7 +88,7 @@ internal fun LocalComposerCapabilityActions(
     onSelectPanel: (String?) -> Unit,
     onReasoningModeChange: (LocalReasoningUiMode) -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val limits = LocalModelPerformanceControls.state.collectAsState().value
     val modes = LocalReasoningControls.availableModes(profile, usageMode, limits.reasoningCeiling)
     val basicReasoning = LocalReasoningControls.requiresBasicReasoning(profile, usageMode)
@@ -103,14 +102,14 @@ internal fun LocalComposerCapabilityActions(
                 ),
                 onClick = { onSelectPanel(if (openPanel == "reasoning") null else "reasoning") },
                 enabled = !running,
-                tint = colors.labelPrimary,
+                tint = colors.text,
                 containerColor = Color.Transparent,
             )
             if (showLabels) {
                 Text(
                     text = stringResource(composerReasoningLabel(reasoningMode, modes, basicReasoning)),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelSecondary,
+                    color = colors.textSecondary,
                 )
             }
 
@@ -156,7 +155,7 @@ internal fun LocalComposerCapabilityPanel(
     temperatureGroupChat: Boolean = false,
     onTemperatureLevelChange: (Int) -> Unit = {},
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val limits = LocalModelPerformanceControls.state.collectAsState().value
     val modes = LocalReasoningControls.availableModes(profile, usageMode, limits.reasoningCeiling)
     val basicReasoning = LocalReasoningControls.requiresBasicReasoning(profile, usageMode)
@@ -168,11 +167,11 @@ internal fun LocalComposerCapabilityPanel(
         if (panel == "reasoning") {
             Text(
                 stringResource(R.string.local_composer_reasoning_title),
-                style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary,
+                style = DsType.std14Strong.withReadingWeight(), color = colors.text,
             )
             if (modes.isEmpty()) {
                 Text(stringResource(R.string.local_composer_reasoning_unsupported),
-                    style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+                    style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
             } else {
                 var chosen by remember(profile?.id, usageMode, reasoningMode, modes) {
                     mutableFloatStateOf(modes.indexOf(effectiveMode).toFloat())
@@ -201,19 +200,19 @@ internal fun LocalComposerCapabilityPanel(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     modes.forEach { mode ->
                         Text(stringResource(reasoningModeLabel(mode, basicReasoning)),
-                            style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                            style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
                     }
                 }
                 if (effectiveMode == LocalReasoningUiMode.DEFAULT) {
                     Text(stringResource(R.string.local_composer_reasoning_default_tip),
-                        style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
                 }
             }
             // Sampling is independently controlled but governed by the same model/reasoning route.
             Text(
                 stringResource(R.string.local_composer_temperature_title),
                 style = DsType.std14Strong.withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
             )
             val range = profile?.let {
                 LocalEffectiveModelContracts.forProfile(it).temperature
@@ -231,7 +230,7 @@ internal fun LocalComposerCapabilityPanel(
                 Text(
                     stringResource(R.string.local_composer_temperature_unavailable),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelSecondary,
+                    color = colors.textSecondary,
                 )
             } else {
                 val maxTemperatureLevel = LocalModelPerformanceControls.temperatureStopLimit(range)
@@ -267,7 +266,7 @@ internal fun LocalComposerCapabilityPanel(
                 Text(
                     temperatureState,
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelSecondary,
+                    color = colors.textSecondary,
                 )
                 Slider(
                     modifier = Modifier
@@ -294,22 +293,22 @@ internal fun LocalComposerCapabilityPanel(
                         if (usageMode == LocalUsageMode.CHAT)
                             R.string.local_composer_temperature_chat_low
                         else R.string.local_composer_temperature_work_low,
-                    ), style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                    ), style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
                     Text(stringResource(R.string.local_composer_temperature_natural),
-                        style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
                     Text(stringResource(
                         if (usageMode == LocalUsageMode.CHAT)
                             R.string.local_composer_temperature_chat_high
                         else R.string.local_composer_temperature_work_high,
-                    ), style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                    ), style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
                 }
                 if (temperatureSaveFailed && usageMode == LocalUsageMode.CHAT) {
                     Text(stringResource(R.string.local_composer_temperature_save_failed),
-                        style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
                 }
                 if (thinkingBlocksSampling) {
                     Text(stringResource(R.string.local_composer_temperature_thinking),
-                        style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
                 } else if (!temperatureEnabled && usageMode == LocalUsageMode.CHAT) {
                     val hint = when {
                         temperatureGroupChat -> R.string.local_composer_temperature_group_hint
@@ -317,7 +316,7 @@ internal fun LocalComposerCapabilityPanel(
                         else -> R.string.local_composer_temperature_busy
                     }
                     Text(stringResource(hint),
-                        style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
                 }
             }
         }
@@ -332,7 +331,7 @@ internal fun LocalComposerPlanAction(
     waitingForApproval: Boolean,
     onToggle: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val pulse = rememberHapticPulse()
     val label = stringResource(
         when {
@@ -349,7 +348,7 @@ internal fun LocalComposerPlanAction(
         contentDescription = stringResource(R.string.local_composer_plan_title) + " · " + label,
         onClick = { pulse(); onToggle() },
         enabled = enabled && !waitingForApproval,
-        tint = if (selected) colors.accent else colors.labelSecondary,
-        containerColor = if (selected) colors.accent.copy(alpha = 0.12f) else Color.Transparent,
+        tint = if (selected) colors.primary else colors.textSecondary,
+        containerColor = if (selected) colors.primary.copy(alpha = 0.12f) else Color.Transparent,
     )
 }

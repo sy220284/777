@@ -27,7 +27,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -39,7 +38,7 @@ internal fun LocalModelPickerSheet(
     onConfigure: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SyResponsiveSheet(
         title = stringResource(R.string.models_title),
         onDismiss = onDismiss,
@@ -64,12 +63,12 @@ internal fun LocalModelPickerSheet(
                 Text(
                     stringResource(R.string.local_model_picker_empty_title),
                     style = DsType.base16Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
+                    color = colors.text,
                 )
                 Text(
                     stringResource(R.string.local_model_picker_empty_body),
                     style = DsType.small13.withReadingWeight(),
-                    color = colors.labelSecondary,
+                    color = colors.textSecondary,
                 )
             }
             profiles.forEach { profile ->
@@ -86,7 +85,7 @@ internal fun LocalModelPickerSheet(
                         .fillMaxWidth()
                         .heightIn(min = 60.dp)
                         .clip(DsShapes.row)
-                        .background(if (selected) colors.bgModulePlatform else colors.bgLayer1)
+                        .background(if (selected) colors.materialL3 else colors.materialL3)
                         .clickable {
                             onSelect(profile.id)
                             onDismiss()
@@ -98,21 +97,21 @@ internal fun LocalModelPickerSheet(
                     Icon(
                         painter = painterResource(R.drawable.ic_ui_model),
                         contentDescription = null,
-                        tint = if (selected) colors.accent else colors.labelSecondary,
+                        tint = if (selected) colors.primary else colors.textSecondary,
                         modifier = Modifier.size(22.dp),
                     )
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
                             profile.displayName ?: profile.model,
                             style = (if (selected) DsType.std14Strong else DsType.std14).withReadingWeight(),
-                            color = colors.labelPrimary,
+                            color = colors.text,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
                             detail,
                             style = DsType.caption11.withReadingWeight(),
-                            color = colors.labelTertiary,
+                            color = colors.textTertiary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -121,7 +120,7 @@ internal fun LocalModelPickerSheet(
                         Icon(
                             painter = painterResource(R.drawable.ic_ui_check),
                             contentDescription = null,
-                            tint = colors.accent,
+                            tint = colors.primary,
                             modifier = Modifier.size(18.dp),
                         )
                     }

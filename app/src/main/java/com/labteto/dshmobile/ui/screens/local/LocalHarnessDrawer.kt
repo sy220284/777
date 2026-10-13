@@ -72,7 +72,6 @@ import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.sidebar.SidebarAvatarPicker
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
@@ -128,7 +127,7 @@ internal fun LocalModeDrawer(
     onImmersiveReader: (() -> Unit)? = null,
     globalSearchOpenRequest: Int = 0,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val sy = LocalSyPalette.current
     // The drawer has its own visual backing: raw L2 on the scene looked fully transparent.
     // Wallpaper mode retains a faint view of the user's image without sacrificing legibility.
@@ -327,7 +326,7 @@ internal fun LocalModeDrawer(
                     Text(
                         stringResource(R.string.app_name),
                         style = DsType.title22.withReadingWeight(),
-                        color = colors.labelPrimary,
+                        color = colors.text,
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -367,7 +366,7 @@ internal fun LocalModeDrawer(
                         modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
                         placeholder = { Text(stringResource(R.string.local_drawer_search_people_sessions)) },
                         leadingIcon = {
-                            Icon(SyEntryIcons.Search, contentDescription = null, tint = colors.labelTertiary)
+                            Icon(SyEntryIcons.Search, contentDescription = null, tint = colors.textTertiary)
                         },
                         singleLine = true,
                         shape = DsShapes.pillFull,
@@ -462,7 +461,7 @@ internal fun LocalModeDrawer(
                 if (crossModeSearch && fileSearchFailed) {
                     item(key = "drawer-file-search-error") {
                         Text(stringResource(R.string.local_files_read_failed),
-                            color = colors.labelTertiary,
+                            color = colors.textTertiary,
                             style = DsType.navigationSupporting.withReadingWeight())
                     }
                 }
@@ -558,7 +557,7 @@ internal fun LocalModeDrawer(
                         Text(
                             stringResource(R.string.local_drawer_search_empty_both),
                             style = DsType.navigationSupporting.withReadingWeight(),
-                            color = colors.labelTertiary,
+                            color = colors.textTertiary,
                             modifier = Modifier.padding(
                                 horizontal = DsSpacing.small,
                                 vertical = DsSpacing.medium,
@@ -591,7 +590,7 @@ internal fun LocalModeDrawer(
                             Text(
                                 stringResource(R.string.local_selected_count, selectedIds.size),
                                 style = DsType.navigationSupporting.withReadingWeight(),
-                                color = colors.labelPrimary,
+                                color = colors.text,
                                 modifier = Modifier.weight(1f),
                             )
                             SyButton(
@@ -608,7 +607,7 @@ internal fun LocalModeDrawer(
                                     selectionOpen = false
                                     selectedIds.clear()
                                 },
-                                tint = colors.labelSecondary,
+                                tint = colors.textSecondary,
                             )
                         }
                     }

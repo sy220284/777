@@ -30,7 +30,6 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -264,7 +263,7 @@ internal fun LocalTranscriptPagingStatus(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     if (error != null) {
         SyButton(
             text = stringResource(R.string.local_transcript_retry_older),
@@ -286,7 +285,7 @@ internal fun LocalTranscriptPagingStatus(
         Text(
             stringResource(R.string.local_transcript_loading_older),
             style = DsType.small13.withReadingWeight(),
-            color = colors.labelSecondary,
+            color = colors.textSecondary,
         )
     }
 }
