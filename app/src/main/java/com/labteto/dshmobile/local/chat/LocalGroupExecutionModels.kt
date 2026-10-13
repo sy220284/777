@@ -11,6 +11,8 @@ internal data class GroupReplyForStateUpdate(
 internal data class GroupStateRefreshBatch(
     val states: Map<String, ChatCharacterState>,
     val complete: Boolean,
+    /** Source-backed, member-identified closure proposals for the shared event reconciler. */
+    val resolvedContinuityIds: List<String> = emptyList(),
 )
 
 internal data class GroupGeneratedReply(
