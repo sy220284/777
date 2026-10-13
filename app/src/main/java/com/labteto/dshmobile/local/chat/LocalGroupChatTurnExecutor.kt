@@ -394,7 +394,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
         assistantMessage: String,
         sharedPending: List<ChatPendingTurn>,
         step: Int,
-    ): ChatCharacterState? {
+    ): Pair<ChatCharacterState, List<String>>? {
         val snapshot = runtimeStateStore.state.value
         val key = modelRequestMarkerOrNull(snapshot) ?: return null
         val sharedContext = runtimeStateStore.state.value.chat.groupChat.context
@@ -442,8 +442,11 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 persona = persona,
             ) ?: return null
             recordGroupDiary(member, persona, plan, sharedPending, snapshot)
-            diaryStore.reconcileState(chatRelationshipSubjectKey(member.galleryId, member.personaId),
-                plan.state.bindStateObservationSources(sharedPending), snapshot.chat.groupChat.context)
+            val state = diaryStore.reconcileState(
+                chatRelationshipSubjectKey(member.galleryId, member.personaId),
+                plan.state.bindStateObservationSources(sharedPending), snapshot.chat.groupChat.context,
+            )
+            state to plan.resolvedContinuityIds
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -482,8 +485,9 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 step = CHAT_POST_TURN_MODEL_STEP + 100,
             )
             return GroupStateRefreshBatch(
-                states = mapOf(reply.member.galleryId to (refreshed ?: reply.member.chatState)),
+                states = mapOf(reply.member.galleryId to (refreshed?.first ?: reply.member.chatState)),
                 complete = refreshed != null,
+                resolvedContinuityIds = refreshed?.second.orEmpty(),
             )
         }
 
@@ -558,6 +562,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 ?: error("群聊状态整理未返回完整 JSON 对象")
             val plans = (root["plans"] as? JsonArray).orEmpty()
             val result = linkedMapOf<String, ChatCharacterState>()
+            val resolvedIds = mutableListOf<String>()
             plans.forEach { element ->
                 val item = runCatching { element.jsonObject }.getOrNull() ?: return@forEach
                 val galleryId = validGroupGalleryId(item) ?: return@forEach
@@ -573,6 +578,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     persona = source.persona,
                 ) ?: return@forEach
                 recordGroupDiary(source.member, source.persona, parsed, sharedPending, snapshot)
+                resolvedIds += parsed.resolvedContinuityIds
                 result[galleryId] = diaryStore.reconcileState(
                     chatRelationshipSubjectKey(source.member.galleryId, source.member.personaId),
                     parsed.state.bindStateObservationSources(sharedPending), snapshot.chat.groupChat.context)
@@ -605,7 +611,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     result[reply.member.galleryId] = reply.member.chatState
                 }
             }
-            GroupStateRefreshBatch(result, complete)
+            GroupStateRefreshBatch(result, complete, resolvedIds.distinct())
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -699,6 +705,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 context = group.context,
                 statesInReplyOrder = replies.mapNotNull { refreshed.states[it.member.galleryId] },
                 processedPending = pending, complete = true,
+                resolvedContinuityIds = refreshed.resolvedContinuityIds,
             ), diaryDecisions,
         )
         val updated = group.copy(
@@ -1022,6 +1029,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 statesInReplyOrder = refreshedInReplyOrder,
                 processedPending = sharedPendingForRefresh,
                 complete = refreshBatch.complete,
+                resolvedContinuityIds = refreshBatch.resolvedContinuityIds,
             ), diaryDecisions)
             if (!refreshBatch.complete) {
                 eventLog.append("group/post-turn-batch", buildJsonObject {
