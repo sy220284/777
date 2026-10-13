@@ -48,30 +48,86 @@ class LocalWorkProgressCoordinatorTest {
     }
 
     @Test
-    fun oversizedPlanAndTodosRetainExistingBoundsAndWholeListReplacement() {
+    fun wholeListReplacementRejectsOversizedOrMalformedPayloadWithoutLosingProgress() {
         val state = MutableStateFlow(LocalWorkRunState(sessionId = "test"))
         val log = eventLog(File(temporary.root, "progress.jsonl"))
-        val coordinator = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) {}
+        var writes = 0
+        val coordinator = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) { writes++ }
         coordinator.updatePlan(buildJsonObject {
-            put("items", JsonArray(List(1000) { JsonPrimitive("步骤 $it") }))
+            put("items", JsonArray(listOf(JsonPrimitive("继续验证"))))
         })
         coordinator.updateTodos(buildJsonObject {
-            put("items", JsonArray(List(1000) {
-                buildJsonObject {
-                    put("content", "x".repeat(1000))
-                    put("status", if (it % 2 == 0) "pending" else "invalid")
-                }
-            }))
+            put("items", JsonArray(listOf(buildJsonObject {
+                put("content", "设备回归")
+                put("status", "pending")
+            })))
         })
-        assertEquals(20, state.value.work.plan.size)
-        assertEquals(50, state.value.work.todos.size)
-        assertTrue(state.value.work.todos.all { it.content.length == 500 && it.status == "pending" })
+        val before = state.value.work
+        val beforeEvents = log.snapshot().size
 
+        val invalidWrites = listOf<() -> Unit>(
+            { coordinator.updatePlan(buildJsonObject {}) },
+            { coordinator.updatePlan(buildJsonObject { put("items", JsonPrimitive("not-array")) }) },
+            { coordinator.updatePlan(buildJsonObject {
+                put("items", JsonArray(List(MAX_WORK_PLAN_ITEMS + 1) { JsonPrimitive("步骤 $it") }))
+            }) },
+            { coordinator.updateTodos(buildJsonObject {}) },
+            { coordinator.updateTodos(buildJsonObject { put("items", JsonPrimitive("not-array")) }) },
+            { coordinator.updateTodos(buildJsonObject {
+                put("items", JsonArray(listOf(buildJsonObject {
+                    put("content", "正常")
+                    put("status", "pending")
+                }, buildJsonObject {
+                    put("content", "不支持")
+                    put("status", "invalid")
+                })))
+            }) },
+            { coordinator.updateTodos(buildJsonObject {
+                put("items", JsonArray(listOf(buildJsonObject {
+                    put("content", "x".repeat(MAX_WORK_TODO_CHARS + 1))
+                    put("status", "pending")
+                })))
+            }) },
+            { coordinator.updateTodos(buildJsonObject {
+                put("items", JsonArray(List(MAX_WORK_TODO_ITEMS + 1) {
+                    buildJsonObject { put("content", "任务 $it"); put("status", "pending") }
+                }))
+            }) },
+        )
+        invalidWrites.forEach { invalid ->
+            val result = runCatching(invalid)
+            assertTrue("无效的全量替换必须拒绝而不能部分提交", result.isFailure)
+            assertEquals(before, state.value.work)
+            assertEquals(beforeEvents, log.snapshot().size)
+            assertEquals(2, writes)
+        }
+        // No missing-payload shortcut: an empty list is an explicit user/model choice.
         coordinator.updatePlan(buildJsonObject { put("plan", "一\n\n二") })
         assertEquals(listOf("一", "二"), state.value.work.plan)
-        coordinator.updateTodos(buildJsonObject {})
+        coordinator.updateTodos(buildJsonObject { put("items", JsonArray(emptyList())) })
         assertTrue(state.value.work.todos.isEmpty())
         assertEquals(listOf("plan/state", "todo/state", "plan/state", "todo/state"), log.snapshot().map { it.type })
+        assertEquals(4, writes)
+    }
+
+    @Test
+    fun fullSizedValidReplacementIsRecoverableWithoutSilentClipping() {
+        val state = MutableStateFlow(LocalWorkRunState(sessionId = "valid-bounds"))
+        val log = eventLog(File(temporary.root, "valid-bounds.jsonl"))
+        val coordinator = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) {}
+        val plan = (1..MAX_WORK_PLAN_ITEMS).map { "第 $it 步" }
+        val tasks = (1..MAX_WORK_TODO_ITEMS).map { "待办 $it" }
+        coordinator.updatePlan(buildJsonObject {
+            put("items", JsonArray(plan.map(::JsonPrimitive)))
+        })
+        coordinator.updateTodos(buildJsonObject {
+            put("items", JsonArray(tasks.map { content ->
+                buildJsonObject { put("content", content); put("status", "pending") }
+            }))
+        })
+        assertEquals(plan, state.value.work.plan)
+        assertEquals(tasks, state.value.work.todos.map(LocalTodoItem::content))
+        assertEquals(tasks, projectWorkSessionControls(LocalWorkState(), log.snapshot()).todos.map(LocalTodoItem::content))
     }
 
     @Test
