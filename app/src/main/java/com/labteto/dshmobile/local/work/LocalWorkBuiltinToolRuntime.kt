@@ -96,10 +96,8 @@ internal fun parseWorkGoalAcceptanceArguments(args: JsonObject): Pair<List<Strin
         val array = args[key] as? JsonArray
             ?: error("create_goal.$key 必须显式提供字符串数组；无需此类验收时请传 []，目标未创建")
         return array.mapIndexed { index, element ->
-            val value = element as? JsonPrimitive
-            require(value?.isString == true) {
-                "create_goal.$key 第 ${index + 1} 项必须为字符串；目标未创建"
-            }
+            val value = (element as? JsonPrimitive)?.takeIf { it.isString }
+                ?: error("create_goal.$key 第 ${index + 1} 项必须为字符串；目标未创建")
             value.content
         }
     }
