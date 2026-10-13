@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "baseline": "7c7a5c88",
+  "baseline": "f2aeac62",
   "scope": "S0 源码场景审计；不是独立 UI Pack 覆盖或设备验收证明",
   "scenes": [
     {
@@ -360,36 +360,6 @@
       ],
       "recovery": "Tool descriptions; execution authority remains owner",
       "v6": 14,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
-    },
-    {
-      "id": "work.history",
-      "owner": "WORK",
-      "route": "RUN_CENTER",
-      "kind": "OVERLAY",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkHistorySheet.kt",
-      "actions": [
-        "load_history",
-        "open_evidence"
-      ],
-      "recovery": "EventLog cursor + run/session identity",
-      "v6": 15,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
-    },
-    {
-      "id": "work.delivery",
-      "owner": "WORK",
-      "route": "RUN_CENTER",
-      "kind": "SLOT",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalRunCenterScreen.kt",
-      "actions": [
-        "open_artifact",
-        "open_evidence"
-      ],
-      "recovery": "Available/missing/unchecked; cancelled distinct from unknown",
-      "v6": 37,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
       "acceptance": "待设备验收"
     },
@@ -1122,21 +1092,6 @@
       "acceptance": "待设备验收"
     },
     {
-      "id": "route.run_center",
-      "owner": "CATALOG",
-      "route": "RUN_CENTER",
-      "kind": "PAGE",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
-      "actions": [
-        "navigate",
-        "back"
-      ],
-      "recovery": "LocalFeatureCatalog + contribution restore policy",
-      "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
-    },
-    {
       "id": "route.project",
       "owner": "CATALOG",
       "route": "PROJECT",
@@ -1211,7 +1166,7 @@
     {
       "referenceScene": 3,
       "semanticScene": "route.run_center",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "主线 #698 已退役；历史参考保留，不计入必需场景"
     },
     {
       "referenceScene": 4,
@@ -1271,7 +1226,7 @@
     {
       "referenceScene": 15,
       "semanticScene": "work.history",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "主线 #698 已退役；历史参考保留，不计入必需场景"
     },
     {
       "referenceScene": 16,
@@ -1381,12 +1336,59 @@
     {
       "referenceScene": 37,
       "semanticScene": "work.delivery",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "主线 #698 已退役；历史参考保留，不计入必需场景"
     },
     {
       "referenceScene": 38,
       "semanticScene": "media.creation",
       "acceptance": "待原生视觉验收"
+    }
+  ],
+  "retiredScenes": [
+    {
+      "id": "work.history",
+      "owner": "WORK",
+      "route": "RUN_CENTER",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkHistorySheet.kt",
+      "actions": [
+        "load_history",
+        "open_evidence"
+      ],
+      "recovery": "EventLog cursor + run/session identity",
+      "v6": 15,
+      "implementation": "主线 #698 已退役；仅作历史索引",
+      "acceptance": "不计入当前场景覆盖"
+    },
+    {
+      "id": "work.delivery",
+      "owner": "WORK",
+      "route": "RUN_CENTER",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalRunCenterScreen.kt",
+      "actions": [
+        "open_artifact",
+        "open_evidence"
+      ],
+      "recovery": "Available/missing/unchecked; cancelled distinct from unknown",
+      "v6": 37,
+      "implementation": "主线 #698 已退役；仅作历史索引",
+      "acceptance": "不计入当前场景覆盖"
+    },
+    {
+      "id": "route.run_center",
+      "owner": "CATALOG",
+      "route": "RUN_CENTER",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "主线 #698 已退役；仅作历史索引",
+      "acceptance": "不计入当前场景覆盖"
     }
   ]
 }

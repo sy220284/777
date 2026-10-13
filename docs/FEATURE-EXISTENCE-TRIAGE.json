@@ -359,6 +359,77 @@
         }
       ],
       "conclusion": "已建立源码场景索引及版本/覆盖兼容检查；缺场景的验证包不能宣称整包兼容。真实完整应用 UI Pack 切换与全量场景迁移尚未实现。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 当前目标、阶段与执行步骤",
+      "kind": "integrated_work_projection_after_ui_retirement",
+      "independent": false,
+      "availability": "source_present_current_ui_acceptance_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkDesignSurface.kt",
+          "symbol": "LocalWorkDesignSurface"
+        }
+      ],
+      "test": [],
+      "conclusion": "现行会话内工作五区读取 Work 的只读状态，目标、计划与执行仍有 UI 源码；独立运行中心已退役。没有本轮新设备证据，不记作功能签收。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
+      "kind": "integrated_work_projection_after_ui_retirement",
+      "independent": false,
+      "availability": "source_present_current_ui_acceptance_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolActivityProjection.kt",
+          "symbol": "LocalToolActivityProjectionRuntime"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/tools/LocalToolActivityProjectionTest.kt",
+          "method": "resultDetailsKeepBoundedEvidenceAndCancellationPhase"
+        }
+      ],
+      "conclusion": "工具活动事件投影和读取 API 仍存在；#698 删除了独立运行中心，专项活动时间线的新会话内 UI 接入须另行确认，不能凭底层投影宣称已验收。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 交付要求与真实成果事件来源绑定",
+      "kind": "integrated_work_projection_after_ui_retirement",
+      "independent": false,
+      "availability": "source_present_current_ui_acceptance_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalRequirementEvidence.kt",
+          "symbol": "projectRequirementEvidenceLinks"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalRequirementEvidenceProjectionTest.kt",
+          "method": "requirementLinkMustMatchSameTaskPositionAndText"
+        }
+      ],
+      "conclusion": "成果与要求的事件绑定、读取和校验仍存在；独立证据面板已随运行中心退役，当前会话内用户触点未重新签收。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 交付成果当前版本及证据变化提示",
+      "kind": "integrated_work_projection_after_ui_retirement",
+      "independent": false,
+      "availability": "source_present_current_ui_acceptance_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkArtifactVersion.kt",
+          "symbol": "localWorkArtifactFileVersion"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkArtifactVersionTest.kt",
+          "method": "eventTimeHashTracksExactFileVersionAndDetectsLaterEdit"
+        }
+      ],
+      "conclusion": "真实文件版本哈希和变化检测仍有代码与测试；旧独立证据展示已退役，不能把后台版本能力当作当前 UI 变化提示已通过。"
     }
   ]
 }

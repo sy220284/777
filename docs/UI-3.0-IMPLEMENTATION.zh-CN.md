@@ -1,13 +1,13 @@
 # UI 3.0-R4 实施台账
 
-执行依据：[用户提供的 R4 完整方案](design/ui3/PLAN-R4.zh-CN.md)。UI 权威以 [UI 3.0](design/UI-3.0.zh-CN.md) 为准。方案里的交付状态是设计时的历史记录，当前代码和验收状态以本台账为准。首批实现从 `origin/main @ 131fcead` 建立 `feat/ui-r4-pluggable` 分支；已组合更新到 `origin/main @ 7c7a5c88`（含 #692、#693、#695、#696、#697、#699、#700 等主线更新）；尚未合并。
+执行依据：[用户提供的 R4 完整方案](design/ui3/PLAN-R4.zh-CN.md)。UI 权威以 [UI 3.0](design/UI-3.0.zh-CN.md) 为准。方案里的交付状态是设计时的历史记录，当前代码和验收状态以本台账为准。首批实现从 `origin/main @ 131fcead` 建立 `feat/ui-r4-pluggable` 分支；已组合更新到 `origin/main @ f2aeac62`（含 #692–#701 的相关主线更新）；尚未合并。
 
 ## 阶段和真实边界
 
 | 阶段 | 已落代码/资料 | 出口状态 |
 |---|---|---|
-| S-1 | 取消/未知分别计数；MCP 未检测健康状态使用中立标识和文案；Chat/群聊投影真实前台队列 | 编译、单测及设备回归记录见下方，不把静态确认算设备通过 |
-| S0 | 79 项源码场景索引、全部 9 条顶级路由、21 个设置导航目标及行内检查更新和主要槽位/弹层；旧问题去向 | 初始审计清单已建立；还需真实旅程核对全部隐性入口，不能以数量宣称完整覆盖 |
+| S-1 | MCP 未检测健康状态使用中立标识和文案；Chat/群聊投影真实前台队列；取消/未知计数补丁随 #698 页面退役撤回 | 编译、单测及设备回归记录见下方，不把静态确认算设备通过 |
+| S0 | 76 项现行源码场景索引、全部 8 条顶级路由及 3 项已退役历史索引、21 个设置导航目标及行内检查更新和主要槽位/弹层；旧问题去向 | 初始审计清单已建立；还需真实旅程核对全部隐性入口，不能以数量宣称完整覆盖 |
 | S1 | 无 Compose 的 `:ui-contract`；Chat 文本发送、Work 文本发送/审批端口；只读消息和能力投影；真实回执；Host SDK | 第一条迁移切片，尚未覆盖附件、编辑、分支、媒体、Automation、Tools、Project、Settings 全量命令 |
 | S2 | `:ui-pack-next` 独立 Compose 验证包；V6 普通文本发送与单次批准/拒绝共用端口；仅 Debug 可显式打开 | 真实发送/审批/恢复与双包设备旅程待验收；不能宣布 S2 通过 |
 | S3 | 尚未开始 V6 全量移包 | 必须先通过 S2；旧页面和兼容回调还未退出 |
@@ -20,7 +20,7 @@
 
 | ID | 当前根因及 Owner | 首批处置 | 回归证据 |
 |---|---|---|---|
-| R4-UNKNOWN-CANCELLED | Work 展示把两种真实工具终态并入一个数量 | `LocalWorkDeliveryEvidenceCounts` 新增 cancelledTools；两种结算独立汇总和资源格式参数 | `LocalWorkDeliveryEvidenceCountsTest` 同时含完成、失败、未知、取消、等待与运行，不改变重试权限 |
+| R4-UNKNOWN-CANCELLED | 初始基线运行中心把取消并入未知数量；该页面及其计数器已被主线 #698 删除 | 已撤回页面、资源和测试补丁；不恢复退役入口 | 旧计数修正曾通过单测；不作为当前 PR 的已修复功能，后续在现行结果展示中复核两种终态 |
 | R4-MCP-HEALTH | `McpServerSnapshot` 只有注册/发现信息，没有当前连接健康和授权观测 | MCP 条目中立灰点；服务概览和插件详情均显示“已注册，连接健康未检测” | `PluginInventoryBrowserRegressionTest.serviceConnectionsCategoryUsesLocalMcpInventory` 新增未检测文案断言；设备运行待补 |
 | R4-CHAT-QUEUE | Chat SendCoordinator 确实将输入入 Shared Runtime 队列并更新 count，Chat surface 漏传 | 投影 kernel.queuedInputCount；保留 Work 专属 plan/approval/context 隔离 | `LocalHarnessUiStateTest` 覆盖单聊、群聊、队列清空及 Work 独立字段 |
 | R4-PLUGIN-LIFECYCLE | 插件生命周期与资源残留的准入关系，不能推断所有 FAILED 都阻断所有工具 | 保持现有 ToolLifecycleAdmission 与资源保护；本批没有放宽门禁 | 现有 Plugin/Tool lifecycle 契约继续有效；没有安全隔离的运行证据时不缩小保护范围 |
@@ -75,7 +75,8 @@ adb shell am start -n com.sy220284.dshmobile.debug/com.labteto.dshmobile.MainAct
 - 静态：UI 设计系统、颜色、CJK、架构、性能、Kotlin 风险、测试质量、安全、通知、工具链基线、CI 完整性已通过；最终模式隔离修正后的架构、测试质量、CI 完整性与功能树同步及独立检查已通过。
 - `:ui-contract:test`：3 项测试通过，失败/错误/跳过均为 0。`:ui-host:compileDebugKotlin`、`:ui-pack-next:compileDebugKotlin` 已通过。
 - 组合至 7c7a5c88 后，Run 38429460247（86629c0b）：全部 JVM 单测、ARM64 optimized APK/lint、x86 Debug/测试/optimized APK 构建通过。Android 16 运行 248 项，MCP 文案断言因列表和详情同时匹配而失败；已限定到详情文本，未削弱健康状态断言。独立包的两项渲染交互测试属于显式夹具验证。
-- 最新画面身份和审批等待器身份修正后必须重跑完整 CI；以上旧 head 结果不是最终通过证明。本地全量编译耗时较长，已停止。
+- 完整 CI Run 38434973184（c5f3e6c9，组合基线 7c7a5c88）全部通过：静态、架构、官方夹具、全部 JVM 单测、ARM64/x86 APK、lint、Android 16/17 仪器化及启动检查、57 张截图输出。真实当前 Codex 与 App 的双包业务验收仍未完成。
+- 主线随后 #698/#701 更新至 f2aeac62：已撤回退役运行中心相关修复，移除三项现行 Scene 要求，保留历史索引。此最新组合需要重新验证；旧 head 的绿色 CI 不代表最新组合已通过。本地全量编译耗时较长，已停止。
 - 首次完整 CI（Run 38416556578）：静态和架构通过；单测和构建被独立包解析出的旧 Lifecycle/Tracing 元数据校验阻断，尚未运行到测试。独立包补充与项目已核验版本一致的依赖约束及 Coroutine Android 依赖，不关闭校验、不添加旧版散列。Android 17 镜像下载同时出现 Zip 损坏，未记录设备通过。修正后重跑。
 - 构建排障：新模块脱离 App 后曾解析到未缓存的 Activity 旧版；Host SDK 已去掉无用 UI 依赖，验证包使用项目固定 Activity 版本；未联网补齐。
 - 首轮 App 构建：KSP 报 `No fir element was found for KtParameter`，失败，没有据此声称单测通过；已对最终依赖图重新执行。
