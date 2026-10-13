@@ -351,6 +351,37 @@ class LocalToolRouterTest {
     }
 
     @Test
+    fun validDeepAndWideSchemasRemainUsableWhenTheyFitTheActualBudget() {
+        var nested = buildJsonObject { put("type", "string") }
+        repeat(15) {
+            val child = nested
+            nested = buildJsonObject {
+                put("type", "object")
+                put("properties", buildJsonObject { put("next", child) })
+            }
+        }
+        val properties = buildJsonObject {
+            put("nested", nested)
+            repeat(300) { index ->
+                put("p$" + "{index}", buildJsonObject { put("type", "string") })
+            }
+        }
+        val complex = tool("complex_remote", "真实复杂扩展", ToolExposure.OPTIONAL, "MCP").copy(
+            schema = functionToolSchema(
+                "complex_remote", "真实复杂扩展",
+                properties = properties,
+                required = setOf("nested"),
+            ),
+        )
+        val selection = LocalToolRouter.selectSchemas(
+            listOf(complex), linkedSetOf("complex_remote"), 24_000,
+        )
+        assertEquals(listOf("complex_remote"), names(selection.schemas))
+        assertTrue(selection.omittedReasons.isEmpty())
+        assertEquals(complex.schema, selection.schemas.first())
+    }
+
+    @Test
     fun staleEnabledNameCannotResurrectAnUnregisteredTool() {
         val core = tool("read", "读取文件", ToolExposure.CORE, "文件")
         val removed = tool("removed", "已卸载工具", ToolExposure.OPTIONAL, "MCP", setOf("MCP"))
