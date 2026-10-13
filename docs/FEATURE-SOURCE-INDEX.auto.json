@@ -3128,7 +3128,7 @@
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterial.kt",
-      "sha256": "ad8197df549470c8"
+      "sha256": "a2db6a68b8d964cd"
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterialColor.kt",
@@ -3448,16 +3448,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "a0de8fc526cd",
+  "source_snapshot": "838e2d463c4f",
   "observed_delta": {
-    "baseline": "db65946c5bfb",
+    "baseline": "a0de8fc526cd",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowser.kt",
-      "app/src/main/java/com/shenyan/designsystem/components/ShenyanFeedback.kt"
+      "app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterial.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

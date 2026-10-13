@@ -94,7 +94,9 @@ fun SyMaterialSurface(
     var materialOrigin by remember { mutableStateOf(IntOffset.Zero) }
     var materialSize by remember { mutableStateOf(IntSize.Zero) }
     val nested = LocalSyGlassDepth.current
-    val resolved = if ((nested >= 3 || LocalSyReduceTransparency.current) && tier != SyMaterialTier.L5_SOLID) SyMaterialTier.L5_SOLID else tier
+    // Matte already has opaque tiers: reduced transparency must not erase their hierarchy.
+    val needsSolidFallback = LocalSyReduceTransparency.current && c.materialL3.alpha < 1f
+    val resolved = if ((nested >= 3 || needsSolidFallback) && tier != SyMaterialTier.L5_SOLID) SyMaterialTier.L5_SOLID else tier
     val regionY = if (scene == null || scene.viewportSize.height == 0) .5f else
         (materialOrigin.y - scene.viewportOrigin.y + materialSize.height / 2f) / scene.viewportSize.height
     val region = when { regionY < .30f -> 0; regionY < .74f -> 1; else -> 2 }
