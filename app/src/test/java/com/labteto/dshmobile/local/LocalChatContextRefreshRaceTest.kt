@@ -198,7 +198,8 @@ class LocalChatContextRefreshRaceTest {
         assertEquals(0, fixture.persisted())
     }
     @Test fun restoringExistingPendingStartsConsolidationWithoutNewUserInput() = runTest {
-        val fixture = fixture(backgroundScope)
+        // Use the test scope so advanceUntilIdle drives the re-admitted lazy job.
+        val fixture = fixture(this)
         val original = fixture.state.value.chat.chatContext
         assertTrue(original.pendingThroughSequence > original.processedThroughSequence)
         assertTrue(fixture.coordinator.resumePending("s", fixture.log, fixture.profile, PersonaProfile()))
