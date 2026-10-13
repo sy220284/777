@@ -335,13 +335,13 @@ fun LocalHarnessScreen(
                 )
                 if (!keepDrawer) {
                     resetFeatureNavigation()
-                memorySourceSessionId = null
-                memorySourceMessageId = null
-                settingsDestination = SettingsDestination.ROOT
-                taskMode = null
-                searchedTaskId = null
-                requestedFilePath = null
-                filesMode = LocalFilesMode.WORKSPACE
+                    memorySourceSessionId = null
+                    memorySourceMessageId = null
+                    settingsDestination = SettingsDestination.ROOT
+                    taskMode = null
+                    searchedTaskId = null
+                    requestedFilePath = null
+                    filesMode = LocalFilesMode.WORKSPACE
                     composerHandoff = emptyList()
                     if (drawerState.isOpen) drawerState.close()
                 }
