@@ -66,8 +66,8 @@ class ChatContextStateTest {
         assertTrue(state.scene.lastSceneChange.isBlank())
         assertTrue(state.continuity.recurringEvents.isEmpty())
         assertEquals(listOf("事件4", "事件5", "事件6", "事件7", "事件8"), state.continuity.recentEvents)
-        assertEquals(listOf("决定4", "决定5", "决定6", "决定7"), state.continuity.decisions)
-        assertEquals(listOf("待续4", "待续5", "待续6", "待续7"), state.continuity.unfinished)
+        assertEquals((1..7).map { "决定$it" }, state.continuity.decisions)
+        assertEquals((1..7).map { "待续$it" }, state.continuity.unfinished)
     }
 
     @Test
@@ -474,6 +474,9 @@ class ChatContextStateTest {
                     assistantMessage = "好，那城南的安排取消。",
                 ),
             ),
+            resolvedContinuityIds = listOf(chatContinuityEventId(
+                ChatContinuityFactKind.DECISION, "明天九点去城南",
+            )),
         )
 
         assertFalse(grounded.decisions.contains("明天九点去城南"))
@@ -591,6 +594,9 @@ class ChatContextStateTest {
                     assistantMessage = "好，城南取消。",
                 ),
             ),
+            resolvedContinuityIds = listOf(chatContinuityEventId(
+                ChatContinuityFactKind.DECISION, "明天九点去城南",
+            )),
         )
 
         assertTrue(grounded.decisions.isEmpty())
@@ -795,6 +801,60 @@ class ChatContextStateTest {
             resolvedContinuityIds = listOf(chatContinuityEventId(ChatContinuityFactKind.OPEN_THREAD, first)),
         )
         assertEquals(previous.unfinished.toSet(), result.unfinished.toSet())
+    }
+
+    @Test
+    fun activeEventsAndProvenanceSurviveNormalizationPastLegacyLimit() {
+        val open = (1..26).map { "还要确认事项$it" }
+        val decisions = (1..24).map { "决定执行事项$it" }
+        val evidence = open.mapIndexed { index, fact ->
+            ChatContinuityEvidence(
+                kind = ChatContinuityFactKind.OPEN_THREAD, text = fact,
+                sourceSequence = index.toLong() + 1L,
+                eventId = chatContinuityEventId(ChatContinuityFactKind.OPEN_THREAD, fact, index.toLong() + 1L),
+            )
+        }
+        val state = ChatContextState(
+            continuity = ChatContinuityState(
+                decisions = decisions, unfinished = open, evidence = evidence,
+            ),
+        ).normalized()
+        assertEquals(open, state.continuity.unfinished)
+        assertEquals(decisions, state.continuity.decisions)
+        assertEquals(evidence.map { it.eventId }, state.continuity.evidence.map { it.eventId })
+    }
+
+    @Test
+    fun cancellationRequiresMatchingEventIdAndUserEvidence() {
+        val fact = "明天九点去城南"
+        val before = ChatContinuityState(decisions = listOf(fact))
+        val turns = listOf(ChatPendingTurn(
+            sequence = 211L,
+            userMessage = "城南不去了，计划取消。",
+            assistantMessage = "好，取消城南。",
+        ))
+        val withoutId = groundContinuityEvidence(before, ChatContinuityState(decisions = emptyList()), turns)
+        assertEquals(before.decisions, withoutId.decisions)
+        val withId = groundContinuityEvidence(
+            before, ChatContinuityState(decisions = emptyList()), turns,
+            resolvedContinuityIds = listOf(chatContinuityEventId(ChatContinuityFactKind.DECISION, fact)),
+        )
+        assertTrue(withId.decisions.isEmpty())
+    }
+
+    @Test
+    fun incorrectSubjectCannotCloseOtherEventEvenWithValidId() {
+        val before = ChatContinuityState(decisions = listOf("明天九点去城南", "明天九点去城北"))
+        val turns = listOf(ChatPendingTurn(
+            sequence = 212L,
+            userMessage = "城北不去了，取消城北计划。",
+            assistantMessage = "好，取消城北。",
+        ))
+        val result = groundContinuityEvidence(
+            before, ChatContinuityState(decisions = emptyList()), turns,
+            resolvedContinuityIds = listOf(chatContinuityEventId(ChatContinuityFactKind.DECISION, "明天九点去城南")),
+        )
+        assertEquals(before.decisions, result.decisions)
     }
 
 }
