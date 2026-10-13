@@ -27,7 +27,7 @@ class LocalDrawerEntryVisibilityRegressionTest {
                     onOpenDiary = {},
                     onTasks = {},
                     onWorkspaceFiles = {},
-                    
+
                     onOpenRunCenter = {},
                     onTools = { openToolsCount++ },
                 )
@@ -55,7 +55,7 @@ class LocalDrawerEntryVisibilityRegressionTest {
                     onOpenDiary = {},
                     onTasks = {},
                     onWorkspaceFiles = {},
-                    
+
                     onOpenRunCenter = {},
                     onTools = {},
                 )
@@ -79,7 +79,7 @@ class LocalDrawerEntryVisibilityRegressionTest {
                     onOpenGroupChat = {}, onOpenPersonaGallery = {}, onOpenDiary = {},
                     onTasks = { opened += "tasks" },
                     onWorkspaceFiles = { opened += "workspace" },
-                    
+
                     onOpenRunCenter = { opened += "run" },
                     onTools = { opened += "tools" },
                     onUsage = { opened += "usage" },
