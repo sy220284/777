@@ -89,7 +89,7 @@ internal fun LocalAgentSwarmLaunchEntry(
     ) {
         Row(
             modifier = Modifier
-                .heightIn(min = 72.dp)
+                .heightIn(min = 64.dp)
                 .padding(
                     horizontal = SyMetric.gapLg,
                     vertical = SyMetric.gapMd,
@@ -101,6 +101,7 @@ internal fun LocalAgentSwarmLaunchEntry(
                 painter = painterResource(R.drawable.ic_ui_create_subagent),
                 contentDescription = null,
                 tint = if (selected) colors.primary else colors.text,
+                modifier = Modifier.size(24.dp),
             )
             Text(
                 stringResource(R.string.local_team_title),
