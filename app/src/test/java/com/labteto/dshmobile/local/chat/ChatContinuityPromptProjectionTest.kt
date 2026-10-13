@@ -28,4 +28,23 @@ class ChatContinuityPromptProjectionTest {
         assertTrue("记得处理事项90" in selected)
         assertTrue(selected.size <= 20)
     }
+    @Test
+    fun modelReceivesExactIdentifiersForBothOpenAndDecidedEvents() {
+        val decision = "明天九点去城南"
+        val pending = "还要确认车票"
+        val text = ChatInteractionPromptBuilder().prompt(
+            persona = PersonaProfile(),
+            state = ChatCharacterState(continuity = ChatContinuityState(
+                decisions = listOf(decision),
+                unfinished = listOf(pending),
+            )),
+            userMessage = "取消城南，车票已经确认好了。",
+            assistantMessage = "好，我记得。",
+        )
+        assertTrue(text.contains(chatContinuityEventId(ChatContinuityFactKind.DECISION, decision)))
+        assertTrue(text.contains(chatContinuityEventId(ChatContinuityFactKind.OPEN_THREAD, pending)))
+        assertTrue(text.contains("已定事项"))
+        assertTrue(text.contains("待续事件"))
+    }
+
 }
