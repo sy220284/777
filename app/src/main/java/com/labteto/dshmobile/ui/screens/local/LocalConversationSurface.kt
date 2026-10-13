@@ -1554,12 +1554,17 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             floating = true,
             scrollable = true,
         ) {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                item {
+            // Two balanced rows keep every action and glyph visible on narrow phones.
+            // The former horizontal list clipped the fourth tile at the sheet edge.
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     SyQuickActionTile(
                         icon = FeatherIcons.Camera,
                         label = stringResource(R.string.composer_camera),
-                        modifier = Modifier.width(96.dp),
+                        modifier = Modifier.weight(1f),
                         onClick = {
                             showAttachmentPicker = false
                             if (attachments.count { it.mediaType.startsWith("image/") } >= MAX_LOCAL_IMAGE_SELECTION) {
@@ -1567,28 +1572,27 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             } else takePhoto()
                         },
                     )
-                }
-                item {
                     SyQuickActionTile(
                         icon = FeatherIcons.Image,
                         label = stringResource(R.string.local_attachment_image),
-                        modifier = Modifier.width(96.dp),
+                        modifier = Modifier.weight(1f),
                         onClick = { showAttachmentPicker = false; imagePicker.launch(arrayOf("image/*")) },
                     )
                 }
-                item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     SyQuickActionTile(
                         icon = FeatherIcons.Folder,
                         label = stringResource(R.string.local_attachment_file),
-                        modifier = Modifier.width(96.dp),
+                        modifier = Modifier.weight(1f),
                         onClick = { showAttachmentPicker = false; filePicker.launch(arrayOf("*/*")) },
                     )
-                }
-                item {
                     SyQuickActionTile(
-                        icon = FeatherIcons.Image,
+                        icon = FeatherIcons.Sparkles,
                         label = stringResource(R.string.media_studio_entry),
-                        modifier = Modifier.width(96.dp),
+                        modifier = Modifier.weight(1f),
                         onClick = {
                             showAttachmentPicker = false
                             mediaInitialPrompt = ""
