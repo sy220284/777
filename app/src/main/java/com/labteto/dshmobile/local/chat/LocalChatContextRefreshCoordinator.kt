@@ -86,6 +86,7 @@ internal fun finalizeGroupContextAfterRefresh(
     statesInReplyOrder: List<ChatCharacterState>,
     processedPending: List<ChatPendingTurn>,
     complete: Boolean,
+    resolvedContinuityIds: List<String> = emptyList(),
 ): ChatContextState {
     if (!complete || processedPending.isEmpty()) return context
     val through = processedPending.maxOf(ChatPendingTurn::sequence)
@@ -94,6 +95,7 @@ internal fun finalizeGroupContextAfterRefresh(
         previous = context.continuity,
         candidate = merged,
         pendingTurns = processedPending,
+        resolvedContinuityIds = resolvedContinuityIds,
     )
     return context.commitProcessed(
         scene = context.scene,

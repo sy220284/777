@@ -66,4 +66,39 @@ class ChatTurnContextPolicyTest {
         assertEquals(once, ChatTurnContextPolicy.advance(once, "继续聊衣服", 7L))
         assertEquals("*", once.pausedSubject)
     }
+    @Test
+    fun multiplePausedTopicsRemainIndependentUntilExplicitlyResumed() {
+        var state = ChatAttentionState()
+        state = ChatTurnContextPolicy.advance(state, "别提衣服了", 11L)
+        state = ChatTurnContextPolicy.advance(state, "今天出去玩", 12L)
+        state = ChatTurnContextPolicy.advance(state, "别再聊工作", 13L)
+        state = ChatTurnContextPolicy.advance(state, "我们改聊晚饭", 14L)
+        assertEquals(setOf("衣服", "工作"), state.pausedSubjects.toSet())
+        assertFalse(ChatUnifiedTurnContext.allowsHistoricalRecord(
+            "我们改聊晚饭", ChatContextState(attention = state), "去年聊过衣服",
+        ))
+        assertFalse(ChatUnifiedTurnContext.allowsHistoricalRecord(
+            "我们改聊晚饭", ChatContextState(attention = state), "过去工作上很忙",
+        ))
+        val resumed = ChatTurnContextPolicy.advance(state, "我们继续聊衣服", 15L)
+        assertFalse("衣服" in resumed.pausedSubjects)
+        assertTrue("工作" in resumed.pausedSubjects)
+        assertTrue(ChatUnifiedTurnContext.allowsHistoricalRecord(
+            "我们继续聊衣服", ChatContextState(attention = resumed), "去年聊过衣服",
+        ))
+        assertFalse(ChatUnifiedTurnContext.allowsHistoricalRecord(
+            "我们继续聊衣服", ChatContextState(attention = resumed), "过去工作上很忙",
+        ))
+    }
+
+    @Test
+    fun restoringLegacyAttentionDoesNotRequireNewTopicFields() {
+        val legacy = """{"lastUserSubject":"修理车票","pausedSubject":"衣服","updatedSequence":3}"""
+        val state = kotlinx.serialization.json.Json.decodeFromString(
+            ChatAttentionState.serializer(), legacy,
+        )
+        assertEquals(emptyList<String>(), state.pausedSubjects)
+        assertEquals("衣服", state.pausedSubject)
+    }
+
 }

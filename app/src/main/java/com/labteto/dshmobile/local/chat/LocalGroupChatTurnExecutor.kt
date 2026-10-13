@@ -394,7 +394,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
         assistantMessage: String,
         sharedPending: List<ChatPendingTurn>,
         step: Int,
-    ): ChatCharacterState? {
+    ): Pair<ChatCharacterState, List<String>>? {
         val snapshot = runtimeStateStore.state.value
         val key = modelRequestMarkerOrNull(snapshot) ?: return null
         val sharedContext = runtimeStateStore.state.value.chat.groupChat.context
@@ -442,8 +442,11 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 persona = persona,
             ) ?: return null
             recordGroupDiary(member, persona, plan, sharedPending, snapshot)
-            diaryStore.reconcileState(chatRelationshipSubjectKey(member.galleryId, member.personaId),
-                plan.state.bindStateObservationSources(sharedPending), snapshot.chat.groupChat.context)
+            val state = diaryStore.reconcileState(
+                chatRelationshipSubjectKey(member.galleryId, member.personaId),
+                plan.state.bindStateObservationSources(sharedPending), snapshot.chat.groupChat.context,
+            )
+            state to plan.resolvedContinuityIds
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -482,8 +485,9 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 step = CHAT_POST_TURN_MODEL_STEP + 100,
             )
             return GroupStateRefreshBatch(
-                states = mapOf(reply.member.galleryId to (refreshed ?: reply.member.chatState)),
+                states = mapOf(reply.member.galleryId to (refreshed?.first ?: reply.member.chatState)),
                 complete = refreshed != null,
+                resolvedContinuityIds = refreshed?.second.orEmpty(),
             )
         }
 
@@ -558,6 +562,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 ?: error("群聊状态整理未返回完整 JSON 对象")
             val plans = (root["plans"] as? JsonArray).orEmpty()
             val result = linkedMapOf<String, ChatCharacterState>()
+            val resolvedIds = mutableListOf<String>()
             plans.forEach { element ->
                 val item = runCatching { element.jsonObject }.getOrNull() ?: return@forEach
                 val galleryId = validGroupGalleryId(item) ?: return@forEach
@@ -573,6 +578,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     persona = source.persona,
                 ) ?: return@forEach
                 recordGroupDiary(source.member, source.persona, parsed, sharedPending, snapshot)
+                resolvedIds += parsed.resolvedContinuityIds
                 result[galleryId] = diaryStore.reconcileState(
                     chatRelationshipSubjectKey(source.member.galleryId, source.member.personaId),
                     parsed.state.bindStateObservationSources(sharedPending), snapshot.chat.groupChat.context)
@@ -605,7 +611,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     result[reply.member.galleryId] = reply.member.chatState
                 }
             }
-            GroupStateRefreshBatch(result, complete)
+            GroupStateRefreshBatch(result, complete, resolvedIds.distinct())
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -620,6 +626,116 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 },
                 complete = false,
             )
+        }
+    }
+
+
+    /**
+     * Reconcile one persisted group batch on session restoration. This uses the same planner,
+     * diary, shared-continuity finalizer and member-state merge as foreground group replies.
+     * A failed or ambiguously-attributed batch stays pending; it must never advance the cursor.
+     */
+    internal suspend fun reconcileDurableGroupPending(expectedSessionId: String): Boolean {
+        val before = runtimeStateStore.state.value
+        if (before.sessionId != expectedSessionId ||
+            before.usageMode != com.labteto.dshmobile.local.LocalUsageMode.CHAT ||
+            !before.chat.groupChat.enabled || !before.modelState.configured
+        ) return false
+
+        val group = before.chat.groupChat
+        val pending = group.context.loadPendingBatch(
+            eventLog, GROUP_POST_TURN_PENDING_BATCH, scope = "group",
+            activeBranchMessageIds = if (hasChatBranchAlternatives(before.chat.chatBranches)) {
+                activeChatBranchMessages(before.chat.chatBranches).mapTo(hashSetOf()) { it.id }
+            } else null,
+        )
+        if (pending.isEmpty()) {
+            // A gap in the restored archive is not successful reconciliation.
+            if (group.context.pendingThroughSequence > group.context.processedThroughSequence) {
+                eventLog.append("group/post-turn-batch", buildJsonObject {
+                    put("status", "recovery-pending-unavailable")
+                })
+                return false
+            }
+            return true
+        }
+        val speakers = pendingGroupSpeakers(pending, group.members, before.messages)
+        if (speakers == null || speakers.isEmpty()) {
+            eventLog.append("group/post-turn-batch", buildJsonObject {
+                put("status", "recovery-speaker-unresolved")
+                put("pending_count", pending.size)
+            })
+            return false
+        }
+        val replies = speakers.map { (member, turn) ->
+            GroupReplyForStateUpdate(
+                member = member,
+                persona = chatPersonaStore.get(member.personaId),
+                content = turn.assistantMessage,
+            )
+        }
+        val userEvidence = pending.joinToString("\n") { it.userMessage }
+        val refreshed = refreshGroupMemberStates(replies, userEvidence, pending)
+        if (!refreshed.complete) {
+            eventLog.append("group/post-turn-batch", buildJsonObject {
+                put("status", "recovery-deferred")
+                put("pending_count", pending.size)
+            })
+            return false
+        }
+
+        // Apply one generation-scoped cursor transition; never mix with a newer branch.
+        val lease = com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry.tryAcquire(
+            expectedSessionId, com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind.MAINTENANCE,
+        ) ?: return false
+        try {
+        val latest = runtimeStateStore.state.value
+        if (latest.sessionId != expectedSessionId ||
+            !latest.chat.groupChat.enabled ||
+            latest.chat.groupChat.context.generation != group.context.generation ||
+            latest.chat.groupChat.context.processedThroughSequence != group.context.processedThroughSequence
+        ) return false
+        val diaryDecisions = group.members.flatMap { member ->
+            diaryStore.decisionsForExperience(
+                chatRelationshipSubjectKey(member.galleryId, member.personaId), group.context,
+            )
+        }
+        val nextContext = reconcileDiaryContext(
+            finalizeGroupContextAfterRefresh(
+                context = group.context,
+                statesInReplyOrder = replies.mapNotNull { refreshed.states[it.member.galleryId] },
+                processedPending = pending, complete = true,
+                resolvedContinuityIds = refreshed.resolvedContinuityIds,
+            ), diaryDecisions,
+        )
+        val updated = group.copy(
+            context = nextContext,
+            members = mergeRefreshedGroupMembers(group.members, refreshed.states, replies),
+        )
+        var committed = false
+        chatState.update { snapshot ->
+            if (snapshot.sessionId == expectedSessionId && snapshot.chat.groupChat.enabled &&
+                snapshot.chat.groupChat.context.generation == group.context.generation &&
+                snapshot.chat.groupChat.context.processedThroughSequence == group.context.processedThroughSequence
+            ) {
+                committed = true
+                snapshot.copy(chat = snapshot.chat.copy(groupChat = updated))
+            } else snapshot
+        }
+        if (!committed) return false
+        if (hasChatBranchAlternatives(runtimeStateStore.state.value.chat.chatBranches)) {
+            persistChatBranchState("group/pending-recovery")
+        }
+        persistNow()
+        projectGalleryState(updated, "pending-recovery")
+        eventLog.append("group/post-turn-batch", buildJsonObject {
+            put("status", "recovered")
+            put("processed_through_sequence", pending.maxOf(ChatPendingTurn::sequence))
+            put("remaining_pending", nextContext.pendingTurns.size)
+        })
+        return true
+        } finally {
+            lease.close()
         }
     }
 
@@ -844,6 +960,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                             userMessage = input,
                             assistantMessage = content,
                             generation = currentGroup.context.generation,
+                            speakerId = generated.member.galleryId,
                         ),
                         eventLog,
                         scope = "group",
@@ -912,6 +1029,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 statesInReplyOrder = refreshedInReplyOrder,
                 processedPending = sharedPendingForRefresh,
                 complete = refreshBatch.complete,
+                resolvedContinuityIds = refreshBatch.resolvedContinuityIds,
             ), diaryDecisions)
             if (!refreshBatch.complete) {
                 eventLog.append("group/post-turn-batch", buildJsonObject {
@@ -921,17 +1039,9 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             }
             currentGroup = currentGroup.copy(
                 context = nextSharedContext,
-                members = currentGroup.members.map { existing ->
-                    val nextState = refreshedStates[existing.galleryId] ?: return@map existing
-                    val source = repliesForStateUpdate.firstOrNull { it.member.galleryId == existing.galleryId }
-                    existing.copy(
-                        displayName = source?.persona?.name ?: existing.displayName,
-                        chatState = nextState.copy(
-                            scene = ChatSceneState(),
-                            continuity = ChatContinuityState(),
-                        ),
-                    )
-                },
+                members = mergeRefreshedGroupMembers(
+                    currentGroup.members, refreshedStates, repliesForStateUpdate,
+                ),
             )
             val nextCursor = (snapshot.chat.groupChat.turnCursor + 1) % members.size
             currentGroup = currentGroup.copy(turnCursor = nextCursor)

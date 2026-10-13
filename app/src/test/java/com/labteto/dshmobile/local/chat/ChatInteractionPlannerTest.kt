@@ -1284,7 +1284,7 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun continuitySanitizerKeepsNewestEntriesWhenModelReturnsTooMany() {
+    fun continuitySanitizerBoundsRecentEventsButPreservesAllActiveItems() {
         val payload = """{
           "state":{
             "continuity":{
@@ -1305,8 +1305,8 @@ class ChatInteractionPlannerTest {
         )!!.state
 
         assertEquals(listOf("事件2", "事件3", "事件4", "事件5", "事件6"), state.continuity.recentEvents)
-        assertEquals(listOf("决定2", "决定3", "决定4", "决定5"), state.continuity.decisions)
-        assertEquals(listOf("待续2", "待续3", "待续4", "待续5"), state.continuity.unfinished)
+        assertEquals(listOf("决定1", "决定2", "决定3", "决定4", "决定5"), state.continuity.decisions)
+        assertEquals(listOf("待续1", "待续2", "待续3", "待续4", "待续5"), state.continuity.unfinished)
     }
 
     @Test
@@ -1657,7 +1657,7 @@ class ChatInteractionPlannerTest {
             dynamics = RelationshipDynamics(unknowns = listOf("是否同意保密约定", "下次见面地点")),
         )
         val reduced = planner.parse(
-            """{"state":{"dynamics":{"unknowns":["下次见面地点"]}},"turnSignificance":"MINOR"}""",
+            """{"state":{"dynamics":{"unknowns":["下次见面地点"]}},"stateEvidence":{"dynamics.unknowns":"好，我答应你，保密。"},"turnSignificance":"MINOR"}""",
             previous, userMessage = "好，我答应你，保密。", assistantMessage = "谢谢你答应。",
         )!!.state
         assertEquals(listOf("下次见面地点"), reduced.dynamics.unknowns)
@@ -1669,7 +1669,7 @@ class ChatInteractionPlannerTest {
         assertEquals(listOf("下次见面地点"), noPatch.dynamics.unknowns)
 
         val closed = planner.parse(
-            """{"state":{"dynamics":{"unknowns":[]}},"turnSignificance":"MINOR"}""",
+            """{"state":{"dynamics":{"unknowns":[]}},"stateEvidence":{"dynamics.unknowns":"地点也确定了"},"turnSignificance":"MINOR"}""",
             reduced, userMessage = "地点也确定了", assistantMessage = "好，说定了",
         )!!.state
         assertTrue(closed.dynamics.unknowns.isEmpty())
@@ -1684,7 +1684,7 @@ class ChatInteractionPlannerTest {
             ),
         )
         val state = planner.parse(
-            """{"state":{"dynamics":{"unknowns":["明天去哪"],"unresolvedConflict":""}},"turnSignificance":"NONE"}""",
+            """{"state":{"dynamics":{"unknowns":["明天去哪"],"unresolvedConflict":""}},"stateEvidence":{"dynamics.unknowns":"我答应你遵守保密约定。","dynamics.unresolvedConflict":"我答应你遵守保密约定。"},"turnSignificance":"NONE"}""",
             previous,
             userMessage = "我答应你遵守保密约定。",
             assistantMessage = "谢谢，我知道你已经同意。",
@@ -1748,6 +1748,34 @@ class ChatInteractionPlannerTest {
         assertEquals("高兴", moodUpdated.mood)
         assertEquals(previous.currentUserImpression, moodUpdated.currentUserImpression)
         assertTrue(moodUpdated.lifeState.activeEvents.isNotEmpty())
+    }
+
+    @Test
+    fun unquotedModelAnswerCannotErasePendingRelationshipUnknowns() {
+        val previous = ChatCharacterState(dynamics = RelationshipDynamics(
+            unknowns = listOf("是否同意保密约定", "周末碰面地点"),
+        ))
+        val speculative = planner.parse(
+            """{"state":{"dynamics":{"unknowns":[]}},"turnSignificance":"MAJOR"}""",
+            previous, userMessage = "今天天气不错", assistantMessage = "是啊",
+        )!!.state
+        assertEquals(previous.dynamics.unknowns, speculative.dynamics.unknowns)
+    }
+
+    @Test
+    fun durableImpressionRequiresTranscriptQuoteRegardlessOfSignificance() {
+        val previous = ChatCharacterState(currentUserImpression = "喜欢在家读书")
+        val unsupported = planner.parse(
+            """{"state":{"currentUserImpression":"经常去健身房"},"turnSignificance":"MAJOR"}""",
+            previous, userMessage = "早上好", assistantMessage = "早上好",
+        )!!.state
+        assertEquals("喜欢在家读书", unsupported.currentUserImpression)
+
+        val supported = planner.parse(
+            """{"state":{"currentUserImpression":"现在喜欢户外跑步"},"stateEvidence":{"currentUserImpression":"我最近喜欢户外跑步"},"turnSignificance":"NONE"}""",
+            previous, userMessage = "我最近喜欢户外跑步", assistantMessage = "那真不错",
+        )!!.state
+        assertEquals("现在喜欢户外跑步", supported.currentUserImpression)
     }
 
 }

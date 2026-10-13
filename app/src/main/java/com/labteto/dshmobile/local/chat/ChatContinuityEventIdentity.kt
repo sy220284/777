@@ -22,12 +22,9 @@ internal object ChatContinuityEventIdentity {
         val a = subject(left)
         val b = subject(right)
         if (a.length < 2 || b.length < 2) return false
-        if (a == b) return true
-        val shorter = if (a.length <= b.length) a else b
-        val longer = if (a.length <= b.length) b else a
-        // Explicit concrete objects/places can acquire descriptive modifiers.
-        if (shorter.length >= 2 && longer.contains(shorter)) return true
-        return false
+        // Substring equality used to make "保密" the same slot as "保密公开照片".
+        // Preserve old lexical aliases only when both normalized subjects are exact.
+        return a == b
     }
 
     /** A user correction/removal must name the concrete matter, not just generic words. */
@@ -54,6 +51,46 @@ internal object ChatContinuityEventIdentity {
                     matchesEvidenceSubject(fact, turn.userMessage + " " + turn.assistantMessage))
         }
     }
+
+    /**
+     * An event transition is accepted only after the caller checks exact event ID and
+     * candidate omission. This method checks the real user utterance, not model-only prose.
+     * Retrieval similarity may suggest facts but never closes or replaces an active event.
+     */
+    fun transitionGrounded(
+        kind: ChatContinuityFactKind,
+        fact: String,
+        turns: List<ChatPendingTurn>,
+        activeFactCount: Int,
+        activeQuestionCount: Int,
+    ): Boolean = when (kind) {
+        ChatContinuityFactKind.EVENT -> false
+        ChatContinuityFactKind.DECISION -> turns.any { turn ->
+            cancellation.containsMatchIn(turn.userMessage) &&
+                transitionSubjectMatches(fact, turn.userMessage, activeFactCount)
+        }
+        ChatContinuityFactKind.OPEN_THREAD -> turns.any { turn ->
+            (completion.containsMatchIn(turn.userMessage) &&
+                transitionSubjectMatches(fact, turn.userMessage, activeFactCount)) ||
+                confirmsQuestion(fact, listOf(turn), activeQuestionCount)
+        }
+    }
+
+    private fun transitionSubjectMatches(fact: String, user: String, activeCount: Int): Boolean {
+        if (matchesEvidenceSubject(fact, user)) return true
+        // The legacy text fact may include time/action framing absent from a direct
+        // cancellation: "明天九点去城南" -> "城南不去了".
+        val core = subject(fact).replace(topicNoise, "")
+        return (core.length in 2..16 && user.contains(core)) ||
+            (activeCount == 1 && genericClosure.matches(user.trim()))
+    }
+
+    private val cancellation = Regex("""(?:取消|作废|不去了|不再去|不去|撤销|延期|推迟|改成|换成)""")
+    private val completion = Regex("""(?:解决了|说清了|说完了|完成了|处理好了|结束了|取消了|没事了|算了)""")
+    private val genericClosure = Regex("""^(?:没事了|解决了|完成了|取消了|算了)[。！! ]*$""")
+    private val topicNoise = Regex(
+        """(?:今天|明天|后天|今晚|上午|中午|下午|晚上|[零一二两三四五六七八九十0-9]{1,3}(?:点|时)(?:半)?|出发|过去|前往|约定|计划|安排|决定|要|还|记得|需要|确认|去|到|与|和|的|了)""",
+    )
 
     private fun subject(text: String): String =
         text.lowercase().replace(punctuation, "").replace(boilerplate, "").take(180)
