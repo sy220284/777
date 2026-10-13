@@ -108,7 +108,7 @@ jobs:
                 break
               fi
             done < <(
-              gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs?branch=main&status=success&per_page=100" \\
+              gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs?branch=main&status=success&per_page=100" \
                 --jq '.workflow_runs[] | select(.name == "CI" and .event == "push" and .conclusion == "success") | .head_sha' |
                 awk '!seen[$0]++' |
                 head -n 50
