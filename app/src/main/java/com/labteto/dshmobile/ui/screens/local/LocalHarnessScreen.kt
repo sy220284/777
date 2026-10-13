@@ -274,6 +274,18 @@ fun LocalHarnessScreen(
         settingsEntryRequest++
     }
 
+    val documentSceneRequest by viewModel.uiSceneRequest.collectAsStateWithLifecycle()
+    LaunchedEffect(documentSceneRequest) {
+        val scene = documentSceneRequest ?: return@LaunchedEffect
+        val route = LocalFeaturePage.entries.firstOrNull { "route.${it.name.lowercase()}" == scene }
+        val settings = SettingsDestination.entries.firstOrNull { "settings.${it.name.lowercase()}" == scene }
+        if (settings != null) {
+            prepareSettingsEntry(settings)
+            pushFeature(LocalFeaturePage.SETTINGS)
+        } else if (route != null) pushFeature(route)
+        viewModel.consumeUiSceneRequest(scene)
+    }
+
     fun openFeatureFromDrawer(page: LocalFeaturePage) {
         if (page == LocalFeaturePage.WORKSPACE) filesEntryRequest++
         conversationOpenedFromDrawer = false
@@ -521,6 +533,9 @@ fun LocalHarnessScreen(
 
     val featureContributions = listOf(
         localShellFeatureUiContribution(
+            documents = viewModel.uiDocumentUiPort,
+            documentForms = viewModel.uiDocumentFormPort,
+            documentIdentity = sendIdentity,
             reading = viewModel.conversationReadingUiPort,
             drafts = viewModel.conversationDraftUiPort,
             shell = shell,

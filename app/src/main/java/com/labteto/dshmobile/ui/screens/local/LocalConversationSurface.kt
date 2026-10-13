@@ -196,6 +196,9 @@ internal class LocalConversationSurfaceArgs(
 @Composable
 internal fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
+    documents: com.labteto.dshmobile.uicontract.UiDocumentUiPort,
+    documentForms: com.labteto.dshmobile.uicontract.UiDocumentFormUiPort,
+    documentIdentity: com.labteto.dshmobile.uicontract.UiSessionIdentity?,
     reading: com.labteto.dshmobile.uicontract.ConversationReadingUiPort,
     drafts: com.labteto.dshmobile.uicontract.ConversationDraftUiPort,
     workActions: LocalWorkFeatureUiActions? = null,
@@ -428,6 +431,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     }
     var temperatureSaving by remember(state.sessionId) { mutableStateOf(false) }
     var temperatureSaveFailed by remember(state.sessionId) { mutableStateOf(false) }
+    val documentSnapshot by documents.snapshots.collectAsStateWithLifecycle(initialValue = remember(documents) { documents.snapshot() })
     val draftValues by drafts.drafts.collectAsStateWithLifecycle()
     LaunchedEffect(composerHandoff, state.sessionId) {
         if (composerHandoff.size == 2 && composerHandoff[0] == state.sessionId) {
@@ -1064,6 +1068,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 onSelectVariant = onSelectMessageVariant,
                                 onRegenerate = onRegenerate,
                             )
+                            if (state.messages.lastOrNull()?.id == transcriptItem.message.id && !state.running && !state.loading) {
+                                LocalUiDocumentGenerateButton(documentIdentity, state.usageMode == LocalUsageMode.WORK,
+                                    transcriptItem.message.id, transcriptItem.message.content, documents)
+                            }
+                            documentSnapshot.documents.filter { it.document.source.messageId == transcriptItem.message.id }.forEach {
+                                LocalDynamicDocument(it, documentIdentity, documents, documentForms)
+                            }
                             if (state.usageMode == LocalUsageMode.CHAT && transcriptItem.message.role == "user") {
                                 turnUsage.summaries[transcriptItem.message.id]?.let { aggregate ->
                                     LocalChatTurnUsageButton(aggregate) { turnUsage.open(transcriptItem.message.id) }

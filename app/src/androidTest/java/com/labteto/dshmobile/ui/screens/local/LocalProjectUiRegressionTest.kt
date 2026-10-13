@@ -236,4 +236,3 @@ class LocalProjectUiRegressionTest {
         compose.runOnIdle { assertEquals(1, calls) }
     }
 }
-

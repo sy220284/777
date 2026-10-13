@@ -50,8 +50,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
-import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
-import com.labteto.dshmobile.local.presentation.LocalToolsUiFacade
+import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot
+import com.labteto.dshmobile.uicontract.ToolsUiPort
 import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
@@ -97,14 +97,14 @@ enum class ToolsNotice {
 
 data class ToolsUiState(
     val loading: Boolean = false,
-    val capabilities: List<com.labteto.dshmobile.local.presentation.LocalCapabilityUiEntry> = emptyList(),
-    val servers: List<McpServerSnapshot> = emptyList(),
+    val capabilities: List<com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot> = emptyList(),
+    val servers: List<UiMcpServerSnapshot> = emptyList(),
     val githubConfigured: Boolean = false,
     val localPlugins: List<String> = emptyList(),
-    val skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
-    val presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
+    val skills: List<com.labteto.dshmobile.uicontract.UiSkillSnapshot> = emptyList(),
+    val presets: List<com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot> = emptyList(),
     val createdSkillId: String? = null,
-    val skillEditor: com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry? = null,
+    val skillEditor: com.labteto.dshmobile.uicontract.UiSkillEditorSnapshot? = null,
     val savedSkillId: String? = null,
     val notice: ToolsNotice? = null,
     val feedback: String? = null,
@@ -113,18 +113,13 @@ data class ToolsUiState(
 
 /** Safe user-facing classification; never surface raw URLs, tokens or command-line contents. */
 internal fun localToolConnectionErrorMessageRes(error: Throwable): Int {
-    var cause: Throwable = error
-    repeat(4) {
-        val nested = cause.cause ?: return@repeat
-        cause = nested
-    }
-    return when (cause) {
-        is java.net.UnknownHostException -> R.string.tools_error_dns
-        is java.net.SocketTimeoutException -> R.string.tools_error_timeout
-        is java.net.ConnectException -> R.string.tools_error_unreachable
-        is SecurityException -> R.string.tools_error_permission
-        is IllegalArgumentException -> R.string.tools_error_config
-        else -> R.string.tools_error_generic
+    return when (com.labteto.dshmobile.uicontract.classifyUiToolError(error)) {
+        com.labteto.dshmobile.uicontract.UiToolError.DNS -> R.string.tools_error_dns
+        com.labteto.dshmobile.uicontract.UiToolError.TIMEOUT -> R.string.tools_error_timeout
+        com.labteto.dshmobile.uicontract.UiToolError.UNREACHABLE -> R.string.tools_error_unreachable
+        com.labteto.dshmobile.uicontract.UiToolError.PERMISSION -> R.string.tools_error_permission
+        com.labteto.dshmobile.uicontract.UiToolError.CONFIGURATION -> R.string.tools_error_config
+        com.labteto.dshmobile.uicontract.UiToolError.UNKNOWN -> R.string.tools_error_generic
     }
 }
 
@@ -136,7 +131,7 @@ internal class ToolsOperationGate {
 
 @HiltViewModel
 class ToolsViewModel @Inject constructor(
-    private val localTools: LocalToolsUiFacade,
+    private val localTools: ToolsUiPort,
     @ApplicationContext private val appContext: Context,
     private val networkSearchSettings: LocalNetworkSearchSettings,
 ) : ViewModel() {
@@ -271,7 +266,7 @@ class ToolsViewModel @Inject constructor(
             try {
                 _state.value = _state.value.copy(
                     loading = false,
-                    skillEditor = com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry(
+                    skillEditor = com.labteto.dshmobile.uicontract.UiSkillEditorSnapshot(
                         id, localTools.readSkillDocument(id),
                     ),
                 )

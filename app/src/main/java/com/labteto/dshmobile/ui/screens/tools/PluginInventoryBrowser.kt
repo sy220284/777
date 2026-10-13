@@ -42,7 +42,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
+import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -84,11 +84,11 @@ private data class InventoryRow(
 @Composable
 internal fun PluginInventoryBrowser(
     localIds: List<String>,
-    connectedServices: List<McpServerSnapshot> = emptyList(),
-    skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
-    presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
+    connectedServices: List<UiMcpServerSnapshot> = emptyList(),
+    skills: List<com.labteto.dshmobile.uicontract.UiSkillSnapshot> = emptyList(),
+    presets: List<com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot> = emptyList(),
     createdSkillId: String? = null,
-    skillEditor: com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry? = null,
+    skillEditor: com.labteto.dshmobile.uicontract.UiSkillEditorSnapshot? = null,
     savedSkillId: String? = null,
     skillsOnly: Boolean = false,
     loading: Boolean = false,

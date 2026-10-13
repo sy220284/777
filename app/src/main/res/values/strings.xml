@@ -2321,5 +2321,17 @@
     <string name="sy_v6_search_assistant">回复消息</string>
     <string name="sy_v6_search_all">搜索其他会话、人物、任务与文件</string>
     <string name="local_reading_anchor_unavailable">原阅读位置的消息未在当前记录中，已显示现有消息。</string>
+    <string name="usage_action_ui_generation">交互界面生成</string>
+    <string name="ui_document_model_source">模型生成的界面建议 · %1$s</string>
+    <string name="ui_document_usage_unknown">该请求未提供完整用量</string>
+    <string name="ui_document_draft_prepared">已放入消息草稿，请确认内容后发送</string>
+    <string name="ui_document_navigation_requested">已请求打开对应页面</string>
+    <string name="ui_document_owner_receipt">已提交到原操作所有者，请查看操作结果</string>
+    <string name="ui_document_unavailable">界面操作未完成，请检查当前会话与权限</string>
+    <string name="ui_document_selected">已选：%1$s</string>
+    <string name="ui_document_generate">生成交互界面</string>
+    <string name="ui_document_request">希望生成的界面</string>
+    <string name="ui_document_extra_request_consent">这会额外请求一次当前模型，可能消耗用量或额度。生成的界面只是建议，表单提交会先放入消息草稿供你确认。</string>
+    <string name="ui_document_confirm_generate">确认并生成</string>
 </resources>
 

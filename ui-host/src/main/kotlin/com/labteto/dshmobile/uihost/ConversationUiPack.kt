@@ -11,6 +11,8 @@ interface ConversationUiPack {
 
     @Composable
     fun Render(
+        documents: com.labteto.dshmobile.uicontract.UiDocumentUiPort?,
+        forms: com.labteto.dshmobile.uicontract.UiDocumentFormUiPort?,
         reading: com.labteto.dshmobile.uicontract.ConversationReadingUiPort,
         drafts: com.labteto.dshmobile.uicontract.ConversationDraftUiPort,
         chat: ChatUiPort,

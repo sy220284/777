@@ -69,6 +69,8 @@ object NextConversationUiPack : ConversationUiPack {
 
     @Composable
     override fun Render(
+        documents: com.labteto.dshmobile.uicontract.UiDocumentUiPort?,
+        forms: com.labteto.dshmobile.uicontract.UiDocumentFormUiPort?,
         reading: com.labteto.dshmobile.uicontract.ConversationReadingUiPort,
         drafts: ConversationDraftUiPort,
         chat: ChatUiPort,
@@ -80,6 +82,9 @@ object NextConversationUiPack : ConversationUiPack {
         val initialWork = remember(work) { work.snapshot() }
         val chatSnapshot by chat.snapshots.collectAsStateWithLifecycle(initialValue = initialChat)
         val workSnapshot by work.snapshots.collectAsStateWithLifecycle(initialValue = initialWork)
+        val documentSnapshot = documents?.snapshots?.collectAsStateWithLifecycle(
+            initialValue = remember(documents) { documents.snapshot() },
+        )?.value
         val identity = if (workMode) workSnapshot.identity else chatSnapshot.identity
         val phase = if (workMode) workSnapshot.phase else chatSnapshot.phase
         val messages = if (workMode) workSnapshot.messages else chatSnapshot.messages
@@ -180,6 +185,14 @@ object NextConversationUiPack : ConversationUiPack {
                                     UiMessageRole.TOOL -> R.string.next_role_tool
                                 }), style = MaterialTheme.typography.labelMedium)
                                 Text(message.text)
+                                if (documents != null && message.id == messages.lastOrNull()?.id && phase == UiExecutionPhase.IDLE) {
+                                    NextDocumentGenerateButton(identity, workMode, message.id, message.text, documents)
+                                }
+                                if (documents != null && forms != null) {
+                                    documentSnapshot?.documents?.filter { it.document.source.messageId == message.id }?.forEach {
+                                        NextUiDocument(it, identity, documents, forms)
+                                    }
+                                }
                                 HorizontalDivider()
                             }
                         }

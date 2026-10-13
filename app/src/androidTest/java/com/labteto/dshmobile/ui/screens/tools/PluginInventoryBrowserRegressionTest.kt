@@ -8,7 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import com.labteto.dshmobile.ui.theme.DshTheme
-import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
+import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -41,7 +41,7 @@ class PluginInventoryBrowserRegressionTest {
             DshTheme {
                 PluginInventoryBrowser(
                     localIds = emptyList(),
-                    connectedServices = listOf(McpServerSnapshot(
+                    connectedServices = listOf(UiMcpServerSnapshot(
                         id = "local-mcp", transport = "http", target = "http://127.0.0.1:4312",
                         tools = listOf("search"),
                     )),
@@ -101,7 +101,7 @@ class PluginInventoryBrowserRegressionTest {
             DshTheme {
                 PluginInventoryBrowser(
                     localIds = listOf("local-builtin"),
-                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry("report", "Build a report", true)),
+                    skills = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot("report", "Build a report", true)),
                     skillsOnly = true, onBack = {}, onManageConnections = {}, onReturnToChat = {},
                 )
             }
@@ -118,7 +118,7 @@ class PluginInventoryBrowserRegressionTest {
             DshTheme {
                 PluginInventoryBrowser(
                     localIds = emptyList(),
-                    presets = listOf(com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry(
+                    presets = listOf(com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot(
                         "research-check", "资料研究与核实", "查证材料", false,
                     )),
                     skillsOnly = true, onBack = {},
@@ -139,7 +139,7 @@ class PluginInventoryBrowserRegressionTest {
             DshTheme {
                 PluginInventoryBrowser(
                     localIds = emptyList(),
-                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                    skills = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot(
                         "my-skill", "My instructions", true,
                     )),
                     skillsOnly = true, onBack = {},
@@ -163,7 +163,7 @@ class PluginInventoryBrowserRegressionTest {
             DshTheme {
                 PluginInventoryBrowser(
                     localIds = emptyList(), skillsOnly = true,
-                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                    skills = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot(
                         "manual-review", "Only on user request", false,
                     )),
                     onBack = {}, onManageConnections = {}, onReturnToChat = {},

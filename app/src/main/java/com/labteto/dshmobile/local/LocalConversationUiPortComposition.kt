@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
+import com.labteto.dshmobile.local.uiBindingIdentity
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendDisposition
@@ -138,12 +139,7 @@ class LocalConversationUiPortComposition @Inject internal constructor(
         ))
     }
 
-    private fun identity(state: LocalHarnessState): UiSessionIdentity? =
-        state.sessionId.takeIf { it.isNotBlank() }?.let {
-            UiSessionIdentity(it, stateStore.foregroundRunHandle.activationId,
-                if (state.usageMode == LocalUsageMode.CHAT) state.chat.chatContext.generation else 0L,
-                state.modelState.modelSelection.activeProfile?.id, state.projectId)
-        }
+    private fun identity(state: LocalHarnessState): UiSessionIdentity? = stateStore.uiBindingIdentity(state)
 
     private fun admission(state: LocalHarnessState, expected: UiSessionIdentity, mode: LocalUsageMode): UiCommandReceipt.Rejected? = when {
         stateStore.sessionTransitioning -> UiCommandReceipt.Rejected(UiCommandRejection.SESSION_TRANSITION)

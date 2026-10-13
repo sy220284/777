@@ -5,20 +5,15 @@ import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadinessProjector
 import javax.inject.Inject
 import javax.inject.Singleton
 
-data class LocalCapabilityUiEntry(val name: String, val family: String, val access: String,
-    val approval: String, val requirements: List<String>)
-
-data class LocalSkillUiEntry(val name: String, val description: String, val modelInvocable: Boolean, val displayName: String = name)
-data class LocalPresetSkillUiEntry(val id: String, val title: String, val description: String, val installed: Boolean)
-data class LocalSkillEditorUiEntry(val id: String, val document: String)
-
 /** Tools page boundary; plugin/runtime implementations stay outside UI. */
 @Singleton
 class LocalToolsUiFacade @Inject constructor(
     private val tools: LocalToolsRuntime,
-) {
-    internal suspend fun servers() = tools.servers()
-    internal suspend fun githubConfigured() = tools.githubConfigured()
+) : com.labteto.dshmobile.uicontract.ToolsUiPort {
+    override suspend fun servers() = tools.servers().map {
+        com.labteto.dshmobile.uicontract.UiMcpServerSnapshot(it.id, it.transport, it.target, it.tools)
+    }
+    override suspend fun githubConfigured() = tools.githubConfigured()
     /** Work handoff UI projection; capability hints do not grant execution permissions. */
     internal fun workHandoffCapabilityReadiness(
         task: String,
@@ -35,34 +30,40 @@ class LocalToolsUiFacade @Inject constructor(
         showModelStatus, modelConfigured, mcpToolsAvailable, pluginsInstalled,
         accessibilityActive, notificationAccessActive,
     )
-    internal suspend fun configureGitHub(token: String) = tools.configureGitHub(token)
-    internal suspend fun clearGitHub() = tools.clearGitHub()
-    internal fun capabilityCatalogue() = tools.capabilityCatalogue().map {
-        LocalCapabilityUiEntry(it.name, it.family, it.access, it.approval, it.requirements)
+    override suspend fun configureGitHub(token: String) { tools.configureGitHub(token) }
+    override suspend fun clearGitHub() = tools.clearGitHub()
+    override fun capabilityCatalogue() = tools.capabilityCatalogue().map {
+        com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot(it.name, it.family, it.access, it.approval, it.requirements)
     }
-    internal fun installedPluginIds() = tools.installedPluginIds()
+    override fun installedPluginIds() = tools.installedPluginIds()
     /** Registry presence is a configuration hint, not an execution grant. */
     internal suspend fun handoffExternalReadiness(): Pair<Boolean, Boolean> {
         val hasMcpTools = tools.servers().any { it.tools.isNotEmpty() }
         val hasThirdPartyPlugin = tools.installedPluginIds().any { it != "local-builtin" }
         return hasMcpTools to hasThirdPartyPlugin
     }
-    internal suspend fun installedSkills() = tools.installedSkills().map {
-        LocalSkillUiEntry(it.name, it.description, it.modelInvocable, it.displayName)
+    override suspend fun installedSkills() = tools.installedSkills().map {
+        com.labteto.dshmobile.uicontract.UiSkillSnapshot(it.name, it.description, it.modelInvocable, it.displayName)
     }
-    internal suspend fun presetSkills() = tools.presetSkills().map {
-        LocalPresetSkillUiEntry(it.id, it.title, it.description, it.installed)
+    override suspend fun presetSkills() = tools.presetSkills().map {
+        com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot(it.id, it.title, it.description, it.installed)
     }
-    internal suspend fun installPreset(id: String) = tools.installPreset(id)
-    internal suspend fun createSkill(id: String, displayName: String, description: String, instructions: String) =
+    override suspend fun installPreset(id: String) = tools.installPreset(id)
+    override suspend fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         tools.createSkill(id, displayName, description, instructions)
-    internal suspend fun importSkill(filename: String, bytes: ByteArray) = tools.importSkill(filename, bytes)
-    internal suspend fun removeSkill(id: String) = tools.removeSkill(id)
-    internal suspend fun readSkillDocument(id: String) = tools.readSkillDocument(id)
-    internal suspend fun updateSkillDocument(id: String, document: String) = tools.updateSkillDocument(id, document)
-    internal suspend fun setSkillModelInvocable(id: String, enabled: Boolean) = tools.setSkillModelInvocable(id, enabled)
-    internal suspend fun connectHttp(serverId: String, endpoint: String) = tools.connectHttp(serverId, endpoint)
-    internal suspend fun connectStdio(serverId: String, command: List<String>, workingDirectory: String?) =
+    override suspend fun importSkill(filename: String, bytes: ByteArray) = tools.importSkill(filename, bytes)
+    override suspend fun removeSkill(id: String) = tools.removeSkill(id)
+    override suspend fun readSkillDocument(id: String) = tools.readSkillDocument(id)
+    override suspend fun updateSkillDocument(id: String, document: String) = tools.updateSkillDocument(id, document)
+    override suspend fun setSkillModelInvocable(id: String, enabled: Boolean) = tools.setSkillModelInvocable(id, enabled)
+    override suspend fun connectHttp(serverId: String, endpoint: String) = tools.connectHttp(serverId, endpoint)
+    override suspend fun connectStdio(serverId: String, command: List<String>, workingDirectory: String?) =
         tools.connectStdio(serverId, command, workingDirectory)
-    internal suspend fun disconnect(serverId: String) = tools.disconnect(serverId)
+    override suspend fun disconnect(serverId: String) = tools.disconnect(serverId)
+}
+
+@dagger.Module
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+internal abstract class LocalToolsUiBindings {
+    @dagger.Binds abstract fun bindToolsUiPort(facade: LocalToolsUiFacade): com.labteto.dshmobile.uicontract.ToolsUiPort
 }

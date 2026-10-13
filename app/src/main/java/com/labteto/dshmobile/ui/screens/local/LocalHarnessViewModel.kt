@@ -41,6 +41,7 @@ import kotlinx.coroutines.withContext
 
 @HiltViewModel
 class LocalHarnessViewModel @Inject constructor(
+    private val documentsFactory: com.labteto.dshmobile.local.presentation.LocalUiDocumentUiPortFactory,
     private val savedStateHandle: androidx.lifecycle.SavedStateHandle,
     private val runtime: LocalUiRuntime,
     private val uiPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
@@ -143,6 +144,21 @@ class LocalHarnessViewModel @Inject constructor(
         LocalConversationReadingState(savedStateHandle.get<List<String>>("conversation_reading").orEmpty()) {
             savedStateHandle["conversation_reading"] = ArrayList(it)
         }
+
+    val uiDocumentFormPort: com.labteto.dshmobile.uicontract.UiDocumentFormUiPort =
+        com.labteto.dshmobile.ui.host.LocalUiDocumentFormState(
+            savedStateHandle.get<List<String>>("ui_document_forms").orEmpty(),
+        ) { savedStateHandle["ui_document_forms"] = it }
+    val uiSceneRequest = savedStateHandle.getStateFlow<String?>("ui_scene_request", null)
+    fun consumeUiSceneRequest(id: String) {
+        if (uiSceneRequest.value == id) savedStateHandle["ui_scene_request"] = null
+    }
+    val uiDocumentUiPort: com.labteto.dshmobile.uicontract.UiDocumentUiPort = documentsFactory.create(
+        viewModelScope, conversationDraftUiPort,
+        com.labteto.dshmobile.ui.host.LocalUiSceneCatalog.requirements
+            .filter { it.kind == com.labteto.dshmobile.uicontract.UiSceneKind.PAGE &&
+                (it.id.value.startsWith("route.") || it.id.value.startsWith("settings.")) }.map { it.id }.toSet(),
+    ) { scene -> savedStateHandle["ui_scene_request"] = scene.value }
 
     private val conversationUiState = LocalConversationUiStateStore(appContext)
     val pinnedSessionIds = conversationUiState.pinnedSessionIds
