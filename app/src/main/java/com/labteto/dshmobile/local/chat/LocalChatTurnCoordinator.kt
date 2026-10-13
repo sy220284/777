@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.session.LocalConversationMode
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextAssembler
