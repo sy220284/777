@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 
 import android.Manifest
@@ -87,7 +89,6 @@ import com.labteto.dshmobile.ui.shenyan.SyUserBubble
 import com.labteto.dshmobile.ui.shenyan.rememberSyToast
 import com.labteto.dshmobile.ui.theme.AccentPalettes
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -377,8 +378,8 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                        .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapMd),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                 ) {
                 when (shownPage) {
                     SettingsDestination.ROOT -> {
@@ -460,7 +461,7 @@ fun SettingsScreen(
                             style = DsType.caption11.withReadingWeight(),
                             color = colors.textTertiary,
                             modifier = Modifier.fillMaxWidth()
-                                .padding(top = DsSpacing.small)
+                                .padding(top = SyMetric.gapMd)
                                 .wrapContentWidth(Alignment.CenterHorizontally),
                         )
                     }
@@ -573,7 +574,7 @@ fun SettingsScreen(
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                             ) {
                                 SyTextField(
                                     value = customChatFilterDraft,
@@ -996,7 +997,7 @@ fun SettingsScreen(
 
                 }
 
-                Spacer(Modifier.height(DsSpacing.xlarge))
+                Spacer(Modifier.height(SyMetric.gapPage))
                 }
                 }
             }
@@ -1033,7 +1034,7 @@ private fun ChatFilterPhraseRow(
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         Text(
             text = "• " + phrase,
@@ -1057,16 +1058,16 @@ internal fun SettingsCard(
     title: String,
     content: @Composable () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
         SettingsGroupTitle(title)
         // The settings groups sample the same V6 wallpaper / light field as the page.
         // Keep content crisp; only the material backing layer is blurred.
         SyMaterialFrame(
             modifier = Modifier.fillMaxWidth(),
             tier = SyMaterialTier.L3_CARD,
-            horizontalPadding = DsSpacing.medium,
-            verticalPadding = DsSpacing.medium,
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalPadding = SyMetric.gapLg,
+            verticalPadding = SyMetric.gapLg,
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             content()
         }

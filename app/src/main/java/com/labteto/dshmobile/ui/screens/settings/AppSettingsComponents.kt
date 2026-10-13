@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,7 +33,6 @@ import com.shenyan.designsystem.components.SyIconBox
 import com.shenyan.designsystem.components.SyMaterialFrame
 import com.shenyan.designsystem.components.SyMaterialTier
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -46,7 +47,7 @@ internal fun AppSettingsSection(compact: Boolean = false, content: @Composable C
         tier = SyMaterialTier.L3_CARD,
         shape = if (compact) DsShapes.settingsGroup else DsShapes.block,
         horizontalPadding = 0.dp,
-        verticalPadding = DsSpacing.tiny,
+        verticalPadding = SyMetric.gapXs,
         verticalArrangement = Arrangement.Top,
     ) {
         content()
@@ -55,9 +56,9 @@ internal fun AppSettingsSection(compact: Boolean = false, content: @Composable C
 
 @Composable
 internal fun AppSettingsMenuGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
         com.shenyan.designsystem.components.SySectionHeader(title,
-            modifier = Modifier.padding(start = DsSpacing.medium, top = DsSpacing.small))
+            modifier = Modifier.padding(start = SyMetric.gapLg, top = SyMetric.gapMd))
         AppSettingsSection(compact = true, content = content)
     }
 }
@@ -65,7 +66,7 @@ internal fun AppSettingsMenuGroup(title: String, content: @Composable ColumnScop
 @Composable
 internal fun SettingsGroupTitle(text: String) {
     com.shenyan.designsystem.components.SySectionHeader(text,
-        modifier = Modifier.padding(start = DsSpacing.small, top = DsSpacing.medium, bottom = DsSpacing.xsmall))
+        modifier = Modifier.padding(start = SyMetric.gapMd, top = SyMetric.gapLg, bottom = SyMetric.gapSm))
 }
 
 @Composable
@@ -74,7 +75,7 @@ internal fun AppSettingsDivider() {
     Box(
         Modifier
             .fillMaxWidth()
-            .padding(start = DsSpacing.comfortable + 24.dp + DsSpacing.medium, end = DsSpacing.comfortable)
+            .padding(start = SyMetric.gapSection + 24.dp + SyMetric.gapLg, end = SyMetric.gapSection)
             .height(1.dp)
             .background(colors.border),
     )
@@ -98,12 +99,12 @@ internal fun AppSettingsRow(
             .fillMaxWidth()
             .heightIn(min = reservedEntryHeight ?: if (compact) 56.dp else 64.dp)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = DsSpacing.comfortable, vertical = if (compact) DsSpacing.small else DsSpacing.medium),
+            .padding(horizontal = SyMetric.gapSection, vertical = if (compact) SyMetric.gapMd else SyMetric.gapLg),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
     ) {
         icon?.let { SyIconBox(icon = it) }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
             Text(
                 title,
                 style = (if (compact) DsType.settingsItem else DsType.navigationItem).withReadingWeight(),

@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -62,7 +64,6 @@ import com.labteto.dshmobile.ui.shenyan.SySegmentedTabs
 import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
@@ -176,7 +177,7 @@ internal fun UsageCalculationPage(
     SectionHeading(stringResource(R.string.usage_mode_detail))
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         CompactMetric(
             label = stringResource(R.string.usage_calculation_total_tokens),
@@ -197,7 +198,7 @@ internal fun UsageCalculationPage(
             val total = analytics.byModel.values.sumOf { it.tracked.totalTokens.toDouble() }.coerceAtLeast(1.0)
             androidx.compose.foundation.lazy.LazyColumn(
                 Modifier.fillMaxWidth().heightIn(max = 260.dp),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
             ) {
                 analytics.byModel.entries.sortedByDescending { it.value.tracked.totalTokens }.forEach { entry ->
                     item(key = entry.key) {
@@ -211,8 +212,8 @@ internal fun UsageCalculationPage(
                             tier = SyMaterialTier.L3_CARD,
                         ) {
                             Column(
-                                modifier = Modifier.padding(DsSpacing.small),
-                                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                                modifier = Modifier.padding(SyMetric.gapMd),
+                                verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                             ) {
                                 Row {
                                     Text(
@@ -244,10 +245,10 @@ internal fun UsageCalculationPage(
         tier = SyMaterialTier.L3_CARD,
     ) {
         Column(
-            modifier = Modifier.padding(DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            modifier = Modifier.padding(SyMetric.gapLg),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 Text(
                     stringResource(R.string.usage_daily_title),
                     style = DsType.std14Strong.withReadingWeight(),
@@ -265,7 +266,7 @@ internal fun UsageCalculationPage(
                 onSelect = { selectedEpochDay = it },
             )
             selectedDay?.let { (day, aggregate) ->
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
                     Text(
                         formatEpochDay(day),
                         style = DsType.small13Strong.withReadingWeight(),
@@ -343,8 +344,8 @@ internal fun UsageCalculationPage(
             color = colors.selected,
         ) {
             Column(
-                modifier = Modifier.padding(DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                modifier = Modifier.padding(SyMetric.gapLg),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
                 if (analytics.trackedSince > 0L) {
                     Text(
@@ -373,8 +374,8 @@ internal fun UsageCalculationPage(
             color = colors.warning.copy(alpha = .18f),
         ) {
             Column(
-                modifier = Modifier.padding(DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                modifier = Modifier.padding(SyMetric.gapLg),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
                 Text(
                     stringResource(R.string.usage_calculation_partial),
@@ -530,8 +531,8 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
         tier = SyMaterialTier.L3_CARD,
     ) {
         Column(
-            modifier = Modifier.padding(DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            modifier = Modifier.padding(SyMetric.gapLg),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             UsageValueLine(
                 stringResource(R.string.usage_calculation_input),

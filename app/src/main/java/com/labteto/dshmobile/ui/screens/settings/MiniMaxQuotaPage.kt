@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,7 +21,6 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.MiniMaxProviderUsage
 import com.labteto.dshmobile.ui.shenyan.SyButton
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CancellationException
@@ -58,8 +59,8 @@ internal fun MiniMaxQuotaPage(
     if (loadingProfile || profile == null) {
         AppSettingsSection {
             Column(
-                modifier = Modifier.padding(DsSpacing.comfortable),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                modifier = Modifier.padding(SyMetric.gapSection),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
             ) {
                 Text(
                     stringResource(if (loadingProfile) R.string.minimax_quota_loading_profile else R.string.minimax_quota_no_profile),
@@ -79,8 +80,8 @@ internal fun MiniMaxQuotaPage(
 
     AppSettingsSection {
         Column(
-            modifier = Modifier.padding(DsSpacing.comfortable),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            modifier = Modifier.padding(SyMetric.gapSection),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
         ) {
             Text(stringResource(R.string.minimax_quota_model, profile.model),
                 style = DsType.std14Strong.withReadingWeight(), color = colors.text)
@@ -136,8 +137,8 @@ internal fun MiniMaxQuotaCard(quota: MiniMaxProviderUsage.ModelQuota) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     AppSettingsSection {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(DsSpacing.comfortable),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.large),
+            modifier = Modifier.fillMaxWidth().padding(SyMetric.gapSection),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSection),
         ) {
             Text(
                 if (quota.name.equals("general", ignoreCase = true)) {
@@ -164,7 +165,7 @@ private fun MiniMaxQuotaWindow(
     resetMillis: Long?,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
         Text(title, style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
         Text(window.display(), style = DsType.title22.withReadingWeight(), color = colors.text)
         window.remainingFraction()?.let { fraction ->

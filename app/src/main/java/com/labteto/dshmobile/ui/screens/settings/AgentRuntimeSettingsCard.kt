@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -40,7 +42,6 @@ import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -155,7 +156,7 @@ private fun StepperRow(
     }
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.xsmall),
+        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapSm),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -181,7 +182,7 @@ private fun StepperRow(
                 tier = SyMaterialTier.L4_OVERLAY,
             ) {
                 Box(
-                    modifier = Modifier.fillMaxWidth().heightIn(min = DsSpacing.touchTarget),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = SyMetric.touch),
                     contentAlignment = Alignment.Center,
                 ) {
                     BasicTextField(
@@ -194,7 +195,7 @@ private fun StepperRow(
                             .onFocusChanged { focus ->
                                 if (!focus.isFocused) commitDraft(announce = false)
                             }
-                            .padding(horizontal = DsSpacing.xsmall),
+                            .padding(horizontal = SyMetric.gapSm),
                         singleLine = true,
                         textStyle = DsType.std14Strong.withReadingWeight().copy(
                             color = colors.text,
@@ -240,7 +241,7 @@ private fun StepperRow(
                 it,
                 style = DsType.caption11.withReadingWeight(),
                 color = colors.textTertiary,
-                modifier = Modifier.padding(top = DsSpacing.tiny),
+                modifier = Modifier.padding(top = SyMetric.gapXs),
             )
         }
     }

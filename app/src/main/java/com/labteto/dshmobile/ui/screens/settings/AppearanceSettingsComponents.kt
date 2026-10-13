@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -51,7 +53,6 @@ import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.shenyan.SyUserBubble
 import com.labteto.dshmobile.ui.theme.AccentPalettes
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
@@ -65,9 +66,9 @@ internal fun AppearanceReadingPreview() {
     SyMaterialFrame(
         modifier = Modifier.fillMaxWidth(),
         tier = SyMaterialTier.L3_CARD,
-        horizontalPadding = DsSpacing.medium,
-        verticalPadding = DsSpacing.medium,
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalPadding = SyMetric.gapLg,
+        verticalPadding = SyMetric.gapLg,
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         Text(
             stringResource(R.string.settings_appearance_preview_assistant),
@@ -99,7 +100,7 @@ internal fun ReadingPreferencesRow(
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         Text(stringResource(R.string.settings_text_smaller), style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
         SySlider(
@@ -143,7 +144,7 @@ internal fun ReadingPreferencesRow(
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         Text(stringResource(R.string.settings_surface_clearer), style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
         SySlider(
@@ -186,9 +187,9 @@ internal fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
 @Composable
 internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    Column(modifier = Modifier.padding(vertical = DsSpacing.small)) {
+    Column(modifier = Modifier.padding(vertical = SyMetric.gapMd)) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             modifier = Modifier.horizontalScroll(rememberScrollState()),
         ) {
             val resolvedAccentKey = AccentPalettes.of(settings.accentTheme).key
@@ -226,7 +227,7 @@ internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
                                 .background(palette.lightAccent.copy(alpha = 0.35f)),
                         )
                     }
-                    Spacer(Modifier.height(DsSpacing.xsmall))
+                    Spacer(Modifier.height(SyMetric.gapSm))
                     Text(
                         palette.cnName,
                         style = DsType.caption11.withReadingWeight(),
@@ -251,11 +252,11 @@ private fun AppearanceChip(label: String, selected: Boolean, onClick: () -> Unit
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Box(
         modifier = Modifier
-            .heightIn(min = DsSpacing.touchTarget)
+            .heightIn(min = SyMetric.touch)
             .clip(DsShapes.cube)
             .background(if (selected) colors.selected else LocalSyColors.current.materialL1)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = DsSpacing.small),
+            .padding(horizontal = 14.dp, vertical = SyMetric.gapMd),
     ) {
         Text(
             label,
@@ -284,7 +285,7 @@ internal fun BackgroundRow(
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) onPick(uri)
     }
-    Column(modifier = Modifier.padding(vertical = DsSpacing.small)) {
+    Column(modifier = Modifier.padding(vertical = SyMetric.gapMd)) {
         if (path != null) {
             val imagePath = path
             val thumbnail by produceState<ImageBitmap?>(initialValue = null, key1 = imagePath) {
@@ -309,7 +310,7 @@ internal fun BackgroundRow(
                         .size(width = 96.dp, height = 56.dp)
                         .clip(DsShapes.cube),
                 )
-                Spacer(Modifier.height(DsSpacing.small))
+                Spacer(Modifier.height(SyMetric.gapMd))
             }
         }
         Text(
@@ -323,8 +324,8 @@ internal fun BackgroundRow(
             style = DsType.small13.withReadingWeight(),
             color = colors.textTertiary,
         )
-        Spacer(Modifier.height(DsSpacing.small))
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        Spacer(Modifier.height(SyMetric.gapMd))
+        Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             AppearanceChip(stringResource(R.string.settings_background_image_choose), false) {
                 picker.launch(arrayOf("image/*"))
             }
@@ -335,7 +336,7 @@ internal fun BackgroundRow(
             }
         }
         if (path != null) {
-            Spacer(Modifier.height(DsSpacing.small))
+            Spacer(Modifier.height(SyMetric.gapMd))
             ToggleRow(
                 stringResource(R.string.settings_background_adaptive_contrast),
                 adaptiveContrast,
