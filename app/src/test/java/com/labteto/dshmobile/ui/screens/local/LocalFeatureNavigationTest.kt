@@ -389,7 +389,7 @@ class LocalFeatureNavigationTest {
     }
 
     @Test
-    fun restoreStackDropsUnknownAndUnownedPagesThenRestoresHomePrefix() {
+    fun restoreStackDropsRemovedRunCenterAndUnownedPagesThenRestoresHomePrefix() {
         val contributions = listOf(
             LocalFeatureUiContribution(
                 moduleId = LocalFeatureModuleId.SHELL,
@@ -408,8 +408,9 @@ class LocalFeatureNavigationTest {
             ),
         )
 
+        assertEquals(null, LocalFeatureCatalog.resolve("RUN_CENTER"))
         val restored = localFeatureRestoreStack(
-            listOf("UNKNOWN", LocalFeaturePage.WORKSPACE.name, LocalFeaturePage.DIARY.name),
+            listOf("RUN_CENTER", "UNKNOWN", LocalFeaturePage.WORKSPACE.name, LocalFeaturePage.DIARY.name),
             contributions,
         )
 
