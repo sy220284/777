@@ -136,7 +136,6 @@ internal fun DrawerQuickActions(
     onOpenDiary: () -> Unit,
     onTasks: () -> Unit,
     onWorkspaceFiles: () -> Unit,
-    onProjects: () -> Unit,
     onOpenRunCenter: () -> Unit,
     onTools: () -> Unit,
     onMiniMaxQuota: (() -> Unit)? = null,
@@ -176,11 +175,6 @@ internal fun DrawerQuickActions(
                     onClick = onOpenDiary,
                 )
             } else {
-                DrawerQuickAction(
-                    icon = SyEntryIcons.Projects,
-                    title = stringResource(R.string.local_project_management_title),
-                    onClick = onProjects,
-                )
                 DrawerQuickAction(
                     icon = SyEntryIcons.RunCenter,
                     title = stringResource(R.string.local_run_center),
