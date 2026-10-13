@@ -408,12 +408,30 @@ private fun LocalUserMessageContent(
     }
 }
 
-/** Presentation-only projection: filter old provider thinking tags in each durable text block
- * while keeping media references, source attribution and display order intact. */
-internal fun localVisibleAssistantBlocks(message: LocalHarnessMessage): List<LocalMessageBlock> =
-    message.visibleBlocks().map { block ->
-        if (block is LocalMessageBlock.Text) block.copy(text = visibleAssistantText(block.text)) else block
+/**
+ * Keep Markdown and model-visible text contiguous until a media boundary. Besides avoiding
+ * broken Markdown across adjacent text chunks, this filters legacy thinking markers even
+ * when the opening tag spans multiple persisted Text blocks. Media order is unchanged.
+ */
+internal fun localVisibleAssistantBlocks(message: LocalHarnessMessage): List<LocalMessageBlock> = buildList {
+    val text = StringBuilder()
+    fun flushText() {
+        if (text.isEmpty()) return
+        val visible = visibleAssistantText(text.toString())
+        if (visible.isNotBlank()) add(LocalMessageBlock.Text(visible))
+        text.clear()
     }
+    message.visibleBlocks().forEach { block ->
+        when (block) {
+            is LocalMessageBlock.Text -> text.append(block.text)
+            else -> {
+                flushText()
+                add(block)
+            }
+        }
+    }
+    flushText()
+}
 
 @Composable
 private fun LocalAssistantMessageContent(
