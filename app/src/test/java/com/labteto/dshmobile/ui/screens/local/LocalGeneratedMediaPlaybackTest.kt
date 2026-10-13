@@ -20,5 +20,7 @@ class LocalGeneratedMediaPlaybackTest {
         assertFalse(canPlayGeneratedVideo(LocalMediaVideoPhase.SUCCEEDED, false, " "))
         assertFalse(canPlayGeneratedVideo(LocalMediaVideoPhase.PROCESSING, true, "https://example.com/video.mp4"))
         assertFalse(canPlayGeneratedVideo(LocalMediaVideoPhase.FAILED, true, null))
+        assertFalse(canPlayGeneratedVideo(LocalMediaVideoPhase.FAILED, false, "https://example.com/expired.mp4"))
+        assertFalse(canPlayGeneratedVideo(LocalMediaVideoPhase.PROCESSING, false, "https://example.com/still-generating.mp4"))
     }
 }
