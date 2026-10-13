@@ -522,6 +522,21 @@ fun LocalHarnessScreen(
                 showNewSessionMode = true
             },
             onOpenDrawer = { scope.launch { drawerState.open() } },
+            onOpenPersonaGallery = {
+                // Preserve the same unsaved-persona guard used by the drawer.
+                if (viewModel.hasUnsavedCurrentPersona()) {
+                    showPersonaGallerySavePrompt = true
+                } else {
+                    drawerGalleryTargetId = shell.galleryId
+                    drawerGalleryEntryVersion++
+                    pushFeature(LocalFeaturePage.PERSONA_GALLERY)
+                }
+            },
+            onOpenWorkspaceFiles = {
+                filesMode = LocalFilesMode.WORKSPACE
+                requestedFilePath = null
+                pushFeature(LocalFeaturePage.WORKSPACE)
+            },
             onOpenFromDrawer = ::openFeatureFromDrawer,
             onCloseDrawer = { scope.launch { drawerState.close() } },
             onReturnFromDrawerReader = {

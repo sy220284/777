@@ -2317,5 +2317,11 @@
     <string name="media_creation_preparing">正在准备创作请求</string>
     <string name="media_creation_saving">服务商已返回成果，正在保存</string>
     <string name="media_creation_save_failed">服务商已返回成果，本地保存未完成</string>
+    <!-- V6 mobile-only primary home destinations; labels describe real screens, not a mock tab. -->
+    <string name="sy_v6_mobile_sessions">会话</string>
+    <string name="sy_v6_mobile_chat">对话</string>
+    <string name="sy_v6_mobile_persona">人物档案</string>
+    <string name="sy_v6_mobile_work">工作</string>
+    <string name="sy_v6_mobile_workspace">文件</string>
 </resources>
 

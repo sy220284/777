@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -178,6 +179,8 @@ internal fun LocalConversationSurface(
     skillDisplayNames: Map<String, String> = emptyMap(),
     onConsumeComposerHandoff: () -> Unit = {},
     onOpenDrawer: (() -> Unit)? = null,
+    onOpenPersonaGallery: () -> Unit = {},
+    onOpenWorkspaceFiles: () -> Unit = {},
     onUseWorkCapability: ((String) -> Unit)? = null,
     usageRevision: StateFlow<Long>? = null,
     loadTurnSummaries: (String) -> Map<String, com.labteto.dshmobile.local.TokenUsageAggregate> = { emptyMap() },
@@ -209,6 +212,9 @@ internal fun LocalConversationSurface(
     // stable root work surface from rootSurfaceColor above.
     // V5: chat and work headers use solid top chrome, not a nested glass layer.
     val topSurfaceColor = LocalSyPalette.current.topBar
+    val showV6MobileNavigation = v6MobileHomeNavigationVisible(
+        LocalConfiguration.current.screenWidthDp, onOpenDrawer != null,
+    )
     val scope = rememberCoroutineScope()
     val appContext = LocalContext.current
     // Global ceiling changes must also refresh the exact per-model persona/Work projection.
@@ -541,7 +547,7 @@ internal fun LocalConversationSurface(
                 .padding(horizontal = DsMetrics.screenHorizontal, vertical = DsSpacing.small),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (onOpenDrawer != null) SyIconButton(
+                if (onOpenDrawer != null && !showV6MobileNavigation) SyIconButton(
                     icon = FeatherIcons.Menu,
                     contentDescription = stringResource(R.string.app_open_navigation),
                     onClick = onOpenDrawer,
@@ -609,6 +615,14 @@ internal fun LocalConversationSurface(
                         tint = colors.labelSecondary,
                     )
                 }
+            }
+            if (showV6MobileNavigation) {
+                V6MobileHomeNavigation(
+                    mode = state.usageMode,
+                    onSessions = { onOpenDrawer?.invoke() },
+                    onPersona = onOpenPersonaGallery,
+                    onWorkspace = onOpenWorkspaceFiles,
+                )
             }
         }
 
