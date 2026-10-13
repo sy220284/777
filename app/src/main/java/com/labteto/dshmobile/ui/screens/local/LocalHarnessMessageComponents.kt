@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -85,7 +87,6 @@ import com.labteto.dshmobile.ui.components.ThinkingRow
 import com.labteto.dshmobile.ui.shenyan.SyUserBubble
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -187,7 +188,7 @@ internal fun LocalMessageRow(
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
             ) {
                 Box {
                     Box(
@@ -297,7 +298,7 @@ internal fun LocalMessageRow(
             }
             Column(
                 readingModifier.testTag("messageActionSurface:${message.id}").combinedClickable(onClick = {}, onLongClick = { pulse(); actionsOpen = true }),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 if (groupMode) {
                     message.speakerName?.takeIf(String::isNotBlank)?.let { speaker ->
@@ -387,7 +388,7 @@ private fun LocalUserMessageContent(
 ) {
     Column(
         horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         message.visibleBlocks().forEach { block ->
             when (block) {
@@ -540,7 +541,7 @@ private fun LocalTranscriptFile(file: LocalMessageBlock.File) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             Icon(
                 FeatherIcons.Tool,
@@ -597,7 +598,7 @@ internal fun CompactMessageAction(
     Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.size(DsSpacing.touchTarget),
+        modifier = Modifier.size(SyMetric.touch),
         shape = RoundedCornerShape(8.dp),
         color = androidx.compose.ui.graphics.Color.Transparent,
     ) {
@@ -621,7 +622,7 @@ internal fun ChatThinkingRow(
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         StateDot(if (streaming) StateDotState.Running else StateDotState.Done, size = 8.dp)
         Text(

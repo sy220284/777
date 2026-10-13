@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -73,7 +75,6 @@ import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
@@ -242,12 +243,12 @@ internal fun LocalModelSettingsCard(
                 ),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Row(Modifier.fillMaxWidth().padding(DsSpacing.small),
+                Row(Modifier.fillMaxWidth().padding(SyMetric.gapMd),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                             Text(profile.displayName ?: profile.model, style = DsType.std14Strong.withReadingWeight(), color = colors.text,
                                 modifier = Modifier.weight(1f, fill = false), maxLines = 1,
                                 overflow = TextOverflow.Ellipsis)
@@ -303,7 +304,7 @@ internal fun LocalModelSettingsCard(
                     }
                     SyMenu(
                         anchor = { Text("⋯", style = DsType.large20.withReadingWeight(), color = colors.textSecondary,
-                            modifier = Modifier.padding(horizontal = DsSpacing.small)) },
+                            modifier = Modifier.padding(horizontal = SyMetric.gapMd)) },
                         items = listOfNotNull(
                             if (!local.modelSelection.isActive(profile))
                                 SyMenuItem(text = stringResource(R.string.local_model_use),
@@ -396,7 +397,7 @@ internal fun LocalModelSettingsCard(
             },
         ) {
             Column(Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 Text(stringResource(R.string.local_model_choose), style = DsType.small13Strong.withReadingWeight(),
                     color = colors.text)
                 SyMenu(
@@ -404,7 +405,7 @@ internal fun LocalModelSettingsCard(
                         Surface(shape = DsShapes.row,
                             color = LocalSyColors.current.materialL1,
                             modifier = Modifier.fillMaxWidth()) {
-                            Row(Modifier.fillMaxWidth().padding(DsSpacing.comfortable),
+                            Row(Modifier.fillMaxWidth().padding(SyMetric.gapSection),
                                 verticalAlignment = Alignment.CenterVertically) {
                                 Text(if (custom) model.ifBlank { stringResource(R.string.local_model_custom) }
                                     else LocalModelPresets.entries.firstOrNull {
@@ -512,7 +513,7 @@ internal fun LocalModelSettingsCard(
                             Surface(shape = DsShapes.row,
                                 color = LocalSyColors.current.materialL1,
                                 modifier = Modifier.fillMaxWidth()) {
-                                Row(Modifier.fillMaxWidth().padding(DsSpacing.comfortable),
+                                Row(Modifier.fillMaxWidth().padding(SyMetric.gapSection),
                                     verticalAlignment = Alignment.CenterVertically) {
                                     Text(stringResource(R.string.local_model_catalog_selector, discoveredModels.size),
                                         style = DsType.std14Strong.withReadingWeight(),
@@ -577,7 +578,7 @@ internal fun LocalModelSettingsCard(
         SyResponsiveSheet(title = stringResource(R.string.local_model_remove),
             subtitle = stringResource(R.string.local_model_remove_confirm),
             onDismiss = { pendingRemoveId = null }) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 SyButton(stringResource(R.string.common_cancel), onClick = { pendingRemoveId = null },
                     modifier = Modifier.weight(1f), variant = SyButtonVariant.Ghost)
                 SyButton(stringResource(R.string.local_model_remove), onClick = {
@@ -595,8 +596,8 @@ internal fun ModelCapabilityTags(capabilities: Set<LocalModelCapability>) {
     if (capabilities.isEmpty()) return
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
     ) {
         capabilities.sortedBy { it.ordinal }.forEach { capability ->
             SyPill(text = stringResource(modelCapabilityLabel(capability)))
@@ -654,8 +655,8 @@ internal fun DeepSeekPricingCard(
                 verticalPadding = 0.dp,
             ) {
                 Column(
-                    modifier = Modifier.padding(DsSpacing.medium),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                    modifier = Modifier.padding(SyMetric.gapLg),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
                 ) {
                     Text(model.displayName, style = DsType.std14Strong.withReadingWeight(), color = colors.text)
                     Text(

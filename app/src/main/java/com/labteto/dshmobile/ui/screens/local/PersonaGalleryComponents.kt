@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -74,7 +76,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
@@ -424,7 +425,7 @@ internal fun GalleryStoryCard(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
@@ -481,7 +482,7 @@ private fun ArchivedDialogueRow(
             text,
             style = DsType.small13.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
-            modifier = Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
+            modifier = Modifier.padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapMd),
         )
     }
 }
@@ -491,7 +492,7 @@ internal fun PersonaHero(persona: PersonaProfile, subtitle: String) {
     SyGlassCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PersonaAvatar(persona.name, large = true)
-            Spacer(Modifier.width(DsSpacing.medium))
+            Spacer(Modifier.width(SyMetric.gapLg))
             Column(Modifier.weight(1f)) {
                 Text(
                     persona.name,

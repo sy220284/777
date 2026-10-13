@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -60,7 +62,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.io.ByteArrayOutputStream
@@ -160,7 +161,7 @@ internal fun LocalGeneratedMediaResultRow(
                         else result.remoteUrl?.let { url -> openMediaUrl(context, url) { error = it } }
                     },
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                     if (file != null) {
                         SyButton(text = resources.getString(R.string.media_chat_view_image), size = SyButtonSize.Small,
                             onClick = { viewMediaFile(context, file, imageMime(file)) { error = it } })
@@ -190,7 +191,7 @@ internal fun LocalGeneratedMediaResultRow(
                         Text(text, style = DsType.std14.withReadingWeight(),
                             color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                         SyButton(text = resources.getString(R.string.media_chat_insert_text), size = SyButtonSize.Small,
                             onClick = { onInsertText(text) })
                         SyButton(text = resources.getString(R.string.media_chat_copy), size = SyButtonSize.Small,
@@ -270,7 +271,7 @@ internal fun LocalGeneratedVideoTaskRow(
                     }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 if (showingPlayer) SyButton(
                     text = resources.getString(R.string.media_chat_collapse_video),
                     size = SyButtonSize.Small,
@@ -349,8 +350,8 @@ private fun MediaMessageCard(
         tier = SyMaterialTier.L3_CARD,
         border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
     ) {
-        Column(Modifier.padding(DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        Column(Modifier.padding(SyMetric.gapLg),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             Text(title, style = DsType.small13Strong.withReadingWeight(), color = colors.text)
             Text(subtitle, style = DsType.caption11.withReadingWeight(),
                 color = colors.textTertiary)
@@ -466,7 +467,7 @@ private fun InlineSpeechPlayer(file: File) {
         }
     }
     Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
         SyButton(
             text = if (playing) resources.getString(R.string.media_chat_pause_audio)
                 else resources.getString(R.string.media_chat_play_audio),
@@ -629,7 +630,7 @@ internal fun LocalWorkArtifactMessageRow(
             Text(resources.getString(R.string.media_chat_work_file_changed), style = DsType.caption11.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             if (artifact.category == "file") {
                 SyButton(resources.getString(R.string.media_chat_view_entire_file), onClick = onOpen, size = SyButtonSize.Small)
                 if (file != null) {
