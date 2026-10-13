@@ -8,7 +8,7 @@ import org.junit.Test
 class ChatContinuityPromptProjectionTest {
     @Test
     fun longTermCommitmentsSurviveEvenWhenOldUnrelatedItemsAreNotInThePrompt() {
-        val active = (1..70).map { "还有事项$it待处理" }
+        val active = (1..70).map { "还有事项${it}待处理" }
         val selected = ChatContinuityPromptProjection.select(active, "这轮聊点别的")
         assertTrue(selected.size <=
             ChatContinuityPromptProjection.RELATED_EVENT_BUDGET +
