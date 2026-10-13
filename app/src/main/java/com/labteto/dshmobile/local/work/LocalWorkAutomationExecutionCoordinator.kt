@@ -11,7 +11,6 @@ import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
-import com.labteto.dshmobile.local.runtime.LOCAL_PROJECT_ID
 import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
@@ -275,9 +274,9 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
                 ?: "自动化任务",
             updatedAt = now,
             usageMode = LocalUsageMode.WORK,
-            conversationMode = LocalConversationMode.PROJECT,
+            conversationMode = LocalConversationMode.INDEPENDENT,
             lineageId = id,
-            projectId = LOCAL_PROJECT_ID,
+            projectId = null,
         )
         sessionStorage.coordinator.enqueue(session)
         return session
@@ -301,7 +300,7 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
             conversationMode = session.conversationMode,
             parentSessionId = session.parentSessionId,
             lineageId = session.lineageId.ifBlank { session.id },
-            projectId = session.projectId ?: LOCAL_PROJECT_ID,
+            projectId = session.projectId,
             handoffSummary = session.handoffSummary,
             userRules = runtime.userRules,
             autoRecall = runtime.autoRecall,
