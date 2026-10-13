@@ -48,12 +48,11 @@ internal object ChatUnifiedTurnContext {
         // substantive subject exists. A new explicit historical question can still recall.
         if (attention.pausedSubject == "*" && ChatTurnContextPolicy.isWeakReply(userMessage) &&
             attention.lastUserSubject.isBlank()) return false
-        val paused = attention.pausedSubject.takeIf { it.isNotBlank() && it != "*" }
-            ?: return true
-        if (content.contains(paused, ignoreCase = true) &&
-            !userMessage.contains(paused, ignoreCase = true)) {
-            return false
+        val paused = (attention.pausedSubjects + attention.pausedSubject)
+            .filter { it.isNotBlank() && it != "*" }.distinct()
+        return paused.none { topic ->
+            content.contains(topic, ignoreCase = true) &&
+                !userMessage.contains(topic, ignoreCase = true)
         }
-        return true
     }
 }
