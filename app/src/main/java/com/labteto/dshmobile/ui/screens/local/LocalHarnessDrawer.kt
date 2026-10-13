@@ -492,6 +492,7 @@ internal fun LocalModeDrawer(
                             running = running && session.id == currentSessionId,
                             selected = session.id in selectedIds,
                             selectionOpen = selectionOpen,
+                            drawerVisible = drawerOpen || docked,
                             onClick = {
                                 if (selectionOpen) {
                                     if (session.id in selectedIds) selectedIds.remove(session.id)
@@ -534,6 +535,7 @@ internal fun LocalModeDrawer(
                             running = running && session.id == currentSessionId,
                             selected = session.id in selectedIds,
                             selectionOpen = selectionOpen,
+                            drawerVisible = drawerOpen || docked,
                             onClick = {
                                 if (selectionOpen) {
                                     if (session.id in selectedIds) selectedIds.remove(session.id)
