@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.tools
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -324,10 +328,10 @@ internal fun PluginInventoryBrowser(
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
                 ) {
                     items(list, key = { it.id }) { item ->
-                        Surface(
+                        SyMaterialSurface(
                             modifier = Modifier.fillMaxWidth(),
                             onClick = { selectedRow = item },
-                            color = colors.bgLayer1,
+                            tier = SyMaterialTier.L3_CARD,
                             shape = DsShapes.block,
                         ) {
                             Row(

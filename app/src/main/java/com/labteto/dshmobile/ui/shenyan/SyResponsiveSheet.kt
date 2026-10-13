@@ -27,7 +27,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -131,11 +133,11 @@ fun SyResponsiveSheet(
                         easing = CubicBezierEasing(.22f, 1f, .36f, 1f)
                     )) { fullWidth -> fullWidth },
                 ) {
-                    Surface(
+                    SyMaterialSurface(
                         modifier = modifier.width(420.dp).fillMaxHeight()
                             .padding(if (floating) 18.dp else 10.dp),
                         shape = RoundedCornerShape(SyDimensions.cornerOverlay),
-                        color = p.l4,
+                        tier = SyMaterialTier.L4_OVERLAY,
                     ) { SheetBody() }
                 }
             }
@@ -146,12 +148,13 @@ fun SyResponsiveSheet(
             sheetState = sheetState,
             modifier = if (floating) modifier.padding(horizontal = 6.dp) else modifier,
             shape = RoundedCornerShape(SyDimensions.cornerOverlay),
-            containerColor = p.l4,
+            containerColor = Color.Transparent,
             scrimColor = p.scrim,
             dragHandle = null,
             contentWindowInsets = { WindowInsets.navigationBars },
         ) {
-            SheetBody()
+            SyMaterialSurface(tier = SyMaterialTier.L4_OVERLAY,
+                shape = RoundedCornerShape(SyDimensions.cornerOverlay)) { SheetBody() }
         }
     }
 }

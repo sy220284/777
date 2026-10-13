@@ -71,21 +71,21 @@ fun SyIconButton(
     val pressed by interaction.collectIsPressedAsState()
     val hovered by interaction.collectIsHoveredAsState()
     val scale by animateFloatAsState(
-        if (pressed && enabled) .96f else 1f,
+        if (pressed && enabled && !motion) .96f else 1f,
         animationSpec = tween(if (motion) 0 else SyMotion.pressMs),
         label = "syIconPress",
     )
     val resolved = when {
-        selected -> p.materialL3
-        pressed -> p.materialL2
-        hovered -> p.materialL1
+        selected -> syMaterialColor(SyMaterialTier.L3_CARD)
+        pressed -> syMaterialColor(SyMaterialTier.L2_BAR)
+        hovered -> syMaterialColor(SyMaterialTier.L1_SECTION)
         else -> containerColor
     }
     val fill by animateColorAsState(
         resolved, animationSpec = tween(if (motion) 0 else SyMotion.selectMs),
         label = "syIconSurface",
     )
-    val foreground = if (selected) p.primaryPressed else tint ?: p.textSecondary
+    val foreground = if (selected) p.text else tint ?: p.textSecondary
     Surface(
         onClick = onClick, enabled = enabled, modifier = modifier.size(SyMetric.touch),
         interactionSource = interaction, color = fill, shadowElevation = shadowElevation,
@@ -120,10 +120,10 @@ fun SyEmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
     ) {
-        Surface(
+        SyMaterialSurface(
             modifier = Modifier.size(52.dp),
             shape = RoundedCornerShape(SyMetric.radiusCard),
-            color = p.materialL3,
+            tier = SyMaterialTier.L3_CARD,
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(icon, contentDescription = null, tint = p.textSecondary,
@@ -167,19 +167,15 @@ fun SyPill(
 ) {
     val p = LocalSyColors.current
     val shape = RoundedCornerShape(999.dp)
-    val fill = when {
-        warn -> p.warning.copy(alpha = .15f)
-        selected -> p.materialL3
-        else -> p.materialL2
-    }
+    val tint = if (warn) p.warning.copy(alpha = .15f) else Color.Unspecified
     val ink = when {
-        warn -> p.warning
-        selected -> p.primaryPressed
+        warn -> p.warningInk
+        selected -> p.text
         else -> p.textSecondary
     }
     if (onClick != null) {
-        Surface(onClick = onClick, modifier = modifier.sizeIn(minWidth = SyMetric.touch, minHeight = SyMetric.touch),
-            shape = shape, color = fill, border = BorderStroke(1.dp, p.border)) {
+        SyMaterialSurface(onClick = onClick, modifier = modifier.sizeIn(minWidth = SyMetric.touch, minHeight = SyMetric.touch),
+            shape = shape, tier = SyMaterialTier.L1_SECTION, tint = tint, shadowElevation = 0.dp, border = BorderStroke(1.dp, p.border)) {
             Box(Modifier.padding(horizontal = 13.dp, vertical = 9.dp),
                 contentAlignment = Alignment.Center) {
                 Text(text, color = ink, style = MaterialTheme.typography.labelMedium,
@@ -187,7 +183,7 @@ fun SyPill(
             }
         }
     } else {
-        Surface(modifier = modifier, shape = shape, color = fill) {
+        SyMaterialSurface(modifier = modifier, shape = shape, tier = SyMaterialTier.L1_SECTION, tint = tint, shadowElevation = 0.dp) {
             Text(text, Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                 color = ink, style = MaterialTheme.typography.labelSmall)
         }
@@ -222,17 +218,17 @@ fun SySheetChoiceRow(
     )
     Row(
         modifier.fillMaxWidth().heightIn(min = if (subtitle == null) 56.dp else 72.dp)
-            .background(if (selected) p.materialL3 else Color.Transparent, shape)
+            .background(if (selected) syMaterialColor(SyMaterialTier.L3_CARD) else Color.Transparent, shape)
             .then(action).padding(horizontal = 14.dp, vertical = 9.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) Icon(icon, contentDescription = null,
-            tint = if (danger) p.danger else p.textSecondary,
+            tint = if (danger) p.dangerInk else p.textSecondary,
             modifier = Modifier.size(20.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(title, style = MaterialTheme.typography.bodyMedium,
-                color = if (danger) p.danger else p.text)
+                color = if (danger) p.dangerInk else p.text)
             if (subtitle != null) Text(subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = p.textSecondary)

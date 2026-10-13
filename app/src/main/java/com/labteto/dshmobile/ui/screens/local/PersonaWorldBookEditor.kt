@@ -1,12 +1,15 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,8 +32,6 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.util.UUID
 import kotlin.math.roundToInt
@@ -59,9 +60,9 @@ internal fun PersonaWorldBookEditor(
     // Keep the same state/data source on both form factors. For >=600dp the
     // reference is a two-column master/detail editor; phones stack list and edit.
     val entryList: @Composable () -> Unit = {
-        Surface(
+        SyMaterialSurface(
             shape = DsShapes.block,
-            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+            tier = SyMaterialTier.L3_CARD,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
@@ -123,9 +124,9 @@ internal fun PersonaWorldBookEditor(
     val entryEditor: @Composable () -> Unit = {
         expandedIndex.takeIf { it in entries.indices }?.let { index ->
             val entry = entries[index]
-            Surface(
+            SyMaterialSurface(
                 shape = DsShapes.block,
-                color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                tier = SyMaterialTier.L3_CARD,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(

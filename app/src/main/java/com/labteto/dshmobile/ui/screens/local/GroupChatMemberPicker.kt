@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,8 +46,6 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
@@ -172,7 +174,7 @@ internal fun GroupChatMemberPickerSheet(
                     items(filteredEntries, key = PersonaGalleryEntry::id) { entry ->
                         val checked = entry.id in selected
                         val canAdd = checked || selected.size < MAX_GROUP_CHAT_MEMBERS
-                        Surface(
+                        SyMaterialSurface(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .toggleable(
@@ -187,10 +189,7 @@ internal fun GroupChatMemberPickerSheet(
                                         }
                                     },
                                 ),
-                            color = DsTheme.colors.wallpaperSurface(
-                                WallpaperSurfaceLevel.CARD,
-                                base = if (checked) DsTheme.colors.accentTertiary else DsTheme.colors.bgLayer1,
-                            ),
+                            tint = if (checked) DsTheme.colors.accentTertiary else androidx.compose.ui.graphics.Color.Transparent,
                         ) {
                             Row(
                                 modifier = Modifier

@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -54,8 +58,6 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
 import java.text.NumberFormat
@@ -490,10 +492,10 @@ internal fun SectionHeading(text: String) {
 internal fun EmptyUsageDetail(message: String? = null) {
     val colors = DsTheme.colors
     val resolvedMessage = message ?: stringResource(R.string.usage_empty_detail)
-    Surface(
+    SyMaterialSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.row,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        tier = SyMaterialTier.L3_CARD,
     ) {
         Text(
             resolvedMessage,

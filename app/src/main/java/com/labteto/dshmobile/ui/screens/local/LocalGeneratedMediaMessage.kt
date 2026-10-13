@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -22,7 +26,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -60,8 +63,6 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -262,7 +263,7 @@ internal fun LocalGeneratedVideoTaskRow(
             if (showingPlayer) {
                 InlineVideoPlayer(task.downloadUrl, savedVideo, onError = { error = it })
             } else {
-                Surface(shape = DsShapes.block, color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                SyMaterialSurface(shape = DsShapes.block, tier = SyMaterialTier.L3_CARD,
                     modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
                     androidx.compose.foundation.layout.Box(
                         contentAlignment = androidx.compose.ui.Alignment.Center) {
@@ -343,10 +344,10 @@ private fun MediaMessageCard(
     content: @Composable () -> Unit,
 ) {
     val colors = DsTheme.colors
-    Surface(
+    SyMaterialSurface(
         modifier = modifier.fillMaxWidth(0.90f).widthIn(max = 470.dp),
         shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        tier = SyMaterialTier.L3_CARD,
         border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderL3),
     ) {
         Column(Modifier.padding(DsSpacing.medium),

@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
@@ -353,9 +357,9 @@ internal fun ApprovalDialog(
             },
         )
 
-        Surface(
+        SyMaterialSurface(
             shape = DsShapes.block,
-            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+            tier = SyMaterialTier.L3_CARD,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
@@ -545,9 +549,9 @@ internal fun ChatPersonaDialog(
             color = DsTheme.colors.labelSecondary,
         )
 
-        Surface(
+        SyMaterialSurface(
             shape = DsShapes.block,
-            color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+            tier = SyMaterialTier.L3_CARD,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(

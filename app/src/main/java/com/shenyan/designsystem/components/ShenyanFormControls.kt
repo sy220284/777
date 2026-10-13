@@ -82,6 +82,7 @@ fun SyTextField(
     colors: TextFieldColors? = null,
 ) {
     val p = LocalSyColors.current
+    val inputFill = syMaterialColor(SyMaterialTier.L1_SECTION)
     OutlinedTextField(
         value = value, onValueChange = onValueChange,
         modifier = modifier.heightIn(min = SyMetric.touch),
@@ -95,18 +96,18 @@ fun SyTextField(
         colors = colors ?: OutlinedTextFieldDefaults.colors(
             focusedTextColor = p.text, unfocusedTextColor = p.text,
             disabledTextColor = p.textTertiary,
-            focusedContainerColor = p.materialL5,
-            unfocusedContainerColor = if (flat) p.materialL2 else p.materialL3,
-            disabledContainerColor = p.materialL2,
+            focusedContainerColor = inputFill,
+            unfocusedContainerColor = inputFill,
+            disabledContainerColor = inputFill,
             cursorColor = p.primary,
             focusedBorderColor = if (flat) Color.Transparent else p.primary,
             unfocusedBorderColor = if (flat) Color.Transparent else p.border,
             disabledBorderColor = p.border.copy(alpha = .45f),
-            focusedLabelColor = p.primary, unfocusedLabelColor = p.textTertiary,
+            focusedLabelColor = p.text, unfocusedLabelColor = p.textTertiary,
             disabledLabelColor = p.textTertiary,
             focusedPlaceholderColor = p.textTertiary,
             unfocusedPlaceholderColor = p.textTertiary,
-            errorBorderColor = p.danger, errorLabelColor = p.danger,
+            errorBorderColor = p.danger, errorLabelColor = p.dangerInk,
             errorCursorColor = p.danger,
         ),
     )
@@ -168,12 +169,12 @@ fun SySliderControl(
         onValueChangeFinished = onValueChangeFinished,
         colors = SliderDefaults.colors(
             thumbColor = p.primary, activeTrackColor = p.primary,
-            inactiveTrackColor = p.materialL2,
+            inactiveTrackColor = syMaterialColor(SyMaterialTier.L2_BAR),
             activeTickColor = Color.Transparent,
             inactiveTickColor = Color.Transparent,
             disabledThumbColor = p.textTertiary,
             disabledActiveTrackColor = p.primary.copy(alpha = .32f),
-            disabledInactiveTrackColor = p.materialL2.copy(alpha = .6f),
+            disabledInactiveTrackColor = syMaterialColor(SyMaterialTier.L2_BAR).copy(alpha = .6f),
             disabledActiveTickColor = Color.Transparent,
             disabledInactiveTickColor = Color.Transparent,
         ),
@@ -197,7 +198,7 @@ fun SySegmentedControl(
     Row(
         modifier = modifier.selectableGroup()
             .then(if (stretch) Modifier else Modifier.horizontalScroll(rememberScrollState()))
-            .clip(shape).background(p.materialL2)
+            .clip(shape).background(syMaterialColor(SyMaterialTier.L2_BAR))
             .border(1.dp, p.border, shape).padding(2.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {

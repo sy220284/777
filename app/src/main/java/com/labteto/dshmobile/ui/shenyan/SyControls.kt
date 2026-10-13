@@ -88,9 +88,9 @@ fun SyPhase.label(): String = when(this) {
 fun SyStatusLine(phase: SyPhase, message: String, modifier: Modifier = Modifier) {
     val p = com.shenyan.designsystem.foundation.LocalSyColors.current
     val ink = when (phase) {
-        SyPhase.DONE, SyPhase.RUNNING -> p.mint
-        SyPhase.FAILED, SyPhase.CANCELLED -> p.clay
-        SyPhase.BLOCKED, SyPhase.WAITING -> p.warning
+        SyPhase.DONE, SyPhase.RUNNING -> p.successInk
+        SyPhase.FAILED, SyPhase.CANCELLED -> p.dangerInk
+        SyPhase.BLOCKED, SyPhase.WAITING -> p.warningInk
         SyPhase.IDLE -> p.textTertiary
     }
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -63,17 +63,40 @@ class ReadmeScreenshotActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val dark = intent.getBooleanExtra("readme_dark", false)
-        val bars = if (dark) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+        val matte = intent.getBooleanExtra("readme_matte", false)
+        val background = intent.getStringExtra("readme_background").orEmpty()
+        val wallpaperPath = if (background.isBlank()) null else {
+            val bitmap = android.graphics.Bitmap.createBitmap(120, 240, android.graphics.Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(bitmap)
+            val paint = android.graphics.Paint()
+            for (y in 0 until 240 step 20) for (x in 0 until 120 step 20) {
+                paint.color = when (background) {
+                    "purple" -> android.graphics.Color.rgb(100, 26, 160)
+                    "forest" -> android.graphics.Color.rgb(19, 107, 81)
+                    else -> if ((x / 20 + y / 20) % 2 == 0) android.graphics.Color.WHITE else android.graphics.Color.rgb(22, 77, 146)
+                }
+                canvas.drawRect(x.toFloat(), y.toFloat(), x + 20f, y + 20f, paint)
+            }
+            java.io.File(cacheDir, "material-quality-wallpaper.png").also { file ->
+                file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            }.absolutePath
+        }
+        val bars = if (dark || matte) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
         else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
         enableEdgeToEdge(statusBarStyle = bars, navigationBarStyle = bars)
         val screen = intent.getStringExtra(EXTRA_SCREEN).orEmpty()
         require(screen in SUPPORTED_SCREENS) { "未知 README 截图页面：$screen" }
 
         setContent {
-            DshTheme(preference = if (dark) ThemePreference.DARK else ThemePreference.LIGHT) {
-                Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-                    ReadmeScreenshotSurface(screen)
-                    ScreenshotReadySignal(screen)
+            DshTheme(preference = if (matte) ThemePreference.MATTE_BLACK else if (dark) ThemePreference.DARK else ThemePreference.LIGHT,
+                backgroundPath = wallpaperPath) {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.shenyan.designsystem.foundation.LocalSyReduceMotion provides true,
+                ) {
+                    Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                        ReadmeScreenshotSurface(screen)
+                        ScreenshotReadySignal(screen, wallpaperPath != null)
+                    }
                 }
             }
         }
@@ -83,6 +106,7 @@ class ReadmeScreenshotActivity : ComponentActivity() {
         const val EXTRA_SCREEN = "readme_screen"
         const val LOG_TAG = "ReadmeScreenshot"
         val SUPPORTED_SCREENS = setOf(
+            "material-quality",
             "navigation",
             "chat",
             "work",
@@ -96,8 +120,10 @@ class ReadmeScreenshotActivity : ComponentActivity() {
 }
 
 @Composable
-private fun ScreenshotReadySignal(screen: String) {
-    LaunchedEffect(screen) {
+private fun ScreenshotReadySignal(screen: String, expectsWallpaper: Boolean) {
+    val wallpaperReady = com.labteto.dshmobile.ui.theme.LocalAppBackgroundState.current.hasImage
+    LaunchedEffect(screen, wallpaperReady) {
+        if (expectsWallpaper && !wallpaperReady) return@LaunchedEffect
         repeat(3) { withFrameNanos { } }
         Log.i(ReadmeScreenshotActivity.LOG_TAG, "READY:$screen")
     }
@@ -107,6 +133,7 @@ private fun ScreenshotReadySignal(screen: String) {
 private fun ReadmeScreenshotSurface(screen: String) {
     if (screen.startsWith("design-")) { FluidDesignScreenshot(screen.removePrefix("design-")); return }
     when (screen) {
+        "material-quality" -> MaterialQualityScreenshot()
         "navigation" -> NavigationScreenshot()
         "chat" -> ChatScreenshot()
         "work" -> FluidDesignScreenshot("work-execution")

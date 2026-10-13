@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 import android.graphics.BitmapFactory
 import android.provider.OpenableColumns
 import java.io.File
@@ -1132,7 +1136,7 @@ internal fun PersonaGalleryScreen(
                 }
             }
             selected?.let { entry ->
-                Surface(color = DsTheme.colors.bgLayer1) {
+                SyMaterialSurface(tier = SyMaterialTier.L3_CARD,) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(DsSpacing.medium),
                         verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),

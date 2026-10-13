@@ -55,6 +55,7 @@ internal fun workCompletionCardKey(sessionId: String, progress: LocalWorkflowPro
 @Composable
 internal fun WorkflowProgressSection(progress: LocalWorkflowProgress) {
     val colors = DsTheme.colors
+    val reduced = com.labteto.dshmobile.ui.shenyan.LocalSyReducedMotion.current
     val isBlocked = progress.blockedReason != null || progress.stage == WorkflowStage.STALLED
     val progressStatus = workflowProgressVisualStatus(progress)
     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
@@ -62,8 +63,8 @@ internal fun WorkflowProgressSection(progress: LocalWorkflowProgress) {
         AnimatedContent(
             targetState = progress.stage,
             transitionSpec = {
-                fadeIn(animationSpec = DsAnimations.tabSwap) togetherWith
-                    fadeOut(animationSpec = DsAnimations.fade)
+                fadeIn(animationSpec = if (reduced) androidx.compose.animation.core.tween(0) else DsAnimations.tabSwap) togetherWith
+                    fadeOut(animationSpec = if (reduced) androidx.compose.animation.core.tween(0) else DsAnimations.fade)
             },
             label = "workflowStageMorph",
         ) { stage ->

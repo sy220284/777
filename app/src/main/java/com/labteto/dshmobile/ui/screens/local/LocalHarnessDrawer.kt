@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -16,10 +20,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -70,8 +74,6 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 
@@ -130,8 +132,6 @@ internal fun LocalModeDrawer(
     val sy = LocalSyPalette.current
     // The drawer has its own visual backing: raw L2 on the scene looked fully transparent.
     // Wallpaper mode retains a faint view of the user's image without sacrificing legibility.
-    val drawerSurface = if (LocalAppBackgroundState.current.hasImage)
-        sy.topBar.copy(alpha = 0.92f) else sy.l2.compositeOver(sy.canvas)
     val expandLabel = stringResource(R.string.sy_v5_nav_expand)
     val collapseLabel = stringResource(R.string.sy_v5_nav_collapse)
     val docked = LocalConfiguration.current.screenWidthDp >= 1024
@@ -140,7 +140,7 @@ internal fun LocalModeDrawer(
         // A functional 64dp rail: never leave a collapsed sidebar full of clipped labels.
         Column(
             Modifier.width(SyDimensions.navigationCollapsed).fillMaxHeight()
-                .background(drawerSurface).safeDrawingPadding(),
+                .background(com.shenyan.designsystem.components.syMaterialColor(SyMaterialTier.L4_OVERLAY)).safeDrawingPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -296,12 +296,14 @@ internal fun LocalModeDrawer(
 
     ModalDrawerSheet(
         drawerShape = androidx.compose.ui.graphics.RectangleShape,
-        drawerContainerColor = drawerSurface,
+        drawerContainerColor = androidx.compose.ui.graphics.Color.Transparent,
         modifier = Modifier.fillMaxHeight().width(
             if (docked) SyDimensions.navigationExpanded
             else LocalConfiguration.current.screenWidthDp.dp * DsMetrics.drawerWidthFraction
         ),
     ) {
+        SyMaterialSurface(modifier = Modifier.fillMaxHeight(), tier = SyMaterialTier.L4_OVERLAY,
+            shape = androidx.compose.ui.graphics.RectangleShape) {
         Column(Modifier.fillMaxHeight().safeDrawingPadding()) {
             Column(
                 modifier = Modifier
@@ -472,7 +474,8 @@ internal fun LocalModeDrawer(
                             count = sessionSections.pinned.size,
                         )
                     }
-                    items(sessionSections.pinned, key = { "pinned:" + it.id }) { session ->
+                    itemsIndexed(sessionSections.pinned, key = { _, item -> "pinned:" + item.id }) { index, session ->
+                        com.shenyan.designsystem.components.SyEntranceCascade(drawerOpen || docked, index) {
                         LocalSessionDrawerRow(
                             session = session,
                             displayTitle = sessionTitleOverrides[session.id] ?: session.title,
@@ -502,6 +505,7 @@ internal fun LocalModeDrawer(
                                     R.string.usage_mode_chat else R.string.usage_mode_work,
                             ) else null,
                         )
+                        }
                     }
                 }
 
@@ -512,7 +516,8 @@ internal fun LocalModeDrawer(
                             count = sessionSections.recent.size,
                         )
                     }
-                    items(sessionSections.recent, key = { "recent:" + it.id }) { session ->
+                    itemsIndexed(sessionSections.recent, key = { _, item -> "recent:" + item.id }) { index, session ->
+                        com.shenyan.designsystem.components.SyEntranceCascade(drawerOpen || docked, index + sessionSections.pinned.size) {
                         LocalSessionDrawerRow(
                             session = session,
                             displayTitle = sessionTitleOverrides[session.id] ?: session.title,
@@ -542,6 +547,7 @@ internal fun LocalModeDrawer(
                                     R.string.usage_mode_chat else R.string.usage_mode_work,
                             ) else null,
                         )
+                        }
                     }
                 }
 
@@ -571,9 +577,9 @@ internal fun LocalModeDrawer(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
                 if (selectionOpen) {
-                    Surface(
+                    SyMaterialSurface(
                         shape = DsShapes.block,
-                        color = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
+                        tier = SyMaterialTier.L4_OVERLAY,
                     ) {
                         Row(
                             Modifier
@@ -617,6 +623,7 @@ internal fun LocalModeDrawer(
                     }
                 }
             }
+        }
         }
         renameTargetId?.let { id ->
             RenameDialog(

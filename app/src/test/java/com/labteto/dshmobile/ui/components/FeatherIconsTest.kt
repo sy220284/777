@@ -44,10 +44,10 @@ class FeatherIconsTest {
     }
 
     @Test
-    fun `every glyph is stroked in Feather's own weight, never filled`() {
+    fun `every generic glyph follows the V6 entry stroke weight, never filled`() {
         glyphs.forEach { (name, vector) ->
             val path = vector.root.first() as VectorPath
-            assertEquals("$name stroke width", 2f, path.strokeLineWidth, 0f)
+            assertEquals("$name stroke width", 1.75f, path.strokeLineWidth, 0f)
             assertEquals("$name stroke cap", StrokeCap.Round, path.strokeLineCap)
             assertEquals("$name stroke join", StrokeJoin.Round, path.strokeLineJoin)
             assertEquals("$name should have no fill", null, path.fill)

@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 
 import android.text.format.DateFormat as AndroidDateFormat
 import androidx.activity.compose.BackHandler
@@ -346,10 +350,10 @@ private fun AutomationCardSurface(
         SyStatus.Failed -> colors.error.copy(alpha = 0.28f)
         else -> colors.borderL1
     }
-    Surface(
+    SyMaterialSurface(
         modifier = modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.bgLayer1,
+        tier = SyMaterialTier.L3_CARD,
         border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
         tonalElevation = 0.dp,
     ) {

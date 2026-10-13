@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import kotlin.math.max
@@ -27,9 +28,15 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import com.shenyan.designsystem.foundation.*
@@ -56,18 +63,49 @@ fun SyMaterialFrame(
     border: BorderStroke? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    SyMaterialSurface(modifier = modifier, tier = tier, onClick = onClick, backdrop = backdrop,
+        shape = shape, border = border) {
+        Column(Modifier.padding(horizontal = horizontalPadding, vertical = verticalPadding),
+            verticalArrangement = verticalArrangement, content = content)
+    }
+}
+
+/** A single material renderer for columns, rows, images, controls and overlays. */
+@Composable
+fun SyMaterialSurface(
+    modifier: Modifier = Modifier,
+    tier: SyMaterialTier = SyMaterialTier.L3_CARD,
+    onClick: (() -> Unit)? = null,
+    enabled: Boolean = true,
+    interactionSource: MutableInteractionSource? = null,
+    tint: Color = Color.Unspecified,
+    backdrop: (@Composable () -> Unit)? = null,
+    shape: Shape = RoundedCornerShape(if (tier == SyMaterialTier.L4_OVERLAY) SyMetric.radiusSheet else SyMetric.radiusCard),
+    border: BorderStroke? = null,
+    contentColor: Color = LocalSyColors.current.text,
+    tonalElevation: Dp = 0.dp,
+    shadowElevation: Dp? = null,
+    content: @Composable () -> Unit,
+) {
     val c = LocalSyColors.current
     val scene = LocalSySceneBackdrop.current
+    val view = LocalView.current
+    val windowOnScreen = remember { IntArray(2) }
     var materialOrigin by remember { mutableStateOf(IntOffset.Zero) }
+    var materialSize by remember { mutableStateOf(IntSize.Zero) }
     val nested = LocalSyGlassDepth.current
     val resolved = if ((nested >= 3 || LocalSyReduceTransparency.current) && tier != SyMaterialTier.L5_SOLID) SyMaterialTier.L5_SOLID else tier
-    val materialFill = when (resolved) {
-        SyMaterialTier.L1_SECTION -> c.materialL1
-        SyMaterialTier.L2_BAR -> c.materialL2
-        SyMaterialTier.L3_CARD -> c.materialL3
-        SyMaterialTier.L4_OVERLAY -> c.materialL4
-        SyMaterialTier.L5_SOLID -> c.materialL5
-    }
+    val regionY = if (scene == null || scene.viewportSize.height == 0) .5f else
+        (materialOrigin.y - scene.viewportOrigin.y + materialSize.height / 2f) / scene.viewportSize.height
+    val region = when { regionY < .30f -> 0; regionY < .74f -> 1; else -> 2 }
+    val materialFill = remember(c, resolved, scene, region) { syResolveMaterialFill(c, resolved, scene, regionY) }
+    val defaultInteraction = remember { MutableInteractionSource() }
+    val interaction = interactionSource ?: defaultInteraction
+    val pressed by interaction.collectIsPressedAsState()
+    val press by animateFloatAsState(
+        if (pressed && enabled && onClick != null && !LocalSyReduceMotion.current) .985f else 1f,
+        tween(if (LocalSyReduceMotion.current) 0 else SyMotion.pressMs), label = "materialPress",
+    )
     // Without a spatial backing, use the same palette over its canvas rather than letting
     // unrelated content show through. Nested cards inherit their parent's backing.
     val fill = if (scene == null && backdrop == null && nested == 0)
@@ -86,6 +124,9 @@ fun SyMaterialFrame(
         SyMaterialTier.L3_CARD -> 7.dp
         SyMaterialTier.L4_OVERLAY -> 16.dp
     }
+    val rim = if (materialFill.alpha < 1f) BorderStroke(1.dp, Brush.linearGradient(
+        listOf(c.materialSheen, c.border.copy(alpha = c.border.alpha * .45f), c.materialSheen.copy(alpha = .12f)),
+    )) else BorderStroke(1.dp, c.border)
     @Composable fun Interior() {
         Box(Modifier.clip(shape)) {
             if (blurRadius > 0.dp && nested == 0) {
@@ -101,9 +142,9 @@ fun SyMaterialFrame(
                 }
             }
             Box(Modifier.matchParentSize().background(fill))
-            CompositionLocalProvider(LocalSyGlassDepth provides (if (materialFill.alpha == 1f) nested else nested + 1)) {
-                Column(Modifier.padding(horizontal = horizontalPadding, vertical = verticalPadding),
-                    verticalArrangement = verticalArrangement, content = content)
+            if (tint.isSpecified) Box(Modifier.matchParentSize().background(tint.copy(alpha = tint.alpha.coerceAtMost(.22f))))
+            CompositionLocalProvider(LocalSyGlassDepth provides (nested + 1)) {
+                content()
             }
             if (materialFill.alpha < 1f) {
                 Box(Modifier.align(Alignment.TopCenter).fillMaxWidth(.93f).height(1.dp).background(c.materialSheen))
@@ -111,16 +152,20 @@ fun SyMaterialFrame(
         }
     }
     val outer = modifier.onGloballyPositioned { coordinates ->
+        view.rootView.getLocationOnScreen(windowOnScreen)
         val point = coordinates.positionInWindow()
-        val next = IntOffset(point.x.roundToInt(), point.y.roundToInt())
+        val next = IntOffset(point.x.roundToInt() + windowOnScreen[0], point.y.roundToInt() + windowOnScreen[1])
         if (materialOrigin != next) materialOrigin = next
-    }.shadow(elevation, shape).clip(shape)
+        if (materialSize != coordinates.size) materialSize = coordinates.size
+    }.graphicsLayer { scaleX = press; scaleY = press }.shadow(shadowElevation ?: elevation, shape).clip(shape)
     if (onClick != null) {
-        Surface(onClick = onClick, modifier = outer, color = Color.Transparent, shape = shape,
-            border = border ?: BorderStroke(1.dp, c.border)) { Interior() }
+        Surface(onClick = onClick, enabled = enabled, interactionSource = interaction, modifier = outer, color = Color.Transparent, shape = shape,
+            contentColor = contentColor, tonalElevation = tonalElevation,
+            border = border ?: rim) { Interior() }
     } else {
         Surface(modifier = outer, color = Color.Transparent, shape = shape,
-            border = border ?: BorderStroke(1.dp, c.border)) { Interior() }
+            contentColor = contentColor, tonalElevation = tonalElevation,
+            border = border ?: rim) { Interior() }
     }
 }
 

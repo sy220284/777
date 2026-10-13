@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 
 import android.content.Context
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -17,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,8 +52,6 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -271,9 +272,9 @@ internal fun PersonaGalleryOverviewV3(
         verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
         if (currentGalleryId == null || currentHasUnsavedChanges) {
-            Surface(
+            SyMaterialSurface(
                 shape = DsShapes.block,
-                color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                tier = SyMaterialTier.L3_CARD,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Row(

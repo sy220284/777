@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -15,7 +19,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -54,14 +57,11 @@ import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.shenyan.rememberSyToast
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
-import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -76,11 +76,11 @@ internal fun LocalAgentSwarmLaunchEntry(
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
-    Surface(
+    SyMaterialSurface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, BackgroundRegion.BOTTOM),
+        tier = SyMaterialTier.L3_CARD,
         border = BorderStroke(
             1.dp,
             if (selected) colors.accent.copy(alpha = 0.32f) else colors.borderL2,
@@ -141,12 +141,12 @@ internal fun LocalAgentTeamStatusBar(
         exit = fadeOut(DsAnimations.composerFade) +
             shrinkVertically(animationSpec = DsAnimations.composerReveal),
     ) {
-        Surface(
+        SyMaterialSurface(
             onClick = onClick,
             enabled = team.visible,
             modifier = modifier.fillMaxWidth(),
             shape = DsShapes.block,
-            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, BackgroundRegion.BOTTOM),
+            tier = SyMaterialTier.L3_CARD,
             border = BorderStroke(1.dp, colors.borderL1),
             tonalElevation = 0.dp,
         ) {
@@ -515,12 +515,12 @@ private fun TeamMemberRow(
     val colors = DsTheme.colors
     val expansionLabel = stringResource(if (selected) R.string.local_team_expanded else R.string.local_team_collapsed)
     val pulse = rememberHapticPulse()
-    Surface(
+    SyMaterialSurface(
         onClick = { pulse(); onClick() },
         modifier = Modifier.fillMaxWidth().semantics { stateDescription = expansionLabel },
         shape = DsShapes.block,
-        color = if (selected) colors.accent.copy(alpha = 0.06f) else {
-            colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, BackgroundRegion.BOTTOM)
+        tint = if (selected) colors.accent.copy(alpha = 0.06f) else {
+            androidx.compose.ui.graphics.Color.Transparent
         },
         border = BorderStroke(
             1.dp,
@@ -614,10 +614,10 @@ private fun TeamMemberDetail(
         } while (true)
     }
 
-    Surface(
+    SyMaterialSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.settingsGroup,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, BackgroundRegion.BOTTOM),
+        tier = SyMaterialTier.L3_CARD,
         border = BorderStroke(1.dp, colors.borderL2),
         tonalElevation = 0.dp,
     ) {
@@ -787,11 +787,11 @@ private fun TeamTaskRow(task: LocalAgentTeamTaskUiState) {
         if (task.writeConflict) add(stringResource(R.string.local_team_write_conflict))
         if (task.description.isNotBlank()) add(task.description)
     }
-    Surface(
+    SyMaterialSurface(
         onClick = { pulse(); expanded = !expanded },
         modifier = Modifier.fillMaxWidth().semantics { stateDescription = expansionLabel },
         shape = DsShapes.row,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, BackgroundRegion.BOTTOM),
+        tier = SyMaterialTier.L3_CARD,
         border = BorderStroke(1.dp, colors.borderL2),
         tonalElevation = 0.dp,
     ) {
@@ -981,7 +981,7 @@ private fun TeamMemberWorksite(member: LocalAgentTeamMemberUiState, output: Stri
     val colors = DsTheme.colors
     val clipboard = LocalClipboardManager.current
     var expanded by rememberSaveable(member.id) { mutableStateOf(false) }
-    Surface(modifier = Modifier.fillMaxWidth(), shape = DsShapes.block, color = colors.bgLayer1) {
+    SyMaterialSurface(modifier = Modifier.fillMaxWidth(), shape = DsShapes.block, tier = SyMaterialTier.L3_CARD,) {
         Column(Modifier.padding(DsSpacing.small), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                 WorkOperationIcon(com.labteto.dshmobile.ui.AgentOperationKind.Delegate, member.activity == "running" || member.phase == "provisioning")

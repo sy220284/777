@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 
 import com.labteto.dshmobile.ui.shenyan.SySearchField
 
@@ -23,7 +27,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -72,8 +75,6 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
 import java.util.Date
@@ -340,10 +341,10 @@ internal fun MemoryManagementCard(
                     )
                 }
             }
-            Surface(
+            SyMaterialSurface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = DsShapes.block,
-                color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                tier = SyMaterialTier.L3_CARD,
             ) {
                 Column(
                     modifier = Modifier.padding(DsSpacing.medium),

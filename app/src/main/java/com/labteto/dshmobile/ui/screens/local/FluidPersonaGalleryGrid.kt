@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -44,6 +48,8 @@ import kotlinx.coroutines.withContext
 internal fun FluidPersonaGalleryGrid(entries: List<PersonaGalleryEntry>, onSelect: (String) -> Unit,
     onLongClick: (String) -> Unit, modifier: Modifier = Modifier,
     animateOnEntrance: Boolean = true) {
+    val reduced = com.labteto.dshmobile.ui.shenyan.LocalSyReducedMotion.current
+    val animateEntrance = animateOnEntrance && !reduced
     LazyVerticalGrid(GridCells.Fixed(2), modifier,
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
         verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
@@ -52,10 +58,10 @@ internal fun FluidPersonaGalleryGrid(entries: List<PersonaGalleryEntry>, onSelec
             // cards animate once; a long gallery must never queue hundreds of delays.
             // The V6 reveal is a first-entry flourish, not a mandatory animation
             // each time a detail screen returns to the same gallery list.
-            var appeared by rememberSaveable(entry.id, animateOnEntrance) {
-                mutableStateOf(!animateOnEntrance || index >= DsAnimations.cascadeMaxItems)
+            var appeared by rememberSaveable(entry.id, animateEntrance) {
+                mutableStateOf(!animateEntrance || index >= DsAnimations.cascadeMaxItems)
             }
-            LaunchedEffect(entry.id) {
+            LaunchedEffect(entry.id, animateEntrance) {
                 if (!appeared) {
                     delay(index.coerceAtMost(DsAnimations.cascadeMaxItems - 1) *
                         DsAnimations.cascadeStaggerMs)
@@ -86,8 +92,8 @@ private fun FluidPersonaGalleryCard(entry: PersonaGalleryEntry, onClick: () -> U
     val image by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, entry.portraitPath) {
         value = withContext(Dispatchers.IO) { decodePersonaPortraitBitmap(entry.portraitPath, maxEdgePx = 480) }
     }
-    Surface(shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+    SyMaterialSurface(shape = DsShapes.block,
+        tier = SyMaterialTier.L3_CARD,
         border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderL1),
         modifier = Modifier.fillMaxWidth().testTag("personaGalleryEntry_${entry.id}")
             .combinedClickable(onClick = onClick, onLongClick = { pulse(); onLongClick() })) {

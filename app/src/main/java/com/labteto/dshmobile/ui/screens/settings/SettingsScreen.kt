@@ -702,7 +702,7 @@ fun SettingsScreen(
                                 onClick = { openPage(SettingsDestination.PRICING) },
                             )
                             AppSettingsRow(
-                                icon = FeatherIcons.Clock,
+                                icon = SyEntryIcons.Usage,
                                 title = stringResource(R.string.usage_calculation_title),
                                 reservedEntryHeight = 80.dp,
                                 onClick = { openPage(SettingsDestination.USAGE) },
@@ -907,13 +907,13 @@ fun SettingsScreen(
                     SettingsDestination.ADVANCED -> {
                         AppSettingsSection {
                             AppSettingsRow(
-                                icon = FeatherIcons.Clock,
+                                icon = SyEntryIcons.SessionStorage,
                                 title = stringResource(R.string.settings_local_session_storage),
                                 onClick = { openPage(SettingsDestination.SESSION_STORAGE) },
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.Info,
+                                icon = SyEntryIcons.Advanced,
                                 title = stringResource(R.string.settings_runtime_diagnostics),
                                 onClick = { openPage(SettingsDestination.DIAGNOSTICS) },
                             )
@@ -922,7 +922,7 @@ fun SettingsScreen(
 
                     SettingsDestination.SESSION_STORAGE -> {
                         AppSettingsSection {
-                            AppSettingsRow(icon = FeatherIcons.MessageCircle,
+                            AppSettingsRow(icon = SyEntryIcons.ChatStyle,
                                 title = stringResource(R.string.settings_page_session),
                                 onClick = { openPage(SettingsDestination.SESSION) })
                         }

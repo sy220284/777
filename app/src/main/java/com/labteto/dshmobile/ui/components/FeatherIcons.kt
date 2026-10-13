@@ -741,7 +741,7 @@ private fun feather(name: String, block: PathBuilder.() -> Unit): ImageVector =
     ).apply {
         path(
             stroke = SolidColor(Color.Black),
-            strokeLineWidth = 2f,
+            strokeLineWidth = 1.75f,
             strokeLineCap = StrokeCap.Round,
             strokeLineJoin = StrokeJoin.Round,
             pathBuilder = block,

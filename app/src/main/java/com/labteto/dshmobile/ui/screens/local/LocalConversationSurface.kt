@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -103,17 +107,14 @@ import com.shenyan.designsystem.components.SyQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
-import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
 import com.labteto.dshmobile.ui.theme.rootSurface
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -812,7 +813,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 if (state.usageMode == LocalUsageMode.WORK &&
                     teamCardDismissed && state.team.visible) {
                     SyIconButton(
-                        icon = FeatherIcons.Users,
+                        icon = com.labteto.dshmobile.ui.components.SyEntryIcons.GroupChat,
                         contentDescription = stringResource(R.string.local_team_reopen),
                         onClick = { showTeamPanel = true },
                         tint = colors.labelSecondary,
@@ -843,8 +844,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         state.personaCorrectionNotice?.takeIf {
             state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled
         }?.let { notice ->
-            Surface(
-                color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+            SyMaterialSurface(
+                tier = SyMaterialTier.L3_CARD,
                 shape = DsShapes.block,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1169,13 +1170,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         }
 
         if (!state.configured && !state.loading && transcriptItems.isEmpty()) {
-            Surface(
+            SyMaterialSurface(
                 modifier = Modifier.fillMaxWidth().padding(
                     horizontal = DsSpacing.medium,
                     vertical = DsSpacing.small,
                 ),
                 shape = DsShapes.row,
-                color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                tier = SyMaterialTier.L3_CARD,
             ) {
                 Row(
                     modifier = Modifier.padding(DsSpacing.medium),
@@ -1241,13 +1242,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     items = state.replySuggestions.filter { it.text.isNotBlank() }.take(3),
                     key = { suggestion -> suggestion.label + "|" + suggestion.text },
                 ) { suggestion ->
-                    Surface(
+                    SyMaterialSurface(
                         onClick = { drafts.putBoundedLocalDraft(state.sessionId, suggestion.text) },
                         shape = DsShapes.pillFull,
-                        color = colors.wallpaperSurface(
-                            WallpaperSurfaceLevel.FLOATING,
-                            BackgroundRegion.BOTTOM,
-                        ),
+                        tier = SyMaterialTier.L4_OVERLAY,
                         border = BorderStroke(1.dp, colors.borderL1),
                     ) {
                         Text(
@@ -1512,7 +1510,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 color = colors.labelSecondary,
             )
             state.replySuggestions.filter { it.text.isNotBlank() }.forEach { suggestion ->
-                Surface(
+                SyMaterialSurface(
                     onClick = {
                         drafts.putBoundedLocalDraft(state.sessionId, suggestion.text)
                         showReplySuggestions = false
@@ -1520,7 +1518,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !state.running,
                     shape = DsShapes.row,
-                    color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                    tier = SyMaterialTier.L3_CARD,
                     border = BorderStroke(1.dp, colors.borderL2),
                 ) {
                     Column(
@@ -1622,7 +1620,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) {
                 SySheetChoiceRow(
                     title = stringResource(R.string.local_persona_picker_title),
-                    icon = FeatherIcons.User,
+                    icon = com.labteto.dshmobile.ui.components.SyEntryIcons.Persona,
                     onClick = {
                         showAttachmentPicker = false
                         showPersonaPicker = true
@@ -1763,9 +1761,9 @@ private fun EmptyLocalHarness(
                 expanded = suggestionsOpen,
                 onDismiss = { suggestionsOpen = false },
                 items = listOf(
-                    SyMenuItem(stringResource(R.string.local_suggestion_files), FeatherIcons.FileText, onClick = { onSuggestion(filesPrompt) }),
-                    SyMenuItem(stringResource(R.string.local_suggestion_research), FeatherIcons.Globe, onClick = { onSuggestion(researchPrompt) }),
-                    SyMenuItem(stringResource(R.string.local_suggestion_tasks), FeatherIcons.CheckSquare, onClick = { onSuggestion(tasksPrompt) }),
+                    SyMenuItem(stringResource(R.string.local_suggestion_files), com.labteto.dshmobile.ui.components.SyEntryIcons.WorkspaceFiles, onClick = { onSuggestion(filesPrompt) }),
+                    SyMenuItem(stringResource(R.string.local_suggestion_research), com.labteto.dshmobile.ui.components.SyEntryIcons.Search, onClick = { onSuggestion(researchPrompt) }),
+                    SyMenuItem(stringResource(R.string.local_suggestion_tasks), com.labteto.dshmobile.ui.components.SyEntryIcons.Tasks, onClick = { onSuggestion(tasksPrompt) }),
                 ),
             )
         }

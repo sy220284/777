@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 
 import android.content.Context
 import androidx.activity.compose.BackHandler
@@ -127,12 +131,9 @@ internal fun PersonaGalleryDetailHeaderV3(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
     ) {
-        Surface(
+        SyMaterialSurface(
             shape = RoundedCornerShape(24.dp),
-            color = colors.wallpaperSurface(
-                WallpaperSurfaceLevel.CARD,
-                base = colors.bgLayer1,
-            ),
+            tier = SyMaterialTier.L3_CARD,
             shadowElevation = 0.dp,
             modifier = Modifier
                 .fillMaxWidth(frameLayout.widthFraction)
@@ -294,9 +295,9 @@ internal fun PersonaGalleryAddPanel(
             ) {
                 items(presets, key = PersonaPreset::id) { preset ->
                     val installed = preset.id in installedPresetIds
-                    Surface(
+                    SyMaterialSurface(
                         shape = DsShapes.row,
-                        color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                        tier = SyMaterialTier.L3_CARD,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Row(
