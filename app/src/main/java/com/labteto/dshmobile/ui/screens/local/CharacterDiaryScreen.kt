@@ -222,7 +222,7 @@ internal fun CharacterDiaryScreen(
 
             if (subjects.isEmpty()) {
                 SyEmptyState(
-                    icon = FeatherIcons.BookOpen,
+                    icon = null,
                     title = stringResource(R.string.chat_diary_no_character_title),
                     body = stringResource(R.string.chat_diary_no_character_body),
                     modifier = Modifier.fillMaxSize(),
@@ -302,7 +302,7 @@ internal fun CharacterDiaryScreen(
                     }
                     loadFailed -> item(key = "diary-load-failed") {
                         SyEmptyState(
-                            icon = FeatherIcons.AlertTriangle,
+                            icon = null,
                             title = stringResource(R.string.chat_diary_load_failed_title),
                             body = stringResource(R.string.chat_diary_load_failed_body),
                             actionText = stringResource(R.string.common_retry),
@@ -312,7 +312,7 @@ internal fun CharacterDiaryScreen(
                     }
                     visibleEntries.isEmpty() -> item(key = "diary-empty") {
                         SyEmptyState(
-                            icon = if (query.isNotBlank()) FeatherIcons.Search else FeatherIcons.BookOpen,
+                            icon = null,
                             title = stringResource(
                                 if (query.isNotBlank()) R.string.chat_diary_no_match_title
                                 else R.string.chat_diary_empty_title,
