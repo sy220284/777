@@ -14,6 +14,7 @@ internal object ChatStatePatchAuthority {
     fun effectivePatch(
         raw: JsonObject?,
         state: ChatCharacterState,
+        previous: ChatCharacterState,
         significance: String,
         quotations: Map<String, String>,
         userMessage: String,
@@ -60,7 +61,9 @@ internal object ChatStatePatchAuthority {
                 when (field) {
                     // An empty unknown set is a semantic claim that questions were answered,
                     // not a generic list clear. Only the user's transcript can authorize it.
-                    "unknowns" -> evidenced("dynamics.unknowns")
+                    "unknowns" -> previous.dynamics.unknowns.isEmpty() ||
+                        previous.dynamics.unknowns.toSet() == state.dynamics.unknowns.toSet() ||
+                        evidenced("dynamics.unknowns")
                     "stage" -> true // Stage has its own event-level validation in the reducer.
                     "unresolvedConflict" -> significance != "NONE" ||
                         state.dynamics.unresolvedConflict.isBlank() || evidenced("dynamics.$field")
