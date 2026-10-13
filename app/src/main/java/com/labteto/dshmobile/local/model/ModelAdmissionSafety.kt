@@ -51,7 +51,9 @@ internal fun RequestBody.withModelAdmissionTracking(
         override fun contentType() = delegate.contentType()
         override fun contentLength() = delegate.contentLength()
         override fun isDuplex() = delegate.isDuplex()
-        override fun isOneShot() = delegate.isOneShot()
+        // Provider inference POST must not be transparently replayed by OkHttp after
+        // a connection reset / HTTP 408 / HTTP 503. The caller owns safe pre-send retries.
+        override fun isOneShot() = true
 
         override fun writeTo(sink: BufferedSink) {
             delegate.writeTo(sink)
