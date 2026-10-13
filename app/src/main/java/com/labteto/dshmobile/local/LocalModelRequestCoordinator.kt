@@ -96,10 +96,9 @@ internal class LocalModelRequestCoordinator @Inject constructor(
     private val streamPreviewIntervalMs: Long = 50L
     private val requestRuntime = LocalAgentModelRequestRuntime(modelGateway, resourceScheduler)
     private val modelStepRuntime = LocalAgentModelStepRuntime()
-    private val evidenceLock = Any()
-    private val messageSurfaceEvidence = mutableMapOf<String, RequestEvidenceRef>()
-    private val toolSurfaceEvidence = mutableMapOf<String, RequestEvidenceRef>()
-    private val contextSurfaceEvidence = mutableMapOf<String, RequestEvidenceRef>()
+    // EventLog owns the actual model request evidence. This helper only memoizes
+    // immutable evidence references across steps of this coordinator's process lifetime.
+    private val evidenceSurfaces = LocalRequestEvidenceSurfaceMemo()
 
     fun reconstructRequest(
         sessionId: String,
@@ -294,8 +293,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         val replayEvidence = buildLocalRequestEvidence(logMessages, tools, nativeTools)
         val evidenceKey = snapshot.sessionId + "\u0000" + routeFingerprint
         val evidenceLogSequence = log.latestSequence()
-        val messageSurfaceSeq = ensureRequestEvidenceSurface(
-            cache = messageSurfaceEvidence,
+        val messageSurfaceSeq = evidenceSurfaces.ensure(
+            kind = LocalRequestSurfaceKind.MESSAGE,
             key = evidenceKey,
             digest = replayEvidence.messageDigest,
             currentLogSequence = evidenceLogSequence,
@@ -310,8 +309,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                 )
             }).sequence
         }
-        val toolSurfaceSeq = ensureRequestEvidenceSurface(
-            cache = toolSurfaceEvidence,
+        val toolSurfaceSeq = evidenceSurfaces.ensure(
+            kind = LocalRequestSurfaceKind.TOOL,
             key = evidenceKey,
             digest = requestEvidence.resolvedToolSurfaceDigest,
             currentLogSequence = evidenceLogSequence,
@@ -324,8 +323,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                 put("native_tools", nativeTools)
             }).sequence
         }
-        val contextSurfaceSeq = ensureRequestEvidenceSurface(
-            cache = contextSurfaceEvidence,
+        val contextSurfaceSeq = evidenceSurfaces.ensure(
+            kind = LocalRequestSurfaceKind.CONTEXT,
             key = evidenceKey,
             digest = replayEvidence.contextDigest,
             currentLogSequence = log.latestSequence(),
@@ -684,8 +683,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                     val activeLogMessages = redactModelImages(activeMessages)
                     val activeEvidence = buildLocalRequestEvidence(activeMessages, tools, nativeTools)
                     val activeReplayEvidence = buildLocalRequestEvidence(activeLogMessages, tools, nativeTools)
-                    val activeMessageSurfaceSeq = ensureRequestEvidenceSurface(
-                        cache = messageSurfaceEvidence,
+                    val activeMessageSurfaceSeq = evidenceSurfaces.ensure(
+                        kind = LocalRequestSurfaceKind.MESSAGE,
                         key = evidenceKey,
                         digest = activeReplayEvidence.messageDigest,
                         currentLogSequence = log.latestSequence(),
@@ -700,8 +699,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             )
                         }).sequence
                     }
-                    val activeContextSurfaceSeq = ensureRequestEvidenceSurface(
-                        cache = contextSurfaceEvidence,
+                    val activeContextSurfaceSeq = evidenceSurfaces.ensure(
+                        kind = LocalRequestSurfaceKind.CONTEXT,
                         key = evidenceKey,
                         digest = activeReplayEvidence.contextDigest,
                         currentLogSequence = log.latestSequence(),
@@ -985,26 +984,6 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         val credentialDiagnostic: com.labteto.dshmobile.local.model.LocalCredentialDiagnostic,
     )
 
-    private fun ensureRequestEvidenceSurface(
-        cache: MutableMap<String, RequestEvidenceRef>,
-        key: String,
-        digest: String,
-        currentLogSequence: Long,
-        append: () -> Long,
-    ): Long = synchronized(evidenceLock) {
-        val existing = cache[key]
-        if (
-            existing?.digest == digest &&
-            existing.sequence <= currentLogSequence
-        ) {
-            existing.sequence
-        } else {
-            val sequence = append()
-            cache[key] = RequestEvidenceRef(digest = digest, sequence = sequence)
-            sequence
-        }
-    }
-
     private fun stablePromptCacheKey(sessionId: String, routeFingerprint: String): String {
         val raw = sessionId + "\u0000" + routeFingerprint
         return MessageDigest.getInstance("SHA-256")
@@ -1012,11 +991,6 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             .joinToString("") { "%02x".format(it) }
             .take(64)
     }
-
-    private data class RequestEvidenceRef(
-        val digest: String,
-        val sequence: Long,
-    )
 
     private companion object {
         const val REQUEST_EVIDENCE_VERSION = 3
