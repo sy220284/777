@@ -3,6 +3,8 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -120,6 +122,54 @@ internal fun V6LoadedConversationSearchSheet(
             onClick = onSearchAll,
             modifier = Modifier.fillMaxWidth(),
             variant = SyButtonVariant.Outline,
+        )
+    }
+}
+
+
+/**
+ * Isolate search state, sheet rendering and scroll targeting from the very large
+ * conversation composable, avoiding ART register-verifier pressure on Android 16.
+ */
+internal class V6LoadedConversationSearchState {
+    var open by mutableStateOf(false)
+    var targetMessageId by mutableStateOf<String?>(null)
+}
+
+@Composable
+internal fun rememberV6LoadedConversationSearchState(sessionId: String): V6LoadedConversationSearchState =
+    remember(sessionId) { V6LoadedConversationSearchState() }
+
+@Composable
+internal fun V6LoadedConversationSearchHost(
+    controller: V6LoadedConversationSearchState,
+    transcript: List<LocalTranscriptItem>,
+    listState: LazyListState,
+    leadingRows: Int,
+    visible: Boolean,
+    onSearchAll: () -> Unit,
+) {
+    // The search result holds a message ID, never an index from an outdated projection.
+    LaunchedEffect(controller.targetMessageId, transcript, leadingRows) {
+        val messageId = controller.targetMessageId ?: return@LaunchedEffect
+        val index = transcript.indexOfFirst {
+            it is LocalTranscriptItem.Message && it.message.id == messageId
+        }
+        if (index >= 0) listState.scrollToItem(leadingRows + index)
+        controller.targetMessageId = null
+    }
+    if (controller.open && visible) {
+        V6LoadedConversationSearchSheet(
+            transcript = transcript,
+            onSelect = { hit ->
+                controller.open = false
+                controller.targetMessageId = hit.messageId
+            },
+            onDismiss = { controller.open = false },
+            onSearchAll = {
+                controller.open = false
+                onSearchAll()
+            },
         )
     }
 }
