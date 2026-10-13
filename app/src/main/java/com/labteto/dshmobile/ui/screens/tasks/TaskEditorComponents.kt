@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 
@@ -35,7 +37,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyGroupCard
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
@@ -72,7 +73,7 @@ internal fun ColumnScope.TaskEditorPane(
 
     Column(
         modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         SyGroupCard {
             Text(
@@ -189,7 +190,7 @@ internal fun ColumnScope.TaskEditorPane(
     }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 SyButton(
                     text = stringResource(R.string.common_cancel),
@@ -276,7 +277,7 @@ private fun CadenceRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         SyButton(
             text = firstLabel,
@@ -379,7 +380,7 @@ private fun TaskSchedulePicker(
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 SyButton(
                     text = stringResource(R.string.common_back),

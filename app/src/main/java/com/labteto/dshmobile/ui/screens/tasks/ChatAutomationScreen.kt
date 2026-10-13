@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -65,7 +67,6 @@ import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -166,7 +167,7 @@ internal fun ChatAutomationScreen(
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(
             Modifier.fillMaxSize().safeDrawingPadding(),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             Box(Modifier.fillMaxWidth()) {
                 SyTopBar(
@@ -181,7 +182,7 @@ internal fun ChatAutomationScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 item("events-heading") {
                     SectionTitle(
@@ -214,14 +215,14 @@ internal fun ChatAutomationScreen(
                             hapticOnChange = true,
                             stretch = true,
                             modifier = Modifier.fillMaxWidth()
-                                .padding(horizontal = DsSpacing.large, vertical = DsSpacing.tiny),
+                                .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapXs),
                         )
                     }
                 }
                 if (visibleTasks.isEmpty()) {
                     item("events-empty") {
                         AutomationCardSurface(
-                            modifier = Modifier.padding(horizontal = DsSpacing.large),
+                            modifier = Modifier.padding(horizontal = SyMetric.gapSection),
                         ) {
                             Text(
                                 stringResource(
@@ -272,7 +273,7 @@ internal fun ChatAutomationScreen(
             state.plannerError?.let {
                 Text(
                     stringResource(it.messageRes()),
-                    modifier = Modifier.padding(horizontal = DsSpacing.large),
+                    modifier = Modifier.padding(horizontal = SyMetric.gapSection),
                     style = DsType.small13.withReadingWeight(),
                     color = colors.dangerInk,
                 )
@@ -287,7 +288,7 @@ internal fun ChatAutomationScreen(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
                 ) {
                     SyComposerField(
                         value = draft,
@@ -357,8 +358,8 @@ private fun AutomationCardSurface(
         tonalElevation = 0.dp,
     ) {
         Column(
-            modifier = Modifier.padding(DsSpacing.comfortable),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            modifier = Modifier.padding(SyMetric.gapSection),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             content = content,
         )
     }
@@ -368,7 +369,7 @@ private fun AutomationCardSurface(
 private fun SectionTitle(title: String, subtitle: String) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Column(
-        Modifier.padding(horizontal = DsSpacing.large, vertical = DsSpacing.tiny),
+        Modifier.padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapXs),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(title, style = DsType.base16Strong.withReadingWeight(), color = colors.text)
@@ -393,7 +394,7 @@ private fun ChatAutomationEventRow(
     val visualStatus = chatAutomationVisualStatus(task)
     var confirmDelete by remember { mutableStateOf(false) }
     AutomationCardSurface(
-        modifier = Modifier.padding(horizontal = DsSpacing.large),
+        modifier = Modifier.padding(horizontal = SyMetric.gapSection),
         status = visualStatus.dsStatus(),
     ) {
         Row(
@@ -561,7 +562,7 @@ private fun ChatAutomationPolicySheet(
                 .fillMaxWidth()
                 .weight(1f, fill = false)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -592,7 +593,7 @@ private fun ChatAutomationPolicySheet(
         if (quietEnabled) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 SyButton(
                     text = stringResource(
@@ -629,7 +630,7 @@ private fun ChatAutomationPolicySheet(
         gapOptions.chunked(3).forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
                 row.forEach { minutes ->
                     SyButton(
@@ -659,7 +660,7 @@ private fun ChatAutomationPolicySheet(
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
         ) {
             (1..5).forEach { count ->
                 SyButton(

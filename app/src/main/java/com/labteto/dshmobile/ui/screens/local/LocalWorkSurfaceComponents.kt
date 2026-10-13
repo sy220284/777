@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -39,7 +41,6 @@ import com.labteto.dshmobile.ui.shenyan.SyExpandableColumn
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
@@ -96,15 +97,15 @@ internal fun ExecutionStatusCard(
     ) {
         Column(
             modifier = Modifier.padding(
-                if (showHeader) DsSpacing.comfortable else DsSpacing.small,
+                if (showHeader) SyMetric.gapSection else SyMetric.gapMd,
             ),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
         ) {
             if (showHeader) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 ) {
                     StateDot(if (state.running) StateDotState.Running else StateDotState.Idle)
                     Text(
@@ -130,7 +131,7 @@ internal fun ExecutionStatusCard(
             }
 
             state.goal?.let { goal ->
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                     Text(
                         stringResource(R.string.local_run_current_goal),
                         style = DsType.caption11Strong.withReadingWeight(),
@@ -168,7 +169,7 @@ internal fun ExecutionStatusCard(
 
 
             if (state.plan.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                     Text(
                         stringResource(R.string.local_run_plan),
                         style = DsType.caption11Strong.withReadingWeight(),
@@ -187,7 +188,7 @@ internal fun ExecutionStatusCard(
             }
 
             if (state.todos.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                     Text(
                         stringResource(R.string.local_run_tasks_progress, completed, total),
                         style = DsType.caption11Strong.withReadingWeight(),
@@ -254,7 +255,7 @@ internal fun ExecutionStatusCard(
             )
             SyExpandableColumn(
                 visible = technicalDetailsExpanded,
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
             ) {
                     Text(resourceSummary, style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
                     Text(pressureSummary, style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
@@ -332,7 +333,7 @@ internal fun RunCenterJobsSection(
         }.thenByDescending(LocalJobInfo::pendingMessageCount),
     )
 
-    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
         Text(
             if (attention) {
                 stringResource(R.string.local_run_needs_attention, jobs.size)
@@ -360,13 +361,13 @@ internal fun RunCenterJobsSection(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(DsSpacing.small),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                        .padding(SyMetric.gapMd),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                 ) {
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                     ) {
                         if (job.isAgent) {
                             Icon(
@@ -432,7 +433,7 @@ internal fun RunCenterJobsSection(
                     }
                     SyExpandableColumn(
                         visible = expanded,
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                     ) {
                         Text(
                             stringResource(R.string.local_run_job_output),

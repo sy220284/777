@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -71,7 +73,6 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.sidebar.SidebarAvatarPicker
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
@@ -307,8 +308,8 @@ internal fun LocalModeDrawer(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = DsSpacing.medium, end = DsSpacing.medium, top = DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    .padding(start = SyMetric.gapLg, end = SyMetric.gapLg, top = SyMetric.gapLg),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -322,7 +323,7 @@ internal fun LocalModeDrawer(
                         )
                     }
                     SidebarAvatarPicker()
-                    Spacer(Modifier.width(DsSpacing.small))
+                    Spacer(Modifier.width(SyMetric.gapMd))
                     Text(
                         stringResource(R.string.app_name),
                         style = DsType.title22.withReadingWeight(),
@@ -384,14 +385,14 @@ internal fun LocalModeDrawer(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = DsSpacing.medium),
-                contentPadding = PaddingValues(bottom = DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                    .padding(horizontal = SyMetric.gapLg),
+                contentPadding = PaddingValues(bottom = SyMetric.gapLg),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
                 if (!searchOpen || historyQuery.isBlank()) item(key = "drawer-feature-actions") {
                     Column(
-                        modifier = Modifier.padding(top = DsSpacing.medium),
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                        modifier = Modifier.padding(top = SyMetric.gapLg),
+                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
                     ) {
                         DrawerQuickActions(
                             usageMode = usageMode,
@@ -559,8 +560,8 @@ internal fun LocalModeDrawer(
                             style = DsType.navigationSupporting.withReadingWeight(),
                             color = colors.textTertiary,
                             modifier = Modifier.padding(
-                                horizontal = DsSpacing.small,
-                                vertical = DsSpacing.medium,
+                                horizontal = SyMetric.gapMd,
+                                vertical = SyMetric.gapLg,
                             ),
                         )
                     }
@@ -572,8 +573,8 @@ internal fun LocalModeDrawer(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                    .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
                 if (selectionOpen) {
                     SyMaterialSurface(
@@ -583,9 +584,9 @@ internal fun LocalModeDrawer(
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                                .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                         ) {
                             Text(
                                 stringResource(R.string.local_selected_count, selectedIds.size),

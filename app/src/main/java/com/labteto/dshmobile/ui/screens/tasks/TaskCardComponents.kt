@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import android.content.Context
 import android.text.format.DateFormat as AndroidDateFormat
@@ -64,7 +66,6 @@ import com.labteto.dshmobile.ui.shenyan.SyTimeline
 import com.labteto.dshmobile.ui.shenyan.SyTimelineItem
 import com.labteto.dshmobile.ui.components.EmptyHero
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -95,9 +96,9 @@ private fun TaskCardSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
         border = BorderStroke(1.dp, borderColor),
-        horizontalPadding = DsSpacing.comfortable,
-        verticalPadding = DsSpacing.comfortable,
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalPadding = SyMetric.gapSection,
+        verticalPadding = SyMetric.gapSection,
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         content()
     }
@@ -169,7 +170,7 @@ internal fun TaskCard(
     TaskCardSurface(status = task.status) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             verticalAlignment = Alignment.Top,
         ) {
             Column(Modifier.weight(1f)) {
@@ -209,8 +210,8 @@ internal fun TaskCard(
 
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             SyStatusPill(
                 state = taskStatus(task.status),
@@ -428,12 +429,12 @@ internal fun TaskSummaryRow(task: AutomationTask, onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        horizontalPadding = DsSpacing.comfortable,
-        verticalPadding = DsSpacing.comfortable,
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalPadding = SyMetric.gapSection,
+        verticalPadding = SyMetric.gapSection,
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             androidx.compose.material3.Icon(
                 if (task.mode == AutomationMode.CHAT) FeatherIcons.MessageCircle else FeatherIcons.Clock,
                 contentDescription = null, tint = colors.textSecondary, modifier = Modifier.size(18.dp))
@@ -442,9 +443,9 @@ internal fun TaskSummaryRow(task: AutomationTask, onClick: () -> Unit) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
         ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 Text(task.prompt.lineSequence().firstOrNull().orEmpty(), style = DsType.std14Strong.withReadingWeight(), color = colors.text, maxLines = 2)
                 Text(taskTiming(task),
                     style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)

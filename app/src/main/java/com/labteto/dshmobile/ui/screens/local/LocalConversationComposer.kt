@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
@@ -52,7 +54,6 @@ import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.AppBackgroundState
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
@@ -286,7 +287,7 @@ internal fun LocalConversationComposer(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 SyPill(
                     text = stringResource(R.string.local_team_title),
@@ -310,7 +311,7 @@ internal fun LocalConversationComposer(
         if (state.usageMode == LocalUsageMode.WORK && state.running && !teamDispatchSelected) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SyPill(
@@ -337,7 +338,7 @@ internal fun LocalConversationComposer(
         if (imageAttachments.isNotEmpty()) {
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 items(
                     items = imageAttachments,
@@ -364,14 +365,14 @@ internal fun LocalConversationComposer(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
         ) {
             AnimatedVisibility(
                 visible = !expanded,
                 enter = expandHorizontally(DsAnimations.composerReveal) + fadeIn(DsAnimations.composerFade),
                 exit = shrinkHorizontally(DsAnimations.composerReveal) + fadeOut(DsAnimations.composerFade),
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                     AttachmentControl()
                     ReplySuggestionsControl()
                 }
@@ -521,7 +522,7 @@ private fun ImportedAttachmentRow(
     SyGlassCard {
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             thumbnail?.let { image ->

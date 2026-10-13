@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -53,7 +55,6 @@ import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.rememberSyToast
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -259,8 +260,8 @@ private fun WorkTasksScreen(
 
                 Column(
                     modifier = Modifier.weight(1f)
-                        .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                        .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                 ) {
                     when {
                         showCreate -> TaskEditorPane(
@@ -288,7 +289,7 @@ private fun WorkTasksScreen(
                         }
                         else -> Column(
                             modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                         ) {
                             // Screen 19: show the real schedule state in the same glass tab
                             // language as the work/history pages; never fabricate budget figures.
@@ -315,9 +316,9 @@ private fun WorkTasksScreen(
                             )
                             if (filteredTasks.isEmpty()) {
                                 Column(
-                                    modifier = Modifier.fillMaxWidth().padding(DsSpacing.large),
+                                    modifier = Modifier.fillMaxWidth().padding(SyMetric.gapSection),
                                     horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                                 ) {
                                     Text(
                                         stringResource(R.string.tasks_filter_empty),
@@ -333,8 +334,8 @@ private fun WorkTasksScreen(
                             } else {
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = DsSpacing.medium),
-                                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = SyMetric.gapLg),
+                                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                                 ) {
                                     items(filteredTasks, key = AutomationTask::id) { task ->
                                         TaskSummaryRow(task = task, onClick = { selectedTaskId = task.id })
@@ -359,15 +360,15 @@ private fun TaskEmptyState(
     Box(Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.align(Alignment.Center).fillMaxWidth()
-                .padding(horizontal = DsSpacing.xlarge),
+                .padding(horizontal = SyMetric.gapPage),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             Image(
                 painter = painterResource(R.drawable.ic_ui_task_empty),
                 contentDescription = null,
                 colorFilter = ColorFilter.tint(colors.textTertiary.copy(alpha = 0.72f)),
-                modifier = Modifier.padding(bottom = DsSpacing.medium),
+                modifier = Modifier.padding(bottom = SyMetric.gapLg),
             )
             Text(
                 stringResource(R.string.tasks_empty_title),
@@ -384,8 +385,8 @@ private fun TaskEmptyState(
         }
         Column(
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                .padding(bottom = DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                .padding(bottom = SyMetric.gapLg),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             Surface(
                 onClick = onManualCreate,
@@ -394,7 +395,7 @@ private fun TaskEmptyState(
                 contentColor = colors.onPrimary,
                 shape = DsShapes.buttonCapsule,
             ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(DsSpacing.medium)) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(SyMetric.gapLg)) {
                     Text(
                         stringResource(R.string.tasks_create_manual),
                         style = DsType.std14Strong.withReadingWeight(),
@@ -408,7 +409,7 @@ private fun TaskEmptyState(
                 tier = SyMaterialTier.L1_SECTION,
                 shape = DsShapes.buttonCapsule,
             ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(DsSpacing.medium)) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(SyMetric.gapLg)) {
                     Text(
                         stringResource(R.string.tasks_create_via_chat),
                         style = DsType.std14Strong.withReadingWeight(),
