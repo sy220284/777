@@ -19,3 +19,26 @@ internal data class GroupGeneratedReply(
     val content: String = "",
     val failure: Throwable? = null,
 )
+
+/**
+ * Rehydrate one accountable speaker per pending group event after process/session restore.
+ * A current explicit speaker ID wins; legacy records may fall back to their transcript row.
+ * Unknown speakers are never assigned to the wrong group member.
+ */
+internal fun pendingGroupSpeakers(
+    pending: List<ChatPendingTurn>,
+    members: List<LocalGroupChatMember>,
+    transcript: List<com.labteto.dshmobile.local.session.LocalHarnessMessage>,
+): List<Pair<LocalGroupChatMember, ChatPendingTurn>>? {
+    val recentById = transcript.filter { it.role == "assistant" }.associateBy { it.id }
+    val resolved = pending.map { turn ->
+        val speakerId = turn.speakerId.ifBlank {
+            recentById[turn.assistantMessageId]?.speakerId.orEmpty()
+        }
+        val member = members.singleOrNull { it.galleryId == speakerId } ?: return null
+        member to turn
+    }
+    // The planner sees ALL pending messages, but each member is updated once per batch
+    // from their latest actual utterance. Preserve the chronological order of last turns.
+    return resolved.asReversed().distinctBy { it.first.galleryId }.asReversed()
+}
