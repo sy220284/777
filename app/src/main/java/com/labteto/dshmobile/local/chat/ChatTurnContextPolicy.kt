@@ -12,6 +12,10 @@ data class ChatAttentionState(
     /** The user's last explicit request to stop discussing a topic. Never means stop an action. */
     val pausedSubject: String = "",
     val updatedSequence: Long = -1L,
+    /** Recent explicit topics: request-level attention, never a second event memory. */
+    val recentUserSubjects: List<String> = emptyList(),
+    /** User-paused named topics, independent of the most recently paused topic. */
+    val pausedSubjects: List<String> = emptyList(),
 )
 
 internal object ChatTurnContextPolicy {
@@ -57,17 +61,30 @@ internal object ChatTurnContextPolicy {
         val message = userMessage.trim()
         if (message.isEmpty()) return attention
         val redirect = redirectedTopic(message)
-        if (redirect != null) return attention.copy(
-            lastUserSubject = "", pausedSubject = redirect.take(80), updatedSequence = sequence,
-        )
+        if (redirect != null) {
+            val named = redirect.takeIf { it != "*" }?.take(80)
+            return attention.copy(
+                lastUserSubject = "", pausedSubject = redirect.take(80),
+                pausedSubjects = (attention.pausedSubjects + listOfNotNull(named))
+                    .distinct().takeLast(8),
+                updatedSequence = sequence,
+            )
+        }
         if (message in weakResponses) return attention.copy(updatedSequence = sequence)
-        val resumed = attention.pausedSubject.isNotBlank() &&
-            attention.pausedSubject != "*" &&
-            normalize(message).contains(normalize(attention.pausedSubject)) &&
-            (references.any(message::contains) || message.contains("继续") || message.contains("再聊"))
+        val continuation = references.any(message::contains) ||
+            message.contains("继续") || message.contains("再聊")
+        val paused = (attention.pausedSubjects +
+            listOfNotNull(attention.pausedSubject.takeIf { it.isNotBlank() && it != "*" }))
+            .distinct()
+        val resumed = paused.filter { topic ->
+            normalize(message).contains(normalize(topic)) && continuation
+        }
         return attention.copy(
             lastUserSubject = message.take(260),
-            pausedSubject = if (resumed) "" else attention.pausedSubject,
+            recentUserSubjects = (attention.recentUserSubjects + message.take(260))
+                .distinct().takeLast(8),
+            pausedSubject = if (attention.pausedSubject in resumed) "" else attention.pausedSubject,
+            pausedSubjects = paused.filterNot(resumed::contains).takeLast(8),
             updatedSequence = sequence,
         )
     }
@@ -91,8 +108,9 @@ internal object ChatTurnContextPolicy {
         val a = normalize(query)
         val b = normalize(fact)
         if (a.length < 3 || b.length < 3) return false
-        val paused = normalize(attention.pausedSubject)
-        if (paused.isNotEmpty() && paused != "*" && b.contains(paused) && !a.contains(paused)) return false
+        val paused = (attention.pausedSubjects + attention.pausedSubject)
+            .map(::normalize).filter { it.isNotBlank() && it != "*" }.distinct()
+        if (paused.any { b.contains(it) && !a.contains(it) }) return false
         val pairsA = a.windowed(2).toSet()
         val pairsB = b.windowed(2).toSet()
         if (pairsA.isEmpty() || pairsB.isEmpty()) return false
