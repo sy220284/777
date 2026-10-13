@@ -213,6 +213,31 @@ class LocalToolOutputStoreTest {
     }
 
     @Test
+    fun defaultQuotaRetainsLongLogsBeyondOldSixteenMiBLimit() {
+        val store = LocalToolOutputStore(File(temporary.root, "large-output"))
+        val content = "prefix-" + "x".repeat(16 * 1024 * 1024) + "-suffix"
+        val stored = store.store("large", "long-log", content)
+        assertTrue(stored != null)
+        assertTrue(stored?.bytes == content.length)
+        assertTrue(store.read("large", "long-log", startByte = stored!!.bytes - 2048)
+            .contains("-suffix"))
+    }
+
+    @Test
+    fun rejectedOversizedReplacementKeepsEarlierCompleteEvidence() {
+        val store = LocalToolOutputStore(
+            root = File(temporary.root, "atomic-output"),
+            maxOutputBytes = 8,
+            maxFilesPerSession = 5,
+            maxSessionBytes = 128,
+            maxGlobalBytes = 256,
+        )
+        assertTrue(store.store("session", "call", "old-ok") != null)
+        assertTrue(store.store("session", "call", "exceeds-the-budget") == null)
+        assertTrue(store.read("session", "call").contains("old-ok"))
+    }
+
+    @Test
     fun refusesSingleSpillAboveItemLimit() {
         val store = LocalToolOutputStore(
             root = File(temporary.root, "tool-output"),
