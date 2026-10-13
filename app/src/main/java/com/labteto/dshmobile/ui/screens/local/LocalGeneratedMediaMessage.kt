@@ -483,6 +483,7 @@ private fun InlineSpeechPlayer(file: File) {
             enabled = !preparing,
             onClick = {
                 if (preparing) return@SyButton
+                error = null
                 runCatching {
                     val current = player
                     if (current == null) {
@@ -506,13 +507,16 @@ private fun InlineSpeechPlayer(file: File) {
                         created.setOnErrorListener { _, _, _ ->
                             preparing = false
                             playing = false
+                            durationMs = 0
+                            positionMs = 0
                             error = resources.getString(R.string.media_chat_audio_failed)
                             player = null
                             runCatching { created.release() }
                             true
                         }
-                        created.setDataSource(file.absolutePath)
+                        // Own the player before I/O so failed setDataSource cannot leak it.
                         player = created
+                        created.setDataSource(file.absolutePath)
                         preparing = true
                         created.prepareAsync()
                     } else if (playing) {
