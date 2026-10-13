@@ -1,8 +1,5 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.harness.state.RuntimeStateTransitionPolicy
-import com.labteto.dshmobile.harness.state.acceptRuntimeStateTransition
-import com.labteto.dshmobile.harness.state.rejectRuntimeStateTransition
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -21,19 +18,11 @@ internal fun applyCharacterPostTurnRuntime(
     userMessage: String,
     assistantMessage: String,
 ): ChatCharacterState {
-    val currentImpression = previous.currentUserImpression
-    val proposedImpression = if (rawState?.containsKey("currentUserImpression") == true) {
-        candidate.currentUserImpression
-    } else {
-        currentImpression
-    }
-    val impression = RuntimeStateTransitionPolicy<String> { runtimeOwned, proposed ->
-        if (significance == "NONE") {
-            rejectRuntimeStateTransition(runtimeOwned, "本轮证据不足，不改写长期主观印象")
-        } else {
-            acceptRuntimeStateTransition(proposed.trim().take(320))
-        }
-    }.resolve(currentImpression, proposedImpression).value
+    // Field authorization has already happened in ChatStatePatchAuthority.
+    // Do not re-classify the same transition based on diary significance here.
+    val impression = if (rawState?.containsKey("currentUserImpression") == true) {
+        current.currentUserImpression
+    } else previous.currentUserImpression
     val withImpression = current.copy(
         currentUserImpression = impression,
         recentImpression = "",

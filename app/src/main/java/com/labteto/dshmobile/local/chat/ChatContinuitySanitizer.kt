@@ -12,18 +12,18 @@ internal fun sanitizeChatContinuity(
     } else previous.recentEvents.takeLast(5),
     recurringEvents = emptyList(),
     decisions = if (raw.containsKey("decisions")) {
-        sanitizeContinuityStrings(value.decisions, limit = 4, maxChars = 180)
-    } else previous.decisions.takeLast(4),
+        sanitizeContinuityStrings(value.decisions, limit = null, maxChars = 180)
+    } else previous.decisions,
     unfinished = if (raw.containsKey("unfinished")) {
-        sanitizeContinuityStrings(value.unfinished, limit = 4, maxChars = 180)
-    } else previous.unfinished.takeLast(4),
+        sanitizeContinuityStrings(value.unfinished, limit = null, maxChars = 180)
+    } else previous.unfinished,
     // Provenance is derived from durable Pending turns after parsing; the model never owns it.
     evidence = previous.evidence,
 )
 
 private fun sanitizeContinuityStrings(
     values: List<String>,
-    limit: Int,
+    limit: Int?,
     maxChars: Int,
 ): List<String> = values.asSequence()
     .map(String::trim)
@@ -31,4 +31,4 @@ private fun sanitizeContinuityStrings(
     .map { it.take(maxChars) }
     .distinctBy(::normalizeChatInteractionText)
     .toList()
-    .takeLast(limit)
+    .let { items -> if (limit == null) items else items.takeLast(limit) }

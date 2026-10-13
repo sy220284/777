@@ -284,7 +284,8 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             }
             // Work is already durable. Restoration must re-admit unprocessed chat turns
             // even if the user never sends another message after relaunching the app.
-            if (state.usageMode == LocalUsageMode.CHAT && !state.chat.groupChat.enabled) {
+            if (state.usageMode == LocalUsageMode.CHAT) {
+                // Both private and group Pending are resumed through Chat's one job owner.
                 chatComposition.resumePostTurn(sessionId, log)
             }
         }

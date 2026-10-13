@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatContinuityState
+import com.labteto.dshmobile.local.chat.ChatContinuityFactKind
+import com.labteto.dshmobile.local.chat.chatContinuityEventId
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.ChatSceneState
 import com.labteto.dshmobile.local.chat.finalizeGroupContextAfterRefresh
@@ -180,4 +182,32 @@ class LocalGroupChatContinuityTest {
         assertEquals(listOf("第一位角色确认的决定"), merged.decisions)
         assertEquals(listOf("旧待续"), merged.unfinished)
     }
+    @Test
+    fun groupAgreementCannotBeCompletedWithoutExactIdentifiedTransition() {
+        val matter = "对方是否同意保密尚未明确"
+        val base = ChatContinuityState(unfinished = listOf(matter))
+        val context = ChatContextState(
+            continuity = base,
+            processedThroughSequence = 5L,
+            pendingTurns = listOf(ChatPendingTurn(
+                sequence = 9L,
+                userMessage = "我答应你保密",
+                assistantMessage = "谢谢你答应保密",
+            )),
+        )
+        val groupPlan = ChatCharacterState(continuity = base.copy(unfinished = emptyList()))
+        val unidentified = finalizeGroupContextAfterRefresh(
+            context, listOf(groupPlan), context.pendingTurns, complete = true,
+        )
+        assertEquals(listOf(matter), unidentified.continuity.unfinished)
+        val identified = finalizeGroupContextAfterRefresh(
+            context, listOf(groupPlan), context.pendingTurns, complete = true,
+            resolvedContinuityIds = listOf(chatContinuityEventId(
+                ChatContinuityFactKind.OPEN_THREAD, matter,
+            )),
+        )
+        assertEquals(emptyList<String>(), identified.continuity.unfinished)
+        assertEquals(9L, identified.processedThroughSequence)
+    }
+
 }
