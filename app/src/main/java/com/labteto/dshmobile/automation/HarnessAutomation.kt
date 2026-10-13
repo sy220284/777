@@ -252,7 +252,6 @@ data class AutomationTask(
     val scheduleType: AutomationScheduleType = AutomationScheduleType.LEGACY,
     val scheduleAnchorAt: Long? = null,
     val scheduleGeneration: Long = 0L,
-    val dispatchPolicy: AutomationDispatchPolicy? = null,
     val silenceMinutes: Long? = null,
     val windowStartMinuteOfDay: Int? = null,
     val windowEndMinuteOfDay: Int? = null,
@@ -277,6 +276,7 @@ data class AutomationTask(
     val lastResult: String? = null,
     val lastError: String? = null,
     val runReceipts: List<AutomationRunReceipt> = emptyList(),
+    val dispatchPolicy: AutomationDispatchPolicy? = null,
 )
 
 internal fun normalizeAutomationTask(task: AutomationTask): AutomationTask {
