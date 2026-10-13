@@ -40,6 +40,8 @@ data class ChatPendingTurn(
     val userMessage: String = "",
     val assistantMessage: String = "",
     val generation: Long = 0L,
+    /** Durable group sender ID; old snapshots may recover this from their transcript. */
+    val speakerId: String = "",
 )
 
 /**
