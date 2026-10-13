@@ -3,6 +3,9 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.model.WORK_TOOL_RECOVERY_PAGE_BYTES
 import java.io.File
 import java.io.FileOutputStream
+import java.io.OutputStream
+import java.io.OutputStreamWriter
+import java.io.IOException
 import java.io.RandomAccessFile
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
@@ -33,19 +36,31 @@ internal class LocalToolOutputStore(
 
     @Synchronized
     fun store(sessionId: String, callId: String, content: String): Stored? {
-        val bytes = content.toByteArray(Charsets.UTF_8)
-        if (bytes.size > maxOutputBytes) return null
+        // Do not allocate a second large UTF-8 array to retain a large tool result.
+        // Existing session/global byte budgets also bound each individual result.
+        val byteBudget = minOf(maxOutputBytes.toLong(), maxSessionBytes, maxGlobalBytes)
+        if (byteBudget <= 0L) return null
 
         val dir = sessionDir(sessionId).apply { mkdirs() }
         val target = File(dir, key(callId) + ".txt")
         val previousBytes = target.takeIf(File::isFile)?.length() ?: 0L
         val cachedBefore = knownGlobalBytes
         val temp = File(dir, "." + target.name + ".tmp")
+        var writtenBytes = 0L
         try {
-            FileOutputStream(temp).use { output ->
-                output.write(bytes)
-                output.flush()
-                output.fd.sync()
+            try {
+                FileOutputStream(temp).use { output ->
+                    val bounded = BudgetedToolOutputStream(output, byteBudget)
+                    // Streaming encoder preserves UTF-8 character boundaries across chunks.
+                    val writer = OutputStreamWriter(bounded, Charsets.UTF_8)
+                    writer.write(content)
+                    writer.flush()
+                    output.fd.sync()
+                    writtenBytes = bounded.written
+                }
+            } catch (_: ToolOutputBudgetExceeded) {
+                // Keep the previous durable result; never replace it with a partial spill.
+                return null
             }
             try {
                 Files.move(
@@ -77,7 +92,7 @@ internal class LocalToolOutputStore(
             globalBytes = pruneGlobal(target)
         }
         knownGlobalBytes = globalBytes
-        return if (target.isFile) Stored(bytes.size) else null
+        return if (target.isFile) Stored(writtenBytes.toInt()) else null
     }
 
     /**
@@ -358,6 +373,31 @@ internal class LocalToolOutputStore(
         return digest.joinToString("") { byte -> "%02x".format(byte) }
     }
 
+    /** The existing byte budget is enforced while encoding; no extra per-run store. */
+    private class BudgetedToolOutputStream(
+        private val sink: OutputStream,
+        private val budget: Long,
+    ) : OutputStream() {
+        var written: Long = 0L
+            private set
+
+        override fun write(value: Int) {
+            if (written >= budget) throw ToolOutputBudgetExceeded()
+            sink.write(value)
+            written++
+        }
+
+        override fun write(bytes: ByteArray, offset: Int, length: Int) {
+            if (length.toLong() > budget - written) throw ToolOutputBudgetExceeded()
+            sink.write(bytes, offset, length)
+            written += length
+        }
+
+        override fun flush() = sink.flush()
+    }
+
+    private class ToolOutputBudgetExceeded : IOException("工具输出超过本次安全存储预算")
+
     companion object {
         const val DEFAULT_READ_BYTES = 4 * 1024
         const val MAX_READ_BYTES = 48 * 1024
@@ -366,7 +406,8 @@ internal class LocalToolOutputStore(
         private const val ACTIVE_REFERENCES_FILE = ".active-tool-refs"
         private const val MAX_ACTIVE_REFERENCES = 16
         private const val MIN_READ_BYTES = 1_024
-        private const val DEFAULT_MAX_OUTPUT_BYTES = 16 * 1024 * 1024
+        // One output may use the existing session quota, rather than an obsolete 16 MiB cap.
+        private const val DEFAULT_MAX_OUTPUT_BYTES = 64 * 1024 * 1024
         private const val DEFAULT_MAX_FILES_PER_SESSION = 64
         private const val DEFAULT_MAX_SESSION_BYTES = 64L * 1024L * 1024L
         private const val DEFAULT_MAX_GLOBAL_BYTES = 256L * 1024L * 1024L
