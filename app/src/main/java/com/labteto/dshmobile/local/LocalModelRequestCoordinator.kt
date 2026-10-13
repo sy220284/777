@@ -23,7 +23,7 @@ import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
 import com.labteto.dshmobile.local.model.LocalModelCancellationException
 import com.labteto.dshmobile.local.model.LocalModelAttemptStreamEvidence
 import com.labteto.dshmobile.local.model.LocalModelGateway
-import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.freezeLocalModelRequestConfiguration
 import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.model.LocalReasoningModeStore
 import com.labteto.dshmobile.local.model.LocalPromptCacheBaselineStore
@@ -38,7 +38,6 @@ import com.labteto.dshmobile.local.model.modelFailureKind
 import com.labteto.dshmobile.local.model.modelTransportFailureKind
 import com.labteto.dshmobile.local.model.redactModelImages
 import com.labteto.dshmobile.local.model.routeFingerprint
-import com.labteto.dshmobile.local.model.toRunModelSurface
 import com.labteto.dshmobile.local.model.LOCAL_NATIVE_TOOL_IMAGE_GENERATION
 import com.labteto.dshmobile.local.model.buildLocalRequestEvidence
 import com.labteto.dshmobile.local.model.resolveLocalNativeToolNames
@@ -130,7 +129,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         val admission = options.admission
         val tools = toolsOverride ?: JsonArray(emptyList())
         val log = requestLog ?: sessionStorage.eventLogs.get(snapshot.sessionId)
-        val frozen = freezeRequestConfiguration(snapshot, profile, tools, temperature)
+        val frozen = freezeLocalModelRequestConfiguration(snapshot, profile, tools, temperature, modelGateway)
         val frozenProfile = frozen.profile
         val runSurface = frozen.surface
         val reasoningEffort = frozen.reasoningEffort
@@ -874,12 +873,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                     diagnosticSurface = cacheDiagnosticSurface,
                                 )
                             }
-                            val rawAcceptedEstimate = LocalPromptPressureMeter.measure(
-                                messages = activeMessages,
-                                tools = tools,
-                                operationalLimitTokens = operationalLimit,
-                                modelContextWindowTokens = modelContextWindow,
-                            ).estimatedInputTokens
+                            val rawAcceptedEstimate = activePressure.estimatedInputTokens
                             if (reply.usage.reported) {
                                 pressureStore.recordReportedUsage(
                                     snapshot.sessionId, reply.usage.promptTokens,
@@ -946,43 +940,6 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             }
         }
     }
-
-    /** Freeze route and session choices once; retries never re-read changing UI settings. */
-    private suspend fun freezeRequestConfiguration(snapshot: LocalHarnessState, profile: LocalModelProfile?,
-        tools: JsonArray, temperature: Double?): FrozenRequestConfiguration {
-        val frozenProfile = profile ?: modelGateway.profileForRoute(
-            snapshot.modelState.modelSelection.activeProfileId,
-            snapshot.modelState.model,
-            snapshot.modelState.baseUrl,
-        )
-        val runSurface = frozenProfile.toRunModelSurface()
-        // Freeze per-turn model reasoning preference before admission and retries.
-        val reasoningEffort = LocalReasoningModeStore.effortFor(
-            sessionId = snapshot.sessionId,
-            profile = frozenProfile,
-            withTools = tools.isNotEmpty(),
-            defaultChatFast = snapshot.usageMode == LocalUsageMode.CHAT,
-        )
-        // Work has its own persisted session sampling; Chat provides persona sampling explicitly.
-        val effectiveTemperature = com.labteto.dshmobile.local.model.LocalModelPerformanceStore
-            .current().constrainTemperature(
-                temperature ?: if (snapshot.usageMode == LocalUsageMode.WORK) {
-                    com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.requestTemperature(
-                        snapshot.sessionId, frozenProfile.model, frozenProfile.baseUrl,
-                    )
-                } else null,
-            )
-        val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
-        return FrozenRequestConfiguration(frozenProfile, runSurface, reasoningEffort, effectiveTemperature, credentialDiagnostic)
-    }
-
-    private data class FrozenRequestConfiguration(
-        val profile: LocalModelProfile,
-        val surface: com.labteto.dshmobile.local.model.LocalRunModelSurface,
-        val reasoningEffort: String?,
-        val temperature: Double?,
-        val credentialDiagnostic: com.labteto.dshmobile.local.model.LocalCredentialDiagnostic,
-    )
 
     private fun stablePromptCacheKey(sessionId: String, routeFingerprint: String): String {
         val raw = sessionId + "\u0000" + routeFingerprint
