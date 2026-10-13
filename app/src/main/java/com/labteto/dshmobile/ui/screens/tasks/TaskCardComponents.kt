@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+
 import com.shenyan.designsystem.foundation.SyMetric
 
 
@@ -65,7 +67,6 @@ import com.labteto.dshmobile.ui.shenyan.SyStatusPill
 import com.labteto.dshmobile.ui.shenyan.SyTimeline
 import com.labteto.dshmobile.ui.shenyan.SyTimelineItem
 import com.labteto.dshmobile.ui.components.EmptyHero
-import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -94,7 +95,7 @@ private fun TaskCardSurface(
     }
     com.shenyan.designsystem.components.SyMaterialFrame(
         modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.block,
+        shape = RoundedCornerShape(SyMetric.radiusCard),
         border = BorderStroke(1.dp, borderColor),
         horizontalPadding = SyMetric.gapSection,
         verticalPadding = SyMetric.gapSection,
@@ -428,7 +429,7 @@ internal fun TaskSummaryRow(task: AutomationTask, onClick: () -> Unit) {
     com.shenyan.designsystem.components.SyMaterialFrame(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.block,
+        shape = RoundedCornerShape(SyMetric.radiusCard),
         horizontalPadding = SyMetric.gapSection,
         verticalPadding = SyMetric.gapSection,
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),

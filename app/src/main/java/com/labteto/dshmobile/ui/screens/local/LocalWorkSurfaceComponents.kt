@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+
 import com.shenyan.designsystem.foundation.SyMetric
 
 import com.shenyan.designsystem.components.SyMaterialTier
@@ -40,7 +42,6 @@ import com.labteto.dshmobile.ui.shenyan.SyComposerField
 import com.labteto.dshmobile.ui.shenyan.SyExpandableColumn
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
-import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
@@ -92,7 +93,7 @@ internal fun ExecutionStatusCard(
 
     SyMaterialSurface(
         modifier = modifier.fillMaxWidth(),
-        shape = DsShapes.block,
+        shape = RoundedCornerShape(SyMetric.radiusCard),
         tier = if (showHeader) SyMaterialTier.L3_CARD else SyMaterialTier.L1_SECTION,
     ) {
         Column(
@@ -347,7 +348,7 @@ internal fun RunCenterJobsSection(
             val expanded = expandedJobId == job.id
             val active = job.status == "running"
             SyMaterialSurface(
-                shape = DsShapes.row,
+                shape = RoundedCornerShape(SyMetric.radiusControl),
                 tier = if (attention) SyMaterialTier.L4_OVERLAY else SyMaterialTier.L2_BAR,
                 border = if (job.isAgent) {
                     BorderStroke(

@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+
 import com.shenyan.designsystem.foundation.SyMetric
 
 import com.shenyan.designsystem.components.SyMaterialTier
@@ -30,7 +32,6 @@ import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
-import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
@@ -43,7 +44,7 @@ internal fun GroupAnnouncementCard(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SyMaterialSurface(
         tier = SyMaterialTier.L3_CARD,
-        shape = DsShapes.block,
+        shape = RoundedCornerShape(SyMetric.radiusCard),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs)

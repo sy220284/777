@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,7 +28,6 @@ import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.shenyan.designsystem.components.SyCategoryRow
 import com.shenyan.designsystem.components.SyTextField
@@ -90,7 +93,7 @@ internal fun V6LoadedConversationSearchSheet(
             leadingIcon = {
                 Icon(SyEntryIcons.Search, contentDescription = null, tint = colors.textTertiary)
             },
-            shape = DsShapes.block,
+            shape = RoundedCornerShape(SyMetric.radiusCard),
             singleLine = true,
         )
         when {

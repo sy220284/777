@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+
 import com.shenyan.designsystem.foundation.SyMetric
 
 import com.shenyan.designsystem.components.SyMaterialTier
@@ -55,7 +57,6 @@ import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.rememberSyToast
-import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -393,7 +394,7 @@ private fun TaskEmptyState(
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                 color = colors.primary,
                 contentColor = colors.onPrimary,
-                shape = DsShapes.buttonCapsule,
+                shape = RoundedCornerShape(SyMetric.radiusControl),
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(SyMetric.gapLg)) {
                     Text(
@@ -407,7 +408,7 @@ private fun TaskEmptyState(
                 onClick = onCreateViaChat,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                 tier = SyMaterialTier.L1_SECTION,
-                shape = DsShapes.buttonCapsule,
+                shape = RoundedCornerShape(SyMetric.radiusControl),
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(SyMetric.gapLg)) {
                     Text(

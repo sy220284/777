@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.labteto.dshmobile.ui.components.FeatherIcons
 
 import androidx.compose.foundation.background
@@ -24,7 +26,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -45,11 +46,11 @@ internal fun ThemePreviewBlock(
     }
     Column(
         modifier = modifier
-            .clip(DsShapes.cube)
+            .clip(RoundedCornerShape(SyMetric.radiusSheet))
             .border(
                 width = if (selected) 1.5.dp else 1.dp,
                 color = if (selected) colors.primary else colors.border,
-                shape = DsShapes.cube,
+                shape = RoundedCornerShape(SyMetric.radiusSheet),
             )
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
     ) {
