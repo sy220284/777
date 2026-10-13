@@ -72,9 +72,10 @@ adb shell am start -n com.sy220284.dshmobile.debug/com.labteto.dshmobile.MainAct
 
 最终验证必须绑定最终源码；以下状态由实际结果更新，不能用设计文件或测试夹具代替完整旅程。
 
-- 静态：UI 设计系统、颜色、CJK、架构、性能、Kotlin 风险、测试质量、安全、通知、工具链基线、CI 完整性已通过；功能树同步及独立检查已通过。最终模式隔离修正后复验。
+- 静态：UI 设计系统、颜色、CJK、架构、性能、Kotlin 风险、测试质量、安全、通知、工具链基线、CI 完整性已通过；最终模式隔离修正后的架构、测试质量、CI 完整性与功能树同步及独立检查已通过。
 - `:ui-contract:test`：3 项测试通过，失败/错误/跳过均为 0。`:ui-host:compileDebugKotlin`、`:ui-pack-next:compileDebugKotlin` 已通过。
-- App 全部 JVM 单测、Debug APK、androidTest 编译和 lint：本地验证进行中；提交分支后使用既有完整 CI 验证最终源码。
+- App 全部 JVM 单测、Debug APK、androidTest 编译和 lint：本地全量编译耗时较长，已停止，未记录通过；使用既有完整 CI 验证最终源码。
+- 首次完整 CI（Run 38416556578）：静态和架构通过；单测和构建被独立包解析出的旧 Lifecycle/Tracing 元数据校验阻断，尚未运行到测试。独立包补充与项目已核验版本一致的依赖约束，不关闭校验、不添加旧版散列。Android 17 镜像下载同时出现 Zip 损坏，未记录设备通过。修正后重跑。
 - 构建排障：新模块脱离 App 后曾解析到未缓存的 Activity 旧版；Host SDK 已去掉无用 UI 依赖，验证包使用项目固定 Activity 版本；未联网补齐。
 - 首轮 App 构建：KSP 报 `No fir element was found for KtParameter`，失败，没有据此声称单测通过；已对最终依赖图重新执行。
 - Android 16/17、真实模型/工具审批、TalkBack、大字体/IME、收费服务：本环境未提供可用设备/真实账户闭环，待验收。

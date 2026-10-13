@@ -24,4 +24,14 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    constraints {
+        // Independent resolution must use the same verified Lifecycle baseline as the App.
+        // Constraints add no unused runtime dependency and allow newer transitive versions.
+        listOf("lifecycle-common-java8", "lifecycle-process", "lifecycle-runtime",
+            "lifecycle-runtime-ktx", "lifecycle-viewmodel", "lifecycle-viewmodel-ktx",
+            "lifecycle-viewmodel-savedstate").forEach { artifact ->
+            implementation("androidx.lifecycle:$artifact:${libs.versions.lifecycle.get()}")
+        }
+        implementation("androidx.tracing:tracing:1.2.0")
+    }
 }
