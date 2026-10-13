@@ -338,7 +338,6 @@ internal fun BackgroundRow(
             ToggleRow(
                 stringResource(R.string.settings_background_adaptive_contrast),
                 adaptiveContrast,
-                stringResource(R.string.settings_background_adaptive_contrast_hint),
             ) { onAdaptiveContrastChange(!adaptiveContrast) }
         }
     }

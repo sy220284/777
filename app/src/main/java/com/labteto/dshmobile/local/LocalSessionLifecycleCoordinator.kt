@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
 import com.labteto.dshmobile.local.chat.ChatDiaryStore
+import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.LocalChatSessionLifecyclePlanner
 import com.labteto.dshmobile.local.chat.LocalChatSessionModeRoute
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
@@ -48,6 +49,20 @@ internal fun localDeletedCurrentSessionMode(
     deletedIds: Set<String>,
     usageMode: LocalUsageMode,
 ): LocalUsageMode? = usageMode.takeIf { currentSessionId in deletedIds }
+
+/** A mode tab chooses an empty landing session, not a historical conversation. */
+internal fun localModeLandingSession(
+    mode: LocalUsageMode,
+    sessions: List<LocalSessionSummary>,
+): LocalSessionSummary? = sessions.firstOrNull { session ->
+    session.usageMode == mode && session.blank &&
+        if (mode == LocalUsageMode.CHAT) {
+            session.chatMode == LocalChatMode.SINGLE.name && session.groupMemberCount == 0
+        } else {
+            // Work project sessions must never masquerade as the generic Work landing.
+            session.projectId == null
+        }
+}
 
 internal class LocalSessionLifecycleCoordinator(
     private val scope: CoroutineScope,
@@ -280,23 +295,10 @@ internal class LocalSessionLifecycleCoordinator(
         if (snapshot.kernel.running && snapshot.usageMode != LocalUsageMode.WORK &&
             mode != snapshot.usageMode
         ) return false
-        if (mode == LocalUsageMode.CHAT && snapshot.usageMode == LocalUsageMode.CHAT) {
-            applyChatModeRoute(
-                chatSessionLifecycle.resolveSingleMode(
-                    usageMode = snapshot.usageMode,
-                    chat = snapshot.chat,
-                    sessions = snapshot.sessions,
-                ),
-            )
-            return true
-        }
-        if (snapshot.usageMode == mode) return true
-        val target = if (mode == LocalUsageMode.CHAT) {
-            chatSessionLifecycle.preferredSingleSession(snapshot.sessions)
-        } else {
-            snapshot.sessions.firstOrNull { it.usageMode == mode && !it.blank }
-                ?: snapshot.sessions.firstOrNull { it.usageMode == mode }
-        }
+        if (snapshot.usageMode == mode &&
+            !(mode == LocalUsageMode.CHAT && snapshot.chat.groupChat.enabled)
+        ) return true
+        val target = localModeLandingSession(mode, snapshot.sessions)
         return if (target != null) {
             startSessionSwitch(target.id)
         } else {

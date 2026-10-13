@@ -15,6 +15,7 @@ import kotlinx.serialization.json.jsonPrimitive
  */
 internal class LocalWorkBuiltinToolRuntime(
     private val persist: (LocalWorkRunBinding) -> Unit,
+    private val workspaceRoot: java.io.File? = null,
     private val updateContextMetrics: (LocalWorkRunBinding) -> Unit,
 ) {
     internal suspend fun execute(
@@ -29,6 +30,7 @@ internal class LocalWorkBuiltinToolRuntime(
             state = run.workState,
             eventLog = run.eventLog,
             persist = { persist(run) },
+            workspaceRoot = workspaceRoot,
         )
         return when (call.name) {
             "update_plan" -> progress.updatePlan(args)
@@ -44,7 +46,9 @@ internal class LocalWorkBuiltinToolRuntime(
                 updateContextMetrics = { updateContextMetrics(run) },
             )
             "todo_write" -> progress.updateTodos(args)
-            "create_goal" -> progress.createGoal(args.string("description"))
+            "create_goal" -> progress.createGoal(args.string("description"),
+                args["artifact_paths"]?.jsonArray.orEmpty().map { it.jsonPrimitive.content },
+                args["verification_commands"]?.jsonArray.orEmpty().map { it.jsonPrimitive.content })
             "get_goal" -> progress.getGoal()
             "update_goal" -> progress.updateGoal(
                 status = args.string("status"),

@@ -489,10 +489,11 @@ fun ToolsScreen(
         )
     }
 
-    BackHandler(enabled = showPluginBrowser || showAgentSettings || handleRootSystemBack) {
+    BackHandler(enabled = showPluginBrowser || showAgentSettings || !capabilityCatalogueVisible || handleRootSystemBack) {
         when {
             showAgentSettings -> showAgentSettings = false
             showPluginBrowser -> showPluginBrowser = false
+            !capabilityCatalogueVisible -> capabilityCatalogueVisible = true
             else -> onClose()
         }
     }
@@ -589,7 +590,7 @@ fun ToolsScreen(
                 SyTopBar(
                     title = stringResource(R.string.tools_title),
                     subtitle = stringResource(R.string.tools_subtitle),
-                    onBack = onClose,
+                    onBack = { capabilityCatalogueVisible = true },
                     backContentDescription = stringResource(R.string.common_back),
                     largeTitle = false,
                     actionIcon = FeatherIcons.RefreshCw,
@@ -635,7 +636,6 @@ fun ToolsScreen(
                         ToolCapabilityRow(
                             icon = FeatherIcons.Globe,
                             title = stringResource(R.string.tools_network_search),
-                            subtitle = stringResource(R.string.tools_network_search_hint),
                             status = stringResource(
                                 if (networkSearchEnabled) R.string.common_enabled else R.string.common_disabled,
                             ),
@@ -651,7 +651,6 @@ fun ToolsScreen(
                         ToolCapabilityRow(
                             icon = FeatherIcons.Shield,
                             title = stringResource(R.string.cap_center_auto_approval),
-                            subtitle = stringResource(R.string.cap_center_auto_approval_hint),
                             status = stringResource(
                                 when (approvalMode) {
                                     LocalApprovalMode.AUTO -> R.string.common_enabled
@@ -671,7 +670,6 @@ fun ToolsScreen(
                         ToolCapabilityRow(
                             icon = FeatherIcons.Sliders,
                             title = stringResource(R.string.advanced_agent_settings),
-                            subtitle = stringResource(R.string.tools_agent_settings_hint),
                             status = stringResource(R.string.tools_capability_available),
                             state = StateDotState.Done,
                             onClick = { showAgentSettings = true },
@@ -689,7 +687,6 @@ fun ToolsScreen(
                         ToolCapabilityRow(
                             iconPainter = painterResource(R.drawable.ic_ui_plugin),
                             title = stringResource(R.string.skills_title),
-                            subtitle = stringResource(R.string.tools_capability_agent_available),
                             status = capabilityStateLabel(builtinAvailable),
                             state = if (builtinAvailable) StateDotState.Done else StateDotState.Idle,
                             onClick = { skillsOnly = true; showPluginBrowser = true },
@@ -697,7 +694,6 @@ fun ToolsScreen(
                         ToolCapabilityRow(
                             icon = FeatherIcons.GitBranch,
                             title = stringResource(R.string.tools_github_connector),
-                            subtitle = stringResource(R.string.tools_github_connector_hint),
                             status = stringResource(
                                 if (state.githubConfigured) R.string.tools_github_configured
                                 else R.string.tools_github_unconfigured,
@@ -708,7 +704,6 @@ fun ToolsScreen(
                         ToolCapabilityRow(
                             iconPainter = painterResource(R.drawable.ic_ui_plugin),
                             title = stringResource(R.string.tools_external_services),
-                            subtitle = stringResource(R.string.tools_external_services_hint),
                             status = state.servers.size.toString(),
                             state = if (state.servers.isNotEmpty()) StateDotState.Done else StateDotState.Idle,
                             onClick = { showExternalConfig = true },
@@ -982,7 +977,6 @@ fun ToolsScreen(
 @Composable
 private fun ToolCapabilityRow(
     title: String,
-    subtitle: String,
     status: String,
     state: StateDotState,
     icon: ImageVector? = null,
@@ -1046,13 +1040,6 @@ private fun ToolCapabilityRow(
                         )
                         if (!stackedStatus) ToolCapabilityStatus(status, state)
                     }
-                    Text(
-                        subtitle,
-                        style = DsType.small13.withReadingWeight(),
-                        color = colors.labelSecondary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
                     if (stackedStatus) ToolCapabilityStatus(status, state)
                 }
             }

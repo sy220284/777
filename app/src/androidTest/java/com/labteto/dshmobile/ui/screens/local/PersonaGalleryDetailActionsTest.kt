@@ -35,11 +35,17 @@ class PersonaGalleryDetailActionsTest {
     private var saves = 0
     private var savedStoryStage: String? = null
 
-    private fun openDetail(pendingProgress: Boolean = false) {
+    private fun openDetail(
+        pendingProgress: Boolean = false,
+        fromSearchResult: Boolean = false,
+        entryVersion: androidx.compose.runtime.State<Int>? = null,
+    ) {
         compose.setContent {
             DshTheme {
                 PersonaGalleryScreen(
                     entries = listOf(entry),
+                    initialEntryId = entry.id.takeIf { fromSearchResult && (entryVersion?.value ?: 1) == 1 },
+                    entryOpenVersion = entryVersion?.value ?: if (fromSearchResult) 1 else 0,
                     presets = emptyList(),
                     currentPersona = entry.persona,
                     currentGalleryId = entry.id,
@@ -69,8 +75,28 @@ class PersonaGalleryDetailActionsTest {
                 )
             }
         }
-        compose.onNodeWithTag("personaGalleryEntry_${entry.id}").performClick()
+        if (!fromSearchResult) {
+            compose.onNodeWithTag("personaGalleryEntry_${entry.id}").performClick()
+        }
         compose.onNodeWithText("继续这条故事").assertIsDisplayed()
+    }
+
+    @Test
+    fun sidebarSearchResultEntersExactPersonaAndBackReturnsToGalleryList() {
+        openDetail(fromSearchResult = true)
+        compose.onNodeWithText("人物详情").assertIsDisplayed()
+        compose.onNodeWithTag("personaGalleryEntry_${entry.id}").assertDoesNotExist()
+        pressDeviceBack()
+        compose.onNodeWithTag("personaGalleryEntry_${entry.id}").assertIsDisplayed()
+    }
+
+    @Test
+    fun openingGalleryNormallyAfterSearchClearsPreviousPersonaTarget() {
+        val version = androidx.compose.runtime.mutableIntStateOf(1)
+        openDetail(fromSearchResult = true, entryVersion = version)
+        compose.runOnIdle { version.intValue = 2 }
+        compose.onNodeWithTag("personaGalleryEntry_${entry.id}").assertIsDisplayed()
+        compose.onNodeWithText("人设图集").assertIsDisplayed()
     }
 
     @Test

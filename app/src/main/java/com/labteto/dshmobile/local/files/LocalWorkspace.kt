@@ -459,7 +459,17 @@ class LocalWorkspace(
         timeoutSeconds: Int,
         onProgress: ((String) -> Unit)? = null,
         throwOnFailure: Boolean = false,
-    ): String = withContext(Dispatchers.IO) {
+    ): String {
+        val result = shellResult(command, timeoutSeconds, onProgress)
+        if (throwOnFailure && result.isError) error("[shell][${result.errorCode}] ${result.content}")
+        return result.content
+    }
+
+    suspend fun shellResult(
+        command: String,
+        timeoutSeconds: Int,
+        onProgress: ((String) -> Unit)? = null,
+    ): com.labteto.dshmobile.harness.tools.ToolResult = withContext(Dispatchers.IO) {
         require(command.isNotBlank()) { "命令不能为空" }
         val builder = ProcessBuilder(shellExecutable, "-c", command)
             .directory(canonicalRoot)
@@ -485,24 +495,15 @@ class LocalWorkspace(
             maxChars = MAX_SHELL_CHARS,
             onProgress = onProgress,
         )
-        when {
-            result.timedOut && throwOnFailure -> {
-                throw IllegalStateException(
-                    "[shell][TOOL_TIMEOUT] 命令执行超时，已终止进程组。\n已产生输出：\n${result.stdout}",
-                )
-            }
-            result.timedOut -> {
+        com.labteto.dshmobile.harness.tools.ToolResult(
+            content = if (result.timedOut) {
                 "[shell][TOOL_TIMEOUT] 命令执行超时，已终止进程组。\n已产生输出：\n${result.stdout}"
-            }
-            result.exitCode != 0 && throwOnFailure -> {
-                throw IllegalStateException(
-                    "[shell][PROCESS_EXIT_${result.exitCode}] 后台命令异常结束。\n已产生输出：\n${result.stdout}",
-                )
-            }
-            else -> {
-                "退出码：${result.exitCode}\n${result.stdout}"
-            }
-        }
+            } else "退出码：${result.exitCode}\n${result.stdout}",
+            isError = result.timedOut || result.exitCode != 0,
+            errorCode = if (result.timedOut) "TOOL_TIMEOUT" else
+                result.exitCode.takeIf { it != 0 }?.let { "PROCESS_EXIT_$it" },
+            processExitCode = result.exitCode.takeUnless { result.timedOut },
+        )
     }
 
     /** Installed workspace skill names. */

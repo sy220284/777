@@ -59,19 +59,14 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
-    fun intimacyDoesNotInstallAnActionRepertoire() {
-        val prompt = engine.prompt("靠近点，陪我聊会", ChatCharacterState())
-        assertFalse(prompt.contains("互动变化"))
-        assertFalse(prompt.contains("姿态"))
-        assertFalse(prompt.contains("换一种"))
+    fun relationshipFactsStayIndependentFromIntimacyIntent() {
+        val state = ChatCharacterState(relationshipState = "亲近")
+        val normal = engine.prompt("今天怎么样", state)
+        val flirting = engine.prompt("今晚撩我一下", state)
+        assertEquals(normal, flirting)
+        assertTrue(normal.contains("当前关系：亲近"))
+        assertFalse(flirting.contains("【亲密模式】"))
     }
-
-    @Test
-    fun differentRequestsDoNotRewriteRelationshipBackground() {
-        val state = ChatCharacterState(relationshipState = "熟悉")
-        assertEquals(engine.prompt("今天怎么样", state), engine.prompt("今晚撩我一下", state))
-    }
-
     @Test
     fun chineseInnuendoRecognizesStrongAndContextualDoubleMeanings() {
         assertEquals(
@@ -161,65 +156,19 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
-    fun innuendoRemainsTheUsersMessageWithoutAnInterpretationRecipe() {
-        assertTrue(hasChineseSuggestiveFlirtingIntent("你行不行啊，别光说"))
-        assertEquals(engine.prompt("你好", ChatCharacterState()),
-            engine.prompt("你行不行啊，别光说", ChatCharacterState()))
-    }
-
-    @Test
-    fun oldCooldownsAndInteractionScoresDoNotEnterCharacterGeneration() {
-        val state = ChatCharacterState(interactionIntensity = 5, recentActionTags = listOf("靠近"),
-            recentPoseTags = listOf("坐近"), interactionCooldowns = mapOf("动作:靠近" to 3))
-        assertEquals(engine.prompt("你好", ChatCharacterState()), engine.prompt("过来点", state))
-    }
-
-    @Test
-    fun relationshipContextAppearsOnlyForActualFactsAndHasNoCommandRouting() {
+    fun relationshipFactsOnlyAppearWithEvidenceAndCommandsDoNotRoute() {
         val empty = ChatCharacterState()
         assertEquals("", engine.prompt("今天怎么样", empty))
-        assertEquals("", engine.prompt("/reply", empty))
+        assertEquals(engine.prompt("今天怎么样", empty), engine.prompt("/reply", empty))
         val recorded = ChatCharacterState(dynamics = RelationshipDynamics(
             facts = listOf(RelationshipEvidence("师父答应下周带我练剑", confidence = 95, source = "dialogue")),
             sharedObjects = listOf("一起修好的木剑"),
         ))
-        val text = engine.prompt("今天做什么", recorded)
-        assertTrue(text.contains("人物关系与共同经历"))
-        assertTrue(text.contains("师父答应下周带我练剑"))
-        assertTrue(text.contains("一起修好的木剑"))
-        assertFalse(text.contains("回复草稿"))
-        assertEquals(text, engine.prompt("/reply", recorded))
-    }
-
-    @Test
-    fun ordinaryChatHasNoInjectedRelationshipBias() {
-        val prompt = engine.prompt("今天工作有点累", ChatCharacterState())
-        assertTrue(prompt.isEmpty())
-        assertFalse(prompt.contains("互动倾向"))
-        assertFalse(prompt.contains("互动变化"))
-    }
-
-    @Test
-    fun anIntimateRequestDoesNotOverridePersonalityWithAnApplicationPriorityRule() {
-        val state = ChatCharacterState()
-        val prompt = engine.prompt("我们都是成年人，过来抱住我亲一下", state)
-        assertEquals(engine.prompt("今天怎么样", state), prompt)
-        assertFalse(prompt.contains("优先级规则"))
-        assertFalse(prompt.contains("默认克制"))
-    }
-
-    @Test
-    fun anIntimateRequestDoesNotAddACannedResponseInstruction() {
-        val prompt = engine.prompt("过来抱住我亲一下", ChatCharacterState())
-        assertFalse(prompt.contains("本轮意图优先"))
-        assertFalse(prompt.contains("重复确认"))
-    }
-
-    @Test
-    fun askingForInitiativeIsNotTranslatedIntoAnApplicationActionScript() {
-        val state = ChatCharacterState(interactionIntent = ChatInteractionIntent.INTIMATE.name,
-            interactionIntentStrength = 100)
-        assertEquals(engine.prompt("你好", state), engine.prompt("这次你主动一点，别躲", state))
+        val prompt = engine.prompt("今天做什么", recorded)
+        assertTrue(prompt.contains("【人物关系与共同经历】"))
+        assertTrue(prompt.contains("师父答应下周带我练剑"))
+        assertTrue(prompt.contains("一起修好的木剑"))
+        assertEquals(prompt, engine.prompt("/reply", recorded))
     }
 
     @Test

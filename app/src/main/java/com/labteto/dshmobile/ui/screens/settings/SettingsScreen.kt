@@ -203,6 +203,7 @@ internal fun settingsInkColors(colors: DsColors): DsColors = colors
 fun SettingsScreen(
     onClose: () -> Unit,
     initialDestination: SettingsDestination = SettingsDestination.ROOT,
+    entryRequest: Int = 0,
     memorySourceSessionId: String? = null,
     memorySourceMessageId: String? = null,
     onCheckUpdate: () -> Unit = {},
@@ -263,7 +264,7 @@ fun SettingsScreen(
             }
         }
     }
-    var page by rememberSaveable(initialDestination) { mutableStateOf(initialDestination) }
+    var page by rememberSaveable(initialDestination, entryRequest) { mutableStateOf(initialDestination) }
     var showAllMemories by rememberSaveable(memorySourceSessionId, memorySourceMessageId) {
         mutableStateOf(false)
     }
@@ -442,7 +443,7 @@ fun SettingsScreen(
                             AppSettingsRow(
                                 icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_model_performance_title),
-                                subtitle = stringResource(R.string.settings_model_performance_subtitle),
+                                reservedEntryHeight = 72.dp,
                                 onClick = { page = SettingsDestination.MODEL_PERFORMANCE },
                                 compact = true,
                             )
@@ -506,7 +507,7 @@ fun SettingsScreen(
                             AppSettingsRow(
                                 icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_chat_style_guard),
-                                subtitle = stringResource(R.string.settings_chat_style_guard_hint),
+                                reservedEntryHeight = 88.dp,
                                 value = stringResource(
                                     if (localHarness.chatStyleGuardEnabled) {
                                         R.string.common_enabled
@@ -580,8 +581,7 @@ fun SettingsScreen(
                             ToggleRow(
                                 stringResource(R.string.settings_chat_style_guard),
                                 localHarness.chatStyleGuardEnabled,
-                                stringResource(R.string.settings_chat_style_guard_hint),
-                            ) {
+                                            ) {
                                 viewModel.configureChatStyleGuard(!localHarness.chatStyleGuardEnabled)
                             }
 
@@ -728,13 +728,13 @@ fun SettingsScreen(
                             AppSettingsRow(
                                 icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_page_pricing),
-                                subtitle = stringResource(R.string.settings_pricing_subtitle),
+                                reservedEntryHeight = 80.dp,
                                 onClick = { page = SettingsDestination.PRICING },
                             )
                             AppSettingsRow(
                                 icon = FeatherIcons.Clock,
                                 title = stringResource(R.string.usage_calculation_title),
-                                subtitle = stringResource(R.string.usage_calculation_subtitle),
+                                reservedEntryHeight = 80.dp,
                                 onClick = { page = SettingsDestination.USAGE },
                             )
                         }
@@ -876,7 +876,6 @@ fun SettingsScreen(
                             ToggleRow(
                                 stringResource(R.string.settings_notifications_local_jobs),
                                 settings.notifyLocalJobs,
-                                stringResource(R.string.settings_notifications_local_jobs_hint),
                             ) { viewModel.set { it.copy(notifyLocalJobs = !it.notifyLocalJobs) } }
                         }
                     }
@@ -972,7 +971,7 @@ fun SettingsScreen(
                             AppSettingsRow(
                                 icon = FeatherIcons.Info,
                                 title = stringResource(R.string.settings_export_diagnostics),
-                                subtitle = stringResource(R.string.settings_export_diagnostics_hint),
+                                reservedEntryHeight = 88.dp,
                                 onClick = { diagnosticExporter.launch("777-diagnostics.txt") },
                             )
                         }

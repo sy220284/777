@@ -12,7 +12,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 internal class LocalBuiltinPlugin(
-    private val execute: suspend (LocalToolCall, Boolean, String?) -> String,
+    private val execute: suspend (LocalToolCall, Boolean, String?) -> ToolResult,
 ) : HarnessPlugin {
         override val id = "android-local-builtins"
 
@@ -32,8 +32,7 @@ internal class LocalBuiltinPlugin(
                         executor = HarnessToolExecutor { toolContext, input, rawArguments ->
                             val callId = toolContext.attributes["call_id"] as? String
                                 ?: "registry-" + UUID.randomUUID().toString().take(8)
-                            ToolResult(
-                                execute(
+                            execute(
                                     LocalToolCall(
                                         id = callId,
                                         name = name,
@@ -42,7 +41,6 @@ internal class LocalBuiltinPlugin(
                                     ),
                                     toolContext.allowMutation,
                                     toolContext.sessionId,
-                                ),
                             )
                         },
                     ),

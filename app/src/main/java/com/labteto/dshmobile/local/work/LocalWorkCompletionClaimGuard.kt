@@ -63,12 +63,13 @@ internal fun guardWorkCompletionDelivery(
     reply: LocalModelReply,
     state: LocalHarnessState,
     eventLog: LocalSessionEventLog,
+    workspaceRoot: java.io.File? = null,
 ): LocalModelReply {
     if (state.usageMode != LocalUsageMode.WORK || reply.toolCalls.isNotEmpty()) return reply
     val original = reply.content?.takeIf(String::isNotBlank) ?: return reply
     val result = LocalWorkCompletionClaimGuard.inspect(
         original, state.work,
-        state.work.goal?.let { localWorkDeliveryEvidence(eventLog, it.description) },
+        state.work.goal?.let { localWorkDeliveryEvidence(eventLog, it, workspaceRoot) },
     )
     if (!result.changed) return reply
     eventLog.append("work/output-quality", buildJsonObject {
@@ -101,11 +102,12 @@ internal fun recordWorkCompletionQuality(
     text: String,
     state: LocalHarnessState,
     eventLog: LocalSessionEventLog,
+    workspaceRoot: java.io.File? = null,
 ) {
     if (state.usageMode != LocalUsageMode.WORK) return
     val result = LocalWorkCompletionClaimGuard.inspect(
         text, state.work,
-        state.work.goal?.let { localWorkDeliveryEvidence(eventLog, it.description) },
+        state.work.goal?.let { localWorkDeliveryEvidence(eventLog, it, workspaceRoot) },
     )
     if (result.findings.isEmpty()) return
     eventLog.append("work/output-quality", buildJsonObject {

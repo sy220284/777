@@ -129,6 +129,7 @@ internal fun LocalConversationSurface(
     workActions: LocalWorkFeatureUiActions? = null,
     onOpenWorkArtifact: (String) -> Unit = {},
     readRequest: Long = 0L,
+    onReaderDismissed: () -> Unit = {},
     activeModelProfile: LocalModelProfile?,
     sendFeedback: LocalSendFeedbackState,
     streamingState: StateFlow<LocalHarnessStreamingState>,
@@ -279,9 +280,12 @@ internal fun LocalConversationSurface(
     }
     // Media is a persistent chat/Work timeline projection, not an assistant text message.
     val mediaStudioViewModel: LocalMediaStudioViewModel = hiltViewModel()
-    val generatedMedia by mediaStudioViewModel.generatedResults.collectAsStateWithLifecycle()
-    val videoMediaTasks by mediaStudioViewModel.videoTasks.collectAsStateWithLifecycle()
-    val pendingMediaJobs by mediaStudioViewModel.creationJobs.collectAsStateWithLifecycle()
+    var mediaLimit by rememberSaveable(state.sessionId) { mutableStateOf(com.labteto.dshmobile.local.presentation.LocalMediaCreationRuntime.PAGE_SIZE) }
+    val mediaFlow = remember(state.sessionId, mediaLimit) { mediaStudioViewModel.sessionPage(state.sessionId, mediaLimit) }
+    val mediaPage by mediaFlow.collectAsStateWithLifecycle(initialValue = com.labteto.dshmobile.local.model.LocalMediaPage())
+    val generatedMedia = mediaPage.results
+    val videoMediaTasks = mediaPage.videos
+    val pendingMediaJobs = mediaPage.jobs
     var workArtifacts by remember(state.sessionId) {
         mutableStateOf<List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem>>(emptyList())
     }
@@ -713,6 +717,18 @@ internal fun LocalConversationSurface(
                 ),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
             ) {
+                if (mediaPage.unavailable) {
+                    item(key = "media-storage-error") {
+                        SyButton(text = stringResource(R.string.media_retry_storage),
+                            onClick = { scope.launch { mediaStudioViewModel.retryStorage() } })
+                    }
+                }
+                if (mediaPage.hasMore) {
+                    item(key = "older-media-results") {
+                        SyButton(text = stringResource(R.string.media_load_older),
+                            onClick = { mediaLimit = Math.addExact(mediaLimit, com.labteto.dshmobile.local.presentation.LocalMediaCreationRuntime.PAGE_SIZE) })
+                    }
+                }
                 if (showTranscriptPagingRow) {
                     item(key = "local-transcript-history-status") {
                         LocalTranscriptPagingStatus(
@@ -1128,7 +1144,11 @@ internal fun LocalConversationSurface(
         FluidMessageReader(
             title = message?.speakerName ?: sessionTitle,
             content = message?.content?.let(::visibleAssistantText).orEmpty(),
-            onDismiss = { readerOpen = false; readerMessageId = null },
+            onDismiss = {
+                readerOpen = false
+                readerMessageId = null
+                onReaderDismissed()
+            },
         )
     }
 

@@ -72,6 +72,7 @@ import com.labteto.dshmobile.local.presentation.galleryMessageArchiveKey
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.shenyan.designsystem.components.SySheetChoiceRow
@@ -171,6 +172,8 @@ internal fun PersonaGallerySavePromptDialog(
 @Composable
 internal fun PersonaGalleryScreen(
     entries: List<PersonaGalleryEntry>,
+    initialEntryId: String? = null,
+    entryOpenVersion: Int = 0,
     presets: List<PersonaPreset>,
     currentPersona: PersonaProfile,
     currentGalleryId: String?,
@@ -207,7 +210,8 @@ internal fun PersonaGalleryScreen(
                 .toSet(),
         )
     }
-    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    // New sidebar navigation owns its target; internal detail/list Back stays local.
+    var selectedId by rememberSaveable(entryOpenVersion) { mutableStateOf(initialEntryId) }
     val selected = entries.firstOrNull { it.id == selectedId }
     var selectedStoryId by rememberSaveable(selectedId) { mutableStateOf<String?>(null) }
     val selectedStory = selected?.stories?.firstOrNull { it.id == selectedStoryId }
@@ -240,6 +244,7 @@ internal fun PersonaGalleryScreen(
     var editingStoryTitle by rememberSaveable(selectedId, selectedStoryId) { mutableStateOf(false) }
     var pendingExportDocument by remember { mutableStateOf<PersonaTransferDocument?>(null) }
     var showExportFormatDialog by remember { mutableStateOf(false) }
+    var confirmDiscardStoryDraft by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
     var portraitTargetId by remember { mutableStateOf<String?>(null) }
     val hasLocalStoryEdits = selectedStory?.let { story ->
         notes != story.notes || storyStage.trim() != story.chatContext.storyStage ||
@@ -370,7 +375,7 @@ internal fun PersonaGalleryScreen(
         if (selected == null) {
             onDismiss()
         } else if (hasLocalStoryEdits) {
-            error = saveEditsBeforeSwitchText
+            confirmDiscardStoryDraft = true
         } else {
             selectedId = null
             selectedStoryId = null
@@ -381,6 +386,36 @@ internal fun PersonaGalleryScreen(
     }
 
     BackHandler(enabled = selected != null, onBack = ::navigateBack)
+
+    if (confirmDiscardStoryDraft && selected != null) {
+        SyDialog(
+            title = stringResource(R.string.persona_gallery_discard_draft_title),
+            onDismiss = { confirmDiscardStoryDraft = false },
+        ) {
+            Text(stringResource(R.string.persona_gallery_discard_draft_body))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SyButton(
+                    text = stringResource(R.string.common_cancel),
+                    onClick = { confirmDiscardStoryDraft = false },
+                    variant = SyButtonVariant.Ghost,
+                    modifier = Modifier.weight(1f),
+                )
+                SyButton(
+                    text = stringResource(R.string.persona_gallery_discard_draft_confirm),
+                    onClick = {
+                        confirmDiscardStoryDraft = false
+                        selectedId = null
+                        selectedStoryId = null
+                        deletingCharacter = false
+                        error = null
+                        notice = null
+                    },
+                    variant = SyButtonVariant.Danger,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
 
     presets.firstOrNull { it.id == pendingPresetDeleteId }?.let { pending ->
         DeletePresetConfirmDialog(

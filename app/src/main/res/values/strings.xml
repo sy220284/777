@@ -1155,6 +1155,9 @@
     <string name="persona_gallery_hide_fixed_persona">收起固定人设</string>
     <string name="persona_gallery_rename_story">重命名故事</string>
     <string name="persona_gallery_save_edits_before_switch">请先保存或取消当前故事的修改，再切换其他故事。</string>
+    <string name="persona_gallery_discard_draft_title">有未保存的故事修改</string>
+    <string name="persona_gallery_discard_draft_body">放弃修改会丢失本次编辑内容。你也可以取消并返回页面保存。</string>
+    <string name="persona_gallery_discard_draft_confirm">放弃并返回</string>
 
 
     <string name="local_persona_picker_title">选择人物</string>
@@ -2088,7 +2091,7 @@
     <string name="media_studio_previous_video_tasks">当前模型已提交的视频任务</string>
     <string name="media_studio_video_submitting">正在向服务商提交生成任务，请勿重复操作</string>
     <string name="media_studio_video_unknown">提交结果未确认：可能已经产生费用，请先核实服务商后台，不要盲目重试</string>
-    <string name="media_studio_history">最近创作成果（%1$d）</string>
+    <string name="media_studio_history">创作成果（已加载 %1$d 项）</string>
     <string name="media_studio_temporary_links_notice">本机文件可长期查看和分享；服务商生成链接可能过期，请及时自行保存。</string>
     <string name="media_studio_history_item">%1$s · %2$s · %3$s</string>
     <string name="media_studio_view_result">查看</string>
@@ -2098,7 +2101,7 @@
     <string name="media_studio_confirm_delete">确定删除这项成果？本机文件会一并删除。</string>
     <string name="media_studio_delete_confirm">确认删除</string>
     <string name="media_studio_delete_cancel">取消</string>
-    <string name="media_studio_video_archive">视频生成任务档案（%1$d）</string>
+    <string name="media_studio_video_archive">视频任务档案（已加载 %1$d 项）</string>
     <string name="media_studio_video_account_unavailable">原创作账户未配置或身份已变化；任务保留在本机，但不能用其他账户查询。</string>
     <string name="media_studio_capability_image">图片生成</string>
     <string name="media_studio_capability_video">视频生成</string>
@@ -2293,5 +2296,13 @@
     <string name="sy_v5_settings">设置</string>
     <string name="sy_v5_nav_expand">展开导航</string>
     <string name="sy_v5_nav_collapse">收起导航</string>
+    <string name="media_load_older">加载更早的媒体成果</string>
+    <string name="media_retry_storage">恢复存储并重试清理</string>
+    <string name="media_retry_save">重新保存到本机</string>
+    <string name="media_refresh_link">用原账户刷新下载链接</string>
+    <string name="media_delete_video_warning">删除本机记录和文件。此操作不会取消服务商任务或退还费用；结果未知时请先核对服务商记录。</string>
+    <string name="media_creation_preparing">正在准备创作请求</string>
+    <string name="media_creation_saving">服务商已返回成果，正在保存</string>
+    <string name="media_creation_save_failed">服务商已返回成果，本地保存未完成</string>
 </resources>
 

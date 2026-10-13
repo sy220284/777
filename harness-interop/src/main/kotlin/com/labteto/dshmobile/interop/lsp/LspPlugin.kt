@@ -11,6 +11,7 @@ import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.harness.tools.ToolMetadata
+import com.labteto.dshmobile.harness.tools.ToolWorkspaceAccess
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.tools.functionToolSchema
@@ -110,6 +111,7 @@ class LspPlugin(
                     exposure = ToolExposure.OPTIONAL,
                     metadata = ToolMetadata(
                         family = "LSP",
+                        workspaceAccess = if (name == "lsp_uninstall_component") ToolWorkspaceAccess.NONE else ToolWorkspaceAccess.READ,
                         discoveryKeywords = discoveryKeywordsFor(name),
                         requirements = if (name == "lsp_uninstall_component") {
                             listOf("需用户审批；卸载前会停止当前运行的语言服务")
