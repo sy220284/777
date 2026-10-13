@@ -551,6 +551,30 @@ private fun bestContinuitySource(
         )
 }
 
+/**
+ * Legacy transcript grounding still needs concrete topic anchors when a model proposes
+ * a new event. These anchors do not authorize *closing* or rewriting an existing event.
+ */
+private fun continuityEvidenceAnchors(fact: String): Set<String> {
+    val core = normalizeContinuityEvidenceText(fact)
+        .replace(CONTINUITY_EVIDENCE_TIME_NOISE, "")
+        .replace(CONTINUITY_EVIDENCE_GENERIC_NOISE, "")
+    if (core.length < 2) return emptySet()
+    return continuityBigrams(core).filterTo(linkedSetOf()) { part ->
+        part.length >= 2 && part !in GENERIC_CONTINUITY_EVIDENCE_ANCHORS
+    }
+}
+
+private val GENERIC_CONTINUITY_EVIDENCE_ANCHORS = setOf(
+    "这个", "那个", "事情", "这事", "那事", "一下", "之后", "然后", "已经",
+)
+private val CONTINUITY_EVIDENCE_TIME_NOISE = Regex(
+    """(?:今天|明天|后天|今晚|明晚|今早|明早|上午|中午|下午|傍晚|晚上|夜里|[0-9０-９零〇一二两三四五六七八九十]{1,4}(?:[:：点时][0-9０-９零〇一二两三四五六七八九十半一刻三刻]{0,4}))""",
+)
+private val CONTINUITY_EVIDENCE_GENERIC_NOISE = Regex(
+    """(?:当前有效决定|已定|决定|安排|计划|约定|还要|需要|记得|确认|准备|继续|尚未|未完成|完成|发生|出发|过去|前往|去|到|回|改成|换成|取消|作废|延期|推迟|解决|处理|不用|不再|别|不)""",
+)
+
 private fun continuityEvidenceGrounded(
     kind: ChatContinuityFactKind,
     fact: String,
@@ -559,7 +583,7 @@ private fun continuityEvidenceGrounded(
     threshold: Int,
 ): Boolean {
     val normalizedSource = normalizeContinuityEvidenceText(source)
-    val anchors = continuityRemovalAnchors(fact)
+    val anchors = continuityEvidenceAnchors(fact)
     if (score >= threshold) {
         if (kind != ChatContinuityFactKind.DECISION || anchors.isEmpty()) return true
         return anchors.any(normalizedSource::contains)
