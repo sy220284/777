@@ -42,6 +42,7 @@ import kotlinx.coroutines.withContext
 @HiltViewModel
 class LocalHarnessViewModel @Inject constructor(
     private val runtime: LocalUiRuntime,
+    private val uiPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val chatUi: LocalChatUiFacade,
     private val sessionUi: LocalSessionUiFacade,
     private val projects: LocalProjectUiFacade,
@@ -93,6 +94,8 @@ class LocalHarnessViewModel @Inject constructor(
     val approvalMode = approvalPreferences.approvalMode
     val networkSearchEnabled = networkSearchSettings.enabled
     fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)
+    val chatUiPort: com.labteto.dshmobile.uicontract.ChatUiPort = uiPorts.chat
+    val workConversationUiPort: com.labteto.dshmobile.uicontract.WorkConversationUiPort = uiPorts.work
     val state = runtime.state
     val streamingState = runtime.streamingState; internal val sendFeedbackState = runtime.sendFeedbackState
     val shellState = state.projectShellState(viewModelScope)
@@ -206,9 +209,25 @@ class LocalHarnessViewModel @Inject constructor(
     internal fun send(
         text: String,
         attachments: List<LocalImportedAttachment> = emptyList(),
-    ): LocalSendResult = when (state.value.usageMode) {
-        LocalUsageMode.WORK -> runtime.work.send(text, attachments)
-        LocalUsageMode.CHAT -> runtime.chat.send(text, attachments)
+    ): LocalSendResult {
+        // Text sends share the stable port with the independent verification pack. Attachment
+        // import and token contracts are a later slice; their current owner entry stays intact.
+        if (attachments.isEmpty() && text.isNotBlank()) {
+            val receipt = when (state.value.usageMode) {
+                LocalUsageMode.CHAT -> chatUiPort.snapshot().identity?.let {
+                    chatUiPort.submit(com.labteto.dshmobile.uicontract.ChatUiCommand.SendText(it, text))
+                }
+                LocalUsageMode.WORK -> workConversationUiPort.snapshot().identity?.let {
+                    workConversationUiPort.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.SendText(it, text))
+                }
+            }
+            return receipt?.toLegacySendResult()
+                ?: LocalSendResult.rejected(com.labteto.dshmobile.local.send.LocalSendRejectReason.SESSION_TRANSITION)
+        }
+        return when (state.value.usageMode) {
+            LocalUsageMode.WORK -> runtime.work.send(text, attachments)
+            LocalUsageMode.CHAT -> runtime.chat.send(text, attachments)
+        }
     }
     internal fun sendWithTeam(
         text: String,
@@ -314,8 +333,15 @@ class LocalHarnessViewModel @Inject constructor(
         val result = runtime.work.stopTeamForUi()
         return LocalWorkUiActionResult(result.accepted, result.message)
     }
-    fun approve(callId: String) = runtime.work.answerApproval(callId, true)
-    fun deny(callId: String) = runtime.work.answerApproval(callId, false)
+    fun approve(callId: String) { answerUiApproval(callId, true) }
+    fun deny(callId: String) { answerUiApproval(callId, false) }
+    private fun answerUiApproval(callId: String, approved: Boolean) {
+        workConversationUiPort.snapshot().identity?.let { identity ->
+            workConversationUiPort.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.AnswerApproval(
+                identity, callId, approved,
+            ))
+        }
+    }
     fun useDefaultApproval() = runtime.work.useDefaultApproval()
     fun enableAutoApproval() = runtime.work.enableAutoApproval()
     fun enableAutoApprovalForPending(callId: String) = runtime.work.enableAutoApprovalForPending(callId)

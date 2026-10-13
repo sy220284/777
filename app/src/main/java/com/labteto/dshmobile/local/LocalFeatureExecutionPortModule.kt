@@ -70,6 +70,13 @@ internal object LocalFeatureExecutionPortModule {
 
     @Provides
     @Singleton
+    fun provideLocalWorkApprovalUiPort(
+        runtime: com.labteto.dshmobile.local.work.LocalWorkRuntime,
+    ): com.labteto.dshmobile.local.work.LocalWorkApprovalUiPort =
+        com.labteto.dshmobile.local.work.LocalWorkApprovalUiPort(runtime::answerApproval)
+
+    @Provides
+    @Singleton
     fun provideLocalWorkExecutionPort(
         coordinator: LocalWorkExecutionCoordinator,
     ): LocalWorkExecutionPort = coordinator

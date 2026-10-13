@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot_scope": "14个旧报告无确认入口条目的人工源码和测试溯源",
+  "snapshot_scope": "历史待确认入口与 UI 3.0 新增迁移切片的源码及测试溯源；未合并新增项不得认作主线交付",
   "limits": "独立存在按是否具有产品级单独入口；静态可到达与真实能用须结合设备/模型运行验证，单元或仪表测试方法的存在不能视为通过",
   "items": [
     {
@@ -321,6 +321,44 @@
         }
       ],
       "conclusion": "对应交付要求、成果版本和记忆来源三个既有能力的跨模块回归集合；独立测试源码存在，执行成功待确认。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送与审批端口（迁移中）",
+      "kind": "ui_contract_migration_slice",
+      "independent": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt",
+          "symbol": "LocalConversationUiPortComposition"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/LocalConversationUiPortTest.kt",
+          "method": "staleActivationTransitionAndModeCannotInvokeEitherOwner"
+        }
+      ],
+      "conclusion": "新增端口已通过生产 DI 接入 V6 普通文本发送与 Debug 验证包；只覆盖文本发送和 Work 审批，完整 Feature 端口及真实双包旅程仍待验收。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / UI 场景覆盖清单与兼容性检查（迁移中）",
+      "kind": "ui_contract_migration_slice",
+      "independent": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalog.kt",
+          "symbol": "LocalUiSceneCatalog"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalogTest.kt",
+          "method": "verificationPackCannotBeSelectedAsACompleteApplicationPack"
+        }
+      ],
+      "conclusion": "已建立源码场景索引及版本/覆盖兼容检查；缺场景的验证包不能宣称整包兼容。真实完整应用 UI Pack 切换与全量场景迁移尚未实现。"
     }
   ]
 }

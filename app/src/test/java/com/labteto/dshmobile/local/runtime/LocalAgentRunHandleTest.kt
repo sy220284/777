@@ -6,6 +6,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -45,6 +46,15 @@ class LocalAgentRunHandleTest {
         assertNull(handle.job)
         assertNull(handle.projectionJob)
         assertTrue(projection.isCancelled)
+    }
+
+    @Test
+    fun leavingAndReturningToSameSessionInvalidatesOldUiActivation() {
+        val handle = LocalAgentRunHandle(initialSessionId = "session-a", maxPendingInputs = 4)
+        val oldActivation = handle.activationId
+        handle.rebindSession("session-b")
+        handle.rebindSession("session-a")
+        assertNotEquals(oldActivation, handle.activationId)
     }
 
     @Test

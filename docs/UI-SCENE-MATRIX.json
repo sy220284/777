@@ -1,0 +1,1377 @@
+{
+  "contractVersion": 1,
+  "baseline": "131fcead",
+  "scope": "S0 源码场景审计；不是独立 UI Pack 覆盖或设备验收证明",
+  "scenes": [
+    {
+      "id": "conversation.chat",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "actions": [
+        "send",
+        "edit",
+        "resend",
+        "regenerate",
+        "select_variant"
+      ],
+      "recovery": "Shared Session + Chat branch + draft + reading anchor",
+      "v6": 1,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "conversation.work",
+      "owner": "WORK",
+      "route": "HOME",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "actions": [
+        "send",
+        "stop",
+        "answer_question"
+      ],
+      "recovery": "Shared Session + Work run identity + draft",
+      "v6": 2,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "conversation.header",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationHeaders.kt",
+      "actions": [
+        "rename",
+        "pin",
+        "delete"
+      ],
+      "recovery": "Session metadata + explicit delete confirmation",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "conversation.timeline",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptPresentation.kt",
+      "actions": [
+        "load_older",
+        "locate_message"
+      ],
+      "recovery": "Session EventLog cursor + message/branch anchor",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "conversation.composer",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt",
+      "actions": [
+        "send",
+        "queue",
+        "import_attachment"
+      ],
+      "recovery": "Session-keyed draft; rejected send retains input",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "conversation.reply_status",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStreamingComponents.kt",
+      "actions": [
+        "stop"
+      ],
+      "recovery": "Model request/Work events; no invented percentages",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "conversation.message_actions",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationActionsMenu.kt",
+      "actions": [
+        "edit",
+        "regenerate",
+        "copy",
+        "select_variant"
+      ],
+      "recovery": "Message ID + branch/variant; old interactions invalidated",
+      "v6": 11,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "conversation.edit",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalChatEditMessageSheet.kt",
+      "actions": [
+        "edit_and_resend"
+      ],
+      "recovery": "Message ID + edit draft; owner admission",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "conversation.reader",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "actions": [
+        "read",
+        "close"
+      ],
+      "recovery": "Reading position + drawer origin",
+      "v6": 5,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "conversation.model_picker",
+      "owner": "SETTINGS",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalModelPickerSheet.kt",
+      "actions": [
+        "select_profile"
+      ],
+      "recovery": "Exact account/profile; running admission",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "conversation.attachments",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SYSTEM",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "actions": [
+        "import_attachment"
+      ],
+      "recovery": "Android picker + attachment import owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "chat.persona_picker",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDialogs.kt",
+      "actions": [
+        "select_persona"
+      ],
+      "recovery": "Gallery/persona identity",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "chat.persona_editor",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDialogs.kt",
+      "actions": [
+        "configure_persona",
+        "auto_fill"
+      ],
+      "recovery": "Persona draft; explicitly frozen model request",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "chat.character_tuning",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterBehaviorTuningDialog.kt",
+      "actions": [
+        "configure_behavior"
+      ],
+      "recovery": "Chat profile values; no invented relationship facts",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "chat.group_members",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/GroupChatMemberPicker.kt",
+      "actions": [
+        "configure_members"
+      ],
+      "recovery": "Member gallery IDs + current session",
+      "v6": 10,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "chat.group_announcement",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/GroupAnnouncementSheet.kt",
+      "actions": [
+        "save_announcement"
+      ],
+      "recovery": "Current group session + owner validation",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "chat.reply_suggestions",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "actions": [
+        "generate_suggestions",
+        "send"
+      ],
+      "recovery": "Current turn + bounded generated suggestions",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "chat.branches",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "actions": [
+        "select_variant",
+        "regenerate"
+      ],
+      "recovery": "Chat branch identity + context generation",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "work.approval",
+      "owner": "WORK",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalDialogComponents.kt",
+      "actions": [
+        "approve",
+        "deny"
+      ],
+      "recovery": "Existing pending callId + interaction waiter",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "work.question",
+      "owner": "WORK",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalDialogComponents.kt",
+      "actions": [
+        "answer_question",
+        "cancel_question"
+      ],
+      "recovery": "Existing question callId + owner waiter",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "work.plan_review",
+      "owner": "WORK",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPlanReviewCard.kt",
+      "actions": [
+        "answer_question"
+      ],
+      "recovery": "Real pending plan question ID",
+      "v6": 19,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "work.team",
+      "owner": "WORK",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt",
+      "actions": [
+        "start_team",
+        "message_member",
+        "stop_member",
+        "stop_team"
+      ],
+      "recovery": "Team run/member identities + EventLog projection",
+      "v6": 17,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "work.capabilities",
+      "owner": "TOOLS",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheet.kt",
+      "actions": [
+        "use_capability"
+      ],
+      "recovery": "Tool descriptions; execution authority remains owner",
+      "v6": 14,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "work.history",
+      "owner": "WORK",
+      "route": "RUN_CENTER",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkHistorySheet.kt",
+      "actions": [
+        "load_history",
+        "open_evidence"
+      ],
+      "recovery": "EventLog cursor + run/session identity",
+      "v6": 15,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "work.delivery",
+      "owner": "WORK",
+      "route": "RUN_CENTER",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalRunCenterScreen.kt",
+      "actions": [
+        "open_artifact",
+        "open_evidence"
+      ],
+      "recovery": "Available/missing/unchecked; cancelled distinct from unknown",
+      "v6": 37,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "workspace.preview",
+      "owner": "WORK",
+      "route": "WORKSPACE",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt",
+      "actions": [
+        "preview",
+        "share",
+        "open_artifact"
+      ],
+      "recovery": "Workspace relative path + project identity",
+      "v6": 16,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "chat.gallery",
+      "owner": "CHAT",
+      "route": "PERSONA_GALLERY",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryDialog.kt",
+      "actions": [
+        "save",
+        "import",
+        "export",
+        "start_story"
+      ],
+      "recovery": "Gallery/story identities + revision",
+      "v6": 6,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "chat.gallery_profile",
+      "owner": "CHAT",
+      "route": "PERSONA_GALLERY",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryDialog.kt",
+      "actions": [
+        "edit",
+        "inspect",
+        "apply_suggestions"
+      ],
+      "recovery": "Saved profile/story identity; draft",
+      "v6": 7,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "chat.world_book",
+      "owner": "CHAT",
+      "route": "PERSONA_GALLERY",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaWorldBookEditor.kt",
+      "actions": [
+        "edit_world_book"
+      ],
+      "recovery": "Owner profile data; no second memory store",
+      "v6": 8,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "chat.gallery_delete",
+      "owner": "CHAT",
+      "route": "PERSONA_GALLERY",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryDialog.kt",
+      "actions": [
+        "delete_persona",
+        "delete_story",
+        "delete_history"
+      ],
+      "recovery": "Explicit target IDs + confirmation",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "chat.gallery_portrait",
+      "owner": "CHAT",
+      "route": "PERSONA_GALLERY",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryDialog.kt",
+      "actions": [
+        "import_portrait",
+        "remove_portrait"
+      ],
+      "recovery": "Android file picker + gallery identity",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "chat.diary",
+      "owner": "CHAT",
+      "route": "DIARY",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalChatUiContribution.kt",
+      "actions": [
+        "correct_diary",
+        "deactivate_diary"
+      ],
+      "recovery": "Subject ID + entry ID + expected revision",
+      "v6": 9,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "automation.tasks",
+      "owner": "AUTOMATION",
+      "route": "TASKS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt",
+      "actions": [
+        "create",
+        "edit",
+        "enable",
+        "run",
+        "delete"
+      ],
+      "recovery": "Task ID + durable schedule generation",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "automation.editor",
+      "owner": "AUTOMATION",
+      "route": "TASKS",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskEditorComponents.kt",
+      "actions": [
+        "save_task"
+      ],
+      "recovery": "Task draft + generation; scheduler remains owner",
+      "v6": 13,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "automation.persona_interaction",
+      "owner": "AUTOMATION",
+      "route": "TASKS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/ChatAutomationScreen.kt",
+      "actions": [
+        "configure_schedule"
+      ],
+      "recovery": "Chat target + Automation task generation",
+      "v6": 12,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "tools.mcp",
+      "owner": "TOOLS",
+      "route": "TOOLS",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
+      "actions": [
+        "connect",
+        "disconnect",
+        "list_tools"
+      ],
+      "recovery": "Registry snapshot; connection health unknown until observed",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "tools.github",
+      "owner": "TOOLS",
+      "route": "TOOLS",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
+      "actions": [
+        "save_credentials",
+        "clear_credentials"
+      ],
+      "recovery": "Existing encrypted credential owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "tools.plugins",
+      "owner": "TOOLS",
+      "route": "TOOLS",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
+      "actions": [
+        "install",
+        "enable",
+        "disable",
+        "remove"
+      ],
+      "recovery": "Plugin lifecycle/resource admission",
+      "v6": 18,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "media.creation",
+      "owner": "MEDIA",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioSheet.kt",
+      "actions": [
+        "create",
+        "query",
+        "save"
+      ],
+      "recovery": "Media owner task/profile identity; unknown outcome no blind replay",
+      "v6": 38,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "media.result",
+      "owner": "MEDIA",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalGeneratedMediaMessage.kt",
+      "actions": [
+        "preview",
+        "save",
+        "play"
+      ],
+      "recovery": "Media sidecar task ID + session origin",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "shell.new_session",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDialogs.kt",
+      "actions": [
+        "create_chat",
+        "create_work",
+        "create_group"
+      ],
+      "recovery": "Committed session selects mode; draft not silently dropped",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "shell.search",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "actions": [
+        "search",
+        "open_result"
+      ],
+      "recovery": "Source session/task/file anchor + return chain",
+      "v6": 33,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "shell.onboarding",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "actions": [
+        "configure",
+        "finish"
+      ],
+      "recovery": "Explicit onboarding preference",
+      "v6": 31,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "shell.empty",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "actions": [
+        "configure",
+        "create_session"
+      ],
+      "recovery": "No inferred successful state",
+      "v6": 34,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "shell.error",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "actions": [
+        "retry_if_owner_allows"
+      ],
+      "recovery": "Owner error/retry capability; sensitive values excluded",
+      "v6": 35,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "shell.notifications",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SYSTEM",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "actions": [
+        "open_session"
+      ],
+      "recovery": "Notification source session + consumed deep link",
+      "v6": 36,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "system.permissions",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "SYSTEM",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeviceCapabilitiesController.kt",
+      "actions": [
+        "request_permission"
+      ],
+      "recovery": "Android grants; UI cannot manufacture authorization",
+      "v6": 32,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.root",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.session",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.appearance",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.chat",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.models",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.model_performance",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.account",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.model_usage",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.minimax_quota",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.pricing",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.usage",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.usage_log",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.usage_detail",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.memory",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.memory_settings",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.memory_management",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.permissions",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.notifications",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.advanced",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.session_storage",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.diagnostics",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "settings.update",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "route.home",
+      "owner": "CATALOG",
+      "route": "HOME",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "route.persona_gallery",
+      "owner": "CATALOG",
+      "route": "PERSONA_GALLERY",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "route.diary",
+      "owner": "CATALOG",
+      "route": "DIARY",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "route.workspace",
+      "owner": "CATALOG",
+      "route": "WORKSPACE",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "route.run_center",
+      "owner": "CATALOG",
+      "route": "RUN_CENTER",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "route.project",
+      "owner": "CATALOG",
+      "route": "PROJECT",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "route.tasks",
+      "owner": "CATALOG",
+      "route": "TASKS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "route.tools",
+      "owner": "CATALOG",
+      "route": "TOOLS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "route.settings",
+      "owner": "CATALOG",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    }
+  ],
+  "v6ReferenceCoverage": [
+    {
+      "referenceScene": 1,
+      "semanticScene": "conversation.chat",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 2,
+      "semanticScene": "conversation.work",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 3,
+      "semanticScene": "route.run_center",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 4,
+      "semanticScene": "settings.usage",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 5,
+      "semanticScene": "conversation.reader",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 6,
+      "semanticScene": "chat.gallery",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 7,
+      "semanticScene": "chat.gallery_profile",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 8,
+      "semanticScene": "chat.world_book",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 9,
+      "semanticScene": "chat.diary",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 10,
+      "semanticScene": "chat.group_members",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 11,
+      "semanticScene": "conversation.message_actions",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 12,
+      "semanticScene": "automation.persona_interaction",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 13,
+      "semanticScene": "automation.editor",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 14,
+      "semanticScene": "work.capabilities",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 15,
+      "semanticScene": "work.history",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 16,
+      "semanticScene": "workspace.preview",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 17,
+      "semanticScene": "work.team",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 18,
+      "semanticScene": "tools.plugins",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 19,
+      "semanticScene": "work.plan_review",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 20,
+      "semanticScene": "settings.root",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 21,
+      "semanticScene": "settings.models",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 22,
+      "semanticScene": "settings.model_performance",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 23,
+      "semanticScene": "settings.account",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 24,
+      "semanticScene": "settings.memory",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 25,
+      "semanticScene": "settings.session_storage",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 26,
+      "semanticScene": "settings.appearance",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 27,
+      "semanticScene": "settings.permissions",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 28,
+      "semanticScene": "settings.notifications",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 29,
+      "semanticScene": "settings.diagnostics",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 30,
+      "semanticScene": "settings.update",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 31,
+      "semanticScene": "shell.onboarding",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 32,
+      "semanticScene": "system.permissions",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 33,
+      "semanticScene": "shell.search",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 34,
+      "semanticScene": "shell.empty",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 35,
+      "semanticScene": "shell.error",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 36,
+      "semanticScene": "shell.notifications",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 37,
+      "semanticScene": "work.delivery",
+      "acceptance": "待原生视觉验收"
+    },
+    {
+      "referenceScene": 38,
+      "semanticScene": "media.creation",
+      "acceptance": "待原生视觉验收"
+    }
+  ]
+}

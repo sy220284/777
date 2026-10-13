@@ -701,8 +701,8 @@ fun ToolsScreen(
                         ToolCapabilityRow(
                             iconPainter = painterResource(R.drawable.ic_ui_plugin),
                             title = stringResource(R.string.tools_external_services),
-                            status = state.servers.size.toString(),
-                            state = if (state.servers.isNotEmpty()) StateDotState.Done else StateDotState.Idle,
+                            status = stringResource(R.string.tools_external_registration_summary, state.servers.size),
+                            state = StateDotState.Idle,
                             onClick = { showExternalConfig = true },
                         )
                     }
@@ -786,7 +786,11 @@ fun ToolsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                     ) {
-                        StateDot(StateDotState.Done)
+                        // The registry snapshot carries discovered tools, not a current health probe.
+                        com.shenyan.designsystem.components.SyStateDot(
+                            phase = com.shenyan.designsystem.foundation.SyPhase.IDLE,
+                            label = stringResource(R.string.tools_server_health_unchecked),
+                        )
                         Column(Modifier.weight(1f)) {
                             Text(
                                 server.id,

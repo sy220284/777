@@ -183,10 +183,10 @@ class LocalWorkRuntime @Inject internal constructor(
         agentUi.stopTeamMember(memberId)
     internal suspend fun stopTeamForUi(): LocalWorkAgentUiResult =
         agentUi.stopTeam()
-    internal fun answerApproval(callId: String, approved: Boolean) {
+    internal fun answerApproval(callId: String, approved: Boolean): Boolean {
         val binding = workRunRegistry[runtimeStateStore.currentSessionId]
-        if (binding?.interactions?.answerApproval(callId, approved) == true) return
-        runtimeStateStore.foregroundInteractions.answerApproval(callId, approved)
+        if (binding?.interactions?.answerApproval(callId, approved) == true) return true
+        return runtimeStateStore.foregroundInteractions.answerApproval(callId, approved)
     }
     internal fun useDefaultApproval() =
         runtimeStateStore.performVisibleOperation("审批设置保存失败") { approvals.useDefaultApproval() }

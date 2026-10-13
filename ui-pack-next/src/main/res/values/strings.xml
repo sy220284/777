@@ -1,0 +1,33 @@
+<resources>
+    <string name="next_title">独立界面验证</string>
+    <string name="next_scope">仅验证会话发送与审批；完整页面尚未适配</string>
+    <string name="next_close">返回当前界面</string>
+    <string name="next_input">消息</string>
+    <string name="next_send">发送</string>
+    <string name="next_queue">排队发送</string>
+    <string name="next_queued">已排队 %1$d 条</string>
+    <string name="next_running">正在运行</string>
+    <string name="next_idle">等待输入</string>
+    <string name="next_waiting">等待用户决定</string>
+    <string name="next_loading">正在恢复会话</string>
+    <string name="next_empty">尚无消息</string>
+    <string name="next_approve">批准本次操作</string>
+    <string name="next_deny">拒绝本次操作</string>
+    <string name="next_accepted">已受理</string>
+    <string name="next_enqueued">已加入队列</string>
+    <string name="next_rejected">未受理：%1$s</string>
+    <string name="next_unknown">操作结果未知，请核实原任务</string>
+    <string name="next_stale">会话已变化，请重新提交</string>
+    <string name="next_role_user">用户</string>
+    <string name="next_role_assistant">助手</string>
+    <string name="next_role_system">系统</string>
+    <string name="next_role_tool">工具</string>
+    <string name="next_reject_empty">请先输入消息</string>
+    <string name="next_reject_loading">会话仍在恢复，请稍后提交</string>
+    <string name="next_reject_config">请先配置可用模型</string>
+    <string name="next_reject_transition">会话正在切换，请稍后提交</string>
+    <string name="next_reject_queue_full">输入队列已满，请等待已有消息处理</string>
+    <string name="next_reject_queue_unavailable">当前任务暂时不能接收新输入</string>
+    <string name="next_reject_approval">这项审批已结束，请查看最新状态</string>
+    <string name="next_reject_unsupported">此操作暂不可用</string>
+</resources>

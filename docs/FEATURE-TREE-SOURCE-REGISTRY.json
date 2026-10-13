@@ -32,6 +32,22 @@
       "entry": "LocalMediaStore",
       "owner": "TOOLS",
       "test": "app/src/androidTest/java/com/labteto/dshmobile/local/model/LocalMediaStoreAndroidTest.kt#receiptAndResultCommitTogetherAndLateWriterCannotResurrectDeletion"
+    },
+    {
+      "id": "ui.conversation.ports",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送与审批端口（迁移中）",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt",
+      "entry": "LocalConversationUiPortComposition",
+      "owner": "SHELL",
+      "test": "app/src/test/java/com/labteto/dshmobile/local/LocalConversationUiPortTest.kt#staleActivationTransitionAndModeCannotInvokeEitherOwner"
+    },
+    {
+      "id": "ui.scene.catalog",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / UI 场景覆盖清单与兼容性检查（迁移中）",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalog.kt",
+      "entry": "LocalUiSceneCatalog",
+      "owner": "SHELL",
+      "test": "app/src/test/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalogTest.kt#verificationPackCannotBeSelectedAsACompleteApplicationPack"
     }
   ]
 }

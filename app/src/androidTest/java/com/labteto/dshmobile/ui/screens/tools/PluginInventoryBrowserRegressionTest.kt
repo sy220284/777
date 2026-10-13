@@ -53,6 +53,8 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithTag("plugin-category-list").performScrollToIndex(1)
         compose.onNodeWithText("服务扩展 · 1").performClick()
         compose.onNodeWithText("local-mcp").assertIsDisplayed().performClick()
+        // A discovered registry entry is not a fresh connection-health observation.
+        compose.onNodeWithText("连接健康未检测", substring = true).assertIsDisplayed()
         compose.onNodeWithTag("plugin-detail-primary-action").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, openedConnections) }
     }

@@ -1,0 +1,184 @@
+package com.labteto.dshmobile.local
+
+import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.send.LocalSendFeedbackState
+import com.labteto.dshmobile.local.send.LocalSendDisposition
+import com.labteto.dshmobile.local.send.LocalSendRejectReason
+import com.labteto.dshmobile.local.send.LocalSendResult
+import com.labteto.dshmobile.local.work.LocalWorkExecutionPort
+import com.labteto.dshmobile.local.work.LocalWorkApprovalUiPort
+import com.labteto.dshmobile.uicontract.ChatSceneSnapshot
+import com.labteto.dshmobile.uicontract.ChatUiCommand
+import com.labteto.dshmobile.uicontract.ChatUiPort
+import com.labteto.dshmobile.uicontract.UiActionAvailability
+import com.labteto.dshmobile.uicontract.UiApprovalSnapshot
+import com.labteto.dshmobile.uicontract.UiApprovalImpact
+import com.labteto.dshmobile.uicontract.UiCommandReceipt
+import com.labteto.dshmobile.uicontract.UiCommandRejection
+import com.labteto.dshmobile.uicontract.UiExecutionPhase
+import com.labteto.dshmobile.uicontract.UiMessageRole
+import com.labteto.dshmobile.uicontract.UiMessageSnapshot
+import com.labteto.dshmobile.uicontract.UiSceneStatus
+import com.labteto.dshmobile.uicontract.UiSessionIdentity
+import com.labteto.dshmobile.uicontract.WorkConversationSceneSnapshot
+import com.labteto.dshmobile.uicontract.WorkConversationUiCommand
+import com.labteto.dshmobile.uicontract.WorkConversationUiPort
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+
+/**
+ * Application composition adapter for the first text-send/approval slice. All writes still go to
+ * Chat/Work owners. The shared foreground lock makes identity checking and owner admission atomic
+ * with session transitions. UI receives no runtime, mutable domain object or executor.
+ */
+@Singleton
+// FEATURE_TREE: {"id":"ui.conversation.ports","path":"第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送与审批端口（迁移中）","entry":"LocalConversationUiPortComposition","owner":"SHELL","test":"app/src/test/java/com/labteto/dshmobile/local/LocalConversationUiPortTest.kt#staleActivationTransitionAndModeCannotInvokeEitherOwner"}
+class LocalConversationUiPortComposition @Inject internal constructor(
+    private val stateStore: LocalRuntimeStateStore,
+    private val chatOwner: LocalChatExecutionPort,
+    private val workOwner: LocalWorkExecutionPort,
+    private val approvalOwner: LocalWorkApprovalUiPort,
+) {
+    val chat: ChatUiPort = object : ChatUiPort {
+        override val snapshots: Flow<ChatSceneSnapshot> = stateStore.state.map { snapshot() }.distinctUntilChanged()
+        override fun snapshot(): ChatSceneSnapshot = synchronized(stateStore.foregroundRunHandle.lock) {
+            val state = stateStore.state.value
+            val active = state.usageMode == LocalUsageMode.CHAT
+            ChatSceneSnapshot(
+                identity = identity(state).takeIf { active },
+                status = if (active) status(state) else UiSceneStatus.EMPTY,
+                phase = if (active && state.kernel.running) UiExecutionPhase.RUNNING else UiExecutionPhase.IDLE,
+                messages = if (active) messages(state) else emptyList(),
+                queuedInputCount = if (active) state.kernel.queuedInputCount else 0,
+                send = availability(state, active),
+                error = state.error.takeIf { active },
+            )
+        }
+        override fun submit(command: ChatUiCommand): UiCommandReceipt = synchronized(stateStore.foregroundRunHandle.lock) {
+            val state = stateStore.state.value
+            val rejection = admission(state, command.identity(), LocalUsageMode.CHAT)
+            if (rejection != null) {
+                publishSendIdentityRejection(state.sessionId)
+                return@synchronized rejection
+            }
+            when (command) {
+                is ChatUiCommand.SendText -> chatOwner.send(command.text).toUiReceipt()
+            }
+        }
+    }
+
+    val work: WorkConversationUiPort = object : WorkConversationUiPort {
+        override val snapshots: Flow<WorkConversationSceneSnapshot> = stateStore.state.map { snapshot() }.distinctUntilChanged()
+        override fun snapshot(): WorkConversationSceneSnapshot = synchronized(stateStore.foregroundRunHandle.lock) {
+            val state = stateStore.state.value
+            val active = state.usageMode == LocalUsageMode.WORK
+            WorkConversationSceneSnapshot(
+                identity = identity(state).takeIf { active },
+                status = if (active) status(state) else UiSceneStatus.EMPTY,
+                phase = when {
+                    active && (state.work.pendingApproval != null || state.work.pendingQuestion != null) -> UiExecutionPhase.WAITING_FOR_USER
+                    active && state.kernel.running -> UiExecutionPhase.RUNNING
+                    else -> UiExecutionPhase.IDLE
+                },
+                messages = if (active) messages(state) else emptyList(),
+                queuedInputCount = if (active) state.kernel.queuedInputCount else 0,
+                send = availability(state, active),
+                approval = state.work.pendingApproval?.takeIf { active }?.let {
+                    UiApprovalSnapshot(it.callId, it.toolName, it.summary, it.arguments, when (it.impact) {
+                        com.labteto.dshmobile.local.interaction.LocalApprovalImpact.LOW -> UiApprovalImpact.LOW
+                        com.labteto.dshmobile.local.interaction.LocalApprovalImpact.MEDIUM -> UiApprovalImpact.MEDIUM
+                        com.labteto.dshmobile.local.interaction.LocalApprovalImpact.HIGH -> UiApprovalImpact.HIGH
+                        com.labteto.dshmobile.local.interaction.LocalApprovalImpact.CRITICAL -> UiApprovalImpact.CRITICAL
+                    })
+                },
+                error = state.error.takeIf { active },
+            )
+        }
+        override fun submit(command: WorkConversationUiCommand): UiCommandReceipt = synchronized(stateStore.foregroundRunHandle.lock) {
+            val state = stateStore.state.value
+            val expected = when (command) {
+                is WorkConversationUiCommand.SendText -> command.identity
+                is WorkConversationUiCommand.AnswerApproval -> command.identity
+            }
+            val rejection = admission(state, expected, LocalUsageMode.WORK)
+            if (rejection != null) {
+                if (command is WorkConversationUiCommand.SendText) publishSendIdentityRejection(state.sessionId)
+                return@synchronized rejection
+            }
+            when (command) {
+                is WorkConversationUiCommand.SendText -> workOwner.send(command.text).toUiReceipt()
+                is WorkConversationUiCommand.AnswerApproval -> {
+                    if (state.work.pendingApproval?.callId != command.pendingId ||
+                        !approvalOwner.answerApproval(command.pendingId, command.approved)) {
+                        UiCommandReceipt.Rejected(UiCommandRejection.APPROVAL_EXPIRED)
+                    } else UiCommandReceipt.Accepted
+                }
+            }
+        }
+    }
+
+    private fun publishSendIdentityRejection(sessionId: String) {
+        stateStore.publishSendFeedback(LocalSendFeedbackState(
+            sessionId = sessionId,
+            rejectReason = LocalSendRejectReason.SESSION_TRANSITION,
+        ))
+    }
+
+    private fun identity(state: LocalHarnessState): UiSessionIdentity? =
+        state.sessionId.takeIf { it.isNotBlank() }?.let {
+            UiSessionIdentity(it, stateStore.foregroundRunHandle.activationId,
+                if (state.usageMode == LocalUsageMode.CHAT) state.chat.chatContext.generation else 0L,
+                state.modelState.modelSelection.activeProfile?.id, state.projectId)
+        }
+
+    private fun admission(state: LocalHarnessState, expected: UiSessionIdentity, mode: LocalUsageMode): UiCommandReceipt.Rejected? = when {
+        stateStore.sessionTransitioning -> UiCommandReceipt.Rejected(UiCommandRejection.SESSION_TRANSITION)
+        state.usageMode != mode || identity(state) != expected -> UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+        else -> null // Capability visibility is a hint; original owners repeat all execution admission.
+    }
+
+    private fun availability(state: LocalHarnessState, active: Boolean): UiActionAvailability = when {
+        !active -> UiActionAvailability(false, UiCommandRejection.STALE_IDENTITY)
+        stateStore.sessionTransitioning -> UiActionAvailability(false, UiCommandRejection.SESSION_TRANSITION)
+        state.loading -> UiActionAvailability(false, UiCommandRejection.LOADING)
+        !state.modelState.configured -> UiActionAvailability(false, UiCommandRejection.UNCONFIGURED)
+        else -> UiActionAvailability(true)
+    }
+}
+
+private fun ChatUiCommand.identity(): UiSessionIdentity = when (this) {
+    is ChatUiCommand.SendText -> identity
+}
+
+private fun status(state: LocalHarnessState): UiSceneStatus = when {
+    state.loading -> UiSceneStatus.LOADING
+    state.error != null -> UiSceneStatus.ERROR
+    state.messages.isEmpty() -> UiSceneStatus.EMPTY
+    else -> UiSceneStatus.CONTENT
+}
+
+private fun messages(state: LocalHarnessState): List<UiMessageSnapshot> = state.messages.map {
+    UiMessageSnapshot(it.id, when (it.role) {
+        "user" -> UiMessageRole.USER
+        "assistant" -> UiMessageRole.ASSISTANT
+        "tool" -> UiMessageRole.TOOL
+        else -> UiMessageRole.SYSTEM
+    }, it.content, it.createdAt)
+}
+
+internal fun LocalSendResult.toUiReceipt(): UiCommandReceipt = when (disposition) {
+    LocalSendDisposition.STARTED -> UiCommandReceipt.Accepted
+    LocalSendDisposition.QUEUED -> UiCommandReceipt.Queued
+    LocalSendDisposition.REJECTED -> UiCommandReceipt.Rejected(when (requireNotNull(rejectReason)) {
+        LocalSendRejectReason.EMPTY -> UiCommandRejection.EMPTY_INPUT
+        LocalSendRejectReason.LOADING -> UiCommandRejection.LOADING
+        LocalSendRejectReason.UNCONFIGURED -> UiCommandRejection.UNCONFIGURED
+        LocalSendRejectReason.SESSION_TRANSITION -> UiCommandRejection.SESSION_TRANSITION
+        LocalSendRejectReason.QUEUE_FULL -> UiCommandRejection.QUEUE_FULL
+        LocalSendRejectReason.QUEUE_UNAVAILABLE -> UiCommandRejection.QUEUE_UNAVAILABLE
+    }, rejectLimit)
+}

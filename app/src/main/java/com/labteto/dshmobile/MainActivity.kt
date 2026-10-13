@@ -26,6 +26,7 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var notifications: DshNotifications
 
     private val requestedLocalSession = mutableStateOf<String?>(null)
+    private val requestedConversationUiSlice = mutableStateOf(false)
     private var appliedApplicationNightMode: Int? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -36,6 +37,7 @@ class MainActivity : AppCompatActivity() {
             DshApplication.applicationNightModeFor(storedTheme, uiModeManager.nightMode)
         requestedLocalSession.value = savedInstanceState?.getString("pending_local_session")
             ?: notificationLocalSession(intent)
+        requestedConversationUiSlice.value = BuildConfig.DEBUG && intent.getStringExtra("ui_pack") == "next-conversation-slice"
         applyWindowBackground(storedTheme)
         enableEdgeToEdge()
         notifications.ensureChannels()
@@ -51,6 +53,11 @@ class MainActivity : AppCompatActivity() {
         setContent {
             AppRoot(
                 requestedLocalSessionId = requestedLocalSession.value,
+                openConversationUiSlice = requestedConversationUiSlice.value,
+                onConversationUiSliceRequestConsumed = {
+                    requestedConversationUiSlice.value = false
+                    intent.removeExtra("ui_pack")
+                },
                 onLocalSessionRequestConsumed = {
                     requestedLocalSession.value = null
                     intent.removeExtra(DshNotifications.EXTRA_LOCAL_SESSION_ID)
@@ -74,6 +81,7 @@ class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         requestedLocalSession.value = notificationLocalSession(intent)
+        requestedConversationUiSlice.value = BuildConfig.DEBUG && intent.getStringExtra("ui_pack") == "next-conversation-slice"
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

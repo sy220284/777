@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "snapshot": "d29c256222ec",
+  "snapshot": "3c66554ae536",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
-  "code_files_scanned": 1498,
-  "production_sources_scanned": 842,
-  "feature_nodes": 544,
-  "functional_leaves": 447,
+  "code_files_scanned": 1515,
+  "production_sources_scanned": 851,
+  "feature_nodes": 546,
+  "functional_leaves": 449,
   "existing_executable_test_mappings": 128,
   "leaf_evidence": [
     {
@@ -117,6 +117,27 @@
       "workflow_evidence": [],
       "identity_id": "existing.0102",
       "identity_status": "静态声明已核，尚未授权自动改树"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / UI 场景覆盖清单与兼容性检查（迁移中）",
+      "verification": "没有可确认的现行入口证据",
+      "test_reference_count": 0,
+      "historical_grade": null,
+      "existing_production_sources": [],
+      "missing_production_sources": [],
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "explicit_test_candidates": [],
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "ui_contract_migration_slice",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 1,
+        "test_methods_confirmed": 1,
+        "explanation": "已建立源码场景索引及版本/覆盖兼容检查；缺场景的验证包不能宣称整包兼容。真实完整应用 UI Pack 切换与全量场景迁移尚未实现。"
+      }
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 新建、切换与搜索会话",
@@ -269,6 +290,27 @@
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
       "workflow_evidence": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送与审批端口（迁移中）",
+      "verification": "没有可确认的现行入口证据",
+      "test_reference_count": 0,
+      "historical_grade": null,
+      "existing_production_sources": [],
+      "missing_production_sources": [],
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "explicit_test_candidates": [],
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "ui_contract_migration_slice",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 1,
+        "test_methods_confirmed": 1,
+        "explanation": "新增端口已通过生产 DI 接入 V6 普通文本发送与 Debug 验证包；只覆盖文本发送和 Work 审批，完整 Feature 端口及真实双包旅程仍待验收。"
+      }
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 主题颜色、圆角、字体与间距",
@@ -8337,8 +8379,8 @@
   "evidence_grade_summary": {
     "真实测试映射（仅局部）": 128,
     "具名源码声明存在（静态，待调用链复核）": 209,
+    "没有可确认的现行入口证据": 16,
     "历史生产文件仍存在（待入口复核）": 73,
-    "没有可确认的现行入口证据": 14,
     "具名源码及仪表测试声明存在（静态，未执行）": 6,
     "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）": 14,
     "候选生产文件仍存在（不足以证明功能）": 3
@@ -8805,6 +8847,48 @@
   ],
   "unproven_feature_triage": [
     {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / UI 场景覆盖清单与兼容性检查（迁移中）",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "共享工具或其他能力",
+      "inspect": "按用户实际功能入口检查共享工具模块",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "ui_contract_migration_slice",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 1,
+        "test_methods_confirmed": 1,
+        "explanation": "已建立源码场景索引及版本/覆盖兼容检查；缺场景的验证包不能宣称整包兼容。真实完整应用 UI Pack 切换与全量场景迁移尚未实现。"
+      }
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送与审批端口（迁移中）",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "共享工具或其他能力",
+      "inspect": "按用户实际功能入口检查共享工具模块",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "ui_contract_migration_slice",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 1,
+        "test_methods_confirmed": 1,
+        "explanation": "新增端口已通过生产 DI 接入 V6 普通文本发送与 Debug 验证包；只覆盖文本发送和 Work 审批，完整 Feature 端口及真实双包旅程仍待验收。"
+      }
+    },
+    {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 16类人物资料按完整事实取用",
       "issue": "缺少可确认的现行源码入口",
       "domain": "聊天人物与连续性",
@@ -9105,17 +9189,15 @@
       }
     }
   ],
-  "followup_investigated_descriptions": 14,
-  "followup_production_or_compatibility": 7,
+  "followup_investigated_descriptions": 16,
+  "followup_production_or_compatibility": 9,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "bc6c12ed54dd",
+    "baseline": "fedfc0b0e981",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkSchedule.kt",
-      "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomation.kt",
-      "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
@@ -9123,7 +9205,7 @@
     "added_ui": [],
     "removed_ui": []
   },
-  "source_verified_registrations": 4,
+  "source_verified_registrations": 6,
   "explicit_retirements": 0,
   "changes_applied": [],
   "pending_changes": [],
