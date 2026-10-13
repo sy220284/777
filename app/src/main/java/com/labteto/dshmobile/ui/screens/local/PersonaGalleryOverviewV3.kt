@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -49,7 +51,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
@@ -209,7 +210,7 @@ internal fun PersonaGalleryOverviewV3(
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 SyButton(
                     text = stringResource(R.string.common_cancel),
@@ -267,8 +268,8 @@ internal fun PersonaGalleryOverviewV3(
     }
 
     Column(
-        modifier = modifier.fillMaxSize().padding(horizontal = DsSpacing.medium),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        modifier = modifier.fillMaxSize().padding(horizontal = SyMetric.gapLg),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         if (currentGalleryId == null || currentHasUnsavedChanges) {
             SyMaterialSurface(
@@ -277,9 +278,9 @@ internal fun PersonaGalleryOverviewV3(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+                    modifier = Modifier.padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 ) {
                     LocalPersonaHeaderAvatar(currentPersona.name, "")
                     Column(Modifier.weight(1f)) {
@@ -312,7 +313,7 @@ internal fun PersonaGalleryOverviewV3(
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = DsSpacing.touchTarget),
+            modifier = Modifier.fillMaxWidth().heightIn(min = SyMetric.touch),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -419,7 +420,7 @@ internal fun PersonaGalleryOverviewV3(
                 } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                 ) {
                     if (pinnedEntries.isNotEmpty()) {
                         item(key = "pinned-heading") {

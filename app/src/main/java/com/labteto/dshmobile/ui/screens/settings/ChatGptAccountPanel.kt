@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.labteto.dshmobile.ui.components.FeatherIcons
 
 import androidx.compose.foundation.BorderStroke
@@ -51,7 +53,6 @@ import com.labteto.dshmobile.ui.shenyan.SyStatus
 import com.labteto.dshmobile.ui.shenyan.SyStatusPill
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -113,12 +114,12 @@ internal fun ChatGptAccountPanel(
         verticalPadding = 0.dp,
     ) {
         Column(
-            modifier = Modifier.padding(DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            modifier = Modifier.padding(SyMetric.gapLg),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 Column(Modifier.fillMaxWidth()) {
                     Text(
@@ -210,7 +211,7 @@ internal fun ChatGptAccountPanel(
                     }
                 }
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (selected.sharingEnabled) {
@@ -249,7 +250,7 @@ internal fun ChatGptAccountPanel(
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                         ) {
                             Text(
                                 buildString {
@@ -342,8 +343,8 @@ internal fun ChatGptAccountPanel(
                 // Account management is a two-column action grid; status and identity keep their own space.
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                     maxItemsInEachRow = 2,
                 ) {
                     ChatGptAccountAction(
@@ -413,14 +414,14 @@ internal fun ChatGptAccountPanel(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth().padding(DsSpacing.small),
+                                modifier = Modifier.fillMaxWidth().padding(SyMetric.gapMd),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                             ) {
                                 Column(Modifier.weight(1f)) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
                                     ) {
                                         Text(
                                             model.displayName,
@@ -477,7 +478,7 @@ internal fun ChatGptAccountPanel(
                 if (authorizationCanRestart) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                     ) {
                         SyButton(
                             text = stringResource(R.string.chatgpt_retry_authorization),
@@ -516,7 +517,7 @@ internal fun ChatGptAccountPanel(
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 SyButton(
                     text = stringResource(R.string.chatgpt_cancel),
@@ -586,9 +587,9 @@ private fun ChatGptAccountAction(
         border = BorderStroke(1.dp, colors.border),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 2.dp, vertical = DsSpacing.small),
+            modifier = Modifier.padding(horizontal = 2.dp, vertical = SyMetric.gapMd),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
         ) {
             Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
             Text(

@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.tools
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -51,7 +53,6 @@ import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.shenyan.designsystem.components.SySwitchControl
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -204,13 +205,13 @@ internal fun PluginInventoryBrowser(
             SySearchField(
                 value = query,
                 onValueChange = { query = it },
-                modifier = Modifier.padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
+                modifier = Modifier.padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
                 placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search else R.string.tools_catalog_search),
             )
             if (skillsOnly) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.comfortable),
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection),
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 ) {
                     if (onImportSkill != null) {
                         SyButton(
@@ -234,7 +235,7 @@ internal fun PluginInventoryBrowser(
                     stringResource(R.string.skills_import_hint),
                     style = DsType.small13.withReadingWeight(),
                     color = colors.textTertiary,
-                    modifier = Modifier.padding(horizontal = DsSpacing.comfortable),
+                    modifier = Modifier.padding(horizontal = SyMetric.gapSection),
                 )
                 if (onCreateSkill != null) {
                     SyButton(
@@ -242,14 +243,14 @@ internal fun PluginInventoryBrowser(
                         variant = SyButtonVariant.Info,
                         onClick = { showCreateSkill = true },
                         enabled = !loading,
-                        modifier = Modifier.padding(horizontal = DsSpacing.comfortable),
+                        modifier = Modifier.padding(horizontal = SyMetric.gapSection),
                     )
                 }
             }
             if (!skillsOnly) LazyRow(
                 modifier = Modifier.testTag("plugin-category-list"),
-                contentPadding = PaddingValues(horizontal = DsSpacing.comfortable),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                contentPadding = PaddingValues(horizontal = SyMetric.gapSection),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
             ) {
                 items(5) { category ->
                     SyFilterChip(
@@ -293,20 +294,20 @@ internal fun PluginInventoryBrowser(
                     hapticOnChange = true,
                     stretch = true,
                     modifier = Modifier.fillMaxWidth()
-                        .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small)
+                        .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapMd)
                         .testTag("plugin-transport-tabs"),
                 )
                 SyButton(
                     text = stringResource(R.string.tools_external_services),
                     variant = SyButtonVariant.Ghost,
                     onClick = onManageConnections,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.comfortable),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection),
                 )
             }
             if (loading || error != null || list.isEmpty()) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(DsSpacing.xlarge),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    modifier = Modifier.fillMaxWidth().padding(SyMetric.gapPage),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
@@ -323,8 +324,8 @@ internal fun PluginInventoryBrowser(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(DsSpacing.comfortable),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                    contentPadding = PaddingValues(SyMetric.gapSection),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                 ) {
                     items(list, key = { it.id }) { item ->
                         SyMaterialSurface(
@@ -334,9 +335,9 @@ internal fun PluginInventoryBrowser(
                             shape = DsShapes.block,
                         ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth().padding(DsSpacing.comfortable),
+                                modifier = Modifier.fillMaxWidth().padding(SyMetric.gapSection),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                             ) {
                                 SyMaterialSurface(
                                     tier = SyMaterialTier.L1_SECTION,

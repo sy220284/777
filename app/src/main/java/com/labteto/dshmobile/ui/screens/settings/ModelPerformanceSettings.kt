@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -30,7 +32,6 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.presentation.LocalModelPerformanceControls
 import com.labteto.dshmobile.local.model.ModelReasoningCeiling
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlin.math.roundToInt
@@ -69,9 +70,9 @@ internal fun ModelPerformanceSettingsPage() {
                         else androidx.compose.ui.graphics.Color.Transparent)
                     .selectable(selected = limits.reasoningCeiling == ceiling, role = Role.RadioButton,
                         onClick = { LocalModelPerformanceControls.setReasoningCeiling(ceiling) })
-                    .padding(horizontal = DsSpacing.small),
+                    .padding(horizontal = SyMetric.gapMd),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 SyRadioControl(
                     selected = limits.reasoningCeiling == ceiling,

@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.tools
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -70,7 +72,6 @@ import com.labteto.dshmobile.ui.shenyan.rememberSyToast
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.screens.settings.SettingsViewModel
 import com.labteto.dshmobile.ui.screens.settings.LocalAgentSettingsCard
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -538,7 +539,7 @@ fun ToolsScreen(
                 )
                 Column(
                     modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())
-                        .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
+                        .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
                 ) {
                     LocalAgentSettingsCard(agentSettings, settingsViewModel, toast.second)
                 }
@@ -613,10 +614,10 @@ fun ToolsScreen(
                     modifier = Modifier
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.large),
+                        .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapSection),
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                         Text(
                             stringResource(R.string.cap_center_settings_group),
                             style = DsType.std14.withReadingWeight(),
@@ -628,7 +629,7 @@ fun ToolsScreen(
                             color = colors.textSecondary,
                         )
                     }
-                    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                         ToolCapabilityRow(
                             icon = SyEntryIcons.Search,
                             title = stringResource(R.string.tools_network_search),
@@ -678,7 +679,7 @@ fun ToolsScreen(
                         style = DsType.std14.withReadingWeight(),
                         color = colors.textTertiary,
                     )
-                    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                         val builtinAvailable = "local-builtin" in state.localPlugins
                         ToolCapabilityRow(
                             iconPainter = painterResource(R.drawable.ic_ui_plugin),
@@ -741,7 +742,7 @@ fun ToolsScreen(
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 SyButton(
                     text = stringResource(
@@ -781,9 +782,9 @@ fun ToolsScreen(
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .padding(vertical = DsSpacing.xsmall),
+                            .padding(vertical = SyMetric.gapSm),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                     ) {
                         StateDot(StateDotState.Done)
                         Column(Modifier.weight(1f)) {
@@ -822,7 +823,7 @@ fun ToolsScreen(
                             server.tools.joinToString(" · "),
                             style = DsType.caption11.withReadingWeight(),
                             color = colors.textSecondary,
-                            modifier = Modifier.padding(bottom = DsSpacing.small),
+                            modifier = Modifier.padding(bottom = SyMetric.gapMd),
                         )
                     }
                 }
@@ -992,9 +993,9 @@ private fun ToolCapabilityRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 70.dp)
-                .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
+                .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             Box(
                 modifier = Modifier.size(40.dp),
@@ -1019,10 +1020,10 @@ private fun ToolCapabilityRow(
             }
             BoxWithConstraints(Modifier.weight(1f)) {
                 val stackedStatus = maxWidth < 200.dp || LocalDensity.current.fontScale > 1.15f
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                     ) {
                         Text(
                             title,
@@ -1055,7 +1056,7 @@ private fun ToolCapabilityRow(
 private fun ToolCapabilityStatus(status: String, state: StateDotState) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
     ) {
         StateDot(state, size = 7.dp)
         Text(

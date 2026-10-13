@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -67,7 +69,7 @@ internal fun LocalWorkHistorySheet(
     }
     SyResponsiveSheet(title = stringResource(R.string.local_run_full_history), onDismiss = onDismiss,
         footer = {
-            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 SyButton(stringResource(R.string.local_run_history_latest), { selected = null; cursor = null; retry++ },
                     variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
                 if (failed) SyButton(stringResource(R.string.common_retry), { retry++ }, size = SyButtonSize.Small)
@@ -99,7 +101,7 @@ internal fun LocalWorkHistorySheet(
                         else -> true
                     }
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                     SySegmented(
                         segments = listOf(
                             SySegment("all", stringResource(R.string.local_run_history_filter_all)),
@@ -120,7 +122,7 @@ internal fun LocalWorkHistorySheet(
                             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
                     } else LazyColumn(
                         Modifier.fillMaxWidth().heightIn(max = 420.dp),
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                     ) {
                         items(displayed, key = { it.sequence }) { record ->
                         Column {

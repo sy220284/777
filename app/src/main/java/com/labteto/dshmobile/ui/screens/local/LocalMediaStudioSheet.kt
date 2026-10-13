@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -46,7 +48,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyTextField
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.io.File
@@ -131,8 +132,8 @@ internal fun LocalMediaStudioSheetContent(
     }
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(DsSpacing.small),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+        modifier = Modifier.fillMaxWidth().padding(SyMetric.gapMd),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
     ) {
         com.shenyan.designsystem.components.SyNote(stringResource(R.string.media_studio_notice),
             modifier = Modifier.fillMaxWidth())
@@ -163,7 +164,7 @@ internal fun LocalMediaStudioSheetContent(
             if (showModelChoices) {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().height(176.dp),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 ) {
                     items(available, key = { it.id }) { option ->
                         SyButton(
@@ -195,8 +196,8 @@ internal fun LocalMediaStudioSheetContent(
 
             when (kind) {
                 LocalMediaKind.IMAGE -> {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                         listOf("1:1", "16:9", "9:16").forEach { option ->
                             SyButton(text = option, enabled = !busy, size = SyButtonSize.Small,
                                 variant = if (ratio == option) SyButtonVariant.Primary else SyButtonVariant.Ghost,
@@ -226,7 +227,7 @@ internal fun LocalMediaStudioSheetContent(
                             style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
                         LazyColumn(
                             modifier = Modifier.fillMaxWidth().height(128.dp),
-                            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                         ) {
                             items(taskRecords, key = { it.id }) { task ->
                                 SyButton(
@@ -295,7 +296,7 @@ internal fun LocalMediaStudioSheetContent(
                             singleLine = true, modifier = Modifier.fillMaxWidth())
                         LazyColumn(
                             modifier = Modifier.fillMaxWidth().height(176.dp),
-                            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                         ) {
                             items(voices.filter {
                                 it.name.contains(voiceFilter, true) || it.id.contains(voiceFilter, true)
@@ -326,8 +327,8 @@ internal fun LocalMediaStudioSheetContent(
                         onClick = { picker.launch(arrayOf("audio/*")) })
                     transcript?.let { text ->
                         Text(text, color = colors.text, style = DsType.std14.withReadingWeight())
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                             SyButton(text = stringResource(R.string.minimax_media_insert_text),
                                 onClick = { onInsertTranscript(text) }, size = SyButtonSize.Small)
                             SyButton(text = stringResource(R.string.minimax_media_copy_text),
@@ -360,11 +361,11 @@ internal fun LocalMediaStudioSheetContent(
             if (showVideoArchive) {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().height(232.dp),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                 ) {
                     items(videoTasks.asReversed(), key = { it.id }) { task ->
                         val matchingOffer = models.firstOrNull { task.belongsTo(it) }
-                        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                             Text(
                                 stringResource(R.string.media_studio_history_item,
                                     task.provider, task.model, stringResource(when (task.phase) {
@@ -461,10 +462,10 @@ internal fun LocalMediaStudioSheetContent(
                     style = DsType.caption11.withReadingWeight())
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().height(232.dp),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                 ) {
                     items(generatedResults.asReversed(), key = { it.id }) { asset ->
-                        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                             Text(
                                 stringResource(
                                     R.string.media_studio_history_item,
@@ -487,8 +488,8 @@ internal fun LocalMediaStudioSheetContent(
                                 "mp3" -> "audio/mpeg"
                                 else -> "application/octet-stream"
                             }
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                                 if (file != null) {
                                     SyButton(
                                         text = stringResource(R.string.media_studio_view_result),
@@ -532,8 +533,8 @@ internal fun LocalMediaStudioSheetContent(
                                 Text(stringResource(R.string.media_studio_confirm_delete),
                                     style = DsType.caption11.withReadingWeight(),
                                     color = colors.textSecondary)
-                                FlowRow(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                                     SyButton(text = stringResource(R.string.media_studio_delete_confirm),
                                         size = SyButtonSize.Small, onClick = {
                                             scope.launch {
