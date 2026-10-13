@@ -1564,7 +1564,6 @@
 
     <string name="chatgpt_continue">继续使用 ChatGPT</string>
     <string name="chatgpt_account_short">授权</string>
-    <string name="chatgpt_using_plan">正在使用 ChatGPT 套餐</string>
     <string name="chatgpt_manage_usage">管理使用额度</string>
     <string name="chatgpt_switch_model_source">切换模型来源</string>
     <string name="chatgpt_welcome_title">正在使用 ChatGPT 套餐</string>
