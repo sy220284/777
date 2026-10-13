@@ -100,7 +100,12 @@ fun SyResponsiveSheet(
                 Column(
                     // Reserve header/footer space within the actual viewport after IME padding.
                     // A screen-height cap alone can leave actions beyond a reduced viewport.
-                    Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = maxBodyHeight)
+                    // ModalBottomSheet is wrap-content on phones: a weighted child can
+                    // receive zero remaining height and hide all scrollable details.
+                    // Keep the viewport cap; only the height-bounded side panel uses weight.
+                    (if (wide) Modifier.fillMaxWidth().weight(1f, fill = false)
+                     else Modifier.fillMaxWidth())
+                        .heightIn(max = maxBodyHeight)
                         .verticalScroll(rememberScrollState())
                         .testTag("bottomSheetScrollBody"),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
