@@ -22,12 +22,9 @@ internal object ChatContinuityEventIdentity {
         val a = subject(left)
         val b = subject(right)
         if (a.length < 2 || b.length < 2) return false
-        if (a == b) return true
-        val shorter = if (a.length <= b.length) a else b
-        val longer = if (a.length <= b.length) b else a
-        // Explicit concrete objects/places can acquire descriptive modifiers.
-        if (shorter.length >= 2 && longer.contains(shorter)) return true
-        return false
+        // Substring equality used to make "保密" the same slot as "保密公开照片".
+        // Preserve old lexical aliases only when both normalized subjects are exact.
+        return a == b
     }
 
     /** A user correction/removal must name the concrete matter, not just generic words. */
