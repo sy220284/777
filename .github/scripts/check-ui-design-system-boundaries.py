@@ -86,7 +86,7 @@ def mask_non_code(source: str) -> str:
             quote = source[i]
             j = i + 1
             while j < n:
-            if source[j] == chr(92):
+                if source[j] == chr(92):
                     j += 2
                     continue
                 if source[j] == quote:
