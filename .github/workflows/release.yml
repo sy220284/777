@@ -1,7 +1,11 @@
 name: Release APK
 
 'on':
-  # UTC 13/43 分每隔 30 分钟检查，避开 GitHub Actions 整点拥堵。
+  # GitHub schedule 可能漏发：完整 main CI 成功时及时检查，半小时定时兜底。
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   schedule:
     - cron: '13,43 * * * *'
   workflow_dispatch:
@@ -17,6 +21,8 @@ concurrency:
 
 jobs:
   check-release:
+    # 不允许 PR、失败的 CI 或外部仓库的 workflow_run 获得发版资格。
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -39,7 +45,7 @@ jobs:
             echo "version=" >> "$GITHUB_OUTPUT"
           }
 
-          # 本批次只处理调度事件创建时的主线提交，发布中发生的新合并留给下一批。
+          # 每次触发均锁定事件创建时的主线提交，发布中发生的新合并留给下一批。
           BATCH_SHA="$(git rev-parse HEAD)"
           RELEASE_SHA="$BATCH_SHA"
 
