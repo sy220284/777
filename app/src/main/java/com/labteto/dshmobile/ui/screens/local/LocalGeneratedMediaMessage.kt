@@ -563,7 +563,8 @@ private fun InlineVideoPlayer(url: String?, localFile: File?, onError: (String) 
         ?: url?.takeIf(String::isNotBlank)?.let(Uri::parse)
     if (source == null) {
         Text(resources.getString(R.string.media_chat_video_failed),
-            style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+            style = DsType.caption11.withReadingWeight(),
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
         return
     }
     var player by remember { mutableStateOf<VideoView?>(null) }
