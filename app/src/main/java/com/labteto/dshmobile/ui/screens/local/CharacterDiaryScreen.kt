@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import java.text.DateFormat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,7 +59,6 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.SySegmentedTabs
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -232,14 +233,14 @@ internal fun CharacterDiaryScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    horizontal = DsSpacing.comfortable,
-                    vertical = DsSpacing.medium,
+                    horizontal = SyMetric.gapSection,
+                    vertical = SyMetric.gapLg,
                 ),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
             ) {
                 if (subjects.size > 1) {
                     item(key = "diary-subjects") {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                             items(subjects, key = CharacterDiarySubject::key) { subject ->
                                 val selected = subject.key == selectedSubjectKey
                                 SyPill(
@@ -306,7 +307,7 @@ internal fun CharacterDiaryScreen(
                             body = stringResource(R.string.chat_diary_load_failed_body),
                             actionText = stringResource(R.string.common_retry),
                             onAction = { reloadNonce++ },
-                            modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.xlarge),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapPage),
                         )
                     }
                     visibleEntries.isEmpty() -> item(key = "diary-empty") {
@@ -320,7 +321,7 @@ internal fun CharacterDiaryScreen(
                                 if (query.isNotBlank()) R.string.chat_diary_no_match_body
                                 else R.string.chat_diary_empty_body,
                             ),
-                            modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.xxlarge),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapHero),
                         )
                     }
                     else -> items(visibleEntries, key = ChatDiaryEntry::id) { entry ->
@@ -487,7 +488,7 @@ private fun CharacterDiaryEntryCard(
     // Never synthesize first-person thoughts or comments that do not exist in the diary store.
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
     SyGlassCard(modifier = Modifier.widthIn(max = 680.dp).fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
         Text(
             dateText,
             style = DsType.caption11.withReadingWeight(),
@@ -504,8 +505,8 @@ private fun CharacterDiaryEntryCard(
         )
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small, Alignment.CenterHorizontally),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             SyPill(
                 text = stringResource(
@@ -556,8 +557,8 @@ private fun CharacterDiaryEntryCard(
                 modifier = Modifier.testTag("diary_source_${entry.id}"),
             )
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             SyButton(text = stringResource(R.string.chat_diary_edit_title),
                 onClick = onEdit, variant = SyButtonVariant.Ghost,
                 modifier = Modifier.testTag("diary_edit_${entry.id}"))
@@ -578,7 +579,7 @@ private fun CharacterDiaryEntryCard(
 private fun CharacterDiaryNarrativeBlock(label: String, text: String) {
     if (text.isBlank()) return
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
         Text(
             label,
             style = DsType.caption11Strong.withReadingWeight(),
