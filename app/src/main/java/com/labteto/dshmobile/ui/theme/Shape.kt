@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.theme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
 import androidx.compose.ui.unit.dp
+import com.shenyan.designsystem.foundation.SyMetric
 
 /**
  * 统一 semantic radius scale:
@@ -11,25 +12,26 @@ import androidx.compose.ui.unit.dp
  *
  * Screens consume semantic names so page code does not invent local radii.
  */
+/** Compatibility names; radius tokens belong to the canonical V6 SyMetric. */
 object DsShapes {
-    val buttonCapsule = RoundedCornerShape(13.dp)
+    val buttonCapsule = RoundedCornerShape(SyMetric.radiusControl)
     val buttonSmall = RoundedCornerShape(12.dp)
     val bubble = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 6.dp)
     val characterBubble = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 6.dp, bottomEnd = 18.dp)
     val composer = RoundedCornerShape(20.dp)
-    val approvalCard = RoundedCornerShape(18.dp)
-    val dialog = RoundedCornerShape(24.dp)
-    val floatingSheet = RoundedCornerShape(24.dp)
+    val approvalCard = RoundedCornerShape(SyMetric.radiusCard)
+    val dialog = RoundedCornerShape(SyMetric.radiusSheet)
+    val floatingSheet = RoundedCornerShape(SyMetric.radiusSheet)
     val sheet = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    val menu = RoundedCornerShape(24.dp)
+    val menu = RoundedCornerShape(SyMetric.radiusSheet)
     val toast = RoundedCornerShape(12.dp)
-    val block = RoundedCornerShape(18.dp)
-    val settingsGroup = RoundedCornerShape(18.dp)
+    val block = RoundedCornerShape(SyMetric.radiusCard)
+    val settingsGroup = RoundedCornerShape(SyMetric.radiusCard)
     val pill = RoundedCornerShape(12.dp)
     val pillFull = RoundedCornerShape(999.dp)
-    val chip = RoundedCornerShape(9.dp)
-    val row = RoundedCornerShape(13.dp)
-    val cube = RoundedCornerShape(24.dp)
+    val chip = RoundedCornerShape(SyMetric.radiusSm)
+    val row = RoundedCornerShape(SyMetric.radiusControl)
+    val cube = RoundedCornerShape(SyMetric.radiusSheet)
 }
 
 val DsMaterialShapes = Shapes(
