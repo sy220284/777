@@ -857,4 +857,11 @@ class ChatContextStateTest {
         assertEquals(before.decisions, result.decisions)
     }
 
+    @Test
+    fun shorterTopicCannotAbsorbDistinctQualifiedPromise() {
+        assertFalse(ChatContinuityEventIdentity.sameSubject("保密", "保密公开照片"))
+        assertFalse(ChatContinuityEventIdentity.sameSubject("关于车票", "关于车票报销"))
+        assertTrue(ChatContinuityEventIdentity.sameSubject("还要确认车票", "车票还没确认"))
+    }
+
 }
