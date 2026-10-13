@@ -192,12 +192,11 @@ internal fun PluginInventoryBrowser(
         }
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
-        Column(Modifier.fillMaxSize().safeDrawingPadding().padding(top = DsSpacing.medium)) {
+        Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             SyTopBar(
                 title = stringResource(if (skillsOnly) R.string.skills_title else R.string.tools_catalog_title),
                 onBack = onBack,
                 backContentDescription = stringResource(R.string.common_back),
-                modifier = Modifier.padding(horizontal = DsSpacing.comfortable),
             )
             SySearchField(
                 value = query,

@@ -10,6 +10,28 @@ import org.junit.Test
 
 class ShenyanColorHarmonyTest {
     @Test
+    fun explicitAccentReachesCanonicalControlsWithoutChangingMaterialsOrStatus() {
+        listOf(DsThemeTokens.light to ShenyanPalettes.light,
+            DsThemeTokens.dark to ShenyanPalettes.dark,
+            DsThemeTokens.matteBlack to ShenyanPalettes.matte).forEachIndexed { index, (base, v6) ->
+            AccentPalettes.ALL.drop(1).forEach { accent ->
+                val page = base.withAccent(accent, dark = index != 0).harmonizeV6(v6, preserveAccent = true)
+                val controls = v6.withV6Accent(page)
+                assertEquals(page.accent, controls.primary)
+                assertEquals(page.onAccent, controls.onPrimary)
+                assertEquals(page.accentTertiary.compositeOver(page.bgBase), controls.selected)
+                assertEquals(v6.materialL1, controls.materialL1)
+                assertEquals(v6.materialL3, controls.materialL3)
+                assertEquals(v6.materialL4, controls.materialL4)
+                assertEquals(v6.canvas, controls.canvas)
+                assertEquals(v6.mint, controls.mint)
+                assertEquals(v6.danger, controls.danger)
+                assertEquals(v6.warning, controls.warning)
+            }
+        }
+    }
+
+    @Test
     fun pageChromeSidebarComposerShareOneV6PaletteAcrossThemes() {
         listOf(
             DsThemeTokens.light to ShenyanPalettes.light,

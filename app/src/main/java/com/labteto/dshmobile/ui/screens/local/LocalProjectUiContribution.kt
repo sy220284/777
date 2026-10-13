@@ -98,15 +98,15 @@ internal fun LocalProjectScreen(
     val deleteFailedMessage = stringResource(R.string.local_project_delete_failed)
 
     Column(Modifier.fillMaxSize().imePadding()) {
+        SyTopBar(
+            title = stringResource(R.string.local_project_management_title),
+            onBack = onBack,
+            backContentDescription = stringResource(R.string.local_project_back),
+        )
         Column(
             modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SyTopBar(
-                title = stringResource(R.string.local_project_management_title),
-                onBack = onBack,
-                backContentDescription = stringResource(R.string.local_project_back),
-            )
             Text(
                 stringResource(R.string.local_project_new_session_hint),
                 style = DsType.small13.withReadingWeight(),

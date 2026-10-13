@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.ui.screens.settings
 
-import androidx.compose.foundation.BorderStroke
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,10 +14,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,12 +28,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.shenyan.designsystem.components.SyIconBox
+import com.shenyan.designsystem.components.SyMaterialFrame
+import com.shenyan.designsystem.components.SyMaterialTier
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /**
@@ -43,15 +42,15 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
  */
 @Composable
 internal fun AppSettingsSection(compact: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
-    val colors = DsTheme.colors
-    Surface(
+    SyMaterialFrame(
         modifier = Modifier.fillMaxWidth(),
+        tier = SyMaterialTier.L3_CARD,
         shape = if (compact) DsShapes.settingsGroup else DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-        tonalElevation = 0.dp,
-        border = BorderStroke(1.dp, colors.borderL1),
+        horizontalPadding = 0.dp,
+        verticalPadding = DsSpacing.tiny,
+        verticalArrangement = Arrangement.Top,
     ) {
-        Column(Modifier.padding(vertical = DsSpacing.tiny), content = content)
+        content()
     }
 }
 
@@ -102,6 +101,7 @@ internal fun AppSettingsRow(
     reservedEntryHeight: Dp? = null,
 ) {
     val colors = DsTheme.colors
+    val stackedValue = LocalDensity.current.fontScale >= 1.2f
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -117,20 +117,20 @@ internal fun AppSettingsRow(
                 title,
                 style = (if (compact) DsType.settingsItem else DsType.navigationItem).withReadingWeight(),
                 color = colors.labelPrimary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
             )
             subtitle?.takeIf(String::isNotBlank)?.let {
                 Text(
                     it,
                     style = DsType.navigationSupporting.withReadingWeight(),
                     color = colors.labelSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
+            if (stackedValue && !value.isNullOrBlank()) {
+                Text(value, style = DsType.navigationSupporting.withReadingWeight(),
+                    color = colors.labelSecondary)
+            }
         }
-        value?.takeIf(String::isNotBlank)?.let {
+        value?.takeIf { it.isNotBlank() && !stackedValue }?.let {
             Text(
                 it,
                 modifier = Modifier.widthIn(max = 108.dp),

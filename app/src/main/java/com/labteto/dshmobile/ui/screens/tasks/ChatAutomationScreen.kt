@@ -156,7 +156,7 @@ internal fun ChatAutomationScreen(
             Modifier.fillMaxSize().safeDrawingPadding(),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            Box(Modifier.padding(horizontal = DsSpacing.large)) {
+            Box(Modifier.fillMaxWidth()) {
                 SyTopBar(
                     title = stringResource(R.string.tasks_chat_title),
                     subtitle = stringResource(R.string.tasks_chat_subtitle),

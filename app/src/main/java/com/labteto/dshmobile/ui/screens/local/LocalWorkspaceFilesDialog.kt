@@ -263,7 +263,7 @@ internal fun LocalWorkspaceFilesDialog(
                             R.string.local_files_back
                         },
                     ),
-                    modifier = Modifier.padding(horizontal = DsSpacing.medium).let { base ->
+                    modifier = Modifier.let { base ->
                         val selectedPath = previewPath ?: initialFilePath
                         if (!selectedPath.isNullOrBlank()) {
                             base.localArtifactSharedBounds(workspacePath, selectedPath)

@@ -795,7 +795,6 @@ internal fun PersonaGalleryScreen(
                 actionEnabled = !busy && !inspecting,
                 onAction = if (selected != null) ({ showMoreActions = true }) else null,
                 largeTitle = selected == null,
-                modifier = Modifier.padding(horizontal = DsSpacing.medium),
             )
             if (selected == null) {
                 PersonaGalleryOverviewV3(

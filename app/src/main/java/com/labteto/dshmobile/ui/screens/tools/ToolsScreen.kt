@@ -597,10 +597,6 @@ fun ToolsScreen(
                     actionContentDescription = stringResource(R.string.tools_refresh),
                     actionEnabled = !state.loading,
                     onAction = viewModel::refresh,
-                    modifier = Modifier.padding(
-                        horizontal = DsSpacing.comfortable,
-                        vertical = DsSpacing.medium,
-                    ),
                 )
 
                 val initialLoading = state.loading &&
@@ -985,12 +981,12 @@ private fun ToolCapabilityRow(
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
-    Surface(
-        onClick = { onClick?.invoke() },
-        enabled = onClick != null,
+    com.shenyan.designsystem.components.SyMaterialFrame(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
         shape = DsShapes.block,
-        color = colors.bgLayer1,
-        tonalElevation = 0.dp,
+        horizontalPadding = 0.dp,
+        verticalPadding = 0.dp,
     ) {
         Row(
             modifier = Modifier
@@ -1000,11 +996,9 @@ private fun ToolCapabilityRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            Surface(
+            Box(
                 modifier = Modifier.size(40.dp),
-                shape = DsShapes.row,
-                color = colors.bgModulePlatform,
-                tonalElevation = 0.dp,
+                contentAlignment = Alignment.Center,
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     when {

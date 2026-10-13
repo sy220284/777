@@ -10,23 +10,32 @@ class ShenyanSceneBackdropTest {
     @Test fun sameWallpaperSamplesCorrespondingScreenRegions() {
         val image = IntSize(400, 800)
         val viewport = IntSize(200, 400)
-        val top = sySceneCrop(image, viewport, IntOffset(0, 0), IntSize(80, 100))!!
-        val next = sySceneCrop(image, viewport, IntOffset(0, 100), IntSize(80, 100))!!
-        assertEquals(IntOffset(0, 0), top.origin)
-        assertEquals(IntSize(160, 200), top.size)
-        assertEquals(IntOffset(0, 200), next.origin)
+        val top = sySceneImagePlacement(image, viewport, IntOffset.Zero)!!
+        val next = sySceneImagePlacement(image, viewport, IntOffset(0, 100))!!
+        assertEquals(IntSize(200, 400), top.size)
+        assertEquals(top.size, next.size)
+        assertEquals(IntOffset(0, -100), next.origin - top.origin)
     }
 
     @Test fun coverCropMaintainsGlobalImageCentering() {
-        val image = IntSize(1000, 500)
-        val viewport = IntSize(250, 500)
-        val crop = sySceneCrop(image, viewport, IntOffset(0, 0), IntSize(250, 500))!!
-        assertEquals(IntOffset(375, 0), crop.origin)
-        assertEquals(IntSize(250, 500), crop.size)
+        val placement = sySceneImagePlacement(IntSize(1000, 500), IntSize(250, 500), IntOffset.Zero)!!
+        assertEquals(IntOffset(-375, 0), placement.origin)
+        assertEquals(IntSize(1000, 500), placement.size)
+    }
+
+    @Test fun partiallyOffscreenSurfacesKeepRootScaleWithoutStretching() {
+        val image = IntSize(800, 1600)
+        val viewport = IntSize(400, 800)
+        val above = sySceneImagePlacement(image, viewport, IntOffset(-20, -60))!!
+        val below = sySceneImagePlacement(image, viewport, IntOffset(350, 760))!!
+        assertEquals(IntOffset(20, 60), above.origin)
+        assertEquals(IntOffset(-350, -760), below.origin)
+        assertEquals(viewport, above.size)
+        assertEquals(above.size, below.size)
     }
 
     @Test fun invalidOrMissingViewportNeverSamples() {
-        assertNull(sySceneCrop(IntSize(0, 300), IntSize(200, 400), IntOffset.Zero, IntSize(40, 40)))
-        assertNull(sySceneCrop(IntSize(200, 400), IntSize.Zero, IntOffset.Zero, IntSize(40, 40)))
+        assertNull(sySceneImagePlacement(IntSize(0, 300), IntSize(200, 400), IntOffset.Zero))
+        assertNull(sySceneImagePlacement(IntSize(200, 400), IntSize.Zero, IntOffset.Zero))
     }
 }

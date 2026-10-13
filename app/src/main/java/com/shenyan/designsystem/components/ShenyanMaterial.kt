@@ -28,6 +28,8 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import com.shenyan.designsystem.foundation.*
@@ -50,6 +52,7 @@ fun SyMaterialFrame(
     horizontalPadding: Dp = 16.dp,
     verticalPadding: Dp = 14.dp,
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(SyMetric.gapMd),
+    shape: Shape = RoundedCornerShape(if (tier == SyMaterialTier.L4_OVERLAY) SyMetric.radiusSheet else SyMetric.radiusCard),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val c = LocalSyColors.current
@@ -57,13 +60,17 @@ fun SyMaterialFrame(
     var materialOrigin by remember { mutableStateOf(IntOffset.Zero) }
     val nested = LocalSyGlassDepth.current
     val resolved = if ((nested >= 3 || LocalSyReduceTransparency.current) && tier != SyMaterialTier.L5_SOLID) SyMaterialTier.L5_SOLID else tier
-    val fill = when (resolved) {
+    val materialFill = when (resolved) {
         SyMaterialTier.L1_SECTION -> c.materialL1
         SyMaterialTier.L2_BAR -> c.materialL2
         SyMaterialTier.L3_CARD -> c.materialL3
         SyMaterialTier.L4_OVERLAY -> c.materialL4
         SyMaterialTier.L5_SOLID -> c.materialL5
     }
+    // Without a spatial backing, use the same palette over its canvas rather than letting
+    // unrelated content show through. Nested cards inherit their parent's backing.
+    val fill = if (scene == null && backdrop == null && nested == 0)
+        materialFill.compositeOver(c.canvas) else materialFill
     // Opaque Matte surfaces must never sample or blur the supplied backdrop.
     val blurRadius = if (resolved == SyMaterialTier.L5_SOLID || fill.alpha == 1f) 0.dp else when (resolved) {
         SyMaterialTier.L1_SECTION -> 18.dp
@@ -72,7 +79,6 @@ fun SyMaterialFrame(
         SyMaterialTier.L4_OVERLAY -> 32.dp
         SyMaterialTier.L5_SOLID -> 0.dp
     }
-    val shape = RoundedCornerShape(if (resolved == SyMaterialTier.L4_OVERLAY) SyMetric.radiusSheet else SyMetric.radiusCard)
     val elevation = when (resolved) {
         SyMaterialTier.L1_SECTION, SyMaterialTier.L5_SOLID -> 1.dp
         SyMaterialTier.L2_BAR -> 3.dp
@@ -81,7 +87,7 @@ fun SyMaterialFrame(
     }
     @Composable fun Interior() {
         Box(Modifier.clip(shape)) {
-            if (blurRadius > 0.dp) {
+            if (blurRadius > 0.dp && nested == 0) {
                 // An explicit caller backdrop wins. Otherwise sample the scene's actual wallpaper
                 // or global light fields at this material's window coordinates.
                 val sampled = backdrop ?: scene?.let { sample ->
@@ -94,11 +100,13 @@ fun SyMaterialFrame(
                 }
             }
             Box(Modifier.matchParentSize().background(fill))
-            CompositionLocalProvider(LocalSyGlassDepth provides (if (fill.alpha == 1f) nested else nested + 1)) {
+            CompositionLocalProvider(LocalSyGlassDepth provides (if (materialFill.alpha == 1f) nested else nested + 1)) {
                 Column(Modifier.padding(horizontal = horizontalPadding, vertical = verticalPadding),
                     verticalArrangement = verticalArrangement, content = content)
             }
-            Box(Modifier.align(Alignment.TopCenter).fillMaxWidth(.93f).height(1.dp).background(c.materialSheen))
+            if (materialFill.alpha < 1f) {
+                Box(Modifier.align(Alignment.TopCenter).fillMaxWidth(.93f).height(1.dp).background(c.materialSheen))
+            }
         }
     }
     val outer = modifier.onGloballyPositioned { coordinates ->
@@ -141,13 +149,11 @@ private fun SyPaintAlignedScene(scene: SySceneBackdrop, surfaceOrigin: IntOffset
         drawRect(scene.canvas)
         val image = scene.image
         if (image != null && image.width > 0 && image.height > 0) {
-            val crop = sySceneCrop(
-                IntSize(image.width, image.height), viewport,
-                IntOffset(dx, dy), IntSize(size.width.roundToInt(), size.height.roundToInt()),
+            val placement = sySceneImagePlacement(
+                IntSize(image.width, image.height), viewport, IntOffset(dx, dy),
             ) ?: return@Canvas
             drawImage(
-                image = image, srcOffset = crop.origin, srcSize = crop.size,
-                dstSize = IntSize(size.width.roundToInt().coerceAtLeast(1), size.height.roundToInt().coerceAtLeast(1)),
+                image = image, dstOffset = placement.origin, dstSize = placement.size,
                 filterQuality = FilterQuality.Medium,
             )
             scene.veil?.let { drawRect(it) }
@@ -168,24 +174,19 @@ private fun SyPaintAlignedScene(scene: SySceneBackdrop, surfaceOrigin: IntOffset
     }
 }
 
-/** Unit-testable centre-crop mapping; every surface samples the same global pixels. */
-internal data class SySceneCrop(val origin: IntOffset, val size: IntSize)
+/** Draw the whole centre-cropped image at the root scale. Clipping belongs to the surface,
+ * so a partly off-screen card never stretches a clamped source crop into its full bounds.
+ */
+internal data class SySceneImagePlacement(val origin: IntOffset, val size: IntSize)
 
-internal fun sySceneCrop(
-    image: IntSize, viewport: IntSize, sampleOffset: IntOffset, sample: IntSize,
-): SySceneCrop? {
-    if (image.width <= 0 || image.height <= 0 || viewport.width <= 0 || viewport.height <= 0 ||
-        sample.width <= 0 || sample.height <= 0) return null
+internal fun sySceneImagePlacement(
+    image: IntSize, viewport: IntSize, sampleOffset: IntOffset,
+): SySceneImagePlacement? {
+    if (image.width <= 0 || image.height <= 0 || viewport.width <= 0 || viewport.height <= 0) return null
     val scale = max(viewport.width.toFloat() / image.width, viewport.height.toFloat() / image.height)
-    val left = ((image.width - viewport.width / scale) / 2f + sampleOffset.x / scale)
-        .roundToInt().coerceIn(0, image.width - 1)
-    val top = ((image.height - viewport.height / scale) / 2f + sampleOffset.y / scale)
-        .roundToInt().coerceIn(0, image.height - 1)
-    return SySceneCrop(
-        origin = IntOffset(left, top),
-        size = IntSize(
-            (sample.width / scale).roundToInt().coerceIn(1, image.width - left),
-            (sample.height / scale).roundToInt().coerceIn(1, image.height - top),
-        ),
+    val size = IntSize((image.width * scale).roundToInt(), (image.height * scale).roundToInt())
+    return SySceneImagePlacement(
+        IntOffset((viewport.width - size.width) / 2 - sampleOffset.x,
+            (viewport.height - size.height) / 2 - sampleOffset.y), size,
     )
 }

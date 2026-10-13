@@ -207,9 +207,7 @@ private fun WorkTasksScreen(
             Column(
                 Modifier
                     .fillMaxSize()
-                    .safeDrawingPadding()
-                    .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                    .safeDrawingPadding(),
             ) {
                 Box(Modifier.fillMaxWidth()) {
                     SyTopBar(
@@ -252,81 +250,88 @@ private fun WorkTasksScreen(
                     }
                 }
 
-                when {
-                    showCreate -> TaskEditorPane(
-                        state = editorState,
-                        viewModel = viewModel,
-                        createInvalidMessage = createInvalidMessage,
-                        onReset = ::resetEditor,
-                    )
-                    visibleTasks.isEmpty() -> TaskEmptyState(
-                        onManualCreate = ::startCreate,
-                        onCreateViaChat = onCreateViaChat?.let { createFromChat },
-                    )
-                    selectedTask != null -> Column(
-                        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                    ) {
-                        TaskCard(
-                            task = selectedTask,
-                            onCancel = { viewModel.cancel(selectedTask.id) },
-                            onPause = { viewModel.pause(selectedTask.id) },
-                            onResume = { viewModel.resume(selectedTask.id) },
-                            onRunNow = { viewModel.runNow(selectedTask.id) },
-                            onEdit = { startEdit(selectedTask) },
-                            onOpenSession = onOpenSession,
+                Column(
+                    modifier = Modifier.weight(1f)
+                        .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                ) {
+                    when {
+                        showCreate -> TaskEditorPane(
+                            state = editorState,
+                            viewModel = viewModel,
+                            createInvalidMessage = createInvalidMessage,
+                            onReset = ::resetEditor,
                         )
-                    }
-                    else -> Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
-                    ) {
-                        // Screen 19: show the real schedule state in the same glass tab
-                        // language as the work/history pages; never fabricate budget figures.
-                        val statusFilters = WorkTaskListFilter.entries
-                        val titles = listOf(
-                            stringResource(R.string.tasks_filter_all),
-                            stringResource(R.string.tasks_filter_scheduled),
-                            stringResource(R.string.tasks_filter_running),
-                            stringResource(R.string.tasks_filter_paused),
+                        visibleTasks.isEmpty() -> TaskEmptyState(
+                            onManualCreate = ::startCreate,
+                            onCreateViaChat = onCreateViaChat?.let { createFromChat },
                         )
-                        SySegmented(
-                            segments = statusFilters.mapIndexed { index, filter ->
-                                SySegment(filter.name, "${titles[index]} · ${visibleTasks.count { workTaskMatchesFilter(it.status, filter) }}")
-                            },
-                            selectedKey = listFilter.name,
-                            onSelect = { key ->
-                                listFilter = WorkTaskListFilter.entries.firstOrNull { it.name == key }
-                                    ?: WorkTaskListFilter.ALL
-                            },
-                            role = Role.Tab,
-                            stretch = true,
-                            hapticOnChange = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        if (filteredTasks.isEmpty()) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth().padding(DsSpacing.large),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                            ) {
-                                Text(
-                                    stringResource(R.string.tasks_filter_empty),
-                                    style = DsType.small13.withReadingWeight(),
-                                    color = colors.labelSecondary,
-                                )
-                                SyButton(
-                                    text = stringResource(R.string.tasks_filter_all),
-                                    onClick = { listFilter = WorkTaskListFilter.ALL },
-                                    variant = SyButtonVariant.Outline,
-                                )
-                            }
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
-                            ) {
-                                items(filteredTasks, key = AutomationTask::id) { task ->
-                                    TaskSummaryRow(task = task, onClick = { selectedTaskId = task.id })
+                        selectedTask != null -> Column(
+                            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                        ) {
+                            TaskCard(
+                                task = selectedTask,
+                                onCancel = { viewModel.cancel(selectedTask.id) },
+                                onPause = { viewModel.pause(selectedTask.id) },
+                                onResume = { viewModel.resume(selectedTask.id) },
+                                onRunNow = { viewModel.runNow(selectedTask.id) },
+                                onEdit = { startEdit(selectedTask) },
+                                onOpenSession = onOpenSession,
+                            )
+                        }
+                        else -> Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                        ) {
+                            // Screen 19: show the real schedule state in the same glass tab
+                            // language as the work/history pages; never fabricate budget figures.
+                            val statusFilters = WorkTaskListFilter.entries
+                            val titles = listOf(
+                                stringResource(R.string.tasks_filter_all),
+                                stringResource(R.string.tasks_filter_scheduled),
+                                stringResource(R.string.tasks_filter_running),
+                                stringResource(R.string.tasks_filter_paused),
+                            )
+                            SySegmented(
+                                segments = statusFilters.mapIndexed { index, filter ->
+                                    SySegment(filter.name, "${titles[index]} · ${visibleTasks.count { workTaskMatchesFilter(it.status, filter) }}")
+                                },
+                                selectedKey = listFilter.name,
+                                onSelect = { key ->
+                                    listFilter = WorkTaskListFilter.entries.firstOrNull { it.name == key }
+                                        ?: WorkTaskListFilter.ALL
+                                },
+                                role = Role.Tab,
+                                stretch = true,
+                                hapticOnChange = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            if (filteredTasks.isEmpty()) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().padding(DsSpacing.large),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                                ) {
+                                    Text(
+                                        stringResource(R.string.tasks_filter_empty),
+                                        style = DsType.small13.withReadingWeight(),
+                                        color = colors.labelSecondary,
+                                    )
+                                    SyButton(
+                                        text = stringResource(R.string.tasks_filter_all),
+                                        onClick = { listFilter = WorkTaskListFilter.ALL },
+                                        variant = SyButtonVariant.Outline,
+                                    )
+                                }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = DsSpacing.medium),
+                                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                                ) {
+                                    items(filteredTasks, key = AutomationTask::id) { task ->
+                                        TaskSummaryRow(task = task, onClick = { selectedTaskId = task.id })
+                                    }
                                 }
                             }
                         }

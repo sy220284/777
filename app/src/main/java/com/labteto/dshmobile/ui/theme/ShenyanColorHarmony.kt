@@ -43,3 +43,13 @@ internal fun DsColors.harmonizeV6(p: SyColors, preserveAccent: Boolean = false):
         tipSurface = card,
     )
 }
+
+/** Project the saved accent into the canonical controls as well as legacy page consumers.
+ * Material tiers and semantic status colours still belong to the V6 palette.
+ */
+internal fun SyColors.withV6Accent(source: DsColors): SyColors = copy(
+    primary = source.accent,
+    primaryPressed = source.accentHover.compositeOver(source.bgBase),
+    onPrimary = source.onAccent,
+    selected = source.accentTertiary.compositeOver(source.bgBase),
+)
