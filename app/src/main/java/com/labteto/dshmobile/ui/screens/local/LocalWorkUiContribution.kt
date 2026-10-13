@@ -3,17 +3,15 @@ package com.labteto.dshmobile.ui.screens.local
 import com.labteto.dshmobile.local.feature.LocalFeatureModuleId
 import com.labteto.dshmobile.local.presentation.LocalHarnessShellState
 
+/** Work execution is shown in the conversation; Workspace is its only standalone page. */
 internal fun localWorkFeatureUiContribution(
     filesMode: LocalFilesMode,
     shell: LocalHarnessShellState,
     actions: LocalWorkFeatureUiActions,
     onFilesModeChange: (LocalFilesMode) -> Unit,
-    onPushFeature: (LocalFeaturePage) -> Unit,
     onPopFeature: () -> Unit,
     onOpenFromDrawer: (LocalFeaturePage) -> Unit,
     onCloseDrawer: () -> Unit,
-    onContinueArtifact: (String) -> Unit = {},
-    onOpenSourceSession: (String) -> Unit = {},
     requestedFilePath: String? = null,
     entryRequest: Int = 0,
     onRequestedFilePathChange: (String?) -> Unit = {},
@@ -25,10 +23,6 @@ internal fun localWorkFeatureUiContribution(
             onRequestedFilePathChange(null)
             onFilesModeChange(LocalFilesMode.WORKSPACE)
             onOpenFromDrawer(LocalFeaturePage.WORKSPACE)
-            onCloseDrawer()
-        },
-        LocalFeatureDrawerEntry.RUN_CENTER to {
-            onOpenFromDrawer(LocalFeaturePage.RUN_CENTER)
             onCloseDrawer()
         },
     ),
@@ -48,44 +42,6 @@ internal fun localWorkFeatureUiContribution(
             entryRequest = entryRequest,
             onInitialFilePathConsumed = onRequestedFilePathConsumed,
         )
-        LocalFeaturePage.RUN_CENTER -> LocalWorkStateContent(actions.workState) { workState ->
-            LocalRunCenterScreen(
-                state = workState,
-                onJobOutput = actions.backgroundJobOutput,
-                onArtifacts = actions.artifactsForUi,
-                onHistoryPage = actions.historyPageForUi,
-                onArtifactHistory = actions.artifactHistoryForUi,
-                onToolActivities = actions.toolActivitiesForUi,
-                onEventSequence = actions.eventSequenceForUi,
-                onToolEvidence = actions.toolEvidenceForUi,
-                onRequirementEvidence = actions.requirementEvidenceForUi,
-                onLinkRequirementEvidence = actions.linkRequirementEvidenceForUi,
-                onStopJob = actions.stopBackgroundJob,
-                onStartBackgroundAgent = actions.startBackgroundAgent,
-                onSendAgentMessage = actions.sendBackgroundAgentMessage,
-                onContinueArtifact = onContinueArtifact,
-                onOpenSourceSession = shell.parentSessionId
-                    ?.takeIf { id -> shell.sessions.any { it.id == id } }
-                    ?.let { sourceId -> { onOpenSourceSession(sourceId) } },
-                sourceSessionMissing = shell.parentSessionId != null &&
-                    shell.sessions.none { it.id == shell.parentSessionId },
-                usageRevision = actions.usageRevision,
-                sessionUsage = actions.sessionUsage,
-                taskUsage = actions.taskUsage,
-                requestUsage = actions.requestUsage,
-                onOpenArtifact = { path ->
-                    onRequestedFilePathChange(path)
-                    onFilesModeChange(LocalFilesMode.CONVERSATION)
-                    onPushFeature(LocalFeaturePage.WORKSPACE)
-                },
-                onOpenResults = {
-                    onRequestedFilePathChange(null)
-                    onFilesModeChange(LocalFilesMode.CONVERSATION)
-                    onPushFeature(LocalFeaturePage.WORKSPACE)
-                },
-                onDismiss = onPopFeature,
-            )
-        }
         else -> error("Work received route owned by another feature: $page")
     }
 }

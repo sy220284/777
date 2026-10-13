@@ -282,21 +282,6 @@ class LocalHarnessViewModel @Inject constructor(
         artifact: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem,
     ) = runtime.work.linkRequirementEvidenceForUi(sessionId, index, artifact)
     fun eventSequenceForUi(sessionId: String) = runtime.work.eventSequenceForUi(sessionId)
-    fun backgroundJobOutput(jobId: String): String = runtime.work.backgroundJobOutputForUi(jobId)
-    fun stopBackgroundJob(jobId: String): String = runtime.work.stopBackgroundJobForUi(jobId)
-    internal suspend fun startBackgroundAgent(task: String): LocalWorkUiActionResult {
-        val result = runtime.work.startBackgroundAgentForUi(task)
-        return LocalWorkUiActionResult(result.accepted, result.message)
-    }
-
-    internal suspend fun sendBackgroundAgentMessage(
-        agentId: String,
-        message: String,
-    ): LocalWorkUiActionResult {
-        val result = runtime.work.sendBackgroundAgentMessageForUi(agentId, message)
-        return LocalWorkUiActionResult(result.accepted, result.message)
-    }
-
     internal fun teamMemberOutput(jobId: String): String = runtime.work.backgroundJobOutputForUi(jobId)
 
     internal suspend fun sendTeamMemberMessage(
