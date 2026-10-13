@@ -192,6 +192,46 @@ class LocalFeatureNavigationTest {
     }
 
     @Test
+    fun modeTabsKeepDrawerAndUnderlyingSettingsPageWhileChangingSessions() {
+        val settingsStack = localFeaturePush(localFeatureHome(), LocalFeaturePage.SETTINGS)
+        assertEquals(LocalFeaturePage.SETTINGS, localFeatureCurrent(settingsStack))
+        assertTrue(localModeTabPreservesNavigation(
+            requestedMode = LocalUsageMode.WORK,
+            previousModeName = LocalUsageMode.CHAT.name,
+            activeMode = LocalUsageMode.WORK,
+        ))
+        assertTrue(localModeTabPreservesNavigation(
+            requestedMode = LocalUsageMode.CHAT,
+            previousModeName = LocalUsageMode.WORK.name,
+            activeMode = LocalUsageMode.CHAT,
+        ))
+        // Re-selecting Chat from an existing Chat group can switch sessions
+        // without changing the usage mode; it must still retain the drawer.
+        assertTrue(localModeTabPreservesNavigation(
+            requestedMode = LocalUsageMode.CHAT,
+            previousModeName = LocalUsageMode.CHAT.name,
+            activeMode = LocalUsageMode.CHAT,
+        ))
+        // Rapid Chat -> Work -> Chat taps may settle via Work first.
+        assertTrue(localModeTabPreservesNavigation(
+            requestedMode = LocalUsageMode.CHAT,
+            previousModeName = LocalUsageMode.CHAT.name,
+            activeMode = LocalUsageMode.WORK,
+        ))
+        // History selection and other session navigation still open the conversation.
+        assertFalse(localModeTabPreservesNavigation(
+            requestedMode = null,
+            previousModeName = LocalUsageMode.CHAT.name,
+            activeMode = LocalUsageMode.WORK,
+        ))
+        assertFalse(localModeTabPreservesNavigation(
+            requestedMode = null,
+            previousModeName = LocalUsageMode.WORK.name,
+            activeMode = LocalUsageMode.WORK,
+        ))
+    }
+
+    @Test
     fun historyAndModeChosenFromDrawerReturnToTheDrawerOnlyOnce() {
         assertTrue(localConversationShouldReturnToDrawer(
             LocalFeaturePage.HOME, drawerOpen = false, wideViewport = false,

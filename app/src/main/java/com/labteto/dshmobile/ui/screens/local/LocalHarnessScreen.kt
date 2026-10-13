@@ -196,6 +196,8 @@ fun LocalHarnessScreen(
     var featureStack by rememberSaveable { mutableStateOf(localFeatureHome()) }
     var settledSessionId by rememberSaveable { mutableStateOf("") }
     var settledUsageMode by rememberSaveable { mutableStateOf("") }
+    // Only explicit mode-tab selections keep the drawer and underlying feature in place.
+    var drawerModeSwitchTarget by remember { mutableStateOf<LocalUsageMode?>(null) }
     var drawerFeatureOriginStack by rememberSaveable { mutableStateOf<List<String>?>(null) }
     var conversationOpenedFromDrawer by rememberSaveable { mutableStateOf(false) }
     var filesMode by rememberSaveable { mutableStateOf(LocalFilesMode.WORKSPACE) }
@@ -307,6 +309,8 @@ fun LocalHarnessScreen(
         sessionId: String,
         fromDrawer: Boolean = false,
     ): Boolean {
+        // Selecting a concrete conversation always navigates to that conversation.
+        drawerModeSwitchTarget = null
         val accepted = viewModel.switchSession(sessionId)
         if (accepted) conversationOpenedFromDrawer = fromDrawer
         if (accepted && sessionId == shell.sessionId) {
@@ -324,16 +328,27 @@ fun LocalHarnessScreen(
             if (settledSessionId.isNotBlank() &&
                 (settledSessionId != shell.sessionId || settledUsageMode != shell.usageMode.name)
             ) {
-                resetFeatureNavigation()
-                memorySourceSessionId = null
-                memorySourceMessageId = null
-                settingsDestination = SettingsDestination.ROOT
-                taskMode = null
-                searchedTaskId = null
-                requestedFilePath = null
-                filesMode = LocalFilesMode.WORKSPACE
-                composerHandoff = emptyList()
-                if (drawerState.isOpen) drawerState.close()
+                val keepDrawer = localModeTabPreservesNavigation(
+                    requestedMode = drawerModeSwitchTarget,
+                    previousModeName = settledUsageMode,
+                    activeMode = shell.usageMode,
+                )
+                if (!keepDrawer) {
+                    resetFeatureNavigation()
+                    memorySourceSessionId = null
+                    memorySourceMessageId = null
+                    settingsDestination = SettingsDestination.ROOT
+                    taskMode = null
+                    searchedTaskId = null
+                    requestedFilePath = null
+                    filesMode = LocalFilesMode.WORKSPACE
+                    composerHandoff = emptyList()
+                    if (drawerState.isOpen) drawerState.close()
+                }
+                // Intermediate queued mode changes must not close the drawer either.
+                if (!keepDrawer || drawerModeSwitchTarget == shell.usageMode) {
+                    drawerModeSwitchTarget = null
+                }
             }
             settledSessionId = shell.sessionId
             settledUsageMode = shell.usageMode.name
@@ -734,6 +749,7 @@ fun LocalHarnessScreen(
                 shell.groupChat.enabled
         if (target == shell.usageMode && !returningFromGroupToSingle && !shell.loading) {
             // This tap must cancel a previously queued switch back to the other mode.
+            drawerModeSwitchTarget = null
             viewModel.switchUsageMode(target)
             return
         }
@@ -744,10 +760,9 @@ fun LocalHarnessScreen(
                 modeIntro = target
             }
         }
-        if (target != shell.usageMode || returningFromGroupToSingle) {
-            // Mode tabs live in the drawer: the next Home back returns to the source drawer.
-            conversationOpenedFromDrawer = true
-        }
+        // Changing a mode tab filters the drawer's content, not the current feature page.
+        // The session behind the drawer still changes, but the drawer stays visible.
+        drawerModeSwitchTarget = target
         // Work capability handoff owns pendingUsageMode; ordinary taps use the
         // runtime navigation inbox, keeping the drawer tied to the real session.
         viewModel.switchUsageMode(target)

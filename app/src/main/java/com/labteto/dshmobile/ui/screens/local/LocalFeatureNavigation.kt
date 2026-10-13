@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.feature.LocalFeatureCatalog
 import com.labteto.dshmobile.local.feature.LocalFeatureRoute
 import com.labteto.dshmobile.local.session.LocalSessionSummary
@@ -76,6 +77,18 @@ internal fun localFeatureBack(
         reopenDrawer = reachedDrawer,
     )
 }
+
+/**
+ * Switching the Chat/Work tab only changes the drawer context, not the feature below it.
+ * While rapid tab taps settle through an intermediate mode, preserve the drawer as well.
+ * A normal history/session selection has no pending tab request and navigates as before.
+ */
+internal fun localModeTabPreservesNavigation(
+    requestedMode: LocalUsageMode?,
+    previousModeName: String,
+    activeMode: LocalUsageMode,
+): Boolean = requestedMode != null &&
+    (requestedMode == activeMode || previousModeName != activeMode.name)
 
 internal fun localFeatureHome(): List<String> = listOf(LocalFeaturePage.HOME.name)
 
