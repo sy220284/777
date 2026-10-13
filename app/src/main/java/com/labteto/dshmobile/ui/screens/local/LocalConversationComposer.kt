@@ -124,9 +124,14 @@ internal fun LocalConversationComposer(
     var capabilityPanel by remember(state.sessionId) { mutableStateOf<String?>(null) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
     var steerCurrentRun by remember(state.sessionId) { mutableStateOf(false) }
-    LaunchedEffect(state.running) {
+    var steeringChoiceDismissed by remember(state.sessionId) { mutableStateOf(false) }
+    LaunchedEffect(state.running, input.isBlank()) {
         if (state.running) capabilityPanel = null
-        else steerCurrentRun = false
+        if (!state.running || input.isBlank()) {
+            // No draft or no active run: never retain the previous steering decision.
+            steerCurrentRun = false
+            steeringChoiceDismissed = false
+        }
     }
 
     // Opening the input reveals the two capabilities; idle chats retain their compact row.
@@ -308,29 +313,22 @@ internal fun LocalConversationComposer(
                 )
             }
         }
-        if (state.usageMode == LocalUsageMode.WORK && state.running && !teamDispatchSelected) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SyPill(
-                    text = stringResource(R.string.local_work_next_turn),
-                    selected = !steerCurrentRun,
-                    onClick = { steerCurrentRun = false },
-                )
-                SyPill(
-                    text = stringResource(R.string.local_work_steer_now),
-                    selected = steerCurrentRun,
-                    onClick = { steerCurrentRun = true },
-                )
-                Text(
-                    text = stringResource(R.string.local_work_steer_boundary),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.textSecondary,
-                    modifier = Modifier.weight(1f),
-                )
-            }
+        if (shouldShowWorkSteeringChoice(
+                mode = state.usageMode,
+                running = state.running,
+                teamDispatchSelected = teamDispatchSelected,
+                hasDraft = input.isNotBlank(),
+                dismissed = steeringChoiceDismissed,
+            )
+        ) {
+            LocalWorkSteeringChoice(
+                selected = steerCurrentRun,
+                onToggle = { steerCurrentRun = !steerCurrentRun },
+                onDismiss = {
+                    steerCurrentRun = false // Closing always restores safe default next-turn queueing.
+                    steeringChoiceDismissed = true
+                },
+            )
         }
         val imageAttachments = attachments.mapIndexedNotNull { index, attachment ->
             (index to attachment).takeIf { attachment.mediaType.startsWith("image/") }
