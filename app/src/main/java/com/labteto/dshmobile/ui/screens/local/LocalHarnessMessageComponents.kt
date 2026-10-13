@@ -58,6 +58,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.LocalChatBranchInfo
@@ -74,6 +75,7 @@ import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.local.model.LocalMediaKind
+import com.labteto.dshmobile.local.model.visibleAssistantText
 import com.labteto.dshmobile.ui.shenyan.SyContextActionMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.SyEntryIcons
@@ -399,12 +401,19 @@ private fun LocalUserMessageContent(
                     image = block,
                     workspacePath = workspacePath,
                 )
-                is LocalMessageBlock.File -> LocalTranscriptFile(block)
+                is LocalMessageBlock.File -> LocalTranscriptFile(block, workspacePath)
                 is LocalMessageBlock.Unknown -> LocalTranscriptUnknown(block)
             }
         }
     }
 }
+
+/** Presentation-only projection: filter old provider thinking tags in each durable text block
+ * while keeping media references, source attribution and display order intact. */
+internal fun localVisibleAssistantBlocks(message: LocalHarnessMessage): List<LocalMessageBlock> =
+    message.visibleBlocks().map { block ->
+        if (block is LocalMessageBlock.Text) block.copy(text = visibleAssistantText(block.text)) else block
+    }
 
 @Composable
 private fun LocalAssistantMessageContent(
@@ -415,7 +424,7 @@ private fun LocalAssistantMessageContent(
     chatMode: Boolean,
 ) {
     var firstText = true
-    message.visibleBlocks().forEach { block ->
+    localVisibleAssistantBlocks(message).forEach { block ->
         when (block) {
             is LocalMessageBlock.Text -> {
                 val text = if (groupMode && firstText) {
@@ -445,7 +454,7 @@ private fun LocalAssistantMessageContent(
                 image = block,
                 workspacePath = workspacePath,
             )
-            is LocalMessageBlock.File -> LocalTranscriptFile(block)
+            is LocalMessageBlock.File -> LocalTranscriptFile(block, workspacePath)
             is LocalMessageBlock.Unknown -> LocalTranscriptUnknown(block)
         }
     }
@@ -457,21 +466,24 @@ private fun LocalTranscriptImage(
     workspacePath: String,
 ) {
     val colors = DsTheme.colors
+    val context = LocalContext.current
+    val file = remember(workspacePath, image.relativePath) {
+        resolveLocalTranscriptFile(workspacePath, image.relativePath)
+    }
     var bitmap by remember(workspacePath, image.relativePath) {
         mutableStateOf<ImageBitmap?>(null)
     }
+    var loading by remember(workspacePath, image.relativePath) { mutableStateOf(true) }
     LaunchedEffect(workspacePath, image.relativePath) {
-        bitmap = if (workspacePath.isBlank()) {
-            null
-        } else {
-            withContext(Dispatchers.IO) {
-                decodeLocalAttachmentThumbnail(
-                    workspacePath = workspacePath,
-                    relativePath = image.relativePath,
-                    targetPx = 720,
-                )
-            }
+        loading = true
+        bitmap = if (file == null) null else withContext(Dispatchers.IO) {
+            decodeLocalAttachmentThumbnail(
+                workspacePath = workspacePath,
+                relativePath = image.relativePath,
+                targetPx = 720,
+            )
         }
+        loading = false
     }
     val ratio = if (
         image.width != null &&
@@ -490,6 +502,13 @@ private fun LocalTranscriptImage(
         .clip(DsShapes.block)
         .background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))
         .border(1.dp, colors.borderL3, DsShapes.block)
+        .clickable(enabled = file != null) {
+            file?.let { localFile ->
+                viewMediaFile(context, localFile, image.mediaType) { error ->
+                    Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     val loaded = bitmap
     if (loaded != null) {
         Image(
@@ -503,12 +522,23 @@ private fun LocalTranscriptImage(
             modifier = modifier,
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                FeatherIcons.Image,
-                contentDescription = image.name,
-                tint = colors.labelTertiary,
-                modifier = Modifier.size(24.dp),
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                Icon(
+                    FeatherIcons.Image,
+                    contentDescription = image.name,
+                    tint = colors.labelTertiary,
+                    modifier = Modifier.size(24.dp),
+                )
+                Text(
+                    stringResource(if (loading) R.string.media_chat_preview_pending
+                        else R.string.media_chat_preview_unavailable),
+                    color = colors.labelSecondary,
+                    style = DsType.caption11.withReadingWeight(),
+                )
+            }
         }
     }
 }
@@ -531,9 +561,20 @@ private fun LocalTranscriptUnknown(block: LocalMessageBlock.Unknown) {
 }
 
 @Composable
-private fun LocalTranscriptFile(file: LocalMessageBlock.File) {
+private fun LocalTranscriptFile(file: LocalMessageBlock.File, workspacePath: String) {
     val colors = DsTheme.colors
+    val context = LocalContext.current
+    val localFile = remember(workspacePath, file.relativePath) {
+        resolveLocalTranscriptFile(workspacePath, file.relativePath)
+    }
     SyMaterialSurface(
+        modifier = Modifier.clickable(enabled = localFile != null) {
+            localFile?.let { attached ->
+                viewMediaFile(context, attached, file.mediaType) { error ->
+                    Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+                }
+            }
+        },
         shape = DsShapes.block,
         tier = SyMaterialTier.L3_CARD,
         border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderL3),
@@ -549,11 +590,30 @@ private fun LocalTranscriptFile(file: LocalMessageBlock.File) {
                 tint = colors.labelSecondary,
                 modifier = Modifier.size(18.dp),
             )
-            Text(
-                file.name,
-                style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                color = colors.labelPrimary,
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    file.name,
+                    style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
+                    color = colors.labelPrimary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (localFile == null) {
+                    Text(
+                        stringResource(R.string.media_chat_work_file_missing),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = colors.labelSecondary,
+                    )
+                }
+            }
+            if (localFile != null) {
+                Icon(
+                    FeatherIcons.ChevronRight,
+                    contentDescription = stringResource(R.string.media_chat_open_result),
+                    tint = colors.labelTertiary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }
@@ -636,14 +696,21 @@ internal fun ChatThinkingRow(
 internal const val MAX_LOCAL_IMAGE_SELECTION = 20
 
 
+/** Never open an attachment that escapes the active workspace (including symlinks). */
+internal fun resolveLocalTranscriptFile(workspacePath: String, relativePath: String): File? =
+    runCatching {
+        if (workspacePath.isBlank() || relativePath.isBlank()) return@runCatching null
+        val root = File(workspacePath).canonicalFile
+        val file = File(root, relativePath).canonicalFile
+        file.takeIf { it.isFile && it.toPath().startsWith(root.toPath()) }
+    }.getOrNull()
+
 internal fun decodeLocalAttachmentThumbnail(
     workspacePath: String,
     relativePath: String,
     targetPx: Int = 160,
 ): androidx.compose.ui.graphics.ImageBitmap? = runCatching {
-    val root = File(workspacePath).canonicalFile
-    val file = File(root, relativePath).canonicalFile
-    require(file.toPath().startsWith(root.toPath()) && file.isFile)
+    val file = resolveLocalTranscriptFile(workspacePath, relativePath) ?: return@runCatching null
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(file.absolutePath, bounds)
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
