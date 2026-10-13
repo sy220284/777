@@ -8,6 +8,7 @@ directly in feature screens.
 
 from pathlib import Path
 import re
+import json
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -85,7 +86,7 @@ def mask_non_code(source: str) -> str:
             quote = source[i]
             j = i + 1
             while j < n:
-                if source[j] == "\\":
+                if source[j] == "\":
                     j += 2
                     continue
                 if source[j] == quote:
@@ -120,6 +121,43 @@ for path in UI.rglob("*.kt"):
         for match in pattern.finditer(text):
             line = text.count("\n", 0, match.start()) + 1
             violations.append(f"{relative}:{line}: {match.group(0).strip()} -> {hint}")
+
+
+# V6 hardening: prevent deleted visual APIs and retired design references from returning.
+RETIRED_DRAWING_CALL = re.compile(
+    r"\bDs(?:Button|Card|Segmented|Checkbox|BottomSheet|SearchField|ToastHost|TopBar|ProgressBar)\s*\("
+)
+baseline_path = ROOT / "docs/design/v6/legacy-theme-consumers.json"
+baseline = set(json.loads(baseline_path.read_text(encoding="utf-8"))["remainingProductionFiles"])
+actual = set()
+for path in UI.rglob("*.kt"):
+    relative = path.relative_to(ROOT).as_posix()
+    source = mask_non_code(path.read_text(encoding="utf-8"))
+    for match in RETIRED_DRAWING_CALL.finditer(source):
+        violations.append(f"{relative}: retired Ds drawing component {match.group(0)}")
+    if re.search(r"\bDsTheme\.colors\b", source):
+        actual.add(relative)
+for new in sorted(actual - baseline):
+    violations.append(f"{new}: new legacy DsTheme.colors consumer; use canonical LocalSyColors")
+for stale in sorted(baseline - actual):
+    violations.append(f"{stale}: remove migrated file from legacy-theme-consumers.json")
+
+for relative in ["docs/UI-UX.zh-CN.md","docs/design/mobile-ui.md","docs/design/v6/README.zh-CN.md","docs/design/v6/STATUS.zh-CN.md","docs/README.md"]:
+    file = ROOT / relative
+    source = file.read_text(encoding="utf-8")
+    for link in re.findall(r"\]\(([^)]+)\)", source):
+        url = link.split("#")[0].split("?")[0].strip()
+        if not url or re.match(r"^(?:https?:|mailto:|data:)", url):
+            continue
+        target = (file.parent / url).resolve()
+        if not target.is_relative_to(ROOT) or not target.is_file():
+            violations.append(f"{relative}: broken local design link -> {url}")
+
+for relative in ("docs/design/v5-p0p1", "docs/design/clear-realm-theme.md",
+                 "docs/design/v6/verification.json", "docs/design/v6/PR664-VISUAL-ACCEPTANCE.zh-CN.md",
+                 "app/src/main/java/com/shenyan/designsystem/layout/SyAdaptiveShell.kt"):
+    if (ROOT / relative).exists():
+        violations.append(f"{relative}: retired V5 visual asset or obsolete component returned")
 
 if violations:
     print("UI Design System boundary violations:")

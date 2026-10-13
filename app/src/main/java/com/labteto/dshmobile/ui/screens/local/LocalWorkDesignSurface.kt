@@ -32,7 +32,7 @@ import com.shenyan.designsystem.components.SyTextField
 import com.shenyan.designsystem.components.SySheetChoiceRow
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
+import com.shenyan.designsystem.foundation.LocalSyColors
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
@@ -57,7 +57,7 @@ internal fun LocalWorkDesignSurface(
     val state = projected.takeIf { it.sessionId == sessionId }
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
-    val colors = DsTheme.colors
+    val colors = LocalSyColors.current
     var artifacts by remember(sessionId) { mutableStateOf<List<LocalArtifactUiItem>>(emptyList()) }
     var outputError by remember(sessionId) { mutableStateOf(false) }
     var refresh by remember(sessionId) { mutableStateOf(0) }
@@ -96,7 +96,7 @@ internal fun LocalWorkDesignSurface(
             Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
                 Text(state?.goal?.description?.takeIf(String::isNotBlank) ?: title,
                     modifier = Modifier.fillMaxWidth(), style = DsType.base16Strong.withReadingWeight(),
-                    color = colors.labelPrimary)
+                    color = colors.text)
                 SyButton(stringResource(R.string.fluid_tool_output), onOpenEvidence,
                     variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
             }
@@ -116,30 +116,30 @@ internal fun LocalWorkDesignSurface(
                         0 -> SyGlassCard(modifier = Modifier.localWorkCompletionSharedBounds(completionMorphKey)) {
                             FluidPanelTitle(stringResource(R.string.fluid_work_goal))
                             Text(state?.goal?.description ?: stringResource(R.string.fluid_goal_empty),
-                                style = DsType.std14.withReadingWeight(), color = colors.labelPrimary)
+                                style = DsType.std14.withReadingWeight(), color = colors.text)
                             state?.goal?.let { Text(localGoalStatusLabel(it.status),
-                                style = DsType.small13, color = colors.labelSecondary) }
+                                style = DsType.small13, color = colors.textSecondary) }
                             state?.workflowProgress?.let { WorkflowProgressSection(it) }
                             state?.handoffSummary?.takeIf(String::isNotBlank)?.let {
-                                Text(it, style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+                                Text(it, style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
                             }
                         }
                         1 -> SyGlassCard {
                             FluidPanelTitle(stringResource(R.string.fluid_work_plan))
                             if (state?.plan.isNullOrEmpty()) Text(stringResource(R.string.fluid_plan_empty),
-                                style = DsType.small13, color = colors.labelSecondary)
+                                style = DsType.small13, color = colors.textSecondary)
                             state?.plan?.forEachIndexed { index, step ->
                                 Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                                     Text((index + 1).toString().padStart(2, '0'), style = DsType.caption11,
-                                        color = colors.labelTertiary)
-                                    Text(step, style = DsType.std14.withReadingWeight(), color = colors.labelPrimary)
+                                        color = colors.textTertiary)
+                                    Text(step, style = DsType.std14.withReadingWeight(), color = colors.text)
                                 }
                             }
                             state?.todos?.forEach { todo ->
                                 Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                                     Text(if (todo.status == "completed") "✓" else "○",
-                                        color = if (todo.status == "completed") colors.success else colors.labelTertiary)
-                                    Text(todo.content, style = DsType.std14.withReadingWeight(), color = colors.labelPrimary)
+                                        color = if (todo.status == "completed") colors.successInk else colors.textTertiary)
+                                    Text(todo.content, style = DsType.std14.withReadingWeight(), color = colors.text)
                                 }
                             }
                         }
@@ -152,13 +152,13 @@ internal fun LocalWorkDesignSurface(
                             }
                             state?.pendingApproval?.let { approval -> SyGlassCard {
                                 FluidPanelTitle(stringResource(R.string.local_approval_title))
-                                Text(approval.summary, style = DsType.std14.withReadingWeight(), color = colors.labelPrimary)
+                                Text(approval.summary, style = DsType.std14.withReadingWeight(), color = colors.text)
                                 Text(stringResource(R.string.fluid_approval_modal_hint), style = DsType.small13,
-                                    color = colors.warnLabel)
+                                    color = colors.warningInk)
                             } }
                             if (state?.pendingQuestion == null && state?.pendingApproval == null) SyGlassCard {
                                 Text(stringResource(R.string.fluid_decision_empty), style = DsType.std14,
-                                    color = colors.labelSecondary)
+                                    color = colors.textSecondary)
                                 SyButton(stringResource(R.string.fluid_back_execution), { onSelectSection(3) },
                                     variant = SyButtonVariant.Ghost)
                             }
@@ -166,10 +166,10 @@ internal fun LocalWorkDesignSurface(
                         4 -> SyGlassCard(modifier = Modifier.localWorkCompletionSharedBounds(completionMorphKey)) {
                             FluidPanelTitle(stringResource(R.string.fluid_work_outputs))
                             if (outputError) {
-                                Text(stringResource(R.string.fluid_outputs_failed), color = colors.error)
+                                Text(stringResource(R.string.fluid_outputs_failed), color = colors.dangerInk)
                                 SyButton(stringResource(R.string.common_retry), { refresh++ })
                             } else if (artifacts.isEmpty()) Text(stringResource(R.string.fluid_outputs_empty),
-                                style = DsType.std14, color = colors.labelSecondary)
+                                style = DsType.std14, color = colors.textSecondary)
                             artifacts.forEach { artifact ->
                                 SySheetChoiceRow(title = artifact.reference,
                                     subtitle = if (artifact.currentlyAvailable == false)
@@ -210,7 +210,7 @@ internal fun FluidDecisionPanel(id: String, question: String, options: List<Stri
     var failed by remember(id) { mutableStateOf(false) }
     SyGlassCard {
         FluidPanelTitle(stringResource(R.string.fluid_decision_checkpoint))
-        Text(question, style = DsType.std14.withReadingWeight(), color = DsTheme.colors.labelPrimary)
+        Text(question, style = DsType.std14.withReadingWeight(), color = LocalSyColors.current.labelPrimary)
         options.forEach { option ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(selected = selection == option, enabled = !submitted,
@@ -222,7 +222,7 @@ internal fun FluidDecisionPanel(id: String, question: String, options: List<Stri
         SyTextField(custom, { custom = it; selection = "" }, enabled = !submitted,
             modifier = Modifier.fillMaxWidth().testTag("workDecisionCustom"),
             label = { Text(stringResource(R.string.local_question_custom_answer)) })
-        if (failed) Text(stringResource(R.string.fluid_decision_failed), color = DsTheme.colors.error)
+        if (failed) Text(stringResource(R.string.fluid_decision_failed), color = LocalSyColors.current.error)
         SyButton(stringResource(R.string.fluid_decision_continue), {
             submitted = onAnswer(custom.trim().ifEmpty { selection })
             failed = !submitted

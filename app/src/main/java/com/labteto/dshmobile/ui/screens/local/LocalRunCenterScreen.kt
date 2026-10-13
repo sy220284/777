@@ -43,9 +43,8 @@ import com.shenyan.designsystem.components.SyEmptyState
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
+import com.shenyan.designsystem.foundation.LocalSyColors
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -91,7 +90,7 @@ internal fun LocalRunCenterScreen(
     taskUsage: (String) -> com.labteto.dshmobile.local.TokenUsageGroupDetail? = { null },
     requestUsage: (String) -> com.labteto.dshmobile.local.TokenUsageRecord? = { null },
 ) {
-    val colors = DsTheme.colors
+    val colors = LocalSyColors.current
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
     val uriHandler = LocalUriHandler.current
@@ -154,7 +153,7 @@ internal fun LocalRunCenterScreen(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = colors.rootSurface(),
+        color = colors.canvas,
     ) {
         Column(
             modifier = Modifier
@@ -196,7 +195,7 @@ internal fun LocalRunCenterScreen(
                 Text(
                     stringResource(R.string.local_work_handoff_source_removed),
                     style = DsType.small13.withReadingWeight(),
-                    color = colors.labelSecondary,
+                    color = colors.textSecondary,
                     modifier = Modifier.padding(horizontal = DsSpacing.medium),
                 )
             }
@@ -246,13 +245,13 @@ internal fun LocalRunCenterScreen(
                     if (completedJobs.isNotEmpty()) RunCenterJobsSection(
                         state.sessionId, completedJobs, false, true, onJobOutput, onStopJob, onSendAgentMessage)
                     if (activityRefreshFailed) {
-                        Text(stringResource(R.string.local_run_center_refresh_failed), color = colors.error)
+                        Text(stringResource(R.string.local_run_center_refresh_failed), color = colors.dangerInk)
                     }
                     if (toolActivities.isNotEmpty() || artifacts.isNotEmpty() || state.todos.isNotEmpty()) {
                         val evidence = localWorkDeliveryEvidenceCounts(state, artifacts, toolActivities)
                         Text(
                             stringResource(R.string.local_delivery_evidence_title),
-                            style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary,
+                            style = DsType.base16Strong.withReadingWeight(), color = colors.text,
                         )
                         Text(
                             stringResource(
@@ -261,23 +260,23 @@ internal fun LocalRunCenterScreen(
                                 evidence.completedTools, evidence.failedTools, evidence.unknownTools,
                                 evidence.openTasks,
                             ),
-                            style = DsType.small13.withReadingWeight(), color = colors.labelSecondary,
+                            style = DsType.small13.withReadingWeight(), color = colors.textSecondary,
                         )
                         Text(
                             stringResource(R.string.local_delivery_evidence_scope),
-                            style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary,
+                            style = DsType.caption11.withReadingWeight(), color = colors.textTertiary,
                         )
                     }
                     if (toolActivities.isNotEmpty()) {
                         Text(
                             stringResource(R.string.local_tool_activity_title),
                             style = DsType.base16Strong.withReadingWeight(),
-                            color = colors.labelPrimary,
+                            color = colors.text,
                         )
                         Text(
                             stringResource(R.string.local_tool_history_scope),
                             style = DsType.caption11.withReadingWeight(),
-                            color = colors.labelTertiary,
+                            color = colors.textTertiary,
                         )
                         toolActivities.forEach { activity ->
                             val phase = when (activity.phase) {
@@ -299,17 +298,17 @@ internal fun LocalRunCenterScreen(
                         Text(
                             stringResource(R.string.local_artifacts_title),
                             style = DsType.base16Strong.withReadingWeight(),
-                            color = colors.labelPrimary,
+                            color = colors.text,
                         )
                         Text(
                             stringResource(R.string.local_artifact_reference_hint),
                             style = DsType.caption11.withReadingWeight(),
-                            color = colors.labelTertiary,
+                            color = colors.textTertiary,
                         )
                         Text(
                             stringResource(R.string.local_artifact_history_scope, artifactScanLimit),
                             style = DsType.caption11.withReadingWeight(),
-                            color = colors.labelTertiary,
+                            color = colors.textTertiary,
                         )
                         artifacts.forEach { artifact ->
                             val label = when (artifact.category) {
@@ -396,7 +395,7 @@ internal fun LocalRunCenterScreen(
                         }
                         if (requirementLinks.isNotEmpty()) {
                             Text(stringResource(R.string.local_delivery_linked_title),
-                                style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
+                                style = DsType.small13Strong.withReadingWeight(), color = colors.text)
                             requirementLinks.forEach { link ->
                                 val current = link.versionNow
                                 Text(
@@ -408,12 +407,12 @@ internal fun LocalRunCenterScreen(
                                             stringResource(R.string.local_delivery_link_current)
                                         else stringResource(R.string.local_delivery_link_stale),
                                     ),
-                                    style = DsType.small13.withReadingWeight(), color = colors.labelSecondary,
+                                    style = DsType.small13.withReadingWeight(), color = colors.textSecondary,
                                 )
                             }
                         }
                         if (artifactActionFailed) {
-                            Text(stringResource(R.string.local_artifact_open_failed), color = colors.error)
+                            Text(stringResource(R.string.local_artifact_open_failed), color = colors.dangerInk)
                         }
                         SyButton(
                             text = stringResource(R.string.local_artifacts_open_files),
@@ -444,7 +443,7 @@ internal fun LocalRunCenterScreen(
         ) {
             if (requirementLinkFeedback.isNotBlank()) {
                 Text(requirementLinkFeedback, style = DsType.small13.withReadingWeight(),
-                    color = colors.labelSecondary)
+                    color = colors.textSecondary)
             }
             state.todos.forEachIndexed { index, todo ->
                 SyButton(
@@ -518,10 +517,10 @@ internal fun LocalRunCenterScreen(
                 style = DsType.caption11.withReadingWeight(),
             )
             selectedActivity.errorCode?.let { code ->
-                Text(stringResource(R.string.local_tool_activity_error, code), color = colors.error)
+                Text(stringResource(R.string.local_tool_activity_error, code), color = colors.dangerInk)
             }
             if (evidenceError) {
-                Text(stringResource(R.string.local_tool_activity_evidence_error), color = colors.error)
+                Text(stringResource(R.string.local_tool_activity_evidence_error), color = colors.dangerInk)
                 SyButton(stringResource(R.string.common_retry), { evidenceRetry++ })
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
@@ -624,13 +623,13 @@ internal fun LocalRunCenterScreen(
             Text(
                 stringResource(R.string.local_run_agent_inherits_context),
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelTertiary,
+                color = colors.textTertiary,
             )
             agentFeedback.takeIf(String::isNotBlank)?.let {
                 Text(
                     it,
                     style = DsType.small13.withReadingWeight(),
-                    color = colors.labelSecondary,
+                    color = colors.textSecondary,
                 )
             }
 
