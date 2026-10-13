@@ -1,7 +1,5 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import com.labteto.dshmobile.local.presentation.LocalWorkUiState
-import com.labteto.dshmobile.local.work.LocalGoal
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -54,20 +52,6 @@ class PersonaGalleryOverviewV3Test {
         )
 
         assertEquals(listOf("pin-b", "regular-a", "pin-a", "regular-b"), moved)
-    }
-
-    @Test
-    fun emptyRunCenterStateIsRecognized() {
-        assertFalse(LocalWorkUiState().hasRunCenterContent())
-        assertTrue(LocalWorkUiState(running = true).hasRunCenterContent())
-        assertTrue(
-            LocalWorkUiState(
-                goal = LocalGoal(
-                    description = "test",
-                    status = "active",
-                ),
-            ).hasRunCenterContent(),
-        )
     }
 
     @Test

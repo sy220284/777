@@ -44,8 +44,7 @@
     <string name="local_empty_conversation_files_title">当前会话没有文件</string>
     <string name="local_empty_conversation_files_body">发送图片、附件或让 AI 生成文件后，就可以在这里打开。</string>
     <string name="local_files_refresh_action">重新检查</string>
-    <string name="local_run_center_empty_title">还没有正在进行的任务</string>
-    <string name="local_run_center_empty_body">把一件事交给 AI 助手后，可以随时在这里查看进度、继续补充要求或打开完成的内容。</string>
+
     <string name="persona_gallery_portrait_actions_title">人物相片</string>
     <string name="persona_gallery_portrait_long_press_hint">长按相片可更换或移除</string>
     <string name="persona_gallery_portrait_photo_empty">轻点添加人物相片</string>

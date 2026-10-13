@@ -101,22 +101,8 @@ internal data class LocalWorkFeatureUiActions(
     val workspaceFiles: suspend () -> List<LocalWorkspaceFile>,
     val conversationFiles: suspend (String) -> LocalConversationFiles,
     val previewWorkspaceFile: suspend (String) -> LocalWorkspaceFilePreview,
-    val backgroundJobOutput: (String) -> String,
     val artifactsForUi: (String) -> List<LocalArtifactUiItem>,
-    val historyPageForUi: ((String, com.labteto.dshmobile.local.presentation.LocalWorkHistoryCursor?) -> com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi)? = null,
-    val artifactHistoryForUi: (String, Int) -> List<LocalArtifactUiItem> = { _, _ -> emptyList() },
-    val toolActivitiesForUi: (String) -> List<LocalToolActivityUiItem>,
     val eventSequenceForUi: (String) -> Long,
-    val toolEvidenceForUi: (String, String, Long) -> String? = { _, _, _ -> null },
-    val requirementEvidenceForUi: (String) -> List<com.labteto.dshmobile.local.work.LocalRequirementEvidenceLink> = { emptyList() },
-    val linkRequirementEvidenceForUi: (String, Int, LocalArtifactUiItem) -> Boolean = { _, _, _ -> false },
-    val stopBackgroundJob: (String) -> String,
-    val startBackgroundAgent: suspend (String) -> LocalWorkUiActionResult,
-    val sendBackgroundAgentMessage: suspend (String, String) -> LocalWorkUiActionResult,
-    val usageRevision: StateFlow<Long>? = null,
-    val sessionUsage: ((String) -> com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot)? = null,
-    val taskUsage: (String) -> com.labteto.dshmobile.local.TokenUsageGroupDetail? = { null },
-    val requestUsage: (String) -> com.labteto.dshmobile.local.TokenUsageRecord? = { null },
 )
 
 internal data class LocalAutomationFeatureUiActions(

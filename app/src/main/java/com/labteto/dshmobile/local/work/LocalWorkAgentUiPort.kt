@@ -5,10 +5,8 @@ internal data class LocalWorkAgentUiResult(
     val message: String,
 )
 
-/** Narrow Work-owned actions surfaced to the Run Center UI. */
+/** Work-owned commands for the existing Agent team conversation controls. */
 internal interface LocalWorkAgentUiPort {
-    suspend fun startBackgroundAgent(task: String): LocalWorkAgentUiResult
-    suspend fun sendMessage(agentId: String, message: String): LocalWorkAgentUiResult
     suspend fun sendTeamMessage(memberId: String, message: String): LocalWorkAgentUiResult
     suspend fun stopTeamMember(memberId: String): LocalWorkAgentUiResult
     suspend fun stopTeam(): LocalWorkAgentUiResult

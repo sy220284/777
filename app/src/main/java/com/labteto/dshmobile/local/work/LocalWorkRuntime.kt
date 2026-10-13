@@ -177,12 +177,6 @@ class LocalWorkRuntime @Inject internal constructor(
 
     internal fun backgroundJobOutputForUi(jobId: String): String =
         runtimeStateStore.jobManager.output(jobId, runtimeStateStore.currentSessionId)
-    internal fun stopBackgroundJobForUi(jobId: String): String =
-        runtimeStateStore.jobManager.kill(jobId, runtimeStateStore.currentSessionId)
-    internal suspend fun startBackgroundAgentForUi(task: String): LocalWorkAgentUiResult =
-        agentUi.startBackgroundAgent(task)
-    internal suspend fun sendBackgroundAgentMessageForUi(agentId: String, message: String): LocalWorkAgentUiResult =
-        agentUi.sendMessage(agentId, message)
     internal suspend fun sendTeamMemberMessageForUi(memberId: String, message: String): LocalWorkAgentUiResult =
         agentUi.sendTeamMessage(memberId, message)
     internal suspend fun stopTeamMemberForUi(memberId: String): LocalWorkAgentUiResult =

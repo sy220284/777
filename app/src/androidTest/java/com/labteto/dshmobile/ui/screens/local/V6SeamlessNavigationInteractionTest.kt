@@ -32,7 +32,6 @@ class V6SeamlessNavigationInteractionTest {
                     onTasks = {},
                     onWorkspaceFiles = {},
                     onProjects = {},
-                    onOpenRunCenter = {},
                     onTools = {},
                 )
             }

@@ -117,7 +117,6 @@ internal fun localShellFeatureUiContribution(
             onStop = actions.stop,
             onNewSession = onNewSession,
             onExitGroupChat = actions.exitGroupChat,
-            onOpenRunCenter = { onPushFeature(LocalFeaturePage.RUN_CENTER) },
             sessionTitle = sessionTitleOverrides[surface.sessionId]
                 ?: shell.sessions.firstOrNull { it.id == surface.sessionId }?.title
                 ?: stringResource(R.string.chatlist_new_session),

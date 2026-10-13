@@ -486,22 +486,8 @@ fun LocalHarnessScreen(
         workspaceFiles = viewModel::workspaceFiles,
         conversationFiles = viewModel::conversationFiles,
         previewWorkspaceFile = viewModel::previewWorkspaceFile,
-        backgroundJobOutput = viewModel::backgroundJobOutput,
         artifactsForUi = viewModel::artifactsForUi,
-        historyPageForUi = viewModel::historyPageForUi,
-        artifactHistoryForUi = viewModel::artifactHistoryForUi,
-        toolActivitiesForUi = viewModel::toolActivitiesForUi,
         eventSequenceForUi = viewModel::eventSequenceForUi,
-        toolEvidenceForUi = viewModel::toolEvidenceForUi,
-        requirementEvidenceForUi = viewModel::requirementEvidenceForUi,
-        linkRequirementEvidenceForUi = viewModel::linkRequirementEvidenceForUi,
-        stopBackgroundJob = viewModel::stopBackgroundJob,
-        startBackgroundAgent = viewModel::startBackgroundAgent,
-        sendBackgroundAgentMessage = viewModel::sendBackgroundAgentMessage,
-        usageRevision = viewModel.usageRevision,
-        sessionUsage = viewModel::sessionUsage,
-        taskUsage = viewModel::taskUsage,
-        requestUsage = viewModel::requestUsage,
     )
     val projectActions = LocalProjectUiActions(
         catalog = viewModel.projectCatalog,
@@ -606,12 +592,6 @@ fun LocalHarnessScreen(
         ),
         localWorkFeatureUiContribution(
             filesMode = filesMode,
-            onContinueArtifact = { path ->
-                handoffWorkCapability(resources.getString(R.string.local_artifact_continue_prompt, path))
-            },
-            onOpenSourceSession = { sourceSessionId ->
-                switchToSessionAndShowConversation(sourceSessionId)
-            },
             requestedFilePath = requestedFilePath,
             entryRequest = filesEntryRequest,
             onRequestedFilePathChange = { requestedFilePath = it },
@@ -621,7 +601,6 @@ fun LocalHarnessScreen(
             shell = shell,
             actions = workActions,
             onFilesModeChange = { filesMode = it },
-            onPushFeature = ::pushFeature,
             onPopFeature = {
                 memorySourceSessionId = null
                 memorySourceMessageId = null
@@ -891,7 +870,6 @@ fun LocalHarnessScreen(
                     requestedFilePath = path
                 },
                 onProjects = { openDrawerEntry(LocalFeatureDrawerEntry.PROJECT) },
-                onOpenRunCenter = { openDrawerEntry(LocalFeatureDrawerEntry.RUN_CENTER) },
                 onOpenGroupChat = { openDrawerEntry(LocalFeatureDrawerEntry.GROUP_CHAT) },
                 onOpenPersonaGallery = {
                     openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY)

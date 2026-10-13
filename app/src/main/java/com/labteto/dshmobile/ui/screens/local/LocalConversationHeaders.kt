@@ -173,7 +173,6 @@ internal fun WorkSurfaceHeader(
     configured: Boolean,
     running: Boolean,
     onModelClick: () -> Unit,
-    onOpenRunCenter: () -> Unit,
     onNewSession: () -> Unit,
     sessionPinned: Boolean,
     onTogglePin: () -> Unit,
@@ -216,12 +215,6 @@ internal fun WorkSurfaceHeader(
             StateDot(StateDotState.Running, size = 8.dp)
             Spacer(Modifier.width(SyMetric.gapSm))
         }
-        SyIconButton(
-            icon = SyEntryIcons.RunCenter,
-            contentDescription = stringResource(R.string.local_execution_console),
-            onClick = onOpenRunCenter,
-            tint = colors.textSecondary,
-        )
         SyIconButton(
             icon = SyEntryIcons.NewSession,
             contentDescription = stringResource(R.string.chatlist_new_session),
