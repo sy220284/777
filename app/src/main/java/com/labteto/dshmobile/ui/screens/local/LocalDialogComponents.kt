@@ -21,7 +21,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -69,7 +68,7 @@ internal fun ConfirmDialog(
     onConfirm: () -> Unit,
 ) {
     SyDialog(title = title, onDismiss = onDismiss) {
-        Text(body, style = DsType.std14.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+        Text(body, style = DsType.std14.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             SyButton(
                 text = stringResource(R.string.common_cancel),

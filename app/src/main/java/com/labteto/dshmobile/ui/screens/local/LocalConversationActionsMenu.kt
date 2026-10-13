@@ -13,7 +13,6 @@ import com.shenyan.designsystem.components.SyIconButton
 import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
-import com.labteto.dshmobile.ui.theme.DsTheme
 
 /** Session actions remain anchored beside the tapped icon, matching the context-menu surface. */
 @Composable
@@ -23,7 +22,7 @@ internal fun ConversationActionsMenu(
     onRename: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var expanded by remember { mutableStateOf(false) }
     // Capture the target action at the original tap, even if the active session changes
     // while the confirmation dialog is open.
@@ -33,7 +32,7 @@ internal fun ConversationActionsMenu(
             icon = FeatherIcons.MoreVertical,
             contentDescription = stringResource(R.string.local_session_actions),
             onClick = { expanded = true },
-            tint = colors.labelSecondary,
+            tint = colors.textSecondary,
         )
         SyPopupMenu(
             expanded = expanded,

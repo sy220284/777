@@ -23,7 +23,6 @@ import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
@@ -41,7 +40,7 @@ internal fun LocalChatEditMessageSheet(
     var error by remember(message.id) { mutableStateOf<String?>(null) }
     var submitting by remember(message.id) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val busyMessage = stringResource(R.string.local_edit_user_message_busy)
     val missingMessage = stringResource(R.string.local_edit_user_message_missing)
     val unavailableMessage = stringResource(R.string.local_edit_user_message_unavailable)
@@ -59,13 +58,13 @@ internal fun LocalChatEditMessageSheet(
         Text(
             stringResource(R.string.local_edit_user_message_hint),
             style = DsType.small13.withReadingWeight(),
-            color = colors.labelSecondary,
+            color = colors.textSecondary,
         )
         if (workMode) {
             Text(
                 stringResource(R.string.local_edit_work_side_effect_notice),
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
         }
         if (chatMessageHasAttachmentContext(message)) {
@@ -81,7 +80,7 @@ internal fun LocalChatEditMessageSheet(
             Text(
                 stringResource(R.string.local_edit_user_message_keeps_attachments, retainedNames),
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
         }
         SyTextField(
@@ -96,7 +95,7 @@ internal fun LocalChatEditMessageSheet(
             enabled = !submitting,
         )
         error?.let { messageText ->
-            Text(messageText, style = DsType.small13.withReadingWeight(), color = colors.error)
+            Text(messageText, style = DsType.small13.withReadingWeight(), color = colors.dangerInk)
         }
         Row(
             modifier = Modifier.fillMaxWidth(),

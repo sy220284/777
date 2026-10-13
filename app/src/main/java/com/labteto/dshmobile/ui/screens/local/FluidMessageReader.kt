@@ -22,7 +22,7 @@ import com.labteto.dshmobile.ui.theme.*
 @Composable
 internal fun FluidMessageReader(title: String, content: String, onDismiss: () -> Unit) {
     SyFullScreenDialog(onDismiss = onDismiss) {
-        Surface(Modifier.fillMaxSize(), color = DsTheme.colors.bgBase) {
+        Surface(Modifier.fillMaxSize(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.canvas) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 SyTopBar(title, onBack = onDismiss, backContentDescription = stringResource(R.string.common_back))
                 if (content.isBlank()) SyEmptyState(FeatherIcons.BookOpen,

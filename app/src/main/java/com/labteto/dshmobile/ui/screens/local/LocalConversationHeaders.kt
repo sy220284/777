@@ -37,7 +37,6 @@ import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -61,7 +60,7 @@ internal fun ChatSurfaceHeader(
     onDeleteSession: () -> Unit,
     tuningEnabled: Boolean = true,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Row(
         Modifier.fillMaxWidth().heightIn(min = DsMetrics.topBarHeight),
         verticalAlignment = Alignment.CenterVertically,
@@ -88,7 +87,7 @@ internal fun ChatSurfaceHeader(
                     Text(
                         if (groupEnabled) stringResource(R.string.local_group_chat_title) else personaName,
                         style = DsType.base16Strong.withReadingWeight(),
-                        color = colors.labelPrimary,
+                        color = colors.text,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -108,7 +107,7 @@ internal fun ChatSurfaceHeader(
                                     stringResource(R.string.local_group_chat_active_speaker, speaker)
                                 } ?: stringResource(R.string.local_group_chat_member_count, groupMembers.size),
                                 style = DsType.caption11.withReadingWeight(),
-                                color = colors.labelSecondary,
+                                color = colors.textSecondary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f),
@@ -118,7 +117,7 @@ internal fun ChatSurfaceHeader(
                         Text(
                             secondary,
                             style = DsType.caption11.withReadingWeight(),
-                            color = colors.labelSecondary,
+                            color = colors.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -127,7 +126,7 @@ internal fun ChatSurfaceHeader(
                 Icon(
                     FeatherIcons.ChevronDown,
                     contentDescription = null,
-                    tint = colors.labelSecondary,
+                    tint = colors.textSecondary,
                     modifier = Modifier.size(16.dp),
                 )
             }
@@ -137,7 +136,7 @@ internal fun ChatSurfaceHeader(
                     contentDescription = stringResource(R.string.local_character_tuning_open),
                     onClick = onOpenCharacterTuning,
                     enabled = !running,
-                    tint = if (behaviorTuningCustomized) colors.accent else colors.labelSecondary,
+                    tint = if (behaviorTuningCustomized) colors.primary else colors.textSecondary,
                     iconSize = 18.dp,
                     selected = behaviorTuningCustomized,
                 )
@@ -156,7 +155,7 @@ internal fun ChatSurfaceHeader(
             icon = SyEntryIcons.NewSession,
             contentDescription = stringResource(R.string.chatlist_new_session),
             onClick = onNewSession,
-            tint = colors.labelSecondary,
+            tint = colors.textSecondary,
         )
         ConversationActionsMenu(
             pinned = sessionPinned,
@@ -180,7 +179,7 @@ internal fun WorkSurfaceHeader(
     onRenameSession: () -> Unit,
     onDeleteSession: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Row(
         Modifier.fillMaxWidth().heightIn(min = DsMetrics.topBarHeight),
         verticalAlignment = Alignment.CenterVertically,
@@ -199,7 +198,7 @@ internal fun WorkSurfaceHeader(
             Text(
                 if (configured) modelLabel else stringResource(R.string.local_model_setup),
                 style = DsType.base16Strong.withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
@@ -207,7 +206,7 @@ internal fun WorkSurfaceHeader(
             Icon(
                 FeatherIcons.ChevronDown,
                 contentDescription = null,
-                tint = colors.labelSecondary,
+                tint = colors.textSecondary,
                 modifier = Modifier.size(16.dp),
             )
         }
@@ -220,13 +219,13 @@ internal fun WorkSurfaceHeader(
             icon = SyEntryIcons.RunCenter,
             contentDescription = stringResource(R.string.local_execution_console),
             onClick = onOpenRunCenter,
-            tint = colors.labelSecondary,
+            tint = colors.textSecondary,
         )
         SyIconButton(
             icon = SyEntryIcons.NewSession,
             contentDescription = stringResource(R.string.chatlist_new_session),
             onClick = onNewSession,
-            tint = colors.labelSecondary,
+            tint = colors.textSecondary,
         )
         ConversationActionsMenu(
             pinned = sessionPinned,

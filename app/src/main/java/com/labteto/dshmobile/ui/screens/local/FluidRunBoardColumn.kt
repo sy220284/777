@@ -15,7 +15,6 @@ import com.labteto.dshmobile.local.presentation.LocalWorkUiState
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 
 /** Design 03's three board columns become three independent views on a compact display. */
@@ -36,33 +35,33 @@ internal fun FluidRunBoardColumn(
         if (section == 0 && (state.running || state.goal != null)) SyGlassCard {
             FluidPanelTitle(stringResource(R.string.local_run_current_goal))
             state.goal?.description?.takeIf(String::isNotBlank)?.let { goal ->
-                Text(goal, style = DsType.std14, color = DsTheme.colors.labelPrimary)
+                Text(goal, style = DsType.std14, color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
             }
             state.goal?.let { goal ->
                 Text(localGoalStatusLabel(goal.status), style = DsType.caption11,
-                    color = DsTheme.colors.labelSecondary)
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
             if (state.running) {
                 state.workflowProgress?.let { WorkflowProgressSection(it) }
                     ?: Text(stringResource(R.string.local_tool_phase_running),
-                        style = DsType.small13, color = DsTheme.colors.success)
+                        style = DsType.small13, color = com.shenyan.designsystem.foundation.LocalSyColors.current.successInk)
             }
         }
         if (section == 1 && (state.pendingQuestion != null || state.pendingApproval != null)) SyGlassCard {
             FluidPanelTitle(stringResource(R.string.fluid_decision_checkpoint))
             Text(state.pendingQuestion?.question ?: state.pendingApproval?.summary.orEmpty(),
-                style = DsType.std14, color = DsTheme.colors.labelPrimary)
+                style = DsType.std14, color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
             SyButton(stringResource(R.string.fluid_board_open_decision), onOpenDecision)
         }
         if (jobs.isNotEmpty()) RunCenterJobsSection(state.sessionId, jobs, section == 1,
             showAll = true, onJobOutput, onStopJob, onSendAgentMessage)
         else if (!(section == 0 && (state.running || state.goal != null)) &&
             !(section == 1 && (state.pendingQuestion != null || state.pendingApproval != null))) {
-            SyGlassCard { Text(stringResource(R.string.fluid_board_empty), color = DsTheme.colors.labelSecondary) }
+            SyGlassCard { Text(stringResource(R.string.fluid_board_empty), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary) }
         }
         if (section == 1) state.goal?.let { goal -> SyGlassCard {
             FluidPanelTitle(stringResource(R.string.local_run_current_goal))
-            Text(goal.description, style = DsType.std14, color = DsTheme.colors.labelPrimary)
+            Text(goal.description, style = DsType.std14, color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
         } }
 
     }

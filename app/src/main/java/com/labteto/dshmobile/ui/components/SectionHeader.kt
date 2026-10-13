@@ -16,7 +16,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
@@ -29,12 +28,12 @@ fun SectionHeader(
     onAction: (() -> Unit)? = null,
     titleTextStyle: TextStyle? = null,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
             title,
             style = (titleTextStyle ?: DsType.std14Strong).withReadingWeight(),
-            color = colors.labelSecondary,
+            color = colors.textSecondary,
             modifier = Modifier.weight(1f),
         )
         if (action != null) {
@@ -55,7 +54,7 @@ fun SectionHeader(
                 Text(
                     action,
                     style = DsType.caption11Strong.withReadingWeight(),
-                    color = colors.accent,
+                    color = colors.primary,
                 )
             }
         }

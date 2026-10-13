@@ -24,7 +24,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
@@ -83,10 +82,10 @@ internal fun LocalConversationErrorCard(
     val uriHandler = LocalUriHandler.current
     val usageError = sendRejectMessage == null && isChatGptPlanUsageError(stateError)
     val modelRecovery = sendRejectMessage == null && isChatGptModelRecoveryError(stateError)
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
 
     Surface(
-        color = colors.warnTertiary,
+        color = colors.warning.copy(alpha = .18f),
         shape = DsShapes.block,
         modifier = Modifier
             .fillMaxWidth()
@@ -101,7 +100,7 @@ internal fun LocalConversationErrorCard(
             Text(
                 message,
                 style = DsType.small13.withReadingWeight(),
-                color = colors.error,
+                color = colors.dangerInk,
             )
             when {
                 showConnectAction -> {
