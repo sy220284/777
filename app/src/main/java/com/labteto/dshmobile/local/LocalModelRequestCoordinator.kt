@@ -24,6 +24,7 @@ import com.labteto.dshmobile.local.model.LocalModelCancellationException
 import com.labteto.dshmobile.local.model.LocalModelAttemptStreamEvidence
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.freezeLocalModelRequestConfiguration
+import com.labteto.dshmobile.local.model.LocalModelRequestSelection
 import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.model.LocalReasoningModeStore
 import com.labteto.dshmobile.local.model.LocalPromptCacheBaselineStore
@@ -129,7 +130,19 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         val admission = options.admission
         val tools = toolsOverride ?: JsonArray(emptyList())
         val log = requestLog ?: sessionStorage.eventLogs.get(snapshot.sessionId)
-        val frozen = freezeLocalModelRequestConfiguration(snapshot, profile, tools, temperature, modelGateway)
+        val frozen = freezeLocalModelRequestConfiguration(
+            selection = LocalModelRequestSelection(
+                sessionId = snapshot.sessionId,
+                activeProfileId = snapshot.modelState.modelSelection.activeProfileId,
+                model = snapshot.modelState.model,
+                baseUrl = snapshot.modelState.baseUrl,
+                usageMode = snapshot.usageMode,
+            ),
+            profile = profile,
+            tools = tools,
+            temperature = temperature,
+            modelGateway = modelGateway,
+        )
         val frozenProfile = frozen.profile
         val runSurface = frozen.surface
         val reasoningEffort = frozen.reasoningEffort

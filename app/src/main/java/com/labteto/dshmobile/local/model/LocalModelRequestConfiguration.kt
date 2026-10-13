@@ -1,8 +1,16 @@
 package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import kotlinx.serialization.json.JsonArray
+
+/** Neutral facts projected once by the caller; no aggregate Feature state enters Model. */
+internal data class LocalModelRequestSelection(
+    val sessionId: String,
+    val activeProfileId: String?,
+    val model: String,
+    val baseUrl: String,
+    val usageMode: LocalUsageMode,
+)
 
 /** Frozen model identity and request options, reused across retries and context recovery. */
 internal data class FrozenLocalModelRequestConfiguration(
@@ -18,28 +26,28 @@ internal data class FrozenLocalModelRequestConfiguration(
  * A caller freezes these once and must never re-read mutable UI selection during a request.
  */
 internal suspend fun freezeLocalModelRequestConfiguration(
-    snapshot: LocalHarnessState,
+    selection: LocalModelRequestSelection,
     profile: LocalModelProfile?,
     tools: JsonArray,
     temperature: Double?,
     modelGateway: LocalModelGateway,
 ): FrozenLocalModelRequestConfiguration {
     val frozenProfile = profile ?: modelGateway.profileForRoute(
-        snapshot.modelState.modelSelection.activeProfileId,
-        snapshot.modelState.model,
-        snapshot.modelState.baseUrl,
+        selection.activeProfileId,
+        selection.model,
+        selection.baseUrl,
     )
     val runSurface = frozenProfile.toRunModelSurface()
     val reasoningEffort = LocalReasoningModeStore.effortFor(
-        sessionId = snapshot.sessionId,
+        sessionId = selection.sessionId,
         profile = frozenProfile,
         withTools = tools.isNotEmpty(),
-        defaultChatFast = snapshot.usageMode == LocalUsageMode.CHAT,
+        defaultChatFast = selection.usageMode == LocalUsageMode.CHAT,
     )
     val effectiveTemperature = LocalModelPerformanceStore.current().constrainTemperature(
-        temperature ?: if (snapshot.usageMode == LocalUsageMode.WORK) {
+        temperature ?: if (selection.usageMode == LocalUsageMode.WORK) {
             LocalWorkTemperatureStore.requestTemperature(
-                snapshot.sessionId, frozenProfile.model, frozenProfile.baseUrl,
+                selection.sessionId, frozenProfile.model, frozenProfile.baseUrl,
             )
         } else null,
     )
