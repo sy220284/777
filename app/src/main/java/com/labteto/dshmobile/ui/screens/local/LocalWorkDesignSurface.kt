@@ -39,7 +39,7 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Screen 02 compact layout: the desktop output rail moves to the existing evidence sheet. */
+/** Progress and generated files are presented inside the Work conversation. */
 @Composable
 internal fun LocalWorkDesignSurface(
     actions: LocalWorkFeatureUiActions,
@@ -49,7 +49,6 @@ internal fun LocalWorkDesignSurface(
     onSelectSection: (Int) -> Unit,
     onAnswer: (String, String) -> Boolean,
     onCancelQuestion: (String) -> Unit,
-    onOpenEvidence: () -> Unit,
     onOpenArtifact: (String) -> Unit,
     execution: @Composable () -> Unit,
 ) {
@@ -98,8 +97,6 @@ internal fun LocalWorkDesignSurface(
                 Text(state?.goal?.description?.takeIf(String::isNotBlank) ?: title,
                     modifier = Modifier.fillMaxWidth(), style = DsType.base16Strong.withReadingWeight(),
                     color = colors.text)
-                SyButton(stringResource(R.string.fluid_tool_output), onOpenEvidence,
-                    variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
             }
             FluidSectionNavigation(labels, section, onSelectSection, counts = counts, numbered = true,
                 attention = if (state?.pendingQuestion != null || state?.pendingApproval != null) 2 else null,
@@ -186,8 +183,6 @@ internal fun LocalWorkDesignSurface(
                                         }
                                     })
                             }
-                            SyButton(stringResource(R.string.fluid_tool_output), onOpenEvidence,
-                                variant = SyButtonVariant.Outline, modifier = Modifier.fillMaxWidth())
                         }
                     }
                 }

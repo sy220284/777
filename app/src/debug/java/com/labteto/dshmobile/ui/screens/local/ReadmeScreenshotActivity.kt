@@ -193,7 +193,6 @@ private fun NavigationScreenshot() {
             loadSearchFiles = { emptyList() },
             onSearchTask = {},
             onSearchFile = {},
-            onOpenRunCenter = {},
             onProjects = {},
             onOpenGroupChat = {},
             onOpenPersonaGallery = {},
@@ -314,7 +313,6 @@ private fun WorkScreenshot() {
             configured = true,
             running = true,
             onModelClick = {},
-            onOpenRunCenter = {},
             onNewSession = {},
             sessionPinned = false,
             onTogglePin = {},
@@ -340,35 +338,6 @@ private fun WorkScreenshot() {
             onRegenerate = { true },
         )
         Spacer(Modifier.padding(top = 10.dp))
-        ExecutionStatusCard(
-            state = LocalWorkUiState(
-                sessionId = "work-current",
-                running = true,
-                goal = LocalGoal("完成全量代码审计并修复发现的问题"),
-                plan = listOf(
-                    "检查关键调用链与模型路由",
-                    "定位并修复高风险问题",
-                    "运行回归验证并复查结果",
-                ),
-                todos = listOf(
-                    LocalTodoItem("模型与账户身份隔离", "completed"),
-                    LocalTodoItem("工具与恢复路径复核", "in_progress"),
-                    LocalTodoItem("最终回归验证", "pending"),
-                ),
-                activeAgents = 2,
-                maxAgents = 4,
-                activeTerminals = 1,
-                maxTerminals = 2,
-                contextChars = 18_420,
-                contextBudgetChars = 64_000,
-            ),
-            onJobOutput = { "" },
-            onStopJob = { "" },
-            onSendAgentMessage = { _, _ ->
-                LocalWorkUiActionResult(false, "")
-            },
-            onOpenResults = {},
-        )
         Spacer(Modifier.weight(1f))
         SyConversationComposer {
             Row(

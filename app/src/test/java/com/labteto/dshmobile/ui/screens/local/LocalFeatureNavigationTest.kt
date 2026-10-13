@@ -141,7 +141,7 @@ class LocalFeatureNavigationTest {
     @Test
     fun drawerSelectionsPreserveThePageThatOpenedTheDrawerAsReturnOrigin() {
         var stack = localFeatureHome()
-        stack = localFeaturePush(stack, LocalFeaturePage.RUN_CENTER)
+        stack = localFeaturePush(stack, LocalFeaturePage.PROJECT)
         stack = localFeaturePush(stack, LocalFeaturePage.WORKSPACE)
         val expectedOrigin = stack
 
@@ -238,7 +238,7 @@ class LocalFeatureNavigationTest {
 
     @Test
     fun drawerExitRestoresItsOriginalUnderlyingFeature() {
-        val origin = localFeaturePush(localFeatureHome(), LocalFeaturePage.RUN_CENTER)
+        val origin = localFeaturePush(localFeatureHome(), LocalFeaturePage.PROJECT)
         val opened = localFeatureOpenFromDrawer(origin, null, LocalFeaturePage.TOOLS)
         val backed = localFeatureBack(opened.stack, opened.originStack)
         assertTrue(backed.reopenDrawer)
@@ -290,7 +290,7 @@ class LocalFeatureNavigationTest {
             LocalFeatureCatalog.ownerOf(LocalFeaturePage.PERSONA_GALLERY),
         )
         assertEquals(
-            listOf(LocalFeaturePage.WORKSPACE, LocalFeaturePage.RUN_CENTER),
+            listOf(LocalFeaturePage.WORKSPACE),
             LocalFeatureCatalog.routesFor(LocalFeatureModuleId.WORK),
         )
         assertEquals(
@@ -377,13 +377,13 @@ class LocalFeatureNavigationTest {
     fun deepNavigationPreservesEveryParentInsteadOfDiscardingHistory() {
         var stack = localFeatureHome()
         repeat(20) { index ->
-            val page = if (index % 2 == 0) LocalFeaturePage.WORKSPACE else LocalFeaturePage.RUN_CENTER
+            val page = if (index % 2 == 0) LocalFeaturePage.WORKSPACE else LocalFeaturePage.PROJECT
             stack = localFeaturePush(stack, page)
         }
 
         assertEquals(21, stack.size)
         assertEquals(LocalFeaturePage.HOME.name, stack.first())
-        assertEquals(LocalFeaturePage.RUN_CENTER, localFeatureCurrent(stack))
+        assertEquals(LocalFeaturePage.PROJECT, localFeatureCurrent(stack))
         repeat(20) { stack = localFeaturePop(stack) }
         assertEquals(localFeatureHome(), stack)
     }

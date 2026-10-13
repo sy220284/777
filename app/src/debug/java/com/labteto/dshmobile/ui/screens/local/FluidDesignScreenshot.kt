@@ -59,18 +59,15 @@ private fun FluidWorkScreenshot(page: String) {
             workState = state, workspaceFiles = { emptyList() },
             conversationFiles = { error("固定设计截图不读取会话文件") },
             previewWorkspaceFile = { error("固定设计截图不读取文件") },
-            backgroundJobOutput = { "" },
             artifactsForUi = { listOf(LocalArtifactUiItem("middleware.ts", "file", "design-call", 3, false)) },
-            toolActivitiesForUi = { emptyList() }, eventSequenceForUi = { 3 }, stopBackgroundJob = { "" },
-            startBackgroundAgent = { LocalWorkUiActionResult(false, "截图样例不执行") },
-            sendBackgroundAgentMessage = { _, _ -> LocalWorkUiActionResult(false, "截图样例不执行") },
+            eventSequenceForUi = { 3 },
         )
     }
     Column(Modifier.fillMaxSize()) {
         SyTopBar("工作执行 · 设计样例", onBack = {}, backContentDescription = "返回")
         Column(Modifier.weight(1f)) {
             LocalWorkDesignSurface(actions, "design-work", "迁移鉴权模块", section, {},
-                { _, _ -> false }, {}, {}, {}, execution = {
+                { _, _ -> false }, {}, {}, execution = {
                     Column(Modifier.padding(SyMetric.gapLg), verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
                         WorkTimelineStepRow(LocalHarnessMessage("design-step", "progress", "已检查现有入口，接下来确认鉴权方案。", createdAt = 1))
                         WorkTimelineStepRow(LocalHarnessMessage("design-tool", "tool", "", createdAt = 2, toolName = "read", toolIsError = false))

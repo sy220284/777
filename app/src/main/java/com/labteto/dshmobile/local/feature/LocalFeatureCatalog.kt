@@ -17,7 +17,6 @@ internal enum class LocalFeatureRoute {
     PERSONA_GALLERY,
     DIARY,
     WORKSPACE,
-    RUN_CENTER,
     PROJECT,
     TASKS,
     TOOLS,
@@ -49,7 +48,7 @@ internal object LocalFeatureCatalog {
         ),
         LocalFeatureModule(
             LocalFeatureModuleId.WORK,
-            listOf(LocalFeatureRoute.WORKSPACE, LocalFeatureRoute.RUN_CENTER),
+            listOf(LocalFeatureRoute.WORKSPACE),
         ),
         LocalFeatureModule(LocalFeatureModuleId.PROJECT, listOf(LocalFeatureRoute.PROJECT)),
         LocalFeatureModule(LocalFeatureModuleId.AUTOMATION, listOf(LocalFeatureRoute.TASKS)),

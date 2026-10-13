@@ -160,7 +160,6 @@ internal class LocalConversationSurfaceArgs(
     val onStop: () -> Unit,
     val onNewSession: () -> Unit,
     val onExitGroupChat: () -> Unit,
-    val onOpenRunCenter: () -> Unit,
     val sessionTitle: String,
     val sessionPinned: Boolean,
     val onTogglePinSession: () -> Unit,
@@ -225,7 +224,6 @@ internal fun LocalConversationSurface(
     onStop: () -> Unit,
     onNewSession: () -> Unit,
     onExitGroupChat: () -> Unit,
-    onOpenRunCenter: () -> Unit,
     sessionTitle: String,
     sessionPinned: Boolean,
     onTogglePinSession: () -> Unit,
@@ -288,7 +286,6 @@ internal fun LocalConversationSurface(
         onStop = onStop,
         onNewSession = onNewSession,
         onExitGroupChat = onExitGroupChat,
-        onOpenRunCenter = onOpenRunCenter,
         sessionTitle = sessionTitle,
         sessionPinned = sessionPinned,
         onTogglePinSession = onTogglePinSession,
@@ -355,7 +352,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val onStop = args.onStop
     val onNewSession = args.onNewSession
     val onExitGroupChat = args.onExitGroupChat
-    val onOpenRunCenter = args.onOpenRunCenter
     val sessionTitle = args.sessionTitle
     val sessionPinned = args.sessionPinned
     val onTogglePinSession = args.onTogglePinSession
@@ -794,7 +790,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             onModelClick = {
                                 if (state.configured) showModelPicker = true else onConfigure()
                             },
-                            onOpenRunCenter = onOpenRunCenter,
                             onNewSession = onNewSession,
                             sessionPinned = sessionPinned,
                             onTogglePin = onTogglePinSession,
@@ -1128,7 +1123,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     actions = workActions, sessionId = state.sessionId, title = sessionTitle,
                     section = workDesignSection, onSelectSection = { workDesignSection = it },
                     onAnswer = onAnswerQuestion, onCancelQuestion = onCancelQuestion,
-                    onOpenEvidence = onOpenRunCenter, onOpenArtifact = onOpenWorkArtifact,
+                    onOpenArtifact = onOpenWorkArtifact,
                     execution = transcriptBody,
                 )
             } else transcriptBody()
