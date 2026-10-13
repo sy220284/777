@@ -1,9 +1,9 @@
 name: Release APK
 
 'on':
-  # 仅在每小时 00/30 分尝试发布（UTC）；不因 CI 完成或标签推送立即发布。
+  # UTC 13/43 分每隔 30 分钟检查，避开 GitHub Actions 整点拥堵。
   schedule:
-    - cron: '0,30 * * * *'
+    - cron: '13,43 * * * *'
   workflow_dispatch:
 
 permissions:

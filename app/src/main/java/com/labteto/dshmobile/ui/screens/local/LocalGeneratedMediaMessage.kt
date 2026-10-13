@@ -208,6 +208,12 @@ internal fun LocalGeneratedMediaResultRow(
     }
 }
 
+/** A downloaded local video remains playable even after its signed remote URL expires. */
+internal fun canPlayGeneratedVideo(
+    phase: LocalMediaVideoPhase, localFileExists: Boolean, downloadUrl: String?,
+): Boolean = phase == LocalMediaVideoPhase.SUCCEEDED &&
+    (localFileExists || !downloadUrl.isNullOrBlank())
+
 @Composable
 internal fun LocalGeneratedVideoTaskRow(
     task: LocalMediaVideoTask,
@@ -217,7 +223,9 @@ internal fun LocalGeneratedVideoTaskRow(
     val resources = LocalResources.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val savedVideo = remember(task.id, task.fileName) { viewModel.videoFile(task) }
+    // A retry may make the local file available without changing its persisted filename.
+    val savedVideo = remember(task) { viewModel.videoFile(task) }
+    val localVideo = savedVideo?.takeIf(File::isFile)
     val offer = remember(task.offerId, task.routeFingerprint, offers) {
         offers.firstOrNull { task.belongsTo(it) }
     }
@@ -259,9 +267,9 @@ internal fun LocalGeneratedVideoTaskRow(
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, maxLines = 3,
                 overflow = TextOverflow.Ellipsis)
         }
-        if (task.phase == LocalMediaVideoPhase.SUCCEEDED && task.downloadUrl != null) {
+        if (canPlayGeneratedVideo(task.phase, savedVideo?.isFile == true, task.downloadUrl)) {
             if (showingPlayer) {
-                InlineVideoPlayer(task.downloadUrl, savedVideo, onError = { error = it })
+                InlineVideoPlayer(task.downloadUrl.orEmpty(), localVideo, onError = { error = it })
             } else {
                 SyMaterialSurface(shape = DsShapes.block, tier = SyMaterialTier.L3_CARD,
                     modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
@@ -277,14 +285,17 @@ internal fun LocalGeneratedVideoTaskRow(
                     size = SyButtonSize.Small,
                     onClick = { showingPlayer = false },
                 )
-                if (savedVideo != null) {
+                if (localVideo != null) {
                     SyButton(text = resources.getString(R.string.media_chat_share_video), size = SyButtonSize.Small,
                         variant = SyButtonVariant.Ghost,
-                        onClick = { shareMediaFile(context, savedVideo, "video/mp4") { error = it } })
+                        onClick = { shareMediaFile(context, localVideo, "video/mp4") { error = it } })
                 } else {
-                    SyButton(text = resources.getString(R.string.media_chat_open_video), size = SyButtonSize.Small,
-                        variant = SyButtonVariant.Ghost,
-                        onClick = { openMediaUrl(context, task.downloadUrl) { error = it } })
+                    // A local-only video has no remote open action; keep the nullable URL guarded.
+                    task.downloadUrl?.takeIf(String::isNotBlank)?.let { remoteUrl ->
+                        SyButton(text = resources.getString(R.string.media_chat_open_video), size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
+                            onClick = { openMediaUrl(context, remoteUrl) { error = it } })
+                    }
                 }
             }
         } else {
@@ -315,7 +326,7 @@ internal fun LocalGeneratedVideoTaskRow(
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, style = DsType.caption11.withReadingWeight())
             }
         }
-        if (task.phase == LocalMediaVideoPhase.SUCCEEDED && savedVideo == null) {
+        if (task.phase == LocalMediaVideoPhase.SUCCEEDED && localVideo == null) {
             SyButton(text = resources.getString(R.string.media_retry_save), size = SyButtonSize.Small,
                 onClick = { scope.launch {
                     try { viewModel.retryVideoSave(task.id); error = null }
@@ -453,6 +464,7 @@ private fun decodeMediaPreview(file: File?, remoteUrl: String?): ImageBitmap? = 
 private fun InlineSpeechPlayer(file: File) {
     val resources = LocalResources.current
     var playing by remember(file.absolutePath) { mutableStateOf(false) }
+    var preparing by remember(file.absolutePath) { mutableStateOf(false) }
     var error by remember(file.absolutePath) { mutableStateOf<String?>(null) }
     var player by remember(file.absolutePath) { mutableStateOf<MediaPlayer?>(null) }
     var durationMs by remember(file.absolutePath) { mutableStateOf(0) }
@@ -472,25 +484,60 @@ private fun InlineSpeechPlayer(file: File) {
             text = if (playing) resources.getString(R.string.media_chat_pause_audio)
                 else resources.getString(R.string.media_chat_play_audio),
             size = SyButtonSize.Small,
+            enabled = !preparing,
             onClick = {
+                if (preparing) return@SyButton
+                error = null
                 runCatching {
-                    val current = player ?: MediaPlayer().apply {
-                        setDataSource(file.absolutePath)
-                        prepare()
-                        setOnCompletionListener {
+                    val current = player
+                    if (current == null) {
+                        val created = MediaPlayer()
+                        created.setOnCompletionListener {
                             playing = false
                             positionMs = durationMs
                         }
-                    }.also {
-                        player = it
-                        durationMs = it.duration.coerceAtLeast(0)
-                    }
-                    if (playing) current.pause() else {
+                        created.setOnPreparedListener { ready ->
+                            preparing = false
+                            durationMs = ready.duration.coerceAtLeast(0)
+                            runCatching { ready.start() }
+                                .onSuccess { playing = true }
+                                .onFailure { failure ->
+                                    playing = false
+                                    error = failure.message ?: resources.getString(R.string.media_chat_audio_failed)
+                                    runCatching { ready.release() }
+                                    player = null
+                                }
+                        }
+                        created.setOnErrorListener { _, _, _ ->
+                            preparing = false
+                            playing = false
+                            durationMs = 0
+                            positionMs = 0
+                            error = resources.getString(R.string.media_chat_audio_failed)
+                            player = null
+                            runCatching { created.release() }
+                            true
+                        }
+                        // Own the player before I/O so failed setDataSource cannot leak it.
+                        player = created
+                        created.setDataSource(file.absolutePath)
+                        preparing = true
+                        created.prepareAsync()
+                    } else if (playing) {
+                        current.pause()
+                        playing = false
+                    } else {
                         if (positionMs >= durationMs && durationMs > 0) current.seekTo(0)
                         current.start()
+                        playing = true
                     }
-                    playing = !playing
-                }.onFailure { error = it.message ?: resources.getString(R.string.media_chat_audio_failed) }
+                }.onFailure { failure ->
+                    preparing = false
+                    playing = false
+                    error = failure.message ?: resources.getString(R.string.media_chat_audio_failed)
+                    runCatching { player?.release() }
+                    player = null
+                }
             },
         )
         Text(
@@ -518,24 +565,40 @@ private fun formatMediaDuration(ms: Int): String {
 }
 
 @Composable
-private fun InlineVideoPlayer(url: String, localFile: File?, onError: (String) -> Unit) {
+private fun InlineVideoPlayer(url: String?, localFile: File?, onError: (String) -> Unit) {
     val resources = LocalResources.current
-    val context = LocalContext.current
-    var player by remember(url, localFile?.absolutePath) { mutableStateOf<VideoView?>(null) }
-    DisposableEffect(url, localFile?.absolutePath) {
+    val source = localFile?.takeIf { it.isFile }?.let(Uri::fromFile)
+        ?: url?.takeIf(String::isNotBlank)?.let(Uri::parse)
+    if (source == null) {
+        Text(resources.getString(R.string.media_chat_video_failed),
+            style = DsType.caption11.withReadingWeight(),
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+        return
+    }
+    var player by remember { mutableStateOf<VideoView?>(null) }
+    DisposableEffect(Unit) {
         onDispose { player?.stopPlayback(); player = null }
     }
     AndroidView(
         modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
-        factory = { context ->
-            VideoView(context).apply {
-                val controls = MediaController(context)
+        factory = { viewContext ->
+            VideoView(viewContext).apply {
+                val controls = MediaController(viewContext)
                 controls.setAnchorView(this)
                 setMediaController(controls)
                 setOnPreparedListener { start() }
                 setOnErrorListener { _, _, _ -> onError(resources.getString(R.string.media_chat_video_failed)); true }
-                setVideoURI(localFile?.let { Uri.fromFile(it) } ?: Uri.parse(url))
                 player = this
+            }
+        },
+        update = { view ->
+            // AndroidView retains its native view across recompositions. Update the media source
+            // explicitly instead of leaving an expired URL in a previously created VideoView.
+            val sourceKey = source.toString()
+            if (view.tag != sourceKey) {
+                view.stopPlayback()
+                view.tag = sourceKey
+                view.setVideoURI(source)
             }
         },
     )

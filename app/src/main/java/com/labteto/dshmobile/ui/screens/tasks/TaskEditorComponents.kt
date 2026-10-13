@@ -349,6 +349,7 @@ private fun TaskSchedulePicker(
             if (choosingTime) R.string.app_schedule_choose_time else R.string.app_schedule_choose_date,
         ),
         onDismiss = onDismiss,
+        scrollable = true,
     ) {
         if (!choosingTime) {
             DatePicker(
@@ -418,6 +419,7 @@ internal fun AutomationTimePickerSheet(
     SyResponsiveSheet(
         title = stringResource(R.string.tasks_schedule_label),
         onDismiss = onDismiss,
+        scrollable = true,
         footer = {
             SyButton(
                 text = stringResource(R.string.common_ok),
