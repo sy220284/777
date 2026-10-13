@@ -45,6 +45,9 @@ data class ToolResult(
     val retryable: Boolean = false,
     val recoveryHint: String? = null,
     val retention: ToolResultRetention = ToolResultRetention.DURABLE,
+    /** Captured by the process executor, never parsed from stdout. */
+    val processExitCode: Int? = null,
+    val fileVersions: Map<String, String> = emptyMap(),
 )
 
 data class ToolInvocationResult internal constructor(

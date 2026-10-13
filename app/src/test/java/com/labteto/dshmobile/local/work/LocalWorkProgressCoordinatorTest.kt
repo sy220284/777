@@ -100,7 +100,7 @@ class LocalWorkProgressCoordinatorTest {
             LocalWorkRunState(
                 sessionId = "goal-transition",
                 work = LocalWorkState(
-                    goal = LocalGoal("收口共享底座"),
+                    goal = LocalGoal("收口共享底座", id = "goal-transition"),
                     todos = listOf(
                         LocalTodoItem("补回归", "pending"),
                         LocalTodoItem("已完成项", "completed"),
@@ -129,6 +129,22 @@ class LocalWorkProgressCoordinatorTest {
         assertEquals("completed", state.value.work.goal?.status)
         assertEquals(1, writes)
         assertEquals("goal/state", log.snapshot().last().type)
+    }
+
+    @Test
+    fun legacyGoalCannotCompleteUntilAcceptanceIsDeclaredAndProgressIsRetained() {
+        val todos = listOf(LocalTodoItem("已完成项", "completed"))
+        val state = MutableStateFlow(LocalWorkRunState(sessionId = "legacy-goal",
+            work = LocalWorkState(goal = LocalGoal("核对进度"), todos = todos)))
+        val log = eventLog(File(temporary.root, "legacy-goal.jsonl"))
+        val coordinator = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) { }
+        assertTrue(runCatching { coordinator.updateGoal("completed", null) }.isFailure)
+        assertEquals("active", state.value.work.goal?.status)
+        coordinator.createGoal("核对进度", emptyList(), emptyList())
+        assertEquals(todos, state.value.work.todos)
+        coordinator.updateGoal("completed", null)
+        assertEquals("completed", state.value.work.goal?.status)
+        assertEquals(todos, state.value.work.todos)
     }
 
     @Test

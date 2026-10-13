@@ -16,6 +16,7 @@ import kotlinx.serialization.json.put
 internal class LocalWorkProgressCoordinator(
     private val state: LocalWorkStatePort,
     private val eventLog: LocalSessionEventLog,
+    private val workspaceRoot: java.io.File? = null,
     private val persist: () -> Unit,
 ) {
     fun updatePlan(
@@ -58,21 +59,28 @@ internal class LocalWorkProgressCoordinator(
 
     fun createGoal(
         description: String,
+        artifactPaths: List<String> = emptyList(),
+        verificationCommands: List<String> = emptyList(),
     ): String {
-        val goal = LocalGoal(description.trim().take(2_000))
-        eventLog.append("goal/state", buildJsonObject {
-            put("description", goal.description)
-            put("status", goal.status)
-            goal.note?.let { put("note", it) }
-        })
-        state.update { it.copy(goal = goal) }
+        require(description.isNotBlank()) { "目标不能为空" }
+        val goal = LocalGoal(description.trim().take(2_000), id = java.util.UUID.randomUUID().toString(),
+            artifactPaths = artifactPaths.distinct().onEach { path ->
+                require(path.isNotBlank() && !path.startsWith("/") && !path.contains('\\') &&
+                    !path.contains(':') && path.split('/').none { it.isBlank() || it == "." || it == ".." }) {
+                    "验收成果必须是工作区相对文件路径"
+                }
+            }, verificationCommands = verificationCommands.map(String::trim).distinct().onEach {
+                require(it.isNotBlank()) { "验收命令不能为空" }
+            })
+        val event = eventLog.append("goal/state", workGoalEvent(goal))
+        state.update { it.copy(goal = goal.copy(startedAtSequence = event.sequence)) }
         persist()
-        return "目标已创建：${goal.description}"
+        return "目标已创建：${goal.description}\n成果：${goal.artifactPaths.joinToString()}\n验收命令：${goal.verificationCommands.joinToString()}"
     }
 
     fun getGoal(): String {
         val goal = state.snapshot().goal ?: return "当前会话没有目标"
-        return "目标：[${goal.status}] ${goal.description}${goal.note?.let { "\n说明：$it" }.orEmpty()}"
+        return "目标：[${goal.status}] ${goal.description}${goal.note?.let { "\n说明：$it" }.orEmpty()}\n成果：${goal.artifactPaths.joinToString()}\n验收命令：${goal.verificationCommands.joinToString()}"
     }
 
     fun updateGoal(
@@ -80,9 +88,10 @@ internal class LocalWorkProgressCoordinator(
         note: String?,
     ): String {
         require(status in setOf("active", "paused", "completed", "blocked")) { "目标状态无效" }
-        val updated = resolveWorkGoalUpdate(state.snapshot(), status, note, eventLog)
-        val delivery = if (status == "completed") localWorkDeliveryEvidence(eventLog, updated.description) else null
+        val updated = resolveWorkGoalUpdate(state.snapshot(), status, note, eventLog, workspaceRoot)
+        val delivery = if (status == "completed") localWorkDeliveryEvidence(eventLog, updated, workspaceRoot) else null
         eventLog.append("goal/state", buildJsonObject {
+            workGoalEvent(updated).forEach { (key, value) -> put(key, value) }
             put("description", updated.description)
             put("status", updated.status)
             updated.note?.let { put("note", it) }
@@ -94,4 +103,12 @@ internal class LocalWorkProgressCoordinator(
         persist()
         return "目标状态已更新为 $status"
     }
+}
+
+internal fun workGoalEvent(goal: LocalGoal): JsonObject = buildJsonObject {
+    put("description", goal.description); put("status", goal.status)
+    goal.note?.let { put("note", it) }
+    put("id", goal.id); put("startedAtSequence", goal.startedAtSequence)
+    put("artifactPaths", JsonArray(goal.artifactPaths.map(::JsonPrimitive)))
+    put("verificationCommands", JsonArray(goal.verificationCommands.map(::JsonPrimitive)))
 }

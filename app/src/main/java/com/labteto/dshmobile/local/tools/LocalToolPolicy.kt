@@ -4,6 +4,7 @@ import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.harness.tools.ToolMetadata
+import com.labteto.dshmobile.harness.tools.ToolWorkspaceAccess
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -192,6 +193,11 @@ internal object LocalToolPolicy {
         }
         return ToolMetadata(
             family = family,
+            workspaceAccess = when (canonical) {
+                "read", "file_inspect", "list_files", "glob", "grep", "skill", "json_query", "update_goal" -> ToolWorkspaceAccess.READ
+                "write", "edit", "apply_patch", "download_file", "present", "bash" -> ToolWorkspaceAccess.WRITE
+                else -> ToolWorkspaceAccess.NONE
+            },
             discoveryKeywords = discoveryKeywords,
             usageNotes = usageNotes,
             // Audited native queries: no workspace/session mutation, network side effect or

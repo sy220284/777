@@ -107,6 +107,7 @@ internal class MiniMaxNativeMediaClient @Inject constructor(
             audio[i] = ((high shl 4) or low).toByte()
         }
         return withContext(Dispatchers.IO) {
+            markMediaProviderSucceeded()
             val dir = File(context.filesDir, "media-studio").apply { mkdirs() }
             val file = File(dir, "voice-${UUID.randomUUID()}.mp3")
             file.writeBytes(audio)
@@ -223,13 +224,15 @@ internal class MiniMaxNativeMediaClient @Inject constructor(
             .url("https://${route.host}$path")
             .header("Authorization", "Bearer $credential")
             .header("Accept", "application/json")
-        val request = (if (body == null) builder.get() else builder.post(body)).build()
+        val request = (if (body == null) builder.get() else builder.post(localMediaOneShotBody(body))).build()
+        if (body != null) markMediaRequestStarted()
         withCancellableHttpResponse(mediaHttp.newCall(request)) { response ->
-            if (!response.isSuccessful) error("MiniMax 多模态请求失败（HTTP ${response.code}）")
+            if (!response.isSuccessful) throwMediaHttpFailure("MiniMax 多模态", response.code)
             val raw = response.body?.string() ?: error("MiniMax 未返回数据")
             check(raw.length <= MAX_JSON_RESPONSE_CHARS) { "MiniMax 响应体超过安全读取上限" }
             val result = json.parseToJsonElement(raw).jsonObject
-            LocalMiniMaxPolicy.requireSuccessfulResponse(result)
+            try { LocalMiniMaxPolicy.requireSuccessfulResponse(result) }
+            catch (rejected: IllegalStateException) { throw LocalMediaRequestRejected(rejected.message ?: "MiniMax 明确拒绝请求") }
             result
         }
     }

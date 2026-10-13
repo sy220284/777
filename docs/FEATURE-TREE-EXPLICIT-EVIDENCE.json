@@ -547,6 +547,63 @@
           "references": "localSettingsFeatureUiContribution"
         }
       ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 媒体创作回执与成果恢复",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStore.kt",
+          "symbols": [
+            "LocalMediaStore"
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/local/model/LocalMediaStoreAndroidTest.kt",
+          "method": "receiptAndResultCommitTogetherAndLateWriterCannotResurrectDeletion",
+          "references": "LocalMediaStore"
+        }
+      ],
+      "scope": "媒体唯一存储入口持有回执及成果事务，删除与迟到写入故障测试已具名登记，设备执行须由当前 CI 证明"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 媒体档案分页与会话隔离",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStore.kt",
+          "symbols": [
+            "LocalMediaStore"
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/local/model/LocalMediaStoreAndroidTest.kt",
+          "method": "indexedPagesKeepAllHistoryAndSeparateSessions",
+          "references": "LocalMediaStore"
+        }
+      ],
+      "scope": "媒体索引分页和会话隔离的实际存储入口与 SQLite 索引测试源码存在，设备执行须由当前 CI 证明"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 目标管理 / 目标结果核验",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidence.kt",
+          "symbols": [
+            "localWorkDeliveryEvidence"
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidenceTest.kt",
+          "method": "sourceChangeOrDeletionMakesEarlierVerificationStale",
+          "references": "localWorkDeliveryEvidence"
+        }
+      ],
+      "scope": "目标显式契约、真实退出码与当前成果版本证据入口和故障测试存在，方法级源码关联不等于完整产品验收"
     }
   ]
 }

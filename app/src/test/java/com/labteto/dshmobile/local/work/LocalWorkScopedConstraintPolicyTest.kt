@@ -116,4 +116,10 @@ class LocalWorkScopedConstraintPolicyTest {
         assertEquals(null, parseLocalWorkScopedConstraintEdit("把兼容旧接口改为新接口"))
         assertEquals(null, parseLocalWorkScopedConstraintEdit("建议把「旧接口」改为「新接口」吗？"))
     }
+    @org.junit.Test fun explicitlyQuotedShortConstraintCanBeRevokedAndRestored() {
+        val edit = parseLocalWorkScopedConstraintEdit("撤销「不联网」")!!
+        org.junit.Assert.assertTrue(isRevokedWorkConstraint("不联网", listOf(edit.previous)))
+        org.junit.Assert.assertFalse(isRevokedWorkConstraint("默认不联网", listOf(edit.previous)))
+        org.junit.Assert.assertEquals("不联网", parseLocalWorkConstraintReinstatement("重新启用「不联网」"))
+    }
 }

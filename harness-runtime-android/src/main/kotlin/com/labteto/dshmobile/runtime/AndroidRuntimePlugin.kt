@@ -124,6 +124,7 @@ class AndroidRuntimePlugin(
                     ToolResult(
                         content = formatProcessResult(result.exitCode, result.stdout, result.stderr, result.timedOut),
                         isError = result.timedOut || result.exitCode != 0,
+                        processExitCode = result.exitCode.takeUnless { result.timedOut },
                     )
                 },
             ),
