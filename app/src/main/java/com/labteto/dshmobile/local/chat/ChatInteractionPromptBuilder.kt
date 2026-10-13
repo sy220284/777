@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.chat
 
 /** Builds model prompts for hidden-state updates and user reply suggestions. */
 internal class ChatInteractionPromptBuilder {
+    private val intimacyMode = ChatIntimacyMode()
     fun prompt(
         persona: PersonaProfile,
         state: ChatCharacterState,
@@ -109,14 +110,7 @@ internal class ChatInteractionPromptBuilder {
                 "人物当前情绪=${state.mood}",
         )
         state.currentUserImpression.takeIf(String::isNotBlank)?.let { appendLine("人物目前对用户的印象：$it") }
-        if (state.interactionIntensity > 0 || state.recentVerbalTags.isNotEmpty() || state.recentActionTags.isNotEmpty()) {
-            appendLine(
-                "互动状态：意图=${state.interactionIntent}｜强度=${state.interactionIntensity}/5｜" +
-                    "近期动作=${state.recentActionTags.joinToString("、").ifBlank { "无" }}｜" +
-                    "近期话术=${state.recentVerbalTags.joinToString("、").ifBlank { "无" }}｜" +
-                    "近期称呼=${state.recentAddressTerms.joinToString("、").ifBlank { "无" }}",
-            )
-        }
+
         val dialogue = recentDialogue
             .filter { (role, content) -> (role == "user" || role == "assistant") && content.isNotBlank() }
             .takeLast(6)
@@ -130,12 +124,9 @@ internal class ChatInteractionPromptBuilder {
             appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
             appendLine("人物：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
         }
-        if (hasFlirtingOrIntimateIntent(userMessage, state)) {
-            appendLine("当前为亲密语境：建议承接当前互动，避免复用近期动作、称呼和表达套路。")
-        }
-        if (hasChineseSuggestiveFlirtingIntent(userMessage)) {
-            appendLine("存在中文双关时接住言外之意，不做词义解释。")
-        }
+        intimacyMode.suggestionContext(userMessage, state)
+            .takeIf(String::isNotBlank)
+            ?.let { appendLine(it) }
         appendLine(
             "输出：{\"suggestions\":[{\"label\":\"2到6字短标签\",\"style\":\"自然|俏皮|直球|放飞\",\"text\":\"用户可直接发送的下一句\",\"bold\":false}]}",
         )
