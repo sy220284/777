@@ -42,7 +42,7 @@ internal class ChatInteractionStateReducer {
             assistantMessage = assistantMessage,
         )
         val evolvedState = applyCharacterPostTurnRuntime(
-            persona, agedPrevious, continuityState, decoded.state, rawState,
+            persona, agedPrevious, continuityState, decoded.state, effectivePatch,
             significance, userMessage, assistantMessage,
         )
         return decoded.copy(
