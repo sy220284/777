@@ -92,6 +92,7 @@ class ReadmeScreenshotActivity : ComponentActivity() {
                 backgroundPath = wallpaperPath) {
                 androidx.compose.runtime.CompositionLocalProvider(
                     com.shenyan.designsystem.foundation.LocalSyReduceMotion provides true,
+                    com.labteto.dshmobile.ui.shenyan.LocalSyReducedMotion provides true,
                 ) {
                     Box(Modifier.fillMaxSize().safeDrawingPadding()) {
                         ReadmeScreenshotSurface(screen)
