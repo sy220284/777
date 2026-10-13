@@ -844,6 +844,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                             userMessage = input,
                             assistantMessage = content,
                             generation = currentGroup.context.generation,
+                            speakerId = generated.member.galleryId,
                         ),
                         eventLog,
                         scope = "group",
