@@ -208,6 +208,14 @@ internal fun LocalGeneratedMediaResultRow(
     }
 }
 
+/** A saved video remains playable after its provider URL has expired or disappeared. */
+internal fun canPlayLocalMediaVideo(
+    phase: LocalMediaVideoPhase,
+    savedFileAvailable: Boolean,
+    remoteUrl: String?,
+): Boolean = phase == LocalMediaVideoPhase.SUCCEEDED &&
+    (savedFileAvailable || !remoteUrl.isNullOrBlank())
+
 @Composable
 internal fun LocalGeneratedVideoTaskRow(
     task: LocalMediaVideoTask,
@@ -218,6 +226,7 @@ internal fun LocalGeneratedVideoTaskRow(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val savedVideo = remember(task.id, task.fileName) { viewModel.videoFile(task) }
+    val localVideo = savedVideo?.takeIf(File::isFile)
     val offer = remember(task.offerId, task.routeFingerprint, offers) {
         offers.firstOrNull { task.belongsTo(it) }
     }
@@ -259,9 +268,9 @@ internal fun LocalGeneratedVideoTaskRow(
                 color = DsTheme.colors.labelSecondary, maxLines = 3,
                 overflow = TextOverflow.Ellipsis)
         }
-        if (task.phase == LocalMediaVideoPhase.SUCCEEDED && task.downloadUrl != null) {
+        if (canPlayLocalMediaVideo(task.phase, localVideo != null, task.downloadUrl)) {
             if (showingPlayer) {
-                InlineVideoPlayer(task.downloadUrl, savedVideo, onError = { error = it })
+                InlineVideoPlayer(task.downloadUrl.orEmpty(), localVideo, onError = { error = it })
             } else {
                 SyMaterialSurface(shape = DsShapes.block, tier = SyMaterialTier.L3_CARD,
                     modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
@@ -277,14 +286,14 @@ internal fun LocalGeneratedVideoTaskRow(
                     size = SyButtonSize.Small,
                     onClick = { showingPlayer = false },
                 )
-                if (savedVideo != null) {
+                if (localVideo != null) {
                     SyButton(text = resources.getString(R.string.media_chat_share_video), size = SyButtonSize.Small,
                         variant = SyButtonVariant.Ghost,
-                        onClick = { shareMediaFile(context, savedVideo, "video/mp4") { error = it } })
-                } else {
+                        onClick = { shareMediaFile(context, localVideo, "video/mp4") { error = it } })
+                } else task.downloadUrl?.let { url ->
                     SyButton(text = resources.getString(R.string.media_chat_open_video), size = SyButtonSize.Small,
                         variant = SyButtonVariant.Ghost,
-                        onClick = { openMediaUrl(context, task.downloadUrl) { error = it } })
+                        onClick = { openMediaUrl(context, url) { error = it } })
                 }
             }
         } else {
@@ -315,7 +324,7 @@ internal fun LocalGeneratedVideoTaskRow(
                     color = DsTheme.colors.labelSecondary, style = DsType.caption11.withReadingWeight())
             }
         }
-        if (task.phase == LocalMediaVideoPhase.SUCCEEDED && savedVideo == null) {
+        if (task.phase == LocalMediaVideoPhase.SUCCEEDED && localVideo == null) {
             SyButton(text = resources.getString(R.string.media_retry_save), size = SyButtonSize.Small,
                 onClick = { scope.launch {
                     try { viewModel.retryVideoSave(task.id); error = null }
