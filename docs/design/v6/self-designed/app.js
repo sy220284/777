@@ -14,6 +14,7 @@ const choice=(label,on=true,sub='')=>`<button class="row" data-switch aria-press
 const timeline=items=>`<div class="timeline">${items.map((x,i)=>`<div class="step"><span aria-hidden="true">${i===items.length-1?'◦':'✓'}</span><div>${x[0]}<small>${x[1]}</small></div></div>`).join('')}</div>`;
 const card=body=>`<article class="card">${body}</article>`;
 let current=1;
+let pageStack=[];
 const body=html=>`<div class="body">${html}</div>`;
 function sceneContent(s){switch(s.kind){
 case 'chat': return `<div style="padding:10px 14px 0">${tabs(['会话','对话','人物档案'],1,[33,null,7])}</div><div class="conversation"><div class="message user">今天想和你慢慢聊一会儿。</div><div class="message assistant"><div class="sender"><span class="avatar">言</span><span>言 · 当前对话</span></div>好呀，今天先把时间留给自己。<br><br>不用急着给这一天一个结论。你想从发生的小事说起，还是我们就安静地待一会儿？</div><div class="message user">那就从一个好消息开始吧。</div></div><div class="composer"><textarea aria-label="消息草稿" placeholder="说点什么…"></textarea><div class="tools"><button data-go="38" aria-label="添加能力">＋</button><span class="eyebrow">聊天 · 默认模型</span><button class="send" data-feedback="消息草稿" aria-label="发送">↑</button></div></div><div class="modebar"><button class="active" data-go="1">聊天</button><button data-go="2">工作</button></div>`;
@@ -55,13 +56,25 @@ case 'notification':return body(`<div class="notification"><div class="appname">
 case 'completion':return body(`<div class="empty" style="padding:35px 10px"><span class="tick" aria-hidden="true">✓</span><h3>旅行计划已完成</h3><p>已完成 3 / 3 项任务</p></div>${card('<span class="eyebrow">本次产物</span><h3>旅行计划.md</h3><p class="subtitle">包含路线、时间与出行清单。</p>'+btn('打开文件',16))}${btn('继续工作',2,'quiet')}${btn('查看工作过程',15,'ghost')}`);
 case 'media':return body(`${tabs(['图片','视频','语音','转录'])}${note('使用当前已配置账户可用的创作模型；生成前可确认输入和参数。')}${group([row('当前创作模型','已配置的模型档案','Models',21)])}${field('描述你想创作的画面','暖色房间里的一张桌子，桌上有书和一杯茶。',true)}${tabs(['1:1','16:9','9:16'])}${btn('生成图片')}<h3>创作历史</h3>${group([row('暖色房间','图片 · 昨天','WorkspaceFiles',16)])}`);
 default:return body(note(s.anatomy));}}
-function header(s){const ico={chat:'Persona',work:'Tasks',board:'RunCenter',gallery:'Gallery',profile:'Persona',settings:'Settings',usage:'Usage',files:'WorkspaceFiles',media:'Tools'}[s.kind]||'NewSession';return `<header class="topbar"><button class="iconbutton" data-go="${s.id===1?20:1}" aria-label="返回">‹</button><h2>${s.title}</h2><button class="iconbutton" data-go="${s.id===33?1:33}" aria-label="搜索">${icon(s.id===33?'NewSession':'Search')}</button></header>`;}
+function header(s){return `<header class="topbar"><button class="iconbutton" ${s.id===1?'data-go="20"':'data-back'} aria-label="${s.id===1?'设置':'返回'}">${s.id===1?icon('Settings'):'‹'}</button><h2>${s.title}</h2><button class="iconbutton" data-go="${s.id===33?1:33}" aria-label="搜索">${icon(s.id===33?'NewSession':'Search')}</button></header>`;}
+
 function render(){const s=scenes.find(x=>x.id===current);$('#sceneIndex').textContent=String(s.id).padStart(2,'0')+' / 38 · V6';$('#sceneTitle').textContent=s.title;$('#intent').textContent=s.intent;$('#anatomy').textContent=s.anatomy;let content=sceneContent(s);const state=$('#state').value;if(state!=='content'){content=body(state==='loading'?`<div class="empty">${icon('RunCenter')}<div class="spinner"></div><h3>正在加载${s.title}</h3><p>准备当前页面的内容。</p></div>`:state==='empty'?`<div class="empty">${icon('Search')}<h3>暂时没有相关内容</h3><p>可以换一个筛选条件，或返回当前会话。</p>${btn('返回会话',1)}</div>`:`<div class="empty">${icon('Advanced')}<h3>内容加载失败</h3><p>草稿与已有内容保持不变，可以重试。</p>${btn('重试')}${btn('查看诊断',29,'ghost')}</div>`);}$('#screen').innerHTML=header(s)+content;document.querySelectorAll('.scene-link').forEach(b=>b.classList.toggle('active',+b.dataset.scene===current));}
-function selectScene(id){current=id;$('#state').value='content';render();location.hash=String(id).padStart(2,'0');}
+function selectScene(id,reset=false){
+ if(!scenes.some(s=>s.id===id))return;
+ if(!reset&&current===id&&pageStack.length)return;
+ pageStack=reset?[id]:[...pageStack,id];current=id;$('#state').value='content';render();
+ history.pushState({pageStack},'', '#'+String(id).padStart(2,'0'));
+}
+function backScene(){if(pageStack.length>1)history.back();else selectScene(1,true);}
+window.addEventListener('popstate',e=>{
+ const id=+location.hash.slice(1);pageStack=e.state?.pageStack||[id>=1&&id<=38?id:1];
+ current=pageStack[pageStack.length-1];$('#state').value='content';render();
+});
+
 $('#sceneList').innerHTML=scenes.map(s=>`<button class="scene-link" data-scene="${s.id}"><span>${String(s.id).padStart(2,'0')}</span>${s.title}</button>`).join('');
-$('#sceneList').addEventListener('click',e=>{const b=e.target.closest('[data-scene]');if(b)selectScene(+b.dataset.scene)});
+$('#sceneList').addEventListener('click',e=>{const b=e.target.closest('[data-scene]');if(b)selectScene(+b.dataset.scene,true)});
 $('#sceneSearch').addEventListener('input',e=>{document.querySelectorAll('.scene-link').forEach((b,i)=>b.hidden=!`${scenes[i].id} ${scenes[i].title}`.includes(e.target.value.trim()))});
 $('#theme').addEventListener('change',e=>{$('#phone').dataset.theme=e.target.value});$('#width').addEventListener('change',e=>{$('#phone').style.width=e.target.value+'px'});$('#fontScale').addEventListener('change',e=>{$('#phone').style.setProperty('--font-scale',e.target.value)});$('#state').addEventListener('change',render);
-$('#screen').addEventListener('click',e=>{const go=e.target.closest('[data-go]');if(go){selectScene(+go.dataset.go);return}const tab=e.target.closest('[data-tab]');if(tab){tab.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===tab);b.setAttribute('aria-selected',b===tab)});$('#feedback').textContent='已选择：'+tab.textContent;return}const sw=e.target.closest('[data-switch]');if(sw){const on=sw.getAttribute('aria-pressed')!=='true';sw.setAttribute('aria-pressed',on);sw.querySelector('.switch').classList.toggle('off',!on);return}const check=e.target.closest('[data-check]');if(check){const on=check.getAttribute('aria-pressed')!=='true';check.setAttribute('aria-pressed',on);check.querySelector('.check').textContent=on?'✓':'○';return}const f=e.target.closest('[data-feedback]');if(f){if(f.dataset.feedback==='重试'){$('#state').value='content';render()}$('#feedback').textContent='设计演示反馈：'+f.dataset.feedback;}});
+$('#screen').addEventListener('click',e=>{if(e.target.closest('[data-back]')){backScene();return}const go=e.target.closest('[data-go]');if(go){selectScene(+go.dataset.go);return}const tab=e.target.closest('[data-tab]');if(tab){tab.parentElement.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===tab);b.setAttribute('aria-selected',b===tab)});$('#feedback').textContent='已选择：'+tab.textContent;return}const sw=e.target.closest('[data-switch]');if(sw){const on=sw.getAttribute('aria-pressed')!=='true';sw.setAttribute('aria-pressed',on);sw.querySelector('.switch').classList.toggle('off',!on);return}const check=e.target.closest('[data-check]');if(check){const on=check.getAttribute('aria-pressed')!=='true';check.setAttribute('aria-pressed',on);check.querySelector('.check').textContent=on?'✓':'○';return}const f=e.target.closest('[data-feedback]');if(f){if(f.dataset.feedback==='重试'){$('#state').value='content';render()}$('#feedback').textContent='设计演示反馈：'+f.dataset.feedback;}});
 $('#screen').addEventListener('input',e=>{if(e.target.matches('.search')){const q=e.target.value.trim();$('#screen').querySelectorAll('.row,.gallery>.card').forEach(r=>r.hidden=!!q&&!r.textContent.includes(q));}});
-const hash=+location.hash.slice(1);if(hash>=1&&hash<=38)current=hash;render();
+const hash=+location.hash.slice(1);if(hash>=1&&hash<=38)current=hash;pageStack=[current];history.replaceState({pageStack},'', '#'+String(current).padStart(2,'0'));render();

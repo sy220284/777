@@ -24,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -116,6 +117,7 @@ internal fun ChatAutomationScreen(
     onOpenSession: (String) -> Unit,
     handleRootSystemBack: Boolean,
     initialSelectedTaskId: String? = null,
+    entryRequest: Int = 0,
 ) {
     val colors = DsTheme.colors
     val canPlan = harnessState.usageMode == LocalUsageMode.CHAT &&
@@ -126,19 +128,26 @@ internal fun ChatAutomationScreen(
     }
     var draft by rememberSaveable { mutableStateOf("") }
     // This filter is a view concern, not an automation policy; ALL always stays available.
-    var currentSessionOnly by rememberSaveable(harnessState.sessionId) { mutableStateOf(false) }
+    var currentSessionOnly by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(
+        false, entryRequest, harnessState.sessionId,
+    )
     val currentSessionEvents = tasks.count { it.targetSessionId == harnessState.sessionId }
     val listState = rememberLazyListState()
     val visibleTasks = tasks.filter {
         chatAutomationInSession(it.targetSessionId, harnessState.sessionId, currentSessionOnly)
     }
-    LaunchedEffect(initialSelectedTaskId, visibleTasks) {
+    var locatedEntry by rememberSaveable { mutableIntStateOf(-1) }
+    LaunchedEffect(initialSelectedTaskId, visibleTasks, entryRequest) {
+        if (locatedEntry == entryRequest || initialSelectedTaskId == null) return@LaunchedEffect
         val index = visibleTasks.indexOfFirst { it.id == initialSelectedTaskId }
-        if (index >= 0) listState.scrollToItem(1 +
-            (if (tasks.isNotEmpty() && harnessState.sessionId.isNotBlank()) 1 else 0) + index)
+        if (index >= 0) {
+            listState.scrollToItem(1 +
+                (if (tasks.isNotEmpty() && harnessState.sessionId.isNotBlank()) 1 else 0) + index)
+            locatedEntry = entryRequest
+        }
     }
-    var editingTaskId by rememberSaveable { mutableStateOf<String?>(null) }
-    var policyTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    var editingTaskId by com.labteto.dshmobile.ui.components.rememberNavigationEntryState<String?>(null, entryRequest)
+    var policyTaskId by com.labteto.dshmobile.ui.components.rememberNavigationEntryState<String?>(null, entryRequest)
     var observedSaveRevision by remember { mutableLongStateOf(state.saveRevision) }
     val planMention = stringResource(R.string.tasks_chat_plan_mention)
 

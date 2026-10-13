@@ -15,7 +15,9 @@ internal fun localWorkFeatureUiContribution(
     onContinueArtifact: (String) -> Unit = {},
     onOpenSourceSession: (String) -> Unit = {},
     requestedFilePath: String? = null,
+    entryRequest: Int = 0,
     onRequestedFilePathChange: (String?) -> Unit = {},
+    onRequestedFilePathConsumed: (String) -> Unit = { onRequestedFilePathChange(null) },
 ): LocalFeatureUiContribution = LocalFeatureUiContribution(
     moduleId = LocalFeatureModuleId.WORK,
     drawerActions = mapOf(
@@ -43,7 +45,8 @@ internal fun localWorkFeatureUiContribution(
             loadPreview = actions.previewWorkspaceFile,
             onDismiss = onPopFeature,
             initialFilePath = requestedFilePath,
-            onInitialFilePathConsumed = { onRequestedFilePathChange(null) },
+            entryRequest = entryRequest,
+            onInitialFilePathConsumed = onRequestedFilePathConsumed,
         )
         LocalFeaturePage.RUN_CENTER -> LocalWorkStateContent(actions.workState) { workState ->
             LocalRunCenterScreen(

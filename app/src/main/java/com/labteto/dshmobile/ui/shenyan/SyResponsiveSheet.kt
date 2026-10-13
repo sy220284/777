@@ -96,7 +96,9 @@ fun SyResponsiveSheet(
             }
             if (scrollable) {
                 Column(
-                    Modifier.fillMaxWidth().heightIn(max = maxBodyHeight)
+                    // Reserve header/footer space within the actual viewport after IME padding.
+                    // A screen-height cap alone can leave actions beyond a reduced viewport.
+                    Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = maxBodyHeight)
                         .verticalScroll(rememberScrollState())
                         .testTag("bottomSheetScrollBody"),
                     verticalArrangement = Arrangement.spacedBy(10.dp),

@@ -267,10 +267,10 @@ fun SettingsScreen(
             }
         }
     }
-    var page by rememberSaveable(initialDestination, entryRequest) { mutableStateOf(initialDestination) }
-    var showAllMemories by rememberSaveable(memorySourceSessionId, memorySourceMessageId) {
-        mutableStateOf(false)
-    }
+    var page by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(initialDestination, entryRequest)
+    var showAllMemories by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(
+        false, entryRequest, memorySourceSessionId, memorySourceMessageId,
+    )
     DisposableEffect(viewModel) {
         onDispose { viewModel.focusMemorySourceMessage(null, null) }
     }
@@ -282,8 +282,8 @@ fun SettingsScreen(
     }
     var usageDetailReturnPage by rememberSaveable { mutableStateOf(SettingsDestination.USAGE) }
     var selectedUsageModel by rememberSaveable { mutableStateOf<String?>(null) }
-    var showDiagnostic by rememberSaveable { mutableStateOf(false) }
-    var showEnvironment by rememberSaveable { mutableStateOf(false) }
+    var showDiagnostic by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(false, entryRequest)
+    var showEnvironment by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(false, entryRequest)
     var environmentInfo by remember { mutableStateOf<String?>(null) }
     var customChatFilterDraft by rememberSaveable { mutableStateOf("") }
     var showChatPreferenceDiagnostics by rememberSaveable { mutableStateOf(false) }
@@ -318,10 +318,8 @@ fun SettingsScreen(
             } else {
                 page = usageDetailReturnPage
             }
-        } else if (page in setOf(SettingsDestination.MINIMAX_QUOTA, SettingsDestination.USAGE) && initialDestination == page) {
-            onClose()
         } else {
-            page.parentDestination()?.let { page = it } ?: onClose()
+            settingsBackDestination(page, initialDestination)?.let { page = it } ?: onClose()
         }
     }
 

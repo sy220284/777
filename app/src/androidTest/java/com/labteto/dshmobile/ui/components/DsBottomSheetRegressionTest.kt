@@ -5,6 +5,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.shenyan.designsystem.components.SySheetChoiceRow
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
@@ -12,6 +13,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -19,6 +22,33 @@ import org.junit.Test
 
 class DsBottomSheetRegressionTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test
+    fun reducedViewportReservesFooterSpaceAndKeepsBodyActionsReachable() {
+        var selected = 0
+        var saved = 0
+        compose.setContent {
+            DshTheme {
+                SyResponsiveSheet(
+                    title = "交接",
+                    onDismiss = {},
+                    modifier = Modifier.heightIn(max = 360.dp),
+                    scrollable = true,
+                    footer = { SyButton(text = "继续工作", onClick = { saved++ }, modifier = Modifier.fillMaxWidth()) },
+                ) {
+                    repeat(30) { Text("历史消息 $it") }
+                    SySheetChoiceRow(title = "选择末条消息", onClick = { selected++ })
+                }
+            }
+        }
+        compose.onNodeWithText("继续工作").assertIsDisplayed().performClick()
+        compose.onNodeWithText("选择末条消息").performScrollTo().assertIsDisplayed().performClick()
+        compose.onNodeWithText("继续工作").assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals(1, selected)
+            assertEquals(1, saved)
+        }
+    }
 
     @Test
     fun longSheetKeepsSaveActionVisibleAndClickable() {

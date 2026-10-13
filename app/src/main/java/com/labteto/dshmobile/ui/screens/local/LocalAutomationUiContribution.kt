@@ -7,6 +7,7 @@ import com.labteto.dshmobile.ui.screens.tasks.TasksScreen
 internal fun localAutomationFeatureUiContribution(
     taskMode: AutomationMode?,
     searchedTaskId: String?,
+    entryRequest: Int,
     onCreateViaChat: (String) -> Unit,
     actions: LocalAutomationFeatureUiActions,
     onTaskModeChange: (AutomationMode?) -> Unit,
@@ -37,6 +38,7 @@ internal fun localAutomationFeatureUiContribution(
         },
         initialMode = taskMode,
         initialSelectedTaskId = searchedTaskId,
+        entryRequest = entryRequest,
         onCreateViaChat = onCreateViaChat,
         handleRootSystemBack = false,
     )

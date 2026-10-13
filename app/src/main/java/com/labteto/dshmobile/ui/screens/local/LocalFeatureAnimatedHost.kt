@@ -58,6 +58,7 @@ internal fun LocalFeatureAnimatedHost(
         val sharedScope = this
         AnimatedContent(
         targetState = stack,
+        contentKey = { localFeatureCurrent(it) },
         modifier = Modifier.fillMaxSize().graphicsLayer {
             translationX = predictiveBackMaxOffsetPx * settledBackProgress
             alpha = 1f - (0.02f * settledBackProgress)

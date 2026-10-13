@@ -78,6 +78,7 @@ fun TasksScreen(
     onCreateViaChat: ((String) -> Unit)? = null,
     initialMode: AutomationMode? = null,
     initialSelectedTaskId: String? = null,
+    entryRequest: Int = 0,
     handleRootSystemBack: Boolean = true,
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
@@ -97,6 +98,7 @@ fun TasksScreen(
             onOpenSession = onOpenSession,
             handleRootSystemBack = handleRootSystemBack,
             initialSelectedTaskId = initialSelectedTaskId,
+            entryRequest = entryRequest,
         )
         return
     }
@@ -109,6 +111,7 @@ fun TasksScreen(
         onCreateViaChat = onCreateViaChat,
         handleRootSystemBack = handleRootSystemBack,
         initialSelectedTaskId = initialSelectedTaskId,
+        entryRequest = entryRequest,
     )
 }
 
@@ -121,6 +124,7 @@ private fun WorkTasksScreen(
     onCreateViaChat: ((String) -> Unit)?,
     handleRootSystemBack: Boolean,
     initialSelectedTaskId: String?,
+    entryRequest: Int,
 ) {
     val colors = DsTheme.colors
     val visibleTasks = state.tasks.filter { it.mode == AutomationMode.WORK }
@@ -129,8 +133,8 @@ private fun WorkTasksScreen(
     val chatCreatePrompt = stringResource(R.string.tasks_create_chat_prompt)
     val createFromChat = { if (onCreateViaChat != null) onCreateViaChat(chatCreatePrompt) else Unit }
     val createInvalidMessage = stringResource(R.string.tasks_create_invalid)
-    var showCreate by rememberSaveable { mutableStateOf(false) }
-    var selectedTaskId by rememberSaveable(initialSelectedTaskId) { mutableStateOf(initialSelectedTaskId) }
+    var showCreate by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(false, entryRequest)
+    var selectedTaskId by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(initialSelectedTaskId, entryRequest)
     val selectedTask = visibleTasks.firstOrNull { it.id == selectedTaskId }
     LaunchedEffect(visibleTasks, selectedTaskId) {
         if (selectedTaskId != null && selectedTask == null) selectedTaskId = null
