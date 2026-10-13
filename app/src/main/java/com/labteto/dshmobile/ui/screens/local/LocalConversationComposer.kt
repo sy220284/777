@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
@@ -52,8 +54,6 @@ import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.AppBackgroundState
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
@@ -110,9 +110,9 @@ internal fun LocalConversationComposer(
     onPlanModeChange: (Boolean) -> Unit,
     onFocusChanged: (Boolean) -> Unit = {},
 ) {
-    val colors = DsTheme.colors
-    val skillCallTransformation = remember(colors.accent, skillDisplayNames) {
-        LocalSkillCallVisualTransformation(colors.accent, skillDisplayNames)
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    val skillCallTransformation = remember(colors.primary, skillDisplayNames) {
+        LocalSkillCallVisualTransformation(colors.primary, skillDisplayNames)
     }
     val backgroundState = LocalAppBackgroundState.current
     val scope = rememberCoroutineScope()
@@ -218,8 +218,8 @@ internal fun LocalConversationComposer(
                 focusManager.clearFocus(force = true)
                 onOpenAttachmentPicker()
             },
-            tint = colors.labelPrimary,
-            containerColor = colors.hoverSolid,
+            tint = colors.text,
+            containerColor = colors.selected,
         )
     }
 
@@ -235,7 +235,7 @@ internal fun LocalConversationComposer(
             },
             onClick = ::openReplySuggestions,
             enabled = !state.running && !replySuggestionsLoading,
-            tint = if (replySuggestionsLoading) colors.labelTertiary else colors.labelSecondary,
+            tint = if (replySuggestionsLoading) colors.textTertiary else colors.textSecondary,
             containerColor = Color.Transparent,
         )
     }
@@ -246,7 +246,7 @@ internal fun LocalConversationComposer(
             icon = null,
             iconPainter = painterResource(R.drawable.ic_ui_button_send_glyph),
             iconSize = 32.dp,
-            tint = if (canSend) colors.onAccent else colors.labelPrimary,
+            tint = if (canSend) colors.onPrimary else colors.text,
             contentDescription = if (queue && state.queuedInputCount > 0) {
                 stringResource(R.string.local_queue_message_count, state.queuedInputCount)
             } else if (queue) {
@@ -256,7 +256,7 @@ internal fun LocalConversationComposer(
             },
             onClick = ::submit,
             enabled = canSend,
-            containerColor = colors.accent,
+            containerColor = colors.primary,
             visualSize = 32.dp,
         )
     }
@@ -267,10 +267,10 @@ internal fun LocalConversationComposer(
             icon = null,
             iconPainter = painterResource(R.drawable.ic_ui_button_stop_glyph),
             iconSize = 32.dp,
-            tint = colors.onAccent,
+            tint = colors.onPrimary,
             contentDescription = stringResource(R.string.chat_composer_stop),
             onClick = onStop,
-            containerColor = colors.accent,
+            containerColor = colors.primary,
             visualSize = 32.dp,
         )
     }
@@ -287,7 +287,7 @@ internal fun LocalConversationComposer(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 SyPill(
                     text = stringResource(R.string.local_team_title),
@@ -296,7 +296,7 @@ internal fun LocalConversationComposer(
                 Text(
                     stringResource(R.string.local_team_selected_hint),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelSecondary,
+                    color = colors.textSecondary,
                     modifier = Modifier.weight(1f),
                 )
                 SyIconButton(
@@ -304,14 +304,14 @@ internal fun LocalConversationComposer(
                     contentDescription = stringResource(R.string.local_team_mode_clear),
                     onClick = onClearTeamDispatch,
                     iconSize = 16.dp,
-                    tint = colors.labelSecondary,
+                    tint = colors.textSecondary,
                 )
             }
         }
         if (state.usageMode == LocalUsageMode.WORK && state.running && !teamDispatchSelected) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SyPill(
@@ -327,7 +327,7 @@ internal fun LocalConversationComposer(
                 Text(
                     text = stringResource(R.string.local_work_steer_boundary),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelSecondary,
+                    color = colors.textSecondary,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -338,7 +338,7 @@ internal fun LocalConversationComposer(
         if (imageAttachments.isNotEmpty()) {
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 items(
                     items = imageAttachments,
@@ -365,14 +365,14 @@ internal fun LocalConversationComposer(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
         ) {
             AnimatedVisibility(
                 visible = !expanded,
                 enter = expandHorizontally(DsAnimations.composerReveal) + fadeIn(DsAnimations.composerFade),
                 exit = shrinkHorizontally(DsAnimations.composerReveal) + fadeOut(DsAnimations.composerFade),
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                     AttachmentControl()
                     ReplySuggestionsControl()
                 }
@@ -461,7 +461,7 @@ private fun ImportedImageAttachmentTile(
     workspacePath: String,
     onRemove: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var thumbnail by remember(attachment.relativePath, workspacePath) {
         mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null)
     }
@@ -478,8 +478,8 @@ private fun ImportedImageAttachmentTile(
         modifier = Modifier
             .size(88.dp)
             .clip(DsShapes.block)
-            .background(colors.hoverSolid)
-            .border(1.dp, colors.borderL3, DsShapes.block),
+            .background(colors.selected)
+            .border(1.dp, colors.border, DsShapes.block),
     ) {
         thumbnail?.let { image ->
             Image(
@@ -494,8 +494,8 @@ private fun ImportedImageAttachmentTile(
             onClick = onRemove,
             modifier = Modifier.align(Alignment.TopEnd),
             iconSize = 16.dp,
-            tint = colors.labelPrimary,
-            containerColor = colors.bgBase.copy(alpha = 0.82f),
+            tint = colors.text,
+            containerColor = colors.canvas.copy(alpha = 0.82f),
         )
     }
 }
@@ -506,7 +506,7 @@ private fun ImportedAttachmentRow(
     workspacePath: String,
     onRemove: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var thumbnail by remember(attachment.relativePath, workspacePath) {
         mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null)
     }
@@ -522,7 +522,7 @@ private fun ImportedAttachmentRow(
     SyGlassCard {
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             thumbnail?.let { image ->
@@ -536,7 +536,7 @@ private fun ImportedAttachmentRow(
                 Text(
                     attachment.name,
                     style = DsType.small13Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
+                    color = colors.text,
                 )
                 val dimensions = if (attachment.width != null && attachment.height != null) {
                     " · ${attachment.width}×${attachment.height}"
@@ -546,7 +546,7 @@ private fun ImportedAttachmentRow(
                 Text(
                     "${attachment.mediaType}$dimensions · ${attachment.bytes} B",
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
+                    color = colors.textTertiary,
                 )
             }
             SyButton(

@@ -36,7 +36,7 @@ import kotlinx.coroutines.delay
 import com.shenyan.designsystem.foundation.*
 
 /** 基础 18 组件：所有业务动作由调用者注入，完全不依赖旧版 Ds 控件。 */
-enum class SyButtonStyle { PRIMARY, SECONDARY, GHOST, OUTLINE, DANGER }
+enum class SyButtonStyle { PRIMARY, SECONDARY, INFO, GHOST, OUTLINE, DANGER }
 
 /**
  * Single V5 button implementation. Supports legacy business handlers during migration.
@@ -53,6 +53,7 @@ fun SyButton(
     icon: ImageVector? = null,
     height: Dp = SyMetric.touch,
     onHoldRepeat: (() -> Unit)? = null,
+    compact: Boolean = false,
 ) {
     val c = LocalSyColors.current
     val interaction = remember { MutableInteractionSource() }
@@ -76,6 +77,8 @@ fun SyButton(
     val fill = if (!enabled) syMaterialColor(SyMaterialTier.L2_BAR) else when (style) {
         SyButtonStyle.PRIMARY -> c.primary
         SyButtonStyle.DANGER -> c.danger
+        // INFO is the visibly emphasized secondary action, not the unselected ghost style.
+        SyButtonStyle.INFO -> c.selected
         SyButtonStyle.SECONDARY -> syMaterialColor(SyMaterialTier.L2_BAR)
         SyButtonStyle.GHOST, SyButtonStyle.OUTLINE ->
             if (LocalSySceneBackdrop.current?.image != null) syMaterialColor(SyMaterialTier.L1_SECTION) else Color.Transparent
@@ -93,14 +96,14 @@ fun SyButton(
         color = if (style == SyButtonStyle.PRIMARY && enabled) Color.Transparent else fill,
         contentColor = foreground,
         shape = RoundedCornerShape(SyMetric.radiusControl),
-        border = if (style == SyButtonStyle.SECONDARY || style == SyButtonStyle.OUTLINE)
+        border = if (style == SyButtonStyle.SECONDARY || style == SyButtonStyle.OUTLINE || style == SyButtonStyle.INFO)
             BorderStroke(1.dp, c.border) else null,
     ) {
         Row(
             Modifier.background(
                 Brush.horizontalGradient(if (style == SyButtonStyle.PRIMARY && enabled)
                     listOf(c.primary, c.primaryPressed) else listOf(fill, fill))
-            ).padding(horizontal = 16.dp, vertical = 11.dp),
+            ).padding(horizontal = if (compact) 12.dp else 16.dp, vertical = if (compact) 8.dp else 11.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -113,7 +116,8 @@ fun SyButton(
                 if (text.isNotEmpty()) Spacer(Modifier.width(8.dp))
             }
             if (text.isNotEmpty()) {
-                Text(text, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                Text(text, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                    style = if (compact) MaterialTheme.typography.labelMedium else LocalTextStyle.current)
             }
         }
     }
@@ -157,27 +161,6 @@ fun SyTabs(tabs: List<SyOption>, selectedId: String, onSelect: (String) -> Unit,
                     Text(tab.label, color = c.text)
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun SyTabBar(tabs: List<SyOption>, selectedId: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
-    NavigationBar(modifier, containerColor = syMaterialColor(SyMaterialTier.L4_OVERLAY)) {
-        tabs.forEach { tab ->
-            NavigationBarItem(
-                selected = selectedId == tab.id,
-                onClick = { onSelect(tab.id) },
-                enabled = tab.enabled,
-                icon = { Text(if (selectedId == tab.id) "●" else "○") },
-                label = { Text(tab.label, maxLines = 1) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = LocalSyColors.current.text, selectedTextColor = LocalSyColors.current.text,
-                    unselectedIconColor = LocalSyColors.current.textSecondary, unselectedTextColor = LocalSyColors.current.textSecondary,
-                    indicatorColor = LocalSyColors.current.selected,
-                ),
-                alwaysShowLabel = true
-            )
         }
     }
 }

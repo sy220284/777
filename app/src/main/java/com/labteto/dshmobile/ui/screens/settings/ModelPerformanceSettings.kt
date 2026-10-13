@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -30,8 +32,6 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.presentation.LocalModelPerformanceControls
 import com.labteto.dshmobile.local.model.ModelReasoningCeiling
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlin.math.roundToInt
@@ -45,13 +45,13 @@ internal fun ModelPerformanceSettingsPage() {
     val context = LocalContext.current
     remember(context) { LocalModelPerformanceControls.attach(context); true }
     val limits by LocalModelPerformanceControls.state.collectAsState()
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
 
     SettingsCard(stringResource(R.string.settings_model_performance_reasoning)) {
         Text(
             stringResource(R.string.settings_model_performance_reasoning_hint),
             style = DsType.small13.withReadingWeight(),
-            color = colors.labelSecondary,
+            color = colors.textSecondary,
         )
         val choices = listOf(
             ModelReasoningCeiling.CUSTOM to R.string.settings_model_performance_custom,
@@ -66,31 +66,31 @@ internal fun ModelPerformanceSettingsPage() {
                 Modifier.fillMaxWidth()
                     .heightIn(min = 48.dp)
                     .clip(DsShapes.row)
-                    .background(if (limits.reasoningCeiling == ceiling) colors.accentTertiary
+                    .background(if (limits.reasoningCeiling == ceiling) colors.selected
                         else androidx.compose.ui.graphics.Color.Transparent)
                     .selectable(selected = limits.reasoningCeiling == ceiling, role = Role.RadioButton,
                         onClick = { LocalModelPerformanceControls.setReasoningCeiling(ceiling) })
-                    .padding(horizontal = DsSpacing.small),
+                    .padding(horizontal = SyMetric.gapMd),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 SyRadioControl(
                     selected = limits.reasoningCeiling == ceiling,
                     onClick = null,
                 )
-                Text(stringResource(label), style = DsType.small13.withReadingWeight(), color = colors.labelPrimary)
+                Text(stringResource(label), style = DsType.small13.withReadingWeight(), color = colors.text)
             }
         }
         Text(
             stringResource(R.string.settings_model_performance_restoration),
-            style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary,
+            style = DsType.caption11.withReadingWeight(), color = colors.textSecondary,
         )
     }
 
     SettingsCard(stringResource(R.string.settings_model_performance_temperature)) {
         Text(
             stringResource(R.string.settings_model_performance_temperature_hint),
-            style = DsType.small13.withReadingWeight(), color = colors.labelSecondary,
+            style = DsType.small13.withReadingWeight(), color = colors.textSecondary,
         )
         var draft by remember(limits.temperatureCeiling) {
             mutableFloatStateOf(limits.temperatureCeiling.toFloat())
@@ -98,7 +98,7 @@ internal fun ModelPerformanceSettingsPage() {
         val rounded = (draft * 20).roundToInt() / 20f
         Text(
             stringResource(R.string.settings_model_performance_temperature_value, rounded),
-            style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary,
+            style = DsType.std14Strong.withReadingWeight(), color = colors.text,
         )
         SySlider(
             value = draft,
@@ -112,8 +112,8 @@ internal fun ModelPerformanceSettingsPage() {
             modifier = Modifier.fillMaxWidth(),
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("1.00", style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
-            Text("2.00", style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+            Text("1.00", style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+            Text("2.00", style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
         }
     }
 }

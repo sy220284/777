@@ -44,7 +44,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.DsAnimations
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -61,8 +60,7 @@ internal fun FluidSectionNavigation(
     attention: Int? = null,
     tag: String = "fluidSection",
 ) {
-    val colors = DsTheme.colors
-    val sy = LocalSyColors.current
+        val sy = LocalSyColors.current
     val pulse = rememberHapticPulse()
     val reduced = LocalSyReducedMotion.current
     val duration = if (reduced) 0 else SyMotion.selectMs
@@ -71,7 +69,7 @@ internal fun FluidSectionNavigation(
         labels.forEachIndexed { index, label ->
             val active = index == selected
             val fill by animateColorAsState(
-                if (active) colors.accentTertiary
+                if (active) sy.selected
                 else if (numbered) sy.materialL1
                 else androidx.compose.ui.graphics.Color.Transparent,
                 tween(duration), label = "sectionFill",
@@ -86,21 +84,21 @@ internal fun FluidSectionNavigation(
                 shape = RoundedCornerShape(SyMetric.radiusControl),
                 color = fill,
                 border = if (numbered) BorderStroke(1.dp, when {
-                    active -> colors.accent
-                    attention == index -> colors.warnLabel
-                    else -> colors.borderL1
+                    active -> sy.primary
+                    attention == index -> sy.warningInk
+                    else -> sy.border
                 }) else null,
             ) {
                 Column(Modifier.padding(horizontal = 7.dp, vertical = 7.dp),
                     verticalArrangement = Arrangement.spacedBy(3.dp),
                     horizontalAlignment = if (numbered) Alignment.Start else Alignment.CenterHorizontally) {
                     if (numbered) Text((index + 1).toString(), style = DsType.caption11,
-                        color = colors.labelTertiary)
+                        color = sy.textTertiary)
                     Text(label, style = DsType.small13Strong.withReadingWeight(),
                         textAlign = if (numbered) TextAlign.Start else TextAlign.Center,
-                        color = if (active) colors.labelPrimary else colors.labelSecondary)
+                        color = if (active) sy.text else sy.textSecondary)
                     counts.getOrNull(index)?.let { Text(it, style = DsType.caption11,
-                        color = colors.labelSecondary) }
+                        color = sy.textSecondary) }
                 }
             }
         }

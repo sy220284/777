@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -43,8 +45,6 @@ import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -92,7 +92,7 @@ internal fun GroupChatMemberPickerSheet(
                 MAX_GROUP_CHAT_MEMBERS,
             ),
             style = DsType.caption11.withReadingWeight(),
-            color = DsTheme.colors.labelTertiary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
         )
         SyButton(
             text = stringResource(R.string.local_group_chat_apply_members),
@@ -117,7 +117,7 @@ internal fun GroupChatMemberPickerSheet(
                 MAX_GROUP_CHAT_MEMBERS,
             ),
             style = DsType.small13.withReadingWeight(),
-            color = DsTheme.colors.labelSecondary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         )
 
         // The reference group-picker explicitly explains whose memory can be used.
@@ -128,19 +128,19 @@ internal fun GroupChatMemberPickerSheet(
             horizontalPadding = 0.dp, verticalPadding = 0.dp,
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(DsSpacing.medium),
+                modifier = Modifier.fillMaxWidth().padding(SyMetric.gapLg),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 Icon(
                     FeatherIcons.Shield,
                     contentDescription = null,
-                    tint = DsTheme.colors.characterAccent,
+                    tint = com.shenyan.designsystem.foundation.LocalSyColors.current.lilac,
                 )
                 Text(
                     stringResource(R.string.local_group_chat_memory_isolation_hint),
                     style = DsType.small13.withReadingWeight(),
-                    color = DsTheme.colors.labelSecondary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -150,7 +150,7 @@ internal fun GroupChatMemberPickerSheet(
             Text(
                 stringResource(R.string.local_group_chat_no_characters),
                 style = DsType.small13.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             )
         } else {
             SyTextField(
@@ -164,12 +164,12 @@ internal fun GroupChatMemberPickerSheet(
                 Text(
                     stringResource(R.string.persona_gallery_no_match),
                     style = DsType.small13.withReadingWeight(),
-                    color = DsTheme.colors.labelSecondary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                 )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                 ) {
                     items(filteredEntries, key = PersonaGalleryEntry::id) { entry ->
                         val checked = entry.id in selected
@@ -189,37 +189,37 @@ internal fun GroupChatMemberPickerSheet(
                                         }
                                     },
                                 ),
-                            tint = if (checked) DsTheme.colors.accentTertiary else androidx.compose.ui.graphics.Color.Transparent,
+                            tint = if (checked) com.shenyan.designsystem.foundation.LocalSyColors.current.selected else androidx.compose.ui.graphics.Color.Transparent,
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+                                    .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                             ) {
                                 Surface(
                                     shape = CircleShape,
-                                    color = DsTheme.colors.characterAccentTertiary,
+                                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.lilac.copy(alpha = .18f),
                                 ) {
                                     Text(
                                         entry.persona.name.trim().take(1).ifBlank { avatarFallback },
                                         style = DsType.std14Strong.withReadingWeight(),
-                                        color = DsTheme.colors.characterAccent,
-                                        modifier = Modifier.padding(DsSpacing.small),
+                                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.lilac,
+                                        modifier = Modifier.padding(SyMetric.gapMd),
                                     )
                                 }
                                 Column(Modifier.weight(1f)) {
                                     Text(
                                         entry.persona.name,
                                         style = DsType.std14Strong.withReadingWeight(),
-                                        color = DsTheme.colors.labelPrimary,
+                                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                                     )
                                     personaMemberDescription(entry.persona).takeIf(String::isNotBlank)?.let {
                                         Text(
                                             it,
                                             style = DsType.caption11.withReadingWeight(),
-                                            color = DsTheme.colors.labelSecondary,
+                                            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                                             maxLines = 1,
                                         )
                                     }

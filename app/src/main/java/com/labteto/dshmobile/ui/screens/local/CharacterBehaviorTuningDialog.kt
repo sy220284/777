@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,8 +34,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SySlider
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlin.coroutines.cancellation.CancellationException
@@ -81,7 +81,7 @@ internal fun CharacterBehaviorTuningDialog(
     onSave: suspend (CharacterBehaviorTuning) -> Result<Unit>,
     onDismiss: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val performanceLimits by LocalModelPerformanceControls.state.collectAsState()
     val positionLimit = temperatureRange?.let(performanceLimits::temperaturePositionLimit) ?: 100
     var draft by remember(initial) { mutableStateOf(initial.normalized()) }
@@ -95,7 +95,7 @@ internal fun CharacterBehaviorTuningDialog(
         scrollable = true,
         dismissEnabled = !saving,
         footer = {
-            saveError?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = colors.error) }
+            saveError?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = colors.dangerInk) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 SyButton(
                     text = stringResource(R.string.local_character_tuning_restore),
@@ -103,7 +103,7 @@ internal fun CharacterBehaviorTuningDialog(
                     variant = SyButtonVariant.Ghost,
                     enabled = !saving,
                 )
-                Spacer(Modifier.width(DsSpacing.small))
+                Spacer(Modifier.width(SyMetric.gapMd))
                 SyButton(
                     text = stringResource(R.string.local_character_tuning_done),
                     enabled = !saving,
@@ -131,16 +131,16 @@ internal fun CharacterBehaviorTuningDialog(
         },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             LocalPersonaHeaderAvatar(name = personaName, portraitPath = portraitPath)
             Column {
-                Text(personaName, style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary)
+                Text(personaName, style = DsType.base16Strong.withReadingWeight(), color = colors.text)
                 Text(listOf(relationshipState, mood).filter(String::isNotBlank).joinToString(" · "),
-                    style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+                    style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
             }
         }
         Text(stringResource(R.string.local_character_tuning_subtitle),
-            style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+            style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
         if (temperatureTuningAvailable) {
             BehaviorSlider(
                 title = stringResource(R.string.local_character_tuning_expression_variation),
@@ -161,10 +161,10 @@ internal fun CharacterBehaviorTuningDialog(
             )
         } else {
             Text(stringResource(R.string.local_composer_temperature_unavailable),
-                style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+                style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
         }
         evolution.lastMajorMilestone.takeIf(String::isNotBlank)?.let {
-            Text(it, style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+            Text(it, style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
         }
     }
 }
@@ -180,7 +180,7 @@ private fun BehaviorSlider(
     displayValue: String? = null,
     maxValue: Int = 100,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val maximum = maxValue.coerceIn(1, 100)
     val clean = value.coerceIn(0, maximum)
     val valueLabel = when {
@@ -196,13 +196,13 @@ private fun BehaviorSlider(
             Text(
                 title,
                 style = DsType.std14Strong.withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 displayValue ?: "$valueLabel · $clean",
                 style = DsType.small13Strong.withReadingWeight(),
-                color = colors.characterAccent,
+                color = colors.lilac,
             )
         }
         SySlider(
@@ -217,9 +217,9 @@ private fun BehaviorSlider(
                 .semantics { contentDescription = title },
         )
         Row(Modifier.fillMaxWidth()) {
-            Text(low, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
+            Text(low, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
             Spacer(Modifier.weight(1f))
-            Text(high, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
+            Text(high, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
         }
     }
 }

@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyComposerField
 import com.labteto.dshmobile.ui.shenyan.SyConversationComposer
@@ -69,14 +71,14 @@ private fun FluidWorkScreenshot(page: String) {
         Column(Modifier.weight(1f)) {
             LocalWorkDesignSurface(actions, "design-work", "迁移鉴权模块", section, {},
                 { _, _ -> false }, {}, {}, {}, execution = {
-                    Column(Modifier.padding(DsSpacing.medium), verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
+                    Column(Modifier.padding(SyMetric.gapLg), verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
                         WorkTimelineStepRow(LocalHarnessMessage("design-step", "progress", "已检查现有入口，接下来确认鉴权方案。", createdAt = 1))
                         WorkTimelineStepRow(LocalHarnessMessage("design-tool", "tool", "", createdAt = 2, toolName = "read", toolIsError = false))
                         WorkTimelineStepRow(LocalHarnessMessage("design-block", "progress", "需要你选择方案。三个候选在部署和维护方式上有不同取舍。", createdAt = 3), active = true)
                     }
                 })
         }
-        SyConversationComposer(Modifier.padding(DsSpacing.medium)) {
+        SyConversationComposer(Modifier.padding(SyMetric.gapLg)) {
             SyComposerField("", {}, "继续交代任务…", modifier = Modifier.fillMaxWidth())
         }
     }
@@ -93,7 +95,7 @@ private fun fluidPersonaFixture() = PersonaGalleryEntry("design-persona",
 @Composable
 private fun FluidPersonaScreenshot(section: Int) {
     val entry = remember { fluidPersonaFixture() }
-    Column(Modifier.fillMaxSize().padding(DsSpacing.medium), verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
+    Column(Modifier.fillMaxSize().padding(SyMetric.gapLg), verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
         SyTopBar("人物档案 · 设计样例", onBack = {}, backContentDescription = "返回")
         FluidPersonaIdentity(entry, "", false, {})
         FluidSectionNavigation(listOf("关系", "事件", "记忆", "设定"), section, {}, tag = "profileFixture")
@@ -107,7 +109,7 @@ private fun FluidPersonaScreenshot(section: Int) {
 private fun FluidGalleryScreenshot() {
     val entries = remember { listOf(fluidPersonaFixture(), fluidPersonaFixture().copy(id = "design-persona-2",
         persona = PersonaProfile(id = "design-profile-2", name = "陆棠", portrait = "周末看展吗"))) }
-    Column(Modifier.fillMaxSize().padding(DsSpacing.medium)) {
+    Column(Modifier.fillMaxSize().padding(SyMetric.gapLg)) {
         SyTopBar("人物图集 · 设计样例", onBack = {}, backContentDescription = "返回")
         SySearchField("", {}, "搜索人物", Modifier.padding(bottom = 14.dp))
         FluidPersonaGalleryGrid(entries, {}, {}, Modifier.weight(1f))

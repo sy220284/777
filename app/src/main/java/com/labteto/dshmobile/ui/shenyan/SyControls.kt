@@ -19,6 +19,32 @@ enum class SyButtonStyle { PRIMARY, GHOST, OUTLINE, DANGER }
 enum class SyButtonVariant { Primary, Info, Ghost, Outline, Danger }
 enum class SyButtonSize { Normal, Small, Large }
 
+/**
+ * Keep the migration façade free of rendering decisions. The canonical button owns
+ * ink, selection emphasis, disabled/loading states and the minimum touch target.
+ */
+internal fun resolveSyButtonStyle(
+    style: SyButtonStyle,
+    variant: SyButtonVariant?,
+): com.shenyan.designsystem.components.SyButtonStyle = when (variant) {
+    SyButtonVariant.Primary -> com.shenyan.designsystem.components.SyButtonStyle.PRIMARY
+    SyButtonVariant.Info -> com.shenyan.designsystem.components.SyButtonStyle.INFO
+    SyButtonVariant.Ghost -> com.shenyan.designsystem.components.SyButtonStyle.GHOST
+    SyButtonVariant.Outline -> com.shenyan.designsystem.components.SyButtonStyle.OUTLINE
+    SyButtonVariant.Danger -> com.shenyan.designsystem.components.SyButtonStyle.DANGER
+    null -> when (style) {
+        SyButtonStyle.PRIMARY -> com.shenyan.designsystem.components.SyButtonStyle.PRIMARY
+        SyButtonStyle.GHOST -> com.shenyan.designsystem.components.SyButtonStyle.GHOST
+        SyButtonStyle.OUTLINE -> com.shenyan.designsystem.components.SyButtonStyle.OUTLINE
+        SyButtonStyle.DANGER -> com.shenyan.designsystem.components.SyButtonStyle.DANGER
+    }
+}
+
+internal fun resolveSyButtonHeight(size: SyButtonSize, requested: Dp): Dp = when (size) {
+    SyButtonSize.Large -> maxOf(requested, 52.dp)
+    SyButtonSize.Normal, SyButtonSize.Small -> maxOf(requested, SyDimensions.minimumTouch)
+}
+
 @Composable
 fun SyButton(
     text: String,
@@ -33,23 +59,12 @@ fun SyButton(
     variant: SyButtonVariant? = null,
     size: SyButtonSize = SyButtonSize.Normal,
 ) {
-    val resolvedStyle = when (variant) {
-        SyButtonVariant.Primary -> SyButtonStyle.PRIMARY
-        SyButtonVariant.Info, SyButtonVariant.Ghost -> SyButtonStyle.GHOST
-        SyButtonVariant.Outline -> SyButtonStyle.OUTLINE
-        SyButtonVariant.Danger -> SyButtonStyle.DANGER
-        null -> style
-    }
-    val canonicalStyle = when (resolvedStyle) {
-        SyButtonStyle.PRIMARY -> com.shenyan.designsystem.components.SyButtonStyle.PRIMARY
-        SyButtonStyle.GHOST -> com.shenyan.designsystem.components.SyButtonStyle.GHOST
-        SyButtonStyle.OUTLINE -> com.shenyan.designsystem.components.SyButtonStyle.OUTLINE
-        SyButtonStyle.DANGER -> com.shenyan.designsystem.components.SyButtonStyle.DANGER
-    }
     com.shenyan.designsystem.components.SyButton(
         text = text, onClick = onClick, modifier = modifier,
-        enabled = enabled, loading = loading, style = canonicalStyle,
-        icon = icon, height = if (size == SyButtonSize.Large) 52.dp else height,
+        enabled = enabled, loading = loading,
+        style = resolveSyButtonStyle(style, variant),
+        icon = icon, height = resolveSyButtonHeight(size, height),
+        compact = size == SyButtonSize.Small,
         onHoldRepeat = onHoldRepeat,
     )
 }

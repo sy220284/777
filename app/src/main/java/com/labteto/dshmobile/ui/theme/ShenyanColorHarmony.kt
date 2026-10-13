@@ -4,8 +4,8 @@ import androidx.compose.ui.graphics.compositeOver
 import com.shenyan.designsystem.foundation.SyColors
 
 /**
- * V6 page color projection. Pages not yet refactored to Sy* still read DsColors;
- * their surfaces must come from the SAME light/dark/matte palette as new controls.
+ * Legacy host preference projection only. Production UI colors are served by LocalSyColors;
+ * keep historical preference values in sync with the canonical V6 palette.
  * This is a visual adapter only: explicit user accent selection remains untouched.
  * The backgrounds are composed over the canonical canvas so a nested page cannot
  * accidentally become a bright white plate or an unbacked transparent drawer.

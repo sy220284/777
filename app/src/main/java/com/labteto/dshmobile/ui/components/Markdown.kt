@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.components
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,10 +49,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.theme.DsColors
+import com.shenyan.designsystem.foundation.SyColors
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
@@ -69,7 +69,7 @@ fun MarkdownText(
     allowCodeCopy: Boolean = true,
     bodyStyle: TextStyle = DsType.mdBody,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val blocks = remember(text) { parseMarkdown(text) }
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         blocks.forEach { block ->
@@ -81,11 +81,11 @@ fun MarkdownText(
                         3 -> DsType.mdH3
                         else -> DsType.mdH4
                     }
-                    InlineMarkdown(block.text, style.copy(color = colors.labelPrimary), Modifier.padding(top = 10.dp))
+                    InlineMarkdown(block.text, style.copy(color = colors.text), Modifier.padding(top = 10.dp))
                 }
                 is MdBlock.Paragraph -> InlineMarkdown(
                     block.lines.joinToString(" "),
-                    bodyStyle.copy(color = colors.labelPrimary),
+                    bodyStyle.copy(color = colors.text),
                     Modifier.fillMaxWidth(),
                 )
                 is MdBlock.MdList -> MdListBlock(block, bodyStyle)
@@ -360,11 +360,11 @@ private fun parseInlineSegments(text: String): List<InlineSegment> {
 /** Renders one line of markdown with bold/italic/code/link spans. */
 @Composable
 private fun InlineMarkdown(text: String, style: TextStyle, modifier: Modifier = Modifier) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val effectiveStyle = style.withReadingWeight()
     val codeStyle = effectiveStyle.copy(
         fontFamily = DsType.codeFont,
-        color = colors.labelPrimary,
+        color = colors.text,
     )
     val result = remember(text, effectiveStyle, codeStyle, colors) {
         buildInlineContent(text, codeStyle, colors)
@@ -385,7 +385,7 @@ private fun InlineMarkdown(text: String, style: TextStyle, modifier: Modifier = 
 private fun buildInlineContent(
     text: String,
     codeStyle: TextStyle,
-    colors: DsColors,
+    colors: SyColors,
 ): AnnotatedString {
     val builder = AnnotatedString.Builder()
     parseInlineSegments(text).forEach { segment ->
@@ -395,11 +395,11 @@ private fun buildInlineContent(
             is InlineSegment.Italic -> builder.withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(segment.text) }
             is InlineSegment.Strikethrough -> builder.withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { append(segment.text) }
             is InlineSegment.Code -> builder.withStyle(
-                SpanStyle(fontFamily = codeStyle.fontFamily, color = codeStyle.color, background = colors.inlineCode),
+                SpanStyle(fontFamily = codeStyle.fontFamily, color = codeStyle.color, background = colors.materialL1),
             ) { append(segment.text) }
             is InlineSegment.Link -> {
                 builder.pushStringAnnotation("url", segment.url)
-                builder.withStyle(SpanStyle(color = colors.accent)) { append(segment.text) }
+                builder.withStyle(SpanStyle(color = colors.primary)) { append(segment.text) }
                 builder.pop()
             }
         }
@@ -411,7 +411,7 @@ private fun buildInlineContent(
 
 @Composable
 private fun MdListBlock(block: MdBlock.MdList, bodyStyle: TextStyle) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val counters = IntArray(7)
     Column(Modifier.fillMaxWidth().padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         block.items.forEachIndexed { index, item ->
@@ -428,12 +428,12 @@ private fun MdListBlock(block: MdBlock.MdList, bodyStyle: TextStyle) {
             ) {
                 Text(
                     marker,
-                    style = bodyStyle.withReadingWeight().copy(color = colors.labelSecondary),
+                    style = bodyStyle.withReadingWeight().copy(color = colors.textSecondary),
                     textAlign = if (ordered) TextAlign.End else TextAlign.Start,
                     modifier = Modifier.width(if (ordered) 28.dp else 18.dp),
                 )
                 Spacer(Modifier.width(6.dp))
-                InlineMarkdown(item, bodyStyle.copy(color = colors.labelPrimary), Modifier.weight(1f))
+                InlineMarkdown(item, bodyStyle.copy(color = colors.text), Modifier.weight(1f))
             }
         }
     }
@@ -443,7 +443,7 @@ private val CODE_SYNTAX_TOKENS = Regex(
     """//[^\n]*|#[^\n]*|"[^"\n]*"|'[^'\n]*'|\b(?:fun|val|var|class|object|interface|data|sealed|return|if|else|when|for|while|try|catch|import|package|private|public|internal|override|suspend|const|let|def|from|async|await|function|true|false|null|None|True|False)\b""",
 )
 
-internal fun highlightedCode(code: String, language: String?, colors: DsColors): AnnotatedString {
+internal fun highlightedCode(code: String, language: String?, colors: SyColors): AnnotatedString {
     val supported = setOf("kotlin", "kt", "java", "python", "py", "javascript", "js", "typescript", "ts")
     val normalizedLanguage = language?.trim()?.lowercase().orEmpty()
     if (normalizedLanguage !in supported || code.length > 20_000) return AnnotatedString(code)
@@ -451,9 +451,9 @@ internal fun highlightedCode(code: String, language: String?, colors: DsColors):
     CODE_SYNTAX_TOKENS.findAll(code).forEach { match ->
         val token = match.value
         val tint = when {
-            token.startsWith("//") || token.startsWith("#") -> colors.labelSecondary
-            token.firstOrNull() == '"' || token.startsWith("'") -> colors.warnLabel
-            else -> colors.accent
+            token.startsWith("//") || token.startsWith("#") -> colors.textSecondary
+            token.firstOrNull() == '"' || token.startsWith("'") -> colors.warningInk
+            else -> colors.primary
         }
         builder.addStyle(SpanStyle(color = tint), match.range.first, match.range.last + 1)
     }
@@ -474,7 +474,7 @@ internal fun markdownCalloutKind(lines: List<String>): MarkdownCalloutKind = whe
 
 @Composable
 private fun MdBlockquote(block: MdBlock.Blockquote, bodyStyle: TextStyle) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val kind = remember(block.lines) { markdownCalloutKind(block.lines) }
     val title = when (kind) {
         MarkdownCalloutKind.NOTE -> stringResource(R.string.markdown_callout_note)
@@ -484,16 +484,16 @@ private fun MdBlockquote(block: MdBlock.Blockquote, bodyStyle: TextStyle) {
         MarkdownCalloutKind.QUOTE -> null
     }
     val stripeColor = when (kind) {
-        MarkdownCalloutKind.WARNING -> colors.warn
-        MarkdownCalloutKind.IMPORTANT -> colors.accent
-        else -> colors.labelSecondary
+        MarkdownCalloutKind.WARNING -> colors.warning
+        MarkdownCalloutKind.IMPORTANT -> colors.primary
+        else -> colors.textSecondary
     }
     val content = if (title != null) block.lines.drop(1) else block.lines
     Row(
         Modifier
             .fillMaxWidth()
             .clip(DsShapes.block)
-            .background(colors.tipSurface)
+            .background(colors.materialL3)
             .height(IntrinsicSize.Min)
             .padding(vertical = 10.dp, horizontal = 12.dp),
     ) {
@@ -509,14 +509,14 @@ private fun MdBlockquote(block: MdBlock.Blockquote, bodyStyle: TextStyle) {
             if (title != null) Text(
                 title,
                 style = DsType.mdSmall.withReadingWeight().copy(fontWeight = FontWeight.SemiBold),
-                color = if (kind == MarkdownCalloutKind.WARNING) colors.warnLabel
-                    else if (kind == MarkdownCalloutKind.IMPORTANT) colors.accent
-                    else colors.labelPrimary,
+                color = if (kind == MarkdownCalloutKind.WARNING) colors.warningInk
+                    else if (kind == MarkdownCalloutKind.IMPORTANT) colors.primary
+                    else colors.text,
             )
             content.forEach { line ->
                 InlineMarkdown(
                     line,
-                    bodyStyle.copy(color = colors.labelPrimary),
+                    bodyStyle.copy(color = colors.text),
                     Modifier.fillMaxWidth(),
                 )
             }
@@ -526,7 +526,7 @@ private fun MdBlockquote(block: MdBlock.Blockquote, bodyStyle: TextStyle) {
 
 @Composable
 private fun MarkdownTable(block: MdBlock.Table) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val allRows = listOf(block.header) + block.rows
     val widths = remember(block) {
         block.header.indices.map { column ->
@@ -542,7 +542,7 @@ private fun MarkdownTable(block: MdBlock.Table) {
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
             .clip(DsShapes.block)
-            .border(1.dp, colors.borderL1, DsShapes.block),
+            .border(1.dp, colors.border, DsShapes.block),
     ) {
         fun textAlign(column: Int): TextAlign = when (block.alignments.getOrElse(column) { TableAlignment.START }) {
             TableAlignment.START -> TextAlign.Start
@@ -550,18 +550,18 @@ private fun MarkdownTable(block: MdBlock.Table) {
             TableAlignment.END -> TextAlign.End
         }
 
-        Row(Modifier.background(colors.tipSurface)) {
+        Row(Modifier.background(colors.materialL3)) {
             block.header.forEachIndexed { column, cell ->
                 InlineMarkdown(
                     cell,
                     DsType.mdSmall.copy(
-                        color = colors.labelPrimary,
+                        color = colors.text,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = textAlign(column),
                     ),
                     Modifier
                         .width(widths[column])
-                        .border(0.5.dp, colors.borderL2)
+                        .border(0.5.dp, colors.border)
                         .padding(horizontal = 10.dp, vertical = 8.dp),
                 )
             }
@@ -572,12 +572,12 @@ private fun MarkdownTable(block: MdBlock.Table) {
                     InlineMarkdown(
                         row.getOrElse(column) { "" },
                         DsType.mdSmall.copy(
-                            color = colors.labelPrimary,
+                            color = colors.text,
                             textAlign = textAlign(column),
                         ),
                         Modifier
                             .width(widths[column])
-                            .border(0.5.dp, colors.borderL2)
+                            .border(0.5.dp, colors.border)
                             .padding(horizontal = 10.dp, vertical = 8.dp),
                     )
                 }
@@ -594,7 +594,7 @@ private fun CodeBlock(
     modifier: Modifier = Modifier,
     allowCopy: Boolean = true,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val clipboard = LocalClipboardManager.current
     val styledCode = remember(code, lang, colors) { highlightedCode(code, lang, colors) }
     var copied by remember(code) { mutableStateOf(false) }
@@ -608,26 +608,26 @@ private fun CodeBlock(
         modifier = modifier
             .fillMaxWidth()
             .clip(DsShapes.block)
-            .background(colors.codeBlockBg)
-            .border(1.dp, colors.borderL1, DsShapes.block),
+            .background(colors.materialL2)
+            .border(1.dp, colors.border, DsShapes.block),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(colors.codeBlockBanner)
+                .background(colors.materialL1)
                 .padding(start = 12.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 lang ?: stringResource(R.string.markdown_code_language),
                 style = DsType.caption11Strong.withReadingWeight().copy(fontFamily = DsType.codeFont),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
                 modifier = Modifier.weight(1f),
             )
             if (allowCopy) {
                 Box(
                     modifier = Modifier
-                        .size(DsSpacing.touchTarget)
+                        .size(SyMetric.touch)
                         .clip(DsShapes.chip)
                         .clickable {
                             clipboard.setText(AnnotatedString(code))
@@ -640,7 +640,7 @@ private fun CodeBlock(
                         contentDescription = stringResource(
                             if (copied) R.string.chat_copy_success else R.string.markdown_copy_code
                         ),
-                        tint = colors.labelSecondary,
+                        tint = colors.textSecondary,
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -653,7 +653,7 @@ private fun CodeBlock(
             Text(
                 styledCode,
                 style = DsType.mdCode.withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
                 softWrap = false,
             )
         }

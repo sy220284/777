@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,8 +27,6 @@ import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.visibleAssistantText
 import com.labteto.dshmobile.local.model.forSurface
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.flow.StateFlow
@@ -41,7 +41,7 @@ internal fun LocalStreamingChatTurn(
     val rawStream by streamingState.collectAsStateWithLifecycle()
     val stream = rawStream.forSurface(sessionId, LocalUsageMode.CHAT)
     val visibleReply = visibleAssistantText(stream.assistant)
-    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
         if (stream.reasoning.isNotBlank()) {
             ChatThinkingRow(
                 messages = listOf(
@@ -78,11 +78,11 @@ internal fun LocalStreamingChatTurn(
         if (stream.reasoning.isBlank() && visibleReply.isBlank()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                Spacer(Modifier.width(DsSpacing.small))
+                Spacer(Modifier.width(SyMetric.gapMd))
                 Text(
                     stringResource(R.string.local_chat_replying),
                     style = DsType.small13.withReadingWeight(),
-                    color = DsTheme.colors.labelTertiary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                 )
             }
         }
@@ -126,12 +126,12 @@ internal fun LocalStreamingWorkPreview(
     if (!visiblePreview && hasDurableProgress) return
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.small),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
             Text(
@@ -141,7 +141,7 @@ internal fun LocalStreamingWorkPreview(
                     else R.string.local_work_process_preparing,
                 ),
                 style = DsType.small13.withReadingWeight(),
-                color = DsTheme.colors.labelTertiary,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
             )
         }
         if (visiblePreview) {

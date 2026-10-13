@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -109,8 +111,6 @@ import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
@@ -407,7 +407,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         }
     }
     var workDesignSection by rememberSaveable(state.sessionId) { mutableStateOf(3) }
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val rootSurfaceColor = colors.rootSurface()
     // Custom wallpapers remain visible behind the chat toolbar; work mode still gets its
     // stable root work surface from rootSurfaceColor above.
@@ -746,7 +746,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().background(rootSurfaceColor)) {
         Column(
             Modifier.fillMaxWidth().background(topSurfaceColor)
-                .padding(horizontal = DsMetrics.screenHorizontal, vertical = DsSpacing.small),
+                .padding(horizontal = DsMetrics.screenHorizontal, vertical = SyMetric.gapMd),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (onOpenDrawer != null && !showV6MobileNavigation) SyIconButton(
@@ -754,7 +754,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     contentDescription = stringResource(R.string.app_open_navigation),
                     onClick = onOpenDrawer,
                     containerColor = com.shenyan.designsystem.components.syMaterialColor(SyMaterialTier.L4_OVERLAY),
-                    tint = colors.labelPrimary,
+                    tint = colors.text,
                 )
                 Column(Modifier.weight(1f)) {
                     if (state.usageMode == LocalUsageMode.CHAT) {
@@ -816,7 +816,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         icon = com.labteto.dshmobile.ui.components.SyEntryIcons.GroupChat,
                         contentDescription = stringResource(R.string.local_team_reopen),
                         onClick = { showTeamPanel = true },
-                        tint = colors.labelSecondary,
+                        tint = colors.textSecondary,
                     )
                 }
             }
@@ -849,17 +849,17 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 shape = DsShapes.block,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
+                    .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs),
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                    modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 ) {
                     Text(
                         stringResource(R.string.local_persona_correction_recorded),
                         style = DsType.small13.withReadingWeight(),
-                        color = colors.labelSecondary,
+                        color = colors.textSecondary,
                         modifier = Modifier.weight(1f),
                     )
                     SyButton(
@@ -876,38 +876,38 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
 
         if (state.usageMode == LocalUsageMode.WORK && state.deviceApprovalLease) {
             Surface(
-                color = colors.warnTertiary,
+                color = colors.warning.copy(alpha = .18f),
                 shape = DsShapes.block,
                 modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
+                    .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs),
             ) {
                 Row(
-                    Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                    Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 ) {
                     Column(
                         Modifier.weight(1f)
-                            .heightIn(min = DsSpacing.touchTarget)
+                            .heightIn(min = SyMetric.touch)
                             .clickable { approvalNoticeExpanded = !approvalNoticeExpanded },
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Text(
                             stringResource(R.string.local_device_approval_on),
                             style = DsType.small13Strong.withReadingWeight(),
-                            color = colors.warnLabel,
+                            color = colors.warningInk,
                         )
                         Text(
                             if (approvalNoticeExpanded) stringResource(R.string.local_approval_scope_hide)
                             else stringResource(R.string.local_approval_scope_show),
                             style = DsType.caption11.withReadingWeight(),
-                            color = colors.labelSecondary,
+                            color = colors.textSecondary,
                         )
                     }
                     SyButton(
                         stringResource(R.string.common_close),
                         onDisableDeviceTurn,
-                        modifier = Modifier.heightIn(min = DsSpacing.touchTarget),
+                        modifier = Modifier.heightIn(min = SyMetric.touch),
                         variant = SyButtonVariant.Ghost,
                     )
                 }
@@ -915,7 +915,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     Text(
                         stringResource(R.string.local_device_approval_scope),
                         style = DsType.caption11.withReadingWeight(),
-                        color = colors.labelSecondary,
+                        color = colors.textSecondary,
                     )
                 }
             }
@@ -930,12 +930,12 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
-                    start = DsSpacing.medium,
-                    end = DsSpacing.medium,
-                    top = DsSpacing.comfortable,
-                    bottom = DsSpacing.xlarge,
+                    start = SyMetric.gapLg,
+                    end = SyMetric.gapLg,
+                    top = SyMetric.gapSection,
+                    bottom = SyMetric.gapPage,
                 ),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapSection),
             ) {
                 if (mediaPage.unavailable) {
                     item(key = "media-storage-error") {
@@ -975,7 +975,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             Text(
                                 stringResource(R.string.local_group_chat_setup_required),
                                 style = DsType.std14.withReadingWeight(),
-                                color = colors.labelSecondary,
+                                color = colors.textSecondary,
                             )
                             SyButton(
                                 text = stringResource(R.string.local_group_chat_manage_members),
@@ -1150,7 +1150,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             ConversationScrollShortcut(
                 target = scrollHint.target,
                 modifier = Modifier.align(Alignment.BottomEnd)
-                    .padding(end = DsSpacing.medium, bottom = DsSpacing.small),
+                    .padding(end = SyMetric.gapLg, bottom = SyMetric.gapMd),
                 onClick = { target ->
                     scrollHint.hide()
                     scope.launch {
@@ -1172,27 +1172,27 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         if (!state.configured && !state.loading && transcriptItems.isEmpty()) {
             SyMaterialSurface(
                 modifier = Modifier.fillMaxWidth().padding(
-                    horizontal = DsSpacing.medium,
-                    vertical = DsSpacing.small,
+                    horizontal = SyMetric.gapLg,
+                    vertical = SyMetric.gapMd,
                 ),
                 shape = DsShapes.row,
                 tier = SyMaterialTier.L3_CARD,
             ) {
                 Row(
-                    modifier = Modifier.padding(DsSpacing.medium),
+                    modifier = Modifier.padding(SyMetric.gapLg),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(
                             stringResource(R.string.local_welcome_connect_title),
                             style = DsType.std14Strong.withReadingWeight(),
-                            color = colors.labelPrimary,
+                            color = colors.text,
                         )
                         Text(
                             stringResource(R.string.local_welcome_connect_body),
                             style = DsType.small13.withReadingWeight(),
-                            color = colors.labelSecondary,
+                            color = colors.textSecondary,
                         )
                     }
                     SyButton(
@@ -1222,8 +1222,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             Text(
                 it,
                 style = DsType.small13.withReadingWeight(),
-                color = colors.error,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
+                color = colors.dangerInk,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
             )
         }
 
@@ -1235,8 +1235,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         ) {
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = DsSpacing.medium),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                contentPadding = PaddingValues(horizontal = SyMetric.gapLg),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
                 items(
                     items = state.replySuggestions.filter { it.text.isNotBlank() }.take(3),
@@ -1246,18 +1246,18 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         onClick = { drafts.putBoundedLocalDraft(state.sessionId, suggestion.text) },
                         shape = DsShapes.pillFull,
                         tier = SyMaterialTier.L4_OVERLAY,
-                        border = BorderStroke(1.dp, colors.borderL1),
+                        border = BorderStroke(1.dp, colors.border),
                     ) {
                         Text(
                             suggestion.label.ifBlank {
                                 suggestion.text.take(18)
                             },
                             style = DsType.small13.withReadingWeight(),
-                            color = colors.labelSecondary,
+                            color = colors.textSecondary,
                             maxLines = 1,
                             modifier = Modifier.padding(
-                                horizontal = DsSpacing.medium,
-                                vertical = DsSpacing.xsmall,
+                                horizontal = SyMetric.gapLg,
+                                vertical = SyMetric.gapSm,
                             ),
                         )
                     }
@@ -1273,8 +1273,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 if (state.team.visible) showTeamPanel = true
             },
             modifier = Modifier.padding(
-                horizontal = DsSpacing.medium,
-                vertical = DsSpacing.xsmall,
+                horizontal = SyMetric.gapLg,
+                vertical = SyMetric.gapSm,
             ),
         )
 
@@ -1507,7 +1507,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             Text(
                 stringResource(R.string.local_reply_suggestions_hint),
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
             state.replySuggestions.filter { it.text.isNotBlank() }.forEach { suggestion ->
                 SyMaterialSurface(
@@ -1519,22 +1519,22 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     enabled = !state.running,
                     shape = DsShapes.row,
                     tier = SyMaterialTier.L3_CARD,
-                    border = BorderStroke(1.dp, colors.borderL2),
+                    border = BorderStroke(1.dp, colors.border),
                 ) {
                     Column(
-                        Modifier.heightIn(min = DsSpacing.touchTarget)
-                            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                        Modifier.heightIn(min = SyMetric.touch)
+                            .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
+                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
                                 suggestion.label,
                                 style = DsType.std14Strong.withReadingWeight(),
-                                color = colors.labelPrimary,
+                                color = colors.text,
                                 modifier = Modifier.weight(1f),
                             )
                             if (suggestion.style.isNotBlank() || suggestion.bold) {
@@ -1542,14 +1542,14 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                     if (suggestion.bold) stringResource(R.string.local_reply_suggestions_bold)
                                     else suggestion.style,
                                     style = DsType.caption11.withReadingWeight(),
-                                    color = if (suggestion.bold) colors.warnLabel else colors.labelTertiary,
+                                    color = if (suggestion.bold) colors.warningInk else colors.textTertiary,
                                 )
                             }
                         }
                         Text(
                             suggestion.text,
                             style = DsType.small13.withReadingWeight(),
-                            color = colors.labelSecondary,
+                            color = colors.textSecondary,
                         )
                     }
                 }
@@ -1733,7 +1733,7 @@ internal fun localComposerAttachmentDecision(
 private fun EmptyLocalHarness(
     onSuggestion: (String) -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val filesPrompt = stringResource(R.string.local_prompt_files)
     val researchPrompt = stringResource(R.string.local_prompt_research)
     val tasksPrompt = stringResource(R.string.local_prompt_tasks)
@@ -1746,7 +1746,7 @@ private fun EmptyLocalHarness(
         Text(
             stringResource(R.string.local_welcome_title),
             style = DsType.large20.withReadingWeight(),
-            color = colors.labelPrimary,
+            color = colors.text,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             modifier = Modifier.widthIn(max = 280.dp),
         )

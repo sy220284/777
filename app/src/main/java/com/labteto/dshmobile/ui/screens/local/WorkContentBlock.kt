@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,8 +20,6 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -62,21 +62,21 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
     val label = if (provider != null && node.summary != null &&
         !summary.contains(provider, ignoreCase = true)
     ) "$provider · $summary" else summary
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.tiny),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapXs),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             when {
                 node.failed -> Icon(
                     FeatherIcons.AlertTriangle,
                     contentDescription = null,
-                    tint = colors.error,
+                    tint = colors.dangerInk,
                     modifier = Modifier.size(18.dp),
                 )
                 node.count > 0 -> WorkOperationIcon(node.kind, running = running)
@@ -84,7 +84,7 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
                 else -> Icon(
                     FeatherIcons.CheckCircle,
                     contentDescription = null,
-                    tint = colors.labelSecondary,
+                    tint = colors.textSecondary,
                     modifier = Modifier.size(18.dp),
                 )
             }
@@ -94,37 +94,37 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
                 style = (if (node.summary != null) DsType.mdSmall else DsType.small13)
                     .withReadingWeight().copy(fontFamily = FontFamily.Default),
                 color = when {
-                    node.failed -> colors.error
-                    node.count > 0 -> colors.labelSecondary
-                    else -> colors.labelPrimary
+                    node.failed -> colors.dangerInk
+                    node.count > 0 -> colors.textSecondary
+                    else -> colors.text
                 },
             )
             if (node.failed) {
                 Text(
                     stringResource(agentOperationStatusRes(running = false, failed = true)),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.error,
+                    color = colors.dangerInk,
                 )
             } else if (running) {
                 Text(
                     stringResource(agentOperationStatusRes(running = true, failed = false)),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.accent,
+                    color = colors.primary,
                 )
             } else if (node.count > 1) {
                 Text(
                     stringResource(R.string.local_work_process_operation_count, node.count),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
+                    color = colors.textTertiary,
                 )
             }
         }
         node.detail?.let { detail ->
             Text(
                 detail,
-                modifier = Modifier.padding(start = 18.dp + DsSpacing.small),
+                modifier = Modifier.padding(start = 18.dp + SyMetric.gapMd),
                 style = DsType.small13.withReadingWeight(),
-                color = if (node.failed) colors.error else colors.labelPrimary,
+                color = if (node.failed) colors.dangerInk else colors.text,
             )
         }
     }
@@ -138,14 +138,14 @@ internal fun WorkTimelineStepRow(
     repeatCount: Int = 1,
     active: Boolean = false,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     if (message.role != "tool") {
         val content = localWorkTimelineText(message.content) ?: return
         val milestone = isWorkTimelineMilestone(content)
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.tiny),
+            modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapXs),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             if (!milestone) {
                 WorkOperationIcon(com.labteto.dshmobile.ui.AgentOperationKind.Generic, active)
@@ -153,12 +153,12 @@ internal fun WorkTimelineStepRow(
             Text(
                 text = content, modifier = Modifier.weight(1f),
                 style = (if (milestone) DsType.mdSmall else DsType.small13).withReadingWeight(),
-                color = if (milestone) colors.labelPrimary else colors.labelSecondary,
+                color = if (milestone) colors.text else colors.textSecondary,
             )
             if (active) {
                 Text(
                     stringResource(agentOperationStatusRes(running = true, failed = false)),
-                    style = DsType.caption11.withReadingWeight(), color = colors.accent,
+                    style = DsType.caption11.withReadingWeight(), color = colors.primary,
                 )
             }
         }
@@ -171,9 +171,9 @@ internal fun WorkTimelineStepRow(
     val action = stringResource(userFacingWorkToolActionRes(message.toolName) ?: agentOperationLabelRes(kind))
     val label = if (provider != null) "$provider · $action" else action
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.tiny),
+        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapXs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         Icon(
             imageVector = when {
@@ -183,23 +183,23 @@ internal fun WorkTimelineStepRow(
                 else -> FeatherIcons.CheckCircle
             },
             contentDescription = null,
-            tint = if (failed) colors.error else colors.labelSecondary,
+            tint = if (failed) colors.dangerInk else colors.textSecondary,
             modifier = Modifier.size(18.dp),
         )
         Text(
             text = label, modifier = Modifier.weight(1f),
             style = DsType.small13.withReadingWeight(),
-            color = if (failed) colors.error else colors.labelSecondary,
+            color = if (failed) colors.dangerInk else colors.textSecondary,
         )
         if (failed) {
             Text(
                 stringResource(agentOperationStatusRes(running = false, failed = true)),
-                style = DsType.caption11.withReadingWeight(), color = colors.error,
+                style = DsType.caption11.withReadingWeight(), color = colors.dangerInk,
             )
         } else if (repeatCount > 1) {
             Text(
                 stringResource(R.string.local_work_process_operation_count, repeatCount),
-                style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary,
+                style = DsType.caption11.withReadingWeight(), color = colors.textTertiary,
             )
         }
     }

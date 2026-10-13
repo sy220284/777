@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,8 +28,6 @@ import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.shenyan.designsystem.components.SyCategoryRow
 import com.shenyan.designsystem.components.SyTextField
@@ -77,7 +79,7 @@ internal fun V6LoadedConversationSearchSheet(
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val results = remember(query, transcript) { v6SearchLoadedConversation(transcript, query) }
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SyResponsiveSheet(
         title = stringResource(R.string.sy_v6_search_messages),
         subtitle = stringResource(R.string.sy_v6_search_loaded_scope),
@@ -89,21 +91,21 @@ internal fun V6LoadedConversationSearchSheet(
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text(stringResource(R.string.sy_v6_search_message_hint)) },
             leadingIcon = {
-                Icon(SyEntryIcons.Search, contentDescription = null, tint = colors.labelTertiary)
+                Icon(SyEntryIcons.Search, contentDescription = null, tint = colors.textTertiary)
             },
-            shape = DsShapes.block,
+            shape = RoundedCornerShape(SyMetric.radiusCard),
             singleLine = true,
         )
         when {
             query.isBlank() -> Text(
                 stringResource(R.string.sy_v6_search_message_hint),
                 style = DsType.small13,
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
             results.isEmpty() -> Text(
                 stringResource(R.string.sy_v6_search_no_messages),
                 style = DsType.small13,
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
             else -> LazyColumn(Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
                 items(results, key = V6LoadedMessageSearchHit::messageId) { hit ->
