@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class LocalRequestEvidenceSurfaceMemoTest {
@@ -10,7 +9,7 @@ class LocalRequestEvidenceSurfaceMemoTest {
         val memo = LocalRequestEvidenceSurfaceMemo()
         var writes = 0L
         fun store() = ++writes
-        val key = "session\\u0000model-route"
+        val key = "session-route"
         assertEquals(1L, memo.ensure(LocalRequestSurfaceKind.MESSAGE, key, "sha-A", 0, ::store))
         assertEquals(1L, memo.ensure(LocalRequestSurfaceKind.MESSAGE, key, "sha-A", 1, ::store))
         assertEquals(2L, memo.ensure(LocalRequestSurfaceKind.TOOL, key, "sha-A", 1, ::store))
