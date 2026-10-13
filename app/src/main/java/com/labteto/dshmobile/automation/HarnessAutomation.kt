@@ -76,6 +76,14 @@ enum class AutomationScheduleType {
     WINDOW,
 }
 
+/**
+ * Persisted scheduling ownership. Null means a pre-upgrade task: retain its original
+ * WorkManager strategy until the user explicitly edits it. Do not silently replace
+ * an in-flight periodic WorkRequest during application startup.
+ */
+@Serializable
+enum class AutomationDispatchPolicy { PERIODIC, CHAINED }
+
 @Serializable(with = AutomationStatusSerializer::class)
 enum class AutomationStatus(val wireValue: String) {
     SCHEDULED("scheduled"),
@@ -268,6 +276,7 @@ data class AutomationTask(
     val lastResult: String? = null,
     val lastError: String? = null,
     val runReceipts: List<AutomationRunReceipt> = emptyList(),
+    val dispatchPolicy: AutomationDispatchPolicy? = null,
 )
 
 internal fun normalizeAutomationTask(task: AutomationTask): AutomationTask {

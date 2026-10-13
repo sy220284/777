@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1497,
+  "repository_code_file_count": 1498,
   "production_source_count": 842,
-  "test_code_file_count": 503,
+  "test_code_file_count": 504,
   "workflow_files": [
     ".github/workflows/capture-readme-ui.yml",
     ".github/workflows/ci.yml",
@@ -112,7 +112,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkSchedule.kt",
-      "sha256": "c66f90e510ba4d04"
+      "sha256": "208f5d698846322f"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkerSettlementCoordinator.kt",
@@ -120,11 +120,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomation.kt",
-      "sha256": "eac6162f1845f918"
+      "sha256": "01cfec7568c4f8c1"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt",
-      "sha256": "6a3992a88b7c0d79"
+      "sha256": "8ec039df0bd410c7"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationWorker.kt",
@@ -3440,14 +3440,15 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "bc6c12ed54dd",
+  "source_snapshot": "d29c256222ec",
   "observed_delta": {
-    "baseline": "cb10b71a187c",
+    "baseline": "bc6c12ed54dd",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkControlProjection.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt"
+      "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkSchedule.kt",
+      "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomation.kt",
+      "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
