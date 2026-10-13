@@ -42,3 +42,17 @@ internal fun pendingGroupSpeakers(
     // from their latest actual utterance. Preserve the chronological order of last turns.
     return resolved.asReversed().distinctBy { it.first.galleryId }.asReversed()
 }
+
+/** Both foreground group turns and recovered Pending use the same member-state application. */
+internal fun mergeRefreshedGroupMembers(
+    members: List<LocalGroupChatMember>,
+    refreshed: Map<String, ChatCharacterState>,
+    replied: List<GroupReplyForStateUpdate>,
+): List<LocalGroupChatMember> = members.map { existing ->
+    val state = refreshed[existing.galleryId] ?: return@map existing
+    val source = replied.lastOrNull { it.member.galleryId == existing.galleryId }
+    existing.copy(
+        displayName = source?.persona?.name ?: existing.displayName,
+        chatState = state.withoutLegacyConversationContext(),
+    )
+}
