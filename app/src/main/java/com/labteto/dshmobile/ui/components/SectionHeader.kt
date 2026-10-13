@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.components
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -15,7 +17,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
@@ -39,7 +40,7 @@ fun SectionHeader(
         if (action != null) {
             Box(
                 modifier = Modifier
-                    .heightIn(min = DsSpacing.touchTarget)
+                    .heightIn(min = SyMetric.touch)
                     .clip(DsShapes.row)
                     .then(
                         if (onAction != null) {
@@ -48,7 +49,7 @@ fun SectionHeader(
                             Modifier
                         },
                     )
-                    .padding(horizontal = DsSpacing.small),
+                    .padding(horizontal = SyMetric.gapMd),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
