@@ -4,6 +4,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 
 /** 完全独立的新组件库，不依赖 777 旧版 DsTheme / DsButton / Ds*。 */
@@ -37,7 +41,12 @@ data class SyColors(
     val danger: Color = Color(0xFFD9705F),
     val selected: Color,
     val overlay: Color,
-)
+) {
+    // Decoration and small status text have different contrast requirements.
+    val successInk: Color get() = if (text.luminance() < .5f) Color(0xFF2E6755) else mint
+    val warningInk: Color get() = if (text.luminance() < .5f) Color(0xFF80511F) else warning
+    val dangerInk: Color get() = if (text.luminance() < .5f) Color(0xFF963B30) else Color(0xFFE89B8F)
+}
 
 private val Light = SyColors(
     canvas = Color(0xFFEDE6DA), topBar = Color(0xFFF6F1E9),
@@ -83,6 +92,26 @@ object ShenyanPalettes {
 }
 
 val LocalSyColors = staticCompositionLocalOf { Light }
+
+/** Root scene coordinates for aligned, GPU-blurred backing in V6 glass surfaces.
+ * This represents the app's wallpaper / static light fields, not private content in other cards.
+ */
+data class SySceneBackdrop(
+    val viewportOrigin: IntOffset,
+    val viewportSize: IntSize,
+    val canvas: Color,
+    val image: ImageBitmap? = null,
+    val veil: Color? = null,
+    val glowColors: List<Color> = emptyList(),
+    val dark: Boolean = false,
+    val regionColors: List<Color> = emptyList(),
+    val regionExtremes: List<List<Color>> = emptyList(),
+    val surfaceTransparency: Float = .5f,
+    val adaptiveContrast: Boolean = true,
+)
+
+val LocalSySceneBackdrop = staticCompositionLocalOf<SySceneBackdrop?> { null }
+
 
 /** 非业务状态量统一设计，用户自定义字体缩放交由 Compose sp / 系统处理。 */
 object SyMetric {

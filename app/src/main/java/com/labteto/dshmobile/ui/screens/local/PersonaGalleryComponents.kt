@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.shenyan.designsystem.components.SyCheckboxControl
@@ -69,13 +73,10 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.labteto.dshmobile.ui.shenyan.SyDialog
-import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -417,13 +418,10 @@ internal fun GalleryStoryCard(
     unsaved: Boolean,
     onClick: () -> Unit,
 ) {
-    Surface(
+    SyMaterialSurface(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
-        color = DsTheme.colors.wallpaperSurface(
-            WallpaperSurfaceLevel.CARD,
-            base = if (selected) DsTheme.colors.accentTertiary else DsTheme.colors.bgLayer1,
-        ),
+        tint = if (selected) DsTheme.colors.accentTertiary else androidx.compose.ui.graphics.Color.Transparent,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -470,7 +468,7 @@ private fun ArchivedDialogueRow(
     text: String,
     onLongClick: () -> Unit,
 ) {
-    Surface(
+    SyMaterialSurface(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
@@ -478,7 +476,7 @@ private fun ArchivedDialogueRow(
                 onLongClick = onLongClick,
             ),
         shape = DsShapes.row,
-        color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, base = DsTheme.colors.bgLayer2),
+        tier = SyMaterialTier.L3_CARD,
     ) {
         Text(
             text,
@@ -538,9 +536,9 @@ private fun PersonaAvatar(name: String, large: Boolean = false) {
 
 @Composable
 internal fun GalleryPill(text: String) {
-    Surface(
+    SyMaterialSurface(
         shape = RoundedCornerShape(999.dp),
-        color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, base = DsTheme.colors.bgLayer1),
+        tier = SyMaterialTier.L3_CARD,
     ) {
         Text(
             text,

@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.rememberScrollState
@@ -77,6 +81,8 @@ fun TasksScreen(
     onOpenSession: (String) -> Unit = {},
     onCreateViaChat: ((String) -> Unit)? = null,
     initialMode: AutomationMode? = null,
+    initialSelectedTaskId: String? = null,
+    entryRequest: Int = 0,
     handleRootSystemBack: Boolean = true,
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
@@ -95,6 +101,8 @@ fun TasksScreen(
             onClose = onClose,
             onOpenSession = onOpenSession,
             handleRootSystemBack = handleRootSystemBack,
+            initialSelectedTaskId = initialSelectedTaskId,
+            entryRequest = entryRequest,
         )
         return
     }
@@ -106,6 +114,8 @@ fun TasksScreen(
         onOpenSession = onOpenSession,
         onCreateViaChat = onCreateViaChat,
         handleRootSystemBack = handleRootSystemBack,
+        initialSelectedTaskId = initialSelectedTaskId,
+        entryRequest = entryRequest,
     )
 }
 
@@ -117,6 +127,8 @@ private fun WorkTasksScreen(
     onOpenSession: (String) -> Unit,
     onCreateViaChat: ((String) -> Unit)?,
     handleRootSystemBack: Boolean,
+    initialSelectedTaskId: String?,
+    entryRequest: Int,
 ) {
     val colors = DsTheme.colors
     val visibleTasks = state.tasks.filter { it.mode == AutomationMode.WORK }
@@ -125,8 +137,8 @@ private fun WorkTasksScreen(
     val chatCreatePrompt = stringResource(R.string.tasks_create_chat_prompt)
     val createFromChat = { if (onCreateViaChat != null) onCreateViaChat(chatCreatePrompt) else Unit }
     val createInvalidMessage = stringResource(R.string.tasks_create_invalid)
-    var showCreate by rememberSaveable { mutableStateOf(false) }
-    var selectedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showCreate by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(false, entryRequest)
+    var selectedTaskId by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(initialSelectedTaskId, entryRequest)
     val selectedTask = visibleTasks.firstOrNull { it.id == selectedTaskId }
     LaunchedEffect(visibleTasks, selectedTaskId) {
         if (selectedTaskId != null && selectedTask == null) selectedTaskId = null
@@ -203,9 +215,7 @@ private fun WorkTasksScreen(
             Column(
                 Modifier
                     .fillMaxSize()
-                    .safeDrawingPadding()
-                    .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                    .safeDrawingPadding(),
             ) {
                 Box(Modifier.fillMaxWidth()) {
                     SyTopBar(
@@ -248,81 +258,88 @@ private fun WorkTasksScreen(
                     }
                 }
 
-                when {
-                    showCreate -> TaskEditorPane(
-                        state = editorState,
-                        viewModel = viewModel,
-                        createInvalidMessage = createInvalidMessage,
-                        onReset = ::resetEditor,
-                    )
-                    visibleTasks.isEmpty() -> TaskEmptyState(
-                        onManualCreate = ::startCreate,
-                        onCreateViaChat = onCreateViaChat?.let { createFromChat },
-                    )
-                    selectedTask != null -> Column(
-                        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                    ) {
-                        TaskCard(
-                            task = selectedTask,
-                            onCancel = { viewModel.cancel(selectedTask.id) },
-                            onPause = { viewModel.pause(selectedTask.id) },
-                            onResume = { viewModel.resume(selectedTask.id) },
-                            onRunNow = { viewModel.runNow(selectedTask.id) },
-                            onEdit = { startEdit(selectedTask) },
-                            onOpenSession = onOpenSession,
+                Column(
+                    modifier = Modifier.weight(1f)
+                        .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                ) {
+                    when {
+                        showCreate -> TaskEditorPane(
+                            state = editorState,
+                            viewModel = viewModel,
+                            createInvalidMessage = createInvalidMessage,
+                            onReset = ::resetEditor,
                         )
-                    }
-                    else -> Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
-                    ) {
-                        // Screen 19: show the real schedule state in the same glass tab
-                        // language as the work/history pages; never fabricate budget figures.
-                        val statusFilters = WorkTaskListFilter.entries
-                        val titles = listOf(
-                            stringResource(R.string.tasks_filter_all),
-                            stringResource(R.string.tasks_filter_scheduled),
-                            stringResource(R.string.tasks_filter_running),
-                            stringResource(R.string.tasks_filter_paused),
+                        visibleTasks.isEmpty() -> TaskEmptyState(
+                            onManualCreate = ::startCreate,
+                            onCreateViaChat = onCreateViaChat?.let { createFromChat },
                         )
-                        SySegmented(
-                            segments = statusFilters.mapIndexed { index, filter ->
-                                SySegment(filter.name, "${titles[index]} · ${visibleTasks.count { workTaskMatchesFilter(it.status, filter) }}")
-                            },
-                            selectedKey = listFilter.name,
-                            onSelect = { key ->
-                                listFilter = WorkTaskListFilter.entries.firstOrNull { it.name == key }
-                                    ?: WorkTaskListFilter.ALL
-                            },
-                            role = Role.Tab,
-                            stretch = true,
-                            hapticOnChange = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        if (filteredTasks.isEmpty()) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth().padding(DsSpacing.large),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                            ) {
-                                Text(
-                                    stringResource(R.string.tasks_filter_empty),
-                                    style = DsType.small13.withReadingWeight(),
-                                    color = colors.labelSecondary,
-                                )
-                                SyButton(
-                                    text = stringResource(R.string.tasks_filter_all),
-                                    onClick = { listFilter = WorkTaskListFilter.ALL },
-                                    variant = SyButtonVariant.Outline,
-                                )
-                            }
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
-                            ) {
-                                items(filteredTasks, key = AutomationTask::id) { task ->
-                                    TaskSummaryRow(task = task, onClick = { selectedTaskId = task.id })
+                        selectedTask != null -> Column(
+                            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                        ) {
+                            TaskCard(
+                                task = selectedTask,
+                                onCancel = { viewModel.cancel(selectedTask.id) },
+                                onPause = { viewModel.pause(selectedTask.id) },
+                                onResume = { viewModel.resume(selectedTask.id) },
+                                onRunNow = { viewModel.runNow(selectedTask.id) },
+                                onEdit = { startEdit(selectedTask) },
+                                onOpenSession = onOpenSession,
+                            )
+                        }
+                        else -> Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                        ) {
+                            // Screen 19: show the real schedule state in the same glass tab
+                            // language as the work/history pages; never fabricate budget figures.
+                            val statusFilters = WorkTaskListFilter.entries
+                            val titles = listOf(
+                                stringResource(R.string.tasks_filter_all),
+                                stringResource(R.string.tasks_filter_scheduled),
+                                stringResource(R.string.tasks_filter_running),
+                                stringResource(R.string.tasks_filter_paused),
+                            )
+                            SySegmented(
+                                segments = statusFilters.mapIndexed { index, filter ->
+                                    SySegment(filter.name, "${titles[index]} · ${visibleTasks.count { workTaskMatchesFilter(it.status, filter) }}")
+                                },
+                                selectedKey = listFilter.name,
+                                onSelect = { key ->
+                                    listFilter = WorkTaskListFilter.entries.firstOrNull { it.name == key }
+                                        ?: WorkTaskListFilter.ALL
+                                },
+                                role = Role.Tab,
+                                stretch = true,
+                                hapticOnChange = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            if (filteredTasks.isEmpty()) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().padding(DsSpacing.large),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                                ) {
+                                    Text(
+                                        stringResource(R.string.tasks_filter_empty),
+                                        style = DsType.small13.withReadingWeight(),
+                                        color = colors.labelSecondary,
+                                    )
+                                    SyButton(
+                                        text = stringResource(R.string.tasks_filter_all),
+                                        onClick = { listFilter = WorkTaskListFilter.ALL },
+                                        variant = SyButtonVariant.Outline,
+                                    )
+                                }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = DsSpacing.medium),
+                                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                                ) {
+                                    items(filteredTasks, key = AutomationTask::id) { task ->
+                                        TaskSummaryRow(task = task, onClick = { selectedTaskId = task.id })
+                                    }
                                 }
                             }
                         }
@@ -386,10 +403,10 @@ private fun TaskEmptyState(
                     )
                 }
             }
-            if (onCreateViaChat != null) Surface(
+            if (onCreateViaChat != null) SyMaterialSurface(
                 onClick = onCreateViaChat,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                color = colors.bgModulePlatform,
+                tier = SyMaterialTier.L1_SECTION,
                 shape = DsShapes.buttonCapsule,
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(DsSpacing.medium)) {

@@ -6,6 +6,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -27,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.shenyan.designsystem.foundation.LocalSyColors
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_RESOURCE
@@ -35,6 +38,8 @@ import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_USAGE_URL
 import com.labteto.dshmobile.local.model.chatgpt.shouldRequestChatGptPlanConsent
+import com.labteto.dshmobile.ui.shenyan.SyMaterialFrame
+import com.labteto.dshmobile.ui.shenyan.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -53,6 +58,7 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ChatGptAccountPanel(
     state: ChatGptUiState,
@@ -101,21 +107,21 @@ internal fun ChatGptAccountPanel(
     val authorizationCanRestart = state.phase == ChatGptAuthPhase.PREPARING ||
         state.phase == ChatGptAuthPhase.WAITING_FOR_BROWSER
 
-    Surface(
+    SyMaterialFrame(
         modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        tier = SyMaterialTier.L3_CARD,
+        horizontalPadding = 0.dp,
+        verticalPadding = 0.dp,
     ) {
         Column(
             modifier = Modifier.padding(DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.fillMaxWidth()) {
                     Text(
                         stringResource(R.string.chatgpt_account_title),
                         style = DsType.std14Strong.withReadingWeight(),
@@ -334,10 +340,12 @@ internal fun ChatGptAccountPanel(
                 }
 
 
-                // 账户快捷操作：同一排四等宽入口，窄屏和字体放大时允许文字折行。
-                Row(
+                // Account management is a two-column action grid; status and identity keep their own space.
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    maxItemsInEachRow = 2,
                 ) {
                     ChatGptAccountAction(
                         label = stringResource(R.string.chatgpt_action_view_usage),
@@ -402,7 +410,7 @@ internal fun ChatGptAccountPanel(
                     planModels.forEach { model ->
                         Surface(
                             shape = DsShapes.row,
-                            color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+                            color = LocalSyColors.current.materialL1,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Row(
@@ -574,7 +582,7 @@ private fun ChatGptAccountAction(
         enabled = enabled,
         modifier = modifier.heightIn(min = 64.dp),
         shape = DsShapes.row,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT, base = colors.bgModulePlatform),
+        color = LocalSyColors.current.materialL1,
         contentColor = labelColor,
         border = BorderStroke(1.dp, colors.borderL2),
     ) {

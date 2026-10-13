@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.labteto.dshmobile.ui.shenyan.SyProgressBar
@@ -61,8 +65,6 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
 import java.text.NumberFormat
@@ -202,12 +204,12 @@ internal fun UsageCalculationPage(
                     item(key = entry.key) {
                         // Design #04: the model-composition rows are functional filter
                         // entrances backed by the same selectedModel source as the menu.
-                        Surface(
+                        SyMaterialSurface(
                             onClick = { onSelectModel(entry.key) },
                             modifier = Modifier.fillMaxWidth()
                                 .testTag("usage-model-select:" + entry.key),
                             shape = DsShapes.row,
-                            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                            tier = SyMaterialTier.L3_CARD,
                         ) {
                             Column(
                                 modifier = Modifier.padding(DsSpacing.small),
@@ -237,21 +239,21 @@ internal fun UsageCalculationPage(
         }
     }
 
-    Surface(
+    SyMaterialSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        tier = SyMaterialTier.L3_CARD,
     ) {
         Column(
             modifier = Modifier.padding(DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                 Text(
                     stringResource(R.string.usage_daily_title),
                     style = DsType.std14Strong.withReadingWeight(),
                     color = colors.labelPrimary,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 UsageRangeSelector(
                     selectedIndex = rangeIndex,
@@ -264,12 +266,12 @@ internal fun UsageCalculationPage(
                 onSelect = { selectedEpochDay = it },
             )
             selectedDay?.let { (day, aggregate) ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
                     Text(
                         formatEpochDay(day),
                         style = DsType.small13Strong.withReadingWeight(),
                         color = colors.labelPrimary,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                     )
                     Text(
                         "${stringResource(R.string.usage_calculation_input)} ${formatTokens(aggregate.inputTokens)} · " +
@@ -295,10 +297,10 @@ internal fun UsageCalculationPage(
     if (groups.isEmpty()) {
         EmptyUsageDetail()
     } else {
-        Surface(
+        SyMaterialSurface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.block,
-            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+            tier = SyMaterialTier.L3_CARD,
         ) {
             Column {
                 val visibleGroups = if (showAllGroups) groups else groups.take(12)
@@ -423,10 +425,10 @@ internal fun UsageLogPage(
         EmptyUsageDetail(message = stringResource(R.string.usage_log_empty))
         return
     }
-    Surface(
+    SyMaterialSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        tier = SyMaterialTier.L3_CARD,
     ) {
         Column {
             val records = visibleAnalytics.recentRecords.take(120)
@@ -455,10 +457,10 @@ internal fun UsageGroupDetailPage(
 
     if (detail.agents.size > 1 || detail.agents.any { it.runKind.isNotBlank() }) {
         SectionHeading(stringResource(R.string.usage_agents))
-        Surface(
+        SyMaterialSurface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.block,
-            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+            tier = SyMaterialTier.L3_CARD,
         ) {
             Column {
                 detail.agents.forEachIndexed { index, agent ->
@@ -471,10 +473,10 @@ internal fun UsageGroupDetailPage(
 
     if (detail.actions.isNotEmpty()) {
         SectionHeading(stringResource(R.string.usage_actions))
-        Surface(
+        SyMaterialSurface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.block,
-            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+            tier = SyMaterialTier.L3_CARD,
         ) {
             Column {
                 detail.actions.forEachIndexed { index, item ->
@@ -486,10 +488,10 @@ internal fun UsageGroupDetailPage(
     }
 
     SectionHeading(stringResource(R.string.usage_log_title))
-    Surface(
+    SyMaterialSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        tier = SyMaterialTier.L3_CARD,
     ) {
         Column {
             val records = detail.records.take(120)
@@ -523,10 +525,10 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
         badge = stringResource(R.string.usage_exact_badge),
     )
 
-    Surface(
+    SyMaterialSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        tier = SyMaterialTier.L3_CARD,
     ) {
         Column(
             modifier = Modifier.padding(DsSpacing.medium),

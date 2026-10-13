@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -54,8 +58,6 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
 import java.text.NumberFormat
@@ -75,10 +77,9 @@ internal fun DeviceUsageHero(usage: DeepSeekUsageSnapshot, showEstimatedCost: Bo
     } else {
         stringResource(R.string.usage_calculation_no_data)
     }
-    Surface(
+    com.shenyan.designsystem.components.SyMaterialFrame(
         modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.dialog,
-        color = colors.accentTertiary,
+        horizontalPadding = 0.dp, verticalPadding = 0.dp,
     ) {
         Column(
             modifier = Modifier.padding(DsSpacing.large),
@@ -425,10 +426,9 @@ internal fun UsageAggregateHero(
     badge: String? = null,
 ) {
     val colors = DsTheme.colors
-    Surface(
+    com.shenyan.designsystem.components.SyMaterialFrame(
         modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.dialog,
-        color = colors.accentTertiary,
+        horizontalPadding = 0.dp, verticalPadding = 0.dp,
     ) {
         Column(
             modifier = Modifier.padding(DsSpacing.large),
@@ -462,19 +462,19 @@ internal fun UsageAggregateHero(
 @Composable
 internal fun CompactMetric(label: String, value: String, modifier: Modifier = Modifier) {
     val colors = DsTheme.colors
-    Surface(
+    com.shenyan.designsystem.components.SyMaterialFrame(
         modifier = modifier,
-        shape = DsShapes.row,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        tier = com.shenyan.designsystem.components.SyMaterialTier.L1_SECTION,
+        shape = DsShapes.row, horizontalPadding = 0.dp, verticalPadding = 0.dp,
     ) {
         Column(
             modifier = Modifier.padding(DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
         ) {
-            Text(label, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary, maxLines = 1)
+            Text(label, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
             Text(
                 value,
-                style = DsType.large20.withReadingWeight(),
+                style = DsType.large20.withReadingWeight().copy(fontFeatureSettings = "tnum"),
                 color = colors.labelPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -485,17 +485,17 @@ internal fun CompactMetric(label: String, value: String, modifier: Modifier = Mo
 
 @Composable
 internal fun SectionHeading(text: String) {
-    Text(text, style = DsType.std14Strong.withReadingWeight(), color = DsTheme.colors.labelPrimary)
+    com.shenyan.designsystem.components.SySectionHeader(text)
 }
 
 @Composable
 internal fun EmptyUsageDetail(message: String? = null) {
     val colors = DsTheme.colors
     val resolvedMessage = message ?: stringResource(R.string.usage_empty_detail)
-    Surface(
+    SyMaterialSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.row,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        tier = SyMaterialTier.L3_CARD,
     ) {
         Text(
             resolvedMessage,

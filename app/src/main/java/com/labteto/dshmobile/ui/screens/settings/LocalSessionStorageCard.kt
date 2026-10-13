@@ -44,6 +44,9 @@ internal fun LocalSessionStorageCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
+                Text(formatStorageBytes(status.totalBytes),
+                    style = DsType.display24.withReadingWeight().copy(fontFeatureSettings = "tnum"),
+                    color = colors.labelPrimary)
                 Text(
                     text = stringResource(
                         R.string.settings_local_session_storage_usage,

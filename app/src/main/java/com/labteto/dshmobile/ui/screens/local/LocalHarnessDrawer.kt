@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -16,10 +20,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,6 +40,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
+import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
+import androidx.compose.ui.graphics.compositeOver
 import com.labteto.dshmobile.ui.shenyan.SyDimensions
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -48,6 +54,11 @@ import androidx.compose.ui.semantics.semantics
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.automation.AutomationTask
+import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.ui.shenyan.SyButton
@@ -57,13 +68,12 @@ import com.shenyan.designsystem.components.SyIconButton
 import com.shenyan.designsystem.components.SyCategoryRow
 import com.shenyan.designsystem.components.SyGroupCard
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.sidebar.SidebarAvatarPicker
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 
@@ -99,6 +109,10 @@ internal fun LocalModeDrawer(
     onRenameSession: (String, String) -> Boolean,
     onTogglePinSession: (String) -> Unit,
     onWorkspaceFiles: () -> Unit,
+    searchTasks: List<AutomationTask>,
+    loadSearchFiles: suspend () -> List<LocalWorkspaceFile>,
+    onSearchTask: (AutomationTask) -> Unit,
+    onSearchFile: (String) -> Unit,
     onProjects: () -> Unit,
     onOpenRunCenter: () -> Unit,
     groupMemberCount: Int,
@@ -112,9 +126,12 @@ internal fun LocalModeDrawer(
     onMiniMaxQuota: (() -> Unit)? = null,
     onUsage: (() -> Unit)? = null,
     onImmersiveReader: (() -> Unit)? = null,
+    globalSearchOpenRequest: Int = 0,
 ) {
     val colors = DsTheme.colors
     val sy = LocalSyPalette.current
+    // The drawer has its own visual backing: raw L2 on the scene looked fully transparent.
+    // Wallpaper mode retains a faint view of the user's image without sacrificing legibility.
     val expandLabel = stringResource(R.string.sy_v5_nav_expand)
     val collapseLabel = stringResource(R.string.sy_v5_nav_collapse)
     val docked = LocalConfiguration.current.screenWidthDp >= 1024
@@ -123,31 +140,38 @@ internal fun LocalModeDrawer(
         // A functional 64dp rail: never leave a collapsed sidebar full of clipped labels.
         Column(
             Modifier.width(SyDimensions.navigationCollapsed).fillMaxHeight()
-                .background(sy.l2).safeDrawingPadding(),
+                .background(com.shenyan.designsystem.components.syMaterialColor(SyMaterialTier.L4_OVERLAY)).safeDrawingPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            TextButton(onClick = { syRailCollapsed = false }, modifier = Modifier.semantics { contentDescription = expandLabel }) { Text("»", color = sy.text) }
-            SyIconButton(icon = FeatherIcons.Plus, contentDescription = stringResource(R.string.sy_v5_new_session),
+            SyIconButton(
+                icon = FeatherIcons.ChevronRight,
+                contentDescription = expandLabel,
+                onClick = { syRailCollapsed = false }, tint = sy.text,
+            )
+            SyIconButton(icon = SyEntryIcons.NewSession, contentDescription = stringResource(R.string.sy_v5_new_session),
                 onClick = onNewSession, containerColor = sy.l3, tint = sy.text)
             when (localCollapsedRailPrimaryEntry(usageMode)) {
                 LocalFeatureDrawerEntry.PERSONA_GALLERY ->
-                    SyIconButton(icon = FeatherIcons.User, contentDescription = stringResource(R.string.persona_gallery_title),
+                    SyIconButton(icon = SyEntryIcons.Persona, contentDescription = stringResource(R.string.persona_gallery_title),
                         onClick = onOpenPersonaGallery, containerColor = sy.l3, tint = sy.text)
                 LocalFeatureDrawerEntry.PROJECT ->
-                    SyIconButton(icon = FeatherIcons.Folder, contentDescription = stringResource(R.string.local_project_management_title),
+                    SyIconButton(icon = SyEntryIcons.Projects, contentDescription = stringResource(R.string.local_project_management_title),
                         onClick = onProjects, containerColor = sy.l3, tint = sy.text)
                 else -> error("Unexpected collapsed rail primary destination")
             }
-            SyIconButton(icon = FeatherIcons.Clock, contentDescription = stringResource(localCollapsedRailTaskTitle(usageMode)),
+            SyIconButton(icon = SyEntryIcons.Tasks, contentDescription = stringResource(localCollapsedRailTaskTitle(usageMode)),
                 onClick = onTasks, containerColor = sy.l3, tint = sy.text)
-            SyIconButton(icon = FeatherIcons.SettingsOutline, contentDescription = stringResource(R.string.sy_v5_settings),
+            SyIconButton(icon = SyEntryIcons.Settings, contentDescription = stringResource(R.string.sy_v5_settings),
                 onClick = onSettings, containerColor = sy.l3, tint = sy.text)
         }
         return
     }
     var historyQuery by rememberSaveable(usageMode) { mutableStateOf("") }
     var searchOpen by rememberSaveable(usageMode) { mutableStateOf(false) }
+    LaunchedEffect(globalSearchOpenRequest) {
+        if (globalSearchOpenRequest > 0) searchOpen = true
+    }
     var selectionOpen by remember { mutableStateOf(false) }
     var renameTargetId by remember { mutableStateOf<String?>(null) }
     var deleteCandidateIds by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -214,6 +238,29 @@ internal fun LocalModeDrawer(
         }?.takeIf(String::isNotBlank)
     }
     val crossModeSearch = searchOpen && historyQuery.isNotBlank()
+    var searchableFiles by remember { mutableStateOf<List<LocalWorkspaceFile>>(emptyList()) }
+    var fileSearchFailed by remember { mutableStateOf(false) }
+    LaunchedEffect(searchOpen, drawerOpen) {
+        if (searchOpen && drawerOpen) {
+            fileSearchFailed = false
+            try {
+                searchableFiles = withContext(Dispatchers.IO) { loadSearchFiles() }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                searchableFiles = emptyList()
+                fileSearchFailed = true
+            }
+        } else if (!searchOpen) {
+            searchableFiles = emptyList()
+        }
+    }
+    val matchedTasks = remember(searchTasks, historyQuery, crossModeSearch) {
+        if (crossModeSearch) localDrawerMatchingTasks(searchTasks, historyQuery) else emptyList()
+    }
+    val matchedFiles = remember(searchableFiles, historyQuery, crossModeSearch) {
+        if (crossModeSearch) localDrawerMatchingFiles(searchableFiles, historyQuery) else emptyList()
+    }
     val sessionSections = remember(
         sessions,
         usageMode,
@@ -249,12 +296,14 @@ internal fun LocalModeDrawer(
 
     ModalDrawerSheet(
         drawerShape = androidx.compose.ui.graphics.RectangleShape,
-        drawerContainerColor = sy.l2,
+        drawerContainerColor = androidx.compose.ui.graphics.Color.Transparent,
         modifier = Modifier.fillMaxHeight().width(
             if (docked) SyDimensions.navigationExpanded
             else LocalConfiguration.current.screenWidthDp.dp * DsMetrics.drawerWidthFraction
         ),
     ) {
+        SyMaterialSurface(modifier = Modifier.fillMaxHeight(), tier = SyMaterialTier.L4_OVERLAY,
+            shape = androidx.compose.ui.graphics.RectangleShape) {
         Column(Modifier.fillMaxHeight().safeDrawingPadding()) {
             Column(
                 modifier = Modifier
@@ -267,9 +316,11 @@ internal fun LocalModeDrawer(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (docked) {
-                        TextButton(onClick = { syRailCollapsed = true }, modifier = Modifier.semantics { contentDescription = collapseLabel }) {
-                            Text("«", color = sy.text)
-                        }
+                        SyIconButton(
+                            icon = FeatherIcons.ChevronLeft,
+                            contentDescription = collapseLabel,
+                            onClick = { syRailCollapsed = true }, tint = sy.text,
+                        )
                     }
                     SidebarAvatarPicker()
                     Spacer(Modifier.width(DsSpacing.small))
@@ -282,7 +333,7 @@ internal fun LocalModeDrawer(
                         overflow = TextOverflow.Ellipsis,
                     )
                     SyIconButton(
-                        icon = FeatherIcons.Search,
+                        icon = SyEntryIcons.Search,
                         contentDescription = stringResource(R.string.common_search),
                         onClick = {
                             searchOpen = !searchOpen
@@ -291,15 +342,15 @@ internal fun LocalModeDrawer(
                                 keyboardController?.hide()
                             }
                         },
-                        containerColor = colors.bgLayer1,
-                        tint = colors.labelPrimary,
+                        containerColor = sy.l3.compositeOver(sy.canvas),
+                        tint = sy.text,
                     )
                     SyIconButton(
-                        icon = FeatherIcons.Plus,
+                        icon = SyEntryIcons.NewSession,
                         contentDescription = stringResource(R.string.chatlist_new_session),
                         onClick = onNewSession,
-                        containerColor = colors.bgLayer1,
-                        tint = colors.labelPrimary,
+                        containerColor = sy.l3.compositeOver(sy.canvas),
+                        tint = sy.text,
                     )
 
                 }
@@ -316,7 +367,7 @@ internal fun LocalModeDrawer(
                         modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
                         placeholder = { Text(stringResource(R.string.local_drawer_search_people_sessions)) },
                         leadingIcon = {
-                            Icon(FeatherIcons.Search, contentDescription = null, tint = colors.labelTertiary)
+                            Icon(SyEntryIcons.Search, contentDescription = null, tint = colors.labelTertiary)
                         },
                         singleLine = true,
                         shape = DsShapes.pillFull,
@@ -371,7 +422,7 @@ internal fun LocalModeDrawer(
                     }
                     items(matchedPersonas, key = { "persona:" + it.id }) { entry ->
                         SyCategoryRow(
-                            icon = FeatherIcons.User,
+                            icon = SyEntryIcons.Persona,
                             title = entry.persona.name,
                             subtitle = entry.persona.coreIdentity.ifBlank {
                                 stringResource(R.string.local_drawer_search_open_gallery)
@@ -382,6 +433,40 @@ internal fun LocalModeDrawer(
                     }
                 }
 
+                if (matchedTasks.isNotEmpty()) {
+                    item(key = "drawer-task-search-heading") {
+                        DrawerSectionTitle(stringResource(R.string.tasks_title), matchedTasks.size)
+                    }
+                    items(matchedTasks, key = { "task-search:" + it.id }) { task ->
+                        SyCategoryRow(
+                            icon = SyEntryIcons.Tasks,
+                            title = task.prompt,
+                            subtitle = task.actorName ?: task.id,
+                            onClick = { onSearchTask(task) },
+                        )
+                    }
+                }
+                if (matchedFiles.isNotEmpty()) {
+                    item(key = "drawer-file-search-heading") {
+                        DrawerSectionTitle(stringResource(R.string.chatlist_workspace_files), matchedFiles.size)
+                    }
+                    items(matchedFiles, key = { "file-search:" + it.path }) { file ->
+                        SyCategoryRow(
+                            icon = SyEntryIcons.WorkspaceFiles,
+                            title = file.path.substringAfterLast('/'),
+                            subtitle = file.path,
+                            onClick = { onSearchFile(file.path) },
+                        )
+                    }
+                }
+                if (crossModeSearch && fileSearchFailed) {
+                    item(key = "drawer-file-search-error") {
+                        Text(stringResource(R.string.local_files_read_failed),
+                            color = colors.labelTertiary,
+                            style = DsType.navigationSupporting.withReadingWeight())
+                    }
+                }
+
                 if (sessionSections.pinned.isNotEmpty()) {
                     item(key = "drawer-pinned-heading") {
                         DrawerSectionTitle(
@@ -389,7 +474,8 @@ internal fun LocalModeDrawer(
                             count = sessionSections.pinned.size,
                         )
                     }
-                    items(sessionSections.pinned, key = { "pinned:" + it.id }) { session ->
+                    itemsIndexed(sessionSections.pinned, key = { _, item -> "pinned:" + item.id }) { index, session ->
+                        com.shenyan.designsystem.components.SyEntranceCascade(drawerOpen || docked, index) {
                         LocalSessionDrawerRow(
                             session = session,
                             displayTitle = sessionTitleOverrides[session.id] ?: session.title,
@@ -419,6 +505,7 @@ internal fun LocalModeDrawer(
                                     R.string.usage_mode_chat else R.string.usage_mode_work,
                             ) else null,
                         )
+                        }
                     }
                 }
 
@@ -429,7 +516,8 @@ internal fun LocalModeDrawer(
                             count = sessionSections.recent.size,
                         )
                     }
-                    items(sessionSections.recent, key = { "recent:" + it.id }) { session ->
+                    itemsIndexed(sessionSections.recent, key = { _, item -> "recent:" + item.id }) { index, session ->
+                        com.shenyan.designsystem.components.SyEntranceCascade(drawerOpen || docked, index + sessionSections.pinned.size) {
                         LocalSessionDrawerRow(
                             session = session,
                             displayTitle = sessionTitleOverrides[session.id] ?: session.title,
@@ -459,10 +547,13 @@ internal fun LocalModeDrawer(
                                     R.string.usage_mode_chat else R.string.usage_mode_work,
                             ) else null,
                         )
+                        }
                     }
                 }
 
-                if (searchOpen && historyQuery.isNotBlank() && matchedPersonas.isEmpty() && sessionSections.pinned.isEmpty() && sessionSections.recent.isEmpty()) {
+                if (crossModeSearch && matchedPersonas.isEmpty() && matchedTasks.isEmpty() &&
+                    matchedFiles.isEmpty() && sessionSections.pinned.isEmpty() && sessionSections.recent.isEmpty() &&
+                    !fileSearchFailed) {
                     item(key = "drawer-no-sessions") {
                         Text(
                             stringResource(R.string.local_drawer_search_empty_both),
@@ -486,9 +577,9 @@ internal fun LocalModeDrawer(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
                 if (selectionOpen) {
-                    Surface(
+                    SyMaterialSurface(
                         shape = DsShapes.block,
-                        color = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
+                        tier = SyMaterialTier.L4_OVERLAY,
                     ) {
                         Row(
                             Modifier
@@ -524,7 +615,7 @@ internal fun LocalModeDrawer(
                 } else {
                     SyGroupCard {
                         SyCategoryRow(
-                            icon = FeatherIcons.SettingsOutline,
+                            icon = SyEntryIcons.Settings,
                             title = stringResource(R.string.settings_title),
                             titleTextStyle = DsType.navigationItem,
                             onClick = onSettings,
@@ -532,6 +623,7 @@ internal fun LocalModeDrawer(
                     }
                 }
             }
+        }
         }
         renameTargetId?.let { id ->
             RenameDialog(

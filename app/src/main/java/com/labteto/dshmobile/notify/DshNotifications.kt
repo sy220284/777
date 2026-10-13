@@ -15,6 +15,8 @@ import com.labteto.dshmobile.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.labteto.dshmobile.connection.AppSettings
+import java.time.LocalTime
 
 /** Local session notifications only. */
 @Singleton
@@ -45,8 +47,12 @@ class DshNotifications @Inject constructor(
         text: String,
         sessionId: String?,
         notificationKey: String = sessionId?.takeIf(String::isNotBlank)?.let { "session:$it" } ?: "id:$id",
+        kind: LocalNotificationKind = LocalNotificationKind.RESULT,
+        settings: AppSettings,
     ) {
         if (!canPost()) return
+        val now = LocalTime.now()
+        if (!shouldDeliverLocalNotification(settings, kind, now.hour * 60 + now.minute)) return
         val open = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             data = android.net.Uri.Builder()

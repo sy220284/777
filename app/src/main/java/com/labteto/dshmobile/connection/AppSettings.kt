@@ -11,6 +11,14 @@ object AppDisplayLimits {
 /** Local application preferences persisted through DataStore. */
 data class AppSettings(
     val notifyLocalJobs: Boolean = true,
+    val notifyJobResults: Boolean = true,
+    val notifyJobFailures: Boolean = true,
+    val notifyNeedsAction: Boolean = true,
+    val notifyChatMessages: Boolean = true,
+    /** Applies to non-urgent results/chat alerts only, never failures or approvals. */
+    val notificationQuietHoursEnabled: Boolean = false,
+    val notificationQuietStartMinute: Int = 23 * 60,
+    val notificationQuietEndMinute: Int = 7 * 60,
     val themePreference: String = "system", // light | dark | matte_black | system
     val accentTheme: String = "celadon", // 中国风传统色卡 key，见 ui/theme/AccentPalettes
     /**

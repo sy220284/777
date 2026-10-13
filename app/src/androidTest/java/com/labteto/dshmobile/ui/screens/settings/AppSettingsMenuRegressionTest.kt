@@ -20,8 +20,8 @@ class AppSettingsMenuRegressionTest {
 
     @Test
     fun appearanceIsOneSettingsPageWithoutNestedDestinations() {
-        assertEquals(SettingsDestination.ROOT, SettingsDestination.APPEARANCE.parentDestination())
-        assertEquals(1, SettingsDestination.APPEARANCE.navigationDepth())
+        val root = listOf(SettingsDestination.ROOT)
+        assertEquals(root, settingsNavigationPop(settingsNavigationPush(root, SettingsDestination.APPEARANCE)))
         assertFalse(SettingsDestination.entries.any { it.name.startsWith("APPEARANCE_") })
     }
 

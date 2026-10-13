@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.tools
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -192,12 +196,11 @@ internal fun PluginInventoryBrowser(
         }
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
-        Column(Modifier.fillMaxSize().safeDrawingPadding().padding(top = DsSpacing.medium)) {
+        Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             SyTopBar(
                 title = stringResource(if (skillsOnly) R.string.skills_title else R.string.tools_catalog_title),
                 onBack = onBack,
                 backContentDescription = stringResource(R.string.common_back),
-                modifier = Modifier.padding(horizontal = DsSpacing.comfortable),
             )
             SySearchField(
                 value = query,
@@ -325,10 +328,10 @@ internal fun PluginInventoryBrowser(
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
                 ) {
                     items(list, key = { it.id }) { item ->
-                        Surface(
+                        SyMaterialSurface(
                             modifier = Modifier.fillMaxWidth(),
                             onClick = { selectedRow = item },
-                            color = colors.bgLayer1,
+                            tier = SyMaterialTier.L3_CARD,
                             shape = DsShapes.block,
                         ) {
                             Row(
@@ -336,8 +339,8 @@ internal fun PluginInventoryBrowser(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
                             ) {
-                                Surface(
-                                    color = colors.bgModulePlatform,
+                                SyMaterialSurface(
+                                    tier = SyMaterialTier.L1_SECTION,
                                     shape = DsShapes.row,
                                 ) {
                                     Icon(

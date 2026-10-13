@@ -13,6 +13,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.*
 import com.labteto.dshmobile.ui.theme.*
@@ -28,8 +29,9 @@ internal fun FluidMessageReader(title: String, content: String, onDismiss: () ->
                     stringResource(R.string.fluid_reader_empty), body = "", modifier = Modifier.weight(1f))
                 else SelectionContainer(Modifier.weight(1f)) {
                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                        .padding(DsSpacing.comfortable)) {
-                        MarkdownText(content, modifier = Modifier.fillMaxWidth())
+                        .padding(horizontal = DsSpacing.large, vertical = DsSpacing.xlarge)) {
+                        MarkdownText(content, modifier = Modifier.fillMaxWidth(),
+                            bodyStyle = DsType.mdBody.copy(fontSize = 17.sp, lineHeight = 28.sp).withReadingWeight())
                     }
                 }
             }

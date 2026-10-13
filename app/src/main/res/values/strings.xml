@@ -1197,8 +1197,21 @@
 
 
     <string name="notif_channel_local_jobs">本机任务</string>
-    <string name="settings_notifications_local_jobs">本机任务完成通知</string>
-    <string name="settings_notifications_local_jobs_hint">工作模式的本机任务结束、失败或取消时发送通知。</string>
+    <string name="settings_notifications_local_jobs">本机通知总开关</string>
+    <string name="settings_notifications_local_jobs_hint">本机任务、自动化与主动消息通知总开关；具体类型可单独关闭。</string>
+    <string name="settings_notification_results">任务完成和取消</string>
+    <string name="settings_notification_results_hint">工作任务与自动化完成、取消时提醒。</string>
+    <string name="settings_notification_failures">执行失败</string>
+    <string name="settings_notification_failures_hint">任务失败时提醒，不受免打扰时间限制。</string>
+    <string name="settings_notification_needs_action">需要处理</string>
+    <string name="settings_notification_needs_action_hint">自动化阻塞或需处理时提醒，不受免打扰时间限制。</string>
+    <string name="settings_notification_chat_messages">人物主动消息</string>
+    <string name="settings_notification_chat_messages_hint">聊天自动化成功送达的消息通知；不影响消息本身执行。</string>
+    <string name="settings_notification_quiet_title">通知免打扰</string>
+    <string name="settings_notification_quiet_enabled">按时段静音普通通知</string>
+    <string name="settings_notification_quiet_hint">仅静音任务结果和人物消息；失败、待处理继续提醒。人物主动互动自身的执行时段仍在对应任务里设置。</string>
+    <string name="settings_notification_quiet_23_7">23:00–07:00</string>
+    <string name="settings_notification_quiet_22_8">22:00–08:00</string>
     <string name="local_execution_notification_running">正在执行</string>
     <string name="local_execution_notification_step">正在执行 · 第 %1$d 步</string>
     <string name="local_execution_notification_jobs">%1$d 个后台任务仍在运行</string>
@@ -2022,6 +2035,8 @@
     <string name="minimax_quota_weekly_label">本周</string>
     <string name="minimax_quota_reset_after">%1$s后重置</string>
     <string name="minimax_quota_title">MiniMax 套餐额度</string>
+    <string name="minimax_quota_loading_profile">正在加载当前模型配置…</string>
+    <string name="minimax_quota_no_profile">当前模型不支持 MiniMax 官方套餐查询。请在模型设置中选择 MiniMax 官方接口配置。</string>
     <string name="minimax_quota_entry_hint">查询当前账户的官方剩余额度或余额</string>
     <string name="minimax_quota_model">当前模型：%1$s</string>
     <string name="minimax_quota_disclaimer">数据来自 MiniMax 官方账户接口，与本机模型 Token 消耗分别统计。</string>
@@ -2304,5 +2319,19 @@
     <string name="media_creation_preparing">正在准备创作请求</string>
     <string name="media_creation_saving">服务商已返回成果，正在保存</string>
     <string name="media_creation_save_failed">服务商已返回成果，本地保存未完成</string>
+    <!-- V6 mobile-only primary home destinations; labels describe real screens, not a mock tab. -->
+    <string name="sy_v6_mobile_sessions">会话</string>
+    <string name="sy_v6_mobile_chat">对话</string>
+    <string name="sy_v6_mobile_persona">人物档案</string>
+    <string name="sy_v6_mobile_work">工作</string>
+    <string name="sy_v6_mobile_workspace">文件</string>
+    <string name="sy_v6_convert_to_work">转为任务</string>
+    <string name="sy_v6_search_messages">查找聊天消息</string>
+    <string name="sy_v6_search_loaded_scope">搜索当前会话已加载的消息，可直接定位；更早历史请先上滑加载</string>
+    <string name="sy_v6_search_message_hint">输入消息内容关键词</string>
+    <string name="sy_v6_search_no_messages">当前已加载消息中没有匹配内容</string>
+    <string name="sy_v6_search_user">我发送的消息</string>
+    <string name="sy_v6_search_assistant">回复消息</string>
+    <string name="sy_v6_search_all">搜索其他会话、人物、任务与文件</string>
 </resources>
 

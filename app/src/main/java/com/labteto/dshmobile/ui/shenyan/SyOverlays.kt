@@ -32,7 +32,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -101,11 +102,11 @@ fun SyDialog(
             indication = null,
             onClick = onDismiss,
         ), contentAlignment = Alignment.Center) {
-            Surface(
+            SyMaterialSurface(
                 modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth(.92f).heightIn(max = maxHeight).scale(scale)
                     .pointerInput(Unit) { detectTapGestures { } },
                 shape = RoundedCornerShape(SyMetric.radiusSheet),
-                color = p.materialL4,
+                tier = SyMaterialTier.L4_OVERLAY,
                 border = BorderStroke(1.dp, p.border),
                 shadowElevation = 16.dp,
             ) {
@@ -201,7 +202,7 @@ fun SyPopupMenu(
         expanded = expanded, onDismissRequest = onDismiss,
         modifier = modifier,
         shape = RoundedCornerShape(13.dp),
-        containerColor = containerColor ?: p.materialL4,
+        containerColor = containerColor ?: com.shenyan.designsystem.components.syMaterialColor(SyMaterialTier.L4_OVERLAY),
         tonalElevation = 0.dp,
         border = BorderStroke(1.dp, p.border),
         properties = PopupProperties(
@@ -227,11 +228,11 @@ fun SyPopupMenu(
                 text = {
                     Text(item.text, maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        color = if (item.danger) p.danger else p.text)
+                        color = if (item.danger) p.dangerInk else p.text)
                 },
                 leadingIcon = if (item.icon == null) null else {
                     { Icon(item.icon, contentDescription = null,
-                        tint = if (item.danger) p.danger else p.textSecondary) }
+                        tint = if (item.danger) p.dangerInk else p.textSecondary) }
                 },
                 onClick = { onDismiss(); item.onClick() },
                 modifier = Modifier.heightIn(min = SyMetric.touch)
@@ -274,8 +275,8 @@ fun SyContextActionMenu(
         properties = PopupProperties(
             focusable = true, dismissOnBackPress = true,
             dismissOnClickOutside = true, clippingEnabled = true)) {
-        Surface(
-            color = p.materialL4,
+        SyMaterialSurface(
+            tier = SyMaterialTier.L4_OVERLAY,
             shape = RoundedCornerShape(SyMetric.radiusControl),
             border = BorderStroke(1.dp, p.border),
             shadowElevation = 12.dp,
@@ -291,9 +292,9 @@ fun SyContextActionMenu(
                     ) {
                         item.icon?.let {
                             Icon(it, contentDescription = null, modifier = Modifier.size(18.dp),
-                                tint = if (item.danger) p.danger else p.textSecondary)
+                                tint = if (item.danger) p.dangerInk else p.textSecondary)
                         }
-                        Text(item.text, color = if (item.danger) p.danger else p.text,
+                        Text(item.text, color = if (item.danger) p.dangerInk else p.text,
                             style = MaterialTheme.typography.labelSmall)
                     }
                 }

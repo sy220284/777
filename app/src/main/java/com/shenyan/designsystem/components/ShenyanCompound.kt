@@ -61,7 +61,7 @@ fun SyCategoryRow(
 ) {
     val p = LocalSyColors.current
     val shape = RoundedCornerShape(SyMetric.radiusControl)
-    val surface = if (onClick != null) p.materialL2 else Color.Transparent
+    val surface = if (onClick != null) syMaterialColor(SyMaterialTier.L2_BAR) else Color.Transparent
     val textMeasurer = rememberTextMeasurer()
     val titleStyle = titleTextStyle ?: MaterialTheme.typography.bodyMedium
     val valueStyle = MaterialTheme.typography.bodySmall
@@ -70,8 +70,8 @@ fun SyCategoryRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (icon != null || iconPainter != null) {
-                Surface(
-                    color = p.materialL3,
+                SyMaterialSurface(
+                    tier = SyMaterialTier.L3_CARD,
                     shape = RoundedCornerShape(SyMetric.radiusControl),
                     modifier = Modifier.size(42.dp),
                 ) {
@@ -142,9 +142,9 @@ fun SyQuickActionTile(
     iconPainter: Painter? = null,
 ) {
     val p = LocalSyColors.current
-    Surface(
+    SyMaterialSurface(
         onClick = onClick, enabled = enabled, modifier = modifier,
-        color = p.materialL3,
+        tier = SyMaterialTier.L3_CARD,
         shape = RoundedCornerShape(SyMetric.radiusCard),
     ) {
         Column(

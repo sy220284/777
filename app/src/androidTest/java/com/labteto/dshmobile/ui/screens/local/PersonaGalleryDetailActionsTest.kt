@@ -4,7 +4,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
@@ -24,7 +25,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class PersonaGalleryDetailActionsTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     private val entry = PersonaGalleryEntry(
         id = "detail-actions-persona",
@@ -86,7 +87,10 @@ class PersonaGalleryDetailActionsTest {
         openDetail(fromSearchResult = true)
         compose.onNodeWithText("人物详情").assertIsDisplayed()
         compose.onNodeWithTag("personaGalleryEntry_${entry.id}").assertDoesNotExist()
-        pressDeviceBack()
+        // Validate the page's registered BackHandler, not the CI emulator's focus.
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.waitForIdle()
+        compose.onNodeWithText("人设图集").assertIsDisplayed()
         compose.onNodeWithTag("personaGalleryEntry_${entry.id}").assertIsDisplayed()
     }
 

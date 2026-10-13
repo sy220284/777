@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 
 import android.text.format.DateFormat as AndroidDateFormat
 import androidx.activity.compose.BackHandler
@@ -16,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -114,6 +120,8 @@ internal fun ChatAutomationScreen(
     onClose: () -> Unit,
     onOpenSession: (String) -> Unit,
     handleRootSystemBack: Boolean,
+    initialSelectedTaskId: String? = null,
+    entryRequest: Int = 0,
 ) {
     val colors = DsTheme.colors
     val canPlan = harnessState.usageMode == LocalUsageMode.CHAT &&
@@ -124,13 +132,26 @@ internal fun ChatAutomationScreen(
     }
     var draft by rememberSaveable { mutableStateOf("") }
     // This filter is a view concern, not an automation policy; ALL always stays available.
-    var currentSessionOnly by rememberSaveable(harnessState.sessionId) { mutableStateOf(false) }
+    var currentSessionOnly by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(
+        false, entryRequest, harnessState.sessionId,
+    )
     val currentSessionEvents = tasks.count { it.targetSessionId == harnessState.sessionId }
+    val listState = rememberLazyListState()
     val visibleTasks = tasks.filter {
         chatAutomationInSession(it.targetSessionId, harnessState.sessionId, currentSessionOnly)
     }
-    var editingTaskId by rememberSaveable { mutableStateOf<String?>(null) }
-    var policyTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    var locatedEntry by rememberSaveable { mutableIntStateOf(-1) }
+    LaunchedEffect(initialSelectedTaskId, visibleTasks, entryRequest) {
+        if (locatedEntry == entryRequest || initialSelectedTaskId == null) return@LaunchedEffect
+        val index = visibleTasks.indexOfFirst { it.id == initialSelectedTaskId }
+        if (index >= 0) {
+            listState.scrollToItem(1 +
+                (if (tasks.isNotEmpty() && harnessState.sessionId.isNotBlank()) 1 else 0) + index)
+            locatedEntry = entryRequest
+        }
+    }
+    var editingTaskId by com.labteto.dshmobile.ui.components.rememberNavigationEntryState<String?>(null, entryRequest)
+    var policyTaskId by com.labteto.dshmobile.ui.components.rememberNavigationEntryState<String?>(null, entryRequest)
     var observedSaveRevision by remember { mutableLongStateOf(state.saveRevision) }
     val planMention = stringResource(R.string.tasks_chat_plan_mention)
 
@@ -148,7 +169,7 @@ internal fun ChatAutomationScreen(
             Modifier.fillMaxSize().safeDrawingPadding(),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            Box(Modifier.padding(horizontal = DsSpacing.large)) {
+            Box(Modifier.fillMaxWidth()) {
                 SyTopBar(
                     title = stringResource(R.string.tasks_chat_title),
                     subtitle = stringResource(R.string.tasks_chat_subtitle),
@@ -159,6 +180,7 @@ internal fun ChatAutomationScreen(
                 )
             }
             LazyColumn(
+                state = listState,
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
@@ -328,10 +350,10 @@ private fun AutomationCardSurface(
         SyStatus.Failed -> colors.error.copy(alpha = 0.28f)
         else -> colors.borderL1
     }
-    Surface(
+    SyMaterialSurface(
         modifier = modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.bgLayer1,
+        tier = SyMaterialTier.L3_CARD,
         border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
         tonalElevation = 0.dp,
     ) {

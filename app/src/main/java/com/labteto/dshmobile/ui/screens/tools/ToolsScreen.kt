@@ -62,6 +62,7 @@ import com.labteto.dshmobile.ui.shenyan.SyToastHost
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.shenyan.designsystem.components.SyLoadingState
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
@@ -597,10 +598,6 @@ fun ToolsScreen(
                     actionContentDescription = stringResource(R.string.tools_refresh),
                     actionEnabled = !state.loading,
                     onAction = viewModel::refresh,
-                    modifier = Modifier.padding(
-                        horizontal = DsSpacing.comfortable,
-                        vertical = DsSpacing.medium,
-                    ),
                 )
 
                 val initialLoading = state.loading &&
@@ -609,7 +606,7 @@ fun ToolsScreen(
                     !state.githubConfigured
                 if (initialLoading) {
                     SyLoadingState(
-                        icon = FeatherIcons.Tool,
+                        icon = SyEntryIcons.Tools,
                         label = stringResource(R.string.tools_loading),
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                     )
@@ -634,7 +631,7 @@ fun ToolsScreen(
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                         ToolCapabilityRow(
-                            icon = FeatherIcons.Globe,
+                            icon = SyEntryIcons.Search,
                             title = stringResource(R.string.tools_network_search),
                             status = stringResource(
                                 if (networkSearchEnabled) R.string.common_enabled else R.string.common_disabled,
@@ -649,7 +646,7 @@ fun ToolsScreen(
                             },
                         )
                         ToolCapabilityRow(
-                            icon = FeatherIcons.Shield,
+                            icon = SyEntryIcons.Permissions,
                             title = stringResource(R.string.cap_center_auto_approval),
                             status = stringResource(
                                 when (approvalMode) {
@@ -668,7 +665,7 @@ fun ToolsScreen(
                             },
                         )
                         ToolCapabilityRow(
-                            icon = FeatherIcons.Sliders,
+                            icon = SyEntryIcons.Advanced,
                             title = stringResource(R.string.advanced_agent_settings),
                             status = stringResource(R.string.tools_capability_available),
                             state = StateDotState.Done,
@@ -692,7 +689,7 @@ fun ToolsScreen(
                             onClick = { skillsOnly = true; showPluginBrowser = true },
                         )
                         ToolCapabilityRow(
-                            icon = FeatherIcons.GitBranch,
+                            icon = SyEntryIcons.Projects,
                             title = stringResource(R.string.tools_github_connector),
                             status = stringResource(
                                 if (state.githubConfigured) R.string.tools_github_configured
@@ -861,7 +858,7 @@ fun ToolsScreen(
                 enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
                 variant = SyButtonVariant.Outline,
                 modifier = Modifier.fillMaxWidth(),
-                icon = FeatherIcons.Globe,
+                icon = SyEntryIcons.Search,
             )
             Text(
                 stringResource(R.string.tools_stdio_title),
@@ -907,7 +904,7 @@ fun ToolsScreen(
                 enabled = !state.loading && serverId.isNotBlank() && stdioArgs.isNotEmpty(),
                 variant = SyButtonVariant.Outline,
                 modifier = Modifier.fillMaxWidth(),
-                icon = FeatherIcons.Terminal,
+                icon = SyEntryIcons.Tools,
             )
         }
     }
@@ -985,12 +982,12 @@ private fun ToolCapabilityRow(
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
-    Surface(
-        onClick = { onClick?.invoke() },
-        enabled = onClick != null,
+    com.shenyan.designsystem.components.SyMaterialFrame(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
         shape = DsShapes.block,
-        color = colors.bgLayer1,
-        tonalElevation = 0.dp,
+        horizontalPadding = 0.dp,
+        verticalPadding = 0.dp,
     ) {
         Row(
             modifier = Modifier
@@ -1000,11 +997,9 @@ private fun ToolCapabilityRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            Surface(
+            Box(
                 modifier = Modifier.size(40.dp),
-                shape = DsShapes.row,
-                color = colors.bgModulePlatform,
-                tonalElevation = 0.dp,
+                contentAlignment = Alignment.Center,
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     when {

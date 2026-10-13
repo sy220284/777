@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 import android.graphics.BitmapFactory
 import android.provider.OpenableColumns
 import java.io.File
@@ -211,37 +215,36 @@ internal fun PersonaGalleryScreen(
         )
     }
     // New sidebar navigation owns its target; internal detail/list Back stays local.
-    var selectedId by rememberSaveable(entryOpenVersion) { mutableStateOf(initialEntryId) }
+    var selectedId by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(initialEntryId, entryOpenVersion)
+    // Returning from a selected persona must restore the first gallery card immediately.
+    // A fresh gallery entry may cascade once, but a detail -> list Back is not a new entry.
+    var galleryCascadeSeen by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(initialEntryId != null, entryOpenVersion)
     val selected = entries.firstOrNull { it.id == selectedId }
-    var selectedStoryId by rememberSaveable(selectedId) { mutableStateOf<String?>(null) }
+    var selectedStoryId by com.labteto.dshmobile.ui.components.rememberNavigationEntryState<String?>(
+        null, entryOpenVersion, selectedId,
+    )
     val selectedStory = selected?.stories?.firstOrNull { it.id == selectedStoryId }
-    var search by rememberSaveable { mutableStateOf("") }
-    var notes by rememberSaveable(selectedId, selectedStoryId, selectedStory?.notes) {
-        mutableStateOf(selectedStory?.notes.orEmpty())
-    }
-    var storyStage by rememberSaveable(selectedId, selectedStoryId, selectedStory?.chatContext?.storyStage) {
-        mutableStateOf(selectedStory?.chatContext?.storyStage.orEmpty())
-    }
-    var storyTitle by rememberSaveable(selectedId, selectedStoryId, selectedStory?.title) {
-        mutableStateOf(selectedStory?.title.orEmpty())
-    }
+    var search by com.labteto.dshmobile.ui.components.rememberNavigationEntryState("", entryOpenVersion)
+    var notes by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(selectedStory?.notes.orEmpty(), entryOpenVersion, selectedId, selectedStoryId, selectedStory?.notes)
+    var storyStage by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(selectedStory?.chatContext?.storyStage.orEmpty(), entryOpenVersion, selectedId, selectedStoryId, selectedStory?.chatContext?.storyStage)
+    var storyTitle by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(selectedStory?.title.orEmpty(), entryOpenVersion, selectedId, selectedStoryId, selectedStory?.title)
     var busy by remember { mutableStateOf(false) }
     var deletingCharacter by remember { mutableStateOf(false) }
     var deletingStory by remember(selectedStoryId) { mutableStateOf(false) }
     var pendingEntryDeleteId by remember { mutableStateOf<String?>(null) }
     var pendingPresetDeleteId by remember { mutableStateOf<String?>(null) }
-    var visibleHistory by rememberSaveable(selectedId, selectedStoryId) { mutableStateOf(8) }
-    var showHistory by rememberSaveable(selectedId, selectedStoryId) { mutableStateOf(false) }
+    var visibleHistory by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(8, entryOpenVersion, selectedId, selectedStoryId)
+    var showHistory by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(false, entryOpenVersion, selectedId, selectedStoryId)
     var pendingHistoryDeleteKey by remember(selectedId, selectedStoryId) { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var notice by remember(selectedId, selectedStoryId) { mutableStateOf<String?>(null) }
     var inspection by remember(selectedId, selectedStoryId) { mutableStateOf<PersonaInspectionResult?>(null) }
     var inspecting by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
-    var showMoreActions by rememberSaveable(selectedId, selectedStoryId) { mutableStateOf(false) }
+    var showMoreActions by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(false, entryOpenVersion, selectedId, selectedStoryId)
     var showPortraitActions by remember(selectedId) { mutableStateOf(false) }
-    var personaDesignSection by rememberSaveable(selectedId) { mutableStateOf(0) }
-    var showPersonaDetails by rememberSaveable(selectedId) { mutableStateOf(false) }
-    var editingStoryTitle by rememberSaveable(selectedId, selectedStoryId) { mutableStateOf(false) }
+    var personaDesignSection by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(0, entryOpenVersion, selectedId)
+    var showPersonaDetails by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(false, entryOpenVersion, selectedId)
+    var editingStoryTitle by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(false, entryOpenVersion, selectedId, selectedStoryId)
     var pendingExportDocument by remember { mutableStateOf<PersonaTransferDocument?>(null) }
     var showExportFormatDialog by remember { mutableStateOf(false) }
     var confirmDiscardStoryDraft by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
@@ -377,6 +380,7 @@ internal fun PersonaGalleryScreen(
         } else if (hasLocalStoryEdits) {
             confirmDiscardStoryDraft = true
         } else {
+            galleryCascadeSeen = true
             selectedId = null
             selectedStoryId = null
             deletingCharacter = false
@@ -791,7 +795,6 @@ internal fun PersonaGalleryScreen(
                 actionEnabled = !busy && !inspecting,
                 onAction = if (selected != null) ({ showMoreActions = true }) else null,
                 largeTitle = selected == null,
-                modifier = Modifier.padding(horizontal = DsSpacing.medium),
             )
             if (selected == null) {
                 PersonaGalleryOverviewV3(
@@ -804,7 +807,9 @@ internal fun PersonaGalleryScreen(
                     canSave = canSave,
                     busy = busy,
                     errorMessage = error,
+                    animateCards = !galleryCascadeSeen,
                     onSelectEntry = { id ->
+                        galleryCascadeSeen = true
                         selectedId = id
                         selectedStoryId = null
                         error = null
@@ -1131,7 +1136,7 @@ internal fun PersonaGalleryScreen(
                 }
             }
             selected?.let { entry ->
-                Surface(color = DsTheme.colors.bgLayer1) {
+                SyMaterialSurface(tier = SyMaterialTier.L3_CARD,) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(DsSpacing.medium),
                         verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),

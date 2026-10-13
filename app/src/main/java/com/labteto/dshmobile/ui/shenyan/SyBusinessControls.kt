@@ -64,6 +64,7 @@ fun SySearchField(
         onSearch = { keyboard?.hide() },
         placeholder = placeholder,
         modifier = modifier, shortcut = shortcut,
+        searchIcon = com.labteto.dshmobile.ui.components.SyEntryIcons.Search,
     )
 }
 

@@ -85,7 +85,7 @@ internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loa
                     items(visible, key = { it.name }) { entry ->
                         SySheetChoiceRow(title = entry.name,
                             modifier = Modifier.heightIn(min = 72.dp),
-                            icon = FeatherIcons.Tool, onClick = { selected = entry })
+                            icon = com.labteto.dshmobile.ui.components.SyEntryIcons.Tools, onClick = { selected = entry })
                     }
                 }
             }

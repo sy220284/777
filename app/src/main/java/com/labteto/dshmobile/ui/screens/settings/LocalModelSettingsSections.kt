@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.shenyan.designsystem.foundation.LocalSyColors
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
@@ -56,6 +57,8 @@ import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyMaterialFrame
+import com.labteto.dshmobile.ui.shenyan.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -233,7 +236,7 @@ internal fun LocalModelSettingsCard(
             Surface(
                 shape = DsShapes.row,
                 color = if (isSelectedProfile) colors.accentTertiary
-                    else colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+                    else LocalSyColors.current.materialL1,
                 border = androidx.compose.foundation.BorderStroke(
                     1.dp,
                     if (isSelectedProfile) colors.accent.copy(alpha = 0.45f) else colors.borderL1,
@@ -400,7 +403,7 @@ internal fun LocalModelSettingsCard(
                 SyMenu(
                     anchor = {
                         Surface(shape = DsShapes.row,
-                            color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+                            color = LocalSyColors.current.materialL1,
                             modifier = Modifier.fillMaxWidth()) {
                             Row(Modifier.fillMaxWidth().padding(DsSpacing.comfortable),
                                 verticalAlignment = Alignment.CenterVertically) {
@@ -508,7 +511,7 @@ internal fun LocalModelSettingsCard(
                     SyMenu(
                         anchor = {
                             Surface(shape = DsShapes.row,
-                                color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+                                color = LocalSyColors.current.materialL1,
                                 modifier = Modifier.fillMaxWidth()) {
                                 Row(Modifier.fillMaxWidth().padding(DsSpacing.comfortable),
                                     verticalAlignment = Alignment.CenterVertically) {
@@ -645,10 +648,11 @@ internal fun DeepSeekPricingCard(
         )
 
         state.models.forEach { model ->
-            Surface(
+            SyMaterialFrame(
                 modifier = Modifier.fillMaxWidth(),
-                shape = DsShapes.block,
-                color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                tier = SyMaterialTier.L3_CARD,
+                horizontalPadding = 0.dp,
+                verticalPadding = 0.dp,
             ) {
                 Column(
                     modifier = Modifier.padding(DsSpacing.medium),

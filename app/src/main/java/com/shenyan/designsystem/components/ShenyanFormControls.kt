@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -42,6 +45,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.shenyan.designsystem.foundation.LocalSyColors
 import com.shenyan.designsystem.foundation.LocalSyReduceMotion
@@ -78,6 +82,7 @@ fun SyTextField(
     colors: TextFieldColors? = null,
 ) {
     val p = LocalSyColors.current
+    val inputFill = syMaterialColor(SyMaterialTier.L1_SECTION)
     OutlinedTextField(
         value = value, onValueChange = onValueChange,
         modifier = modifier.heightIn(min = SyMetric.touch),
@@ -91,18 +96,18 @@ fun SyTextField(
         colors = colors ?: OutlinedTextFieldDefaults.colors(
             focusedTextColor = p.text, unfocusedTextColor = p.text,
             disabledTextColor = p.textTertiary,
-            focusedContainerColor = p.materialL5,
-            unfocusedContainerColor = if (flat) p.materialL2 else p.materialL3,
-            disabledContainerColor = p.materialL2,
+            focusedContainerColor = inputFill,
+            unfocusedContainerColor = inputFill,
+            disabledContainerColor = inputFill,
             cursorColor = p.primary,
             focusedBorderColor = if (flat) Color.Transparent else p.primary,
             unfocusedBorderColor = if (flat) Color.Transparent else p.border,
             disabledBorderColor = p.border.copy(alpha = .45f),
-            focusedLabelColor = p.primary, unfocusedLabelColor = p.textTertiary,
+            focusedLabelColor = p.text, unfocusedLabelColor = p.textTertiary,
             disabledLabelColor = p.textTertiary,
             focusedPlaceholderColor = p.textTertiary,
             unfocusedPlaceholderColor = p.textTertiary,
-            errorBorderColor = p.danger, errorLabelColor = p.danger,
+            errorBorderColor = p.danger, errorLabelColor = p.dangerInk,
             errorCursorColor = p.danger,
         ),
     )
@@ -164,12 +169,12 @@ fun SySliderControl(
         onValueChangeFinished = onValueChangeFinished,
         colors = SliderDefaults.colors(
             thumbColor = p.primary, activeTrackColor = p.primary,
-            inactiveTrackColor = p.materialL2,
+            inactiveTrackColor = syMaterialColor(SyMaterialTier.L2_BAR),
             activeTickColor = Color.Transparent,
             inactiveTickColor = Color.Transparent,
             disabledThumbColor = p.textTertiary,
             disabledActiveTrackColor = p.primary.copy(alpha = .32f),
-            disabledInactiveTrackColor = p.materialL2.copy(alpha = .6f),
+            disabledInactiveTrackColor = syMaterialColor(SyMaterialTier.L2_BAR).copy(alpha = .6f),
             disabledActiveTickColor = Color.Transparent,
             disabledInactiveTickColor = Color.Transparent,
         ),
@@ -191,14 +196,16 @@ fun SySegmentedControl(
     val reduceMotion = LocalSyReduceMotion.current
     val shape = RoundedCornerShape(SyMetric.radiusControl)
     Row(
-        modifier = modifier.clip(shape).background(p.materialL2)
+        modifier = modifier.selectableGroup()
+            .then(if (stretch) Modifier else Modifier.horizontalScroll(rememberScrollState()))
+            .clip(shape).background(syMaterialColor(SyMaterialTier.L2_BAR))
             .border(1.dp, p.border, shape).padding(2.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         segments.forEach { option ->
             val selected = option.id == selectedId
             val background by animateColorAsState(
-                if (selected) p.materialL3 else Color.Transparent,
+                if (selected) p.selected else Color.Transparent,
                 animationSpec = tween(if (reduceMotion) 0 else SyMotion.selectMs),
                 label = "sySegment",
             )
@@ -212,7 +219,7 @@ fun SySegmentedControl(
                         role = role,
                         onClick = { onSelect(option.id) },
                     )
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                    .padding(horizontal = if (stretch) 7.dp else 14.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
@@ -224,8 +231,7 @@ fun SySegmentedControl(
                         else -> p.textSecondary
                     },
                     style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
                 )
                 if (role == Role.Tab) {
                     Spacer(Modifier.height(3.dp))

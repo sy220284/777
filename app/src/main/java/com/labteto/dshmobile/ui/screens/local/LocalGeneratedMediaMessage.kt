@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -22,7 +26,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -60,8 +63,6 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -262,7 +263,7 @@ internal fun LocalGeneratedVideoTaskRow(
             if (showingPlayer) {
                 InlineVideoPlayer(task.downloadUrl, savedVideo, onError = { error = it })
             } else {
-                Surface(shape = DsShapes.block, color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                SyMaterialSurface(shape = DsShapes.block, tier = SyMaterialTier.L3_CARD,
                     modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
                     androidx.compose.foundation.layout.Box(
                         contentAlignment = androidx.compose.ui.Alignment.Center) {
@@ -339,13 +340,14 @@ internal fun LocalGeneratedVideoTaskRow(
 
 @Composable
 private fun MediaMessageCard(
-    title: String, subtitle: String, content: @Composable () -> Unit,
+    title: String, subtitle: String, modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
 ) {
     val colors = DsTheme.colors
-    Surface(
-        modifier = Modifier.fillMaxWidth(0.90f).widthIn(max = 470.dp),
+    SyMaterialSurface(
+        modifier = modifier.fillMaxWidth(0.90f).widthIn(max = 470.dp),
         shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        tier = SyMaterialTier.L3_CARD,
         border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderL3),
     ) {
         Column(Modifier.padding(DsSpacing.medium),
@@ -593,6 +595,9 @@ internal fun LocalWorkArtifactMessageRow(
     MediaMessageCard(
         title = if (artifact.category == "file") resources.getString(R.string.media_chat_work_file, name) else resources.getString(R.string.media_chat_work_result),
         subtitle = if (artifact.currentlyAvailable == false) resources.getString(R.string.media_chat_work_file_missing) else resources.getString(R.string.media_chat_work_output_here),
+        modifier = if (artifact.category == "file" && artifact.currentlyAvailable != false) {
+            Modifier.localArtifactSharedBounds(workspacePath, artifact.reference)
+        } else Modifier,
     ) {
         if (isImage && file != null) {
             MediaInlinePicture(file, null)

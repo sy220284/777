@@ -170,7 +170,6 @@ internal fun LocalRunCenterScreen(
                 actionPainter = painterResource(R.drawable.ic_ui_create_subagent),
                 actionContentDescription = stringResource(R.string.local_run_agent_start),
                 onAction = { showAgentLauncher = true },
-                modifier = Modifier.padding(horizontal = DsSpacing.medium),
             )
             FluidSectionNavigation(
                 labels = listOf(R.string.fluid_board_running, R.string.fluid_board_attention,

@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,7 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,8 +43,6 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
@@ -175,10 +176,10 @@ private fun StepperRow(
                 size = SyButtonSize.Small,
                 variant = SyButtonVariant.Ghost,
             )
-            Surface(
+            SyMaterialSurface(
                 modifier = Modifier.width(64.dp),
                 shape = DsShapes.buttonSmall,
-                color = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, base = colors.bgLayer2),
+                tier = SyMaterialTier.L4_OVERLAY,
             ) {
                 Box(
                     modifier = Modifier.fillMaxWidth().heightIn(min = DsSpacing.touchTarget),

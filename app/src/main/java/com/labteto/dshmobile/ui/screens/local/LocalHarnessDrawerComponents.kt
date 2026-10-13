@@ -44,15 +44,20 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.automation.AutomationTask
+import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.shenyan.designsystem.components.SyIconButton
+import com.shenyan.designsystem.components.SyIconBox
+import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
 import com.shenyan.designsystem.components.SyCheckboxControl
 import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.relativeTime
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.DsAnimations
@@ -74,6 +79,25 @@ internal fun localDrawerMatchingPersonas(
         entry.persona.name.contains(needle, ignoreCase = true) ||
             entry.persona.coreIdentity.contains(needle, ignoreCase = true)
     }
+}
+
+/** Search the actual scheduler records and only user-visible workspace paths. */
+internal fun localDrawerMatchingTasks(tasks: List<AutomationTask>, query: String): List<AutomationTask> {
+    val needle = query.trim()
+    if (needle.isEmpty()) return emptyList()
+    return tasks.filter {
+        it.prompt.contains(needle, ignoreCase = true) ||
+            it.actorName?.contains(needle, ignoreCase = true) == true ||
+            it.id.contains(needle, ignoreCase = true)
+    }
+}
+
+internal fun localDrawerMatchingFiles(files: List<LocalWorkspaceFile>, query: String): List<LocalWorkspaceFile> {
+    val needle = query.trim()
+    if (needle.isEmpty()) return emptyList()
+    return files.filter { file ->
+        isShareableWorkspacePath(file.path) && file.path.contains(needle, ignoreCase = true)
+    }.distinctBy(LocalWorkspaceFile::path).sortedBy(LocalWorkspaceFile::path)
 }
 
 internal data class LocalDrawerSessionSections(
@@ -127,65 +151,65 @@ internal fun DrawerQuickActions(
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
             onUsage?.let { openUsage ->
-                DrawerQuickAction(icon = FeatherIcons.Activity,
+                DrawerQuickAction(icon = SyEntryIcons.Usage,
                     title = stringResource(R.string.usage_calculation_title), onClick = openUsage)
             }
             onImmersiveReader?.let { read ->
-                DrawerQuickAction(FeatherIcons.BookOpen, stringResource(R.string.fluid_reader_title), read)
+                DrawerQuickAction(SyEntryIcons.Reader, stringResource(R.string.fluid_reader_title), read)
             }
             if (usageMode == LocalUsageMode.CHAT) {
                 DrawerQuickAction(
-                    icon = FeatherIcons.Image,
+                    icon = SyEntryIcons.Gallery,
                     title = stringResource(R.string.persona_gallery_title),
                     badge = galleryCount.takeIf { it > 0 }?.toString(),
                     onClick = onOpenPersonaGallery,
                 )
                 DrawerQuickAction(
-                    icon = FeatherIcons.Users,
+                    icon = SyEntryIcons.GroupChat,
                     title = stringResource(R.string.local_group_chat_title),
                     badge = groupMemberCount.takeIf { it > 0 }?.toString(),
                     onClick = onOpenGroupChat,
                 )
                 DrawerQuickAction(
-                    icon = FeatherIcons.Clock,
+                    icon = SyEntryIcons.Tasks,
                     title = stringResource(R.string.tasks_chat_title),
                     onClick = onTasks,
                 )
                 DrawerQuickAction(
-                    icon = FeatherIcons.BookOpen,
+                    icon = SyEntryIcons.Diary,
                     title = stringResource(R.string.chat_diary_title),
                     onClick = onOpenDiary,
                 )
             } else {
                 DrawerQuickAction(
-                    icon = FeatherIcons.Folder,
+                    icon = SyEntryIcons.Projects,
                     title = stringResource(R.string.local_project_management_title),
                     onClick = onProjects,
                 )
                 DrawerQuickAction(
-                    icon = FeatherIcons.Activity,
+                    icon = SyEntryIcons.RunCenter,
                     title = stringResource(R.string.local_run_center),
                     onClick = onOpenRunCenter,
                 )
                 DrawerQuickAction(
-                    icon = FeatherIcons.Folder,
+                    icon = SyEntryIcons.WorkspaceFiles,
                     title = stringResource(R.string.chatlist_workspace_files),
                     onClick = onWorkspaceFiles,
                 )
                 DrawerQuickAction(
-                    icon = FeatherIcons.Clock,
+                    icon = SyEntryIcons.Tasks,
                     title = stringResource(R.string.tasks_title),
                     onClick = onTasks,
                 )
                 DrawerQuickAction(
-                    icon = FeatherIcons.Tool,
+                    icon = SyEntryIcons.Tools,
                     title = stringResource(R.string.tools_title),
                     onClick = onTools,
                 )
             }
         onMiniMaxQuota?.let { openQuota ->
             DrawerQuickAction(
-                icon = FeatherIcons.CreditCard,
+                icon = SyEntryIcons.Quota,
                 title = stringResource(R.string.minimax_quota_title),
                 onClick = openQuota,
             )
@@ -202,13 +226,14 @@ internal fun DrawerQuickAction(
     badge: String? = null,
 ) {
     val colors = DsTheme.colors
+    val sy = LocalSyPalette.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val hovered by interaction.collectIsHoveredAsState()
     val feedbackColor by animateColorAsState(
         targetValue = when {
-            pressed -> colors.hoverAccent
-            hovered -> colors.hover
+            pressed -> sy.peach.copy(alpha = 0.17f)
+            hovered -> sy.l3
             else -> Color.Transparent
         },
         animationSpec = DsAnimations.interactionColor,
@@ -230,12 +255,7 @@ internal fun DrawerQuickAction(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = colors.labelSecondary,
-            modifier = Modifier.size(22.dp),
-        )
+        SyIconBox(icon = icon)
         Text(
             title,
             style = DsType.drawerItem.withReadingWeight(),

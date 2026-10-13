@@ -25,6 +25,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -126,14 +128,15 @@ fun SyConversationComposer(
     val p = LocalSyColors.current
     val reduceMotion = LocalSyReduceMotion.current
     val shape = RoundedCornerShape(SyMetric.radiusCard)
-    Surface(
+    SyMaterialSurface(
+        tier = SyMaterialTier.L2_BAR,
         modifier = modifier.testTag("ds-conversation-composer")
             .fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)
             .then(if (animateSize)
                 Modifier.animateContentSize(tween(if (reduceMotion) 0 else SyMotion.toolExpandMs))
                 else Modifier),
         shape = shape,
-        color = surfaceColor,
+        tint = surfaceColor.copy(alpha = surfaceColor.alpha.coerceAtMost(.06f)),
         border = BorderStroke(1.dp, p.border),
         shadowElevation = shadowElevation,
     ) {

@@ -1,8 +1,11 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -13,8 +16,6 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /** Keep optional intro rendering outside the conversation's large inline layout/register frame. */
@@ -23,8 +24,8 @@ internal fun LocalModeIntroBanner(intro: LocalModeIntro?) {
     if (intro == null) return
     val mode = intro.usageMode
     val colors = DsTheme.colors
-    Surface(
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+    SyMaterialSurface(
+        tier = SyMaterialTier.L3_CARD,
         shape = DsShapes.block,
         modifier = Modifier.fillMaxWidth()
             .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),

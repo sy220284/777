@@ -27,8 +27,8 @@ fun SyChoiceControls(options: List<SyOption>, selected: Set<String>, onChange: (
                 onChange(setOf(option.id))
             }
             Row(Modifier.fillMaxWidth().heightIn(min = SyMetric.touch).then(hit), verticalAlignment = Alignment.CenterVertically) {
-                if (multiple) Checkbox(checked = checked, enabled = option.enabled, onCheckedChange = null)
-                else RadioButton(selected = checked, enabled = option.enabled, onClick = null)
+                if (multiple) SyCheckboxControl(checked = checked, enabled = option.enabled, onCheckedChange = null)
+                else SyRadioControl(selected = checked, enabled = option.enabled, onClick = null)
                 Text(option.label, color = LocalSyColors.current.text)
             }
         }
@@ -42,7 +42,7 @@ fun SyGlassSelect(options: List<SyOption>, selectedId: String?, onSelect: (Strin
     Box(modifier) {
         SyButton(options.firstOrNull { it.id == selectedId }?.label ?: "请选择", { expanded = true },
             modifier = Modifier.fillMaxWidth(), style = SyButtonStyle.SECONDARY, enabled = enabled)
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, containerColor = syMaterialColor(SyMaterialTier.L4_OVERLAY)) {
             options.forEach { option -> DropdownMenuItem(text = { Text(option.label) }, enabled = option.enabled,
                 onClick = { expanded = false; onSelect(option.id) }) }
         }
@@ -54,7 +54,7 @@ fun SyValueSlider(label: String, value: Float, onValueChange: (Float) -> Unit,
                   modifier: Modifier = Modifier, range: ClosedFloatingPointRange<Float> = 0f..100f, enabled: Boolean = true) {
     Column(modifier) {
         Row { Text(label, Modifier.weight(1f)); Text("${value.toInt()}") }
-        Slider(value = value.coerceIn(range.start, range.endInclusive), onValueChange = onValueChange,
+        SySliderControl(value = value.coerceIn(range.start, range.endInclusive), onValueChange = onValueChange,
             valueRange = range, enabled = enabled, modifier = Modifier.heightIn(min = SyMetric.touch))
     }
 }
@@ -64,9 +64,9 @@ fun SyDateTimeField(date: String, time: String, onDateChange: (String) -> Unit, 
                     onConfirm: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true,
                     timezoneLabel: String = "设备时区") {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        OutlinedTextField(value = date, onValueChange = onDateChange, label = { Text("日期 · YYYY-MM-DD") },
+        SyTextField(value = date, onValueChange = onDateChange, label = { Text("日期 · YYYY-MM-DD") },
             enabled = enabled, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        OutlinedTextField(value = time, onValueChange = onTimeChange, label = { Text("时间 · HH:mm") },
+        SyTextField(value = time, onValueChange = onTimeChange, label = { Text("时间 · HH:mm") },
             enabled = enabled, modifier = Modifier.fillMaxWidth(), singleLine = true)
         Text("时区：$timezoneLabel", style = MaterialTheme.typography.labelSmall,
             color = LocalSyColors.current.textSecondary)
@@ -79,11 +79,11 @@ fun SyDateTimeField(date: String, time: String, onDateChange: (String) -> Unit, 
 fun SyContextMenu(actions: List<SyAction>, onSelect: (String) -> Unit, modifier: Modifier = Modifier,
                   expanded: Boolean = true, onDismiss: () -> Unit = {}) {
     Box(modifier) {
-        DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenu(expanded = expanded, onDismissRequest = onDismiss, containerColor = syMaterialColor(SyMaterialTier.L4_OVERLAY)) {
             actions.forEach { action ->
                 DropdownMenuItem(
                     text = { Text(action.label,
-                        color = if (action.destructive) LocalSyColors.current.danger else LocalSyColors.current.text) },
+                        color = if (action.destructive) LocalSyColors.current.dangerInk else LocalSyColors.current.text) },
                     onClick = { onSelect(action.id); onDismiss() }, enabled = action.enabled,
                     modifier = Modifier.heightIn(min = SyMetric.touch)
                 )
@@ -97,7 +97,13 @@ fun SyDisclosure(title: String, expanded: Boolean, onToggle: () -> Unit, modifie
                  content: @Composable ColumnScope.() -> Unit) {
     SyGlassCard(modifier) {
         SyButton((if (expanded) "▾ " else "▸ ") + title, onToggle, modifier = Modifier.fillMaxWidth(), style = SyButtonStyle.GHOST)
-        if (expanded) content()
+        androidx.compose.animation.AnimatedVisibility(
+            visible = expanded,
+            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(if (LocalSyReduceMotion.current) 0 else SyMotion.toolExpandMs)) +
+                androidx.compose.animation.expandVertically(androidx.compose.animation.core.tween(if (LocalSyReduceMotion.current) 0 else SyMotion.toolExpandMs)),
+            exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(if (LocalSyReduceMotion.current) 0 else SyMotion.toolExpandMs)) +
+                androidx.compose.animation.shrinkVertically(androidx.compose.animation.core.tween(if (LocalSyReduceMotion.current) 0 else SyMotion.toolExpandMs)),
+        ) { Column(content = content) }
     }
 }
 
@@ -118,7 +124,7 @@ fun SyFileTree(nodes: List<SyFileNode>, selectedId: String?, onSelect: (String) 
     Column(modifier) {
         nodes.forEach { node ->
             val c = LocalSyColors.current
-            Surface(onClick = { onSelect(node.id) }, color = if (selectedId == node.id) c.selected else c.surface,
+            Surface(onClick = { onSelect(node.id) }, color = if (selectedId == node.id) c.selected else syMaterialColor(SyMaterialTier.L3_CARD),
                 modifier = Modifier.fillMaxWidth().heightIn(min = SyMetric.touch),
                 shape = RoundedCornerShape(SyMetric.radiusControl)) {
                 Row(Modifier.padding(start = (12 + node.depth.coerceIn(0, 8) * 16).dp, end = 12.dp, top = 10.dp, bottom = 10.dp),

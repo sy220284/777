@@ -89,20 +89,22 @@ internal fun LocalWorkspaceFilesDialog(
     loadPreview: suspend (String) -> LocalWorkspaceFilePreview,
     onDismiss: () -> Unit,
     initialFilePath: String? = null,
-    onInitialFilePathConsumed: () -> Unit = {},
+    entryRequest: Int = 0,
+    onInitialFilePathConsumed: (String) -> Unit = {},
 ) {
     var loading by remember(mode, sessionId) { mutableStateOf(true) }
     var error by remember(mode, sessionId) { mutableStateOf<String?>(null) }
     var workspace by remember(mode, sessionId) { mutableStateOf(emptyList<LocalWorkspaceFile>()) }
     var conversation by remember(mode, sessionId) { mutableStateOf(LocalConversationFiles()) }
     var preview by remember(mode, sessionId) { mutableStateOf<LocalWorkspaceFilePreview?>(null) }
-    var previewPath by rememberSaveable(mode, sessionId) { mutableStateOf<String?>(null) }
+    var previewPath by com.labteto.dshmobile.ui.components.rememberNavigationEntryState<String?>(null, entryRequest, mode, sessionId)
+    var loadedForEntry by remember(mode, sessionId, entryRequest) { mutableStateOf(false) }
     var previewLoading by remember(mode, sessionId) { mutableStateOf(false) }
-    var directory by rememberSaveable(mode, sessionId) { mutableStateOf("") }
-    var section by rememberSaveable(mode, sessionId) {
-        mutableStateOf(if (mode == LocalFilesMode.WORKSPACE) 0 else 1)
-    }
-    var query by rememberSaveable(mode, sessionId) { mutableStateOf("") }
+    var directory by com.labteto.dshmobile.ui.components.rememberNavigationEntryState("", entryRequest, mode, sessionId)
+    var section by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(
+        if (mode == LocalFilesMode.WORKSPACE) 0 else 1, entryRequest, mode, sessionId,
+    )
+    var query by com.labteto.dshmobile.ui.components.rememberNavigationEntryState("", entryRequest, mode, sessionId)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var selecting by rememberSaveable(mode, sessionId, section, directory) { mutableStateOf(false) }
@@ -203,14 +205,20 @@ internal fun LocalWorkspaceFilesDialog(
         }
     }
 
-    LaunchedEffect(mode, sessionId) {
+    LaunchedEffect(mode, sessionId, initialFilePath, entryRequest) {
+        // Acknowledging a handled request must not start a second load. New requests to
+        // an already mounted file page still replace the restored preview immediately.
+        if (initialFilePath == null && loadedForEntry) return@LaunchedEffect
         // An explicit route request wins over restored browsing state, then is consumed.
         // Rotating after returning to the list must not reopen an already handled artifact.
         if (initialFilePath != null) {
             previewPath = initialFilePath
-            onInitialFilePathConsumed()
+            selecting = false
+            selected.clear()
         }
         reload()
+        loadedForEntry = true
+        initialFilePath?.let(onInitialFilePathConsumed)
     }
 
     fun navigateBack() {
@@ -263,7 +271,12 @@ internal fun LocalWorkspaceFilesDialog(
                             R.string.local_files_back
                         },
                     ),
-                    modifier = Modifier.padding(horizontal = DsSpacing.medium),
+                    modifier = Modifier.let { base ->
+                        val selectedPath = previewPath ?: initialFilePath
+                        if (!selectedPath.isNullOrBlank()) {
+                            base.localArtifactSharedBounds(workspacePath, selectedPath)
+                        } else base
+                    },
                     largeTitle = preview == null && directory.isEmpty(),
                     actionIcon = FeatherIcons.RefreshCw,
                     actionContentDescription = stringResource(R.string.local_files_refresh),

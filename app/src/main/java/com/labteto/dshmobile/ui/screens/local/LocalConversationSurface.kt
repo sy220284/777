@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -58,6 +62,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -100,18 +105,16 @@ import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.shenyan.designsystem.components.SySheetChoiceRow
 import com.shenyan.designsystem.components.SyQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
-import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
 import com.labteto.dshmobile.ui.theme.rootSurface
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -122,6 +125,74 @@ import kotlinx.coroutines.withContext
 
 /** Optional introduction is wrapped so Compose never tracks a nullable enum via ordinal(). */
 internal data class LocalModeIntro(val usageMode: LocalUsageMode)
+
+/** Parameter boundary for the 61-argument Compose shell. Keeps the original public
+ * callsite intact while cutting the renderer's DEX register pressure on API 36/37.
+ * No mutable business state, run scheduling, permissions or model calls are duplicated.
+ */
+internal class LocalConversationSurfaceArgs(
+    val state: LocalConversationSurfaceState,
+    val workActions: LocalWorkFeatureUiActions?,
+    val onOpenWorkArtifact: (String) -> Unit,
+    val readRequest: Long,
+    val onReaderDismissed: () -> Unit,
+    val activeModelProfile: LocalModelProfile?,
+    val sendFeedback: LocalSendFeedbackState,
+    val streamingState: StateFlow<LocalHarnessStreamingState>,
+    val gallery: List<PersonaGalleryEntry>,
+    val transcriptHistory: LocalTranscriptHistoryState,
+    val modeIntro: LocalModeIntro?,
+    val onConfigure: () -> Unit,
+    val onSelectModel: (String) -> Unit,
+    val onSend: (String, List<LocalImportedAttachment>) -> LocalSendResult,
+    val onSendTeam: (String, List<LocalImportedAttachment>) -> LocalSendResult,
+    val onTeamMemberOutput: (String) -> String,
+    val onSendTeamMemberMessage: suspend (String, String) -> LocalWorkUiActionResult,
+    val onStopTeamMember: suspend (String) -> LocalWorkUiActionResult,
+    val onStopTeam: suspend () -> LocalWorkUiActionResult,
+    val onEditAndResend: suspend (String, String) -> LocalChatUserEditResult,
+    val onLocateMemoryForMessage: (String) -> Unit,
+    val onSelectMessageVariant: suspend (String, Int) -> Boolean,
+    val onRegenerate: (String) -> Boolean,
+    val onGenerateReplySuggestions: suspend () -> Boolean,
+    val onLoadOlderTranscript: suspend (String) -> Result<Int>,
+    val onImportAttachment: suspend (android.net.Uri) -> LocalImportedAttachment,
+    val onStop: () -> Unit,
+    val onNewSession: () -> Unit,
+    val onExitGroupChat: () -> Unit,
+    val onOpenRunCenter: () -> Unit,
+    val sessionTitle: String,
+    val sessionPinned: Boolean,
+    val onTogglePinSession: () -> Unit,
+    val onRenameSession: (String) -> Boolean,
+    val onDeleteSession: () -> Unit,
+    val onConfigureChatPersona: suspend (PersonaProfile) -> Result<Unit>,
+    val onConfigureGroupMembers: (List<String>) -> Boolean,
+    val onSelectGalleryPersona: (String) -> Boolean,
+    val onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
+    val onSaveGroupAnnouncement: suspend (String) -> Result<Unit>,
+    val onUndoPersonaCorrection: (Long, String, String) -> Unit,
+    val onPlanModeChange: (Boolean) -> Unit,
+    val onApprove: (String) -> Unit,
+    val onDeny: (String) -> Unit,
+    val onAutoApprovePending: (String) -> Unit,
+    val onApproveDeviceTurn: (String) -> Unit,
+    val onDisableDeviceTurn: () -> Unit,
+    val onAnswerQuestion: (String, String) -> Boolean,
+    val onCancelQuestion: (String) -> Unit,
+    val composerHandoff: List<String>,
+    val skillDisplayNames: Map<String, String>,
+    val onConsumeComposerHandoff: () -> Unit,
+    val onOpenDrawer: (() -> Unit)?,
+    val onOpenGlobalSearch: () -> Unit,
+    val onOpenPersonaGallery: () -> Unit,
+    val onOpenWorkspaceFiles: () -> Unit,
+    val onUseWorkCapability: ((String) -> Unit)?,
+    val usageRevision: StateFlow<Long>?,
+    val loadTurnSummaries: (String) -> Map<String, com.labteto.dshmobile.local.TokenUsageAggregate>,
+    val loadTurnUsage: (String, String) -> com.labteto.dshmobile.local.TokenUsageGroupDetail?,
+    val loadUsageRequest: (String) -> com.labteto.dshmobile.local.TokenUsageRecord?,
+)
 
 @Composable
 internal fun LocalConversationSurface(
@@ -178,12 +249,145 @@ internal fun LocalConversationSurface(
     skillDisplayNames: Map<String, String> = emptyMap(),
     onConsumeComposerHandoff: () -> Unit = {},
     onOpenDrawer: (() -> Unit)? = null,
+    onOpenGlobalSearch: () -> Unit = {},
+    onOpenPersonaGallery: () -> Unit = {},
+    onOpenWorkspaceFiles: () -> Unit = {},
     onUseWorkCapability: ((String) -> Unit)? = null,
     usageRevision: StateFlow<Long>? = null,
     loadTurnSummaries: (String) -> Map<String, com.labteto.dshmobile.local.TokenUsageAggregate> = { emptyMap() },
     loadTurnUsage: (String, String) -> com.labteto.dshmobile.local.TokenUsageGroupDetail? = { _, _ -> null },
     loadUsageRequest: (String) -> com.labteto.dshmobile.local.TokenUsageRecord? = { null },
 ) {
+    val args = LocalConversationSurfaceArgs(
+        state = state,
+        workActions = workActions,
+        onOpenWorkArtifact = onOpenWorkArtifact,
+        readRequest = readRequest,
+        onReaderDismissed = onReaderDismissed,
+        activeModelProfile = activeModelProfile,
+        sendFeedback = sendFeedback,
+        streamingState = streamingState,
+        gallery = gallery,
+        transcriptHistory = transcriptHistory,
+        modeIntro = modeIntro,
+        onConfigure = onConfigure,
+        onSelectModel = onSelectModel,
+        onSend = onSend,
+        onSendTeam = onSendTeam,
+        onTeamMemberOutput = onTeamMemberOutput,
+        onSendTeamMemberMessage = onSendTeamMemberMessage,
+        onStopTeamMember = onStopTeamMember,
+        onStopTeam = onStopTeam,
+        onEditAndResend = onEditAndResend,
+        onLocateMemoryForMessage = onLocateMemoryForMessage,
+        onSelectMessageVariant = onSelectMessageVariant,
+        onRegenerate = onRegenerate,
+        onGenerateReplySuggestions = onGenerateReplySuggestions,
+        onLoadOlderTranscript = onLoadOlderTranscript,
+        onImportAttachment = onImportAttachment,
+        onStop = onStop,
+        onNewSession = onNewSession,
+        onExitGroupChat = onExitGroupChat,
+        onOpenRunCenter = onOpenRunCenter,
+        sessionTitle = sessionTitle,
+        sessionPinned = sessionPinned,
+        onTogglePinSession = onTogglePinSession,
+        onRenameSession = onRenameSession,
+        onDeleteSession = onDeleteSession,
+        onConfigureChatPersona = onConfigureChatPersona,
+        onConfigureGroupMembers = onConfigureGroupMembers,
+        onSelectGalleryPersona = onSelectGalleryPersona,
+        onAutoFillChatPersona = onAutoFillChatPersona,
+        onSaveGroupAnnouncement = onSaveGroupAnnouncement,
+        onUndoPersonaCorrection = onUndoPersonaCorrection,
+        onPlanModeChange = onPlanModeChange,
+        onApprove = onApprove,
+        onDeny = onDeny,
+        onAutoApprovePending = onAutoApprovePending,
+        onApproveDeviceTurn = onApproveDeviceTurn,
+        onDisableDeviceTurn = onDisableDeviceTurn,
+        onAnswerQuestion = onAnswerQuestion,
+        onCancelQuestion = onCancelQuestion,
+        composerHandoff = composerHandoff,
+        skillDisplayNames = skillDisplayNames,
+        onConsumeComposerHandoff = onConsumeComposerHandoff,
+        onOpenDrawer = onOpenDrawer,
+        onOpenGlobalSearch = onOpenGlobalSearch,
+        onOpenPersonaGallery = onOpenPersonaGallery,
+        onOpenWorkspaceFiles = onOpenWorkspaceFiles,
+        onUseWorkCapability = onUseWorkCapability,
+        usageRevision = usageRevision,
+        loadTurnSummaries = loadTurnSummaries,
+        loadTurnUsage = loadTurnUsage,
+        loadUsageRequest = loadUsageRequest,
+    )
+    LocalConversationSurfaceBody(args)
+}
+
+@Composable
+private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
+    val state = args.state
+    val workActions = args.workActions
+    val onOpenWorkArtifact = args.onOpenWorkArtifact
+    val readRequest = args.readRequest
+    val onReaderDismissed = args.onReaderDismissed
+    val activeModelProfile = args.activeModelProfile
+    val sendFeedback = args.sendFeedback
+    val streamingState = args.streamingState
+    val gallery = args.gallery
+    val transcriptHistory = args.transcriptHistory
+    val modeIntro = args.modeIntro
+    val onConfigure = args.onConfigure
+    val onSelectModel = args.onSelectModel
+    val onSend = args.onSend
+    val onSendTeam = args.onSendTeam
+    val onTeamMemberOutput = args.onTeamMemberOutput
+    val onSendTeamMemberMessage = args.onSendTeamMemberMessage
+    val onStopTeamMember = args.onStopTeamMember
+    val onStopTeam = args.onStopTeam
+    val onEditAndResend = args.onEditAndResend
+    val onLocateMemoryForMessage = args.onLocateMemoryForMessage
+    val onSelectMessageVariant = args.onSelectMessageVariant
+    val onRegenerate = args.onRegenerate
+    val onGenerateReplySuggestions = args.onGenerateReplySuggestions
+    val onLoadOlderTranscript = args.onLoadOlderTranscript
+    val onImportAttachment = args.onImportAttachment
+    val onStop = args.onStop
+    val onNewSession = args.onNewSession
+    val onExitGroupChat = args.onExitGroupChat
+    val onOpenRunCenter = args.onOpenRunCenter
+    val sessionTitle = args.sessionTitle
+    val sessionPinned = args.sessionPinned
+    val onTogglePinSession = args.onTogglePinSession
+    val onRenameSession = args.onRenameSession
+    val onDeleteSession = args.onDeleteSession
+    val onConfigureChatPersona = args.onConfigureChatPersona
+    val onConfigureGroupMembers = args.onConfigureGroupMembers
+    val onSelectGalleryPersona = args.onSelectGalleryPersona
+    val onAutoFillChatPersona = args.onAutoFillChatPersona
+    val onSaveGroupAnnouncement = args.onSaveGroupAnnouncement
+    val onUndoPersonaCorrection = args.onUndoPersonaCorrection
+    val onPlanModeChange = args.onPlanModeChange
+    val onApprove = args.onApprove
+    val onDeny = args.onDeny
+    val onAutoApprovePending = args.onAutoApprovePending
+    val onApproveDeviceTurn = args.onApproveDeviceTurn
+    val onDisableDeviceTurn = args.onDisableDeviceTurn
+    val onAnswerQuestion = args.onAnswerQuestion
+    val onCancelQuestion = args.onCancelQuestion
+    val composerHandoff = args.composerHandoff
+    val skillDisplayNames = args.skillDisplayNames
+    val onConsumeComposerHandoff = args.onConsumeComposerHandoff
+    val onOpenDrawer = args.onOpenDrawer
+    val onOpenGlobalSearch = args.onOpenGlobalSearch
+    val onOpenPersonaGallery = args.onOpenPersonaGallery
+    val onOpenWorkspaceFiles = args.onOpenWorkspaceFiles
+    val onUseWorkCapability = args.onUseWorkCapability
+    val usageRevision = args.usageRevision
+    val loadTurnSummaries = args.loadTurnSummaries
+    val loadTurnUsage = args.loadTurnUsage
+    val loadUsageRequest = args.loadUsageRequest
+
     val turnUsage = LocalChatTurnUsageController(
         sessionId = state.sessionId,
         enabled = state.usageMode == LocalUsageMode.CHAT,
@@ -209,6 +413,9 @@ internal fun LocalConversationSurface(
     // stable root work surface from rootSurfaceColor above.
     // V5: chat and work headers use solid top chrome, not a nested glass layer.
     val topSurfaceColor = LocalSyPalette.current.topBar
+    val showV6MobileNavigation = v6MobileHomeNavigationVisible(
+        LocalConfiguration.current.screenWidthDp, onOpenDrawer != null,
+    )
     val scope = rememberCoroutineScope()
     val appContext = LocalContext.current
     // Global ceiling changes must also refresh the exact per-model persona/Work projection.
@@ -255,6 +462,7 @@ internal fun LocalConversationSurface(
     var teamCardDismissed by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
+    val loadedSearchState = rememberV6LoadedConversationSearchState(state.sessionId)
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
     var showCharacterTuning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showGroupMemberPicker by rememberSaveable { mutableStateOf(false) }
@@ -541,11 +749,11 @@ internal fun LocalConversationSurface(
                 .padding(horizontal = DsMetrics.screenHorizontal, vertical = DsSpacing.small),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (onOpenDrawer != null) SyIconButton(
+                if (onOpenDrawer != null && !showV6MobileNavigation) SyIconButton(
                     icon = FeatherIcons.Menu,
                     contentDescription = stringResource(R.string.app_open_navigation),
                     onClick = onOpenDrawer,
-                    containerColor = colors.bgLayer1,
+                    containerColor = com.shenyan.designsystem.components.syMaterialColor(SyMaterialTier.L4_OVERLAY),
                     tint = colors.labelPrimary,
                 )
                 Column(Modifier.weight(1f)) {
@@ -599,16 +807,28 @@ internal fun LocalConversationSurface(
                         )
                     }
                 }
+                // Search lives on V6's secondary navigation row to protect
+                // the 393dp top bar from clipping current persona/session actions.
                 // 隐藏大卡片后仍可从顶部直接查看，不占用聊天记录和输入区。
                 if (state.usageMode == LocalUsageMode.WORK &&
                     teamCardDismissed && state.team.visible) {
                     SyIconButton(
-                        icon = FeatherIcons.Users,
+                        icon = com.labteto.dshmobile.ui.components.SyEntryIcons.GroupChat,
                         contentDescription = stringResource(R.string.local_team_reopen),
                         onClick = { showTeamPanel = true },
                         tint = colors.labelSecondary,
                     )
                 }
+            }
+            if (showV6MobileNavigation) {
+                V6MobileHomeNavigation(
+                    mode = state.usageMode,
+                    onSessions = { onOpenDrawer?.invoke() },
+                    onPersona = onOpenPersonaGallery,
+                    onWorkspace = onOpenWorkspaceFiles,
+                    onSearch = if (state.usageMode == LocalUsageMode.CHAT)
+                        ({ loadedSearchState.open = true }) else onOpenGlobalSearch,
+                )
             }
         }
 
@@ -624,8 +844,8 @@ internal fun LocalConversationSurface(
         state.personaCorrectionNotice?.takeIf {
             state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled
         }?.let { notice ->
-            Surface(
-                color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+            SyMaterialSurface(
+                tier = SyMaterialTier.L3_CARD,
                 shape = DsShapes.block,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -826,6 +1046,9 @@ internal fun LocalConversationSurface(
                                     mediaInitialKind = kind.name
                                     showMediaStudio = true
                                 },
+                                onConvertToWork = if (state.usageMode == LocalUsageMode.CHAT &&
+                                    onUseWorkCapability != null && !state.loading && !state.running
+                                ) { message -> onUseWorkCapability(message.content) } else null,
                                  onLocateSourceMemory = { message -> onLocateMemoryForMessage(message.id) },
                                 onSelectVariant = onSelectMessageVariant,
                                 onRegenerate = onRegenerate,
@@ -947,13 +1170,13 @@ internal fun LocalConversationSurface(
         }
 
         if (!state.configured && !state.loading && transcriptItems.isEmpty()) {
-            Surface(
+            SyMaterialSurface(
                 modifier = Modifier.fillMaxWidth().padding(
                     horizontal = DsSpacing.medium,
                     vertical = DsSpacing.small,
                 ),
                 shape = DsShapes.row,
-                color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                tier = SyMaterialTier.L3_CARD,
             ) {
                 Row(
                     modifier = Modifier.padding(DsSpacing.medium),
@@ -1019,13 +1242,10 @@ internal fun LocalConversationSurface(
                     items = state.replySuggestions.filter { it.text.isNotBlank() }.take(3),
                     key = { suggestion -> suggestion.label + "|" + suggestion.text },
                 ) { suggestion ->
-                    Surface(
+                    SyMaterialSurface(
                         onClick = { drafts.putBoundedLocalDraft(state.sessionId, suggestion.text) },
                         shape = DsShapes.pillFull,
-                        color = colors.wallpaperSurface(
-                            WallpaperSurfaceLevel.FLOATING,
-                            BackgroundRegion.BOTTOM,
-                        ),
+                        tier = SyMaterialTier.L4_OVERLAY,
                         border = BorderStroke(1.dp, colors.borderL1),
                     ) {
                         Text(
@@ -1139,6 +1359,17 @@ internal fun LocalConversationSurface(
 
     }
 
+    V6LoadedConversationSearchHost(
+        controller = loadedSearchState,
+        transcript = transcriptItems,
+        listState = listState,
+        leadingRows = listOf(
+            mediaPage.unavailable, mediaPage.hasMore, showTranscriptPagingRow,
+            showEmptyWorkbench, showEmptyGroupSetup, planReview != null,
+        ).count { it },
+        visible = state.usageMode == LocalUsageMode.CHAT,
+        onSearchAll = onOpenGlobalSearch,
+    )
     if (readerOpen) {
         val message = (transcriptHistory.olderMessages + state.messages).firstOrNull { it.id == readerMessageId }
         FluidMessageReader(
@@ -1279,7 +1510,7 @@ internal fun LocalConversationSurface(
                 color = colors.labelSecondary,
             )
             state.replySuggestions.filter { it.text.isNotBlank() }.forEach { suggestion ->
-                Surface(
+                SyMaterialSurface(
                     onClick = {
                         drafts.putBoundedLocalDraft(state.sessionId, suggestion.text)
                         showReplySuggestions = false
@@ -1287,7 +1518,7 @@ internal fun LocalConversationSurface(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !state.running,
                     shape = DsShapes.row,
-                    color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                    tier = SyMaterialTier.L3_CARD,
                     border = BorderStroke(1.dp, colors.borderL2),
                 ) {
                     Column(
@@ -1389,7 +1620,7 @@ internal fun LocalConversationSurface(
             if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) {
                 SySheetChoiceRow(
                     title = stringResource(R.string.local_persona_picker_title),
-                    icon = FeatherIcons.User,
+                    icon = com.labteto.dshmobile.ui.components.SyEntryIcons.Persona,
                     onClick = {
                         showAttachmentPicker = false
                         showPersonaPicker = true
@@ -1530,9 +1761,9 @@ private fun EmptyLocalHarness(
                 expanded = suggestionsOpen,
                 onDismiss = { suggestionsOpen = false },
                 items = listOf(
-                    SyMenuItem(stringResource(R.string.local_suggestion_files), FeatherIcons.FileText, onClick = { onSuggestion(filesPrompt) }),
-                    SyMenuItem(stringResource(R.string.local_suggestion_research), FeatherIcons.Globe, onClick = { onSuggestion(researchPrompt) }),
-                    SyMenuItem(stringResource(R.string.local_suggestion_tasks), FeatherIcons.CheckSquare, onClick = { onSuggestion(tasksPrompt) }),
+                    SyMenuItem(stringResource(R.string.local_suggestion_files), com.labteto.dshmobile.ui.components.SyEntryIcons.WorkspaceFiles, onClick = { onSuggestion(filesPrompt) }),
+                    SyMenuItem(stringResource(R.string.local_suggestion_research), com.labteto.dshmobile.ui.components.SyEntryIcons.Search, onClick = { onSuggestion(researchPrompt) }),
+                    SyMenuItem(stringResource(R.string.local_suggestion_tasks), com.labteto.dshmobile.ui.components.SyEntryIcons.Tasks, onClick = { onSuggestion(tasksPrompt) }),
                 ),
             )
         }

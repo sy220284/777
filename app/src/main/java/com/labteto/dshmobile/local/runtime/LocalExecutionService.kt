@@ -14,6 +14,7 @@ import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.tools.string
 import com.labteto.dshmobile.notify.DshNotifications
+import com.labteto.dshmobile.notify.LocalNotificationKind
 import com.labteto.dshmobile.notify.stableNotificationId
 import com.labteto.dshmobile.observability.AppLog
 import dagger.hilt.android.AndroidEntryPoint
@@ -175,7 +176,7 @@ class LocalExecutionService : Service() {
 
     private fun postCompletion(sessionId: String, outcome: String) {
         scope.launch {
-            if (!runCatching { hostsStore.settingsOnce().notifyLocalJobs }
+            val notificationSettings = runCatching { hostsStore.settingsOnce() }
                     .onFailure { failure ->
                         // A cancelled lifecycle scope is expected when the service stops.
                         if (failure !is CancellationException) {
@@ -183,9 +184,8 @@ class LocalExecutionService : Service() {
                                 sessionId = sessionId)
                         }
                     }
-                    .getOrDefault(true)) {
-                return@launch
-            }
+                    .getOrNull() ?: return@launch
+            if (!notificationSettings.notifyLocalJobs) return@launch
             val failed = outcome == OUTCOME_FAILED
             val cancelled = outcome == OUTCOME_CANCELLED
             val title = getString(
@@ -206,6 +206,8 @@ class LocalExecutionService : Service() {
                 text = text,
                 sessionId = sessionId,
                 notificationKey = "completion:$sessionId",
+                settings = notificationSettings,
+                kind = if (failed) LocalNotificationKind.FAILURE else LocalNotificationKind.RESULT,
             )
         }
     }

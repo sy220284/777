@@ -1,5 +1,6 @@
 package com.shenyan.designsystem.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
@@ -27,6 +28,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
@@ -67,17 +69,18 @@ fun SyButton(
     }
     val reduceMotion = LocalSyReduceMotion.current
     val scale by animateFloatAsState(
-        if (pressed && enabled) .97f else 1f,
+        if (pressed && enabled && !reduceMotion) .97f else 1f,
         animationSpec = tween(if (reduceMotion) 0 else SyMotion.pressMs),
         label = "syButtonPress",
     )
-    val fill = when (style) {
+    val fill = if (!enabled) syMaterialColor(SyMaterialTier.L2_BAR) else when (style) {
         SyButtonStyle.PRIMARY -> c.primary
         SyButtonStyle.DANGER -> c.danger
-        SyButtonStyle.SECONDARY -> c.surfaceRaised
-        SyButtonStyle.GHOST, SyButtonStyle.OUTLINE -> Color.Transparent
+        SyButtonStyle.SECONDARY -> syMaterialColor(SyMaterialTier.L2_BAR)
+        SyButtonStyle.GHOST, SyButtonStyle.OUTLINE ->
+            if (LocalSySceneBackdrop.current?.image != null) syMaterialColor(SyMaterialTier.L1_SECTION) else Color.Transparent
     }
-    val foreground = when (style) {
+    val foreground = if (!enabled) c.textTertiary else when (style) {
         SyButtonStyle.PRIMARY -> c.onPrimary
         SyButtonStyle.DANGER -> Color(0xFF241613)
         else -> c.text
@@ -87,7 +90,7 @@ fun SyButton(
         enabled = enabled && !loading,
         interactionSource = interaction,
         modifier = modifier.sizeIn(minWidth = SyMetric.touch, minHeight = height.coerceAtLeast(SyMetric.touch)).scale(scale),
-        color = if (style == SyButtonStyle.PRIMARY) Color.Transparent else fill,
+        color = if (style == SyButtonStyle.PRIMARY && enabled) Color.Transparent else fill,
         contentColor = foreground,
         shape = RoundedCornerShape(SyMetric.radiusControl),
         border = if (style == SyButtonStyle.SECONDARY || style == SyButtonStyle.OUTLINE)
@@ -95,7 +98,7 @@ fun SyButton(
     ) {
         Row(
             Modifier.background(
-                Brush.horizontalGradient(if (style == SyButtonStyle.PRIMARY)
+                Brush.horizontalGradient(if (style == SyButtonStyle.PRIMARY && enabled)
                     listOf(c.primary, c.primaryPressed) else listOf(fill, fill))
             ).padding(horizontal = 16.dp, vertical = 11.dp),
             horizontalArrangement = Arrangement.Center,
@@ -110,7 +113,7 @@ fun SyButton(
                 if (text.isNotEmpty()) Spacer(Modifier.width(8.dp))
             }
             if (text.isNotEmpty()) {
-                Text(text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(text, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             }
         }
     }
@@ -126,7 +129,7 @@ fun SyGlassCard(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null,
 @Composable
 fun SyInput(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier,
             label: String = "", error: String? = null, enabled: Boolean = true, singleLine: Boolean = true) {
-    OutlinedTextField(value = value, onValueChange = onValueChange, modifier = modifier.fillMaxWidth().heightIn(min = SyMetric.touch),
+    SyTextField(value = value, onValueChange = onValueChange, modifier = modifier.fillMaxWidth().heightIn(min = SyMetric.touch),
         enabled = enabled, singleLine = singleLine, isError = error != null,
         label = if (label.isEmpty()) null else ({ Text(label) }),
         supportingText = if (error == null) null else ({ Text(error) }),
@@ -138,13 +141,17 @@ fun SyTabs(tabs: List<SyOption>, selectedId: String, onSelect: (String) -> Unit,
     val c = LocalSyColors.current
     Row(modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         tabs.forEach { tab ->
+            val fill by animateColorAsState(
+                if (tab.id == selectedId) c.selected else syMaterialColor(SyMaterialTier.L2_BAR),
+                tween(if (LocalSyReduceMotion.current) 0 else SyMotion.selectMs), label = "tabSelection",
+            )
             Surface(onClick = { onSelect(tab.id) }, enabled = tab.enabled,
                 modifier = Modifier.heightIn(min = SyMetric.touch).semantics {
                     selected = tab.id == selectedId
                     role = Role.Tab
                 },
                 shape = RoundedCornerShape(13.dp),
-                color = if (tab.id == selectedId) c.selected else c.surface,
+                color = fill,
                 border = BorderStroke(1.dp, c.border)) {
                 Box(Modifier.padding(horizontal = 15.dp, vertical = 11.dp), contentAlignment = Alignment.Center) {
                     Text(tab.label, color = c.text)
@@ -156,7 +163,7 @@ fun SyTabs(tabs: List<SyOption>, selectedId: String, onSelect: (String) -> Unit,
 
 @Composable
 fun SyTabBar(tabs: List<SyOption>, selectedId: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
-    NavigationBar(modifier, containerColor = LocalSyColors.current.surfaceSolid) {
+    NavigationBar(modifier, containerColor = syMaterialColor(SyMaterialTier.L4_OVERLAY)) {
         tabs.forEach { tab ->
             NavigationBarItem(
                 selected = selectedId == tab.id,
@@ -164,6 +171,11 @@ fun SyTabBar(tabs: List<SyOption>, selectedId: String, onSelect: (String) -> Uni
                 enabled = tab.enabled,
                 icon = { Text(if (selectedId == tab.id) "●" else "○") },
                 label = { Text(tab.label, maxLines = 1) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = LocalSyColors.current.text, selectedTextColor = LocalSyColors.current.text,
+                    unselectedIconColor = LocalSyColors.current.textSecondary, unselectedTextColor = LocalSyColors.current.textSecondary,
+                    indicatorColor = LocalSyColors.current.selected,
+                ),
                 alwaysShowLabel = true
             )
         }
@@ -173,7 +185,7 @@ fun SyTabBar(tabs: List<SyOption>, selectedId: String, onSelect: (String) -> Uni
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SyModalSheet(onDismiss: () -> Unit, title: String, content: @Composable ColumnScope.() -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = LocalSyColors.current.surfaceSolid) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = syMaterialColor(SyMaterialTier.L4_OVERLAY)) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 14.dp), content = {
             Text(title, style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(14.dp))
@@ -188,7 +200,7 @@ fun SyConfirmDialog(title: String, body: String, dangerous: Boolean, onConfirm: 
     AlertDialog(onDismissRequest = { if (!dangerous) onDismiss() }, title = { Text(title) }, text = { Text(body) },
         confirmButton = { SyButton(if (dangerous) "确认执行" else "确认", onConfirm, style = if (dangerous) SyButtonStyle.DANGER else SyButtonStyle.PRIMARY) },
         dismissButton = { SyButton("取消", onDismiss, style = SyButtonStyle.GHOST) },
-        containerColor = LocalSyColors.current.surfaceSolid,
+        containerColor = syMaterialColor(SyMaterialTier.L4_OVERLAY),
         shape = RoundedCornerShape(SyMetric.radiusSheet))
 }
 
@@ -200,19 +212,18 @@ fun SySearchBar(
     modifier: Modifier = Modifier,
     placeholder: String = "",
     shortcut: String? = null,
+    searchIcon: ImageVector = Icons.Outlined.Search,
 ) {
     val colors = LocalSyColors.current
-    var focused by remember { mutableStateOf(false) }
-    OutlinedTextField(
+    SyTextField(
         value = query,
         onValueChange = onQueryChange,
-        modifier = modifier.fillMaxWidth().heightIn(min = SyMetric.touch)
-            .onFocusChanged { focused = it.isFocused },
+        modifier = modifier.fillMaxWidth(),
         placeholder = if (placeholder.isBlank()) null else {
             { Text(placeholder, color = colors.textTertiary) }
         },
         leadingIcon = {
-            Icon(Icons.Outlined.Search, contentDescription = null,
+            Icon(searchIcon, contentDescription = null,
                 tint = colors.textTertiary, modifier = Modifier.size(18.dp))
         },
         trailingIcon = if (shortcut.isNullOrBlank()) null else {
@@ -223,15 +234,7 @@ fun SySearchBar(
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { onSearch() }),
         shape = RoundedCornerShape(14.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = colors.surfaceSolid,
-            unfocusedContainerColor = colors.materialL3,
-            focusedBorderColor = colors.primary,
-            unfocusedBorderColor = colors.border,
-            focusedTextColor = colors.text,
-            unfocusedTextColor = colors.text,
-            cursorColor = colors.primary,
-        ),
+
     )
 }
 
@@ -259,11 +262,11 @@ fun SyProgressBar(
     }
     // Unknown percentage is indeterminate ONLY when work is genuinely active.
     if (progress == null && phase == SyPhase.RUNNING) {
-        LinearProgressIndicator(modifier.fillMaxWidth(), color = color, trackColor = c.materialL2)
+        LinearProgressIndicator(modifier.fillMaxWidth(), color = color, trackColor = syMaterialColor(SyMaterialTier.L2_BAR))
     } else {
         val amount = progress?.coerceIn(0f, 1f) ?: if (phase == SyPhase.DONE) 1f else 0f
         LinearProgressIndicator(progress = { amount }, modifier = modifier.fillMaxWidth(),
-            color = color, trackColor = c.materialL2)
+            color = color, trackColor = syMaterialColor(SyMaterialTier.L2_BAR))
     }
 }
 
@@ -309,13 +312,13 @@ fun SySwitchControl(
             checkedTrackColor = p.primary,
             checkedBorderColor = Color.Transparent,
             uncheckedThumbColor = p.textTertiary,
-            uncheckedTrackColor = p.materialL2,
+            uncheckedTrackColor = syMaterialColor(SyMaterialTier.L2_BAR),
             uncheckedBorderColor = p.border,
             disabledCheckedThumbColor = p.onPrimary.copy(alpha = .58f),
             disabledCheckedTrackColor = p.primary.copy(alpha = .36f),
             disabledCheckedBorderColor = Color.Transparent,
             disabledUncheckedThumbColor = p.textTertiary.copy(alpha = .55f),
-            disabledUncheckedTrackColor = p.materialL2.copy(alpha = .6f),
+            disabledUncheckedTrackColor = syMaterialColor(SyMaterialTier.L2_BAR).copy(alpha = .6f),
             disabledUncheckedBorderColor = p.border.copy(alpha = .5f),
         ),
     )
@@ -324,7 +327,7 @@ fun SySwitchControl(
 
 @Composable
 fun SyListItem(title: String, description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(onClick = onClick, modifier = modifier.fillMaxWidth().heightIn(min = SyMetric.touch), color = LocalSyColors.current.surface,
+    SyMaterialSurface(onClick = onClick, modifier = modifier.fillMaxWidth().heightIn(min = SyMetric.touch), tier = SyMaterialTier.L3_CARD,
         shape = RoundedCornerShape(13.dp)) {
         Column(Modifier.padding(13.dp)) { Text(title); Text(description, style = MaterialTheme.typography.bodySmall, color = LocalSyColors.current.textSecondary) }
     }
@@ -334,10 +337,10 @@ fun SyListItem(title: String, description: String, onClick: () -> Unit, modifier
 fun SyStatusTag(label: String, phase: SyPhase, modifier: Modifier = Modifier) {
     val c = LocalSyColors.current
     val tint = when (phase) {
-        SyPhase.DONE, SyPhase.RUNNING -> c.mint
-        SyPhase.FAILED -> c.clay
-        SyPhase.BLOCKED -> c.primary
-        SyPhase.WAITING -> c.lilac
+        SyPhase.DONE, SyPhase.RUNNING -> c.successInk
+        SyPhase.FAILED -> c.dangerInk
+        SyPhase.BLOCKED -> c.warningInk
+        SyPhase.WAITING -> c.textSecondary
         SyPhase.CANCELLED, SyPhase.IDLE -> c.textTertiary
     }
     Surface(modifier, color = tint.copy(alpha = .18f), shape = CircleShape) {
@@ -352,8 +355,8 @@ fun SyStatusTag(label: String, phase: SyPhase, modifier: Modifier = Modifier) {
 
 @Composable
 fun SyFileRow(fileName: String, detail: String, onOpen: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    Surface(onClick = onOpen, enabled = enabled, modifier = modifier.fillMaxWidth().heightIn(min = SyMetric.touch),
-        color = LocalSyColors.current.surface, shape = RoundedCornerShape(13.dp)) {
+    SyMaterialSurface(onClick = onOpen, enabled = enabled, modifier = modifier.fillMaxWidth().heightIn(min = SyMetric.touch),
+        tier = SyMaterialTier.L3_CARD, shape = RoundedCornerShape(13.dp)) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("▤", Modifier.padding(end = 12.dp))
             Column(Modifier.weight(1f)) { Text(fileName, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(detail, style = MaterialTheme.typography.bodySmall) }
@@ -363,7 +366,7 @@ fun SyFileRow(fileName: String, detail: String, onOpen: () -> Unit, modifier: Mo
 
 @Composable
 fun SyNote(text: String, modifier: Modifier = Modifier) {
-    Surface(modifier, color = LocalSyColors.current.surfaceRaised, shape = RoundedCornerShape(13.dp)) {
+    SyMaterialSurface(modifier, tier = SyMaterialTier.L2_BAR, shape = RoundedCornerShape(13.dp)) {
         Text(text, Modifier.padding(13.dp), color = LocalSyColors.current.textSecondary)
     }
 }

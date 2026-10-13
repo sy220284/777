@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 
 import android.graphics.BitmapFactory
 import android.widget.Toast
@@ -72,13 +76,13 @@ import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.ui.shenyan.SyContextActionMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ThinkingRow
 import com.labteto.dshmobile.ui.shenyan.SyUserBubble
-import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -142,6 +146,7 @@ internal fun LocalMessageRow(
     onLocateSourceMemory: ((LocalHarnessMessage) -> Unit)? = null,
     onReadMessage: ((LocalHarnessMessage) -> Unit)? = null,
     onCreateMedia: ((LocalHarnessMessage, LocalMediaKind) -> Unit)? = null,
+    onConvertToWork: ((LocalHarnessMessage) -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
     val pulse = rememberHapticPulse()
@@ -218,6 +223,16 @@ internal fun LocalMessageRow(
                                     ),
                                 )
                             }
+                            // Design 01 → 02: a chosen USER message opens the real Work
+                            // capability/handoff sheet. The sheet handles confirmation,
+                            // permissions and session linking; a chat menu never runs tools.
+                            if (chatMode && copyText.isNotBlank()) onConvertToWork?.let { convert ->
+                                add(SyMenuItem(
+                                    text = stringResource(R.string.sy_v6_convert_to_work),
+                                    icon = SyEntryIcons.Tasks,
+                                    onClick = { convert(message.copy(content = copyText)) },
+                                ))
+                            }
                             if (canEdit) {
                                 add(
                                     SyMenuItem(
@@ -269,11 +284,7 @@ internal fun LocalMessageRow(
                 Modifier
                     .fillMaxWidth(0.80f)
                     .background(
-                        backgroundState.wallpaperSurface(
-                            base = colors.bgLayer1,
-                            level = WallpaperSurfaceLevel.CARD,
-                            region = BackgroundRegion.MIDDLE,
-                        ),
+                        com.shenyan.designsystem.components.syMaterialColor(SyMaterialTier.L3_CARD),
                         DsShapes.characterBubble,
                     )
                     .border(
@@ -505,9 +516,9 @@ private fun LocalTranscriptImage(
 @Composable
 private fun LocalTranscriptUnknown(block: LocalMessageBlock.Unknown) {
     val colors = DsTheme.colors
-    Surface(
+    SyMaterialSurface(
         shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        tier = SyMaterialTier.L3_CARD,
         border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderL3),
     ) {
         Text(
@@ -522,9 +533,9 @@ private fun LocalTranscriptUnknown(block: LocalMessageBlock.Unknown) {
 @Composable
 private fun LocalTranscriptFile(file: LocalMessageBlock.File) {
     val colors = DsTheme.colors
-    Surface(
+    SyMaterialSurface(
         shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        tier = SyMaterialTier.L3_CARD,
         border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderL3),
     ) {
         Row(

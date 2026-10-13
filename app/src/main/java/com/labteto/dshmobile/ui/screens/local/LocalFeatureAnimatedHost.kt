@@ -1,6 +1,13 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -47,9 +54,12 @@ internal fun LocalFeatureAnimatedHost(
         delayMillis = if (reduced) 0 else SyDurations.sidebarDelay, easing = ease)
     val fadeExit = tween<Float>(if (reduced) 80 else 110, easing = ease)
 
-    AnimatedContent(
+    SharedTransitionLayout(modifier = modifier) {
+        val sharedScope = this
+        AnimatedContent(
         targetState = stack,
-        modifier = modifier.graphicsLayer {
+        contentKey = { localFeatureCurrent(it) },
+        modifier = Modifier.fillMaxSize().graphicsLayer {
             translationX = predictiveBackMaxOffsetPx * settledBackProgress
             alpha = 1f - (0.02f * settledBackProgress)
         },
@@ -88,6 +98,38 @@ internal fun LocalFeatureAnimatedHost(
         },
         label = "localFeaturePage",
     ) { renderedStack ->
-        content(localFeatureCurrent(renderedStack))
+            CompositionLocalProvider(
+                LocalFeatureSharedTransitionScope provides sharedScope,
+                LocalFeatureVisibilityScope provides this,
+            ) {
+                content(localFeatureCurrent(renderedStack))
+            }
+        }
+    }
+}
+
+/** Shared layout/visibility scopes are owned by this single navigation host. */
+@OptIn(ExperimentalSharedTransitionApi::class)
+internal val LocalFeatureSharedTransitionScope =
+    staticCompositionLocalOf<SharedTransitionScope?> { null }
+internal val LocalFeatureVisibilityScope =
+    staticCompositionLocalOf<AnimatedVisibilityScope?> { null }
+
+/** Path-qualified bounds key avoids morphing two unrelated workspace files. */
+internal fun localArtifactTransitionKey(workspace: String, file: String): String =
+    "workspace-file:$workspace:$file"
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+internal fun Modifier.localArtifactSharedBounds(workspace: String, file: String): Modifier {
+    val scope = LocalFeatureSharedTransitionScope.current ?: return this
+    val visibility = LocalFeatureVisibilityScope.current ?: return this
+    if (LocalSyReducedMotion.current || file.isBlank()) return this
+    return with(scope) {
+        this@localArtifactSharedBounds.sharedBounds(
+            sharedContentState = rememberSharedContentState(localArtifactTransitionKey(workspace, file)),
+            animatedVisibilityScope = visibility,
+            boundsTransform = { _, _ -> tween(SyDurations.page) },
+        )
     }
 }

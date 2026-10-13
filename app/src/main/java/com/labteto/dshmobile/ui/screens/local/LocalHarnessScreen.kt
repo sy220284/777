@@ -67,6 +67,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.labteto.dshmobile.ui.screens.tasks.TasksViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -149,6 +150,8 @@ fun LocalHarnessScreen(
     updateStatus: String? = null,
     viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
+    val searchTaskViewModel: TasksViewModel = hiltViewModel()
+    val searchTaskState by searchTaskViewModel.state.collectAsStateWithLifecycle()
     val shell by viewModel.shellState.collectAsStateWithLifecycle()
     val chatSurface by viewModel.chatSurfaceState.collectAsStateWithLifecycle()
     val activeModelProfile by viewModel.activeModelProfile.collectAsStateWithLifecycle()
@@ -160,6 +163,7 @@ fun LocalHarnessScreen(
     val sessionTitleOverrides by viewModel.sessionTitleOverrides.collectAsStateWithLifecycle()
     val projectRecoveryNotice by viewModel.projectRecoveryNotice.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
+    var openGlobalSearchRequest by rememberSaveable { mutableIntStateOf(0) }
     val syWideViewport = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 1024
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -195,6 +199,7 @@ fun LocalHarnessScreen(
     var drawerFeatureOriginStack by rememberSaveable { mutableStateOf<List<String>?>(null) }
     var conversationOpenedFromDrawer by rememberSaveable { mutableStateOf(false) }
     var filesMode by rememberSaveable { mutableStateOf(LocalFilesMode.WORKSPACE) }
+    var filesEntryRequest by rememberSaveable { mutableIntStateOf(0) }
     var requestedFilePath by rememberSaveable(shell.sessionId) { mutableStateOf<String?>(null) }
     var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
     var settingsEntryRequest by rememberSaveable { mutableIntStateOf(0) }
@@ -203,6 +208,8 @@ fun LocalHarnessScreen(
     var drawerGalleryTargetId by rememberSaveable { mutableStateOf<String?>(null) }
     var drawerGalleryEntryVersion by rememberSaveable { mutableIntStateOf(0) }
     var taskMode by rememberSaveable { mutableStateOf<AutomationMode?>(null) }
+    var searchedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    var taskEntryRequest by rememberSaveable { mutableIntStateOf(0) }
     var composerHandoff by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var installedSkillDisplayNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var pendingWorkCapability by rememberSaveable { mutableStateOf<String?>(null) }
@@ -253,11 +260,20 @@ fun LocalHarnessScreen(
     val predictiveBackProgress = remember { Animatable(0f) }
 
     fun pushFeature(page: LocalFeaturePage) {
+        if (page == LocalFeaturePage.WORKSPACE) filesEntryRequest++
         // Keep the drawer origin when opening nested feature pages.
         featureStack = localFeaturePush(featureStack, page)
     }
 
+    fun prepareSettingsEntry(destination: SettingsDestination) {
+        memorySourceSessionId = null
+        memorySourceMessageId = null
+        settingsDestination = destination
+        settingsEntryRequest++
+    }
+
     fun openFeatureFromDrawer(page: LocalFeaturePage) {
+        if (page == LocalFeaturePage.WORKSPACE) filesEntryRequest++
         conversationOpenedFromDrawer = false
         val navigation = localFeatureOpenFromDrawer(
             stack = featureStack,
@@ -313,6 +329,7 @@ fun LocalHarnessScreen(
                 memorySourceMessageId = null
                 settingsDestination = SettingsDestination.ROOT
                 taskMode = null
+                searchedTaskId = null
                 requestedFilePath = null
                 filesMode = LocalFilesMode.WORKSPACE
                 composerHandoff = emptyList()
@@ -508,16 +525,32 @@ fun LocalHarnessScreen(
                 filesMode = LocalFilesMode.CONVERSATION
                 pushFeature(LocalFeaturePage.WORKSPACE)
             },
-            onSettingsDestinationChange = {
-                settingsDestination = it
-                settingsEntryRequest++
-            },
+            onSettingsDestinationChange = ::prepareSettingsEntry,
             onPushFeature = ::pushFeature,
             onNewSession = {
                 newSessionOpenedFromDrawer = false
                 showNewSessionMode = true
             },
             onOpenDrawer = { scope.launch { drawerState.open() } },
+            onOpenGlobalSearch = {
+                openGlobalSearchRequest++
+                scope.launch { drawerState.open() }
+            },
+            onOpenPersonaGallery = {
+                // Preserve the same unsaved-persona guard used by the drawer.
+                if (viewModel.hasUnsavedCurrentPersona()) {
+                    showPersonaGallerySavePrompt = true
+                } else {
+                    drawerGalleryTargetId = shell.galleryId
+                    drawerGalleryEntryVersion++
+                    pushFeature(LocalFeaturePage.PERSONA_GALLERY)
+                }
+            },
+            onOpenWorkspaceFiles = {
+                filesMode = LocalFilesMode.WORKSPACE
+                requestedFilePath = null
+                pushFeature(LocalFeaturePage.WORKSPACE)
+            },
             onOpenFromDrawer = ::openFeatureFromDrawer,
             onCloseDrawer = { scope.launch { drawerState.close() } },
             onReturnFromDrawerReader = {
@@ -565,7 +598,11 @@ fun LocalHarnessScreen(
                 switchToSessionAndShowConversation(sourceSessionId)
             },
             requestedFilePath = requestedFilePath,
+            entryRequest = filesEntryRequest,
             onRequestedFilePathChange = { requestedFilePath = it },
+            onRequestedFilePathConsumed = { path ->
+                if (requestedFilePath == path) requestedFilePath = null
+            },
             shell = shell,
             actions = workActions,
             onFilesModeChange = { filesMode = it },
@@ -586,6 +623,8 @@ fun LocalHarnessScreen(
         ),
         localAutomationFeatureUiContribution(
             taskMode = taskMode,
+            searchedTaskId = searchedTaskId,
+            entryRequest = taskEntryRequest,
             onCreateViaChat = ::useWorkCapability,
             actions = automationActions,
             onTaskModeChange = { taskMode = it },
@@ -597,10 +636,7 @@ fun LocalHarnessScreen(
             startAtPlugins = toolsStartAtPlugins,
             startAtSkills = toolsStartAtSkills,
             onUseCapability = ::useWorkCapability,
-            onSettingsDestinationChange = {
-                settingsDestination = it
-                settingsEntryRequest++
-            },
+            onSettingsDestinationChange = ::prepareSettingsEntry,
             onPushFeature = ::pushFeature,
             onPopFeature = { toolsStartAtPlugins = false; toolsStartAtSkills = false; popFeature() },
             onOpenFromDrawer = ::openFeatureFromDrawer,
@@ -613,10 +649,7 @@ fun LocalHarnessScreen(
             memorySourceMessageId = memorySourceMessageId,
             updateStatus = updateStatus,
             onCheckUpdate = onCheckUpdate,
-            onSettingsDestinationChange = {
-                settingsDestination = it
-                settingsEntryRequest++
-            },
+            onSettingsDestinationChange = ::prepareSettingsEntry,
             onPopFeature = ::popFeature,
             onOpenFromDrawer = ::openFeatureFromDrawer,
             onCloseDrawer = { scope.launch { drawerState.close() } },
@@ -624,6 +657,10 @@ fun LocalHarnessScreen(
     )
 
     fun openDrawerEntry(entry: LocalFeatureDrawerEntry, galleryTargetId: String? = null) {
+        if (entry == LocalFeatureDrawerEntry.TASKS) {
+            searchedTaskId = null
+            taskEntryRequest++
+        }
         if (entry == LocalFeatureDrawerEntry.PERSONA_GALLERY ||
             entry == LocalFeatureDrawerEntry.PERSONA_GALLERY_CONTINUE
         ) {
@@ -796,6 +833,7 @@ fun LocalHarnessScreen(
                 modeSwitchEnabled = shell.sessionId.isNotBlank() &&
                     localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
                 drawerOpen = syWideViewport || drawerState.isOpen,
+                globalSearchOpenRequest = openGlobalSearchRequest,
                 pinnedSessionIds = pinnedSessionIds,
                 sessionTitleOverrides = sessionTitleOverrides,
                 currentGalleryId = shell.galleryId,
@@ -823,6 +861,20 @@ fun LocalHarnessScreen(
                 onRenameSession = viewModel::renameSession,
                 onTogglePinSession = viewModel::toggleSessionPinned,
                 onWorkspaceFiles = { openDrawerEntry(LocalFeatureDrawerEntry.WORKSPACE) },
+                searchTasks = searchTaskState.tasks,
+                loadSearchFiles = viewModel::workspaceFiles,
+                onSearchTask = { task ->
+                    openDrawerEntry(LocalFeatureDrawerEntry.TASKS)
+                    taskMode = task.mode
+                    searchedTaskId = task.id
+                },
+                onSearchFile = { path ->
+                    // The ordinary drawer action clears pending file selection. Set the exact
+                    // search target AFTER that action so the workspace preview opens it.
+                    openDrawerEntry(LocalFeatureDrawerEntry.WORKSPACE)
+                    filesMode = LocalFilesMode.WORKSPACE
+                    requestedFilePath = path
+                },
                 onProjects = { openDrawerEntry(LocalFeatureDrawerEntry.PROJECT) },
                 onOpenRunCenter = { openDrawerEntry(LocalFeatureDrawerEntry.RUN_CENTER) },
                 groupMemberCount = shell.groupChat.members.size,
@@ -896,7 +948,11 @@ fun LocalHarnessScreen(
             }
         }
     } else {
-        ModalNavigationDrawer(drawerState = drawerState, drawerContent = syDrawerContent) {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = syDrawerContent,
+            scrimColor = LocalSyPalette.current.scrim,
+        ) {
             sySceneContent()
         }
     }
@@ -948,14 +1004,12 @@ fun LocalHarnessScreen(
             onRefreshCapabilities = { workCapabilityOpenVersion += 1 },
             onConfigureModel = {
                 workCapabilityConfiguring = true
-                settingsDestination = SettingsDestination.MODELS
-                settingsEntryRequest++
+                prepareSettingsEntry(SettingsDestination.MODELS)
                 pushFeature(LocalFeaturePage.SETTINGS)
             },
             onConfigureDevice = {
                 workCapabilityConfiguring = true
-                settingsDestination = SettingsDestination.PERMISSIONS
-                settingsEntryRequest++
+                prepareSettingsEntry(SettingsDestination.PERMISSIONS)
                 pushFeature(LocalFeaturePage.SETTINGS)
             },
             onContinue = {
@@ -983,11 +1037,11 @@ fun LocalHarnessScreen(
                 finishFirstLaunch()
                 if (selectedMode != shell.usageMode) viewModel.switchUsageMode(selectedMode)
             },
-            onConfigureModel = { selectedMode ->
+            onConfigureModel = { _ ->
                 finishFirstLaunch()
-                if (selectedMode != shell.usageMode) viewModel.switchUsageMode(selectedMode)
-                settingsDestination = SettingsDestination.MODELS
-                settingsEntryRequest++
+                // Model settings are global. Switching sessions here would complete later
+                // and reset navigation after the user has already entered configuration.
+                prepareSettingsEntry(SettingsDestination.MODELS)
                 pushFeature(LocalFeaturePage.SETTINGS)
             },
         )

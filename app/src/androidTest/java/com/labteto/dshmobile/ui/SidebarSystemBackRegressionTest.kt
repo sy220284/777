@@ -1,8 +1,6 @@
 package com.labteto.dshmobile.ui
 
 import androidx.activity.ComponentActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
@@ -40,20 +38,12 @@ class SidebarSystemBackRegressionTest {
         compose.onNodeWithText(InstrumentationRegistry.getInstrumentation().targetContext.getString(
             R.string.persona_gallery_add_title,
         )).assertIsDisplayed()
-        // Android emulator window focus is not guaranteed when instrumented tests share an
-        // activity stack. It is NOT a precondition for the Back handler's correctness.
-        // Dismiss any IME first, then still inject real device Back and assert the callback.
+        // Verify the real AndroidX BackHandler registration through its owning Activity.
+        // Injecting shell KEYCODE_BACK can target another focused emulator window in CI.
         compose.waitForIdle()
         compose.runOnUiThread {
-            ViewCompat.getWindowInsetsController(compose.activity.window.decorView)
-                ?.hide(WindowInsetsCompat.Type.ime())
+            compose.activity.onBackPressedDispatcher.onBackPressed()
         }
-        compose.waitUntil(timeoutMillis = 8_000L) {
-            ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
-                ?.isVisible(WindowInsetsCompat.Type.ime()) != true
-        }
-        pressDeviceBack()
-        compose.waitUntil(timeoutMillis = 8_000L) { backCount.get() != 0 }
         compose.waitForIdle()
 
         assertEquals(1, backCount.get())

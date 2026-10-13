@@ -23,6 +23,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import com.shenyan.designsystem.foundation.LocalSySceneBackdrop
+import com.shenyan.designsystem.foundation.SySceneBackdrop
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.sqrt
@@ -54,6 +62,9 @@ data class BackgroundRegionStats(
     val luminance: Float = 0.5f,
     val contrast: Float = 0f,
     val detail: Float = 0f,
+    val averageColor: Color = Color.Unspecified,
+    val darkestColor: Color = Color.Unspecified,
+    val brightestColor: Color = Color.Unspecified,
 )
 
 data class BackgroundAnalysis(
@@ -223,11 +234,41 @@ fun AppBackgroundHost(
         surfaceTransparency = surfaceTransparency.coerceIn(0f, 1f),
         fluidGlass = fluidGlass,
     )
-    CompositionLocalProvider(
-        LocalAppBackground provides loaded?.image,
-        LocalAppBackgroundState provides state,
-    ) {
-        Box(modifier.fillMaxSize().background(surfaceBase)) {
+    val view = LocalView.current
+    val windowOnScreen = remember { IntArray(2) }
+    var viewportOrigin by remember { mutableStateOf(IntOffset.Zero) }
+    var viewportSize by remember { mutableStateOf(IntSize.Zero) }
+    val dsColors = DsTheme.colors
+    val sceneBackdrop = if (viewportSize.width > 0 && viewportSize.height > 0 &&
+        (loaded != null || fluidGlass)
+    ) SySceneBackdrop(
+        viewportOrigin = viewportOrigin,
+        viewportSize = viewportSize,
+        canvas = surfaceBase,
+        image = loaded?.image,
+        veil = adaptiveGlobalVeil(state, surfaceBase),
+        glowColors = if (loaded == null && fluidGlass) listOf(
+            dsColors.brandPrimary, dsColors.successSecondary, dsColors.characterAccentTertiary,
+        ) else emptyList(),
+        dark = darkTheme,
+        regionColors = loaded?.analysis?.let { listOf(it.top.averageColor, it.middle.averageColor, it.bottom.averageColor) } ?: emptyList(),
+        regionExtremes = loaded?.analysis?.let { analysis -> listOf(analysis.top, analysis.middle, analysis.bottom)
+            .map { listOf(it.darkestColor, it.brightestColor) } } ?: emptyList(),
+        surfaceTransparency = state.surfaceTransparency,
+        adaptiveContrast = adaptiveEnabled,
+    ) else null
+    Box(modifier.fillMaxSize().background(surfaceBase).onGloballyPositioned { coordinates ->
+        view.rootView.getLocationOnScreen(windowOnScreen)
+        val point = coordinates.positionInWindow()
+        val nextOrigin = IntOffset(point.x.roundToInt() + windowOnScreen[0], point.y.roundToInt() + windowOnScreen[1])
+        if (viewportOrigin != nextOrigin) viewportOrigin = nextOrigin
+        if (viewportSize != coordinates.size) viewportSize = coordinates.size
+    }) {
+        CompositionLocalProvider(
+            LocalAppBackground provides loaded?.image,
+            LocalAppBackgroundState provides state,
+            LocalSySceneBackdrop provides sceneBackdrop,
+        ) {
             if (loaded == null && fluidGlass) FluidGlassBackdrop(darkTheme)
             loaded?.let { background ->
                 Image(
@@ -237,11 +278,7 @@ fun AppBackgroundHost(
                     contentScale = ContentScale.Crop,
                 )
                 adaptiveGlobalVeil(state, surfaceBase)?.let { veil ->
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(veil),
-                    )
+                    Box(Modifier.fillMaxSize().background(veil))
                 }
             }
             content()
@@ -327,6 +364,7 @@ private fun rememberBackground(path: String?): LoadedBackground? {
 
 private data class PixelSample(
     val normalizedY: Float,
+    val color: Color,
     val luminance: Float,
     val saturation: Float,
     val detail: Float,
@@ -373,6 +411,7 @@ internal fun analyzeBackground(bitmap: Bitmap): BackgroundAnalysis {
             val detail = if (detailCount == 0) 0f else (detailSum / detailCount * 2.2f).coerceIn(0f, 1f)
             samples += PixelSample(
                 normalizedY = (row + 0.5f) / rows,
+                color = Color(red, green, blue),
                 luminance = luminance,
                 saturation = saturation,
                 detail = detail,
@@ -395,7 +434,13 @@ internal fun analyzeBackground(bitmap: Bitmap): BackgroundAnalysis {
             .toFloat()
         val contrast = (sqrt(variance) * 2.35f).coerceIn(0f, 1f)
         val detail = regionSamples.map { it.detail }.average().toFloat().coerceIn(0f, 1f)
-        return BackgroundRegionStats(average, contrast, detail)
+        val tint = Color(
+            regionSamples.map { it.color.red }.average().toFloat(),
+            regionSamples.map { it.color.green }.average().toFloat(),
+            regionSamples.map { it.color.blue }.average().toFloat(),
+        )
+        return BackgroundRegionStats(average, contrast, detail, tint,
+            regionSamples.minBy { it.luminance }.color, regionSamples.maxBy { it.luminance }.color)
     }
 
     val global = stats(0f, 1.001f)
@@ -431,7 +476,19 @@ fun DsColors.wallpaperSurface(
         WallpaperSurfaceLevel.DIALOG -> bgLayer2
         WallpaperSurfaceLevel.MENU -> bgLayer3
     },
-): Color = LocalAppBackgroundState.current.wallpaperSurface(base, level, region)
+): Color {
+    if (level == WallpaperSurfaceLevel.PAGE) return LocalAppBackgroundState.current.wallpaperSurface(base, level, region)
+    val tier = when (level) {
+        WallpaperSurfaceLevel.INPUT -> com.shenyan.designsystem.components.SyMaterialTier.L1_SECTION
+        WallpaperSurfaceLevel.CHROME -> com.shenyan.designsystem.components.SyMaterialTier.L2_BAR
+        WallpaperSurfaceLevel.FLOATING, WallpaperSurfaceLevel.SHEET, WallpaperSurfaceLevel.DRAWER,
+        WallpaperSurfaceLevel.DIALOG, WallpaperSurfaceLevel.MENU -> com.shenyan.designsystem.components.SyMaterialTier.L4_OVERLAY
+        else -> com.shenyan.designsystem.components.SyMaterialTier.L3_CARD
+    }
+    val neutral = base in listOf(bgBase, bgLayer1, bgLayer2, bgLayer3, bgModulePlatform, sidebar)
+    return if (neutral) com.shenyan.designsystem.components.syMaterialColor(tier)
+    else LocalAppBackgroundState.current.wallpaperSurface(base, level, region)
+}
 
 @Composable
 fun DsColors.rootSurface(): Color = wallpaperSurface(WallpaperSurfaceLevel.PAGE)

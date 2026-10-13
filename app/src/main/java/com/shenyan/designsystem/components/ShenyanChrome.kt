@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -46,9 +45,10 @@ fun SyTopBar(
     onAction: (() -> Unit)? = null,
 ) {
     val tokens = LocalSyColors.current
-    Surface(
+    SyMaterialSurface(
         modifier = modifier.fillMaxWidth(),
-        color = tokens.topBar,
+        tier = SyMaterialTier.L2_BAR,
+        shape = androidx.compose.ui.graphics.RectangleShape, shadowElevation = 0.dp,
         border = BorderStroke(1.dp, tokens.border.copy(alpha = .45f)),
     ) {
         Column {

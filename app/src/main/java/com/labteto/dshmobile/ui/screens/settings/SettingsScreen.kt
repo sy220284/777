@@ -77,9 +77,12 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.shenyan.SyToastHost
+import com.labteto.dshmobile.ui.shenyan.SyMaterialFrame
+import com.labteto.dshmobile.ui.shenyan.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.shenyan.SyHierarchyPage
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.shenyan.SyUserBubble
 import com.labteto.dshmobile.ui.shenyan.rememberSyToast
@@ -131,34 +134,6 @@ enum class SettingsDestination {
     DIAGNOSTICS,
     UPDATE,
 }
-
-internal fun SettingsDestination.parentDestination(): SettingsDestination? = when (this) {
-    SettingsDestination.ROOT -> null
-    SettingsDestination.SESSION,
-    SettingsDestination.APPEARANCE,
-    SettingsDestination.MODELS,
-    SettingsDestination.MODEL_PERFORMANCE,
-    SettingsDestination.ACCOUNT,
-    SettingsDestination.SESSION_STORAGE,
-    SettingsDestination.MODEL_USAGE,
-    SettingsDestination.MINIMAX_QUOTA,
-    SettingsDestination.MEMORY,
-    SettingsDestination.PERMISSIONS,
-    SettingsDestination.NOTIFICATIONS,
-    SettingsDestination.ADVANCED,
-    SettingsDestination.UPDATE -> SettingsDestination.ROOT
-    SettingsDestination.MEMORY_SETTINGS,
-    SettingsDestination.MEMORY_MANAGEMENT -> SettingsDestination.MEMORY
-    SettingsDestination.CHAT -> SettingsDestination.SESSION
-    SettingsDestination.PRICING,
-    SettingsDestination.USAGE -> SettingsDestination.MODEL_USAGE
-    SettingsDestination.USAGE_LOG -> SettingsDestination.USAGE
-    SettingsDestination.USAGE_DETAIL -> SettingsDestination.USAGE
-    SettingsDestination.DIAGNOSTICS -> SettingsDestination.ADVANCED
-}
-
-internal fun SettingsDestination.navigationDepth(): Int =
-    parentDestination()?.let { it.navigationDepth() + 1 } ?: 0
 
 internal fun encodeUsageDetailSelection(selection: UsageDetailSelection?): List<String> = when (selection) {
     null -> emptyList()
@@ -213,7 +188,6 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.state.collectAsStateWithLifecycle()
     val localHarness by viewModel.localHarnessState.collectAsStateWithLifecycle()
-    val selectedMiniMaxProfile = localHarness.miniMaxQuotaProfile
     val approvalMode by viewModel.approvalMode.collectAsStateWithLifecycle()
     val deepSeekPricing by viewModel.deepSeekPricing.collectAsStateWithLifecycle()
     val usageAnalytics by viewModel.usageAnalytics.collectAsStateWithLifecycle()
@@ -264,10 +238,16 @@ fun SettingsScreen(
             }
         }
     }
-    var page by rememberSaveable(initialDestination, entryRequest) { mutableStateOf(initialDestination) }
-    var showAllMemories by rememberSaveable(memorySourceSessionId, memorySourceMessageId) {
-        mutableStateOf(false)
+    var pageStack by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(
+        listOf(initialDestination), entryRequest,
+    )
+    val page = pageStack.last()
+    fun openPage(destination: SettingsDestination) {
+        pageStack = settingsNavigationPush(pageStack, destination)
     }
+    var showAllMemories by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(
+        false, entryRequest, memorySourceSessionId, memorySourceMessageId,
+    )
     DisposableEffect(viewModel) {
         onDispose { viewModel.focusMemorySourceMessage(null, null) }
     }
@@ -277,10 +257,9 @@ fun SettingsScreen(
     var usageDetailBackSelection by rememberSaveable(saver = usageDetailSelectionStateSaver) {
         mutableStateOf<UsageDetailSelection?>(null)
     }
-    var usageDetailReturnPage by rememberSaveable { mutableStateOf(SettingsDestination.USAGE) }
     var selectedUsageModel by rememberSaveable { mutableStateOf<String?>(null) }
-    var showDiagnostic by rememberSaveable { mutableStateOf(false) }
-    var showEnvironment by rememberSaveable { mutableStateOf(false) }
+    var showDiagnostic by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(false, entryRequest)
+    var showEnvironment by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(false, entryRequest)
     var environmentInfo by remember { mutableStateOf<String?>(null) }
     var customChatFilterDraft by rememberSaveable { mutableStateOf("") }
     var showChatPreferenceDiagnostics by rememberSaveable { mutableStateOf(false) }
@@ -307,18 +286,11 @@ fun SettingsScreen(
     }
 
     fun navigateBack() {
-        if (page == SettingsDestination.USAGE_DETAIL) {
-            if (usageDetailReturnPage == SettingsDestination.USAGE_DETAIL && usageDetailBackSelection != null) {
-                usageDetailSelection = usageDetailBackSelection
-                usageDetailBackSelection = null
-                usageDetailReturnPage = SettingsDestination.USAGE
-            } else {
-                page = usageDetailReturnPage
-            }
-        } else if (page in setOf(SettingsDestination.MINIMAX_QUOTA, SettingsDestination.USAGE) && initialDestination == page) {
-            onClose()
+        if (page == SettingsDestination.USAGE_DETAIL && usageDetailBackSelection != null) {
+            usageDetailSelection = usageDetailBackSelection
+            usageDetailBackSelection = null
         } else {
-            page.parentDestination()?.let { page = it } ?: onClose()
+            settingsNavigationPop(pageStack)?.let { pageStack = it } ?: onClose()
         }
     }
 
@@ -327,9 +299,6 @@ fun SettingsScreen(
         if (page == SettingsDestination.PERMISSIONS || page == SettingsDestination.NOTIFICATIONS) {
             viewModel.refreshDeviceCapabilities()
         }
-    }
-    LaunchedEffect(page, selectedMiniMaxProfile?.id) {
-        if (page == SettingsDestination.MINIMAX_QUOTA && selectedMiniMaxProfile == null) page = SettingsDestination.ROOT
     }
     LaunchedEffect(page, memorySourceSessionId, memorySourceMessageId, showAllMemories) {
         if (page == SettingsDestination.MEMORY || page == SettingsDestination.MEMORY_MANAGEMENT) {
@@ -393,23 +362,24 @@ fun SettingsScreen(
                     backContentDescription = stringResource(R.string.common_back),
                     largeTitle = page == SettingsDestination.ROOT,
                     plainBackButton = page == SettingsDestination.ROOT,
-                    modifier = Modifier.padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
+                    modifier = Modifier.fillMaxWidth(),
                     actionIcon = FeatherIcons.Clock.takeIf { page == SettingsDestination.USAGE },
                     actionContentDescription = stringResource(R.string.usage_log_open)
                         .takeIf { page == SettingsDestination.USAGE },
                     onAction = if (page == SettingsDestination.USAGE) {
-                        { page = SettingsDestination.USAGE_LOG }
+                        { openPage(SettingsDestination.USAGE_LOG) }
                     } else {
                         null
                     },
                 )
 
                 SyHierarchyPage(
-                    page = page,
-                    pageKey = { it.name },
-                    depth = { it.navigationDepth() },
+                    page = pageStack,
+                    pageKey = { it.last().name },
+                    depth = { it.size },
                     modifier = Modifier.weight(1f),
-                ) { shownPage ->
+                ) { shownStack ->
+                val shownPage = shownStack.last()
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -420,51 +390,51 @@ fun SettingsScreen(
                 when (shownPage) {
                     SettingsDestination.ROOT -> {
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_common)) {
-                            AppSettingsRow(icon = FeatherIcons.Eye,
+                            AppSettingsRow(icon = SyEntryIcons.Appearance,
                                 title = stringResource(R.string.settings_page_appearance),
-                                onClick = { page = SettingsDestination.APPEARANCE }, compact = true)
+                                onClick = { openPage(SettingsDestination.APPEARANCE) }, compact = true)
                             AppSettingsDivider()
-                            AppSettingsRow(icon = FeatherIcons.BookOpen,
+                            AppSettingsRow(icon = SyEntryIcons.Memory,
                                 title = stringResource(R.string.settings_page_memory),
-                                onClick = { page = SettingsDestination.MEMORY }, compact = true)
+                                onClick = { openPage(SettingsDestination.MEMORY) }, compact = true)
                             AppSettingsDivider()
-                            AppSettingsRow(icon = FeatherIcons.Folder,
+                            AppSettingsRow(icon = SyEntryIcons.SessionStorage,
                                 title = stringResource(R.string.fluid_settings_session_storage),
-                                onClick = { page = SettingsDestination.SESSION_STORAGE }, compact = true)
+                                onClick = { openPage(SettingsDestination.SESSION_STORAGE) }, compact = true)
                         }
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_models_experience)) {
                             AppSettingsRow(
-                                icon = FeatherIcons.Globe,
+                                icon = SyEntryIcons.Models,
                                 title = stringResource(R.string.settings_page_models),
-                                onClick = { page = SettingsDestination.MODELS },
+                                onClick = { openPage(SettingsDestination.MODELS) },
                                 compact = true,
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.Sliders,
+                                icon = SyEntryIcons.Performance,
                                 title = stringResource(R.string.settings_model_performance_title),
                                 reservedEntryHeight = 72.dp,
-                                onClick = { page = SettingsDestination.MODEL_PERFORMANCE },
+                                onClick = { openPage(SettingsDestination.MODEL_PERFORMANCE) },
                                 compact = true,
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.CreditCard,
+                                icon = SyEntryIcons.Account,
                                 title = stringResource(R.string.chatgpt_account_title),
-                                onClick = { page = SettingsDestination.ACCOUNT },
+                                onClick = { openPage(SettingsDestination.ACCOUNT) },
                                 compact = true,
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.BookOpen,
+                                icon = SyEntryIcons.Notifications,
                                 title = stringResource(R.string.settings_page_notifications),
-                                onClick = { page = SettingsDestination.NOTIFICATIONS },
+                                onClick = { openPage(SettingsDestination.NOTIFICATIONS) },
                                 compact = true,
                             )
                         }
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_system_maintenance)) {
                             AppSettingsRow(
-                                icon = FeatherIcons.Shield,
+                                icon = SyEntryIcons.Permissions,
                                 title = stringResource(R.string.settings_page_permissions),
                                 value = stringResource(when {
                                     deviceCapabilities.loading -> R.string.common_loading
@@ -473,22 +443,22 @@ fun SettingsScreen(
                                         deviceCapabilities.postingNotifications == true -> R.string.settings_permissions_ready
                                     else -> R.string.settings_permissions_needs_setup
                                 }),
-                                onClick = { page = SettingsDestination.PERMISSIONS },
+                                onClick = { openPage(SettingsDestination.PERMISSIONS) },
                                 compact = true,
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.SettingsOutline,
+                                icon = SyEntryIcons.Advanced,
                                 title = stringResource(R.string.settings_page_advanced),
-                                onClick = { page = SettingsDestination.ADVANCED },
+                                onClick = { openPage(SettingsDestination.ADVANCED) },
                                 compact = true,
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.RefreshCw,
+                                icon = SyEntryIcons.Updates,
                                 title = stringResource(R.string.settings_update_check),
                                 value = updateStatus,
-                                onClick = { page = SettingsDestination.UPDATE },
+                                onClick = { openPage(SettingsDestination.UPDATE) },
                                 compact = true,
                             )
                         }
@@ -505,7 +475,7 @@ fun SettingsScreen(
                     SettingsDestination.SESSION -> {
                         AppSettingsSection {
                             AppSettingsRow(
-                                icon = FeatherIcons.Sliders,
+                                icon = SyEntryIcons.ChatStyle,
                                 title = stringResource(R.string.settings_chat_style_guard),
                                 reservedEntryHeight = 88.dp,
                                 value = stringResource(
@@ -515,7 +485,7 @@ fun SettingsScreen(
                                         R.string.common_disabled
                                     },
                                 ),
-                                onClick = { page = SettingsDestination.CHAT },
+                                onClick = { openPage(SettingsDestination.CHAT) },
                             )
                         }
                     }
@@ -711,9 +681,9 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             icon = FeatherIcons.Plus,
                         )
-                        AppSettingsRow(icon = FeatherIcons.CreditCard,
+                        AppSettingsRow(icon = SyEntryIcons.Account,
                             title = stringResource(R.string.settings_page_model_usage),
-                            onClick = { page = SettingsDestination.MODEL_USAGE })
+                            onClick = { openPage(SettingsDestination.MODEL_USAGE) })
                         LocalModelSettingsCard(
                             local = localHarness,
                             viewModel = viewModel,
@@ -726,22 +696,27 @@ fun SettingsScreen(
                     SettingsDestination.MODEL_USAGE -> {
                         AppSettingsSection {
                             AppSettingsRow(
-                                icon = FeatherIcons.Sliders,
+                                icon = SyEntryIcons.ChatStyle,
                                 title = stringResource(R.string.settings_page_pricing),
                                 reservedEntryHeight = 80.dp,
-                                onClick = { page = SettingsDestination.PRICING },
+                                onClick = { openPage(SettingsDestination.PRICING) },
                             )
                             AppSettingsRow(
-                                icon = FeatherIcons.Clock,
+                                icon = SyEntryIcons.Usage,
                                 title = stringResource(R.string.usage_calculation_title),
                                 reservedEntryHeight = 80.dp,
-                                onClick = { page = SettingsDestination.USAGE },
+                                onClick = { openPage(SettingsDestination.USAGE) },
                             )
                         }
                     }
 
                     SettingsDestination.MINIMAX_QUOTA -> {
-                        selectedMiniMaxProfile?.let { MiniMaxQuotaPage(profile = it, viewModel = viewModel) }
+                        MiniMaxQuotaPage(
+                            profile = localHarness.miniMaxQuotaProfile,
+                            loadingProfile = localHarness.loading,
+                            onConfigureModel = { openPage(SettingsDestination.MODELS) },
+                            queryQuota = viewModel::queryMiniMaxQuota,
+                        )
                     }
 
                     SettingsDestination.PRICING -> {
@@ -751,15 +726,15 @@ fun SettingsScreen(
                     SettingsDestination.USAGE -> {
                         UsageCalculationPage(
                             usage = localHarness.usage,
-                            onOpenPricing = { page = SettingsDestination.PRICING },
+                            onOpenPricing = { openPage(SettingsDestination.PRICING) },
                             analytics = usageAnalytics,
                             configuredModels = localHarness.modelProfiles.map { it.model },
                             selectedModel = selectedUsageModel,
                             onSelectModel = { selectedUsageModel = it },
                             onOpenGroup = { kind, key, title ->
                                 usageDetailSelection = UsageDetailSelection.Group(kind, key, title)
-                                usageDetailReturnPage = SettingsDestination.USAGE
-                                page = SettingsDestination.USAGE_DETAIL
+                                usageDetailBackSelection = null
+                                openPage(SettingsDestination.USAGE_DETAIL)
                             },
                         )
                     }
@@ -770,8 +745,8 @@ fun SettingsScreen(
                             selectedModel = selectedUsageModel,
                             onOpenRequest = { requestId ->
                                 usageDetailSelection = UsageDetailSelection.Request(requestId)
-                                usageDetailReturnPage = SettingsDestination.USAGE_LOG
-                                page = SettingsDestination.USAGE_DETAIL
+                                usageDetailBackSelection = null
+                                openPage(SettingsDestination.USAGE_DETAIL)
                             },
                         )
                     }
@@ -792,7 +767,6 @@ fun SettingsScreen(
                                     onOpenRequest = { requestId ->
                                         usageDetailBackSelection = selection
                                         usageDetailSelection = UsageDetailSelection.Request(requestId)
-                                        usageDetailReturnPage = SettingsDestination.USAGE_DETAIL
                                     },
                                 )
                             }
@@ -814,12 +788,12 @@ fun SettingsScreen(
                         SettingsGroupTitle(stringResource(R.string.settings_memory_status))
                         MemoryOverviewCard(localHarness)
                         AppSettingsSection {
-                            AppSettingsRow(FeatherIcons.Sliders, stringResource(R.string.advanced_memory_settings),
-                                onClick = { page = SettingsDestination.MEMORY_SETTINGS })
+                            AppSettingsRow(SyEntryIcons.ChatStyle, stringResource(R.string.advanced_memory_settings),
+                                onClick = { openPage(SettingsDestination.MEMORY_SETTINGS) })
                             AppSettingsDivider()
-                            AppSettingsRow(FeatherIcons.BookOpen, stringResource(R.string.advanced_manage_memory),
+                            AppSettingsRow(SyEntryIcons.Memory, stringResource(R.string.advanced_manage_memory),
                                 value = stringResource(R.string.advanced_memory_active_count, memories.size),
-                                onClick = { page = SettingsDestination.MEMORY_MANAGEMENT })
+                                onClick = { openPage(SettingsDestination.MEMORY_MANAGEMENT) })
                         }
                     }
                     SettingsDestination.MEMORY_SETTINGS -> {
@@ -877,30 +851,80 @@ fun SettingsScreen(
                                 stringResource(R.string.settings_notifications_local_jobs),
                                 settings.notifyLocalJobs,
                             ) { viewModel.set { it.copy(notifyLocalJobs = !it.notifyLocalJobs) } }
+                            ToggleRow(
+                                stringResource(R.string.settings_notification_results),
+                                settings.notifyJobResults,
+                                stringResource(R.string.settings_notification_results_hint),
+                            ) { viewModel.set { it.copy(notifyJobResults = !it.notifyJobResults) } }
+                            ToggleRow(
+                                stringResource(R.string.settings_notification_failures),
+                                settings.notifyJobFailures,
+                                stringResource(R.string.settings_notification_failures_hint),
+                            ) { viewModel.set { it.copy(notifyJobFailures = !it.notifyJobFailures) } }
+                            ToggleRow(
+                                stringResource(R.string.settings_notification_needs_action),
+                                settings.notifyNeedsAction,
+                                stringResource(R.string.settings_notification_needs_action_hint),
+                            ) { viewModel.set { it.copy(notifyNeedsAction = !it.notifyNeedsAction) } }
+                            ToggleRow(
+                                stringResource(R.string.settings_notification_chat_messages),
+                                settings.notifyChatMessages,
+                                stringResource(R.string.settings_notification_chat_messages_hint),
+                            ) { viewModel.set { it.copy(notifyChatMessages = !it.notifyChatMessages) } }
+                        }
+                        SettingsCard(stringResource(R.string.settings_notification_quiet_title)) {
+                            ToggleRow(
+                                stringResource(R.string.settings_notification_quiet_enabled),
+                                settings.notificationQuietHoursEnabled,
+                                stringResource(R.string.settings_notification_quiet_hint),
+                            ) { viewModel.set { it.copy(notificationQuietHoursEnabled = !it.notificationQuietHoursEnabled) } }
+                            if (settings.notificationQuietHoursEnabled) {
+                                SySegmented(
+                                    segments = listOf(
+                                        SySegment("23-7", stringResource(R.string.settings_notification_quiet_23_7)),
+                                        SySegment("22-8", stringResource(R.string.settings_notification_quiet_22_8)),
+                                    ),
+                                    selectedKey = if (settings.notificationQuietStartMinute == 1320 &&
+                                        settings.notificationQuietEndMinute == 480) "22-8" else "23-7",
+                                    onSelect = { selected ->
+                                        viewModel.set {
+                                            if (selected == "22-8") it.copy(
+                                                notificationQuietStartMinute = 1320,
+                                                notificationQuietEndMinute = 480,
+                                            ) else it.copy(
+                                                notificationQuietStartMinute = 1380,
+                                                notificationQuietEndMinute = 420,
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    stretch = true,
+                                )
+                            }
                         }
                     }
 
                     SettingsDestination.ADVANCED -> {
                         AppSettingsSection {
                             AppSettingsRow(
-                                icon = FeatherIcons.Clock,
+                                icon = SyEntryIcons.SessionStorage,
                                 title = stringResource(R.string.settings_local_session_storage),
-                                onClick = { page = SettingsDestination.SESSION_STORAGE },
+                                onClick = { openPage(SettingsDestination.SESSION_STORAGE) },
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.Info,
+                                icon = SyEntryIcons.Advanced,
                                 title = stringResource(R.string.settings_runtime_diagnostics),
-                                onClick = { page = SettingsDestination.DIAGNOSTICS },
+                                onClick = { openPage(SettingsDestination.DIAGNOSTICS) },
                             )
                         }
                     }
 
                     SettingsDestination.SESSION_STORAGE -> {
                         AppSettingsSection {
-                            AppSettingsRow(icon = FeatherIcons.MessageCircle,
+                            AppSettingsRow(icon = SyEntryIcons.ChatStyle,
                                 title = stringResource(R.string.settings_page_session),
-                                onClick = { page = SettingsDestination.SESSION })
+                                onClick = { openPage(SettingsDestination.SESSION) })
                         }
                         LocalSessionStorageCard(
                             status = localSessionStorageStatus,
@@ -1041,21 +1065,18 @@ internal fun SettingsCard(
     title: String,
     content: @Composable () -> Unit,
 ) {
-    val colors = DsTheme.colors
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
         SettingsGroupTitle(title)
-        Surface(
+        // The settings groups sample the same V6 wallpaper / light field as the page.
+        // Keep content crisp; only the material backing layer is blurred.
+        SyMaterialFrame(
             modifier = Modifier.fillMaxWidth(),
-            shape = DsShapes.block,
-            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-            tonalElevation = 0.dp,
+            tier = SyMaterialTier.L3_CARD,
+            horizontalPadding = DsSpacing.medium,
+            verticalPadding = DsSpacing.medium,
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            ) {
-                content()
-            }
+            content()
         }
     }
 }
