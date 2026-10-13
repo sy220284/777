@@ -311,7 +311,7 @@ class LocalFeatureNavigationTest {
     fun collapsedRailLabelsAndTargetsMatchExpandedDrawerModes() {
         assertEquals(LocalFeatureDrawerEntry.PERSONA_GALLERY,
             localCollapsedRailPrimaryEntry(LocalUsageMode.CHAT))
-        assertEquals(LocalFeatureDrawerEntry.PROJECT,
+        assertEquals(LocalFeatureDrawerEntry.WORKSPACE,
             localCollapsedRailPrimaryEntry(LocalUsageMode.WORK))
         assertEquals(com.labteto.dshmobile.R.string.tasks_chat_title,
             localCollapsedRailTaskTitle(LocalUsageMode.CHAT))
