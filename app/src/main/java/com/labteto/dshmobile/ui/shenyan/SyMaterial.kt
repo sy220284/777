@@ -45,4 +45,3 @@ fun SyMaterialFrame(
         content = content,
     )
 }
-
