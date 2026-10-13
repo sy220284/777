@@ -17,10 +17,14 @@ internal object LocalWorkCompletionClaimGuard {
         deliveryEvidence: LocalWorkDeliveryEvidence? = null,
     ): LocalOutputQualityResult {
         if (text.isBlank()) return LocalOutputQualityResult(text)
+        return inspectWithEvidence(text, localWorkCompletionEvidence(workState, deliveryEvidence))
+    }
+
+    /** Both final-message paths consume the exact same structured completion evidence. */
+    internal fun inspectWithEvidence(text: String, evidence: LocalWorkCompletionEvidence): LocalOutputQualityResult {
+        if (text.isBlank() || evidence.readyForGoalCompletion) return LocalOutputQualityResult(text)
         val corrected = correctGlobalCompletionClaims(text)
         if (corrected == text) return LocalOutputQualityResult(text)
-        val evidence = localWorkCompletionEvidence(workState, deliveryEvidence)
-        if (evidence.readyForGoalCompletion) return LocalOutputQualityResult(text)
         return LocalOutputQualityResult(
             text = truthfulIncompleteDeliveryText(evidence) + "\n\n" + corrected,
             findings = evidence.findings,
@@ -67,28 +71,14 @@ internal fun guardWorkCompletionDelivery(
 ): LocalModelReply {
     if (state.usageMode != LocalUsageMode.WORK || reply.toolCalls.isNotEmpty()) return reply
     val original = reply.content?.takeIf(String::isNotBlank) ?: return reply
-    val result = LocalWorkCompletionClaimGuard.inspect(
-        original, state.work,
+    val evidence = localWorkCompletionEvidence(
+        state.work,
         state.work.goal?.let { localWorkDeliveryEvidence(eventLog, it, workspaceRoot) },
     )
+    val result = LocalWorkCompletionClaimGuard.inspectWithEvidence(original, evidence)
     if (!result.changed) return reply
-    eventLog.append("work/output-quality", buildJsonObject {
-        put("findings", JsonArray(result.findings.map(::JsonPrimitive)))
-        put("changed", true)
-        put("delivery_blocked", true)
-        put("open_todos", state.work.todos.count { it.status == "pending" || it.status == "in_progress" })
-        put("open_team_tasks", state.work.team.tasks.count { it.status == "pending" || it.status == "in_progress" })
-        put("active_team_members", state.work.team.members.count {
-            it.phase == "provisioning" || it.activity == "running" || it.activity == "stopping"
-        })
-        put("pending_team_messages", maxOf(
-            state.work.team.pendingMessageCount,
-            state.work.team.members.sumOf { it.pendingMessageCount },
-        ))
-        put("failed_team_members", state.work.team.failedMemberCount)
-        state.work.team.failure?.let { put("team_failure", it) }
-        state.work.goal?.status?.let { put("goal_status", it) }
-    })
+    appendWorkOutputQuality(eventLog, result, evidence, state.work.goal?.status,
+        teamFailureDetail = state.work.team.failure, deliveryBlocked = true)
     // User-visible correction is a presentation projection. Preserve the provider's original
     // message and canonical content for diagnostic replay and truthful model history.
     return reply.copy(content = result.text)
@@ -105,25 +95,32 @@ internal fun recordWorkCompletionQuality(
     workspaceRoot: java.io.File? = null,
 ) {
     if (state.usageMode != LocalUsageMode.WORK) return
-    val result = LocalWorkCompletionClaimGuard.inspect(
-        text, state.work,
+    val evidence = localWorkCompletionEvidence(
+        state.work,
         state.work.goal?.let { localWorkDeliveryEvidence(eventLog, it, workspaceRoot) },
     )
+    val result = LocalWorkCompletionClaimGuard.inspectWithEvidence(text, evidence)
     if (result.findings.isEmpty()) return
+    appendWorkOutputQuality(eventLog, result, evidence, state.work.goal?.status,
+        teamFailureDetail = state.work.team.failure, deliveryBlocked = result.changed)
+}
+
+/** Exactly one log projection for final display correction and turn-completed diagnostics. */
+private fun appendWorkOutputQuality(
+    eventLog: LocalSessionEventLog,
+    result: LocalOutputQualityResult,
+    evidence: LocalWorkCompletionEvidence,
+    goalStatus: String?,
+    teamFailureDetail: String?,
+    deliveryBlocked: Boolean,
+) {
     eventLog.append("work/output-quality", buildJsonObject {
         put("findings", JsonArray(result.findings.map(::JsonPrimitive)))
         put("changed", result.changed)
-        put("open_todos", state.work.todos.count { it.status == "pending" || it.status == "in_progress" })
-        put("open_team_tasks", state.work.team.tasks.count { it.status == "pending" || it.status == "in_progress" })
-        put("active_team_members", state.work.team.members.count {
-            it.phase == "provisioning" || it.activity == "running" || it.activity == "stopping"
-        })
-        put("pending_team_messages", maxOf(
-            state.work.team.pendingMessageCount,
-            state.work.team.members.sumOf { it.pendingMessageCount },
-        ))
-        put("failed_team_members", state.work.team.failedMemberCount)
-        state.work.team.failure?.let { put("team_failure", it) }
-        state.work.goal?.status?.let { put("goal_status", it) }
+        put("delivery_blocked", deliveryBlocked)
+        evidence.toDiagnosticJson().forEach { (key, value) -> put(key, value) }
+        goalStatus?.let { put("goal_status", it) }
+        // Preserve the historical event's human-readable failure detail.
+        teamFailureDetail?.let { put("team_failure", it) }
     })
 }

@@ -45,13 +45,8 @@ internal fun resolveWorkGoalUpdate(
             put("from_status", current.status)
             put("to_status", status)
             val evidence = localWorkCompletionEvidence(snapshot.copy(goal = candidate), delivery)
-            put("open_todos", evidence.openTodos)
-            put("open_team_tasks", evidence.openTeamTasks)
-            put("active_team_members", evidence.activeTeamMembers)
-            put("pending_team_messages", evidence.pendingTeamMessages)
-            put("team_rebuilding", evidence.teamRebuilding)
-            put("pending_approval", evidence.pendingApproval)
-            put("pending_question", evidence.pendingQuestion)
+            // Same snapshot used by final-answer validation; no second ad-hoc counter list.
+            evidence.toDiagnosticJson().forEach { (key, value) -> put(key, value) }
             put("artifact_evidence", delivery?.artifactCallId ?: "")
             put("test_evidence", delivery?.testCallId ?: "")
             transition.reason?.let { put("reason", it) }
