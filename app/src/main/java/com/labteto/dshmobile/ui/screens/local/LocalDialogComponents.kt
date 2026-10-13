@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -20,7 +22,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -47,7 +48,7 @@ internal fun RenameDialog(
                 onClick = onDismiss,
                 variant = SyButtonVariant.Ghost,
             )
-            Spacer(Modifier.width(DsSpacing.small))
+            Spacer(Modifier.width(SyMetric.gapMd))
             SyButton(
                 text = stringResource(R.string.common_save),
                 onClick = { onConfirm(text.trim()) },
@@ -75,7 +76,7 @@ internal fun ConfirmDialog(
                 onClick = onDismiss,
                 variant = SyButtonVariant.Ghost,
             )
-            Spacer(Modifier.width(DsSpacing.small))
+            Spacer(Modifier.width(SyMetric.gapMd))
             SyButton(text = confirmLabel, onClick = onConfirm, variant = SyButtonVariant.Danger)
         }
     }

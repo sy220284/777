@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -46,7 +48,6 @@ import com.shenyan.designsystem.components.SyCategoryRow
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -76,7 +77,7 @@ internal fun FirstLaunchOnboarding(
         color = colors.rootSurface(),
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(DsSpacing.comfortable),
+            modifier = Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(SyMetric.gapSection),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -91,7 +92,7 @@ internal fun FirstLaunchOnboarding(
                         contentDescription = null, tint = colors.text, modifier = Modifier.size(28.dp))
                 }
             }
-            Spacer(Modifier.height(DsSpacing.xlarge))
+            Spacer(Modifier.height(SyMetric.gapPage))
             AnimatedContent(
                 targetState = step,
                 modifier = Modifier.widthIn(max = 380.dp),
@@ -102,7 +103,7 @@ internal fun FirstLaunchOnboarding(
             ) { current ->
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     val title = when (current) {
@@ -131,7 +132,7 @@ internal fun FirstLaunchOnboarding(
                         com.shenyan.designsystem.components.SyMaterialFrame(
                             horizontalPadding = 0.dp, verticalPadding = 0.dp,
                         ) {
-                            Column(Modifier.padding(DsSpacing.small)) {
+                            Column(Modifier.padding(SyMetric.gapMd)) {
                                 SyCategoryRow(
                                     icon = FeatherIcons.MessageCircle,
                                     title = stringResource(R.string.shenyan_onboarding_chat),
@@ -153,8 +154,8 @@ internal fun FirstLaunchOnboarding(
                     }
                 }
             }
-            Spacer(Modifier.height(DsSpacing.xlarge))
-            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+            Spacer(Modifier.height(SyMetric.gapPage))
+            Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                 repeat(3) { index ->
                     Spacer(
                         Modifier
@@ -167,7 +168,7 @@ internal fun FirstLaunchOnboarding(
                     )
                 }
             }
-            Spacer(Modifier.height(DsSpacing.xlarge))
+            Spacer(Modifier.height(SyMetric.gapPage))
             SyButton(
                 text = stringResource(
                     when (step) {

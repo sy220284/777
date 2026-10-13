@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -37,7 +39,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.shenyan.designsystem.components.SyGroupCard
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -58,8 +59,8 @@ internal fun LocalConfiguration(
     Column(
         Modifier.fillMaxSize().background(colors.rootSurface()).safeDrawingPadding().imePadding()
             .verticalScroll(rememberScrollState())
-            .padding(DsSpacing.xlarge),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
+            .padding(SyMetric.gapPage),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSection),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -73,7 +74,7 @@ internal fun LocalConfiguration(
             }
         }
 
-        SyGlassCard(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        SyGlassCard(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             Text(stringResource(R.string.local_on_device_execution_title), style = DsType.base16Strong.withReadingWeight(), color = colors.text)
             Text(
                 stringResource(R.string.local_on_device_execution_hint),
@@ -100,13 +101,13 @@ internal fun LocalConfiguration(
                 visualTransformation = PasswordVisualTransformation(),
                 singleLine = true,
             )
-            Spacer(Modifier.height(DsSpacing.medium))
-            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+            Spacer(Modifier.height(SyMetric.gapLg))
+            Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                 Text(stringResource(R.string.models_title), style = DsType.std14Strong.withReadingWeight(), color = colors.text)
                 ModelChoice("deepseek-flash", stringResource(R.string.local_model_flash_label), model) { model = it }
                 ModelChoice("deepseek-v4-pro", stringResource(R.string.local_model_pro_label), model) { model = it }
             }
-            Spacer(Modifier.height(DsSpacing.medium))
+            Spacer(Modifier.height(SyMetric.gapLg))
             SyTextField(
                 value = baseUrl,
                 onValueChange = { baseUrl = it },
@@ -140,9 +141,9 @@ internal fun LocalConfiguration(
 internal fun ModelChoice(id: String, label: String, selected: String, onSelect: (String) -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(DsShapes.row)
-            .heightIn(min = DsSpacing.touchTarget)
+            .heightIn(min = SyMetric.touch)
             .selectable(selected = selected == id, onClick = { onSelect(id) })
-            .padding(vertical = DsSpacing.tiny),
+            .padding(vertical = SyMetric.gapXs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         SyRadioControl(selected = selected == id, onClick = { onSelect(id) })

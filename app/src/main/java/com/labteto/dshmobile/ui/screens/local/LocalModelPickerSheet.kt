@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,7 +28,6 @@ import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -58,7 +59,7 @@ internal fun LocalModelPickerSheet(
         )
         },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             if (profiles.isEmpty()) {
                 Text(
                     stringResource(R.string.local_model_picker_empty_title),
@@ -90,9 +91,9 @@ internal fun LocalModelPickerSheet(
                             onSelect(profile.id)
                             onDismiss()
                         }
-                        .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                        .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.ic_ui_model),

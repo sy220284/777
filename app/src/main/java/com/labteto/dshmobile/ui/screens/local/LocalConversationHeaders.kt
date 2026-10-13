@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,7 +38,6 @@ import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -72,13 +73,13 @@ internal fun ChatSurfaceHeader(
             Row(
                 modifier = Modifier
                     .widthIn(max = 188.dp)
-                    .heightIn(min = DsSpacing.touchTarget)
+                    .heightIn(min = SyMetric.touch)
                     .clip(DsShapes.row)
                     .clickable(enabled = !running, role = Role.Button, onClick = onContextClick)
                     .semantics(mergeDescendants = true) { }
-                    .padding(horizontal = DsSpacing.small),
+                    .padding(horizontal = SyMetric.gapMd),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
                 if (!groupEnabled) {
                     LocalPersonaHeaderAvatar(name = personaName, portraitPath = portraitPath)
@@ -187,13 +188,13 @@ internal fun WorkSurfaceHeader(
         Row(
             modifier = Modifier
                 .widthIn(max = 168.dp)
-                .heightIn(min = DsSpacing.touchTarget)
+                .heightIn(min = SyMetric.touch)
                 .clip(DsShapes.row)
                 .clickable(enabled = !running, role = Role.Button, onClick = onModelClick)
                 .semantics(mergeDescendants = true) { }
-                .padding(horizontal = DsSpacing.small),
+                .padding(horizontal = SyMetric.gapMd),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
         ) {
             Text(
                 if (configured) modelLabel else stringResource(R.string.local_model_setup),
@@ -213,7 +214,7 @@ internal fun WorkSurfaceHeader(
         Spacer(Modifier.weight(1f))
         if (running) {
             StateDot(StateDotState.Running, size = 8.dp)
-            Spacer(Modifier.width(DsSpacing.xsmall))
+            Spacer(Modifier.width(SyMetric.gapSm))
         }
         SyIconButton(
             icon = SyEntryIcons.RunCenter,

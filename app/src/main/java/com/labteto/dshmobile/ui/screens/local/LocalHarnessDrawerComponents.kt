@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
@@ -62,7 +64,6 @@ import com.labteto.dshmobile.ui.components.relativeTime
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlin.math.roundToInt
@@ -241,7 +242,7 @@ internal fun DrawerQuickAction(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = DsSpacing.touchTarget)
+            .heightIn(min = SyMetric.touch)
             .clip(DsShapes.row)
             .background(feedbackColor)
             .hoverable(interaction)
@@ -250,9 +251,9 @@ internal fun DrawerQuickAction(
                 indication = LocalIndication.current,
                 onClick = onClick,
             )
-            .padding(horizontal = DsSpacing.small),
+            .padding(horizontal = SyMetric.gapMd),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         SyIconBox(icon = icon)
         Text(
@@ -275,7 +276,7 @@ internal fun DrawerSectionTitle(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = DsSpacing.small, top = DsSpacing.medium, bottom = DsSpacing.tiny),
+            .padding(start = SyMetric.gapMd, top = SyMetric.gapLg, bottom = SyMetric.gapXs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -346,7 +347,7 @@ internal fun LocalSessionDrawerRow(
                         onDragEnd = { swipe = if (swipe < -reveal / 2) -reveal else 0f },
                     )
                 }
-                .heightIn(min = DsSpacing.touchTarget)
+                .heightIn(min = SyMetric.touch)
                 .clip(DsShapes.row)
                 .background(
                     animateColorAsState(
@@ -360,7 +361,7 @@ internal fun LocalSessionDrawerRow(
                     ).value,
                 )
                 .combinedClickable(onClick = onClick, onLongClick = { menuOpen = true })
-                .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
+                .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapMd),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (selectionOpen) {
@@ -374,7 +375,7 @@ internal fun LocalSessionDrawerRow(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                 ) {
                     Text(
                         displayTitle,
