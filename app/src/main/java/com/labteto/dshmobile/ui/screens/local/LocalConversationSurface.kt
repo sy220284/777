@@ -753,7 +753,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     icon = FeatherIcons.Menu,
                     contentDescription = stringResource(R.string.app_open_navigation),
                     onClick = onOpenDrawer,
-                    containerColor = colors.bgLayer1,
+                    containerColor = com.shenyan.designsystem.components.syMaterialColor(SyMaterialTier.L4_OVERLAY),
                     tint = colors.labelPrimary,
                 )
                 Column(Modifier.weight(1f)) {

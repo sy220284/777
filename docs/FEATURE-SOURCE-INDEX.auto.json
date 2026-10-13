@@ -2608,7 +2608,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "sha256": "c9b32e52d0a2a62e"
+      "sha256": "244a4f4cd660180e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationTemperatureUi.kt",
@@ -2960,7 +2960,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt",
-      "sha256": "b63a4a8d96fcb717"
+      "sha256": "d5c028c2b47cccf0"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksViewModel.kt",
@@ -2972,7 +2972,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowser.kt",
-      "sha256": "75c77e7b7c013985"
+      "sha256": "0823a12682201026"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
@@ -3116,7 +3116,7 @@
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/components/ShenyanFeedback.kt",
-      "sha256": "ca77652aed4a5848"
+      "sha256": "0f6293bec8edc5b1"
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/components/ShenyanFormControls.kt",
@@ -3448,13 +3448,16 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "db65946c5bfb",
+  "source_snapshot": "a0de8fc526cd",
   "observed_delta": {
-    "baseline": "21c382cbff90",
+    "baseline": "db65946c5bfb",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/shenyan/designsystem/components/ShenyanSections.kt"
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowser.kt",
+      "app/src/main/java/com/shenyan/designsystem/components/ShenyanFeedback.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

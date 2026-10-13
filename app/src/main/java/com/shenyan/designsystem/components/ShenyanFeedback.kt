@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -167,15 +168,19 @@ fun SyPill(
 ) {
     val p = LocalSyColors.current
     val shape = RoundedCornerShape(999.dp)
-    val tint = if (warn) p.warning.copy(alpha = .15f) else Color.Unspecified
+    val tint = when {
+        warn -> p.warning.copy(alpha = .15f)
+        selected -> p.selected.copy(alpha = .22f)
+        else -> Color.Unspecified
+    }
     val ink = when {
         warn -> p.warningInk
         selected -> p.text
         else -> p.textSecondary
     }
     if (onClick != null) {
-        SyMaterialSurface(onClick = onClick, modifier = modifier.sizeIn(minWidth = SyMetric.touch, minHeight = SyMetric.touch),
-            shape = shape, tier = SyMaterialTier.L1_SECTION, tint = tint, shadowElevation = 0.dp, border = BorderStroke(1.dp, p.border)) {
+        SyMaterialSurface(onClick = onClick, modifier = modifier.sizeIn(minWidth = SyMetric.touch, minHeight = SyMetric.touch).semantics { this.selected = selected },
+            shape = shape, tier = SyMaterialTier.L1_SECTION, tint = tint, shadowElevation = 0.dp, border = BorderStroke(1.dp, if (selected) p.primary else p.border)) {
             Box(Modifier.padding(horizontal = 13.dp, vertical = 9.dp),
                 contentAlignment = Alignment.Center) {
                 Text(text, color = ink, style = MaterialTheme.typography.labelMedium,

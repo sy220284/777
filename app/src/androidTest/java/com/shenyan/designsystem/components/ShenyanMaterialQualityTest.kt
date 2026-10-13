@@ -45,6 +45,7 @@ class ShenyanMaterialQualityTest {
                 SyMaterialFrame(modifier = Modifier.fillMaxWidth().testTag("glass")) {
                     Text("清晰的正文")
                     SyTextField(value.value, { value.value = it }, modifier = Modifier.testTag("field"))
+                    SyPill("selected-filter", selected = true, onClick = {})
                     SyButton("apply", { clicks++ })
                     SyButton("disabled", { clicks++ }, enabled = false)
                 }
@@ -55,6 +56,7 @@ class ShenyanMaterialQualityTest {
             val fill = pixels[pixels.width / 2, 6]
             assertTrue("Wallpaper hue must remain in the glass", fill.blue > fill.green + .02f)
             compose.onNodeWithTag("field").performTextReplacement("edited")
+            compose.onNodeWithText("selected-filter").assertIsSelected()
             compose.onNodeWithText("apply").performClick()
             compose.onNodeWithText("disabled").assertIsNotEnabled().performClick()
             compose.runOnIdle { assertEquals("edited", value.value); assertEquals(1, clicks) }

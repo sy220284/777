@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import com.shenyan.designsystem.components.SyMaterialTier
+
+import com.shenyan.designsystem.components.SyMaterialSurface
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.rememberScrollState
@@ -399,10 +403,10 @@ private fun TaskEmptyState(
                     )
                 }
             }
-            if (onCreateViaChat != null) Surface(
+            if (onCreateViaChat != null) SyMaterialSurface(
                 onClick = onCreateViaChat,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                color = colors.bgModulePlatform,
+                tier = SyMaterialTier.L1_SECTION,
                 shape = DsShapes.buttonCapsule,
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(DsSpacing.medium)) {

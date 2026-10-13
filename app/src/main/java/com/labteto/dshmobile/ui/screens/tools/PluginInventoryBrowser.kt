@@ -339,8 +339,8 @@ internal fun PluginInventoryBrowser(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
                             ) {
-                                Surface(
-                                    color = colors.bgModulePlatform,
+                                SyMaterialSurface(
+                                    tier = SyMaterialTier.L1_SECTION,
                                     shape = DsShapes.row,
                                 ) {
                                     Icon(
