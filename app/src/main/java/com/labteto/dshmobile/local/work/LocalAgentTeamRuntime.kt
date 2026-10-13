@@ -1649,7 +1649,7 @@ internal class LocalAgentTeamRuntime(
             append(" | workspace=shared")
             append(" | write_execution=serialized")
             if (task.writeScopes.isNotEmpty()) {
-                append(" | scope_enforcement=advisory_only")
+                append(" | scope_enforcement=advisory_only | claim_conflict=enforced | file_isolation=none")
             }
             if (task.status == LocalTeamTaskStatus.IN_PROGRESS &&
                 state.tasks.any { other ->
