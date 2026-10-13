@@ -6,7 +6,6 @@ import com.shenyan.designsystem.foundation.SyMetric
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Surface
@@ -23,7 +22,6 @@ import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_USAGE_URL
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -37,10 +35,8 @@ internal fun ChatGptPlanUsageBar(profile: LocalModelProfile?) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+        horizontalArrangement = Arrangement.End,
     ) {
-        SyPill(text = stringResource(R.string.chatgpt_using_plan), selected = true)
-        Spacer(Modifier.weight(1f))
         SyButton(
             text = stringResource(R.string.chatgpt_manage_usage),
             onClick = { uriHandler.openUri(CHATGPT_USAGE_URL) },
