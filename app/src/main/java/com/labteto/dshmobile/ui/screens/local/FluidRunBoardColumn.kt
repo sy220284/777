@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
@@ -14,7 +16,6 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 
 /** Design 03's three board columns become three independent views on a compact display. */
@@ -31,7 +32,7 @@ internal fun FluidRunBoardColumn(
         if (section == 1) job.needsUserAttention() else job.status == "running" && !job.needsUserAttention()
     }
     Column(Modifier.fillMaxWidth().animateContentSize(tween(500)),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
         if (section == 0 && (state.running || state.goal != null)) SyGlassCard {
             FluidPanelTitle(stringResource(R.string.local_run_current_goal))
             state.goal?.description?.takeIf(String::isNotBlank)?.let { goal ->

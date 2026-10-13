@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyEmptyState
 
 import com.labteto.dshmobile.ui.shenyan.SyFullScreenDialog
@@ -29,7 +31,7 @@ internal fun FluidMessageReader(title: String, content: String, onDismiss: () ->
                     stringResource(R.string.fluid_reader_empty), body = "", modifier = Modifier.weight(1f))
                 else SelectionContainer(Modifier.weight(1f)) {
                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                        .padding(horizontal = DsSpacing.large, vertical = DsSpacing.xlarge)) {
+                        .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapPage)) {
                         MarkdownText(content, modifier = Modifier.fillMaxWidth(),
                             bodyStyle = DsType.mdBody.copy(fontSize = 17.sp, lineHeight = 28.sp).withReadingWeight())
                     }

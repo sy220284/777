@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,7 +33,6 @@ import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.shenyan.designsystem.components.SyTextField
 import com.shenyan.designsystem.components.SySheetChoiceRow
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.shenyan.designsystem.foundation.LocalSyColors
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -90,10 +91,10 @@ internal fun LocalWorkDesignSurface(
         )
         .map { stringResource(R.string.fluid_item_count, it) } + listOf("—") +
         listOf(if (section == 4) stringResource(R.string.fluid_item_count, artifacts.size) else "—")
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-        Column(Modifier.padding(horizontal = DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+        Column(Modifier.padding(horizontal = SyMetric.gapLg),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+            Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
                 Text(state?.goal?.description?.takeIf(String::isNotBlank) ?: title,
                     modifier = Modifier.fillMaxWidth(), style = DsType.base16Strong.withReadingWeight(),
                     color = colors.text)
@@ -111,7 +112,7 @@ internal fun LocalWorkDesignSurface(
             FluidSectionSwap(section, Modifier.weight(1f).fillMaxWidth(),
                 enableSharedBounds = completionMorphKey != null) { visibleSection ->
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                    .padding(DsSpacing.medium), verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
+                    .padding(SyMetric.gapLg), verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
                     when (visibleSection) {
                         0 -> SyGlassCard(modifier = Modifier.localWorkCompletionSharedBounds(completionMorphKey)) {
                             FluidPanelTitle(stringResource(R.string.fluid_work_goal))
@@ -129,14 +130,14 @@ internal fun LocalWorkDesignSurface(
                             if (state?.plan.isNullOrEmpty()) Text(stringResource(R.string.fluid_plan_empty),
                                 style = DsType.small13, color = colors.textSecondary)
                             state?.plan?.forEachIndexed { index, step ->
-                                Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                                     Text((index + 1).toString().padStart(2, '0'), style = DsType.caption11,
                                         color = colors.textTertiary)
                                     Text(step, style = DsType.std14.withReadingWeight(), color = colors.text)
                                 }
                             }
                             state?.todos?.forEach { todo ->
-                                Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                                     Text(if (todo.status == "completed") "✓" else "○",
                                         color = if (todo.status == "completed") colors.successInk else colors.textTertiary)
                                     Text(todo.content, style = DsType.std14.withReadingWeight(), color = colors.text)

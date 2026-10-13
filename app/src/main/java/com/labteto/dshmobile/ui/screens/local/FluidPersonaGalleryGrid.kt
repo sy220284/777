@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -51,8 +53,8 @@ internal fun FluidPersonaGalleryGrid(entries: List<PersonaGalleryEntry>, onSelec
     val reduced = com.labteto.dshmobile.ui.shenyan.LocalSyReducedMotion.current
     val animateEntrance = animateOnEntrance && !reduced
     LazyVerticalGrid(GridCells.Fixed(2), modifier,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
         itemsIndexed(entries, key = { _, entry -> entry.id }) { index, entry ->
             // Screen 06: reference 360ms cascade, 80ms stagger. The first ten
             // cards animate once; a long gallery must never queue hundreds of delays.
@@ -107,7 +109,7 @@ private fun FluidPersonaGalleryCard(entry: PersonaGalleryEntry, onClick: () -> U
                     }, style = DsType.largeTitle28, color = colors.lilac)
                 }
             }
-            Column(Modifier.padding(DsSpacing.medium), verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+            Column(Modifier.padding(SyMetric.gapLg), verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                 Text(entry.persona.name, style = DsType.std14Strong.withReadingWeight(), color = colors.text)
                 val saved = entry.story(null)?.chatState
                 Text(saved?.takeIf { it.updatedAt > 0 }?.relationshipState

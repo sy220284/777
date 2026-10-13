@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,7 +20,6 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -64,12 +65,12 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.tiny),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapXs),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             when {
                 node.failed -> Icon(
@@ -121,7 +122,7 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
         node.detail?.let { detail ->
             Text(
                 detail,
-                modifier = Modifier.padding(start = 18.dp + DsSpacing.small),
+                modifier = Modifier.padding(start = 18.dp + SyMetric.gapMd),
                 style = DsType.small13.withReadingWeight(),
                 color = if (node.failed) colors.dangerInk else colors.text,
             )
@@ -142,9 +143,9 @@ internal fun WorkTimelineStepRow(
         val content = localWorkTimelineText(message.content) ?: return
         val milestone = isWorkTimelineMilestone(content)
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.tiny),
+            modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapXs),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             if (!milestone) {
                 WorkOperationIcon(com.labteto.dshmobile.ui.AgentOperationKind.Generic, active)
@@ -170,9 +171,9 @@ internal fun WorkTimelineStepRow(
     val action = stringResource(userFacingWorkToolActionRes(message.toolName) ?: agentOperationLabelRes(kind))
     val label = if (provider != null) "$provider · $action" else action
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.tiny),
+        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapXs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         Icon(
             imageVector = when {

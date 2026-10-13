@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -26,7 +28,6 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaGalleryStory
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
@@ -42,7 +43,7 @@ internal fun FluidPersonaIdentity(entry: PersonaGalleryEntry, subtitle: String,
     }
     SyGlassCard {
         Row(verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
             Surface(color = colors.lilac.copy(alpha = .18f), shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.size(80.dp).clickable(enabled = enabled, onClick = onPortrait)) {
                 val picture = portrait
@@ -52,7 +53,7 @@ internal fun FluidPersonaIdentity(entry: PersonaGalleryEntry, subtitle: String,
                         color = colors.lilac)
                 }
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                 Text(entry.persona.name, style = DsType.title22.withReadingWeight(), color = colors.text)
                 Text(entry.persona.portrait.takeIf(String::isNotBlank) ?: subtitle,
                     style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
@@ -82,7 +83,7 @@ internal fun FluidPersonaStorySection(story: PersonaGalleryStory?, section: Int)
                     state?.dynamics?.sharedMoments.orEmpty()).filter(String::isNotBlank).distinct()
                 if (events.isEmpty()) Text(stringResource(R.string.fluid_persona_no_events), color = colors.textSecondary)
                 events.forEachIndexed { index, event ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                         Text((index + 1).toString().padStart(2, '0'), style = DsType.caption11, color = colors.textTertiary)
                         Text(event, style = DsType.std14.withReadingWeight(), color = colors.text)
                     }
@@ -101,8 +102,8 @@ internal fun FluidPersonaStorySection(story: PersonaGalleryStory?, section: Int)
 @Composable
 private fun FluidPersonaFactRow(label: String, value: String) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    Row(Modifier.fillMaxWidth().padding(vertical = DsSpacing.small),
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
+    Row(Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
         Text(label, style = DsType.small13, color = colors.textSecondary)
         Text(value.ifBlank { "—" }, modifier = Modifier.weight(1f),
             style = DsType.std14.withReadingWeight(), color = colors.text)
