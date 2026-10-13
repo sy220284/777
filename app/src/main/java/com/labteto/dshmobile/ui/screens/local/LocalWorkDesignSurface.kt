@@ -210,7 +210,7 @@ internal fun FluidDecisionPanel(id: String, question: String, options: List<Stri
     var failed by remember(id) { mutableStateOf(false) }
     SyGlassCard {
         FluidPanelTitle(stringResource(R.string.fluid_decision_checkpoint))
-        Text(question, style = DsType.std14.withReadingWeight(), color = LocalSyColors.current.labelPrimary)
+        Text(question, style = DsType.std14.withReadingWeight(), color = LocalSyColors.current.text)
         options.forEach { option ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(selected = selection == option, enabled = !submitted,
@@ -222,7 +222,7 @@ internal fun FluidDecisionPanel(id: String, question: String, options: List<Stri
         SyTextField(custom, { custom = it; selection = "" }, enabled = !submitted,
             modifier = Modifier.fillMaxWidth().testTag("workDecisionCustom"),
             label = { Text(stringResource(R.string.local_question_custom_answer)) })
-        if (failed) Text(stringResource(R.string.fluid_decision_failed), color = LocalSyColors.current.error)
+        if (failed) Text(stringResource(R.string.fluid_decision_failed), color = LocalSyColors.current.dangerInk)
         SyButton(stringResource(R.string.fluid_decision_continue), {
             submitted = onAnswer(custom.trim().ifEmpty { selection })
             failed = !submitted
