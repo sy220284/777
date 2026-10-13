@@ -1367,7 +1367,8 @@ class ChatInteractionPlannerTest {
         assertTrue(prompt.contains("suggestions 固定为空"))
         assertTrue(prompt.contains("interaction* 由系统维护"))
         assertTrue(prompt.contains("scene 和 interaction* 由系统维护"))
-        assertTrue(prompt.contains("NONE=无有效变化"))
+        assertTrue(prompt.contains("NONE=无需记录显著长期事件"))
+        assertTrue(prompt.contains("NONE 下新增非空状态时须在 stateEvidence"))
         assertTrue(prompt.contains("合并重复"))
     }
 
