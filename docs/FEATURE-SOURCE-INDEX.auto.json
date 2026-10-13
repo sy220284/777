@@ -180,7 +180,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt",
-      "sha256": "b86ee596e03be390"
+      "sha256": "5c44ea7df814a3f2"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalCurrentSessionSnapshotComposition.kt",
@@ -3484,13 +3484,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "ba99b55d98b8",
+  "source_snapshot": "87493d519ef7",
   "observed_delta": {
-    "baseline": "c3e63782c38e",
+    "baseline": "ba99b55d98b8",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

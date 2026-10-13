@@ -30,6 +30,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /** Boundary/admission tests. External model/tool execution and device interaction remain S2 evidence. */
@@ -70,6 +71,19 @@ class LocalConversationUiPortTest {
             override fun pendingApproval(): LocalApproval? = null
             override fun answerApproval(pendingId: String, approved: Boolean) = false
         })
+    }
+
+    @Test fun bootstrapSnapshotDoesNotQueryAnUninitializedWorkOwner() {
+        val port = LocalConversationUiPortComposition(LocalRuntimeStateStore(), ChatOwner(), WorkOwner(),
+            object : LocalWorkApprovalUiPort {
+                override fun pendingApproval(): LocalApproval? = error("Work owner cannot resolve a session before bootstrap")
+                override fun answerApproval(pendingId: String, approved: Boolean): Boolean = error("No command during bootstrap")
+            })
+        val snapshot = port.work.snapshot()
+        assertEquals(UiSceneStatus.LOADING, snapshot.status)
+        assertNull(snapshot.identity)
+        assertNull(snapshot.approval)
+        assertFalse(snapshot.send.available)
     }
 
     @Test fun chatTextRoutesOnlyToChatAndPreservesOwnerQueueReceipt() {

@@ -81,7 +81,8 @@ class LocalConversationUiPortComposition @Inject internal constructor(
         override fun snapshot(): WorkConversationSceneSnapshot = synchronized(stateStore.foregroundRunHandle.lock) {
             val state = stateStore.state.value
             val active = state.usageMode == LocalUsageMode.WORK
-            val approval = if (active) approvalOwner.pendingApproval()?.takeIf {
+            val approval = if (active && state.sessionId.isNotBlank() && !state.loading && !stateStore.sessionTransitioning)
+                approvalOwner.pendingApproval()?.takeIf {
                 it.requestId == state.work.pendingApproval?.requestId
             } else null
             WorkConversationSceneSnapshot(

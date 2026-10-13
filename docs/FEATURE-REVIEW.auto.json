@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot": "ba99b55d98b8",
+  "snapshot": "87493d519ef7",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
   "code_files_scanned": 1519,
   "production_sources_scanned": 853,
@@ -9193,11 +9193,11 @@
   "followup_production_or_compatibility": 9,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "c3e63782c38e",
+    "baseline": "ba99b55d98b8",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
