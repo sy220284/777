@@ -13,6 +13,8 @@ import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
@@ -258,6 +260,59 @@ class LocalConversationComposerRegressionTest {
         compose.runOnIdle { assertEquals(1, connectCount) }
     }
 
+
+    @Test
+    fun chatGptPlanComposerDoesNotShowManageUsageButton() {
+        compose.setContent {
+            DshTheme {
+                LocalConversationComposer(
+                    state = LocalConversationSurfaceState(
+                        loading = false,
+                        configured = true,
+                        sessionId = "chatgpt-plan-composer",
+                        usageMode = LocalUsageMode.CHAT,
+                    ),
+                    activeModelProfile = LocalModelProfile(
+                        id = "plan",
+                        model = "gpt-test",
+                        baseUrl = "https://api.openai.com/v1",
+                        authKind = LocalModelAuthKind.CHATGPT_PLAN,
+                    ),
+                    input = "",
+                    attachments = emptyList(),
+                    onInputChange = {},
+                    onRemoveAttachment = {},
+                    onClearAttachments = {},
+                    onOpenAttachmentPicker = {},
+                    onShowReplySuggestions = {},
+                    onGenerateReplySuggestions = { false },
+                    onSend = { _, _ -> LocalSendResult.Empty },
+                    onStop = {},
+                    onPlanModeChange = {},
+                )
+            }
+        }
+        compose.onNodeWithText("管理使用额度").assertDoesNotExist()
+    }
+
+    @Test
+    fun chatGptPlanUsageErrorOffersModelSwitchWithoutManageUsage() {
+        var switchCount = 0
+        compose.setContent {
+            DshTheme {
+                LocalConversationErrorCard(
+                    sendRejectMessage = null,
+                    stateError = "CHATGPT_PLAN_LIMIT_REACHED",
+                    restoreRequest = null,
+                    onRestoreRequest = {},
+                    onSwitchModelSource = { switchCount++ },
+                )
+            }
+        }
+        compose.onNodeWithText("管理使用额度").assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.chatgpt_switch_model_source)).performClick()
+        compose.runOnIdle { assertEquals(1, switchCount) }
+    }
 
     @Test
     fun focusRevealsReasoningActionAndPopupDoesNotReplaceDraft() {
