@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.model.LocalMediaVideoPhase
 import com.labteto.dshmobile.local.session.LocalMessageBlock
 import java.io.File
 import java.nio.file.Files
@@ -61,6 +62,17 @@ class LocalTranscriptMediaPresentationTest {
         )
         assertEquals(listOf(LocalMessageBlock.Text("**Bold**")),
             localVisibleAssistantBlocks(multipart))
+    }
+
+    @Test
+    fun savedVideoPlaybackDoesNotRequireAProviderDownloadUrl() {
+        assertTrue(canPlayLocalMediaVideo(LocalMediaVideoPhase.SUCCEEDED, true, null))
+        assertTrue(canPlayLocalMediaVideo(LocalMediaVideoPhase.SUCCEEDED, true, ""))
+        assertTrue(canPlayLocalMediaVideo(LocalMediaVideoPhase.SUCCEEDED, false,
+            "https://example.invalid/video.mp4"))
+        assertTrue(!canPlayLocalMediaVideo(LocalMediaVideoPhase.SUCCEEDED, false, null))
+        assertTrue(!canPlayLocalMediaVideo(LocalMediaVideoPhase.PROCESSING, true,
+            "https://example.invalid/video.mp4"))
     }
 
     @Test
