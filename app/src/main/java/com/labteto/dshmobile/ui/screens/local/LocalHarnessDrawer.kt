@@ -64,6 +64,7 @@ import com.shenyan.designsystem.components.SyIconButton
 import com.shenyan.designsystem.components.SyCategoryRow
 import com.shenyan.designsystem.components.SyGroupCard
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.sidebar.SidebarAvatarPicker
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -147,20 +148,20 @@ internal fun LocalModeDrawer(
                 contentDescription = expandLabel,
                 onClick = { syRailCollapsed = false }, tint = sy.text,
             )
-            SyIconButton(icon = FeatherIcons.Plus, contentDescription = stringResource(R.string.sy_v5_new_session),
+            SyIconButton(icon = SyEntryIcons.NewSession, contentDescription = stringResource(R.string.sy_v5_new_session),
                 onClick = onNewSession, containerColor = sy.l3, tint = sy.text)
             when (localCollapsedRailPrimaryEntry(usageMode)) {
                 LocalFeatureDrawerEntry.PERSONA_GALLERY ->
-                    SyIconButton(icon = FeatherIcons.User, contentDescription = stringResource(R.string.persona_gallery_title),
+                    SyIconButton(icon = SyEntryIcons.Persona, contentDescription = stringResource(R.string.persona_gallery_title),
                         onClick = onOpenPersonaGallery, containerColor = sy.l3, tint = sy.text)
                 LocalFeatureDrawerEntry.PROJECT ->
-                    SyIconButton(icon = FeatherIcons.Folder, contentDescription = stringResource(R.string.local_project_management_title),
+                    SyIconButton(icon = SyEntryIcons.Projects, contentDescription = stringResource(R.string.local_project_management_title),
                         onClick = onProjects, containerColor = sy.l3, tint = sy.text)
                 else -> error("Unexpected collapsed rail primary destination")
             }
-            SyIconButton(icon = FeatherIcons.Clock, contentDescription = stringResource(localCollapsedRailTaskTitle(usageMode)),
+            SyIconButton(icon = SyEntryIcons.Tasks, contentDescription = stringResource(localCollapsedRailTaskTitle(usageMode)),
                 onClick = onTasks, containerColor = sy.l3, tint = sy.text)
-            SyIconButton(icon = FeatherIcons.SettingsOutline, contentDescription = stringResource(R.string.sy_v5_settings),
+            SyIconButton(icon = SyEntryIcons.Settings, contentDescription = stringResource(R.string.sy_v5_settings),
                 onClick = onSettings, containerColor = sy.l3, tint = sy.text)
         }
         return
@@ -326,7 +327,7 @@ internal fun LocalModeDrawer(
                         overflow = TextOverflow.Ellipsis,
                     )
                     SyIconButton(
-                        icon = FeatherIcons.Search,
+                        icon = SyEntryIcons.Search,
                         contentDescription = stringResource(R.string.common_search),
                         onClick = {
                             searchOpen = !searchOpen
@@ -339,7 +340,7 @@ internal fun LocalModeDrawer(
                         tint = sy.text,
                     )
                     SyIconButton(
-                        icon = FeatherIcons.Plus,
+                        icon = SyEntryIcons.NewSession,
                         contentDescription = stringResource(R.string.chatlist_new_session),
                         onClick = onNewSession,
                         containerColor = sy.l3.compositeOver(sy.canvas),
@@ -360,7 +361,7 @@ internal fun LocalModeDrawer(
                         modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
                         placeholder = { Text(stringResource(R.string.local_drawer_search_people_sessions)) },
                         leadingIcon = {
-                            Icon(FeatherIcons.Search, contentDescription = null, tint = colors.labelTertiary)
+                            Icon(SyEntryIcons.Search, contentDescription = null, tint = colors.labelTertiary)
                         },
                         singleLine = true,
                         shape = DsShapes.pillFull,
@@ -415,7 +416,7 @@ internal fun LocalModeDrawer(
                     }
                     items(matchedPersonas, key = { "persona:" + it.id }) { entry ->
                         SyCategoryRow(
-                            icon = FeatherIcons.User,
+                            icon = SyEntryIcons.Persona,
                             title = entry.persona.name,
                             subtitle = entry.persona.coreIdentity.ifBlank {
                                 stringResource(R.string.local_drawer_search_open_gallery)
@@ -432,7 +433,7 @@ internal fun LocalModeDrawer(
                     }
                     items(matchedTasks, key = { "task-search:" + it.id }) { task ->
                         SyCategoryRow(
-                            icon = FeatherIcons.CheckSquare,
+                            icon = SyEntryIcons.Tasks,
                             title = task.prompt,
                             subtitle = task.actorName ?: task.id,
                             onClick = { onSearchTask(task) },
@@ -445,7 +446,7 @@ internal fun LocalModeDrawer(
                     }
                     items(matchedFiles, key = { "file-search:" + it.path }) { file ->
                         SyCategoryRow(
-                            icon = FeatherIcons.FileText,
+                            icon = SyEntryIcons.WorkspaceFiles,
                             title = file.path.substringAfterLast('/'),
                             subtitle = file.path,
                             onClick = { onSearchFile(file.path) },
@@ -604,7 +605,7 @@ internal fun LocalModeDrawer(
                 } else {
                     SyGroupCard {
                         SyCategoryRow(
-                            icon = FeatherIcons.SettingsOutline,
+                            icon = SyEntryIcons.Settings,
                             title = stringResource(R.string.settings_title),
                             titleTextStyle = DsType.navigationItem,
                             onClick = onSettings,

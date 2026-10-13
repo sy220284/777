@@ -82,6 +82,7 @@ import com.labteto.dshmobile.ui.shenyan.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.shenyan.SyHierarchyPage
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.shenyan.SyUserBubble
 import com.labteto.dshmobile.ui.shenyan.rememberSyToast
@@ -422,28 +423,28 @@ fun SettingsScreen(
                 when (shownPage) {
                     SettingsDestination.ROOT -> {
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_common)) {
-                            AppSettingsRow(icon = FeatherIcons.Palette,
+                            AppSettingsRow(icon = SyEntryIcons.Appearance,
                                 title = stringResource(R.string.settings_page_appearance),
                                 onClick = { page = SettingsDestination.APPEARANCE }, compact = true)
                             AppSettingsDivider()
-                            AppSettingsRow(icon = FeatherIcons.BookOpen,
+                            AppSettingsRow(icon = SyEntryIcons.Memory,
                                 title = stringResource(R.string.settings_page_memory),
                                 onClick = { page = SettingsDestination.MEMORY }, compact = true)
                             AppSettingsDivider()
-                            AppSettingsRow(icon = FeatherIcons.Archive,
+                            AppSettingsRow(icon = SyEntryIcons.SessionStorage,
                                 title = stringResource(R.string.fluid_settings_session_storage),
                                 onClick = { page = SettingsDestination.SESSION_STORAGE }, compact = true)
                         }
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_models_experience)) {
                             AppSettingsRow(
-                                icon = FeatherIcons.Sparkles,
+                                icon = SyEntryIcons.Models,
                                 title = stringResource(R.string.settings_page_models),
                                 onClick = { page = SettingsDestination.MODELS },
                                 compact = true,
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.Gauge,
+                                icon = SyEntryIcons.Performance,
                                 title = stringResource(R.string.settings_model_performance_title),
                                 reservedEntryHeight = 72.dp,
                                 onClick = { page = SettingsDestination.MODEL_PERFORMANCE },
@@ -451,14 +452,14 @@ fun SettingsScreen(
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.CreditCard,
+                                icon = SyEntryIcons.Account,
                                 title = stringResource(R.string.chatgpt_account_title),
                                 onClick = { page = SettingsDestination.ACCOUNT },
                                 compact = true,
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.Bell,
+                                icon = SyEntryIcons.Notifications,
                                 title = stringResource(R.string.settings_page_notifications),
                                 onClick = { page = SettingsDestination.NOTIFICATIONS },
                                 compact = true,
@@ -466,7 +467,7 @@ fun SettingsScreen(
                         }
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_system_maintenance)) {
                             AppSettingsRow(
-                                icon = FeatherIcons.Shield,
+                                icon = SyEntryIcons.Permissions,
                                 title = stringResource(R.string.settings_page_permissions),
                                 value = stringResource(when {
                                     deviceCapabilities.loading -> R.string.common_loading
@@ -480,14 +481,14 @@ fun SettingsScreen(
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.Gear,
+                                icon = SyEntryIcons.Advanced,
                                 title = stringResource(R.string.settings_page_advanced),
                                 onClick = { page = SettingsDestination.ADVANCED },
                                 compact = true,
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.RefreshCw,
+                                icon = SyEntryIcons.Updates,
                                 title = stringResource(R.string.settings_update_check),
                                 value = updateStatus,
                                 onClick = { page = SettingsDestination.UPDATE },
@@ -507,7 +508,7 @@ fun SettingsScreen(
                     SettingsDestination.SESSION -> {
                         AppSettingsSection {
                             AppSettingsRow(
-                                icon = FeatherIcons.Sliders,
+                                icon = SyEntryIcons.ChatStyle,
                                 title = stringResource(R.string.settings_chat_style_guard),
                                 reservedEntryHeight = 88.dp,
                                 value = stringResource(
@@ -713,7 +714,7 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             icon = FeatherIcons.Plus,
                         )
-                        AppSettingsRow(icon = FeatherIcons.CreditCard,
+                        AppSettingsRow(icon = SyEntryIcons.Account,
                             title = stringResource(R.string.settings_page_model_usage),
                             onClick = { page = SettingsDestination.MODEL_USAGE })
                         LocalModelSettingsCard(
@@ -728,7 +729,7 @@ fun SettingsScreen(
                     SettingsDestination.MODEL_USAGE -> {
                         AppSettingsSection {
                             AppSettingsRow(
-                                icon = FeatherIcons.Sliders,
+                                icon = SyEntryIcons.ChatStyle,
                                 title = stringResource(R.string.settings_page_pricing),
                                 reservedEntryHeight = 80.dp,
                                 onClick = { page = SettingsDestination.PRICING },
@@ -816,10 +817,10 @@ fun SettingsScreen(
                         SettingsGroupTitle(stringResource(R.string.settings_memory_status))
                         MemoryOverviewCard(localHarness)
                         AppSettingsSection {
-                            AppSettingsRow(FeatherIcons.Sliders, stringResource(R.string.advanced_memory_settings),
+                            AppSettingsRow(SyEntryIcons.ChatStyle, stringResource(R.string.advanced_memory_settings),
                                 onClick = { page = SettingsDestination.MEMORY_SETTINGS })
                             AppSettingsDivider()
-                            AppSettingsRow(FeatherIcons.BookOpen, stringResource(R.string.advanced_manage_memory),
+                            AppSettingsRow(SyEntryIcons.Memory, stringResource(R.string.advanced_manage_memory),
                                 value = stringResource(R.string.advanced_memory_active_count, memories.size),
                                 onClick = { page = SettingsDestination.MEMORY_MANAGEMENT })
                         }

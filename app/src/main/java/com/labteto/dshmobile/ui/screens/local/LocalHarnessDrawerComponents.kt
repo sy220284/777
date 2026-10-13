@@ -57,6 +57,7 @@ import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.relativeTime
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.DsAnimations
@@ -150,65 +151,65 @@ internal fun DrawerQuickActions(
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
             onUsage?.let { openUsage ->
-                DrawerQuickAction(icon = FeatherIcons.Activity,
+                DrawerQuickAction(icon = SyEntryIcons.Usage,
                     title = stringResource(R.string.usage_calculation_title), onClick = openUsage)
             }
             onImmersiveReader?.let { read ->
-                DrawerQuickAction(FeatherIcons.BookOpen, stringResource(R.string.fluid_reader_title), read)
+                DrawerQuickAction(SyEntryIcons.Reader, stringResource(R.string.fluid_reader_title), read)
             }
             if (usageMode == LocalUsageMode.CHAT) {
                 DrawerQuickAction(
-                    icon = FeatherIcons.Image,
+                    icon = SyEntryIcons.Gallery,
                     title = stringResource(R.string.persona_gallery_title),
                     badge = galleryCount.takeIf { it > 0 }?.toString(),
                     onClick = onOpenPersonaGallery,
                 )
                 DrawerQuickAction(
-                    icon = FeatherIcons.Users,
+                    icon = SyEntryIcons.GroupChat,
                     title = stringResource(R.string.local_group_chat_title),
                     badge = groupMemberCount.takeIf { it > 0 }?.toString(),
                     onClick = onOpenGroupChat,
                 )
                 DrawerQuickAction(
-                    icon = FeatherIcons.CheckSquare,
+                    icon = SyEntryIcons.Tasks,
                     title = stringResource(R.string.tasks_chat_title),
                     onClick = onTasks,
                 )
                 DrawerQuickAction(
-                    icon = FeatherIcons.BookOpen,
+                    icon = SyEntryIcons.Diary,
                     title = stringResource(R.string.chat_diary_title),
                     onClick = onOpenDiary,
                 )
             } else {
                 DrawerQuickAction(
-                    icon = FeatherIcons.Folder,
+                    icon = SyEntryIcons.Projects,
                     title = stringResource(R.string.local_project_management_title),
                     onClick = onProjects,
                 )
                 DrawerQuickAction(
-                    icon = FeatherIcons.Activity,
+                    icon = SyEntryIcons.RunCenter,
                     title = stringResource(R.string.local_run_center),
                     onClick = onOpenRunCenter,
                 )
                 DrawerQuickAction(
-                    icon = FeatherIcons.FileText,
+                    icon = SyEntryIcons.WorkspaceFiles,
                     title = stringResource(R.string.chatlist_workspace_files),
                     onClick = onWorkspaceFiles,
                 )
                 DrawerQuickAction(
-                    icon = FeatherIcons.CheckSquare,
+                    icon = SyEntryIcons.Tasks,
                     title = stringResource(R.string.tasks_title),
                     onClick = onTasks,
                 )
                 DrawerQuickAction(
-                    icon = FeatherIcons.Tool,
+                    icon = SyEntryIcons.Tools,
                     title = stringResource(R.string.tools_title),
                     onClick = onTools,
                 )
             }
         onMiniMaxQuota?.let { openQuota ->
             DrawerQuickAction(
-                icon = FeatherIcons.CreditCard,
+                icon = SyEntryIcons.Quota,
                 title = stringResource(R.string.minimax_quota_title),
                 onClick = openQuota,
             )
