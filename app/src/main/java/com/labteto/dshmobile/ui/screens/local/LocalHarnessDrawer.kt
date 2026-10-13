@@ -84,7 +84,7 @@ import kotlinx.coroutines.launch
 /** Narrow rail uses the same mode-dependent destination as the expanded drawer. */
 internal fun localCollapsedRailPrimaryEntry(mode: LocalUsageMode): LocalFeatureDrawerEntry =
     if (mode == LocalUsageMode.CHAT) LocalFeatureDrawerEntry.PERSONA_GALLERY
-    else LocalFeatureDrawerEntry.PROJECT
+    else LocalFeatureDrawerEntry.WORKSPACE
 
 internal fun localCollapsedRailTaskTitle(mode: LocalUsageMode): Int =
     if (mode == LocalUsageMode.CHAT) R.string.tasks_chat_title else R.string.tasks_title
@@ -117,7 +117,6 @@ internal fun LocalModeDrawer(
     loadSearchFiles: suspend () -> List<LocalWorkspaceFile>,
     onSearchTask: (AutomationTask) -> Unit,
     onSearchFile: (String) -> Unit,
-    onProjects: () -> Unit,
     onOpenRunCenter: () -> Unit,
     onOpenGroupChat: () -> Unit,
     onOpenPersonaGallery: () -> Unit,
@@ -158,9 +157,9 @@ internal fun LocalModeDrawer(
                 LocalFeatureDrawerEntry.PERSONA_GALLERY ->
                     SyIconButton(icon = SyEntryIcons.Persona, contentDescription = stringResource(R.string.persona_gallery_title),
                         onClick = onOpenPersonaGallery, containerColor = sy.l3, tint = sy.text)
-                LocalFeatureDrawerEntry.PROJECT ->
-                    SyIconButton(icon = SyEntryIcons.Projects, contentDescription = stringResource(R.string.local_project_management_title),
-                        onClick = onProjects, containerColor = sy.l3, tint = sy.text)
+                LocalFeatureDrawerEntry.WORKSPACE ->
+                    SyIconButton(icon = SyEntryIcons.WorkspaceFiles, contentDescription = stringResource(R.string.chatlist_workspace_files),
+                        onClick = onWorkspaceFiles, containerColor = sy.l3, tint = sy.text)
                 else -> error("Unexpected collapsed rail primary destination")
             }
             SyIconButton(icon = SyEntryIcons.Tasks, contentDescription = stringResource(localCollapsedRailTaskTitle(usageMode)),
@@ -410,7 +409,6 @@ internal fun LocalModeDrawer(
                             onOpenDiary = onOpenDiary,
                             onTasks = onTasks,
                             onWorkspaceFiles = onWorkspaceFiles,
-                            onProjects = onProjects,
                             onOpenRunCenter = onOpenRunCenter,
                             onTools = onTools,
                             onMiniMaxQuota = onMiniMaxQuota,
