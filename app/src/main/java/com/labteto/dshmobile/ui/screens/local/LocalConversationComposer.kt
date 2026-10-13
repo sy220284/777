@@ -287,7 +287,6 @@ internal fun LocalConversationComposer(
         // the IME is already animating the whole surface.
         animateSize = false,
     ) {
-        ChatGptPlanUsageBar(activeModelProfile)
         if (state.usageMode == LocalUsageMode.WORK && teamDispatchSelected) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
