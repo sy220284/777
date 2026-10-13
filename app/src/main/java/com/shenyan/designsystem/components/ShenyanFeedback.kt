@@ -111,7 +111,7 @@ fun SyIconButton(
 /** Empty state is never a fake loading skeleton; recovery retains the real caller's callback. */
 @Composable
 fun SyEmptyState(
-    icon: ImageVector, title: String, body: String,
+    icon: ImageVector?, title: String, body: String,
     modifier: Modifier = Modifier, actionText: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
@@ -121,14 +121,16 @@ fun SyEmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
     ) {
-        SyMaterialSurface(
-            modifier = Modifier.size(52.dp),
-            shape = RoundedCornerShape(SyMetric.radiusCard),
-            tier = SyMaterialTier.L3_CARD,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, tint = p.textSecondary,
-                    modifier = Modifier.size(24.dp))
+        if (icon != null) {
+            SyMaterialSurface(
+                modifier = Modifier.size(52.dp),
+                shape = RoundedCornerShape(SyMetric.radiusCard),
+                tier = SyMaterialTier.L3_CARD,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, tint = p.textSecondary,
+                        modifier = Modifier.size(24.dp))
+                }
             }
         }
         Text(title, modifier = Modifier.widthIn(max = 340.dp).semantics { heading() },
