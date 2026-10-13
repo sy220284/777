@@ -366,6 +366,14 @@ internal object FeatherIcons {
         }
     }
 
+    /** Distinct camera glyph for video creation (24-unit Feather grid). */
+    val Video: ImageVector by lazy {
+        feather("Video") {
+            rectangle(2f, 7f, 13f, 10f)
+            moveTo(15f, 10f); lineTo(22f, 6f); verticalLineTo(18f); lineTo(15f, 14f)
+        }
+    }
+
     /** `image` — gallery / visual asset. */
     val Image: ImageVector by lazy {
         feather("Image") {
