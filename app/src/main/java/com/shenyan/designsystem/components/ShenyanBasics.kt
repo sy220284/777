@@ -161,27 +161,6 @@ fun SyTabs(tabs: List<SyOption>, selectedId: String, onSelect: (String) -> Unit,
     }
 }
 
-@Composable
-fun SyTabBar(tabs: List<SyOption>, selectedId: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
-    NavigationBar(modifier, containerColor = syMaterialColor(SyMaterialTier.L4_OVERLAY)) {
-        tabs.forEach { tab ->
-            NavigationBarItem(
-                selected = selectedId == tab.id,
-                onClick = { onSelect(tab.id) },
-                enabled = tab.enabled,
-                icon = { Text(if (selectedId == tab.id) "●" else "○") },
-                label = { Text(tab.label, maxLines = 1) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = LocalSyColors.current.text, selectedTextColor = LocalSyColors.current.text,
-                    unselectedIconColor = LocalSyColors.current.textSecondary, unselectedTextColor = LocalSyColors.current.textSecondary,
-                    indicatorColor = LocalSyColors.current.selected,
-                ),
-                alwaysShowLabel = true
-            )
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SyModalSheet(onDismiss: () -> Unit, title: String, content: @Composable ColumnScope.() -> Unit) {
