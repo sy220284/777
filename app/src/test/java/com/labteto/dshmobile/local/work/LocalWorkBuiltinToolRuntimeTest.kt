@@ -63,7 +63,7 @@ class LocalWorkBuiltinToolRuntimeTest {
             },
         )
         invalid.forEach { args ->
-            assertTrue("缺失或格式错误的验收条件不能变成空验收", 
+            assertTrue("缺失或格式错误的验收条件不能变成空验收",
                 runCatching { parseWorkGoalAcceptanceArguments(args) }.isFailure)
         }
     }
