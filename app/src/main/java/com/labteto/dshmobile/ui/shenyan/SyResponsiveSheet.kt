@@ -98,9 +98,13 @@ fun SyResponsiveSheet(
             }
             if (scrollable) {
                 Column(
-                    // Reserve header/footer space within the actual viewport after IME padding.
-                    // A screen-height cap alone can leave actions beyond a reduced viewport.
-                    Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = maxBodyHeight)
+                    // Reserve pinned-footer space within the actual viewport.
+                    // On mobile, unweighted content allows short, footer-free sheets
+                    // to wrap their content. A footer requires a bounded, weighted
+                    // scroll body so the action remains visible after scrolling.
+                    (if (wide || footer != null) Modifier.fillMaxWidth().weight(1f, fill = false)
+                     else Modifier.fillMaxWidth())
+                        .heightIn(max = maxBodyHeight)
                         .verticalScroll(rememberScrollState())
                         .testTag("bottomSheetScrollBody"),
                     verticalArrangement = Arrangement.spacedBy(10.dp),

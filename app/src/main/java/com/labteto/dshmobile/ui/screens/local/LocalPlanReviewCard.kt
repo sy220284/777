@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -30,8 +32,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -67,7 +67,7 @@ internal fun LocalPlanReviewCard(
     onRegenerate: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     val copiedMessage = stringResource(R.string.chat_copy_success)
@@ -76,22 +76,22 @@ internal fun LocalPlanReviewCard(
         modifier = modifier.fillMaxWidth(),
         shape = DsShapes.approvalCard,
         tier = SyMaterialTier.L3_CARD,
-        border = BorderStroke(1.dp, colors.borderL1),
+        border = BorderStroke(1.dp, colors.border),
     ) {
         Column(
-            modifier = Modifier.padding(DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            modifier = Modifier.padding(SyMetric.gapLg),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             Text(
                 stringResource(R.string.plan_review_title),
                 style = DsType.small13Strong.withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
             )
             MarkdownText(review.plan)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
                 SyButton(
                     text = stringResource(R.string.local_plan_review_confirm),

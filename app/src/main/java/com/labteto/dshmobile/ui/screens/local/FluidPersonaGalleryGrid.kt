@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -51,8 +53,8 @@ internal fun FluidPersonaGalleryGrid(entries: List<PersonaGalleryEntry>, onSelec
     val reduced = com.labteto.dshmobile.ui.shenyan.LocalSyReducedMotion.current
     val animateEntrance = animateOnEntrance && !reduced
     LazyVerticalGrid(GridCells.Fixed(2), modifier,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
         itemsIndexed(entries, key = { _, entry -> entry.id }) { index, entry ->
             // Screen 06: reference 360ms cascade, 80ms stagger. The first ten
             // cards animate once; a long gallery must never queue hundreds of delays.
@@ -87,32 +89,32 @@ internal fun FluidPersonaGalleryGrid(entries: List<PersonaGalleryEntry>, onSelec
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FluidPersonaGalleryCard(entry: PersonaGalleryEntry, onClick: () -> Unit, onLongClick: () -> Unit) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val pulse = rememberHapticPulse()
     val image by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, entry.portraitPath) {
         value = withContext(Dispatchers.IO) { decodePersonaPortraitBitmap(entry.portraitPath, maxEdgePx = 480) }
     }
     SyMaterialSurface(shape = DsShapes.block,
         tier = SyMaterialTier.L3_CARD,
-        border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderL1),
+        border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
         modifier = Modifier.fillMaxWidth().testTag("personaGalleryEntry_${entry.id}")
             .combinedClickable(onClick = onClick, onLongClick = { pulse(); onLongClick() })) {
         Column {
-            Surface(color = colors.characterAccentTertiary, modifier = Modifier.fillMaxWidth().height(140.dp)) {
+            Surface(color = colors.lilac.copy(alpha = .18f), modifier = Modifier.fillMaxWidth().height(140.dp)) {
                 val portrait = image
                 if (portrait != null) Image(portrait, entry.persona.name, contentScale = ContentScale.Fit)
                 else Box(contentAlignment = Alignment.Center) {
                     Text(entry.persona.name.let { name ->
                         if (name.isEmpty()) "" else String(Character.toChars(name.codePointAt(0)))
-                    }, style = DsType.largeTitle28, color = colors.characterAccent)
+                    }, style = DsType.largeTitle28, color = colors.lilac)
                 }
             }
-            Column(Modifier.padding(DsSpacing.medium), verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                Text(entry.persona.name, style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
+            Column(Modifier.padding(SyMetric.gapLg), verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
+                Text(entry.persona.name, style = DsType.std14Strong.withReadingWeight(), color = colors.text)
                 val saved = entry.story(null)?.chatState
                 Text(saved?.takeIf { it.updatedAt > 0 }?.relationshipState
                     ?: stringResource(R.string.fluid_item_count, entry.stories.size),
-                    style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                    style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
             }
         }
     }

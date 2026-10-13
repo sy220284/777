@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -17,6 +18,7 @@ import kotlinx.coroutines.CompletableDeferred
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Rule
 import org.junit.Test
 
@@ -76,7 +78,7 @@ class CharacterDiaryCorrectionRegressionTest {
     @Test
     fun editingDiaryRequiresExplicitSaveAndRefreshesCurrentCharacter() {
         val current = mutableStateOf(listOf(entry()))
-        var saved = 0
+        val saved = AtomicInteger(0)
         compose.setContent {
             DshTheme {
                 CharacterDiaryScreen(
@@ -88,7 +90,7 @@ class CharacterDiaryCorrectionRegressionTest {
                         assertEquals("event-1", id)
                         assertEquals(1L, version)
                         current.value = listOf(entry().copy(event = change.event, updatedAt = 2L))
-                        saved++
+                        saved.incrementAndGet()
                         true
                     },
                     onDeactivateEntry = { _, _, _ -> false },
@@ -100,12 +102,17 @@ class CharacterDiaryCorrectionRegressionTest {
         // The recorded event is presented as a readable diary heading, not generated content.
         compose.onNodeWithTag("diary_paper_event_event-1").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("diary_edit_event-1").performScrollTo().performClick()
-        compose.runOnIdle { assertEquals(0, saved) }
+        compose.runOnIdle { assertEquals(0, saved.get()) }
         compose.onNodeWithTag("diary_edit_event").performTextReplacement("周末改去山上")
-        compose.onNodeWithTag("diary_save").performClick()
+        // A draft TextField can show the new text even if Save never reaches the
+        // suspend callback. Wait for the actual mutation and require the editor to
+        // close before accepting the refreshed diary as successful.
+        compose.onNodeWithTag("diary_save").assertIsEnabled().performClick()
+        compose.waitUntil(timeoutMillis = 10_000) { saved.get() == 1 }
         compose.waitForIdle()
+        compose.onNodeWithTag("diary_edit_event").assertDoesNotExist()
         compose.onNodeWithText("周末改去山上").assertIsDisplayed()
-        compose.runOnIdle { assertEquals(1, saved) }
+        compose.runOnIdle { assertEquals(1, saved.get()) }
     }
 
     @Test

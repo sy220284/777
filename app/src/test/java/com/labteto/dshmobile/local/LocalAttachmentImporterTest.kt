@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.attachment.copyAttachmentCancellably
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
+import java.io.OutputStream
 import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -12,10 +13,47 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalAttachmentImporterTest {
+    @Test
+    fun attachmentLargerThanOldTwentyMegabyteLimitCopiesWithoutRejection() = runBlocking {
+        val size = 21L * 1024L * 1024L
+        val source = object : InputStream() {
+            var remaining = size
+            override fun read(): Int = if (remaining > 0L) {
+                remaining -= 1
+                0
+            } else -1
+
+            override fun read(bytes: ByteArray, offset: Int, length: Int): Int {
+                if (remaining == 0L) return -1
+                val count = minOf(remaining, length.toLong()).toInt()
+                bytes.fill(0, offset, offset + count)
+                remaining -= count
+                return count
+            }
+        }
+        val output = object : OutputStream() {
+            var written = 0L
+            override fun write(value: Int) { written++ }
+            override fun write(bytes: ByteArray, offset: Int, length: Int) {
+                written += length
+            }
+        }
+
+        val copied = copyAttachmentCancellably(
+            source = source,
+            output = output,
+            digest = MessageDigest.getInstance("SHA-256"),
+        )
+
+        assertEquals(size, copied)
+        assertEquals(size, output.written)
+    }
+
     @Test
     fun cancellationInterruptsBlockedAttachmentCopy() = runBlocking {
         val started = CountDownLatch(1)
@@ -40,7 +78,6 @@ class LocalAttachmentImporterTest {
             copyAttachmentCancellably(
                 source = source,
                 output = ByteArrayOutputStream(),
-                maxAttachmentBytes = 1024L,
                 digest = MessageDigest.getInstance("SHA-256"),
             )
         }

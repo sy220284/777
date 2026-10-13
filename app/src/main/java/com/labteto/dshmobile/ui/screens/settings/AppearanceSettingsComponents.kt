@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -51,8 +53,6 @@ import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.shenyan.SyUserBubble
 import com.labteto.dshmobile.ui.theme.AccentPalettes
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
@@ -62,24 +62,24 @@ import kotlinx.coroutines.withContext
 
 @Composable
 internal fun AppearanceReadingPreview() {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SyMaterialFrame(
         modifier = Modifier.fillMaxWidth(),
         tier = SyMaterialTier.L3_CARD,
-        horizontalPadding = DsSpacing.medium,
-        verticalPadding = DsSpacing.medium,
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalPadding = SyMetric.gapLg,
+        verticalPadding = SyMetric.gapLg,
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         Text(
             stringResource(R.string.settings_appearance_preview_assistant),
             style = DsType.chatBody.withReadingWeight(),
-            color = colors.labelPrimary,
+            color = colors.text,
         )
         SyUserBubble(stringResource(R.string.settings_appearance_preview_user))
         Text(
             stringResource(R.string.settings_appearance_preview_hint),
             style = DsType.small13.withReadingWeight(),
-            color = colors.labelSecondary,
+            color = colors.textSecondary,
         )
     }
 }
@@ -91,18 +91,18 @@ internal fun ReadingPreferencesRow(
     onTextWeightChange: (Int) -> Unit,
     onTransparencyChange: (Float) -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Text(
         stringResource(R.string.settings_text_size),
         style = DsType.std14Strong.withReadingWeight(),
-        color = colors.labelPrimary,
+        color = colors.text,
     )
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
-        Text(stringResource(R.string.settings_text_smaller), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+        Text(stringResource(R.string.settings_text_smaller), style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
         SySlider(
             value = settings.textScale,
             onValueChange = onTextScaleChange,
@@ -114,14 +114,14 @@ internal fun ReadingPreferencesRow(
         Text(
             stringResource(R.string.settings_text_scale_value, (settings.textScale * 100).toInt()),
             style = DsType.small13Strong.withReadingWeight(),
-            color = colors.labelPrimary,
+            color = colors.text,
         )
     }
 
     Text(
         stringResource(R.string.settings_text_weight),
         style = DsType.std14Strong.withReadingWeight(),
-        color = colors.labelPrimary,
+        color = colors.text,
     )
     SySegmented(
         segments = listOf(
@@ -139,14 +139,14 @@ internal fun ReadingPreferencesRow(
     Text(
         stringResource(R.string.settings_component_transparency),
         style = DsType.std14Strong.withReadingWeight(),
-        color = colors.labelPrimary,
+        color = colors.text,
     )
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
-        Text(stringResource(R.string.settings_surface_clearer), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+        Text(stringResource(R.string.settings_surface_clearer), style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
         SySlider(
             value = settings.wallpaperSurfaceTransparency,
             onValueChange = onTransparencyChange,
@@ -155,12 +155,12 @@ internal fun ReadingPreferencesRow(
             hapticSegments = 10,
             modifier = Modifier.weight(1f),
         )
-        Text(stringResource(R.string.settings_surface_airier), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+        Text(stringResource(R.string.settings_surface_airier), style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
     }
     Text(
         stringResource(R.string.settings_component_transparency_hint),
         style = DsType.small13.withReadingWeight(),
-        color = colors.labelSecondary,
+        color = colors.textSecondary,
     )
 }
 
@@ -186,10 +186,10 @@ internal fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
 
 @Composable
 internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
-    val colors = DsTheme.colors
-    Column(modifier = Modifier.padding(vertical = DsSpacing.small)) {
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    Column(modifier = Modifier.padding(vertical = SyMetric.gapMd)) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             modifier = Modifier.horizontalScroll(rememberScrollState()),
         ) {
             val resolvedAccentKey = AccentPalettes.of(settings.accentTheme).key
@@ -201,12 +201,12 @@ internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
                         .width(68.dp)
                         .clip(DsShapes.cube)
                         .background(
-                            if (selected) colors.accentTertiary else Color.Transparent,
+                            if (selected) colors.selected else Color.Transparent,
                             DsShapes.cube,
                         )
                         .border(
                             width = if (selected) 1.5.dp else 1.dp,
-                            color = if (selected) colors.accent else colors.borderL2,
+                            color = if (selected) colors.primary else colors.border,
                             shape = DsShapes.cube,
                         )
                         .selectable(
@@ -227,17 +227,17 @@ internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
                                 .background(palette.lightAccent.copy(alpha = 0.35f)),
                         )
                     }
-                    Spacer(Modifier.height(DsSpacing.xsmall))
+                    Spacer(Modifier.height(SyMetric.gapSm))
                     Text(
                         palette.cnName,
                         style = DsType.caption11.withReadingWeight(),
-                        color = if (selected) colors.accent else colors.labelTertiary,
+                        color = if (selected) colors.primary else colors.textTertiary,
                     )
                     if (selected) {
                         Icon(
                             FeatherIcons.Check,
                             contentDescription = null,
-                            tint = colors.accent,
+                            tint = colors.primary,
                             modifier = Modifier.size(14.dp),
                         )
                     }
@@ -249,19 +249,19 @@ internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
 
 @Composable
 private fun AppearanceChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Box(
         modifier = Modifier
-            .heightIn(min = DsSpacing.touchTarget)
+            .heightIn(min = SyMetric.touch)
             .clip(DsShapes.cube)
-            .background(if (selected) colors.accentTertiary else LocalSyColors.current.materialL1)
+            .background(if (selected) colors.selected else LocalSyColors.current.materialL1)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = DsSpacing.small),
+            .padding(horizontal = 14.dp, vertical = SyMetric.gapMd),
     ) {
         Text(
             label,
             style = DsType.small13.withReadingWeight(),
-            color = if (selected) colors.accent else colors.labelSecondary,
+            color = if (selected) colors.primary else colors.textSecondary,
         )
     }
 }
@@ -281,11 +281,11 @@ internal fun BackgroundRow(
     onPick: (Uri) -> Unit,
     onClear: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) onPick(uri)
     }
-    Column(modifier = Modifier.padding(vertical = DsSpacing.small)) {
+    Column(modifier = Modifier.padding(vertical = SyMetric.gapMd)) {
         if (path != null) {
             val imagePath = path
             val thumbnail by produceState<ImageBitmap?>(initialValue = null, key1 = imagePath) {
@@ -310,7 +310,7 @@ internal fun BackgroundRow(
                         .size(width = 96.dp, height = 56.dp)
                         .clip(DsShapes.cube),
                 )
-                Spacer(Modifier.height(DsSpacing.small))
+                Spacer(Modifier.height(SyMetric.gapMd))
             }
         }
         Text(
@@ -322,10 +322,10 @@ internal fun BackgroundRow(
                 },
             ),
             style = DsType.small13.withReadingWeight(),
-            color = colors.labelTertiary,
+            color = colors.textTertiary,
         )
-        Spacer(Modifier.height(DsSpacing.small))
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        Spacer(Modifier.height(SyMetric.gapMd))
+        Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             AppearanceChip(stringResource(R.string.settings_background_image_choose), false) {
                 picker.launch(arrayOf("image/*"))
             }
@@ -336,7 +336,7 @@ internal fun BackgroundRow(
             }
         }
         if (path != null) {
-            Spacer(Modifier.height(DsSpacing.small))
+            Spacer(Modifier.height(SyMetric.gapMd))
             ToggleRow(
                 stringResource(R.string.settings_background_adaptive_contrast),
                 adaptiveContrast,

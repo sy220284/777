@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -37,8 +39,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.shenyan.designsystem.components.SyGroupCard
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -51,7 +51,7 @@ internal fun LocalConfiguration(
     onSave: (String, String, String) -> Unit,
     onClearCredential: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var apiKey by remember { mutableStateOf("") }
     var model by rememberSaveable(state.model) { mutableStateOf(state.model) }
     var baseUrl by rememberSaveable(state.baseUrl) { mutableStateOf(state.baseUrl) }
@@ -59,14 +59,14 @@ internal fun LocalConfiguration(
     Column(
         Modifier.fillMaxSize().background(colors.rootSurface()).safeDrawingPadding().imePadding()
             .verticalScroll(rememberScrollState())
-            .padding(DsSpacing.xlarge),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
+            .padding(SyMetric.gapPage),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSection),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 stringResource(R.string.local_harness_title),
                 style = DsType.large20.withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
                 modifier = Modifier.weight(1f),
             )
             if (canCancel) {
@@ -74,16 +74,16 @@ internal fun LocalConfiguration(
             }
         }
 
-        SyGlassCard(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            Text(stringResource(R.string.local_on_device_execution_title), style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary)
+        SyGlassCard(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+            Text(stringResource(R.string.local_on_device_execution_title), style = DsType.base16Strong.withReadingWeight(), color = colors.text)
             Text(
                 stringResource(R.string.local_on_device_execution_hint),
                 style = DsType.std14.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
         }
 
-        Text(stringResource(R.string.local_model_section_title), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
+        Text(stringResource(R.string.local_model_section_title), style = DsType.std14.withReadingWeight(), color = colors.textTertiary)
         SyGroupCard {
             SyTextField(
                 value = apiKey,
@@ -101,13 +101,13 @@ internal fun LocalConfiguration(
                 visualTransformation = PasswordVisualTransformation(),
                 singleLine = true,
             )
-            Spacer(Modifier.height(DsSpacing.medium))
-            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                Text(stringResource(R.string.models_title), style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
+            Spacer(Modifier.height(SyMetric.gapLg))
+            Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
+                Text(stringResource(R.string.models_title), style = DsType.std14Strong.withReadingWeight(), color = colors.text)
                 ModelChoice("deepseek-flash", stringResource(R.string.local_model_flash_label), model) { model = it }
                 ModelChoice("deepseek-v4-pro", stringResource(R.string.local_model_pro_label), model) { model = it }
             }
-            Spacer(Modifier.height(DsSpacing.medium))
+            Spacer(Modifier.height(SyMetric.gapLg))
             SyTextField(
                 value = baseUrl,
                 onValueChange = { baseUrl = it },
@@ -118,7 +118,7 @@ internal fun LocalConfiguration(
             )
         }
 
-        state.error?.let { Text(it, style = DsType.small13.withReadingWeight(), color = colors.error) }
+        state.error?.let { Text(it, style = DsType.small13.withReadingWeight(), color = colors.dangerInk) }
 
         SyButton(
             text = stringResource(R.string.local_model_save_enter),
@@ -141,12 +141,12 @@ internal fun LocalConfiguration(
 internal fun ModelChoice(id: String, label: String, selected: String, onSelect: (String) -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(DsShapes.row)
-            .heightIn(min = DsSpacing.touchTarget)
+            .heightIn(min = SyMetric.touch)
             .selectable(selected = selected == id, onClick = { onSelect(id) })
-            .padding(vertical = DsSpacing.tiny),
+            .padding(vertical = SyMetric.gapXs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         SyRadioControl(selected = selected == id, onClick = { onSelect(id) })
-        Text(label, style = DsType.std14.withReadingWeight(), color = DsTheme.colors.labelPrimary)
+        Text(label, style = DsType.std14.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
     }
 }

@@ -25,7 +25,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.SimpleDateFormat
@@ -39,7 +38,7 @@ internal fun NetworkDiagnosticDialog(
     onDismiss: () -> Unit,
     diagnose: suspend (String) -> String,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val scope = rememberCoroutineScope()
     var target by rememberSaveable { mutableStateOf("https://github.com") }
     var result by remember { mutableStateOf<String?>(null) }
@@ -54,7 +53,7 @@ internal fun NetworkDiagnosticDialog(
         Text(
             stringResource(R.string.settings_runtime_network_diagnostic_intro),
             style = DsType.small13.withReadingWeight(),
-            color = colors.labelSecondary,
+            color = colors.textSecondary,
         )
         SyTextField(
             value = target,
@@ -91,7 +90,7 @@ internal fun NetworkDiagnosticDialog(
                 Text(
                     it,
                     style = DsType.mdCode.withReadingWeight(),
-                    color = colors.labelPrimary,
+                    color = colors.text,
                     modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp).verticalScroll(rememberScrollState()),
                 )
             }
@@ -105,7 +104,7 @@ internal fun EnvironmentInfoDialog(
     onDismiss: () -> Unit,
     onExport: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var events by remember { mutableStateOf(AppLog.snapshot()) }
     var errorsOnly by rememberSaveable { mutableStateOf(false) }
     val eventTime = remember { SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault()) }
@@ -118,13 +117,13 @@ internal fun EnvironmentInfoDialog(
         Text(
             stringResource(R.string.settings_runtime_environment_intro),
             style = DsType.small13.withReadingWeight(),
-            color = colors.labelSecondary,
+            color = colors.textSecondary,
         )
         SelectionContainer {
             Text(
                 text,
                 style = DsType.mdCode.withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
                 modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).verticalScroll(rememberScrollState()),
             )
         }
@@ -155,7 +154,7 @@ internal fun EnvironmentInfoDialog(
                     "${eventTime.format(Date(it.timestampMillis))} ${it.level}/${it.tag} ${it.throwableType.orEmpty()} ${it.message.replace("\n", " ").take(240)}"
                 },
                 style = DsType.mdCode.withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
                 modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp).verticalScroll(rememberScrollState()),
             )
         }
