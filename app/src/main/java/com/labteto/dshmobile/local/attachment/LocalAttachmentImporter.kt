@@ -26,29 +26,21 @@ import kotlinx.coroutines.runInterruptible
 internal class LocalAttachmentImporter(
     private val context: Context,
     private val workspace: LocalWorkspace,
-    private val maxAttachmentBytes: Long = 20L * 1024L * 1024L,
 ) {
     suspend fun import(uri: Uri): LocalImportedAttachment {
         val resolver = context.contentResolver
         var displayName: String? = null
-        var declaredSize: Long? = null
         resolver.query(
             uri,
-            arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
+            arrayOf(OpenableColumns.DISPLAY_NAME),
             null,
             null,
             null,
         )?.use { cursor ->
             if (cursor.moveToFirst()) {
                 val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
                 if (nameIndex >= 0) displayName = cursor.getString(nameIndex)
-                if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) declaredSize = cursor.getLong(sizeIndex)
             }
-        }
-
-        if ((declaredSize ?: 0L) > maxAttachmentBytes) {
-            error("附件超过 ${maxAttachmentBytes / 1024 / 1024} MB 上限")
         }
 
         val safeName = (displayName ?: "attachment-${System.currentTimeMillis()}")
@@ -77,7 +69,6 @@ internal class LocalAttachmentImporter(
                     copyAttachmentCancellably(
                         source = source,
                         output = output,
-                        maxAttachmentBytes = maxAttachmentBytes,
                         digest = digest,
                     )
                 }
@@ -228,9 +219,7 @@ internal class LocalAttachmentImporter(
                     "图片格式转换失败"
                 }
             }
-            require(normalized.length() in 1..maxAttachmentBytes) {
-                "转换后的图片超过 ${maxAttachmentBytes / 1024 / 1024} MB 上限"
-            }
+            check(normalized.length() > 0L) { "转换后的图片为空" }
             return NormalizedImportedFile(
                 file = normalized,
                 imageMetadata = LocalImageMetadata(
@@ -272,7 +261,6 @@ internal class LocalAttachmentImporter(
 internal suspend fun copyAttachmentCancellably(
     source: InputStream,
     output: OutputStream,
-    maxAttachmentBytes: Long,
     digest: MessageDigest,
 ): Long = runInterruptible(Dispatchers.IO) {
     val buffer = ByteArray(32 * 1024)
@@ -282,9 +270,6 @@ internal suspend fun copyAttachmentCancellably(
         val read = source.read(buffer)
         if (read < 0) break
         total += read
-        if (total > maxAttachmentBytes) {
-            error("附件超过 ${maxAttachmentBytes / 1024 / 1024} MB 上限")
-        }
         digest.update(buffer, 0, read)
         output.write(buffer, 0, read)
     }
