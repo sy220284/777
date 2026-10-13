@@ -103,7 +103,7 @@ internal fun V6LoadedConversationSearchSheet(
             else -> LazyColumn(Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
                 items(results, key = V6LoadedMessageSearchHit::messageId) { hit ->
                     SyCategoryRow(
-                        icon = if (hit.fromUser) SyEntryIcons.Persona else SyEntryIcons.Chats,
+                        icon = if (hit.fromUser) SyEntryIcons.Persona else SyEntryIcons.ChatStyle,
                         title = hit.excerpt,
                         subtitle = stringResource(if (hit.fromUser) R.string.sy_v6_search_user
                             else R.string.sy_v6_search_assistant),
