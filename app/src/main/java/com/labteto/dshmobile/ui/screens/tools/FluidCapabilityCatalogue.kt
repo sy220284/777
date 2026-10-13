@@ -63,24 +63,24 @@ internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loa
             item {
                 SyGlassCard {
                     Text(stringResource(R.string.fluid_capability_count, entries.size, families.size, connections),
-                        style = DsType.std14Strong, color = DsTheme.colors.labelPrimary)
+                        style = DsType.std14Strong, color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
                     Text(stringResource(R.string.fluid_capability_hint), style = DsType.small13,
-                        color = DsTheme.colors.labelSecondary)
-                    if (loading) Text(stringResource(R.string.common_loading), color = DsTheme.colors.labelSecondary)
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+                    if (loading) Text(stringResource(R.string.common_loading), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
                     if (failed) {
-                        Text(stringResource(R.string.tools_load_failed), color = DsTheme.colors.error)
+                        Text(stringResource(R.string.tools_load_failed), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk)
                         SyButton(stringResource(R.string.common_retry), onRefresh, enabled = !loading)
                     }
                 }
             }
             if (!loading && entries.isEmpty()) item {
-                Text(stringResource(R.string.fluid_capability_none), color = DsTheme.colors.labelSecondary)
+                Text(stringResource(R.string.fluid_capability_none), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
             families.forEach { (family, tools) ->
                 val visible = tools.filter { query.isBlank() || it.name.contains(query, true) || family.contains(query, true) }
                 if (visible.isNotEmpty()) {
                     item(key = "heading:$family") {
-                        Text(family, style = DsType.caption11Strong, color = DsTheme.colors.labelTertiary)
+                        Text(family, style = DsType.caption11Strong, color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary)
                     }
                     items(visible, key = { it.name }) { entry ->
                         SySheetChoiceRow(title = entry.name,
@@ -94,15 +94,15 @@ internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loa
     selected?.let { entry ->
         val usePrompt = stringResource(R.string.plugin_use_prompt, entry.name, entry.name)
         SyResponsiveSheet(title = entry.name, onDismiss = { selected = null }, scrollable = true) {
-            Text(entry.family, style = DsType.std14Strong, color = DsTheme.colors.labelPrimary)
+            Text(entry.family, style = DsType.std14Strong, color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
             Text(stringResource(R.string.fluid_capability_hint), style = DsType.small13,
-                color = DsTheme.colors.labelSecondary)
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             if (entry.requirements.isNotEmpty()) {
                 Text(stringResource(R.string.fluid_capability_requirements), style = DsType.std14Strong)
                 entry.requirements.forEach { Text(it, style = DsType.small13) }
             }
             Text(entry.access + " · " + entry.approval, style = DsType.caption11,
-                color = DsTheme.colors.labelTertiary)
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary)
             onUseCapability?.let { use -> SyButton(stringResource(R.string.plugin_use), {
                 selected = null; use(usePrompt)
             }, modifier = Modifier.fillMaxWidth()) }

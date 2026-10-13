@@ -17,7 +17,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyProgressBar
 import com.labteto.dshmobile.ui.shenyan.SyProgressStatus
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -29,7 +28,7 @@ internal fun LocalSessionStorageCard(
     onExport: () -> Unit,
     onCleanup: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SettingsCard(
         title = stringResource(R.string.settings_local_session_storage),
     ) {
@@ -37,7 +36,7 @@ internal fun LocalSessionStorageCard(
             Text(
                 text = stringResource(R.string.common_loading),
                 style = DsType.std14.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
         } else {
             Column(
@@ -46,7 +45,7 @@ internal fun LocalSessionStorageCard(
             ) {
                 Text(formatStorageBytes(status.totalBytes),
                     style = DsType.display24.withReadingWeight().copy(fontFeatureSettings = "tnum"),
-                    color = colors.labelPrimary)
+                    color = colors.text)
                 Text(
                     text = stringResource(
                         R.string.settings_local_session_storage_usage,
@@ -54,13 +53,13 @@ internal fun LocalSessionStorageCard(
                         formatStorageBytes(status.budgetBytes),
                     ),
                     style = DsType.std14Strong.withReadingWeight(),
-                    color = if (status.warning) colors.warnLabel else colors.labelPrimary,
+                    color = if (status.warning) colors.warningInk else colors.text,
                 )
                 // Design #25: truthful occupancy of the session archive only;
                 // workspace/media/cache breakdowns require separate measured owners.
                 SyProgressBar(
                     value = sessionStorageUsageFraction(status.totalBytes, status.budgetBytes),
-                    color = if (status.warning) colors.warnLabel else colors.accent,
+                    color = if (status.warning) colors.warningInk else colors.primary,
                     status = SyProgressStatus.Running,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -71,7 +70,7 @@ internal fun LocalSessionStorageCard(
                         status.sessionCount,
                     ),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelSecondary,
+                    color = colors.textSecondary,
                 )
                 Text(
                     text = stringResource(
@@ -80,7 +79,7 @@ internal fun LocalSessionStorageCard(
                         status.compressedSegmentCount,
                     ),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelSecondary,
+                    color = colors.textSecondary,
                 )
                 Text(
                     text = stringResource(
@@ -91,7 +90,7 @@ internal fun LocalSessionStorageCard(
                         },
                     ),
                     style = DsType.caption11.withReadingWeight(),
-                    color = if (status.warning) colors.warnLabel else colors.labelTertiary,
+                    color = if (status.warning) colors.warningInk else colors.textTertiary,
                 )
             }
         }

@@ -56,7 +56,6 @@ import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
@@ -71,7 +70,7 @@ import kotlin.math.max
 
 @Composable
 internal fun DeviceUsageHero(usage: DeepSeekUsageSnapshot, showEstimatedCost: Boolean = true) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val cacheValue = if (usage.cacheMeasuredTokens > 0L) {
         String.format(Locale.US, "%.1f%%", usage.cacheHitRate * 100.0)
     } else {
@@ -88,28 +87,28 @@ internal fun DeviceUsageHero(usage: DeepSeekUsageSnapshot, showEstimatedCost: Bo
             Text(
                 stringResource(R.string.usage_device_total),
                 style = DsType.small13Strong.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
             Text(
                 formatTokens(usage.totalTokens),
                 style = DsType.display24.withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
             )
             Text(
                 "${stringResource(R.string.usage_calculation_input)} ${formatTokens(usage.inputTokens)} · " +
                     "${stringResource(R.string.usage_calculation_output)} ${formatTokens(usage.outputTokens)}" +
                     if (showEstimatedCost) " · ${stringResource(R.string.usage_deepseek_cost_label)} ¥${String.format(Locale.US, "%.4f", usage.estimatedCostCny)}" else "",
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(R.string.local_usage_cache_hit_rate),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
+                    color = colors.textTertiary,
                     modifier = Modifier.weight(1f),
                 )
-                Text(cacheValue, style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
+                Text(cacheValue, style = DsType.small13Strong.withReadingWeight(), color = colors.text)
             }
         }
     }
@@ -200,7 +199,7 @@ internal fun UsageDayChart(
     selectedEpochDay: Long,
     onSelect: (Long) -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val scrollState = rememberScrollState()
     val maxTokens = max(1L, days.maxOfOrNull { it.second.totalTokens } ?: 1L)
     LaunchedEffect(days.size, scrollState.maxValue) {
@@ -242,7 +241,7 @@ internal fun UsageDayChart(
                                 .height(4.dp)
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(5.dp))
-                                .background(colors.bgModulePlatform),
+                                .background(colors.materialL3),
                         )
                     } else {
                         Column(
@@ -256,7 +255,7 @@ internal fun UsageDayChart(
                                     Modifier
                                         .fillMaxWidth()
                                         .weight(inputFraction.coerceAtLeast(0.05f))
-                                        .background(if (selected) colors.accent else colors.accentHover),
+                                        .background(if (selected) colors.primary else colors.primaryPressed),
                                 )
                             }
                             if (aggregate.outputTokens > 0L) {
@@ -264,7 +263,7 @@ internal fun UsageDayChart(
                                     Modifier
                                         .fillMaxWidth()
                                         .weight((1f - inputFraction).coerceAtLeast(0.05f))
-                                        .background(colors.labelTertiary),
+                                        .background(colors.textTertiary),
                                 )
                             }
                         }
@@ -273,7 +272,7 @@ internal fun UsageDayChart(
                 Text(
                     LocalDate.ofEpochDay(epochDay).dayOfMonth.toString(),
                     style = DsType.caption11.withReadingWeight(),
-                    color = if (selected) colors.labelPrimary else colors.labelTertiary,
+                    color = if (selected) colors.text else colors.textTertiary,
                 )
             }
         }
@@ -282,7 +281,7 @@ internal fun UsageDayChart(
 
 @Composable
 internal fun UsageGroupRow(group: TokenUsageGroupSummary, onClick: () -> Unit) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -298,7 +297,7 @@ internal fun UsageGroupRow(group: TokenUsageGroupSummary, onClick: () -> Unit) {
             Text(
                 group.title,
                 style = DsType.std14Strong.withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -313,20 +312,20 @@ internal fun UsageGroupRow(group: TokenUsageGroupSummary, onClick: () -> Unit) {
                     stringResource(R.string.usage_turn_count, group.turnCount)
                 },
                 style = DsType.caption11.withReadingWeight(),
-                color = colors.labelTertiary,
+                color = colors.textTertiary,
                 maxLines = 1,
             )
         }
         Text(
             formatTokens(group.aggregate.totalTokens),
             style = DsType.small13Strong.withReadingWeight(),
-            color = colors.labelPrimary,
+            color = colors.text,
         )
         Spacer(Modifier.width(DsSpacing.small))
         Icon(
             imageVector = FeatherIcons.ChevronRight,
             contentDescription = null,
-            tint = colors.labelTertiary,
+            tint = colors.textTertiary,
             modifier = Modifier.size(20.dp),
         )
     }
@@ -334,7 +333,7 @@ internal fun UsageGroupRow(group: TokenUsageGroupSummary, onClick: () -> Unit) {
 
 @Composable
 internal fun UsageRequestRow(record: TokenUsageRecord, onClick: () -> Unit) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -350,24 +349,24 @@ internal fun UsageRequestRow(record: TokenUsageRecord, onClick: () -> Unit) {
             Text(
                 actionLabel(record.context.action),
                 style = DsType.small13Strong.withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
                 maxLines = 1,
             )
             Text(
                 "${formatTime(record.timestamp)} · ${record.model}" +
                     record.context.agentId?.let { " · $it" }.orEmpty(),
                 style = DsType.caption11.withReadingWeight(),
-                color = colors.labelTertiary,
+                color = colors.textTertiary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         Column(horizontalAlignment = Alignment.End) {
-            Text(formatTokens(record.totalTokens), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
+            Text(formatTokens(record.totalTokens), style = DsType.small13Strong.withReadingWeight(), color = colors.text)
             Text(
                 "↓${formatTokens(record.inputTokens)}  ↑${formatTokens(record.outputTokens)}",
                 style = DsType.caption11.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
         }
     }
@@ -375,12 +374,12 @@ internal fun UsageRequestRow(record: TokenUsageRecord, onClick: () -> Unit) {
 
 @Composable
 internal fun PromptBreakdownCard(breakdown: TokenPromptBreakdown) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SectionHeading(stringResource(R.string.usage_prompt_composition))
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.characterAccentTertiary,
+        color = colors.lilac.copy(alpha = .18f),
     ) {
         Column(
             modifier = Modifier.padding(DsSpacing.medium),
@@ -389,7 +388,7 @@ internal fun PromptBreakdownCard(breakdown: TokenPromptBreakdown) {
             Text(
                 stringResource(R.string.usage_estimated_badge),
                 style = DsType.caption11.withReadingWeight(),
-                color = colors.characterAccent,
+                color = colors.lilac,
             )
             PromptLine(stringResource(R.string.usage_prompt_system), breakdown.systemBaseTokens)
             PromptLine(stringResource(R.string.usage_prompt_persona), breakdown.personaStateTokens)
@@ -407,7 +406,7 @@ internal fun PromptBreakdownCard(breakdown: TokenPromptBreakdown) {
             Text(
                 stringResource(R.string.usage_prompt_note),
                 style = DsType.caption11.withReadingWeight(),
-                color = colors.labelTertiary,
+                color = colors.textTertiary,
             )
         }
     }
@@ -425,7 +424,7 @@ internal fun UsageAggregateHero(
     aggregate: TokenUsageAggregate,
     badge: String? = null,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     com.shenyan.designsystem.components.SyMaterialFrame(
         modifier = Modifier.fillMaxWidth(),
         horizontalPadding = 0.dp, verticalPadding = 0.dp,
@@ -438,22 +437,22 @@ internal fun UsageAggregateHero(
                 Text(
                     title,
                     style = DsType.small13Strong.withReadingWeight(),
-                    color = colors.labelSecondary,
+                    color = colors.textSecondary,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 badge?.let {
-                    Text(it, style = DsType.caption11.withReadingWeight(), color = colors.accent)
+                    Text(it, style = DsType.caption11.withReadingWeight(), color = colors.primary)
                 }
             }
-            Text(formatTokens(aggregate.totalTokens), style = DsType.display24.withReadingWeight(), color = colors.labelPrimary)
+            Text(formatTokens(aggregate.totalTokens), style = DsType.display24.withReadingWeight(), color = colors.text)
             Text(
                 "${stringResource(R.string.usage_calculation_input)} ${formatTokens(aggregate.inputTokens)} · " +
                     "${stringResource(R.string.usage_calculation_output)} ${formatTokens(aggregate.outputTokens)} · " +
                     "¥${String.format(Locale.US, "%.4f", aggregate.estimatedCostCny)}",
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
         }
     }
@@ -461,7 +460,7 @@ internal fun UsageAggregateHero(
 
 @Composable
 internal fun CompactMetric(label: String, value: String, modifier: Modifier = Modifier) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     com.shenyan.designsystem.components.SyMaterialFrame(
         modifier = modifier,
         tier = com.shenyan.designsystem.components.SyMaterialTier.L1_SECTION,
@@ -471,11 +470,11 @@ internal fun CompactMetric(label: String, value: String, modifier: Modifier = Mo
             modifier = Modifier.padding(DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
         ) {
-            Text(label, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
+            Text(label, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
             Text(
                 value,
                 style = DsType.large20.withReadingWeight().copy(fontFeatureSettings = "tnum"),
-                color = colors.labelPrimary,
+                color = colors.text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -490,7 +489,7 @@ internal fun SectionHeading(text: String) {
 
 @Composable
 internal fun EmptyUsageDetail(message: String? = null) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val resolvedMessage = message ?: stringResource(R.string.usage_empty_detail)
     SyMaterialSurface(
         modifier = Modifier.fillMaxWidth(),
@@ -501,23 +500,23 @@ internal fun EmptyUsageDetail(message: String? = null) {
             resolvedMessage,
             modifier = Modifier.padding(DsSpacing.medium),
             style = DsType.small13.withReadingWeight(),
-            color = colors.labelSecondary,
+            color = colors.textSecondary,
         )
     }
 }
 
 @Composable
 internal fun UsageValueLine(label: String, value: String, padded: Boolean = true) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (padded) Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = DsType.small13.withReadingWeight(), color = colors.labelSecondary, modifier = Modifier.weight(1f))
+        Text(label, style = DsType.small13.withReadingWeight(), color = colors.textSecondary, modifier = Modifier.weight(1f))
         if (value.isNotEmpty()) {
-            Text(value, style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
+            Text(value, style = DsType.small13Strong.withReadingWeight(), color = colors.text)
         }
     }
 }
@@ -528,7 +527,7 @@ internal fun UsageDivider() {
         Modifier
             .fillMaxWidth()
             .height(1.dp)
-            .background(DsTheme.colors.borderL1),
+            .background(com.shenyan.designsystem.foundation.LocalSyColors.current.border),
     )
 }
 

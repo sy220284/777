@@ -63,7 +63,6 @@ import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
@@ -125,7 +124,7 @@ internal fun UsageCalculationPage(
         dailyWindow(visibleAnalytics.days, mode, range.days)
     }
     val selectedDay = days.firstOrNull { it.first == selectedEpochDay } ?: days.lastOrNull()
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val allModelsLabel = stringResource(R.string.usage_model_all)
 
     Row(
@@ -135,7 +134,7 @@ internal fun UsageCalculationPage(
         Text(
             stringResource(R.string.usage_model_filter_label),
             style = DsType.std14Strong.withReadingWeight(),
-            color = colors.labelPrimary,
+            color = colors.text,
             modifier = Modifier.weight(1f),
         )
         Box {
@@ -161,7 +160,7 @@ internal fun UsageCalculationPage(
         Text(
             stringResource(R.string.usage_model_history_partial),
             style = DsType.caption11.withReadingWeight(),
-            color = colors.labelTertiary,
+            color = colors.textTertiary,
         )
     }
 
@@ -194,7 +193,7 @@ internal fun UsageCalculationPage(
     if (selectedModel == null && analytics.byModel.isNotEmpty()) {
         SyGlassCard {
             Text(stringResource(R.string.fluid_model_composition), style = DsType.std14Strong,
-                color = colors.labelPrimary)
+                color = colors.text)
             val total = analytics.byModel.values.sumOf { it.tracked.totalTokens.toDouble() }.coerceAtLeast(1.0)
             androidx.compose.foundation.lazy.LazyColumn(
                 Modifier.fillMaxWidth().heightIn(max = 260.dp),
@@ -220,12 +219,12 @@ internal fun UsageCalculationPage(
                                         entry.key,
                                         style = DsType.small13Strong.withReadingWeight(),
                                         modifier = Modifier.weight(1f),
-                                        color = colors.labelPrimary,
+                                        color = colors.text,
                                     )
                                     Text(
                                         formatTokens(entry.value.tracked.totalTokens),
                                         style = DsType.caption11.copy(fontFeatureSettings = "tnum"),
-                                        color = colors.labelSecondary,
+                                        color = colors.textSecondary,
                                     )
                                 }
                                 SyProgressBar(
@@ -252,7 +251,7 @@ internal fun UsageCalculationPage(
                 Text(
                     stringResource(R.string.usage_daily_title),
                     style = DsType.std14Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
+                    color = colors.text,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 UsageRangeSelector(
@@ -270,14 +269,14 @@ internal fun UsageCalculationPage(
                     Text(
                         formatEpochDay(day),
                         style = DsType.small13Strong.withReadingWeight(),
-                        color = colors.labelPrimary,
+                        color = colors.text,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Text(
                         "${stringResource(R.string.usage_calculation_input)} ${formatTokens(aggregate.inputTokens)} · " +
                             "${stringResource(R.string.usage_calculation_output)} ${formatTokens(aggregate.outputTokens)}",
                         style = DsType.caption11.withReadingWeight(),
-                        color = colors.labelSecondary,
+                        color = colors.textSecondary,
                     )
                 }
             }
@@ -341,7 +340,7 @@ internal fun UsageCalculationPage(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.row,
-            color = colors.accentTertiary,
+            color = colors.selected,
         ) {
             Column(
                 modifier = Modifier.padding(DsSpacing.medium),
@@ -355,13 +354,13 @@ internal fun UsageCalculationPage(
                                 .format(Date(analytics.trackedSince)),
                         ),
                         style = DsType.small13Strong.withReadingWeight(),
-                        color = colors.labelPrimary,
+                        color = colors.text,
                     )
                 }
                 Text(
                     stringResource(R.string.usage_legacy_notice),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelSecondary,
+                    color = colors.textSecondary,
                 )
             }
         }
@@ -371,7 +370,7 @@ internal fun UsageCalculationPage(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.row,
-            color = colors.warnTertiary,
+            color = colors.warning.copy(alpha = .18f),
         ) {
             Column(
                 modifier = Modifier.padding(DsSpacing.medium),
@@ -380,20 +379,20 @@ internal fun UsageCalculationPage(
                 Text(
                     stringResource(R.string.usage_calculation_partial),
                     style = DsType.small13Strong.withReadingWeight(),
-                    color = colors.warnLabel,
+                    color = colors.warningInk,
                 )
                 if (visibleUsage.unreportedRequestCount > 0L) {
                     Text(
                         stringResource(R.string.local_usage_unreported, visibleUsage.unreportedRequestCount),
                         style = DsType.caption11.withReadingWeight(),
-                        color = colors.labelSecondary,
+                        color = colors.textSecondary,
                     )
                 }
                 if (selectedModel == null && usage.unpricedTokens > 0L) {
                     Text(
                         stringResource(R.string.local_usage_unpriced, formatNumber(usage.unpricedTokens)),
                         style = DsType.caption11.withReadingWeight(),
-                        color = colors.labelSecondary,
+                        color = colors.textSecondary,
                     )
                 }
             }
@@ -403,7 +402,7 @@ internal fun UsageCalculationPage(
     Text(
         stringResource(R.string.usage_calculation_disclaimer),
         style = DsType.caption11.withReadingWeight(),
-        color = colors.labelTertiary,
+        color = colors.textTertiary,
     )
     SyButton(
         text = stringResource(R.string.usage_calculation_view_prices),
@@ -419,7 +418,7 @@ internal fun UsageLogPage(
     onOpenRequest: (String) -> Unit,
     selectedModel: String? = null,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val visibleAnalytics = selectedModel?.let { analytics.byModel[it] ?: TokenUsageAnalyticsSnapshot() } ?: analytics
     if (visibleAnalytics.recentRecords.isEmpty()) {
         EmptyUsageDetail(message = stringResource(R.string.usage_log_empty))
@@ -449,7 +448,7 @@ internal fun UsageGroupDetailPage(
         EmptyUsageDetail()
         return
     }
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     UsageAggregateHero(
         title = detail.title,
         aggregate = detail.aggregate,
@@ -509,7 +508,7 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
         EmptyUsageDetail()
         return
     }
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     UsageAggregateHero(
         title = actionLabel(record.context.action),
         aggregate = TokenUsageAggregate(
@@ -560,7 +559,7 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
                     formatNumber(record.reasoningTokens),
                 ),
                 style = DsType.caption11.withReadingWeight(),
-                color = colors.labelTertiary,
+                color = colors.textTertiary,
             )
         }
     }
@@ -573,7 +572,7 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
     Text(
         "$modelStep · ${formatTime(record.timestamp)}",
         style = DsType.caption11.withReadingWeight(),
-        color = colors.labelTertiary,
+        color = colors.textTertiary,
     )
 }
 

@@ -31,7 +31,6 @@ import com.labteto.dshmobile.ui.shenyan.SySlider
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -82,8 +81,8 @@ internal fun SidebarAvatarCropper(
                         }
                     },
                 shape = CircleShape,
-                color = DsTheme.colors.characterAccentTertiary,
-                border = BorderStroke(2.dp, DsTheme.colors.characterAccent),
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.lilac.copy(alpha = .18f),
+                border = BorderStroke(2.dp, com.shenyan.designsystem.foundation.LocalSyColors.current.lilac),
             ) {
                 SidebarAvatarImage(
                     source = previewSource,
@@ -96,14 +95,14 @@ internal fun SidebarAvatarCropper(
         Text(
             text = stringResource(R.string.sidebar_avatar_crop_gesture_hint),
             style = DsType.small13.withReadingWeight(),
-            color = DsTheme.colors.labelSecondary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             modifier = Modifier.fillMaxWidth(),
         )
 
         Text(
             text = stringResource(R.string.sidebar_avatar_crop_zoom),
             style = DsType.small13Strong.withReadingWeight(),
-            color = DsTheme.colors.labelPrimary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
         )
         SySlider(
             value = crop.zoom,
@@ -124,7 +123,7 @@ internal fun SidebarAvatarCropper(
             Text(
                 text = it,
                 style = DsType.small13.withReadingWeight(),
-                color = DsTheme.colors.error,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk,
                 modifier = Modifier.fillMaxWidth(),
             )
         }

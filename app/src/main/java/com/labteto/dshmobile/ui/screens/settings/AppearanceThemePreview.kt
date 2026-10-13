@@ -25,7 +25,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -38,7 +37,7 @@ internal fun ThemePreviewBlock(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val palette = when (themeKey) {
         "dark" -> com.labteto.dshmobile.ui.theme.DsThemeTokens.dark
         "matte_black" -> com.labteto.dshmobile.ui.theme.DsThemeTokens.matteBlack
@@ -49,7 +48,7 @@ internal fun ThemePreviewBlock(
             .clip(DsShapes.cube)
             .border(
                 width = if (selected) 1.5.dp else 1.dp,
-                color = if (selected) colors.accent else colors.borderL2,
+                color = if (selected) colors.primary else colors.border,
                 shape = DsShapes.cube,
             )
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
@@ -79,7 +78,7 @@ internal fun ThemePreviewBlock(
                 Icon(
                     FeatherIcons.Check,
                     contentDescription = null,
-                    tint = colors.accent,
+                    tint = colors.primary,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(6.dp)
@@ -90,7 +89,7 @@ internal fun ThemePreviewBlock(
         Text(
             label,
             style = DsType.small13.withReadingWeight(),
-            color = if (selected) colors.accent else colors.labelSecondary,
+            color = if (selected) colors.primary else colors.textSecondary,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
         )
     }

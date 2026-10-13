@@ -32,7 +32,6 @@ import com.shenyan.designsystem.components.SyMaterialFrame
 import com.shenyan.designsystem.components.SyMaterialTier
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -71,13 +70,13 @@ internal fun SettingsGroupTitle(text: String) {
 
 @Composable
 internal fun AppSettingsDivider() {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Box(
         Modifier
             .fillMaxWidth()
             .padding(start = DsSpacing.comfortable + 24.dp + DsSpacing.medium, end = DsSpacing.comfortable)
             .height(1.dp)
-            .background(colors.borderL1),
+            .background(colors.border),
     )
 }
 
@@ -92,7 +91,7 @@ internal fun AppSettingsRow(
     compact: Boolean = false,
     reservedEntryHeight: Dp? = null,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val stackedValue = LocalDensity.current.fontScale >= 1.2f
     Row(
         modifier = Modifier
@@ -108,18 +107,18 @@ internal fun AppSettingsRow(
             Text(
                 title,
                 style = (if (compact) DsType.settingsItem else DsType.navigationItem).withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
             )
             subtitle?.takeIf(String::isNotBlank)?.let {
                 Text(
                     it,
                     style = DsType.navigationSupporting.withReadingWeight(),
-                    color = colors.labelSecondary,
+                    color = colors.textSecondary,
                 )
             }
             if (stackedValue && !value.isNullOrBlank()) {
                 Text(value, style = DsType.navigationSupporting.withReadingWeight(),
-                    color = colors.labelSecondary)
+                    color = colors.textSecondary)
             }
         }
         value?.takeIf { it.isNotBlank() && !stackedValue }?.let {
@@ -127,7 +126,7 @@ internal fun AppSettingsRow(
                 it,
                 modifier = Modifier.widthIn(max = 108.dp),
                 style = DsType.navigationSupporting.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.End,
@@ -138,7 +137,7 @@ internal fun AppSettingsRow(
             Icon(
                 FeatherIcons.ChevronRight,
                 contentDescription = null,
-                tint = colors.labelCaption,
+                tint = colors.textTertiary,
                 modifier = Modifier.size(16.dp),
             )
         }

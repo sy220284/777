@@ -41,7 +41,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -126,7 +125,7 @@ private fun StepperRow(
     onValueChange: (Int) -> Unit,
     onCommitted: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val focusManager = LocalFocusManager.current
     val tick = rememberHapticPulse(minIntervalMillis = 90L)
     var draft by remember(value) { mutableStateOf(value.toString()) }
@@ -165,7 +164,7 @@ private fun StepperRow(
             Text(
                 label,
                 style = DsType.small13Strong.withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
                 modifier = Modifier.weight(1f),
             )
             SyButton(
@@ -198,7 +197,7 @@ private fun StepperRow(
                             .padding(horizontal = DsSpacing.xsmall),
                         singleLine = true,
                         textStyle = DsType.std14Strong.withReadingWeight().copy(
-                            color = colors.labelPrimary,
+                            color = colors.text,
                             textAlign = TextAlign.Center,
                         ),
                         keyboardOptions = KeyboardOptions(
@@ -211,7 +210,7 @@ private fun StepperRow(
                                 focusManager.clearFocus()
                             },
                         ),
-                        cursorBrush = SolidColor(colors.accent),
+                        cursorBrush = SolidColor(colors.primary),
                     )
                 }
             }
@@ -240,7 +239,7 @@ private fun StepperRow(
             Text(
                 it,
                 style = DsType.caption11.withReadingWeight(),
-                color = colors.labelTertiary,
+                color = colors.textTertiary,
                 modifier = Modifier.padding(top = DsSpacing.tiny),
             )
         }
