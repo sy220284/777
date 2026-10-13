@@ -492,3 +492,8 @@ fun DsColors.wallpaperSurface(
 
 @Composable
 fun DsColors.rootSurface(): Color = wallpaperSurface(WallpaperSurfaceLevel.PAGE)
+
+/** V6 root surfaces preserve wallpaper visibility just like the legacy page contract. */
+@Composable
+fun com.shenyan.designsystem.foundation.SyColors.rootSurface(): Color =
+    LocalAppBackgroundState.current.wallpaperSurface(canvas, WallpaperSurfaceLevel.PAGE)

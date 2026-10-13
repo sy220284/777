@@ -45,6 +45,7 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.shenyan.designsystem.foundation.LocalSyColors
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -153,7 +154,7 @@ internal fun LocalRunCenterScreen(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = colors.canvas,
+        color = colors.rootSurface(),
     ) {
         Column(
             modifier = Modifier
