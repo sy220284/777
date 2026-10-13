@@ -1,11 +1,24 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
+import com.labteto.dshmobile.local.send.LocalSendResult
+import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.shenyan.designsystem.components.SyQuickActionTile
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
@@ -96,4 +109,85 @@ class LocalFeatureEntryDescriptionsRegressionTest {
         compose.onNodeWithText(context.getString(R.string.local_team_title)).performClick()
         compose.runOnIdle { assertEquals(1, clicks) }
     }
+    @Test
+    fun selectedTeamComposerHasNoRepeatedTextAndCanBeCleared() {
+        var clearCount = 0
+        compose.setContent {
+            DshTheme {
+                LocalConversationComposer(
+                    state = LocalConversationSurfaceState(
+                        loading = false,
+                        configured = true,
+                        sessionId = "selected-team-compact",
+                        usageMode = LocalUsageMode.WORK,
+                    ),
+                    activeModelProfile = null,
+                    input = "",
+                    attachments = emptyList(),
+                    onInputChange = {},
+                    onRemoveAttachment = {},
+                    onClearAttachments = {},
+                    onOpenAttachmentPicker = {},
+                    onShowReplySuggestions = {},
+                    onGenerateReplySuggestions = { false },
+                    onSend = { _, _ -> LocalSendResult.Empty },
+                    teamDispatchSelected = true,
+                    onClearTeamDispatch = { clearCount++ },
+                    onStop = {},
+                    onPlanModeChange = {},
+                )
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.local_team_title)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.local_team_selected_hint)).assertDoesNotExist()
+        compose.onNodeWithContentDescription(
+            context.getString(R.string.local_team_mode_clear),
+        ).performClick()
+        compose.runOnIdle { assertEquals(1, clearCount) }
+    }
+
+    @Test
+    fun quickActionIconsAndLabelsRemainVisibleOnNarrowPhone() {
+        var lastAction = ""
+        compose.setContent {
+            DshTheme {
+                Column(Modifier.width(320.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SyQuickActionTile(
+                            icon = FeatherIcons.Camera,
+                            label = "拍照",
+                            modifier = Modifier.weight(1f),
+                            onClick = { lastAction = "camera" },
+                        )
+                        SyQuickActionTile(
+                            icon = FeatherIcons.Image,
+                            label = "图片",
+                            modifier = Modifier.weight(1f),
+                            onClick = { lastAction = "image" },
+                        )
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SyQuickActionTile(
+                            icon = FeatherIcons.Folder,
+                            label = "文件",
+                            modifier = Modifier.weight(1f),
+                            onClick = { lastAction = "file" },
+                        )
+                        SyQuickActionTile(
+                            icon = FeatherIcons.Sparkles,
+                            label = "多模态创作",
+                            modifier = Modifier.weight(1f),
+                            onClick = { lastAction = "media" },
+                        )
+                    }
+                }
+            }
+        }
+        listOf("拍照", "图片", "文件", "多模态创作").forEach {
+            compose.onNodeWithText(it).assertIsDisplayed()
+        }
+        compose.onNodeWithText("多模态创作").performClick()
+        compose.runOnIdle { assertEquals("media", lastAction) }
+    }
+
 }
