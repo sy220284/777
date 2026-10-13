@@ -363,7 +363,7 @@ class LocalToolRouterTest {
         val properties = buildJsonObject {
             put("nested", nested)
             repeat(300) { index ->
-                put("p$" + "{index}", buildJsonObject { put("type", "string") })
+                put("p" + index, buildJsonObject { put("type", "string") })
             }
         }
         val complex = tool("complex_remote", "真实复杂扩展", ToolExposure.OPTIONAL, "MCP").copy(
