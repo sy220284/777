@@ -7,10 +7,12 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+
+/** The persisted full-list replacement contract is shared with the replay projection. */
+internal const val MAX_WORK_PLAN_ITEMS = 20
+internal const val MAX_WORK_TODO_ITEMS = 50
+internal const val MAX_WORK_TODO_CHARS = 500
 
 /** Plan, todo and goal mutations for one captured session; never resolves the visible session. */
 internal class LocalWorkProgressCoordinator(
@@ -22,10 +24,28 @@ internal class LocalWorkProgressCoordinator(
     fun updatePlan(
         args: JsonObject,
     ): String {
-        val items = args["items"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }
-            ?: args.optionalString("plan")?.lines()?.filter { it.isNotBlank() }
-            ?: emptyList()
-        val normalized = items.take(20)
+        // A replacement must be intentional. Missing or malformed payloads cannot erase a
+        // durable Work plan; explicit items=[] or plan="" still clears it.
+        val items = when {
+            args.containsKey("items") -> {
+                val array = args["items"] as? JsonArray ?: error("update_plan.items 必须是字符串数组；未修改原计划")
+                array.mapIndexed { index, element ->
+                    val item = element as? JsonPrimitive
+                    require(item?.isString == true) { "计划第 ${index + 1} 项必须是字符串；未修改原计划" }
+                    item.content
+                }
+            }
+            args.containsKey("plan") -> {
+                val legacy = args.optionalString("plan")
+                    ?: error("update_plan.plan 必须是字符串；未修改原计划")
+                legacy.lines().filter(String::isNotBlank)
+            }
+            else -> error("update_plan 缺少 items 或 plan；清空计划请显式传入 items=[]")
+        }
+        require(items.size <= MAX_WORK_PLAN_ITEMS) {
+            "计划包含 ${items.size} 项，超过当前 ${MAX_WORK_PLAN_ITEMS} 项的持久化上限；未修改原计划，请合并步骤后重试"
+        }
+        val normalized = items
         eventLog.append("plan/state", buildJsonObject {
             put("items", JsonArray(normalized.map { item -> JsonPrimitive(item) }))
         })
@@ -37,13 +57,29 @@ internal class LocalWorkProgressCoordinator(
     fun updateTodos(
         args: JsonObject,
     ): String {
+        // todo_write replaces the *whole* list. Silently dropping one pending task can
+        // make the authoritative goal-completion projection report false success.
+        val raw = args["items"] as? JsonArray
+            ?: error("todo_write 缺少有效 items 数组；清空任务请显式传入 items=[]")
+        require(raw.size <= MAX_WORK_TODO_ITEMS) {
+            "任务清单包含 ${raw.size} 项，超过当前 ${MAX_WORK_TODO_ITEMS} 项的持久化上限；未修改原任务，请合并条目后重试"
+        }
         val allowed = setOf("pending", "in_progress", "completed")
-        val items = args["items"]?.jsonArray.orEmpty().mapNotNull { element ->
-            val item = element.jsonObject
-            val content = item["content"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
-            val status = item["status"]?.jsonPrimitive?.contentOrNull.orEmpty()
-            if (content.isEmpty() || status !in allowed) null else LocalTodoItem(content.take(500), status)
-        }.take(50)
+        val items = raw.mapIndexed { index, element ->
+            val item = element as? JsonObject
+                ?: error("任务清单第 ${index + 1} 项不是对象；未修改原任务")
+            val contentValue = item["content"] as? JsonPrimitive
+            val statusValue = item["status"] as? JsonPrimitive
+            require(contentValue?.isString == true && statusValue?.isString == true) {
+                "任务清单第 ${index + 1} 项缺少有效 content/status 字符串；未修改原任务"
+            }
+            val content = contentValue.content.trim()
+            val status = statusValue.content
+            require(content.isNotEmpty() && content.length <= MAX_WORK_TODO_CHARS && status in allowed) {
+                "任务清单第 ${index + 1} 项无效（任务内容须为 1–${MAX_WORK_TODO_CHARS} 字符；状态须为 pending/in_progress/completed）；未修改原任务"
+            }
+            LocalTodoItem(content, status)
+        }
         eventLog.append("todo/state", buildJsonObject {
             put("items", JsonArray(items.map { item ->
                 buildJsonObject {
