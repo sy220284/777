@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.tools
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
@@ -47,9 +49,9 @@ internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loa
             actionIcon = FeatherIcons.RefreshCw, onAction = onRefresh, actionEnabled = !loading,
             actionContentDescription = stringResource(R.string.tools_refresh))
         SySearchField(query, { query = it }, placeholder = stringResource(R.string.tools_catalog_search),
-            modifier = Modifier.padding(horizontal = DsSpacing.medium))
-        Row(Modifier.fillMaxWidth().padding(DsSpacing.medium),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            modifier = Modifier.padding(horizontal = SyMetric.gapLg))
+        Row(Modifier.fillMaxWidth().padding(SyMetric.gapLg),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             SyButton(stringResource(R.string.tools_catalog_title), onPlugins,
                 variant = SyButtonVariant.Ghost, modifier = Modifier.weight(1f))
             SyButton(stringResource(R.string.skills_title), onSkills,
@@ -58,8 +60,8 @@ internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loa
                 variant = SyButtonVariant.Ghost, modifier = Modifier.weight(1f))
         }
         LazyColumn(Modifier.weight(1f),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(SyMetric.gapLg),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
             item {
                 SyGlassCard {
                     Text(stringResource(R.string.fluid_capability_count, entries.size, families.size, connections),

@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.sidebar
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import android.content.Context
 import android.graphics.ImageDecoder
@@ -58,7 +60,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.rememberSidebarAvatarStore
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.io.File
@@ -220,7 +221,7 @@ private fun SidebarAvatarSheet(
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             SyButton(
                 text = stringResource(R.string.sidebar_avatar_custom),
@@ -243,20 +244,20 @@ private fun SidebarAvatarSheet(
                 text = it,
                 style = DsType.small13.withReadingWeight(),
                 color = colors.dangerInk,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.tiny),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapXs),
             )
         }
         Text(
             text = stringResource(R.string.sidebar_avatar_presets),
             style = DsType.small13Strong.withReadingWeight(),
             color = colors.textSecondary,
-            modifier = Modifier.padding(top = DsSpacing.xsmall),
+            modifier = Modifier.padding(top = SyMetric.gapSm),
         )
         LazyVerticalGrid(
             columns = GridCells.Adaptive(68.dp),
             modifier = Modifier.fillMaxWidth().heightIn(max = 430.dp),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             items(presets, key = PersonaPreset::id) { preset ->
                 val assetPath = checkNotNull(preset.artwork).assetPath
@@ -272,9 +273,9 @@ private fun SidebarAvatarSheet(
                     ),
                 ) {
                     Column(
-                        modifier = Modifier.padding(DsSpacing.xsmall),
+                        modifier = Modifier.padding(SyMetric.gapSm),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
                     ) {
                         Surface(
                             modifier = Modifier.size(52.dp),

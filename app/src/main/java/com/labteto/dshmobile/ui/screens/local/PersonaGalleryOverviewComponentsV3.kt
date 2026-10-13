@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -62,7 +64,6 @@ import com.shenyan.designsystem.components.SyIconButton
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -128,7 +129,7 @@ internal fun PersonaGalleryDetailHeaderV3(
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
     ) {
         SyMaterialSurface(
             shape = RoundedCornerShape(24.dp),
@@ -178,7 +179,7 @@ internal fun PersonaGalleryDetailHeaderV3(
                         ) {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                                verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                             ) {
                                 Icon(
                                     FeatherIcons.User,
@@ -198,7 +199,7 @@ internal fun PersonaGalleryDetailHeaderV3(
                 }
             }
         }
-        Spacer(Modifier.size(DsSpacing.xsmall))
+        Spacer(Modifier.size(SyMetric.gapSm))
         Text(
             entry.persona.name,
             style = DsType.title22.withReadingWeight().copy(fontFamily = DsType.contentFont),
@@ -243,11 +244,11 @@ internal fun PersonaGalleryAddPanel(
     BackHandler(onBack = onBack)
 
     Column(
-        modifier = modifier.fillMaxSize().padding(horizontal = DsSpacing.medium),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        modifier = modifier.fillMaxSize().padding(horizontal = SyMetric.gapLg),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = DsSpacing.touchTarget),
+            modifier = Modifier.fillMaxWidth().heightIn(min = SyMetric.touch),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SyIconButton(
@@ -270,7 +271,7 @@ internal fun PersonaGalleryAddPanel(
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             SyButton(
                 text = stringResource(R.string.local_persona_picker_new),
@@ -290,7 +291,7 @@ internal fun PersonaGalleryAddPanel(
             PersonaGallerySectionLabel(stringResource(R.string.persona_gallery_presets_title))
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
                 items(presets, key = PersonaPreset::id) { preset ->
                     val installed = preset.id in installedPresetIds
@@ -300,9 +301,9 @@ internal fun PersonaGalleryAddPanel(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+                            modifier = Modifier.padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                         ) {
                             LocalPersonaHeaderAvatar(
                                 name = preset.persona.name,
@@ -357,7 +358,7 @@ internal fun PersonaGallerySectionLabel(title: String) {
         title,
         style = DsType.caption11.withReadingWeight(),
         color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
-        modifier = Modifier.padding(start = DsSpacing.small, top = DsSpacing.xsmall),
+        modifier = Modifier.padding(start = SyMetric.gapMd, top = SyMetric.gapSm),
     )
 }
 
@@ -373,9 +374,9 @@ internal fun PersonaGalleryEmptyState(
 ) {
     Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.large),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             Icon(
                 FeatherIcons.User,
@@ -444,9 +445,9 @@ internal fun CompactPersonaRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 64.dp)
-                .padding(horizontal = DsSpacing.small),
+                .padding(horizontal = SyMetric.gapMd),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             if (managing) {
                 SyCheckboxControl(
@@ -507,7 +508,7 @@ internal fun CompactPersonaRow(
                 )
                 Box(
                     modifier = Modifier
-                        .size(DsSpacing.touchTarget)
+                        .size(SyMetric.touch)
                         .pointerInput(entry.id, dragEnabled) {
                             if (!dragEnabled) return@pointerInput
                             detectDragGestures(

@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -55,7 +57,6 @@ import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
@@ -81,8 +82,8 @@ internal fun DeviceUsageHero(usage: DeepSeekUsageSnapshot, showEstimatedCost: Bo
         horizontalPadding = 0.dp, verticalPadding = 0.dp,
     ) {
         Column(
-            modifier = Modifier.padding(DsSpacing.large),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            modifier = Modifier.padding(SyMetric.gapSection),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             Text(
                 stringResource(R.string.usage_device_total),
@@ -125,7 +126,7 @@ internal fun UsageEfficiency(mode: LocalUsageMode, analytics: TokenUsageModeAnal
     )
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         if (mode == LocalUsageMode.CHAT) {
             CompactMetric(
@@ -153,7 +154,7 @@ internal fun UsageEfficiency(mode: LocalUsageMode, analytics: TokenUsageModeAnal
     }
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         CompactMetric(
             if (mode == LocalUsageMode.CHAT) {
@@ -210,7 +211,7 @@ internal fun UsageDayChart(
             .fillMaxWidth()
             .height(136.dp)
             .horizontalScroll(scrollState),
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         verticalAlignment = Alignment.Bottom,
     ) {
         days.forEach { (epochDay, aggregate) ->
@@ -224,10 +225,10 @@ internal fun UsageDayChart(
             }
             Column(
                 modifier = Modifier
-                    .width(DsSpacing.touchTarget)
+                    .width(SyMetric.touch)
                     .clickable { onSelect(epochDay) },
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
             ) {
                 Box(
                     modifier = Modifier
@@ -285,14 +286,14 @@ internal fun UsageGroupRow(group: TokenUsageGroupSummary, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = DsSpacing.touchTarget)
+            .heightIn(min = SyMetric.touch)
             .clickable(onClick = onClick)
-            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.medium),
+            .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapLg),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
         ) {
             Text(
                 group.title,
@@ -321,7 +322,7 @@ internal fun UsageGroupRow(group: TokenUsageGroupSummary, onClick: () -> Unit) {
             style = DsType.small13Strong.withReadingWeight(),
             color = colors.text,
         )
-        Spacer(Modifier.width(DsSpacing.small))
+        Spacer(Modifier.width(SyMetric.gapMd))
         Icon(
             imageVector = FeatherIcons.ChevronRight,
             contentDescription = null,
@@ -337,14 +338,14 @@ internal fun UsageRequestRow(record: TokenUsageRecord, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = DsSpacing.touchTarget)
+            .heightIn(min = SyMetric.touch)
             .clickable(onClick = onClick)
-            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
         ) {
             Text(
                 actionLabel(record.context.action),
@@ -382,8 +383,8 @@ internal fun PromptBreakdownCard(breakdown: TokenPromptBreakdown) {
         color = colors.lilac.copy(alpha = .18f),
     ) {
         Column(
-            modifier = Modifier.padding(DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            modifier = Modifier.padding(SyMetric.gapLg),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             Text(
                 stringResource(R.string.usage_estimated_badge),
@@ -430,8 +431,8 @@ internal fun UsageAggregateHero(
         horizontalPadding = 0.dp, verticalPadding = 0.dp,
     ) {
         Column(
-            modifier = Modifier.padding(DsSpacing.large),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            modifier = Modifier.padding(SyMetric.gapSection),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -467,8 +468,8 @@ internal fun CompactMetric(label: String, value: String, modifier: Modifier = Mo
         shape = DsShapes.row, horizontalPadding = 0.dp, verticalPadding = 0.dp,
     ) {
         Column(
-            modifier = Modifier.padding(DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            modifier = Modifier.padding(SyMetric.gapLg),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
         ) {
             Text(label, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
             Text(
@@ -498,7 +499,7 @@ internal fun EmptyUsageDetail(message: String? = null) {
     ) {
         Text(
             resolvedMessage,
-            modifier = Modifier.padding(DsSpacing.medium),
+            modifier = Modifier.padding(SyMetric.gapLg),
             style = DsType.small13.withReadingWeight(),
             color = colors.textSecondary,
         )
@@ -511,7 +512,7 @@ internal fun UsageValueLine(label: String, value: String, padded: Boolean = true
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (padded) Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small) else Modifier),
+            .then(if (padded) Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, style = DsType.small13.withReadingWeight(), color = colors.textSecondary, modifier = Modifier.weight(1f))

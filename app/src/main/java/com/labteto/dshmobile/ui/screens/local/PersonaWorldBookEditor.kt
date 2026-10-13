@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -29,7 +31,6 @@ import com.labteto.dshmobile.ui.shenyan.SySlider
 import com.shenyan.designsystem.components.SySwitchControl
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.util.UUID
@@ -65,8 +66,8 @@ internal fun PersonaWorldBookEditor(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                modifier = Modifier.fillMaxWidth().padding(SyMetric.gapLg),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 if (entries.isEmpty()) {
                     Text(
@@ -83,7 +84,7 @@ internal fun PersonaWorldBookEditor(
                     ) {
                         Column(
                             modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
                         ) {
                             Text(
                                 entry.title.ifBlank { stringResource(R.string.local_persona_lore_entry_number, index + 1) },
@@ -129,8 +130,8 @@ internal fun PersonaWorldBookEditor(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(DsSpacing.medium),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    modifier = Modifier.fillMaxWidth().padding(SyMetric.gapLg),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 ) {
                     fun change(next: PersonaLoreEntry) {
                         onChange(entries.toMutableList().also { it[index] = next })
@@ -227,7 +228,7 @@ internal fun PersonaWorldBookEditor(
         if (maxWidth >= 600.dp) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                 verticalAlignment = Alignment.Top,
             ) {
                 Column(Modifier.weight(1f)) { entryList() }
@@ -236,7 +237,7 @@ internal fun PersonaWorldBookEditor(
         } else {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
             ) {
                 entryList()
                 entryEditor()
