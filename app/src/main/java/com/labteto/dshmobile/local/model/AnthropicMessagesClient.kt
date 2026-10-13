@@ -309,7 +309,7 @@ internal class AnthropicMessagesClient @Inject constructor(
         var sawMessageStop = false
         var sawMessageStart = false
         val closedBlocks = mutableSetOf<Int>()
-        
+
         val reader = ModelStreamLineReader(body.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_STREAM_BYTES)
         run {
             while (true) {
