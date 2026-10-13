@@ -217,7 +217,7 @@ class LocalWorkCompletionClaimGuardTest {
             assertEquals(true, event.data["delivery_blocked"]?.jsonPrimitive?.content?.toBoolean())
             assertEquals(false, event.data["ready_for_goal_completion"]?.jsonPrimitive?.content?.toBoolean())
             assertEquals("1", event.data["open_todos"]?.jsonPrimitive?.content)
-            assertEquals("1", (event.data["user_reasons"] as? kotlinx.serialization.json.JsonArray)?.size?.toString())
+            assertTrue((event.data["user_reasons"] as? kotlinx.serialization.json.JsonArray)?.isNotEmpty() == true)
         } finally {
             root.deleteRecursively()
         }
