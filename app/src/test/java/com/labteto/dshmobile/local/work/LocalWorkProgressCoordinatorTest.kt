@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.After
@@ -68,6 +69,17 @@ class LocalWorkProgressCoordinatorTest {
         val invalidWrites = listOf<() -> Unit>(
             { coordinator.updatePlan(buildJsonObject {}) },
             { coordinator.updatePlan(buildJsonObject { put("items", JsonPrimitive("not-array")) }) },
+            { coordinator.updatePlan(buildJsonObject { put("plan", 42) }) },
+            { coordinator.updatePlan(buildJsonObject { put("plan", false) }) },
+            { coordinator.updatePlan(buildJsonObject { put("plan", JsonNull) }) },
+            { coordinator.updatePlan(buildJsonObject { put("plan", buildJsonObject {}) }) },
+            { coordinator.updatePlan(buildJsonObject { put("plan", JsonArray(emptyList())) }) },
+            { coordinator.updatePlan(buildJsonObject {
+                put("items", JsonArray(listOf(JsonPrimitive("合法步骤"), JsonPrimitive(" \n\t"))))
+            }) },
+            { coordinator.updatePlan(buildJsonObject {
+                put("items", JsonArray(listOf(JsonPrimitive("合法步骤"), JsonPrimitive(42))))
+            }) },
             { coordinator.updatePlan(buildJsonObject {
                 put("items", JsonArray(List(MAX_WORK_PLAN_ITEMS + 1) { JsonPrimitive("步骤 $it") }))
             }) },
@@ -108,6 +120,26 @@ class LocalWorkProgressCoordinatorTest {
         assertTrue(state.value.work.todos.isEmpty())
         assertEquals(listOf("plan/state", "todo/state", "plan/state", "todo/state"), log.snapshot().map { it.type })
         assertEquals(4, writes)
+    }
+
+    @Test
+    fun bothPlanInputsPreserveContentAndOnlyExplicitEmptyInputClears() {
+        val state = MutableStateFlow(LocalWorkRunState(sessionId = "plan-inputs"))
+        val log = eventLog(File(temporary.root, "plan-inputs.jsonl"))
+        val coordinator = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) {}
+        val steps = listOf("  验证第一步  ", "x".repeat(2000))
+        coordinator.updatePlan(buildJsonObject {
+            put("items", JsonArray(steps.map(::JsonPrimitive)))
+        })
+        assertEquals(steps, state.value.work.plan)
+        assertEquals(steps, projectWorkSessionControls(LocalWorkState(), log.snapshot()).plan)
+        coordinator.updatePlan(buildJsonObject { put("items", JsonArray(emptyList())) })
+        assertTrue(state.value.work.plan.isEmpty())
+        coordinator.updatePlan(buildJsonObject { put("plan", "重新验证\n\n保留下一步") })
+        assertEquals(listOf("重新验证", "保留下一步"), state.value.work.plan)
+        coordinator.updatePlan(buildJsonObject { put("plan", "") })
+        assertTrue(state.value.work.plan.isEmpty())
+        assertTrue(projectWorkSessionControls(LocalWorkState(), log.snapshot()).plan.isEmpty())
     }
 
     @Test

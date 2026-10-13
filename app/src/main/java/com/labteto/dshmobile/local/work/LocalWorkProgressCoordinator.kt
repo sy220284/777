@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
-import com.labteto.dshmobile.local.tools.optionalString
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -32,11 +31,14 @@ internal class LocalWorkProgressCoordinator(
                 array.mapIndexed { index, element ->
                     val item = (element as? JsonPrimitive)?.takeIf { it.isString }
                         ?: error("计划第 ${index + 1} 项必须是字符串；未修改原计划")
+                    require(item.content.isNotBlank()) {
+                        "计划第 ${index + 1} 项不能为空白；未修改原计划"
+                    }
                     item.content
                 }
             }
             args.containsKey("plan") -> {
-                val legacy = args.optionalString("plan")
+                val legacy = (args["plan"] as? JsonPrimitive)?.takeIf { it.isString }?.content
                     ?: error("update_plan.plan 必须是字符串；未修改原计划")
                 legacy.lines().filter(String::isNotBlank)
             }
