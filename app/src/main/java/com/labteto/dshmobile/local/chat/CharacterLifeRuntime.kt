@@ -40,7 +40,10 @@ internal fun advanceCharacterLife(
 }
 
 internal fun renderCharacterLifePrompt(life: CharacterLifeState): String {
-    val events = life.activeEvents.filter { it.active && it.source != "persona" }.takeLast(3)
+    // Agenda, concerns and unfinished threads already come from the same current-state
+    // source. Rendering them again as "life events" artificially doubles their importance.
+    val mirroredSources = setOf("persona", "agenda", "concern", "unfinished")
+    val events = life.activeEvents.filter { it.active && it.source !in mirroredSources }.takeLast(3)
     if (events.isEmpty()) return ""
     return buildString {
         appendLine("【已有生活事件】")

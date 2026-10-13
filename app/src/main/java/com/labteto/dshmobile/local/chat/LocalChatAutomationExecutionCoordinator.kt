@@ -371,6 +371,7 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                     trigger = trigger,
                     persona = persona,
                     state = sessionCharacterState,
+                    context = sessionContext,
                 )
                 val localHistory = buildList {
                     add(buildJsonObject {
@@ -386,14 +387,14 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                             })
                         }
                 }
-                val dynamicContext = listOf(
-                    chatContext.dynamicPrompt,
-                    relationshipMemory,
-                    proactiveBackground,
-                    proactiveDirective,
+                val dynamicParts = chatContext.dynamicParts + listOf(
+                    ChatContextPart(ChatContextLayer.RECALL, relationshipMemory),
+                    ChatContextPart(ChatContextLayer.HISTORICAL, proactiveBackground),
+                    ChatContextPart(ChatContextLayer.INSTRUCTION, proactiveDirective),
                 )
-                    .filter(String::isNotBlank)
-                    .joinToString("\n\n")
+                val dynamicContext = ChatUnifiedTurnContext.compose(
+                    conversationFocus, sessionContext, dynamicParts,
+                )
                 val requestMessages = withChatTurnContext(
                     history = localHistory,
                     stableContext = chatTurnCoordinator.projectStablePrompt(boundState, chatContext.stablePrompt),

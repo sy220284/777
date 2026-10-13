@@ -51,7 +51,9 @@ internal fun RequestBody.withModelAdmissionTracking(
         override fun contentType() = delegate.contentType()
         override fun contentLength() = delegate.contentLength()
         override fun isDuplex() = delegate.isDuplex()
-        override fun isOneShot() = delegate.isOneShot()
+        // Provider inference POST must not be transparently replayed by OkHttp after
+        // a connection reset / HTTP 408 / HTTP 503. The caller owns safe pre-send retries.
+        override fun isOneShot() = true
 
         override fun writeTo(sink: BufferedSink) {
             delegate.writeTo(sink)
@@ -157,4 +159,31 @@ internal fun modelFailureKind(error: LocalModelException): String = when {
     error.code.contains("NETWORK") -> "network_failure"
     error.code.startsWith("MODEL_HTTP_5") -> "provider_failure"
     else -> "model_failure"
+}
+
+/** Diagnostic transport cause, independent of admission/replay eligibility. */
+internal fun modelTransportFailureKind(error: LocalModelException): String? {
+    val seen = mutableSetOf<Throwable>()
+    var cause: Throwable? = error.cause
+    while (cause != null && seen.add(cause)) {
+        when (cause) {
+            is SocketTimeoutException -> return "timeout"
+            is UnknownHostException -> return "dns_failure"
+            is ConnectException -> return "connect_failed"
+            is SSLException -> return "tls_failure"
+            is EOFException -> return "unexpected_eof"
+            is SocketException -> return if (cause.message?.contains("broken pipe", true) == true) {
+                "broken_pipe"
+            } else {
+                "connection_reset"
+            }
+        }
+        cause = cause.cause
+    }
+    return when {
+        error.code.contains("TIMEOUT") -> "timeout"
+        error.code.contains("NETWORK") -> "network_failure"
+        error.code.contains("STREAM_INTERRUPTED") -> "stream_incomplete"
+        else -> null
+    }
 }

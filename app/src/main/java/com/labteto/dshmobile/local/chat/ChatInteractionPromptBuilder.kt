@@ -48,12 +48,22 @@ internal class ChatInteractionPromptBuilder {
             appendLine("已定事项：${state.continuity.decisions.joinToString("；")}")
         }
         if (state.continuity.unfinished.isNotEmpty()) {
-            appendLine("待续事项：${state.continuity.unfinished.joinToString("；")}")
+            appendLine("待续事件（编号只用于准确结清，不向用户展示）：")
+            state.continuity.unfinished.forEach { fact ->
+                val source = state.continuity.evidence.firstOrNull {
+                    it.kind == ChatContinuityFactKind.OPEN_THREAD && it.text == fact
+                }
+                val id = source?.eventId?.takeIf(String::isNotBlank)
+                    ?: chatContinuityEventId(
+                        ChatContinuityFactKind.OPEN_THREAD, fact, source?.sourceSequence ?: 0L,
+                    )
+                appendLine("- $id：$fact")
+            }
         }
 
         appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
         appendLine("人物：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
-        appendLine("输出：{\"state\":{仅写变化字段},\"stateEvidence\":{\"变化字段名\":\"支持变化的本轮原文\"},\"suggestions\":[],\"turnSignificance\":\"NONE|MINOR|MAJOR\",\"diaryDelta\":null}")
+        appendLine("输出：{\"state\":{仅写变化字段},\"stateEvidence\":{\"变化字段名\":\"支持变化的本轮原文\"},\"resolvedContinuityIds\":[],\"suggestions\":[],\"turnSignificance\":\"NONE|MINOR|MAJOR\",\"diaryDelta\":null}")
         appendLine(
             "state字段：physicalState, mood, relationshipState, currentFocus, activeGoal, " +
                 "currentAgenda, internalConflict, immediateConcern, unresolvedThreads, currentUserImpression；" +
@@ -77,8 +87,12 @@ internal class ChatInteractionPromptBuilder {
         appendLine("- 情绪、身体状态、当前安排与未完事项由本轮实际事件更新；省略字段保留原值，已结束的状态显式清空。scene 和 interaction* 由系统维护，不输出。")
         appendLine("- 重新核对上一状态是否仍然成立；已经说开、完成、撤销或纠正的事项更新为当前版本。状态值为空字符串表示结束，mood为空或自然表示已无特定情绪；dynamics.unresolvedConflict为空表示矛盾已解。不要仅因聊了几轮清除状态，也不要把已解事项永久保留。")
         appendLine("- stateEvidence引用实际对话，嵌套字段用dynamics.unresolvedConflict等完整字段名；不编造引文。人物的主观理解与用户事实分开，未知情绪不补写。")
+        appendLine("- dynamics.unknowns 若输出，必须是本轮处理后仍未解答问题的完整列表；已由对话确认的问题移除，全部解答则输出 []。省略字段代表本轮没有检查此项。")
+        appendLine("- 用户说不再讨论某话题，不等于该事件从历史中删除；应停止把它当成本轮目标，后续明确重新提起时仍可回忆。")
+        appendLine("- resolvedContinuityIds 仅填写本批用户真实对话已确认/完成且本轮不再保留的待续事件编号；同一句确认了几件事要逐项关联，不能猜编号或仅凭角色自己说了算。")
         appendLine("- continuity 只保留当前有效的关键事件、决定和待续事项，合并重复，不复制旧台词。")
-        appendLine("- NONE=无有效变化；MINOR=短期或连续性变化；MAJOR=重大关系事件、共同经历或稳定事实。")
+        appendLine("- NONE=无需记录显著长期事件，但仍必须更新本轮有证据的短期状态、结清与纠正；MINOR=有短期或连续性事件；MAJOR=重大关系事件、共同经历或稳定事实。")
+        appendLine("- NONE 下新增非空状态时须在 stateEvidence 提供本轮双方真实原话。显式空字段清理不受重要程度阻止；不能编造新状态。")
         appendLine("- suggestions 固定为空；不得替用户作重大决定。现实关系建议禁止跟踪、胁迫、欺骗操控或绕过明确拒绝。")
     }.trim()
 

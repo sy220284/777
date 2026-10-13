@@ -51,4 +51,7 @@ internal class LocalChatComposition @Inject constructor(
     )
 
     internal fun cancelPostTurn() = contextRefresh.cancelScheduledRefresh()
+
+    internal fun resumePostTurn(sessionId: String, eventLog: com.labteto.dshmobile.local.session.LocalSessionEventLog): Boolean =
+        contextRefresh.resumePendingIfAny(sessionId, eventLog)
 }

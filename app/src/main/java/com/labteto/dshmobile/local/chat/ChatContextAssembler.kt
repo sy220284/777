@@ -11,30 +11,48 @@ internal object ChatMemorySelector {
     /** Search the ongoing public conversation, including when the user only says "嗯". */
     fun continuityQuery(query: String, context: ChatContextState): String {
         val text = query.trim()
-        if (RESET_HINTS.any(text::contains)) return text
+        if (isExplicitTopicShift(text)) return text
+        // After an explicit topic pause, "嗯/继续" does not reactivate older pending raw
+        // turns that happen to be adjacent in the archive.
+        if (context.attention.pausedSubject.isNotBlank() &&
+            ChatTurnContextPolicy.isWeakReply(text)) {
+            return listOf(text, context.attention.lastUserSubject)
+                .filter(String::isNotBlank).joinToString(" ")
+        }
         val ongoing = context.pendingForRequest(limit = 4).sortedBy(ChatPendingTurn::sequence)
             .takeLast(2).flatMap { listOf(it.userMessage, it.assistantMessage) }
             .filter { it.trim() !in LOW_INFORMATION_REPLIES && it.isNotBlank() }
-        val unresolved = context.continuity.unfinished.takeLast(2)
         val referents = if (text in LOW_INFORMATION_REPLIES ||
             IMPLICIT_CONTINUITY_HINTS.any(text::contains)) {
-            ongoing.ifEmpty { context.continuity.recentEvents.takeLast(1) +
-                context.continuity.decisions.takeLast(1) } + unresolved
+            // The discourse referent comes from lived conversation, not every old to-do.
+            ongoing.ifEmpty { listOf(context.attention.lastUserSubject).filter(String::isNotBlank) }
+                .ifEmpty {
+                    context.continuity.recentEvents.takeLast(1) +
+                        context.continuity.decisions.takeLast(1)
+                }
         } else emptyList()
         return (listOf(text) + referents).filter(String::isNotBlank).distinct()
             .joinToString(" ").takeLast(1_200)
     }
 
     fun recallQuery(query: String, context: ChatContextState): String? {
-        if (RESET_HINTS.any(query.trim()::contains)) return null
+        if (isExplicitTopicShift(query)) return null
         val candidate = continuityQuery(query, context)
         return candidate.takeIf { it.length >= 2 && it.trim() !in LOW_INFORMATION_REPLIES }
     }
 
+    /** One policy is used for chat generation, recall and scheduled proactive messages. */
+    fun isExplicitTopicShift(query: String): Boolean =
+        ChatTurnContextPolicy.isTopicRedirect(query)
+
+    fun isRelevantToTurn(query: String, fact: String): Boolean =
+        ChatTurnContextPolicy.relevant(query, fact)
+
+
     fun shouldRecall(query: String): Boolean {
         val text = query.trim().lowercase()
         if (text.isBlank()) return false
-        if (RESET_HINTS.any { text.contains(it) }) return false
+        if (isExplicitTopicShift(text)) return false
         if (RECALL_HINTS.any { text.contains(it) }) return true
         if (text in LOW_INFORMATION_REPLIES) return false
         if (SHORT_RELATIONSHIP_RECALL_HINTS.any { text.contains(it) }) return true
@@ -57,6 +75,7 @@ internal object ChatMemorySelector {
             context.pendingForRequest(limit = 8).sortedBy(ChatPendingTurn::sequence)
                 .lastOrNull { it.userMessage.isNotBlank() && it.userMessage.trim() != query.trim() }
                 ?.userMessage
+                ?: context.attention.lastUserSubject.takeIf(String::isNotBlank)
                 ?: context.continuity.unfinished.lastOrNull()
                 ?: context.continuity.decisions.lastOrNull()
                 ?: context.continuity.recentEvents.lastOrNull()

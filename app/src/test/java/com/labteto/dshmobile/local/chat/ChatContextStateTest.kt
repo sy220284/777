@@ -620,4 +620,181 @@ class ChatContextStateTest {
         assertTrue(cleaned.continuity.unfinished.isEmpty())
     }
 
+    @Test
+    fun acknowledgedAgreementClosesOnlyTheQuestionThePlannerRetired() {
+        val question = "对方是否接受保密与提前告知条件尚未明确"
+        val previous = ChatContinuityState(unfinished = listOf("还要收拾桌子", question))
+        val candidate = ChatContinuityState(unfinished = listOf("还要收拾桌子"))
+        val eventId = chatContinuityEventId(ChatContinuityFactKind.OPEN_THREAD, question)
+        val confirmed = groundContinuityEvidence(
+            previous = previous,
+            candidate = candidate,
+            pendingTurns = listOf(ChatPendingTurn(
+                sequence = 88L,
+                userMessage = "好，我答应你了",
+                assistantMessage = "谢谢你答应我，我们说定了",
+            )),
+            resolvedContinuityIds = listOf(eventId),
+        )
+        assertEquals(listOf("还要收拾桌子"), confirmed.unfinished)
+
+        val unrelated = groundContinuityEvidence(
+            previous = previous,
+            candidate = candidate,
+            pendingTurns = listOf(ChatPendingTurn(
+                sequence = 89L,
+                userMessage = "好，喝杯茶",
+                assistantMessage = "好呀，喝茶",
+            )),
+        )
+        assertEquals(previous.unfinished.toSet(), unrelated.unfinished.toSet())
+
+        val notRetiredByPlanner = groundContinuityEvidence(
+            previous = previous,
+            candidate = previous,
+            pendingTurns = listOf(ChatPendingTurn(
+                sequence = 90L,
+                userMessage = "好，我答应你了",
+                assistantMessage = "谢谢你答应我",
+            )),
+        )
+        assertEquals(previous.unfinished, notRetiredByPlanner.unfinished)
+    }
+
+    @Test
+    fun archivedFalseArrivalPlaceIsHealedWithoutInventingALocation() {
+        val invalid = ChatSceneEvent(
+            sequence = 2L,
+            kind = ChatSceneEventKind.LOCATION,
+            actor = "角色",
+            from = "房间",
+            to = "才讲",
+            evidence = "到了才讲",
+        )
+        val previous = ChatContextState(
+            scene = ChatSceneState(location = "才讲"),
+            sceneEvents = listOf(invalid),
+        )
+        val noPrior = previous.normalized()
+        assertEquals("", noPrior.scene.location)
+        assertTrue(noPrior.sceneEvents.isEmpty())
+
+        val valid = ChatSceneEvent(
+            sequence = 1L,
+            kind = ChatSceneEventKind.LOCATION,
+            actor = "角色",
+            from = "",
+            to = "房间",
+            evidence = "走进房间",
+        )
+        val repaired = previous.copy(sceneEvents = listOf(valid, invalid)).normalized()
+        assertEquals("房间", repaired.scene.location)
+        assertEquals(listOf(valid), repaired.sceneEvents)
+    }
+
+
+    @Test
+    fun twoPendingAgreementsRequireExactEventIdentityNotBroadAcceptance() {
+        val first = "对方是否同意保密尚未明确"
+        val second = "对方是否同意公开照片尚未明确"
+        val previous = ChatContinuityState(unfinished = listOf(first, second))
+        val agreed = listOf(ChatPendingTurn(
+            sequence = 129L,
+            userMessage = "保密这件事我答应你。",
+            assistantMessage = "谢谢你答应保密的约定。",
+        ))
+        val withoutResolutionId = groundContinuityEvidence(
+            previous = previous,
+            candidate = ChatContinuityState(unfinished = listOf(second)),
+            pendingTurns = agreed,
+        )
+        assertEquals(previous.unfinished.toSet(), withoutResolutionId.unfinished.toSet())
+        val targeted = groundContinuityEvidence(
+            previous = previous,
+            candidate = ChatContinuityState(unfinished = listOf(second)),
+            pendingTurns = agreed,
+            resolvedContinuityIds = listOf(chatContinuityEventId(
+                ChatContinuityFactKind.OPEN_THREAD, first,
+            )),
+        )
+        assertEquals(listOf(second), targeted.unfinished)
+
+        val wrongId = groundContinuityEvidence(
+            previous = previous,
+            candidate = ChatContinuityState(unfinished = listOf(first)),
+            pendingTurns = agreed,
+            resolvedContinuityIds = listOf("open_thread:999:nonexistent"),
+        )
+        assertEquals(previous.unfinished.toSet(), wrongId.unfinished.toSet())
+    }
+
+    @Test
+    fun evidenceIdentityPersistsAcrossStateNormalization() {
+        val fact = "还有一次约定待确认"
+        val source = ChatContinuityEvidence(
+            kind = ChatContinuityFactKind.OPEN_THREAD,
+            text = fact,
+            sourceSequence = 199L,
+            sourceUserMessageId = "u199",
+        )
+        val context = ChatContextState(continuity = ChatContinuityState(
+            unfinished = listOf(fact), evidence = listOf(source),
+        )).normalized()
+        assertEquals(
+            chatContinuityEventId(ChatContinuityFactKind.OPEN_THREAD, fact, 199L),
+            context.continuity.evidence.single().eventId,
+        )
+        assertEquals(context, context.normalized())
+    }
+
+    @Test
+    fun relatedWordingDoesNotMergeDistinctOpenEvents() {
+        val confidentiality = "对方是否同意保密尚未明确"
+        val photo = "对方是否同意公开照片尚未明确"
+        assertFalse(ChatContinuityEventIdentity.sameSubject(confidentiality, photo))
+        assertTrue(ChatContinuityEventIdentity.sameSubject("还要确认车票", "车票还没确认"))
+        val previous = ChatContinuityState(unfinished = listOf(confidentiality, photo))
+        val turn = ChatPendingTurn(
+            sequence = 120L,
+            userMessage = "保密这件事我答应你",
+            assistantMessage = "我们约定保密",
+        )
+        val accepted = groundContinuityEvidence(
+            previous,
+            ChatContinuityState(unfinished = listOf(photo)),
+            listOf(turn),
+            resolvedContinuityIds = listOf(chatContinuityEventId(
+                ChatContinuityFactKind.OPEN_THREAD, confidentiality,
+            )),
+        )
+        assertEquals(listOf(photo), accepted.unfinished)
+        val wrongSelection = groundContinuityEvidence(
+            previous,
+            ChatContinuityState(unfinished = listOf(confidentiality)),
+            listOf(turn),
+            resolvedContinuityIds = listOf(chatContinuityEventId(
+                ChatContinuityFactKind.OPEN_THREAD, photo,
+            )),
+        )
+        assertTrue(photo in wrongSelection.unfinished)
+    }
+
+    @Test
+    fun genericAcceptanceCannotChooseBetweenTwoPendingQuestions() {
+        val first = "对方是否同意保密尚未明确"
+        val second = "对方是否同意公开照片尚未明确"
+        val previous = ChatContinuityState(unfinished = listOf(first, second))
+        val vague = ChatPendingTurn(
+            sequence = 121L,
+            userMessage = "好，我答应你",
+            assistantMessage = "谢谢你答应我",
+        )
+        val result = groundContinuityEvidence(
+            previous, ChatContinuityState(unfinished = listOf(second)),
+            listOf(vague),
+            resolvedContinuityIds = listOf(chatContinuityEventId(ChatContinuityFactKind.OPEN_THREAD, first)),
+        )
+        assertEquals(previous.unfinished.toSet(), result.unfinished.toSet())
+    }
+
 }

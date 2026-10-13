@@ -42,6 +42,8 @@ data class ChatContinuityEvidence(
     val sourceUserMessageId: String = "",
     val sourceAssistantMessageId: String = "",
     val evidence: String = "",
+    /** Stable within the story; used to resolve the correct event rather than text-matching. */
+    val eventId: String = "",
 )
 
 @Serializable
@@ -148,6 +150,8 @@ data class ChatPostTurnPlan(
     val diaryDelta: ChatDiaryDelta? = null,
     /** Optional literal transcript quotations supporting changed fields, including resolutions. */
     val stateEvidence: Map<String, String> = emptyMap(),
+    /** Optional references to specific previous continuity events the latest user turn settled. */
+    val resolvedContinuityIds: List<String> = emptyList(),
 )
 @Serializable
 data class ChatReplySuggestionPlan(

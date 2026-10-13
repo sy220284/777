@@ -16,28 +16,28 @@ internal class ChatInteractionStateReducer {
         val significance = normalizeSignificance(decoded.turnSignificance)
 
         val agedPrevious = previous.canonicalizeLegacyCharacterState()
-        val baseState = if (significance == "NONE") {
-            applyExplicitTransientClears(
-                value = decoded.state,
-                previous = agedPrevious,
-                rawState = rawState,
-            )
-        } else {
-            sanitizeState(
-                value = decoded.state,
-                previous = agedPrevious,
-                userMessage = userMessage,
-                assistantMessage = assistantMessage,
-                rawState = rawState,
-                stageQuote = decoded.stateEvidence["dynamics.stage"].orEmpty(),
-                descriptionQuote = decoded.stateEvidence["relationshipState"].orEmpty(),
-                significance = significance,
-            )
-        }
+        val effectivePatch = ChatStatePatchAuthority.effectivePatch(
+            raw = rawState,
+            state = decoded.state,
+            significance = significance,
+            quotations = decoded.stateEvidence,
+            userMessage = userMessage,
+            assistantMessage = assistantMessage,
+        )
+        val baseState = sanitizeState(
+            value = decoded.state,
+            previous = agedPrevious,
+            userMessage = userMessage,
+            assistantMessage = assistantMessage,
+            rawState = effectivePatch,
+            stageQuote = decoded.stateEvidence["dynamics.stage"].orEmpty(),
+            descriptionQuote = decoded.stateEvidence["relationshipState"].orEmpty(),
+            significance = significance,
+        )
         val continuityState = mergeSceneAndContinuity(
             value = decoded.state,
             previous = baseState,
-            rawState = rawState,
+            rawState = effectivePatch,
             userMessage = userMessage,
             assistantMessage = assistantMessage,
         )
@@ -57,59 +57,6 @@ internal class ChatInteractionStateReducer {
                 assistantMessage = assistantMessage,
             ), quotations = decoded.stateEvidence, userMessage = userMessage, assistantMessage = assistantMessage),
             turnSignificance = significance,
-        )
-    }
-
-    private fun applyExplicitTransientClears(
-        value: ChatCharacterState,
-        previous: ChatCharacterState,
-        rawState: JsonObject?,
-    ): ChatCharacterState {
-        if (rawState == null) return previous
-
-        val ages = mutableMapOf<String, Int>()
-        var changed = false
-
-        fun shouldClear(key: String, value: String): Boolean =
-            rawState.containsKey(key) && value.isBlank()
-
-        val clearMood = rawState.containsKey("mood") && (value.mood.isBlank() || value.mood == "自然")
-        val clearPhysicalState = shouldClear("physicalState", value.physicalState)
-        val clearCurrentFocus = shouldClear("currentFocus", value.currentFocus)
-        val clearActiveGoal = shouldClear("activeGoal", value.activeGoal)
-        val clearCurrentAgenda = shouldClear("currentAgenda", value.currentAgenda)
-        val clearInternalConflict = shouldClear("internalConflict", value.internalConflict)
-        val clearImmediateConcern = shouldClear("immediateConcern", value.immediateConcern)
-        val clearThreads = rawState.containsKey("unresolvedThreads") && value.unresolvedThreads.isEmpty()
-
-        listOf(
-            "physicalState" to clearPhysicalState,
-            "currentFocus" to clearCurrentFocus,
-            "activeGoal" to clearActiveGoal,
-            "currentAgenda" to clearCurrentAgenda,
-            "internalConflict" to clearInternalConflict,
-            "immediateConcern" to clearImmediateConcern,
-        ).forEach { (key, clear) ->
-            if (clear) {
-                ages.remove(key)
-                changed = true
-            }
-        }
-        if (clearThreads || clearMood) changed = true
-        if (!changed) return previous
-
-        return previous.copy(
-            mood = if (clearMood) "自然" else previous.mood,
-            physicalState = if (clearPhysicalState) "" else previous.physicalState,
-            currentFocus = if (clearCurrentFocus) "" else previous.currentFocus,
-            activeGoal = if (clearActiveGoal) "" else previous.activeGoal,
-            currentAgenda = if (clearCurrentAgenda) "" else previous.currentAgenda,
-            internalConflict = if (clearInternalConflict) "" else previous.internalConflict,
-            immediateConcern = if (clearImmediateConcern) "" else previous.immediateConcern,
-            unresolvedThreads = if (clearThreads) emptyList() else previous.unresolvedThreads,
-            transientAges = ages,
-            unresolvedThreadAges = if (clearThreads) emptyMap() else previous.unresolvedThreadAges,
-            updatedAt = System.currentTimeMillis(),
         )
     }
 
@@ -238,13 +185,15 @@ internal class ChatInteractionStateReducer {
                 ) -> value.relationshipState.trim().take(120)
             else -> previous.relationshipState
         }
-        val merged = value.copy(
+        // Patch the existing authoritative snapshot. Copying the model's partially decoded
+        // default state loses fields it never owned (lifeState, observations, impressions).
+        val merged = previous.copy(
             behaviorTuning = previous.behaviorTuning.normalized(),
             physicalState = if (rawState?.containsKey("physicalState") == true) {
                 value.physicalState.trim().take(120)
             } else previous.physicalState,
             mood = if (rawState?.containsKey("mood") == true) {
-                value.mood.trim().take(80).ifBlank { "自然" }
+                value.mood.trim().take(240).ifBlank { "自然" }
             } else previous.mood,
             relationshipState = relationshipDescription,
             currentFocus = if (rawState?.containsKey("currentFocus") == true) {
@@ -262,6 +211,9 @@ internal class ChatInteractionStateReducer {
             immediateConcern = if (rawState?.containsKey("immediateConcern") == true) {
                 value.immediateConcern.trim().take(240)
             } else previous.immediateConcern,
+            currentUserImpression = if (rawState?.containsKey("currentUserImpression") == true) {
+                value.currentUserImpression.trim().take(240)
+            } else previous.currentUserImpression,
             unresolvedThreads = if (rawState?.containsKey("unresolvedThreads") == true) {
                 value.unresolvedThreads.asSequence()
                     .map(String::trim)
@@ -462,8 +414,10 @@ internal class ChatInteractionStateReducer {
                 incoming = value.hypotheses.filter { evidenceGrounded(it, userMessage, assistantMessage) },
                 minimumConfidence = 10, maximumConfidence = 85, allowedSources = FACT_SOURCES, limit = 6,
             ) else previous.hypotheses,
+            // Unknowns are the full currently-open set, not append-only history. [] closes
+            // answered questions; omission preserves the previous state for partial patches.
             unknowns = if (raw.containsKey("unknowns")) {
-                mergeStrings(previous.unknowns, value.unknowns, 6, 160)
+                mergeStrings(emptyList(), value.unknowns, 6, 160)
             } else previous.unknowns,
             sharedMoments = if (raw.containsKey("sharedMoments")) {
                 mergeStrings(previous.sharedMoments, value.sharedMoments.filter { moment ->

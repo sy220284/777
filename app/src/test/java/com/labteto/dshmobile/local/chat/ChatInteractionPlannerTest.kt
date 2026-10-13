@@ -1381,7 +1381,8 @@ class ChatInteractionPlannerTest {
         assertTrue(prompt.contains("suggestions 固定为空"))
         assertTrue(prompt.contains("interaction* 由系统维护"))
         assertTrue(prompt.contains("scene 和 interaction* 由系统维护"))
-        assertTrue(prompt.contains("NONE=无有效变化"))
+        assertTrue(prompt.contains("NONE=无需记录显著长期事件"))
+        assertTrue(prompt.contains("NONE 下新增非空状态时须在 stateEvidence"))
         assertTrue(prompt.contains("合并重复"))
     }
 
@@ -1650,4 +1651,103 @@ class ChatInteractionPlannerTest {
         val previous = ChatCharacterState(mood = "开心")
         assertEquals(null, planner.parse("随便说点别的", previous))
     }
+    @Test
+    fun resolvedUnknownsAreReplacedWithoutErasingOmittedState() {
+        val previous = ChatCharacterState(
+            dynamics = RelationshipDynamics(unknowns = listOf("是否同意保密约定", "下次见面地点")),
+        )
+        val reduced = planner.parse(
+            """{"state":{"dynamics":{"unknowns":["下次见面地点"]}},"turnSignificance":"MINOR"}""",
+            previous, userMessage = "好，我答应你，保密。", assistantMessage = "谢谢你答应。",
+        )!!.state
+        assertEquals(listOf("下次见面地点"), reduced.dynamics.unknowns)
+
+        val noPatch = planner.parse(
+            """{"state":{},"turnSignificance":"NONE"}""",
+            reduced, userMessage = "嗯", assistantMessage = "好",
+        )!!.state
+        assertEquals(listOf("下次见面地点"), noPatch.dynamics.unknowns)
+
+        val closed = planner.parse(
+            """{"state":{"dynamics":{"unknowns":[]}},"turnSignificance":"MINOR"}""",
+            reduced, userMessage = "地点也确定了", assistantMessage = "好，说定了",
+        )!!.state
+        assertTrue(closed.dynamics.unknowns.isEmpty())
+    }
+
+    @Test
+    fun noneSignificanceStillReconcilesExplicitlyAnsweredUnknownsAndClearedConflict() {
+        val previous = ChatCharacterState(
+            dynamics = RelationshipDynamics(
+                unknowns = listOf("是否接受保密条件", "明天去哪"),
+                unresolvedConflict = "是否愿意遵守约定",
+            ),
+        )
+        val state = planner.parse(
+            """{"state":{"dynamics":{"unknowns":["明天去哪"],"unresolvedConflict":""}},"turnSignificance":"NONE"}""",
+            previous,
+            userMessage = "我答应你遵守保密约定。",
+            assistantMessage = "谢谢，我知道你已经同意。",
+        )!!.state
+        assertEquals(listOf("明天去哪"), state.dynamics.unknowns)
+        assertEquals("", state.dynamics.unresolvedConflict)
+    }
+
+    @Test
+    fun noneSignificanceReconcilesEvidenceBackedNewStateWithoutAllowingSpeculation() {
+        val previous = ChatCharacterState(mood = "自然", currentAgenda = "")
+        val confirmed = planner.parse(
+            """{"state":{"mood":"高兴","currentAgenda":"准备收拾书桌"},"stateEvidence":{"mood":"我现在很高兴","currentAgenda":"我正准备收拾书桌"},"turnSignificance":"NONE"}""",
+            previous = previous,
+            userMessage = "我正准备收拾书桌",
+            assistantMessage = "我现在很高兴",
+        )!!.state
+        assertEquals("高兴", confirmed.mood)
+        assertEquals("准备收拾书桌", confirmed.currentAgenda)
+
+        val speculative = planner.parse(
+            """{"state":{"mood":"愤怒","currentAgenda":"计划离家出走"},"turnSignificance":"NONE"}""",
+            previous = previous,
+            userMessage = "天气不错",
+            assistantMessage = "是啊",
+        )!!.state
+        assertEquals("自然", speculative.mood)
+        assertEquals("", speculative.currentAgenda)
+    }
+
+    @Test
+    fun sparsePostTurnPatchNeverReplacesUnownedCharacterStateWithDefaults() {
+        val previous = ChatCharacterState(
+            mood = "心情平和",
+            currentUserImpression = "对方做事有自己的节奏",
+            stateObservations = listOf(ChatStateObservation(
+                field = "currentUserImpression",
+                value = "对方做事有自己的节奏",
+                sourceSequence = 12L,
+            )),
+            lifeState = CharacterLifeState(
+                activeEvents = listOf(CharacterLifeEvent(
+                    summary = "正在照顾窗边的绿植", source = "observation",
+                )),
+            ),
+        )
+        val unchanged = planner.parse(
+            """{"state":{},"turnSignificance":"NONE"}""",
+            previous = previous,
+            userMessage = "嗯", assistantMessage = "好",
+        )!!.state
+        assertEquals(previous.currentUserImpression, unchanged.currentUserImpression)
+        assertTrue(unchanged.stateObservations.isNotEmpty())
+        assertTrue(unchanged.lifeState.activeEvents.isNotEmpty())
+
+        val moodUpdated = planner.parse(
+            """{"state":{"mood":"高兴"},"turnSignificance":"MINOR"}""",
+            previous = previous,
+            userMessage = "我看见你笑了", assistantMessage = "我很高兴",
+        )!!.state
+        assertEquals("高兴", moodUpdated.mood)
+        assertEquals(previous.currentUserImpression, moodUpdated.currentUserImpression)
+        assertTrue(moodUpdated.lifeState.activeEvents.isNotEmpty())
+    }
+
 }

@@ -289,4 +289,16 @@ class CharacterLifeRuntimeV3Test {
         assertEquals("", renderCharacterLifePrompt(life))
         assertEquals(null, characterLifeProactiveReason(persona, ChatCharacterState(), now = 1000L))
     }
+    @Test
+    fun lifeProjectionDoesNotInjectCurrentAgendaForASecondTime() {
+        val persona = PersonaProfile(name = "阿青")
+        val state = ChatCharacterState(
+            currentAgenda = "继续展示明制披衫",
+            unresolvedThreads = listOf("整理宋制襦裙"),
+        )
+        val life = advanceCharacterLife(persona, state)
+        assertEquals(2, life.activeEvents.size)
+        assertEquals("", renderCharacterLifePrompt(life))
+    }
+
 }

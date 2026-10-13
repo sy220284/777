@@ -9,6 +9,7 @@ data class ChatTurnContext(
     val persona: PersonaProfile,
     val stablePrompt: String,
     val dynamicPrompt: String,
+    val dynamicParts: List<ChatContextPart> = emptyList(),
 ) {
     val prompt: String
         get() = listOf(stablePrompt, dynamicPrompt)
@@ -45,19 +46,23 @@ class ChatTurnRunner @Inject constructor(
         storyContext: String? = null,
     ): ChatTurnContext {
         if (persona.isUnboundChatPersona()) {
-            val continuationPrompt = storyContext?.takeIf(String::isNotBlank)?.let {
+            val continuationPrompt = ChatTurnContextPolicy.storyLines(
+                storyContext, userInput, context.attention,
+            ).takeIf(String::isNotBlank)?.let {
                 """
                 【对话连续性摘要｜已发生】
                 ${it.take(MAX_STORY_CONTEXT_CHARS)}
                 """.trimIndent()
             }.orEmpty()
+            val parts = listOf(
+                ChatContextPart(ChatContextLayer.LIVE, renderChatContextForModel(context, focusQuery = userInput)),
+                ChatContextPart(ChatContextLayer.HISTORICAL, continuationPrompt),
+            )
             return ChatTurnContext(
                 persona = persona,
                 stablePrompt = UNBOUND_CHAT_PROMPT,
-                dynamicPrompt = listOf(
-                    renderChatContextForModel(context),
-                    continuationPrompt,
-                ).filter(String::isNotBlank).joinToString("\n\n"),
+                dynamicPrompt = ChatUnifiedTurnContext.compose(userInput, context, parts),
+                dynamicParts = parts,
             )
         }
 
@@ -72,6 +77,7 @@ class ChatTurnRunner @Inject constructor(
             persona = persona,
             stablePrompt = runtime.stablePrompt,
             dynamicPrompt = runtime.dynamicPrompt,
+            dynamicParts = runtime.dynamicParts,
         )
     }
 

@@ -237,4 +237,42 @@ class ChatSceneRuntimeTest {
         assertEquals(original, result)
     }
 
+    @Test
+    fun arrivingBeforeSpeakingIsNotAPlaceAndRealNextMovementStillWorks() {
+        val previous = ChatSceneState(location = "房间")
+        val noMove = ChatSceneRuntime.extractTurnEvents(
+            previous, "不能你到了才讲，我会不安的。", "", 40L,
+        )
+        assertTrue(noMove.none { it.kind == ChatSceneEventKind.LOCATION })
+        assertEquals("房间", ChatSceneRuntime.reduce(previous, noMove).location)
+
+        val moved = ChatSceneRuntime.extractTurnEvents(
+            previous, "你到了才讲，然后我们走进茶室。", "", 41L,
+        )
+        assertEquals("茶室", ChatSceneRuntime.reduce(previous, moved).location)
+    }
+
+    @Test
+    fun sceneTracksLatestCompletedMovementInsteadOfRegexDeclarationOrder() {
+        val previous = ChatSceneState(location = "院子")
+        val events = ChatSceneRuntime.extractTurnEvents(
+            previous = previous, userMessage = "",
+            assistantMessage = "她回到客厅后，走进卧室。",
+            sequence = 71L,
+        )
+        assertEquals("卧室", ChatSceneRuntime.reduce(previous, events).location)
+    }
+
+    @Test
+    fun conditionalAndFutureTravelDoNotOverwriteActualScene() {
+        val previous = ChatSceneState(location = "院子")
+        val events = ChatSceneRuntime.extractTurnEvents(
+            previous = previous, userMessage = "",
+            assistantMessage = "她计划明天走进房间。如果你来到花园，我们再慢慢谈。",
+            sequence = 72L,
+        )
+        assertEquals("院子", ChatSceneRuntime.reduce(previous, events).location)
+        assertTrue(events.none { it.kind == ChatSceneEventKind.LOCATION })
+    }
+
 }

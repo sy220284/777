@@ -154,7 +154,9 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                         sourceSessionIds = (conversation.experienceSessionIds + snapshot.sessionId).toSet(),
                     )
                 },
-            ).distinctBy { it.id }
+            ).filter { memory ->
+                ChatUnifiedTurnContext.allowsHistoricalRecord(query, conversation, memory.content)
+            }.distinctBy { it.id }
             if (recalled.isNotEmpty()) {
                 blocks += takeWithinModelTokenBudget(
                     buildString {
@@ -192,7 +194,11 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                 maxItems = diaryRecallItemLimit(recallQuery),
                 experienceId = conversation.experienceId.ifBlank { snapshot.sessionId },
                 sourceSessionIds = (conversation.experienceSessionIds + snapshot.sessionId).toSet(),
-            )
+            ).filter { entry ->
+                ChatUnifiedTurnContext.allowsHistoricalRecord(
+                    query, conversation, renderRecalledChatDiary(entry, groupAudience),
+                )
+            }
             if (diary.isNotEmpty()) {
                 blocks += takeWithinModelTokenBudget(
                     buildString {
