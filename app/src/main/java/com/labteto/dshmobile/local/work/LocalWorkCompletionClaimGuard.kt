@@ -77,7 +77,8 @@ internal fun guardWorkCompletionDelivery(
     )
     val result = LocalWorkCompletionClaimGuard.inspectWithEvidence(original, evidence)
     if (!result.changed) return reply
-    appendWorkOutputQuality(eventLog, result, evidence, state.work.goal?.status, deliveryBlocked = true)
+    appendWorkOutputQuality(eventLog, result, evidence, state.work.goal?.status,
+        teamFailureDetail = state.work.team.failure, deliveryBlocked = true)
     // User-visible correction is a presentation projection. Preserve the provider's original
     // message and canonical content for diagnostic replay and truthful model history.
     return reply.copy(content = result.text)
@@ -100,7 +101,8 @@ internal fun recordWorkCompletionQuality(
     )
     val result = LocalWorkCompletionClaimGuard.inspectWithEvidence(text, evidence)
     if (result.findings.isEmpty()) return
-    appendWorkOutputQuality(eventLog, result, evidence, state.work.goal?.status, deliveryBlocked = result.changed)
+    appendWorkOutputQuality(eventLog, result, evidence, state.work.goal?.status,
+        teamFailureDetail = state.work.team.failure, deliveryBlocked = result.changed)
 }
 
 /** Exactly one log projection for final display correction and turn-completed diagnostics. */
@@ -109,6 +111,7 @@ private fun appendWorkOutputQuality(
     result: LocalOutputQualityResult,
     evidence: LocalWorkCompletionEvidence,
     goalStatus: String?,
+    teamFailureDetail: String?,
     deliveryBlocked: Boolean,
 ) {
     eventLog.append("work/output-quality", buildJsonObject {
@@ -117,5 +120,7 @@ private fun appendWorkOutputQuality(
         put("delivery_blocked", deliveryBlocked)
         evidence.toDiagnosticJson().forEach { (key, value) -> put(key, value) }
         goalStatus?.let { put("goal_status", it) }
+        // Preserve the historical event's human-readable failure detail.
+        teamFailureDetail?.let { put("team_failure", it) }
     })
 }
