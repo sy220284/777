@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.host
 import com.labteto.dshmobile.local.feature.LocalFeatureCatalog
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.uicontract.UiSceneId
+import com.labteto.dshmobile.uicontract.UiSceneKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertFalse
@@ -30,8 +31,11 @@ class LocalUiSceneCatalogTest {
             val scene = requirements.single { it.id == UiSceneId("route.${route.name.lowercase()}") }
             assertEquals(LocalFeatureCatalog.ownerOf(route).name, scene.owner)
         }
-        SettingsDestination.entries.forEach { destination ->
-            assertTrue(UiSceneId("settings.${destination.name.lowercase()}") in ids)
-        }
+        val settingPages = requirements.filter {
+            it.kind == UiSceneKind.PAGE && it.id.value.startsWith("settings.")
+        }.map { it.id }.toSet()
+        assertEquals(SettingsDestination.entries.map {
+            UiSceneId("settings.${it.name.lowercase()}")
+        }.toSet(), settingPages)
     }
 }

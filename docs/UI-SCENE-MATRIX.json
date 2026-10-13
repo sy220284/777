@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "baseline": "131fcead",
+  "baseline": "7c7a5c88",
   "scope": "S0 源码场景审计；不是独立 UI Pack 覆盖或设备验收证明",
   "scenes": [
     {
@@ -284,6 +284,21 @@
         "deny"
       ],
       "recovery": "Existing pending callId + interaction waiter",
+      "v6": null,
+      "implementation": "V6 现行入口；独立 Pack 待迁移",
+      "acceptance": "待设备验收"
+    },
+    {
+      "id": "work.steering_choice",
+      "owner": "WORK",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkSteeringChoice.kt",
+      "actions": [
+        "select_steering",
+        "dismiss_steering"
+      ],
+      "recovery": "Composer draft + explicit steering choice; queue/execution remain original Work owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
       "acceptance": "待设备验收"
@@ -1035,13 +1050,13 @@
       "id": "settings.update",
       "owner": "SETTINGS",
       "route": "SETTINGS",
-      "kind": "PAGE",
+      "kind": "SLOT",
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
       "actions": [
-        "open",
-        "edit_owner_configuration"
+        "check_update",
+        "observe_download_install_status"
       ],
-      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "recovery": "Settings ROOT; existing update owner retains download/install status; standalone page retired in #697",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
       "acceptance": "待设备验收"
