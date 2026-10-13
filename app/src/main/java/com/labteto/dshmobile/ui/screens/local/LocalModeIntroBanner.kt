@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -12,9 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -23,12 +24,12 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 internal fun LocalModeIntroBanner(intro: LocalModeIntro?) {
     if (intro == null) return
     val mode = intro.usageMode
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SyMaterialSurface(
         tier = SyMaterialTier.L3_CARD,
-        shape = DsShapes.block,
+        shape = RoundedCornerShape(SyMetric.radiusCard),
         modifier = Modifier.fillMaxWidth()
-            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
+            .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs),
     ) {
         Text(
             stringResource(
@@ -36,8 +37,8 @@ internal fun LocalModeIntroBanner(intro: LocalModeIntro?) {
                 else R.string.local_mode_intro_work,
             ),
             style = DsType.small13.withReadingWeight(),
-            color = colors.labelSecondary,
-            modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            color = colors.textSecondary,
+            modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
         )
     }
 }

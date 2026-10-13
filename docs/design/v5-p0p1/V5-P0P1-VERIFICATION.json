@@ -1,9 +1,0 @@
-{
-  "status": "static_pass_browser_blocked",
-  "staticChecks": "passed",
-  "browser": "blocked by container policy",
-  "screenshots": 0,
-  "pageError": "Page.goto: net::ERR_BLOCKED_BY_ADMINISTRATOR at http://127.0.0.1:35383/v5-p0p1-components.html",
-  "figma": "rate-limited; no canvas write",
-  "android": "not-run"
-}

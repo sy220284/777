@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,8 +21,6 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.MiniMaxProviderUsage
 import com.labteto.dshmobile.ui.shenyan.SyButton
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CancellationException
@@ -33,7 +33,7 @@ internal fun MiniMaxQuotaPage(
     onConfigureModel: () -> Unit,
     queryQuota: suspend (LocalModelProfile) -> MiniMaxProviderUsage,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var refresh by remember(profile) { mutableIntStateOf(0) }
     var loading by remember(profile) { mutableStateOf(true) }
     var usage by remember(profile) { mutableStateOf<MiniMaxProviderUsage?>(null) }
@@ -59,12 +59,12 @@ internal fun MiniMaxQuotaPage(
     if (loadingProfile || profile == null) {
         AppSettingsSection {
             Column(
-                modifier = Modifier.padding(DsSpacing.comfortable),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                modifier = Modifier.padding(SyMetric.gapSection),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
             ) {
                 Text(
                     stringResource(if (loadingProfile) R.string.minimax_quota_loading_profile else R.string.minimax_quota_no_profile),
-                    style = DsType.std14Strong.withReadingWeight(), color = colors.labelSecondary,
+                    style = DsType.std14Strong.withReadingWeight(), color = colors.textSecondary,
                 )
                 if (!loadingProfile) {
                     SyButton(
@@ -80,13 +80,13 @@ internal fun MiniMaxQuotaPage(
 
     AppSettingsSection {
         Column(
-            modifier = Modifier.padding(DsSpacing.comfortable),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            modifier = Modifier.padding(SyMetric.gapSection),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
         ) {
             Text(stringResource(R.string.minimax_quota_model, profile.model),
-                style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
+                style = DsType.std14Strong.withReadingWeight(), color = colors.text)
             Text(stringResource(R.string.minimax_quota_disclaimer),
-                style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+                style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
             SyButton(
                 text = stringResource(if (loading) R.string.minimax_quota_loading else R.string.minimax_quota_refresh),
                 onClick = { if (!loading) refresh++ },
@@ -95,11 +95,11 @@ internal fun MiniMaxQuotaPage(
             )
             if (loading) {
                 Text(stringResource(R.string.minimax_quota_querying),
-                    style = DsType.std14Strong.withReadingWeight(), color = colors.labelSecondary)
+                    style = DsType.std14Strong.withReadingWeight(), color = colors.textSecondary)
             }
             if (error != null) {
                 Text(stringResource(R.string.minimax_quota_error, error.orEmpty()),
-                    style = DsType.std14Strong.withReadingWeight(), color = colors.error)
+                    style = DsType.std14Strong.withReadingWeight(), color = colors.dangerInk)
             }
         }
     }
@@ -108,21 +108,21 @@ internal fun MiniMaxQuotaPage(
         is MiniMaxProviderUsage.AccountBalance -> {
             AppSettingsSection {
                 Text(stringResource(R.string.minimax_quota_balance_title),
-                    style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
+                    style = DsType.std14Strong.withReadingWeight(), color = colors.text)
                 Text(stringResource(R.string.minimax_quota_balance_available, result.available),
-                    color = colors.labelPrimary)
+                    color = colors.text)
                 Text(stringResource(R.string.minimax_quota_balance_cash, result.cash),
-                    color = colors.labelSecondary)
+                    color = colors.textSecondary)
                 Text(stringResource(R.string.minimax_quota_balance_voucher, result.voucher),
-                    color = colors.labelSecondary)
+                    color = colors.textSecondary)
                 Text(stringResource(R.string.minimax_quota_balance_credit, result.credit),
-                    color = colors.labelSecondary)
+                    color = colors.textSecondary)
             }
         }
         is MiniMaxProviderUsage.TokenPlan -> {
             if (result.models.isEmpty()) {
                 AppSettingsSection {
-                    Text(stringResource(R.string.minimax_quota_empty), color = colors.labelSecondary)
+                    Text(stringResource(R.string.minimax_quota_empty), color = colors.textSecondary)
                 }
             }
             result.models.forEach { quota -> MiniMaxQuotaCard(quota) }
@@ -134,17 +134,17 @@ internal fun MiniMaxQuotaPage(
 
 @Composable
 internal fun MiniMaxQuotaCard(quota: MiniMaxProviderUsage.ModelQuota) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     AppSettingsSection {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(DsSpacing.comfortable),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.large),
+            modifier = Modifier.fillMaxWidth().padding(SyMetric.gapSection),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSection),
         ) {
             Text(
                 if (quota.name.equals("general", ignoreCase = true)) {
                     stringResource(R.string.minimax_quota_shared)
                 } else quota.name,
-                style = DsType.headline17.withReadingWeight(), color = colors.labelPrimary,
+                style = DsType.headline17.withReadingWeight(), color = colors.text,
             )
             MiniMaxQuotaWindow(
                 title = stringResource(R.string.minimax_quota_interval_label),
@@ -164,16 +164,16 @@ private fun MiniMaxQuotaWindow(
     window: MiniMaxProviderUsage.Window,
     resetMillis: Long?,
 ) {
-    val colors = DsTheme.colors
-    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-        Text(title, style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
-        Text(window.display(), style = DsType.title22.withReadingWeight(), color = colors.labelPrimary)
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+        Text(title, style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+        Text(window.display(), style = DsType.title22.withReadingWeight(), color = colors.text)
         window.remainingFraction()?.let { fraction ->
-            SyProgressBar(fraction, modifier = Modifier.fillMaxWidth(), color = colors.successSecondary)
+            SyProgressBar(fraction, modifier = Modifier.fillMaxWidth(), color = colors.mint)
         }
         resetMillis?.takeIf { it >= 0 }?.let {
             Text(stringResource(R.string.minimax_quota_reset_after, it.durationDisplay()),
-                style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+                style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
         }
     }
 }

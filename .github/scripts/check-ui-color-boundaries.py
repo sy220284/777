@@ -20,7 +20,7 @@ def violations_in_text(source: str, path: str) -> list[str]:
     for lineno, line in enumerate(source.splitlines(), 1):
         code = line.split("//", 1)[0]
         if FORBIDDEN.search(code):
-            found.append(f"{path}:{lineno}: UI literal color; use DsTheme.colors")
+            found.append(f"{path}:{lineno}: UI literal color; use canonical LocalSyColors.current")
     return found
 
 def self_test() -> None:

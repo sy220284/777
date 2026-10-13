@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -28,9 +32,6 @@ import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
@@ -40,39 +41,39 @@ internal fun GroupAnnouncementCard(
     announcement: String,
     onClick: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SyMaterialSurface(
         tier = SyMaterialTier.L3_CARD,
-        shape = DsShapes.block,
+        shape = RoundedCornerShape(SyMetric.radiusCard),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny)
+            .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs)
             .clickable(onClick = onClick),
     ) {
-        Column(Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)) {
+        Column(Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     stringResource(R.string.local_group_announcement_title),
                     style = DsType.small13Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
+                    color = colors.text,
                     modifier = Modifier.weight(1f),
                 )
                 if (announcement.isNotBlank()) {
                     Text(
                         stringResource(R.string.local_group_announcement_active_short),
                         style = DsType.caption11.withReadingWeight(),
-                        color = colors.accent,
+                        color = colors.primary,
                     )
                 }
             }
             Text(
                 announcement.ifBlank { stringResource(R.string.local_group_announcement_empty) },
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -80,7 +81,7 @@ internal fun GroupAnnouncementCard(
                 Text(
                     stringResource(R.string.local_group_announcement_active_hint),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
+                    color = colors.textTertiary,
                 )
             }
         }
@@ -103,9 +104,11 @@ internal fun GroupAnnouncementSheet(
     SyResponsiveSheet(
         title = stringResource(R.string.local_group_announcement_title),
         onDismiss = { if (!saving) onDismiss() },
+        dismissEnabled = !saving,
+        scrollable = true,
     ) {
         Text(stringResource(R.string.local_group_announcement_hint),
-            style = DsType.small13.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+            style = DsType.small13.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
         SyTextField(
             value = draft,
             onValueChange = { draft = it.take(2_000); error = null },
@@ -115,7 +118,7 @@ internal fun GroupAnnouncementSheet(
             maxLines = 9,
             enabled = enabled && !saving,
         )
-        error?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error) }
+        error?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk) }
         SyButton(
             text = stringResource(
                 if (saving) R.string.local_group_announcement_saving

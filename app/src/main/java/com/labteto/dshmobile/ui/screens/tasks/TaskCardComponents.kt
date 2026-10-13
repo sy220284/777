@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import android.content.Context
 import android.text.format.DateFormat as AndroidDateFormat
@@ -63,9 +67,6 @@ import com.labteto.dshmobile.ui.shenyan.SyStatusPill
 import com.labteto.dshmobile.ui.shenyan.SyTimeline
 import com.labteto.dshmobile.ui.shenyan.SyTimelineItem
 import com.labteto.dshmobile.ui.components.EmptyHero
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -85,20 +86,20 @@ private fun TaskCardSurface(
     status: AutomationStatus,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val borderColor = when (status) {
-        AutomationStatus.RUNNING, AutomationStatus.QUEUED -> colors.accent.copy(alpha = 0.28f)
-        AutomationStatus.WAITING_USER -> colors.warn.copy(alpha = 0.34f)
-        AutomationStatus.FAILED, AutomationStatus.BLOCKED -> colors.error.copy(alpha = 0.28f)
-        else -> colors.borderL1
+        AutomationStatus.RUNNING, AutomationStatus.QUEUED -> colors.primary.copy(alpha = 0.28f)
+        AutomationStatus.WAITING_USER -> colors.warning.copy(alpha = 0.34f)
+        AutomationStatus.FAILED, AutomationStatus.BLOCKED -> colors.dangerInk.copy(alpha = 0.28f)
+        else -> colors.border
     }
     com.shenyan.designsystem.components.SyMaterialFrame(
         modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.block,
+        shape = RoundedCornerShape(SyMetric.radiusCard),
         border = BorderStroke(1.dp, borderColor),
-        horizontalPadding = DsSpacing.comfortable,
-        verticalPadding = DsSpacing.comfortable,
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalPadding = SyMetric.gapSection,
+        verticalPadding = SyMetric.gapSection,
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         content()
     }
@@ -115,7 +116,7 @@ internal fun TaskCard(
     onEdit: () -> Unit,
     onOpenSession: (String) -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var confirmDelete by remember(task.id) { mutableStateOf(false) }
     var actionsOpen by remember(task.id) { mutableStateOf(false) }
     val chatCharacterFallback = stringResource(R.string.tasks_chat_character_fallback)
@@ -170,19 +171,19 @@ internal fun TaskCard(
     TaskCardSurface(status = task.status) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             verticalAlignment = Alignment.Top,
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
                     title,
                     style = DsType.std14Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
+                    color = colors.text,
                 )
                 Text(
                     timing,
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
+                    color = colors.textTertiary,
                 )
             }
             Box {
@@ -210,8 +211,8 @@ internal fun TaskCard(
 
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             SyStatusPill(
                 state = taskStatus(task.status),
@@ -241,21 +242,21 @@ internal fun TaskCard(
                     task.failureStreak,
                 ),
                 style = DsType.caption11.withReadingWeight(),
-                color = colors.error,
+                color = colors.dangerInk,
             )
         }
         task.lastError?.takeIf(String::isNotBlank)?.let {
             Text(
                 stringResource(R.string.tasks_last_status, it.take(160)),
                 style = DsType.caption11.withReadingWeight(),
-                color = colors.error,
+                color = colors.dangerInk,
             )
         }
         task.lastResult?.takeIf(String::isNotBlank)?.let {
             Text(
                 stringResource(R.string.tasks_last_result, it.replace("\n", " ").take(180)),
                 style = DsType.caption11.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
                 maxLines = 2,
             )
         }
@@ -264,7 +265,7 @@ internal fun TaskCard(
             Text(
                 stringResource(R.string.tasks_run_history, task.runReceipts.size),
                 style = DsType.caption11.withReadingWeight(),
-                color = colors.labelTertiary,
+                color = colors.textTertiary,
             )
             val timelineItems = mutableListOf<SyTimelineItem>()
             for (receipt in task.runReceipts.asReversed()) {
@@ -337,7 +338,7 @@ internal fun TaskCard(
                     else R.string.tasks_delete_confirm_body,
                 ),
                 style = DsType.std14.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -424,33 +425,33 @@ private fun taskTiming(task: AutomationTask): String {
 
 @Composable
 internal fun TaskSummaryRow(task: AutomationTask, onClick: () -> Unit) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     com.shenyan.designsystem.components.SyMaterialFrame(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.block,
-        horizontalPadding = DsSpacing.comfortable,
-        verticalPadding = DsSpacing.comfortable,
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        shape = RoundedCornerShape(SyMetric.radiusCard),
+        horizontalPadding = SyMetric.gapSection,
+        verticalPadding = SyMetric.gapSection,
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             androidx.compose.material3.Icon(
                 if (task.mode == AutomationMode.CHAT) FeatherIcons.MessageCircle else FeatherIcons.Clock,
-                contentDescription = null, tint = colors.labelSecondary, modifier = Modifier.size(18.dp))
+                contentDescription = null, tint = colors.textSecondary, modifier = Modifier.size(18.dp))
             SyStatusPill(state = taskStatus(task.status), label = taskStatusLabel(task.status))
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
         ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                Text(task.prompt.lineSequence().firstOrNull().orEmpty(), style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary, maxLines = 2)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+                Text(task.prompt.lineSequence().firstOrNull().orEmpty(), style = DsType.std14Strong.withReadingWeight(), color = colors.text, maxLines = 2)
                 Text(taskTiming(task),
-                    style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                    style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
             }
-            androidx.compose.material3.Icon(FeatherIcons.ChevronRight, contentDescription = null, tint = colors.labelTertiary)
+            androidx.compose.material3.Icon(FeatherIcons.ChevronRight, contentDescription = null, tint = colors.textTertiary)
         }
     }
 }

@@ -117,8 +117,8 @@ if '.event == "push"' not in RELEASE or '.conclusion == "success"' not in RELEAS
     fail("full validation must come from a successful main push workflow")
 # 定时批次只处理触发时的 SHA，不能被新合并换包或中止。
 triggers = RELEASE.split("'on':\n", 1)[1].split("\npermissions:", 1)[0]
-if "cron: '0,30 * * * *'" not in triggers:
-    fail("release must check on both half-hour UTC boundaries")
+if "cron: '13,43 * * * *'" not in triggers:
+    fail("release must check every 30 minutes off the busy hourly boundary")
 if re.search(r"(?m)^  (?:workflow_run|push):", triggers):
     fail("CI completion or tag push still triggers immediate release")
 if "workflow_dispatch:" not in triggers:

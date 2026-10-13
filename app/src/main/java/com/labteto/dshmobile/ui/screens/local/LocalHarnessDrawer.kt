@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -57,6 +59,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
@@ -71,8 +74,6 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.sidebar.SidebarAvatarPicker
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
@@ -128,7 +129,7 @@ internal fun LocalModeDrawer(
     onImmersiveReader: (() -> Unit)? = null,
     globalSearchOpenRequest: Int = 0,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val sy = LocalSyPalette.current
     // The drawer has its own visual backing: raw L2 on the scene looked fully transparent.
     // Wallpaper mode retains a faint view of the user's image without sacrificing legibility.
@@ -240,8 +241,11 @@ internal fun LocalModeDrawer(
     val crossModeSearch = searchOpen && historyQuery.isNotBlank()
     var searchableFiles by remember { mutableStateOf<List<LocalWorkspaceFile>>(emptyList()) }
     var fileSearchFailed by remember { mutableStateOf(false) }
-    LaunchedEffect(searchOpen, drawerOpen) {
+    // Refresh the file snapshot when the user refines a query; do not keep a stale list from
+    // the moment the drawer was opened. Debounce disk enumeration while the user is typing.
+    LaunchedEffect(searchOpen, drawerOpen, historyQuery) {
         if (searchOpen && drawerOpen) {
+            if (historyQuery.isNotBlank()) delay(300)
             fileSearchFailed = false
             try {
                 searchableFiles = withContext(Dispatchers.IO) { loadSearchFiles() }
@@ -308,8 +312,8 @@ internal fun LocalModeDrawer(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = DsSpacing.medium, end = DsSpacing.medium, top = DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    .padding(start = SyMetric.gapLg, end = SyMetric.gapLg, top = SyMetric.gapLg),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -323,11 +327,11 @@ internal fun LocalModeDrawer(
                         )
                     }
                     SidebarAvatarPicker()
-                    Spacer(Modifier.width(DsSpacing.small))
+                    Spacer(Modifier.width(SyMetric.gapMd))
                     Text(
                         stringResource(R.string.app_name),
                         style = DsType.title22.withReadingWeight(),
-                        color = colors.labelPrimary,
+                        color = colors.text,
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -367,7 +371,7 @@ internal fun LocalModeDrawer(
                         modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
                         placeholder = { Text(stringResource(R.string.local_drawer_search_people_sessions)) },
                         leadingIcon = {
-                            Icon(SyEntryIcons.Search, contentDescription = null, tint = colors.labelTertiary)
+                            Icon(SyEntryIcons.Search, contentDescription = null, tint = colors.textTertiary)
                         },
                         singleLine = true,
                         shape = DsShapes.pillFull,
@@ -385,14 +389,14 @@ internal fun LocalModeDrawer(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = DsSpacing.medium),
-                contentPadding = PaddingValues(bottom = DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                    .padding(horizontal = SyMetric.gapLg),
+                contentPadding = PaddingValues(bottom = SyMetric.gapLg),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
                 if (!searchOpen || historyQuery.isBlank()) item(key = "drawer-feature-actions") {
                     Column(
-                        modifier = Modifier.padding(top = DsSpacing.medium),
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                        modifier = Modifier.padding(top = SyMetric.gapLg),
+                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
                     ) {
                         DrawerQuickActions(
                             usageMode = usageMode,
@@ -462,7 +466,7 @@ internal fun LocalModeDrawer(
                 if (crossModeSearch && fileSearchFailed) {
                     item(key = "drawer-file-search-error") {
                         Text(stringResource(R.string.local_files_read_failed),
-                            color = colors.labelTertiary,
+                            color = colors.textTertiary,
                             style = DsType.navigationSupporting.withReadingWeight())
                     }
                 }
@@ -558,10 +562,10 @@ internal fun LocalModeDrawer(
                         Text(
                             stringResource(R.string.local_drawer_search_empty_both),
                             style = DsType.navigationSupporting.withReadingWeight(),
-                            color = colors.labelTertiary,
+                            color = colors.textTertiary,
                             modifier = Modifier.padding(
-                                horizontal = DsSpacing.small,
-                                vertical = DsSpacing.medium,
+                                horizontal = SyMetric.gapMd,
+                                vertical = SyMetric.gapLg,
                             ),
                         )
                     }
@@ -573,8 +577,8 @@ internal fun LocalModeDrawer(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                    .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
                 if (selectionOpen) {
                     SyMaterialSurface(
@@ -584,14 +588,14 @@ internal fun LocalModeDrawer(
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                                .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                         ) {
                             Text(
                                 stringResource(R.string.local_selected_count, selectedIds.size),
                                 style = DsType.navigationSupporting.withReadingWeight(),
-                                color = colors.labelPrimary,
+                                color = colors.text,
                                 modifier = Modifier.weight(1f),
                             )
                             SyButton(
@@ -608,7 +612,7 @@ internal fun LocalModeDrawer(
                                     selectionOpen = false
                                     selectedIds.clear()
                                 },
-                                tint = colors.labelSecondary,
+                                tint = colors.textSecondary,
                             )
                         }
                     }

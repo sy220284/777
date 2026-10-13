@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -20,8 +22,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -48,7 +48,7 @@ internal fun RenameDialog(
                 onClick = onDismiss,
                 variant = SyButtonVariant.Ghost,
             )
-            Spacer(Modifier.width(DsSpacing.small))
+            Spacer(Modifier.width(SyMetric.gapMd))
             SyButton(
                 text = stringResource(R.string.common_save),
                 onClick = { onConfirm(text.trim()) },
@@ -69,14 +69,14 @@ internal fun ConfirmDialog(
     onConfirm: () -> Unit,
 ) {
     SyDialog(title = title, onDismiss = onDismiss) {
-        Text(body, style = DsType.std14.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+        Text(body, style = DsType.std14.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             SyButton(
                 text = stringResource(R.string.common_cancel),
                 onClick = onDismiss,
                 variant = SyButtonVariant.Ghost,
             )
-            Spacer(Modifier.width(DsSpacing.small))
+            Spacer(Modifier.width(SyMetric.gapMd))
             SyButton(text = confirmLabel, onClick = onConfirm, variant = SyButtonVariant.Danger)
         }
     }

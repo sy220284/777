@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -65,8 +67,6 @@ import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -123,7 +123,7 @@ internal fun ChatAutomationScreen(
     initialSelectedTaskId: String? = null,
     entryRequest: Int = 0,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val canPlan = harnessState.usageMode == LocalUsageMode.CHAT &&
         !harnessState.groupChat.enabled &&
         harnessState.sessionId.isNotBlank()
@@ -167,7 +167,7 @@ internal fun ChatAutomationScreen(
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(
             Modifier.fillMaxSize().safeDrawingPadding(),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             Box(Modifier.fillMaxWidth()) {
                 SyTopBar(
@@ -182,7 +182,7 @@ internal fun ChatAutomationScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 item("events-heading") {
                     SectionTitle(
@@ -215,14 +215,14 @@ internal fun ChatAutomationScreen(
                             hapticOnChange = true,
                             stretch = true,
                             modifier = Modifier.fillMaxWidth()
-                                .padding(horizontal = DsSpacing.large, vertical = DsSpacing.tiny),
+                                .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapXs),
                         )
                     }
                 }
                 if (visibleTasks.isEmpty()) {
                     item("events-empty") {
                         AutomationCardSurface(
-                            modifier = Modifier.padding(horizontal = DsSpacing.large),
+                            modifier = Modifier.padding(horizontal = SyMetric.gapSection),
                         ) {
                             Text(
                                 stringResource(
@@ -230,7 +230,7 @@ internal fun ChatAutomationScreen(
                                     else R.string.tasks_chat_filter_empty,
                                 ),
                                 style = DsType.std14.withReadingWeight(),
-                                color = colors.labelSecondary,
+                                color = colors.textSecondary,
                             )
                         }
                     }
@@ -273,9 +273,9 @@ internal fun ChatAutomationScreen(
             state.plannerError?.let {
                 Text(
                     stringResource(it.messageRes()),
-                    modifier = Modifier.padding(horizontal = DsSpacing.large),
+                    modifier = Modifier.padding(horizontal = SyMetric.gapSection),
                     style = DsType.small13.withReadingWeight(),
-                    color = colors.error,
+                    color = colors.dangerInk,
                 )
             }
             SyConversationComposer {
@@ -288,7 +288,7 @@ internal fun ChatAutomationScreen(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
                 ) {
                     SyComposerField(
                         value = draft,
@@ -303,11 +303,11 @@ internal fun ChatAutomationScreen(
                         icon = null,
                         iconPainter = painterResource(R.drawable.ic_ui_button_send_glyph),
                         iconSize = 32.dp,
-                        tint = if (canSubmitPlan) colors.onAccent else colors.labelPrimary,
+                        tint = if (canSubmitPlan) colors.onPrimary else colors.text,
                         contentDescription = stringResource(R.string.tasks_chat_plan_send),
                         onClick = { viewModel.submitChatPlan(draft, editingTaskId) },
                         enabled = canSubmitPlan,
-                        containerColor = colors.accent,
+                        containerColor = colors.primary,
                         visualSize = 32.dp,
                     )
                 }
@@ -315,13 +315,13 @@ internal fun ChatAutomationScreen(
                     Text(
                         stringResource(R.string.tasks_chat_planning),
                         style = DsType.caption11.withReadingWeight(),
-                        color = colors.labelSecondary,
+                        color = colors.textSecondary,
                     )
                 } else if (editingTaskId != null) {
                     Text(
                         stringResource(R.string.tasks_chat_editing_hint),
                         style = DsType.caption11.withReadingWeight(),
-                        color = colors.labelSecondary,
+                        color = colors.textSecondary,
                     )
                 }
             }
@@ -343,12 +343,12 @@ private fun AutomationCardSurface(
     status: SyStatus = SyStatus.Neutral,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val borderColor = when (status) {
-        SyStatus.Running -> colors.accent.copy(alpha = 0.28f)
-        SyStatus.Warning -> colors.warn.copy(alpha = 0.32f)
-        SyStatus.Failed -> colors.error.copy(alpha = 0.28f)
-        else -> colors.borderL1
+        SyStatus.Running -> colors.primary.copy(alpha = 0.28f)
+        SyStatus.Warning -> colors.warning.copy(alpha = 0.32f)
+        SyStatus.Failed -> colors.dangerInk.copy(alpha = 0.28f)
+        else -> colors.border
     }
     SyMaterialSurface(
         modifier = modifier.fillMaxWidth(),
@@ -358,8 +358,8 @@ private fun AutomationCardSurface(
         tonalElevation = 0.dp,
     ) {
         Column(
-            modifier = Modifier.padding(DsSpacing.comfortable),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            modifier = Modifier.padding(SyMetric.gapSection),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             content = content,
         )
     }
@@ -367,13 +367,13 @@ private fun AutomationCardSurface(
 
 @Composable
 private fun SectionTitle(title: String, subtitle: String) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Column(
-        Modifier.padding(horizontal = DsSpacing.large, vertical = DsSpacing.tiny),
+        Modifier.padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapXs),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(title, style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary)
-        Text(subtitle, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
+        Text(title, style = DsType.base16Strong.withReadingWeight(), color = colors.text)
+        Text(subtitle, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
     }
 }
 
@@ -390,11 +390,11 @@ private fun ChatAutomationEventRow(
     onResume: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val visualStatus = chatAutomationVisualStatus(task)
     var confirmDelete by remember { mutableStateOf(false) }
     AutomationCardSurface(
-        modifier = Modifier.padding(horizontal = DsSpacing.large),
+        modifier = Modifier.padding(horizontal = SyMetric.gapSection),
         status = visualStatus.dsStatus(),
     ) {
         Row(
@@ -406,7 +406,7 @@ private fun ChatAutomationEventRow(
                 task.actorName?.takeIf(String::isNotBlank)
                     ?: stringResource(R.string.tasks_chat_character_fallback),
                 style = DsType.small13Strong.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
             SyStatusPill(
                 state = visualStatus.dsStatus(),
@@ -416,13 +416,13 @@ private fun ChatAutomationEventRow(
         Text(
             task.prompt,
             style = DsType.std14.withReadingWeight(),
-            color = colors.labelPrimary,
+            color = colors.text,
             maxLines = 3,
         )
         Text(
             scheduleDescription,
             style = DsType.caption11.withReadingWeight(),
-            color = colors.labelTertiary,
+            color = colors.textTertiary,
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -495,7 +495,7 @@ private fun ChatAutomationEventRow(
             Text(
                 stringResource(R.string.tasks_chat_delete_confirm_body),
                 style = DsType.std14.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -525,7 +525,7 @@ private fun ChatAutomationPolicySheet(
     viewModel: TasksViewModel,
     onDismiss: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var editingQuietStart by rememberSaveable(task.id) { mutableStateOf<Boolean?>(null) }
     val saveFailedMessage = stringResource(R.string.tasks_chat_policy_save_failed)
     var quietEnabled by remember(task.id) { mutableStateOf(task.quietHoursEnabled) }
@@ -562,7 +562,7 @@ private fun ChatAutomationPolicySheet(
                 .fillMaxWidth()
                 .weight(1f, fill = false)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -573,7 +573,7 @@ private fun ChatAutomationPolicySheet(
                 Text(
                     stringResource(R.string.tasks_chat_policy_quiet_hours),
                     style = DsType.small13Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
+                    color = colors.text,
                 )
                 Text(
                     stringResource(
@@ -582,7 +582,7 @@ private fun ChatAutomationPolicySheet(
                         formatMinute(quietEndMinute),
                     ),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
+                    color = colors.textTertiary,
                 )
             }
             SySwitchControl(
@@ -593,7 +593,7 @@ private fun ChatAutomationPolicySheet(
         if (quietEnabled) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 SyButton(
                     text = stringResource(
@@ -625,12 +625,12 @@ private fun ChatAutomationPolicySheet(
         Text(
             stringResource(R.string.tasks_chat_policy_min_gap),
             style = DsType.small13Strong.withReadingWeight(),
-            color = colors.labelPrimary,
+            color = colors.text,
         )
         gapOptions.chunked(3).forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
                 row.forEach { minutes ->
                     SyButton(
@@ -650,17 +650,17 @@ private fun ChatAutomationPolicySheet(
         Text(
             stringResource(R.string.tasks_chat_policy_min_gap_hint),
             style = DsType.caption11.withReadingWeight(),
-            color = colors.labelTertiary,
+            color = colors.textTertiary,
         )
 
         Text(
             stringResource(R.string.tasks_chat_max_unanswered),
             style = DsType.small13Strong.withReadingWeight(),
-            color = colors.labelPrimary,
+            color = colors.text,
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
         ) {
             (1..5).forEach { count ->
                 SyButton(
@@ -679,7 +679,7 @@ private fun ChatAutomationPolicySheet(
         Text(
             stringResource(R.string.tasks_chat_max_unanswered_hint, maxUnanswered),
             style = DsType.caption11.withReadingWeight(),
-            color = colors.labelTertiary,
+            color = colors.textTertiary,
         )
 
         Row(
@@ -691,12 +691,12 @@ private fun ChatAutomationPolicySheet(
                 Text(
                     stringResource(R.string.tasks_notify_title),
                     style = DsType.small13Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
+                    color = colors.text,
                 )
                 Text(
                     stringResource(R.string.tasks_notify_hint),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
+                    color = colors.textTertiary,
                 )
             }
             SySwitchControl(
@@ -710,7 +710,7 @@ private fun ChatAutomationPolicySheet(
             Text(
                 it,
                 style = DsType.caption11.withReadingWeight(),
-                color = colors.error,
+                color = colors.dangerInk,
             )
         }
         Row(
