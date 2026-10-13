@@ -73,8 +73,9 @@ internal fun chatContinuityEventId(
 
 internal fun ChatContextState.normalized(): ChatContextState {
     val recentEvents = continuity.recentEvents.cleanRecentContextLines(5, 180)
-    val decisions = continuity.decisions.cleanRecentContextLines(4, 180)
-    val unfinished = continuity.unfinished.cleanRecentContextLines(4, 180)
+    // Durable active events are NOT a four-slot model prompt cache.
+    val decisions = continuity.decisions.cleanActiveContextLines(180)
+    val unfinished = continuity.unfinished.cleanActiveContextLines(180)
     val activeEvidenceKeys = buildSet {
         recentEvents.forEach { add(ChatContinuityFactKind.EVENT to normalizeContinuityFact(it)) }
         decisions.forEach { add(ChatContinuityFactKind.DECISION to normalizeContinuityFact(it)) }
@@ -98,7 +99,6 @@ internal fun ChatContextState.normalized(): ChatContextState {
         }
         .distinctBy { item -> item.kind to normalizeContinuityFact(item.text) }
         .toList()
-        .takeLast(MAX_CONTINUITY_EVIDENCE)
 
     val orderedSceneEvents = sceneEvents.sortedBy(ChatSceneEvent::sequence)
     val latestLocationEvent = orderedSceneEvents.lastOrNull { it.kind == ChatSceneEventKind.LOCATION }
@@ -314,34 +314,12 @@ internal fun ChatCharacterState.withContextForPlanner(context: ChatContextState)
 private const val HOT_WINDOW_PENDING_TURNS = 10
 private const val PENDING_RAW_FALLBACK_TURNS = 4
 private const val RECENT_SCENE_EVENT_LIMIT = 12
-private const val MAX_CONTINUITY_EVIDENCE = 13
 private const val DECISION_CONTINUITY_EVIDENCE_SCORE = 80
 private const val EVENT_CONTINUITY_EVIDENCE_SCORE = 55
 private const val OPEN_THREAD_CONTINUITY_EVIDENCE_SCORE = 55
 private const val DERIVED_CONTINUITY_EVIDENCE_SCORE = 10
-private val DECISION_REMOVAL_SIGNAL = Regex(
-    """(?:取消|作废|不去了|不再去|不去|别去了|不约了|不见了|不出发|撤销|改计划|改成|换成|延期|推迟)""",
-)
-private val OPEN_THREAD_REMOVAL_SIGNAL = Regex(
-    """(?:解决了|说清了|说完了|完成了|处理好了|不用继续|不用再|结束了|不提了|取消了|没事了|算了)""",
-)
 private val OPEN_THREAD_EVIDENCE_SIGNAL = Regex(
     """(?:还没|尚未|未完成|没完成|待定|待办|记得|需要|还要|晚点|之后再|稍后)""",
-)
-private val GENERIC_OPEN_THREAD_CLOSE_SIGNAL = Regex(
-    """(?:没事了|解决了|说清了|说完了|完成了|处理好了|结束了|不提了|算了)""",
-)
-private val GENERIC_OPEN_THREAD_CLOSE_EXACT = Regex(
-    """^(?:没事了|解决了|说清了|说完了|完成了|处理好了|结束了|不提了|算了)$""",
-)
-private val GENERIC_DECISION_CLOSE_EXACT = Regex(
-    """^(?:那个)?(?:安排|计划|约定)(?:取消|作废|延期|推迟)(?:了)?$""",
-)
-private val CONTINUITY_ANCHOR_TIME_NOISE = Regex(
-    """(?:今天|明天|后天|今晚|明晚|今早|明早|上午|中午|下午|傍晚|晚上|夜里|[0-9０-９零〇一二两三四五六七八九十]{1,4}(?:[:：点时][0-9０-９零〇一二两三四五六七八九十半一刻三刻]{0,4}))""",
-)
-private val CONTINUITY_ANCHOR_GENERIC_NOISE = Regex(
-    """(?:当前有效决定|已定|决定|安排|计划|约定|还要|需要|记得|确认|准备|继续|尚未|未完成|完成|发生|出发|过去|前往|去|到|回|改成|换成|取消|作废|延期|推迟|解决|处理|不用|不再|别|不)""",
 )
 private const val MAX_PENDING_CONTEXT_CHARS = 1_800
 private const val MAX_SCENE_CONTEXT_CHARS = 700
@@ -356,6 +334,10 @@ private fun List<String>.cleanContextLines(limit: Int, maxChars: Int): List<Stri
         .distinct()
         .take(limit)
         .toList()
+
+private fun List<String>.cleanActiveContextLines(maxChars: Int): List<String> =
+    asSequence().map(String::trim).filter(String::isNotBlank)
+        .map { it.take(maxChars) }.distinct().toList()
 
 private fun List<String>.cleanRecentContextLines(limit: Int, maxChars: Int): List<String> =
     asSequence()
@@ -404,21 +386,14 @@ internal fun groundContinuityEvidence(
             }
             // Resolution must refer to this exact event, be omitted by the model's current
             // projection AND be supported by the real exchange, never a generic "好".
-            val confirmedByEventId = kind == ChatContinuityFactKind.OPEN_THREAD &&
-                plannerOmittedFact && eventId in resolvedContinuityIds &&
-                ChatContinuityEventIdentity.confirmsQuestion(
-                    previousFact,
-                    orderedTurns,
-                    previousValues.count {
+            plannerOmittedFact && eventId in resolvedContinuityIds &&
+                ChatContinuityEventIdentity.transitionGrounded(
+                    kind, previousFact, orderedTurns,
+                    activeFactCount = previousValues.size,
+                    activeQuestionCount = previousValues.count {
                         Regex("""(?:是否|有没有|待确认|尚未明确|还没确认)""").containsMatchIn(it)
                     },
                 )
-            continuityRemovalGrounded(
-                kind = kind,
-                fact = previousFact,
-                turns = orderedTurns,
-                activeFactCount = previousValues.size,
-            ) || confirmedByEventId
         }
         if (values.isEmpty()) return retainedPrevious.takeLast(limit)
         val previousKeys = retainedPrevious.associateBy(::normalizeContinuityFact)
@@ -511,7 +486,7 @@ internal fun groundContinuityEvidence(
         values = candidate.decisions,
         previousValues = previous.decisions,
         preserveUnrelatedPrevious = true,
-        limit = 4,
+        limit = Int.MAX_VALUE,
     )
     val unfinished = ground(
         kind = ChatContinuityFactKind.OPEN_THREAD,
@@ -519,7 +494,7 @@ internal fun groundContinuityEvidence(
         previousValues = previous.unfinished,
         allowDerivedEvidence = true,
         preserveUnrelatedPrevious = true,
-        limit = 4,
+        limit = Int.MAX_VALUE,
     )
 
     val activeKeys = buildSet {
@@ -538,77 +513,12 @@ internal fun groundContinuityEvidence(
         decisions = decisions,
         unfinished = unfinished,
         evidence = (carriedLegacyEvidence + acceptedEvidence.values)
-            .distinctBy { item -> item.kind to normalizeContinuityFact(item.text) }
-            .takeLast(MAX_CONTINUITY_EVIDENCE),
+            .distinctBy { item -> item.kind to normalizeContinuityFact(item.text) },
     )
 }
 
-private fun continuityRemovalGrounded(
-    kind: ChatContinuityFactKind,
-    fact: String,
-    turns: List<ChatPendingTurn>,
-    activeFactCount: Int,
-): Boolean {
-    if (kind == ChatContinuityFactKind.EVENT || fact.isBlank()) return false
-    return turns.any { turn ->
-        val userEvidence = turn.userMessage.trim()
-        if (userEvidence.isBlank()) return@any false
-        val normalized = normalizeContinuityEvidenceText(userEvidence)
-        val hasRemovalSignal = when (kind) {
-            ChatContinuityFactKind.DECISION -> DECISION_REMOVAL_SIGNAL.containsMatchIn(normalized)
-            ChatContinuityFactKind.OPEN_THREAD -> OPEN_THREAD_REMOVAL_SIGNAL.containsMatchIn(normalized)
-            ChatContinuityFactKind.EVENT -> false
-        }
-        if (!hasRemovalSignal) return@any false
-
-        val score = continuityEvidenceScore(fact, userEvidence)
-        val anchorMatched = if (kind == ChatContinuityFactKind.OPEN_THREAD) {
-            ChatContinuityEventIdentity.matchesEvidenceSubject(fact, userEvidence)
-        } else continuityRemovalAnchorMatches(fact, userEvidence)
-        when (kind) {
-            ChatContinuityFactKind.DECISION ->
-                anchorMatched ||
-                    score >= 50 ||
-                    (activeFactCount == 1 && GENERIC_DECISION_CLOSE_EXACT.matches(normalized))
-            ChatContinuityFactKind.OPEN_THREAD ->
-                anchorMatched ||
-                    score >= 45 ||
-                    (activeFactCount == 1 && GENERIC_OPEN_THREAD_CLOSE_EXACT.matches(normalized))
-            ChatContinuityFactKind.EVENT -> false
-        }
-    }
-}
-
-private fun continuityRemovalAnchorMatches(
-    fact: String,
-    source: String,
-): Boolean {
-    val anchors = continuityRemovalAnchors(fact)
-    if (anchors.isEmpty()) return false
-    val normalizedSource = normalizeContinuityEvidenceText(source)
-    return anchors.any(normalizedSource::contains)
-}
-
-private fun continuityRemovalAnchors(fact: String): Set<String> {
-    val core = continuityAnchorCore(fact)
-    if (core.length < 2) return emptySet()
-    return continuityBigrams(core)
-        .filterTo(linkedSetOf()) { anchor ->
-            anchor.length >= 2 && anchor !in GENERIC_CONTINUITY_ANCHORS
-        }
-}
-
-private fun continuityAnchorCore(fact: String): String =
-    normalizeContinuityEvidenceText(fact)
-        .replace(CONTINUITY_ANCHOR_TIME_NOISE, "")
-        .replace(CONTINUITY_ANCHOR_GENERIC_NOISE, "")
-
 private fun continuityOpenThreadsShareSubject(left: String, right: String): Boolean =
     ChatContinuityEventIdentity.sameSubject(left, right)
-
-private val GENERIC_CONTINUITY_ANCHORS = setOf(
-    "这个", "那个", "事情", "这事", "那事", "一下", "之后", "然后", "已经",
-)
 
 private fun bestContinuitySource(
     kind: ChatContinuityFactKind,
