@@ -26,8 +26,8 @@ class LocalProjectUiRegressionTest {
         var started = 0
         compose.setContent {
             DshTheme {
-                LocalProjectScreen(
-                    actions = LocalProjectUiActions(
+                FixtureProjectScreen(
+                    actions = projectUiFixture(
                         catalog = MutableStateFlow(LocalProjectCatalogState()),
                         recoveryNotice = MutableStateFlow<String?>(null),
                         backupAndReset = {},
@@ -59,8 +59,8 @@ class LocalProjectUiRegressionTest {
         var called = 0
         compose.setContent {
             DshTheme {
-                LocalProjectScreen(
-                    actions = LocalProjectUiActions(
+                FixtureProjectScreen(
+                    actions = projectUiFixture(
                         catalog = catalog,
                         recoveryNotice = MutableStateFlow(null),
                         backupAndReset = {},
@@ -95,8 +95,8 @@ class LocalProjectUiRegressionTest {
         var reset = 0
         compose.setContent {
             DshTheme {
-                LocalProjectScreen(
-                    actions = LocalProjectUiActions(
+                FixtureProjectScreen(
+                    actions = projectUiFixture(
                         catalog = MutableStateFlow(LocalProjectCatalogState()),
                         recoveryNotice = MutableStateFlow<String?>("目录损坏"),
                         backupAndReset = { reset++ },
@@ -124,8 +124,8 @@ class LocalProjectUiRegressionTest {
         var attempts = 0
         compose.setContent {
             DshTheme {
-                LocalProjectScreen(
-                    actions = LocalProjectUiActions(
+                FixtureProjectScreen(
+                    actions = projectUiFixture(
                         catalog = catalog,
                         recoveryNotice = MutableStateFlow(null),
                         backupAndReset = {},
@@ -171,8 +171,8 @@ class LocalProjectUiRegressionTest {
         var called = 0
         compose.setContent {
             DshTheme {
-                LocalProjectScreen(
-                    actions = LocalProjectUiActions(
+                FixtureProjectScreen(
+                    actions = projectUiFixture(
                         catalog = catalog,
                         recoveryNotice = MutableStateFlow(null),
                         backupAndReset = {},
@@ -206,8 +206,8 @@ class LocalProjectUiRegressionTest {
         var calls = 0
         compose.setContent {
             DshTheme {
-                LocalProjectScreen(
-                    actions = LocalProjectUiActions(
+                FixtureProjectScreen(
+                    actions = projectUiFixture(
                         catalog = catalog,
                         recoveryNotice = MutableStateFlow(null),
                         backupAndReset = {},
@@ -236,3 +236,4 @@ class LocalProjectUiRegressionTest {
         compose.runOnIdle { assertEquals(1, calls) }
     }
 }
+

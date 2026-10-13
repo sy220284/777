@@ -110,17 +110,11 @@ class LocalHarnessViewModel @Inject constructor(
     internal fun turnUsageSummaries(sessionId: String) = usageUi.turnSummaries(sessionId)
     internal fun turnUsage(sessionId: String, turnId: String) = usageUi.turnDetail(sessionId, turnId)
     internal fun requestUsage(requestId: String) = usageUi.requestDetail(requestId)
-    internal val projectCatalog = projects.catalog
+    val projectUiPort: com.labteto.dshmobile.uicontract.ProjectUiPort get() = projects
     internal val projectRecoveryNotice = projects.recoveryNotice
-    internal fun backupAndResetProjectCatalog() = projects.backupAndResetCatalog()
     internal fun createProjectWorkSession() = runtime.session.createSession(
         LocalConversationMode.PROJECT, LocalUsageMode.WORK,
     )
-    internal fun createProject(name: String) = projects.create(name)
-    internal fun selectProject(id: String) = projects.select(id)
-    internal suspend fun deleteProject(id: String) = projects.delete(id)
-    internal fun renameProject(id: String, name: String) = projects.rename(id, name)
-    internal fun updateProjectInstructions(id: String, instructions: String) = projects.updateInstructions(id, instructions)
     private val personaGalleryController = LocalPersonaGalleryUiController(
         runtime = runtime,
         chatUi = chatUi,
@@ -143,6 +137,11 @@ class LocalHarnessViewModel @Inject constructor(
     val conversationDraftUiPort: com.labteto.dshmobile.uicontract.ConversationDraftUiPort =
         LocalSessionDraftCache.restore(savedStateHandle.get<List<String>>("conversation_drafts").orEmpty()) {
             savedStateHandle["conversation_drafts"] = ArrayList(it)
+        }
+
+    val conversationReadingUiPort: com.labteto.dshmobile.uicontract.ConversationReadingUiPort =
+        LocalConversationReadingState(savedStateHandle.get<List<String>>("conversation_reading").orEmpty()) {
+            savedStateHandle["conversation_reading"] = ArrayList(it)
         }
 
     private val conversationUiState = LocalConversationUiStateStore(appContext)

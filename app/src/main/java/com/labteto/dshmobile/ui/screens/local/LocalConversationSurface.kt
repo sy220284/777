@@ -45,6 +45,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
@@ -195,6 +196,7 @@ internal class LocalConversationSurfaceArgs(
 @Composable
 internal fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
+    reading: com.labteto.dshmobile.uicontract.ConversationReadingUiPort,
     drafts: com.labteto.dshmobile.uicontract.ConversationDraftUiPort,
     workActions: LocalWorkFeatureUiActions? = null,
     onOpenWorkArtifact: (String) -> Unit = {},
@@ -673,16 +675,46 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         }
     }
 
+    val workReaderPaused = remember(state.sessionId) { mutableStateOf(false) }
+    var readingAnchorMissing by remember(state.sessionId) { mutableStateOf(false) }
+    val readingItemsByKey = remember(transcriptItems) { transcriptItems.associateBy { it.key } }
+    var previousChatTailIndex by remember(state.sessionId) { mutableStateOf(-1) }
     LaunchedEffect(state.sessionId) {
         transcriptInitialPositionReady = false
         scrollHint.hide()
         attachments.clear()
         attachmentError = null
         showReplySuggestions = false
-        if (transcriptItems.isNotEmpty()) {
+    }
+    LaunchedEffect(state.sessionId, state.loading, transcriptItems.isNotEmpty()) {
+        if (state.loading || transcriptInitialPositionReady) return@LaunchedEffect
+        val anchor = reading.anchor(state.sessionId)
+        val itemIndex = transcriptItems.indexOfFirst { it.containsReadingMessage(anchor?.messageId) }
+        if (anchor != null && !anchor.followingTail && itemIndex >= 0) {
+            val prefix = listOf(mediaPage.unavailable, mediaPage.hasMore, showTranscriptPagingRow,
+                showEmptyWorkbench, showEmptyGroupSetup, planReview != null).count { it }
+            listState.scrollToItem(prefix + itemIndex, anchor.offsetPx)
+            workReaderPaused.value = true
+            previousChatTailIndex = transcriptLastListIndex
+        } else if (transcriptItems.isNotEmpty()) {
+            readingAnchorMissing = anchor != null && !anchor.followingTail && itemIndex < 0
             listState.scrollToItem(transcriptLastListIndex)
         }
         transcriptInitialPositionReady = true
+    }
+    LaunchedEffect(state.sessionId, transcriptItems, transcriptInitialPositionReady) {
+        if (!transcriptInitialPositionReady || state.loading) return@LaunchedEffect
+        snapshotFlow {
+            val first = listState.layoutInfo.visibleItemsInfo.firstOrNull { visible ->
+                readingItemsByKey[visible.key] != null
+            }
+            val messageId = readingItemsByKey[first?.key]?.readingMessageId()
+            com.labteto.dshmobile.uicontract.UiReadingAnchor(
+                messageId, -(first?.offset ?: 0), listState.isConversationTailVisible(),
+            )
+        }.collect { anchor ->
+            if (anchor.messageId != null || anchor.followingTail) reading.rememberAnchor(state.sessionId, anchor)
+        }
     }
 
     LocalTranscriptAutoPager(
@@ -699,7 +731,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         anchoredViewportExtent = composerTailViewportAnchor,
     )
     val workTailFollowing = remember(state.sessionId) { mutableStateOf(false) }
-    val workReaderPaused = remember(state.sessionId) { mutableStateOf(false) }
     LocalWorkStreamingTailFollower(
         listState = listState,
         enabled = showStreamingTail && !workTailFollowing.value &&
@@ -718,8 +749,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         )
     } else {
         // Chat mode retains its established scrolling behavior.
-        var previousChatTailIndex by remember(state.sessionId) { mutableStateOf(-1) }
-        LaunchedEffect(state.messages.size, transcriptItems.size, state.running) {
+        LaunchedEffect(state.messages.size, transcriptItems.size, state.running, transcriptInitialPositionReady) {
+            if (!transcriptInitialPositionReady) return@LaunchedEffect
             if (transcriptItems.isNotEmpty()) {
                 val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
                 val wasNearTail = previousChatTailIndex < 0 ||
@@ -731,6 +762,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     }
 
     Column(Modifier.fillMaxSize().background(rootSurfaceColor).safeDrawingPadding().imePadding()) {
+        if (readingAnchorMissing) Text(
+            stringResource(R.string.local_reading_anchor_unavailable),
+            style = DsType.std14.withReadingWeight(), color = colors.textSecondary,
+        )
         Column(
             Modifier.fillMaxWidth()
                 .padding(horizontal = DsMetrics.screenHorizontal, vertical = SyMetric.gapMd),

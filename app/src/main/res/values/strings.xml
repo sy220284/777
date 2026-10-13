@@ -2320,5 +2320,6 @@
     <string name="sy_v6_search_user">我发送的消息</string>
     <string name="sy_v6_search_assistant">回复消息</string>
     <string name="sy_v6_search_all">搜索其他会话、人物、任务与文件</string>
+    <string name="local_reading_anchor_unavailable">原阅读位置的消息未在当前记录中，已显示现有消息。</string>
 </resources>
 

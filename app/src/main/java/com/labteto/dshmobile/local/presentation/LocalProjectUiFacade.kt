@@ -17,7 +17,48 @@ class LocalProjectUiFacade @Inject internal constructor(
     private val sessions: LocalSessionStorageRuntime,
     private val state: LocalRuntimeStateStore,
     private val memory: MemoryStore,
-) {
+) : com.labteto.dshmobile.uicontract.ProjectUiPort {
+    override val snapshots: kotlinx.coroutines.flow.Flow<com.labteto.dshmobile.uicontract.ProjectSceneSnapshot> =
+        kotlinx.coroutines.flow.combine(runtime.catalog, runtime.recoveryNotice) { catalog, notice ->
+            projectSnapshot(catalog, notice)
+        }
+
+    override fun snapshot() = projectSnapshot(runtime.catalog.value, runtime.recoveryNotice.value)
+
+    private fun projectSnapshot(
+        catalog: com.labteto.dshmobile.local.project.LocalProjectCatalogState,
+        notice: String?,
+    ) = com.labteto.dshmobile.uicontract.ProjectSceneSnapshot(
+        status = if (notice != null) com.labteto.dshmobile.uicontract.UiSceneStatus.ERROR
+            else com.labteto.dshmobile.uicontract.UiSceneStatus.CONTENT,
+        projects = catalog.projects.map {
+            com.labteto.dshmobile.uicontract.UiProjectSnapshot(it.id, it.name, it.instructions,
+                it.id != com.labteto.dshmobile.local.project.DEFAULT_PROJECT_ID && notice == null)
+        },
+        activeId = catalog.activeId,
+        recoveryNotice = notice,
+    )
+
+    override suspend fun submit(
+        command: com.labteto.dshmobile.uicontract.ProjectUiCommand,
+    ): com.labteto.dshmobile.uicontract.ProjectUiReceipt = try {
+        val createdId = when (command) {
+            is com.labteto.dshmobile.uicontract.ProjectUiCommand.Create -> create(command.name)
+            is com.labteto.dshmobile.uicontract.ProjectUiCommand.Select -> { select(command.projectId); null }
+            is com.labteto.dshmobile.uicontract.ProjectUiCommand.Rename -> { rename(command.projectId, command.name); null }
+            is com.labteto.dshmobile.uicontract.ProjectUiCommand.Delete -> { delete(command.projectId); null }
+            is com.labteto.dshmobile.uicontract.ProjectUiCommand.UpdateInstructions -> {
+                updateInstructions(command.projectId, command.instructions); null
+            }
+            com.labteto.dshmobile.uicontract.ProjectUiCommand.BackupAndResetCatalog -> { backupAndResetCatalog(); null }
+        }
+        com.labteto.dshmobile.uicontract.ProjectUiReceipt.Applied(createdId)
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
+    } catch (failure: Exception) {
+        com.labteto.dshmobile.uicontract.ProjectUiReceipt.Failed(failure.message)
+    }
+
     internal val catalog get() = runtime.catalog
     internal val recoveryNotice get() = runtime.recoveryNotice
     fun backupAndResetCatalog() = runtime.backupAndResetCatalog()

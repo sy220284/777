@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -19,6 +20,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -66,6 +69,7 @@ object NextConversationUiPack : ConversationUiPack {
 
     @Composable
     override fun Render(
+        reading: com.labteto.dshmobile.uicontract.ConversationReadingUiPort,
         drafts: ConversationDraftUiPort,
         chat: ChatUiPort,
         work: WorkConversationUiPort,
@@ -84,6 +88,42 @@ object NextConversationUiPack : ConversationUiPack {
         val error = if (workMode) workSnapshot.error else chatSnapshot.error
         val status = if (workMode) workSnapshot.status else chatSnapshot.status
         val approval = workSnapshot.approval.takeIf { workMode }
+        val listState = remember(identity?.sessionId) { LazyListState() }
+        var readingAnchorMissing by remember(identity?.sessionId) { mutableStateOf(false) }
+        var readingReady by remember(identity?.sessionId) { mutableStateOf(false) }
+        LaunchedEffect(identity?.sessionId, status, messages.isNotEmpty()) {
+            val sessionId = identity?.sessionId ?: return@LaunchedEffect
+            if (readingReady || status == UiSceneStatus.LOADING) return@LaunchedEffect
+            val anchor = reading.anchor(sessionId)
+            val index = messages.indexOfFirst { it.id == anchor?.messageId }
+            if (anchor != null && !anchor.followingTail && index >= 0) {
+                listState.scrollToItem(index, anchor.offsetPx)
+            } else if (messages.isNotEmpty()) {
+                readingAnchorMissing = anchor != null && !anchor.followingTail && index < 0
+                listState.scrollToItem(messages.lastIndex)
+            }
+            readingReady = true
+        }
+        LaunchedEffect(identity?.sessionId, readingReady, messages.lastOrNull()?.id) {
+            val sessionId = identity?.sessionId ?: return@LaunchedEffect
+            if (readingReady && reading.anchor(sessionId)?.followingTail == true && messages.isNotEmpty()) {
+                listState.scrollToItem(messages.lastIndex)
+            }
+        }
+        LaunchedEffect(identity?.sessionId, readingReady, messages) {
+            val sessionId = identity?.sessionId ?: return@LaunchedEffect
+            if (!readingReady) return@LaunchedEffect
+            snapshotFlow {
+                val first = listState.layoutInfo.visibleItemsInfo.firstOrNull()
+                com.labteto.dshmobile.uicontract.UiReadingAnchor(
+                    messages.getOrNull(first?.index ?: -1)?.id,
+                    listState.firstVisibleItemScrollOffset,
+                    !listState.canScrollForward,
+                )
+            }.collect { anchor ->
+                if (anchor.messageId != null || anchor.followingTail) reading.rememberAnchor(sessionId, anchor)
+            }
+        }
         val draftValues by drafts.drafts.collectAsStateWithLifecycle()
         val draft = draftValues[identity?.sessionId].orEmpty()
         var receipt by rememberSaveable(identity?.sessionId) { mutableStateOf<String?>(null) }
@@ -129,7 +169,8 @@ object NextConversationUiPack : ConversationUiPack {
                     if (queued > 0) Text(stringResource(R.string.next_queued, queued))
                     if (status == UiSceneStatus.LOADING) Text(stringResource(R.string.next_loading))
                     if (status == UiSceneStatus.EMPTY) Text(stringResource(R.string.next_empty))
-                    LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (readingAnchorMissing) Text(stringResource(R.string.next_reading_anchor_unavailable))
+                    LazyColumn(Modifier.weight(1f), state = listState, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(messages, key = UiMessageSnapshot::id) { message ->
                             Column {
                                 Text(stringResource(when (message.role) {

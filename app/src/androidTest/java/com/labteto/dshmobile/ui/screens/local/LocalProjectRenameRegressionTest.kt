@@ -25,7 +25,7 @@ class LocalProjectRenameRegressionTest {
         val catalog = MutableStateFlow(
             LocalProjectCatalogState(listOf(LocalProject("project-1", "旧名称", "原项目规则")), "project-1"),
         )
-        val actions = LocalProjectUiActions(
+        val actions = projectUiFixture(
             catalog = catalog,
             recoveryNotice = MutableStateFlow(null),
             backupAndReset = {},
@@ -40,7 +40,7 @@ class LocalProjectRenameRegressionTest {
             updateInstructions = { _, _ -> error("No instruction mutation expected") },
         )
         compose.setContent {
-            DshTheme { LocalProjectScreen(actions, onBack = {}) }
+            DshTheme { FixtureProjectScreen(actions, onBack = {}) }
         }
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         compose.onNodeWithText(context.getString(R.string.local_project_rename_hint))

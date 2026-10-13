@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1511,
-  "production_source_count": 849,
-  "test_code_file_count": 506,
+  "repository_code_file_count": 1516,
+  "production_source_count": 852,
+  "test_code_file_count": 508,
   "workflow_files": [
     ".github/workflows/capture-readme-ui.yml",
     ".github/workflows/ci.yml",
@@ -1527,7 +1527,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalProjectUiFacade.kt",
-      "sha256": "2680d007939679b4"
+      "sha256": "44454f414928f178"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalReasoningControls.kt",
@@ -2507,7 +2507,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalConversationSliceHost.kt",
-      "sha256": "eda4f1d07390ace8"
+      "sha256": "f622dcaaa23b6632"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalog.kt",
@@ -2607,7 +2607,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationDraftCache.kt",
-      "sha256": "b8d1d4ebf0439d55"
+      "sha256": "735bbac74f6b61e6"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationHeaderAvatars.kt",
@@ -2618,8 +2618,12 @@
       "sha256": "db2cd03420fdf616"
     },
     {
+      "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationReadingState.kt",
+      "sha256": "ce9e1b8d6eff131d"
+    },
+    {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "sha256": "7755bb7f4d5a30f8"
+      "sha256": "ebce66b90ffccdd8"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationTemperatureUi.kt",
@@ -2679,7 +2683,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "sha256": "34ca9f79e3d52129"
+      "sha256": "69aa8c3141566a91"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStreamingComponents.kt",
@@ -2687,7 +2691,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "sha256": "f06b68d7b1f6eb0a"
+      "sha256": "07b7116e557ead51"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModelDefaults.kt",
@@ -2723,7 +2727,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiContribution.kt",
-      "sha256": "4b408a61b0ded815"
+      "sha256": "060644d0dd1ab37f"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalSettingsUiContribution.kt",
@@ -2731,7 +2735,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalShellUiContribution.kt",
-      "sha256": "51681b9ea3210a47"
+      "sha256": "cefa51d434f31c6f"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalSkillCallDisplay.kt",
@@ -2763,7 +2767,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptPresentation.kt",
-      "sha256": "c076fb9771a0e0ba"
+      "sha256": "14abf3d7821ca1f4"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalUiSendReceiptAdapter.kt",
@@ -3446,8 +3450,16 @@
       "sha256": "1fbd806f7f48f239"
     },
     {
+      "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ConversationReadingUiPort.kt",
+      "sha256": "211eae8e02724bb5"
+    },
+    {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ConversationUiPort.kt",
       "sha256": "140d515df564c2e7"
+    },
+    {
+      "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ProjectUiPort.kt",
+      "sha256": "5115d89258d7a681"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiPackManifest.kt",
@@ -3455,20 +3467,34 @@
     },
     {
       "path": "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/ConversationUiPack.kt",
-      "sha256": "87cb1388c8742b49"
+      "sha256": "1c62a334380d8c36"
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationUiPack.kt",
-      "sha256": "9342e5b09a2c82f1"
+      "sha256": "799f51a4a347068a"
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "c3d867db6752",
+  "source_snapshot": "f12c66ea844e",
   "observed_delta": {
-    "baseline": "f665e5f5bb53",
-    "added_production_files": [],
+    "baseline": "c3d867db6752",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationReadingState.kt",
+      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ConversationReadingUiPort.kt",
+      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ProjectUiPort.kt"
+    ],
     "removed_production_files": [],
     "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalProjectUiFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalConversationSliceHost.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationDraftCache.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiContribution.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalShellUiContribution.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptPresentation.kt",
+      "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/ConversationUiPack.kt",
       "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationUiPack.kt"
     ],
     "moved_unchanged_files": [],

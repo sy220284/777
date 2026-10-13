@@ -510,17 +510,7 @@ fun LocalHarnessScreen(
         artifactsForUi = viewModel::artifactsForUi,
         eventSequenceForUi = viewModel::eventSequenceForUi,
     )
-    val projectActions = LocalProjectUiActions(
-        catalog = viewModel.projectCatalog,
-        recoveryNotice = viewModel.projectRecoveryNotice,
-        backupAndReset = viewModel::backupAndResetProjectCatalog,
-        createProjectWorkSession = viewModel::createProjectWorkSession,
-        create = viewModel::createProject,
-        select = viewModel::selectProject,
-        rename = viewModel::renameProject,
-        delete = viewModel::deleteProject,
-        updateInstructions = viewModel::updateProjectInstructions,
-    )
+
     val automationActions = LocalAutomationFeatureUiActions(
         switchSession = { switchToSessionAndShowConversation(it) },
     )
@@ -531,6 +521,7 @@ fun LocalHarnessScreen(
 
     val featureContributions = listOf(
         localShellFeatureUiContribution(
+            reading = viewModel.conversationReadingUiPort,
             drafts = viewModel.conversationDraftUiPort,
             shell = shell,
             state = activeConversationState,
@@ -632,7 +623,8 @@ fun LocalHarnessScreen(
             onCloseDrawer = { scope.launch { drawerState.close() } },
         ),
         localProjectFeatureUiContribution(
-            actions = projectActions,
+            port = viewModel.projectUiPort,
+            onCreateWorkSession = viewModel::createProjectWorkSession,
             onPopFeature = ::popFeature,
             onOpenFromDrawer = ::openFeatureFromDrawer,
             onCloseDrawer = { scope.launch { drawerState.close() } },

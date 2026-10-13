@@ -37,25 +37,15 @@ import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.local.feature.LocalFeatureModuleId
-import com.labteto.dshmobile.local.project.LocalProjectCatalogState
-import kotlinx.coroutines.flow.StateFlow
+import com.labteto.dshmobile.uicontract.ProjectUiPort
+import com.labteto.dshmobile.uicontract.ProjectUiCommand
+import com.labteto.dshmobile.uicontract.ProjectUiReceipt
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 
-internal data class LocalProjectUiActions(
-    val catalog: StateFlow<LocalProjectCatalogState>,
-    val recoveryNotice: StateFlow<String?>,
-    val backupAndReset: () -> Unit,
-    val createProjectWorkSession: () -> Boolean,
-    val create: (String) -> String,
-    val select: (String) -> Unit,
-    val rename: (String, String) -> Unit,
-    val delete: suspend (String) -> Unit = {},
-    val updateInstructions: (String, String) -> Unit,
-)
-
 internal fun localProjectFeatureUiContribution(
-    actions: LocalProjectUiActions,
+    port: ProjectUiPort,
+    onCreateWorkSession: () -> Boolean,
     onPopFeature: () -> Unit,
     onOpenFromDrawer: (LocalFeaturePage) -> Unit,
     onCloseDrawer: () -> Unit,
@@ -71,16 +61,18 @@ internal fun localProjectFeatureUiContribution(
     restorePage = ::localFeatureRestoreOwnedPage,
 ) { page ->
     check(page == LocalFeaturePage.PROJECT) { "Project received a foreign route: $page" }
-    LocalProjectScreen(actions, onPopFeature)
+    LocalProjectScreen(port, onCreateWorkSession, onPopFeature)
 }
 
 @Composable
 internal fun LocalProjectScreen(
-    actions: LocalProjectUiActions,
+    port: ProjectUiPort,
+    onCreateWorkSession: () -> Boolean,
     onBack: () -> Unit,
 ) {
-    val state by actions.catalog.collectAsStateWithLifecycle()
-    val recovery by actions.recoveryNotice.collectAsStateWithLifecycle()
+    val initial = remember(port) { port.snapshot() }
+    val state by port.snapshots.collectAsStateWithLifecycle(initialValue = initial)
+    val recovery = state.recoveryNotice
     val active = state.projects.firstOrNull { it.id == state.activeId }
     var newName by remember { mutableStateOf("") }
     var instructionDraft by remember(active?.id, active?.instructions) {
@@ -94,7 +86,17 @@ internal fun LocalProjectScreen(
     var deleting by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val localProjectCannotSwitchMessage = stringResource(R.string.local_project_cannot_switch_session)
+    val operationFailedMessage = stringResource(R.string.common_error)
     val deleteFailedMessage = stringResource(R.string.local_project_delete_failed)
+
+    fun submit(command: ProjectUiCommand, onApplied: () -> Unit = {}) {
+        scope.launch {
+            when (val receipt = port.submit(command)) {
+                is ProjectUiReceipt.Applied -> { error = null; onApplied() }
+                is ProjectUiReceipt.Failed -> { error = receipt.message ?: operationFailedMessage }
+            }
+        }
+    }
 
     Column(Modifier.fillMaxSize().imePadding()) {
         SyTopBar(
@@ -115,7 +117,7 @@ internal fun LocalProjectScreen(
                 Text(requireNotNull(recovery))
                 SyButton(
                     text = stringResource(R.string.local_project_backup_and_reset),
-                    onClick = { runCatching { actions.backupAndReset() }.onFailure { error = it.message } },
+                    onClick = { submit(ProjectUiCommand.BackupAndResetCatalog) },
                     modifier = Modifier.fillMaxWidth(),
                     variant = SyButtonVariant.Danger,
                 )
@@ -124,7 +126,7 @@ internal fun LocalProjectScreen(
             SyButton(
                 text = stringResource(R.string.local_project_start_work_session),
                 onClick = {
-                    runCatching { actions.createProjectWorkSession() }
+                    runCatching { onCreateWorkSession() }
                         .onSuccess { if (!it) error = localProjectCannotSwitchMessage }
                         .onFailure { error = it.message }
                 },
@@ -144,9 +146,7 @@ internal fun LocalProjectScreen(
                             .semantics { selected = project.id == state.activeId },
                         subtitle = project.instructions.takeIf(String::isNotBlank),
                         onClick = {
-                            runCatching { actions.select(project.id) }
-                                .onSuccess { error = null }
-                                .onFailure { error = it.message }
+                            submit(ProjectUiCommand.Select(project.id))
                         },
                     )
                 }
@@ -162,9 +162,7 @@ internal fun LocalProjectScreen(
                 SyButton(
                     text = stringResource(R.string.local_project_create),
                     onClick = {
-                        runCatching { actions.create(newName) }
-                            .onSuccess { newName = ""; error = null }
-                            .onFailure { error = it.message }
+                        submit(ProjectUiCommand.Create(newName)) { newName = "" }
                     },
                     enabled = newName.isNotBlank(),
                     variant = SyButtonVariant.Outline,
@@ -187,9 +185,7 @@ internal fun LocalProjectScreen(
                     SyButton(
                         text = stringResource(R.string.local_project_rename),
                         onClick = {
-                            runCatching { actions.rename(project.id, nameDraft) }
-                                .onSuccess { error = null }
-                                .onFailure { error = it.message }
+                            submit(ProjectUiCommand.Rename(project.id, nameDraft))
                         },
                         enabled = nameDraft.isNotBlank() && nameDraft.trim() != project.name,
                         variant = SyButtonVariant.Outline,
@@ -206,14 +202,12 @@ internal fun LocalProjectScreen(
                     SyButton(
                         text = stringResource(R.string.local_project_save_instruction),
                         onClick = {
-                            runCatching { actions.updateInstructions(project.id, instructionDraft) }
-                                .onSuccess { error = null }
-                                .onFailure { error = it.message }
+                            submit(ProjectUiCommand.UpdateInstructions(project.id, instructionDraft))
                         },
                         enabled = instructionDraft != project.instructions,
                         variant = SyButtonVariant.Outline,
                     )
-                    if (project.id != com.labteto.dshmobile.local.project.DEFAULT_PROJECT_ID) {
+                    if (project.deletable) {
                         SyButton(
                             text = stringResource(R.string.local_project_delete),
                             onClick = { pendingDeleteId = project.id },
@@ -255,9 +249,13 @@ internal fun LocalProjectScreen(
                         deleting = true
                         scope.launch {
                             try {
-                                actions.delete(target.id)
-                                pendingDeleteId = null
-                                error = null
+                                when (val receipt = port.submit(ProjectUiCommand.Delete(target.id))) {
+                                    is ProjectUiReceipt.Applied -> { pendingDeleteId = null; error = null }
+                                    is ProjectUiReceipt.Failed -> {
+                                        pendingDeleteId = null
+                                        error = receipt.message ?: deleteFailedMessage
+                                    }
+                                }
                             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                                 throw cancelled
                             } catch (failure: Exception) {

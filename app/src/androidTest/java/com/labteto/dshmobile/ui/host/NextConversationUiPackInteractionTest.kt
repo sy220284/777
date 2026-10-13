@@ -30,6 +30,7 @@ import org.junit.Test
 /** Renderer/contract tests with explicit fixtures, not proof of real model/tool completion. */
 class NextConversationUiPackInteractionTest {
     @get:Rule val compose = createComposeRule()
+    private val reading = com.labteto.dshmobile.ui.screens.local.LocalConversationReadingState()
     private val drafts = com.labteto.dshmobile.ui.screens.local.LocalSessionDraftCache()
     private val identity = UiSessionIdentity("session", "activation", 0, "profile", null)
     private inner class Chat : ChatUiPort {
@@ -58,7 +59,7 @@ class NextConversationUiPackInteractionTest {
     @Test fun rejectionKeepsDraftAndAcceptanceClearsItUsingTheCapturedIdentity() {
         val chat = Chat()
         val work = Work()
-        compose.setContent { NextConversationUiPack.Render(drafts, chat, work, workMode = false, onClose = {}) }
+        compose.setContent { NextConversationUiPack.Render(reading, drafts, chat, work, workMode = false, onClose = {}) }
         compose.onNode(hasSetTextAction()).performTextInput("retain draft")
         compose.onNodeWithText("发送").performClick()
         compose.onNode(hasSetTextAction()).assertTextContains("retain draft")
@@ -74,7 +75,7 @@ class NextConversationUiPackInteractionTest {
     @Test fun approvalOnlySubmitsTheExistingPendingIdentityAndDisplaysOwnerRejection() {
         val chat = Chat()
         val work = Work()
-        compose.setContent { NextConversationUiPack.Render(drafts, chat, work, workMode = true, onClose = {}) }
+        compose.setContent { NextConversationUiPack.Render(reading, drafts, chat, work, workMode = true, onClose = {}) }
         compose.onNodeWithText("{path:report}").assertIsDisplayed()
         compose.onNodeWithText("批准本次操作").performClick()
         compose.runOnIdle {
@@ -88,7 +89,7 @@ class NextConversationUiPackInteractionTest {
         val visible = androidx.compose.runtime.mutableStateOf(true)
         drafts.updateDraft(identity.sessionId, "host draft")
         compose.setContent {
-            if (visible.value) NextConversationUiPack.Render(drafts, chat, work, workMode = false, onClose = {})
+            if (visible.value) NextConversationUiPack.Render(reading, drafts, chat, work, workMode = false, onClose = {})
         }
         compose.onNode(hasSetTextAction()).assertTextContains("host draft")
         compose.runOnIdle { visible.value = false }

@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "snapshot": "c3d867db6752",
+  "snapshot": "f12c66ea844e",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
-  "code_files_scanned": 1511,
-  "production_sources_scanned": 849,
+  "code_files_scanned": 1516,
+  "production_sources_scanned": 852,
   "feature_nodes": 543,
   "functional_leaves": 446,
   "existing_executable_test_mappings": 128,
@@ -9217,10 +9217,24 @@
   "followup_production_or_compatibility": 13,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "f665e5f5bb53",
-    "added_production_files": [],
+    "baseline": "c3d867db6752",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationReadingState.kt",
+      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ConversationReadingUiPort.kt",
+      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ProjectUiPort.kt"
+    ],
     "removed_production_files": [],
     "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalProjectUiFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalConversationSliceHost.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationDraftCache.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiContribution.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalShellUiContribution.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptPresentation.kt",
+      "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/ConversationUiPack.kt",
       "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationUiPack.kt"
     ],
     "moved_unchanged_files": [],

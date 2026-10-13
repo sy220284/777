@@ -4,7 +4,7 @@ import com.labteto.dshmobile.uicontract.ConversationDraftUiPort
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-private const val MAX_LOCAL_SESSION_DRAFTS = 12
+internal const val MAX_LOCAL_SESSION_PRESENTATION_STATES = 12
 
 /** Single UI-only owner for both packs. Updates run on the UI thread, like the composer. */
 internal class LocalSessionDraftCache(
@@ -21,7 +21,7 @@ internal class LocalSessionDraftCache(
     fun putBoundedLocalDraft(sessionId: String, value: String) {
         values.remove(sessionId)
         if (value.isNotBlank()) values[sessionId] = value
-        while (values.size > MAX_LOCAL_SESSION_DRAFTS) values.remove(values.keys.first())
+        while (values.size > MAX_LOCAL_SESSION_PRESENTATION_STATES) values.remove(values.keys.first())
         published.value = values.toMap()
         onSave(save())
     }
@@ -37,7 +37,7 @@ internal class LocalSessionDraftCache(
                         if (pair[1].isNotBlank()) values[pair[0]] = pair[1]
                     }
                 }
-                while (values.size > MAX_LOCAL_SESSION_DRAFTS) values.remove(values.keys.first())
+                while (values.size > MAX_LOCAL_SESSION_PRESENTATION_STATES) values.remove(values.keys.first())
                 published.value = values.toMap()
             }
     }

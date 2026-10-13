@@ -265,3 +265,19 @@ internal fun appendWorkArtifactsToTranscript(
         .distinctBy { it.category to it.reference }.asReversed()
     return transcript + unique.map(LocalTranscriptItem::WorkArtifact)
 }
+
+/** Message anchors survive pack layouts and Work row compaction; sidecars keep their own identity. */
+internal fun LocalTranscriptItem.readingMessageId(): String? = when (this) {
+    is LocalTranscriptItem.Message -> message.id
+    is LocalTranscriptItem.Thinking -> messages.first().id
+    is LocalTranscriptItem.WorkProcess -> messages.first().id
+    is LocalTranscriptItem.WorkStep -> message.id
+    else -> null
+}
+
+internal fun LocalTranscriptItem.containsReadingMessage(messageId: String?): Boolean =
+    messageId != null && when (this) {
+        is LocalTranscriptItem.Thinking -> messages.any { it.id == messageId }
+        is LocalTranscriptItem.WorkProcess -> messages.any { it.id == messageId }
+        else -> readingMessageId() == messageId
+    }

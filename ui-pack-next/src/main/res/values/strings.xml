@@ -30,4 +30,5 @@
     <string name="next_reject_queue_unavailable">当前任务暂时不能接收新输入</string>
     <string name="next_reject_approval">这项审批已结束，请查看最新状态</string>
     <string name="next_reject_unsupported">此操作暂不可用</string>
+    <string name="next_reading_anchor_unavailable">原阅读位置的消息未在当前记录中，已显示现有消息。</string>
 </resources>
