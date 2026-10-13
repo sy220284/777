@@ -66,7 +66,10 @@ fun SyResponsiveSheet(
     val p = LocalSyPalette.current
     val cfg = LocalConfiguration.current
     val wide = cfg.screenWidthDp >= 600
-    val maxBodyHeight = cfg.screenHeightDp.dp * .67f
+    // V6 phone sheet is bounded by min(83% viewport, 730dp), not 360dp.
+    // Apply the cap to the entire sheet body so title, footer and IME consume
+    // space before the scroll region is measured.
+    val maxSheetHeight = minOf(cfg.screenHeightDp.dp * .83f, 730.dp)
     val dismissal = rememberUpdatedState(dismissEnabled)
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
@@ -75,7 +78,7 @@ fun SyResponsiveSheet(
     val reducedMotion = LocalSyReducedMotion.current
     @Composable fun SheetBody() {
         Column(
-            Modifier.fillMaxWidth().imePadding()
+            Modifier.fillMaxWidth().heightIn(max = maxSheetHeight).imePadding()
                 .padding(horizontal = 20.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -98,14 +101,10 @@ fun SyResponsiveSheet(
             }
             if (scrollable) {
                 Column(
-                    // Reserve header/footer space within the actual viewport after IME padding.
-                    // A screen-height cap alone can leave actions beyond a reduced viewport.
-                    // ModalBottomSheet is wrap-content on phones: a weighted child can
-                    // receive zero remaining height and hide all scrollable details.
-                    // Keep the viewport cap; only the height-bounded side panel uses weight.
-                    (if (wide) Modifier.fillMaxWidth().weight(1f, fill = false)
-                     else Modifier.fillMaxWidth())
-                        .heightIn(max = maxBodyHeight)
+                    // The finite height constraint is on the parent Column.
+                    // Weight gives the scroll body only the space left after
+                    // the fixed header and footer, including IME insets.
+                    Modifier.fillMaxWidth().weight(1f, fill = false)
                         .verticalScroll(rememberScrollState())
                         .testTag("bottomSheetScrollBody"),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
