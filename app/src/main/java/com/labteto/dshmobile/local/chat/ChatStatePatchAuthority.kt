@@ -19,7 +19,7 @@ internal object ChatStatePatchAuthority {
         userMessage: String,
         assistantMessage: String,
     ): JsonObject? {
-        if (raw == null || significance != "NONE") return raw
+        if (raw == null) return null
         val exchange = listOf(userMessage, assistantMessage).joinToString("\n")
         fun evidenced(field: String): Boolean {
             val quote = quotations[field].orEmpty().trim()
@@ -32,9 +32,14 @@ internal object ChatStatePatchAuthority {
         val top = raw.filter { (key, _) ->
             when (key) {
                 "dynamics" -> true
-                "continuity" -> true // Grounded against real pending evidence at commit time.
-                "unresolvedThreads" -> state.unresolvedThreads.isEmpty() || evidenced(key)
+                "continuity" -> true // Validated against durable Pending at commit time.
+                // A durable impression has no special bypass for MINOR/MAJOR. It is a
+                // separate fact from transient mood and always needs an actual quote.
+                "currentUserImpression", "relationshipState" -> evidenced(key)
+                "unresolvedThreads" -> significance != "NONE" ||
+                    state.unresolvedThreads.isEmpty() || evidenced(key)
                 in clearedScalar -> {
+                    if (significance != "NONE") return@filter true
                     val value = when (key) {
                         "physicalState" -> state.physicalState
                         "currentFocus" -> state.currentFocus
@@ -46,17 +51,21 @@ internal object ChatStatePatchAuthority {
                     }
                     value.isBlank() || key == "mood" && value == "自然" || evidenced(key)
                 }
-                else -> evidenced(key)
+                else -> significance != "NONE" || evidenced(key)
             }
         }.toMutableMap()
         val rawDynamics = raw["dynamics"] as? JsonObject
         if (rawDynamics != null) {
             val accepted = rawDynamics.filter { (field, _) ->
                 when (field) {
-                    "unknowns" -> true // Complete still-unanswered set, including [].
-                    "unresolvedConflict" ->
+                    // An empty unknown set is a semantic claim that questions were answered,
+                    // not a generic list clear. Only the user's transcript can authorize it.
+                    "unknowns" -> evidenced("dynamics.unknowns")
+                    "stage" -> true // Stage has its own event-level validation in the reducer.
+                    "unresolvedConflict" -> significance != "NONE" ||
                         state.dynamics.unresolvedConflict.isBlank() || evidenced("dynamics.$field")
-                    else -> evidenced("dynamics.$field")
+                    "facts", "hypotheses", "sharedObjects", "sharedMoments" -> true
+                    else -> significance != "NONE" || evidenced("dynamics.$field")
                 }
             }
             if (accepted.isEmpty()) top.remove("dynamics")
