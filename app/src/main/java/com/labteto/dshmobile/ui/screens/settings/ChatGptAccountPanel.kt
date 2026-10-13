@@ -216,7 +216,6 @@ internal fun ChatGptAccountPanel(
                 ) {
                     if (selected.sharingEnabled) {
                         SyPill(text = stringResource(R.string.chatgpt_plan_usage))
-                        SyPill(text = stringResource(R.string.chatgpt_model_count, planModels.size))
                     } else if (selected.signedIn) {
                         SyPill(text = stringResource(R.string.chatgpt_signed_in_plan_disabled))
                     } else {
