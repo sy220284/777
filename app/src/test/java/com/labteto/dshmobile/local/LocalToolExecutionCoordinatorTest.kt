@@ -1211,6 +1211,42 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals(1, observations)
     }
 
+    @Test
+    fun modelSelectionDiagnosesAbsentOrPolicyExcludedToolsWithoutExposingSchemas() {
+        val registry = ToolRegistry().apply {
+            register(tool(name = "web_search", access = ToolAccess.NETWORK,
+                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                family = "网络") { ToolResult("ok") })
+            register(tool(name = "workspace_write", access = ToolAccess.WORKSPACE_WRITE,
+                approval = ToolApprovalPolicy.MUTATION, exposure = ToolExposure.OPTIONAL,
+                family = "文件") { ToolResult("ok") })
+        }
+        val execution = coordinator(registry, networkSearchEnabled = { false })
+        val projection = LocalToolSchemaProjection(registry, execution)
+        val selection = projection.modelSelection(
+            policy = localAgentRunPolicy(LocalUsageMode.WORK),
+            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
+            planModeEnabled = true,
+            history = emptyList(),
+            enabledOptional = linkedSetOf("web_search", "workspace_write", "uninstalled_extension"),
+        )
+        assertFalse("web_search" in projection.names(selection.schemas))
+        assertFalse("workspace_write" in projection.names(selection.schemas))
+        assertFalse("uninstalled_extension" in projection.names(selection.schemas))
+        assertTrue(selection.omittedReasons["web_search"].orEmpty().contains("关闭"))
+        assertTrue(selection.omittedReasons["workspace_write"].orEmpty().contains("规划模式"))
+        assertTrue(selection.omittedReasons["uninstalled_extension"].orEmpty().contains("未注册"))
+
+        // The public model-facing API must not drift from the diagnostic selection.
+        assertEquals(selection.schemas, projection.modelSchemas(
+            policy = localAgentRunPolicy(LocalUsageMode.WORK),
+            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
+            planModeEnabled = true,
+            history = emptyList(),
+            enabledOptional = linkedSetOf("web_search", "workspace_write", "uninstalled_extension"),
+        ))
+    }
+
     private fun coordinator(
         registry: ToolRegistry,
         planMode: Boolean = false,

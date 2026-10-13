@@ -161,15 +161,33 @@ internal class LocalToolExecutionCoordinator(
     fun visibleSchemas(
         policy: LocalAgentRunPolicy,
         maxOptionalDefinitionTokens: Int = LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
-    ): JsonArray {
-        if (!policy.toolsEnabled) return JsonArray(emptyList())
+    ): JsonArray = selectVisibleSchemas(policy, maxOptionalDefinitionTokens).schemas
+
+    /** Foreground requests and capability inspection share one admission decision. */
+    internal fun selectVisibleSchemas(
+        policy: LocalAgentRunPolicy,
+        maxOptionalDefinitionTokens: Int = LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
+    ): LocalToolRouter.ToolSchemaSelection {
+        if (!policy.toolsEnabled) return LocalToolRouter.ToolSchemaSelection(
+            schemas = JsonArray(emptyList()), omittedReasons = emptyMap(), compactedNames = emptySet(),
+        )
+        val enabled = enabledOptionalSnapshot()
         val tools = registry.names().mapNotNull(registry::get)
             .filter { isNetworkSearchPermitted(it.name) }
-        return LocalToolRouter.visibleSchemas(
-            tools = tools,
-            enabledOptional = enabledOptionalSnapshot(),
+        val selection = LocalToolRouter.selectSchemas(
+            tools = tools, enabledOptional = enabled,
             maxOptionalDefinitionTokens = maxOptionalDefinitionTokens,
         )
+        val unavailable = enabled.mapNotNull { name ->
+            val registered = registry.get(name)
+            val reason = when {
+                registered == null -> "已选工具未注册或已卸载；请重新发现能力"
+                !isNetworkSearchPermitted(name) -> "网络搜索设置已关闭"
+                else -> null
+            }
+            reason?.let { name to it }
+        }.toMap()
+        return selection.copy(omittedReasons = unavailable + selection.omittedReasons)
     }
 
     fun visibleToolNames(policy: LocalAgentRunPolicy): List<String> =

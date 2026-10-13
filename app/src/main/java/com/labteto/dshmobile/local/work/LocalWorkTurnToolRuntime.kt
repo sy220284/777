@@ -85,7 +85,7 @@ internal class LocalWorkTurnToolRuntime(
             }
             binding.enabledOptionalTools.toSet()
         }
-        return schemas.modelSchemas(
+        val selection = schemas.modelSelection(
             policy = policy,
             modelState = binding.state.value.modelState,
             planModeEnabled = binding.state.value.work.planMode,
@@ -93,6 +93,21 @@ internal class LocalWorkTurnToolRuntime(
             enabledOptional = enabled,
             agentTeamMode = teamMode,
         )
+        // The request evidence already records the exact schema digest. Only record a separate
+        // fact when a selected capability could not reach the model; no parallel tool registry.
+        if (selection.omittedReasons.isNotEmpty()) {
+            binding.eventLog.append("tool/schema-admission", buildJsonObject {
+                put("version", 1)
+                put("enabled_optional_count", enabled.size)
+                put("omitted_total", selection.omittedReasons.size)
+                put("omitted", buildJsonObject {
+                    selection.omittedReasons.entries.take(24).forEach { (name, reason) ->
+                        put(name, reason)
+                    }
+                })
+            })
+        }
+        return selection.schemas
     }
 
     internal fun names(
