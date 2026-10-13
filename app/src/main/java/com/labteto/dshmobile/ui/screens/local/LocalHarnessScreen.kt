@@ -416,10 +416,31 @@ fun LocalHarnessScreen(
         }
     }
 
+    // The callback belongs to this rendered frame. Never retarget its text to whichever session
+    // happens to be current when the event is delivered after a transition.
+    val sendIdentity = viewModel.captureUiSendIdentity()?.takeIf { it.sessionId == shell.sessionId }
+    val sendMode = shell.usageMode
+    fun answerApprovalFromFrame(pendingId: String, approved: Boolean) {
+        val receipt = viewModel.answerUiApproval(pendingId, sendIdentity, approved)
+        val notice = when (receipt) {
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted,
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued -> null
+            is com.labteto.dshmobile.uicontract.UiCommandReceipt.Rejected -> resources.getString(
+                when (receipt.reason) {
+                    com.labteto.dshmobile.uicontract.UiCommandRejection.APPROVAL_EXPIRED -> R.string.local_ui_approval_expired
+                    com.labteto.dshmobile.uicontract.UiCommandRejection.SESSION_TRANSITION -> R.string.local_send_rejected_session_transition
+                    else -> R.string.local_ui_context_changed
+                },
+            )
+            is com.labteto.dshmobile.uicontract.UiCommandReceipt.Failed -> receipt.message
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.OutcomeUnknown -> resources.getString(R.string.local_ui_result_unknown)
+        }
+        notice?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show() }
+    }
     val shellActions = LocalShellFeatureUiActions(
         streamingState = viewModel.streamingState,
         selectModel = viewModel::selectModel,
-        send = viewModel::send,
+        send = { text, attachments -> viewModel.send(text, attachments, sendIdentity, sendMode) },
         sendWithTeam = viewModel::sendWithTeam,
         teamMemberOutput = viewModel::teamMemberOutput,
         sendTeamMemberMessage = viewModel::sendTeamMemberMessage,
@@ -443,8 +464,8 @@ fun LocalHarnessScreen(
         saveGroupAnnouncement = viewModel::setGroupChatAnnouncement,
         undoPersonaCorrection = viewModel::undoChatPersonaCorrection,
         setPlanMode = viewModel::setPlanMode,
-        approve = viewModel::approve,
-        deny = viewModel::deny,
+        approve = { pendingId -> answerApprovalFromFrame(pendingId, true) },
+        deny = { pendingId -> answerApprovalFromFrame(pendingId, false) },
         enableAutoApproval = viewModel::enableAutoApproval,
         useDefaultApproval = viewModel::useDefaultApproval,
         setNetworkSearchEnabled = viewModel::setNetworkSearchEnabled,

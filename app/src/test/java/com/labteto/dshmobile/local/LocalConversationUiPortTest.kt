@@ -66,7 +66,10 @@ class LocalConversationUiPortTest {
         val work = WorkOwner()
         val state = store.initialize(LocalHarnessState(sessionId = "a", usageMode = mode,
             loading = false, modelState = LocalModelState(configured = true)))
-        val port = LocalConversationUiPortComposition(store, chat, work, LocalWorkApprovalUiPort { _, _ -> false })
+        val port = LocalConversationUiPortComposition(store, chat, work, object : LocalWorkApprovalUiPort {
+            override fun pendingApproval(): LocalApproval? = null
+            override fun answerApproval(pendingId: String, approved: Boolean) = false
+        })
     }
 
     @Test fun chatTextRoutesOnlyToChatAndPreservesOwnerQueueReceipt() {
@@ -102,7 +105,7 @@ class LocalConversationUiPortTest {
 
     @Test fun staleActivationTransitionAndModeCannotInvokeEitherOwner() {
         val f = Fixture(LocalUsageMode.CHAT)
-        val old = requireNotNull(f.port.chat.snapshot().identity)
+        val old = requireNotNull(f.port.identitySnapshot())
         f.store.foregroundRunHandle.rebindSession("b")
         f.store.foregroundRunHandle.rebindSession("a")
         assertEquals(UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY),
@@ -156,18 +159,31 @@ class LocalConversationUiPortTest {
             override fun setDeviceApprovalLease(enabled: Boolean) = Unit
         })
         val port = LocalConversationUiPortComposition(f.store, f.chat, f.work,
-            LocalWorkApprovalUiPort(interaction::answerApproval))
+            object : LocalWorkApprovalUiPort {
+                override fun pendingApproval() = interaction.pendingApprovalForUi()
+                override fun answerApproval(pendingId: String, approved: Boolean) = interaction.answerApprovalFromUi(pendingId, approved)
+            })
         val waiter = async { interaction.awaitApproval(LocalApproval("pending", "write_file", "write", "{}", "write")) }
         runCurrent()
         val identity = requireNotNull(port.work.snapshot().identity)
+        val pendingId = requireNotNull(port.work.snapshot().approval).pendingId
         assertEquals(UiCommandReceipt.Rejected(UiCommandRejection.APPROVAL_EXPIRED),
             port.work.submit(WorkConversationUiCommand.AnswerApproval(identity, "invented", true)))
         assertFalse(waiter.isCompleted)
         assertEquals(UiCommandReceipt.Accepted,
-            port.work.submit(WorkConversationUiCommand.AnswerApproval(identity, "pending", true)))
+            port.work.submit(WorkConversationUiCommand.AnswerApproval(identity, pendingId, true)))
         assertTrue(waiter.await())
         assertEquals(UiCommandReceipt.Rejected(UiCommandRejection.APPROVAL_EXPIRED),
-            port.work.submit(WorkConversationUiCommand.AnswerApproval(identity, "pending", true)))
+            port.work.submit(WorkConversationUiCommand.AnswerApproval(identity, pendingId, true)))
+        val replacement = async { interaction.awaitApproval(LocalApproval("pending", "write_file", "write", "{}", "write")) }
+        runCurrent()
+        assertEquals(UiCommandReceipt.Rejected(UiCommandRejection.APPROVAL_EXPIRED),
+            port.work.submit(WorkConversationUiCommand.AnswerApproval(identity, pendingId, true)))
+        assertFalse(replacement.isCompleted)
+        val replacementId = requireNotNull(port.work.snapshot().approval).pendingId
+        assertEquals(UiCommandReceipt.Accepted,
+            port.work.submit(WorkConversationUiCommand.AnswerApproval(identity, replacementId, false)))
+        assertFalse(replacement.await())
         assertTrue(f.chat.sent.isEmpty())
         assertTrue(f.work.sent.isEmpty())
     }

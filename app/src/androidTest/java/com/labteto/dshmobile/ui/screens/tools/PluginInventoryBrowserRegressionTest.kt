@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.tools
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -54,7 +55,8 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithText("服务扩展 · 1").performClick()
         compose.onNodeWithText("local-mcp").assertIsDisplayed().performClick()
         // A discovered registry entry is not a fresh connection-health observation.
-        compose.onNodeWithText("连接健康未检测", substring = true).assertIsDisplayed()
+        compose.onNodeWithTag("plugin-detail-description")
+            .assertTextContains("连接健康未检测", substring = true).assertIsDisplayed()
         compose.onNodeWithTag("plugin-detail-primary-action").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, openedConnections) }
     }

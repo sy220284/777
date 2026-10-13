@@ -35,9 +35,9 @@ MCP 首批只修假健康显示；实时注册、选中、连接、授权四维�
 
 消息只读快照来自 Shared Session 已有有界正文，队列仍归 Shared Runtime，审批仍归 Work 的真实 interaction waiter。新端口不返回可写领域对象、Store、Runtime、执行协调器、Compose 类型或 V6 组件。
 
-文本发送先在 Shared Runtime 既有 foreground lock 内核对会话激活身份、模式、项目、账户 profile 和 Chat context generation，再调用原 Chat/Work execution port。`LocalAgentRunHandle.activationId` 随 rebind 更新，是进程内旧 UI 意图的生命周期栅栏，不持久化、不替代 Owner 的幂等/任务身份，也不用于收费操作重放。离开再回到同一会话后，旧激活身份失效。
+V6 普通文本和单次审批的回调固定画面生成时的身份；不在点击时按当前会话重新定向。文本发送先在 Shared Runtime 既有 foreground lock 内核对会话激活身份、模式、项目、账户 profile 和 Chat context generation，再调用原 Chat/Work execution port。`LocalAgentRunHandle.activationId` 随 rebind 更新，是进程内旧 UI 意图的生命周期栅栏，不持久化、不替代 Owner 的幂等/任务身份，也不用于收费操作重放。离开再回到同一会话后，旧激活身份失效。
 
-`Accepted` 只表示原 Owner 接纳，`Queued` 表示原 Owner 已排队。审批必须同时存在当前 pending ID，并由真实等待器成功接纳才返回 Accepted；过期/重复审批不能凭界面状态伪造成功。历史动作不自动重提。
+`Accepted` 只表示原 Owner 接纳，`Queued` 表示原 Owner 已排队。审批 ID 由真实等待器注册时签发，每次等待都有新身份；模型提供的工具调用 ID 不作为 UI 审批权限。当前可见投影、当前等待器与命令身份必须一致，并由实际等待器成功接纳才返回 Accepted；重复调用 ID、过期和重复审批都不能凭界面状态伪造成功。新增身份只附于现有等待记录，不持久化、不建立审批账本，也不改变工具执行或自动审批政策。历史动作不自动重提。
 
 ## 独立包验证方式
 
@@ -54,7 +54,7 @@ adb shell am start -n com.sy220284.dshmobile.debug/com.labteto.dshmobile.MainAct
 
 `UiPackManifest.checkCompatibility` 检查契约版本、必要 Scene、能力、窗口、无障碍和暗色声明。单测确认此切片包无法通过全应用覆盖检查。声明支持无障碍和窗口类型只是契约声明，不等于已通过设备验收。
 
-本批仍缺双包共享草稿、阅读锚点、附件、审批参数大字布局、账号撤销和进程恢复的完整用户旅程证据。不能按“能编译”宣布插拔完成，也不能绕过 S2 出口直接全量迁移。
+自动审批政策、设备批准租期及问答继续由现有 Owner 处理，尚未纳入新强类型命令。本批仍缺双包共享草稿、阅读锚点、附件、审批参数大字布局、账号撤销和进程恢复的完整用户旅程证据。不能按“能编译”宣布插拔完成，也不能绕过 S2 出口直接全量迁移。
 
 ## 旧 22 项问题的唯一去向
 
@@ -74,7 +74,8 @@ adb shell am start -n com.sy220284.dshmobile.debug/com.labteto.dshmobile.MainAct
 
 - 静态：UI 设计系统、颜色、CJK、架构、性能、Kotlin 风险、测试质量、安全、通知、工具链基线、CI 完整性已通过；最终模式隔离修正后的架构、测试质量、CI 完整性与功能树同步及独立检查已通过。
 - `:ui-contract:test`：3 项测试通过，失败/错误/跳过均为 0。`:ui-host:compileDebugKotlin`、`:ui-pack-next:compileDebugKotlin` 已通过。
-- App 全部 JVM 单测：Run 38427220801 的首批 `bb6df7c2` 通过，并通过 JVM 21 字节码检查；随后主线更新至 7c7a5c88，已重新组合，旧结果不作为最新组合通过证明。本地全量编译耗时较长，已停止。Debug/optimized APK、androidTest 和 lint 以最新组合完整 CI 为准。
+- 组合至 7c7a5c88 后，Run 38429460247（86629c0b）：全部 JVM 单测、ARM64 optimized APK/lint、x86 Debug/测试/optimized APK 构建通过。Android 16 运行 248 项，MCP 文案断言因列表和详情同时匹配而失败；已限定到详情文本，未削弱健康状态断言。独立包的两项渲染交互测试属于显式夹具验证。
+- 最新画面身份和审批等待器身份修正后必须重跑完整 CI；以上旧 head 结果不是最终通过证明。本地全量编译耗时较长，已停止。
 - 首次完整 CI（Run 38416556578）：静态和架构通过；单测和构建被独立包解析出的旧 Lifecycle/Tracing 元数据校验阻断，尚未运行到测试。独立包补充与项目已核验版本一致的依赖约束及 Coroutine Android 依赖，不关闭校验、不添加旧版散列。Android 17 镜像下载同时出现 Zip 损坏，未记录设备通过。修正后重跑。
 - 构建排障：新模块脱离 App 后曾解析到未缓存的 Activity 旧版；Host SDK 已去掉无用 UI 依赖，验证包使用项目固定 Activity 版本；未联网补齐。
 - 首轮 App 构建：KSP 报 `No fir element was found for KtParameter`，失败，没有据此声称单测通过；已对最终依赖图重新执行。

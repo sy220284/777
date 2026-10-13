@@ -43,6 +43,11 @@ class LocalConversationUiPortComposition @Inject internal constructor(
     private val workOwner: LocalWorkExecutionPort,
     private val approvalOwner: LocalWorkApprovalUiPort,
 ) {
+    /** Captured by a legacy frame without copying message bodies; admission still belongs to ports. */
+    internal fun identitySnapshot(): UiSessionIdentity? = synchronized(stateStore.foregroundRunHandle.lock) {
+        identity(stateStore.state.value)
+    }
+
     val chat: ChatUiPort = object : ChatUiPort {
         override val snapshots: Flow<ChatSceneSnapshot> = stateStore.state.map { snapshot() }.distinctUntilChanged()
         override fun snapshot(): ChatSceneSnapshot = synchronized(stateStore.foregroundRunHandle.lock) {
@@ -76,19 +81,22 @@ class LocalConversationUiPortComposition @Inject internal constructor(
         override fun snapshot(): WorkConversationSceneSnapshot = synchronized(stateStore.foregroundRunHandle.lock) {
             val state = stateStore.state.value
             val active = state.usageMode == LocalUsageMode.WORK
+            val approval = if (active) approvalOwner.pendingApproval()?.takeIf {
+                it.requestId == state.work.pendingApproval?.requestId
+            } else null
             WorkConversationSceneSnapshot(
                 identity = identity(state).takeIf { active },
                 status = if (active) status(state) else UiSceneStatus.EMPTY,
                 phase = when {
-                    active && (state.work.pendingApproval != null || state.work.pendingQuestion != null) -> UiExecutionPhase.WAITING_FOR_USER
+                    active && (approval != null || state.work.pendingQuestion != null) -> UiExecutionPhase.WAITING_FOR_USER
                     active && state.kernel.running -> UiExecutionPhase.RUNNING
                     else -> UiExecutionPhase.IDLE
                 },
                 messages = if (active) messages(state) else emptyList(),
                 queuedInputCount = if (active) state.kernel.queuedInputCount else 0,
                 send = availability(state, active),
-                approval = state.work.pendingApproval?.takeIf { active }?.let {
-                    UiApprovalSnapshot(it.callId, it.toolName, it.summary, it.arguments, when (it.impact) {
+                approval = approval?.let {
+                    UiApprovalSnapshot(requireNotNull(it.requestId), it.toolName, it.summary, it.arguments, when (it.impact) {
                         com.labteto.dshmobile.local.interaction.LocalApprovalImpact.LOW -> UiApprovalImpact.LOW
                         com.labteto.dshmobile.local.interaction.LocalApprovalImpact.MEDIUM -> UiApprovalImpact.MEDIUM
                         com.labteto.dshmobile.local.interaction.LocalApprovalImpact.HIGH -> UiApprovalImpact.HIGH
@@ -112,7 +120,8 @@ class LocalConversationUiPortComposition @Inject internal constructor(
             when (command) {
                 is WorkConversationUiCommand.SendText -> workOwner.send(command.text).toUiReceipt()
                 is WorkConversationUiCommand.AnswerApproval -> {
-                    if (state.work.pendingApproval?.callId != command.pendingId ||
+                    if (state.work.pendingApproval?.requestId != command.pendingId ||
+                        approvalOwner.pendingApproval()?.requestId != command.pendingId ||
                         !approvalOwner.answerApproval(command.pendingId, command.approved)) {
                         UiCommandReceipt.Rejected(UiCommandRejection.APPROVAL_EXPIRED)
                     } else UiCommandReceipt.Accepted

@@ -206,18 +206,22 @@ class LocalHarnessViewModel @Inject constructor(
 
     fun configure(apiKey: String, model: String, baseUrl: String) = runtime.model.configure(apiKey, model, baseUrl)
     fun selectModel(model: String) = runtime.model.selectModel(model)
+    internal fun captureUiSendIdentity(): com.labteto.dshmobile.uicontract.UiSessionIdentity? = uiPorts.identitySnapshot()
+
     internal fun send(
         text: String,
-        attachments: List<LocalImportedAttachment> = emptyList(),
+        attachments: List<LocalImportedAttachment>,
+        identity: com.labteto.dshmobile.uicontract.UiSessionIdentity?,
+        mode: LocalUsageMode,
     ): LocalSendResult {
         // Text sends share the stable port with the independent verification pack. Attachment
         // import and token contracts are a later slice; their current owner entry stays intact.
         if (attachments.isEmpty() && text.isNotBlank()) {
-            val receipt = when (state.value.usageMode) {
-                LocalUsageMode.CHAT -> chatUiPort.snapshot().identity?.let {
+            val receipt = when (mode) {
+                LocalUsageMode.CHAT -> identity?.let {
                     chatUiPort.submit(com.labteto.dshmobile.uicontract.ChatUiCommand.SendText(it, text))
                 }
-                LocalUsageMode.WORK -> workConversationUiPort.snapshot().identity?.let {
+                LocalUsageMode.WORK -> identity?.let {
                     workConversationUiPort.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.SendText(it, text))
                 }
             }
@@ -333,15 +337,18 @@ class LocalHarnessViewModel @Inject constructor(
         val result = runtime.work.stopTeamForUi()
         return LocalWorkUiActionResult(result.accepted, result.message)
     }
-    fun approve(callId: String) { answerUiApproval(callId, true) }
-    fun deny(callId: String) { answerUiApproval(callId, false) }
-    private fun answerUiApproval(callId: String, approved: Boolean) {
-        workConversationUiPort.snapshot().identity?.let { identity ->
+    internal fun answerUiApproval(
+        pendingId: String,
+        identity: com.labteto.dshmobile.uicontract.UiSessionIdentity?,
+        approved: Boolean,
+    ): com.labteto.dshmobile.uicontract.UiCommandReceipt =
+        identity?.let {
             workConversationUiPort.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.AnswerApproval(
-                identity, callId, approved,
+                it, pendingId, approved,
             ))
-        }
-    }
+        } ?: com.labteto.dshmobile.uicontract.UiCommandReceipt.Rejected(
+            com.labteto.dshmobile.uicontract.UiCommandRejection.STALE_IDENTITY,
+        )
     fun useDefaultApproval() = runtime.work.useDefaultApproval()
     fun enableAutoApproval() = runtime.work.enableAutoApproval()
     fun enableAutoApprovalForPending(callId: String) = runtime.work.enableAutoApprovalForPending(callId)

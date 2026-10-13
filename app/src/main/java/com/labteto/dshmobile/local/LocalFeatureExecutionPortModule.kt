@@ -73,7 +73,10 @@ internal object LocalFeatureExecutionPortModule {
     fun provideLocalWorkApprovalUiPort(
         runtime: com.labteto.dshmobile.local.work.LocalWorkRuntime,
     ): com.labteto.dshmobile.local.work.LocalWorkApprovalUiPort =
-        com.labteto.dshmobile.local.work.LocalWorkApprovalUiPort(runtime::answerApproval)
+        object : com.labteto.dshmobile.local.work.LocalWorkApprovalUiPort {
+            override fun pendingApproval() = runtime.pendingApprovalForUi()
+            override fun answerApproval(pendingId: String, approved: Boolean) = runtime.answerApproval(pendingId, approved)
+        }
 
     @Provides
     @Singleton

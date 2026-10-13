@@ -183,10 +183,15 @@ class LocalWorkRuntime @Inject internal constructor(
         agentUi.stopTeamMember(memberId)
     internal suspend fun stopTeamForUi(): LocalWorkAgentUiResult =
         agentUi.stopTeam()
-    internal fun answerApproval(callId: String, approved: Boolean): Boolean {
+    internal fun pendingApprovalForUi(): com.labteto.dshmobile.local.interaction.LocalApproval? {
         val binding = workRunRegistry[runtimeStateStore.currentSessionId]
-        if (binding?.interactions?.answerApproval(callId, approved) == true) return true
-        return runtimeStateStore.foregroundInteractions.answerApproval(callId, approved)
+        return binding?.interactions?.pendingApprovalForUi()
+            ?: runtimeStateStore.foregroundInteractions.pendingApprovalForUi()
+    }
+    internal fun answerApproval(requestId: String, approved: Boolean): Boolean {
+        val binding = workRunRegistry[runtimeStateStore.currentSessionId]
+        if (binding?.interactions?.answerApprovalFromUi(requestId, approved) == true) return true
+        return runtimeStateStore.foregroundInteractions.answerApprovalFromUi(requestId, approved)
     }
     internal fun useDefaultApproval() =
         runtimeStateStore.performVisibleOperation("审批设置保存失败") { approvals.useDefaultApproval() }

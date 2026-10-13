@@ -31,6 +31,28 @@ class LocalInteractionCoordinatorTest {
     }
 
     @Test
+    fun reusedModelCallIdCannotReuseUiApprovalAuthority() = runTest {
+        val state = TestState()
+        val coordinator = LocalInteractionCoordinator(state)
+        val approval = LocalApproval("same-model-id", "write", "write", "{}", "workspace_write", requestId = "untrusted-id")
+        val first = async { coordinator.awaitApproval(approval) }
+        runCurrent()
+        val firstId = requireNotNull(coordinator.pendingApprovalForUi()?.requestId)
+        assertFalse(coordinator.answerApprovalFromUi("untrusted-id", true))
+        assertTrue(coordinator.answerApprovalFromUi(firstId, true))
+        assertTrue(first.await())
+        val second = async { coordinator.awaitApproval(approval) }
+        runCurrent()
+        assertFalse(coordinator.answerApprovalFromUi(firstId, true))
+        assertFalse(second.isCompleted)
+        assertEquals(approval.copy(requestId = null), state.approval?.copy(requestId = null))
+        val secondId = requireNotNull(coordinator.pendingApprovalForUi()?.requestId)
+        assertTrue(coordinator.answerApprovalFromUi(secondId, false))
+        assertFalse(second.await())
+        assertNull(coordinator.pendingApprovalForUi())
+    }
+
+    @Test
     fun staleApprovalIdCannotResolveCurrentInteraction() = runTest {
         val state = TestState()
         val coordinator = LocalInteractionCoordinator(state)

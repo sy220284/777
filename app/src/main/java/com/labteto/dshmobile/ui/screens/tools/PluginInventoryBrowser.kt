@@ -418,6 +418,7 @@ internal fun PluginInventoryBrowser(
             )
             Text(
                 item.detail,
+                modifier = Modifier.testTag("plugin-detail-description"),
                 style = DsType.small13.withReadingWeight(),
                 color = colors.textSecondary,
             )

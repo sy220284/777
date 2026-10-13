@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.interaction
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.sync.Mutex
+import java.util.UUID
 
 internal const val LOCAL_QUESTION_CANCELLED_RESPONSE = "用户取消了问题"
 private const val LOCAL_QUESTION_EMPTY_RESPONSE = "用户未提供文字回答"
@@ -29,15 +30,18 @@ internal interface LocalInteractionStatePort {
  * Owns all user-mediated wait/response state for one local Harness run.
  *
  * One interaction mutex preserves the current UI contract of showing a single decision at a time.
- * Call-id checks ensure a stale click can never resolve a later approval or question.
+ * UI approvals bind to an owner-issued waiter identity; model call IDs may be reused.
+ * Internal policy changes and existing question handling keep their call-id contract.
  */
 internal class LocalInteractionCoordinator(
     private val state: LocalInteractionStatePort,
 ) {
     private data class ApprovalWaiter(
-        val callId: String,
+        val approval: LocalApproval,
         val response: CompletableDeferred<Boolean>,
-    )
+    ) {
+        val callId: String get() = approval.callId
+    }
 
     private data class QuestionWaiter(
         val callId: String,
@@ -63,6 +67,7 @@ internal class LocalInteractionCoordinator(
         interactionMutex.lock()
         try {
             val response = CompletableDeferred<Boolean>()
+            val activeApproval = approval.copy(requestId = UUID.randomUUID().toString())
             synchronized(waiterLock) {
                 if (generation != cancellationGeneration) {
                     throw CancellationException("用户交互所属回合已取消")
@@ -70,9 +75,9 @@ internal class LocalInteractionCoordinator(
                 check(approvalWaiter == null && questionWaiter == null) {
                     "已有用户交互正在等待处理"
                 }
-                approvalWaiter = ApprovalWaiter(approval.callId, response)
+                approvalWaiter = ApprovalWaiter(activeApproval, response)
             }
-            state.setPendingApproval(approval)
+            state.setPendingApproval(activeApproval)
             return try {
                 response.await()
             } finally {
@@ -120,6 +125,22 @@ internal class LocalInteractionCoordinator(
             if (waiter?.callId != callId) return@synchronized false
             waiter.response.complete(approved)
         }
+
+    /** UI authority comes from this unresolved waiter, not from a possibly reused model call ID. */
+    fun pendingApprovalForUi(): LocalApproval? = synchronized(waiterLock) {
+        val waiter = approvalWaiter ?: return@synchronized null
+        if (waiter.response.isCompleted || state.pendingApproval()?.requestId != waiter.approval.requestId) {
+            return@synchronized null
+        }
+        waiter.approval
+    }
+
+    fun answerApprovalFromUi(requestId: String, approved: Boolean): Boolean = synchronized(waiterLock) {
+        val waiter = approvalWaiter ?: return@synchronized false
+        if (waiter.approval.requestId != requestId ||
+            state.pendingApproval()?.requestId != requestId) return@synchronized false
+        waiter.response.complete(approved)
+    }
 
     /** Commit an approval mode change only while this exact unresolved request still owns the wait. */
     fun resolveApproval(callId: String, commit: (LocalApproval) -> Boolean): Boolean =
