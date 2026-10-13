@@ -1,7 +1,5 @@
 package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.io.NetworkInputTooLargeException
-import com.labteto.dshmobile.local.io.readBoundedLine
 
 import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.local.TokenPromptBreakdown
@@ -311,30 +309,24 @@ internal class AnthropicMessagesClient @Inject constructor(
         var sawMessageStop = false
         var sawMessageStart = false
         val closedBlocks = mutableSetOf<Int>()
-        var totalBytes = 0
-
-        val reader = body.charStream().buffered()
+        
+        val reader = ModelStreamLineReader(body.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_STREAM_BYTES)
         run {
             while (true) {
                 val line = try {
-                            readBoundedLine(reader, MAX_SSE_LINE_CHARS)
-                        } catch (failure: NetworkInputTooLargeException) {
-                            throw LocalModelException(
-                                code = "MODEL_RESPONSE_TOO_LARGE",
-                                message = "Anthropic 流式响应单行超过安全上限",
-                                retryable = false,
-                                requestId = requestId,
-                            )
-                        } ?: break
-                totalBytes += line.toByteArray(Charsets.UTF_8).size + 1
-                if (totalBytes > MAX_STREAM_BYTES) {
+                    reader.readLine()
+                } catch (failure: ModelStreamLimitException) {
                     throw LocalModelException(
                         code = "MODEL_RESPONSE_TOO_LARGE",
-                        message = "Anthropic 流式响应超过本机安全上限",
+                        message = if (failure.kind == ModelStreamLimitKind.LINE) {
+                            "Anthropic 流式响应单行超过安全上限"
+                        } else {
+                            "Anthropic 流式响应超过本机安全上限"
+                        },
                         retryable = false,
                         requestId = requestId,
                     )
-                }
+                } ?: break
                 if (!line.startsWith("data:")) continue
                 val data = line.removePrefix("data:").trim()
                 if (data.isBlank()) continue
