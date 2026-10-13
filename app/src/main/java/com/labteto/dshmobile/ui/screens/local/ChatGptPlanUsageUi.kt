@@ -5,46 +5,20 @@ import com.shenyan.designsystem.foundation.SyMetric
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.model.LocalModelAuthKind
-import com.labteto.dshmobile.local.model.LocalModelProfile
-import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_USAGE_URL
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
-
-@Composable
-internal fun ChatGptPlanUsageBar(profile: LocalModelProfile?) {
-    if (profile?.authKind != LocalModelAuthKind.CHATGPT_PLAN) return
-    val uriHandler = LocalUriHandler.current
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.End,
-    ) {
-        SyButton(
-            text = stringResource(R.string.chatgpt_manage_usage),
-            onClick = { uriHandler.openUri(CHATGPT_USAGE_URL) },
-            size = SyButtonSize.Small,
-            variant = SyButtonVariant.Ghost,
-        )
-    }
-}
 
 internal fun isChatGptPlanUsageError(message: String?): Boolean {
     val value = message.orEmpty()
@@ -76,7 +50,6 @@ internal fun LocalConversationErrorCard(
     showConnectAction: Boolean = false,
 ) {
     val message = sendRejectMessage ?: stateError ?: return
-    val uriHandler = LocalUriHandler.current
     val usageError = sendRejectMessage == null && isChatGptPlanUsageError(stateError)
     val modelRecovery = sendRejectMessage == null && isChatGptModelRecoveryError(stateError)
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
@@ -109,12 +82,6 @@ internal fun LocalConversationErrorCard(
                     )
                 }
                 usageError -> {
-                    SyButton(
-                        text = stringResource(R.string.chatgpt_manage_usage),
-                        onClick = { uriHandler.openUri(CHATGPT_USAGE_URL) },
-                        modifier = Modifier.fillMaxWidth(),
-                        size = SyButtonSize.Small,
-                    )
                     SyButton(
                         text = stringResource(R.string.chatgpt_switch_model_source),
                         onClick = onSwitchModelSource,
