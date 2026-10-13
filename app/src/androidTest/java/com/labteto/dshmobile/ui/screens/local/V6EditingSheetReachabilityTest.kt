@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import com.labteto.dshmobile.ui.screens.tasks.AutomationTimePickerSheet
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Rule
 import org.junit.Test
