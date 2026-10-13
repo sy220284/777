@@ -395,7 +395,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt",
-      "sha256": "fe0e41484aa8b7c4"
+      "sha256": "4c80e8d0cc9a5aa8"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt",
@@ -1367,7 +1367,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalUiDocumentGeneration.kt",
-      "sha256": "fc570df3e4b7c78a"
+      "sha256": "66a8ee6557f88b06"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalWorkRuntimeContext.kt",
@@ -1735,7 +1735,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt",
-      "sha256": "4dfffd41277091e8"
+      "sha256": "97fbb9fdaf037d1e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionRuntimeRegistry.kt",
@@ -3535,46 +3535,15 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "2258af242e74",
+  "source_snapshot": "ad13c692ecc3",
   "observed_delta": {
-    "baseline": "f12c66ea844e",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalUiSessionIdentityProjection.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalUiDocumentGeneration.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiDocumentUiAdapter.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/document/LocalUiDocumentCodec.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/session/LocalUiDocumentSessionStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiDocumentFormState.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalDynamicDocument.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalUiDocumentGenerateButton.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ToolsUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiDocument.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiDocumentFormUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiDocumentUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/model/LocalModelValues.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextDocumentGenerateButton.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextUiDocument.kt"
-    ],
+    "baseline": "2258af242e74",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt",
       "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelProfiles.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalConversationSliceHost.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalShellUiContribution.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationComponents.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/FluidCapabilityCatalogue.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowser.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
-      "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/ConversationUiPack.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationUiPack.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalUiDocumentGeneration.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

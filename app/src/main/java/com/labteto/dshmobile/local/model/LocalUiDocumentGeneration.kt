@@ -67,7 +67,7 @@ internal class LocalUiDocumentGeneration @Inject constructor(
             val profile = gateway.profileForRoute(command.identity.profileId, captured.modelState.model, captured.modelState.baseUrl)
             val source = UiDocumentSource(sessionId, command.messageId, command.identity.contextGeneration,
                 command.identity.profileId, command.identity.projectId, command.workMode)
-            val reply = state.withModelRequestResource("ui-document-generation") {
+            val reply = state.withNamedModelRequestResource("ui-document-generation") {
                 gateway.complete(profile.model, profile.baseUrl, listOf(
                     buildJsonObject { put("role", "system"); put("content", instruction(knownScenes)) },
                     buildJsonObject { put("role", "user"); put("content", command.prompt) },

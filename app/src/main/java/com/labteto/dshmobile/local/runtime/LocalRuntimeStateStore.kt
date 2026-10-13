@@ -208,7 +208,10 @@ class LocalRuntimeStateStore internal constructor(
             modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
     ).maxHistoryChars
 
-    internal suspend fun <T> withModelRequestResource(label: String = "automation-planning", block: suspend () -> T): T =
+    internal suspend fun <T> withModelRequestResource(block: suspend () -> T): T =
+        withNamedModelRequestResource("automation-planning", block)
+
+    internal suspend fun <T> withNamedModelRequestResource(label: String, block: suspend () -> T): T =
         resourceScheduler.withResource(
             HarnessResourceKind.MODEL_REQUEST,
             label,
