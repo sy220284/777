@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -470,6 +472,7 @@ internal fun CharacterDiaryScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CharacterDiaryEntryCard(
     entry: ChatDiaryEntry,
@@ -500,10 +503,10 @@ private fun CharacterDiaryEntryCard(
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().testTag("diary_paper_event_${entry.id}"),
         )
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             SyPill(
                 text = stringResource(
@@ -554,7 +557,8 @@ private fun CharacterDiaryEntryCard(
                 modifier = Modifier.testTag("diary_source_${entry.id}"),
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             SyButton(text = stringResource(R.string.chat_diary_edit_title),
                 onClick = onEdit, variant = SyButtonVariant.Ghost,
                 modifier = Modifier.testTag("diary_edit_${entry.id}"))
@@ -579,11 +583,11 @@ private fun CharacterDiaryNarrativeBlock(label: String, text: String) {
         Text(
             label,
             style = DsType.caption11Strong.withReadingWeight(),
-            color = colors.accent,
+            color = colors.labelSecondary,
         )
         Text(
             text,
-            style = DsType.std14.withReadingWeight().copy(fontFamily = DsType.contentFont),
+            style = DsType.chatBody.withReadingWeight(),
             color = colors.labelSecondary,
         )
     }

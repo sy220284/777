@@ -6,6 +6,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -56,6 +58,7 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ChatGptAccountPanel(
     state: ChatGptUiState,
@@ -114,12 +117,11 @@ internal fun ChatGptAccountPanel(
             modifier = Modifier.padding(DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.fillMaxWidth()) {
                     Text(
                         stringResource(R.string.chatgpt_account_title),
                         style = DsType.std14Strong.withReadingWeight(),
@@ -338,10 +340,12 @@ internal fun ChatGptAccountPanel(
                 }
 
 
-                // 账户快捷操作：同一排四等宽入口，窄屏和字体放大时允许文字折行。
-                Row(
+                // Account management is a two-column action grid; status and identity keep their own space.
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    maxItemsInEachRow = 2,
                 ) {
                     ChatGptAccountAction(
                         label = stringResource(R.string.chatgpt_action_view_usage),

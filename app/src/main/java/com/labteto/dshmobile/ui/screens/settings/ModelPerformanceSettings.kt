@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.ui.screens.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -65,14 +68,15 @@ internal fun ModelPerformanceSettingsPage() {
                     .clip(DsShapes.row)
                     .background(if (limits.reasoningCeiling == ceiling) colors.accentTertiary
                         else androidx.compose.ui.graphics.Color.Transparent)
-                    .clickable { LocalModelPerformanceControls.setReasoningCeiling(ceiling) }
+                    .selectable(selected = limits.reasoningCeiling == ceiling, role = Role.RadioButton,
+                        onClick = { LocalModelPerformanceControls.setReasoningCeiling(ceiling) })
                     .padding(horizontal = DsSpacing.small),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
                 SyRadioControl(
                     selected = limits.reasoningCeiling == ceiling,
-                    onClick = { LocalModelPerformanceControls.setReasoningCeiling(ceiling) },
+                    onClick = null,
                 )
                 Text(stringResource(label), style = DsType.small13.withReadingWeight(), color = colors.labelPrimary)
             }

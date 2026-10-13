@@ -40,6 +40,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -113,7 +118,7 @@ fun SyEmptyState(
     Column(
         modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 30.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
     ) {
         Surface(
             modifier = Modifier.size(52.dp),
@@ -125,12 +130,14 @@ fun SyEmptyState(
                     modifier = Modifier.size(24.dp))
             }
         }
-        Text(title, color = p.text, style = MaterialTheme.typography.titleMedium,
+        Text(title, modifier = Modifier.widthIn(max = 340.dp).semantics { heading() },
+            color = p.text, style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center)
-        Text(body, color = p.textSecondary, style = MaterialTheme.typography.bodyMedium,
+        if (body.isNotBlank()) Text(body, modifier = Modifier.widthIn(max = 340.dp),
+            color = p.textSecondary, style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center)
         if (onAction != null && !actionText.isNullOrBlank()) {
-            SyButton(actionText, onClick = onAction)
+            SyButton(actionText, onClick = onAction, modifier = Modifier.widthIn(min = 180.dp, max = 340.dp))
         }
     }
 }
@@ -140,9 +147,10 @@ fun SyLoadingState(
     icon: ImageVector, label: String, modifier: Modifier = Modifier,
 ) {
     val p = LocalSyColors.current
-    Column(modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 30.dp),
+    Column(modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 30.dp)
+        .semantics { liveRegion = LiveRegionMode.Polite },
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically)) {
         Icon(icon, contentDescription = null, tint = p.primary, modifier = Modifier.size(24.dp))
         CircularProgressIndicator(color = p.primary, strokeWidth = 2.dp,
             modifier = Modifier.size(22.dp))

@@ -246,12 +246,12 @@ internal fun UsageCalculationPage(
             modifier = Modifier.padding(DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                 Text(
                     stringResource(R.string.usage_daily_title),
                     style = DsType.std14Strong.withReadingWeight(),
                     color = colors.labelPrimary,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 UsageRangeSelector(
                     selectedIndex = rangeIndex,
@@ -264,12 +264,12 @@ internal fun UsageCalculationPage(
                 onSelect = { selectedEpochDay = it },
             )
             selectedDay?.let { (day, aggregate) ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
                     Text(
                         formatEpochDay(day),
                         style = DsType.small13Strong.withReadingWeight(),
                         color = colors.labelPrimary,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                     )
                     Text(
                         "${stringResource(R.string.usage_calculation_input)} ${formatTokens(aggregate.inputTokens)} · " +

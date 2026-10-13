@@ -53,6 +53,7 @@ fun SyMaterialFrame(
     verticalPadding: Dp = 14.dp,
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(SyMetric.gapMd),
     shape: Shape = RoundedCornerShape(if (tier == SyMaterialTier.L4_OVERLAY) SyMetric.radiusSheet else SyMetric.radiusCard),
+    border: BorderStroke? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val c = LocalSyColors.current
@@ -116,10 +117,10 @@ fun SyMaterialFrame(
     }.shadow(elevation, shape).clip(shape)
     if (onClick != null) {
         Surface(onClick = onClick, modifier = outer, color = Color.Transparent, shape = shape,
-            border = BorderStroke(1.dp, c.border)) { Interior() }
+            border = border ?: BorderStroke(1.dp, c.border)) { Interior() }
     } else {
         Surface(modifier = outer, color = Color.Transparent, shape = shape,
-            border = BorderStroke(1.dp, c.border)) { Interior() }
+            border = border ?: BorderStroke(1.dp, c.border)) { Interior() }
     }
 }
 

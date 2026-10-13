@@ -120,12 +120,10 @@ internal fun GroupChatMemberPickerSheet(
 
         // The reference group-picker explicitly explains whose memory can be used.
         // No invitation or selection may silently disclose another person's private thread.
-        Surface(
-            shape = DsShapes.row,
-            color = DsTheme.colors.wallpaperSurface(
-                WallpaperSurfaceLevel.CARD, base = DsTheme.colors.bgModulePlatform,
-            ),
+        com.shenyan.designsystem.components.SyMaterialFrame(
+            tier = com.shenyan.designsystem.components.SyMaterialTier.L1_SECTION,
             modifier = Modifier.fillMaxWidth(),
+            horizontalPadding = 0.dp, verticalPadding = 0.dp,
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(DsSpacing.medium),

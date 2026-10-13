@@ -6,6 +6,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -73,20 +77,21 @@ internal fun FirstLaunchOnboarding(
         color = colors.rootSurface(),
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(DsSpacing.comfortable),
+            modifier = Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(DsSpacing.comfortable),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .background(
-                        Brush.linearGradient(
-                            listOf(colors.accent, colors.successSecondary),
-                        ),
-                        RoundedCornerShape(18.dp),
-                    ),
-            )
+            Surface(
+                modifier = Modifier.size(64.dp),
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.materialL2,
+                shape = RoundedCornerShape(18.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(if (step == 2) FeatherIcons.Shield else if (mode == LocalUsageMode.CHAT)
+                        FeatherIcons.MessageCircle else FeatherIcons.Zap,
+                        contentDescription = null, tint = colors.labelPrimary, modifier = Modifier.size(28.dp))
+                }
+            }
             Spacer(Modifier.height(DsSpacing.xlarge))
             AnimatedContent(
                 targetState = step,
@@ -124,9 +129,8 @@ internal fun FirstLaunchOnboarding(
                         textAlign = TextAlign.Center,
                     )
                     if (current == 1) {
-                        Surface(
-                            shape = DsShapes.block,
-                            color = colors.bgLayer1,
+                        com.shenyan.designsystem.components.SyMaterialFrame(
+                            horizontalPadding = 0.dp, verticalPadding = 0.dp,
                         ) {
                             Column(Modifier.padding(DsSpacing.small)) {
                                 SyCategoryRow(

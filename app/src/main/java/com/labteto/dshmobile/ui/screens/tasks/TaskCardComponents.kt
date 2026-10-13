@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -89,21 +92,19 @@ private fun TaskCardSurface(
         AutomationStatus.FAILED, AutomationStatus.BLOCKED -> colors.error.copy(alpha = 0.28f)
         else -> colors.borderL1
     }
-    Surface(
+    com.shenyan.designsystem.components.SyMaterialFrame(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.bgLayer1,
         border = BorderStroke(1.dp, borderColor),
-        tonalElevation = 0.dp,
+        horizontalPadding = DsSpacing.comfortable,
+        verticalPadding = DsSpacing.comfortable,
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
-        Column(
-            modifier = Modifier.padding(DsSpacing.comfortable),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            content = content,
-        )
+        content()
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun TaskCard(
     task: AutomationTask,
@@ -164,16 +165,7 @@ internal fun TaskCard(
         task.prompt.lineSequence().firstOrNull()?.trim()?.take(56).orEmpty()
             .ifBlank { backgroundTaskLabel }
     }
-    val terminalOneShot = task.recurringMinutes == null &&
-        task.status in setOf(AutomationStatus.COMPLETED, AutomationStatus.FAILED, AutomationStatus.BLOCKED)
-    val timing = when {
-        task.status == AutomationStatus.WAITING_USER ->
-            stringResource(R.string.tasks_waiting_user_timing)
-        terminalOneShot && task.lastRunAt != null ->
-            stringResource(R.string.tasks_last_run, formatTime(task.lastRunAt))
-        else ->
-            stringResource(R.string.tasks_next_run, formatTime(task.nextRunAt))
-    }
+    val timing = taskTiming(task)
 
     TaskCardSurface(status = task.status) {
         Row(
@@ -216,10 +208,10 @@ internal fun TaskCard(
             }
         }
 
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             SyStatusPill(
                 state = taskStatus(task.status),
@@ -388,7 +380,7 @@ private fun receiptStatusLabel(receipt: AutomationRunReceipt): String {
 
 private fun receiptStatus(status: AutomationStatus): SyStatus = when (status) {
     AutomationStatus.COMPLETED -> SyStatus.Done
-    AutomationStatus.BLOCKED -> SyStatus.Warning
+    AutomationStatus.BLOCKED, AutomationStatus.WAITING_USER -> SyStatus.Warning
     AutomationStatus.FAILED -> SyStatus.Failed
     AutomationStatus.RUNNING, AutomationStatus.QUEUED -> SyStatus.Running
     else -> SyStatus.Neutral
@@ -397,7 +389,7 @@ private fun receiptStatus(status: AutomationStatus): SyStatus = when (status) {
 private fun taskStatus(status: AutomationStatus): SyStatus = when (status) {
     AutomationStatus.RUNNING, AutomationStatus.QUEUED -> SyStatus.Running
     AutomationStatus.COMPLETED -> SyStatus.Done
-    AutomationStatus.BLOCKED -> SyStatus.Warning
+    AutomationStatus.BLOCKED, AutomationStatus.WAITING_USER -> SyStatus.Warning
     AutomationStatus.FAILED -> SyStatus.Failed
     else -> SyStatus.Neutral
 }
@@ -417,23 +409,46 @@ private fun taskStatusLabel(status: AutomationStatus): String = when (status) {
 }
 
 @Composable
+private fun taskTiming(task: AutomationTask): String {
+    val terminalOneShot = task.recurringMinutes == null &&
+        task.status in setOf(AutomationStatus.COMPLETED, AutomationStatus.FAILED, AutomationStatus.BLOCKED)
+    return when {
+        task.status == AutomationStatus.WAITING_USER ->
+            stringResource(R.string.tasks_waiting_user_timing)
+        terminalOneShot && task.lastRunAt != null ->
+            stringResource(R.string.tasks_last_run, formatTime(task.lastRunAt))
+        else ->
+            stringResource(R.string.tasks_next_run, formatTime(task.nextRunAt))
+    }
+}
+
+@Composable
 internal fun TaskSummaryRow(task: AutomationTask, onClick: () -> Unit) {
     val colors = DsTheme.colors
-    Surface(
+    com.shenyan.designsystem.components.SyMaterialFrame(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.bgLayer1,
+        horizontalPadding = DsSpacing.comfortable,
+        verticalPadding = DsSpacing.comfortable,
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
+        Row(verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            androidx.compose.material3.Icon(
+                if (task.mode == AutomationMode.CHAT) FeatherIcons.MessageCircle else FeatherIcons.Clock,
+                contentDescription = null, tint = colors.labelSecondary, modifier = Modifier.size(18.dp))
+            SyStatusPill(state = taskStatus(task.status), label = taskStatusLabel(task.status))
+        }
         Row(
-            modifier = Modifier.padding(DsSpacing.comfortable),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                 Text(task.prompt.lineSequence().firstOrNull().orEmpty(), style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary, maxLines = 2)
-                Text(formatTime(task.nextRunAt), style = DsType.small13.withReadingWeight(), color = colors.labelTertiary)
-                SyStatusPill(state = taskStatus(task.status), label = taskStatusLabel(task.status))
+                Text(taskTiming(task),
+                    style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
             }
             androidx.compose.material3.Icon(FeatherIcons.ChevronRight, contentDescription = null, tint = colors.labelTertiary)
         }

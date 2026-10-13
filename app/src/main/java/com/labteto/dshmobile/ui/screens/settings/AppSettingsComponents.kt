@@ -57,24 +57,16 @@ internal fun AppSettingsSection(compact: Boolean = false, content: @Composable C
 @Composable
 internal fun AppSettingsMenuGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-        Text(
-            text = title,
-            style = DsType.navigationSection.withReadingWeight(),
-            color = DsTheme.colors.labelSecondary,
-            modifier = Modifier.padding(start = DsSpacing.medium),
-        )
+        com.shenyan.designsystem.components.SySectionHeader(title,
+            modifier = Modifier.padding(start = DsSpacing.medium, top = DsSpacing.small))
         AppSettingsSection(compact = true, content = content)
     }
 }
 
 @Composable
 internal fun SettingsGroupTitle(text: String) {
-    Text(
-        text = text,
-        style = DsType.navigationSection.withReadingWeight(),
-        color = DsTheme.colors.labelSecondary,
-        modifier = Modifier.padding(start = DsSpacing.comfortable, top = DsSpacing.medium, bottom = DsSpacing.small),
-    )
+    com.shenyan.designsystem.components.SySectionHeader(text,
+        modifier = Modifier.padding(start = DsSpacing.small, top = DsSpacing.medium, bottom = DsSpacing.xsmall))
 }
 
 @Composable

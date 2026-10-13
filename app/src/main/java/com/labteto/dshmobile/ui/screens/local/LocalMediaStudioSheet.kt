@@ -10,6 +10,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -32,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.local.model.LocalMediaCatalog
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalMediaOffer
@@ -52,6 +55,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /** '+' is only a surface. Selected creator and credential are independent of the chat model. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun LocalMediaStudioSheetContent(
     profiles: List<LocalModelProfile>,
@@ -131,8 +135,8 @@ internal fun LocalMediaStudioSheetContent(
         modifier = Modifier.fillMaxWidth().padding(DsSpacing.small),
         verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
     ) {
-        Text(stringResource(R.string.media_studio_notice), color = colors.labelSecondary,
-            style = DsType.caption11.withReadingWeight())
+        com.shenyan.designsystem.components.SyNote(stringResource(R.string.media_studio_notice),
+            modifier = Modifier.fillMaxWidth())
         val mediaKinds = listOf(LocalMediaKind.IMAGE, LocalMediaKind.VIDEO,
             LocalMediaKind.SPEECH, LocalMediaKind.TRANSCRIBE)
         FluidSectionNavigation(
@@ -144,7 +148,8 @@ internal fun LocalMediaStudioSheetContent(
         )
 
         if (selected == null) {
-            Text(stringResource(R.string.media_studio_no_model), color = colors.labelSecondary)
+            com.shenyan.designsystem.components.SyEmptyState(FeatherIcons.Image,
+                stringResource(R.string.media_studio_no_model), body = "")
         } else {
             SyButton(
                 text = stringResource(
@@ -191,7 +196,8 @@ internal fun LocalMediaStudioSheetContent(
 
             when (kind) {
                 LocalMediaKind.IMAGE -> {
-                    Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                         listOf("1:1", "16:9", "9:16").forEach { option ->
                             SyButton(text = option, enabled = !busy, size = SyButtonSize.Small,
                                 variant = if (ratio == option) SyButtonVariant.Primary else SyButtonVariant.Ghost,
@@ -321,7 +327,8 @@ internal fun LocalMediaStudioSheetContent(
                         onClick = { picker.launch(arrayOf("audio/*")) })
                     transcript?.let { text ->
                         Text(text, color = colors.labelPrimary, style = DsType.std14.withReadingWeight())
-                        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                             SyButton(text = stringResource(R.string.minimax_media_insert_text),
                                 onClick = { onInsertTranscript(text) }, size = SyButtonSize.Small)
                             SyButton(text = stringResource(R.string.minimax_media_copy_text),
@@ -481,7 +488,8 @@ internal fun LocalMediaStudioSheetContent(
                                 "mp3" -> "audio/mpeg"
                                 else -> "application/octet-stream"
                             }
-                            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                                 if (file != null) {
                                     SyButton(
                                         text = stringResource(R.string.media_studio_view_result),
@@ -525,7 +533,8 @@ internal fun LocalMediaStudioSheetContent(
                                 Text(stringResource(R.string.media_studio_confirm_delete),
                                     style = DsType.caption11.withReadingWeight(),
                                     color = colors.labelSecondary)
-                                Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                                     SyButton(text = stringResource(R.string.media_studio_delete_confirm),
                                         size = SyButtonSize.Small, onClick = {
                                             scope.launch {

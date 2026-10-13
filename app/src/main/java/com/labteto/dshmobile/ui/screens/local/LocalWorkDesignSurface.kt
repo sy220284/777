@@ -93,9 +93,9 @@ internal fun LocalWorkDesignSurface(
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
         Column(Modifier.padding(horizontal = DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
                 Text(state?.goal?.description?.takeIf(String::isNotBlank) ?: title,
-                    modifier = Modifier.weight(1f), style = DsType.std14Strong.withReadingWeight(),
+                    modifier = Modifier.fillMaxWidth(), style = DsType.base16Strong.withReadingWeight(),
                     color = colors.labelPrimary)
                 SyButton(stringResource(R.string.fluid_tool_output), onOpenEvidence,
                     variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
@@ -197,7 +197,7 @@ internal fun LocalWorkDesignSurface(
 
 @Composable
 internal fun FluidPanelTitle(title: String) {
-    Text(title, style = DsType.std14Strong.withReadingWeight(), color = DsTheme.colors.labelPrimary)
+    com.shenyan.designsystem.components.SySectionHeader(title)
 }
 
 /** A decision stays in context; sending is explicit and a rejected submission keeps the draft. */

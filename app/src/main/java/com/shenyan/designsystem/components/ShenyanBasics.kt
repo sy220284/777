@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
@@ -71,13 +72,13 @@ fun SyButton(
         animationSpec = tween(if (reduceMotion) 0 else SyMotion.pressMs),
         label = "syButtonPress",
     )
-    val fill = when (style) {
+    val fill = if (!enabled) c.materialL2 else when (style) {
         SyButtonStyle.PRIMARY -> c.primary
         SyButtonStyle.DANGER -> c.danger
         SyButtonStyle.SECONDARY -> c.surfaceRaised
         SyButtonStyle.GHOST, SyButtonStyle.OUTLINE -> Color.Transparent
     }
-    val foreground = when (style) {
+    val foreground = if (!enabled) c.textTertiary else when (style) {
         SyButtonStyle.PRIMARY -> c.onPrimary
         SyButtonStyle.DANGER -> Color(0xFF241613)
         else -> c.text
@@ -87,7 +88,7 @@ fun SyButton(
         enabled = enabled && !loading,
         interactionSource = interaction,
         modifier = modifier.sizeIn(minWidth = SyMetric.touch, minHeight = height.coerceAtLeast(SyMetric.touch)).scale(scale),
-        color = if (style == SyButtonStyle.PRIMARY) Color.Transparent else fill,
+        color = if (style == SyButtonStyle.PRIMARY && enabled) Color.Transparent else fill,
         contentColor = foreground,
         shape = RoundedCornerShape(SyMetric.radiusControl),
         border = if (style == SyButtonStyle.SECONDARY || style == SyButtonStyle.OUTLINE)
@@ -95,7 +96,7 @@ fun SyButton(
     ) {
         Row(
             Modifier.background(
-                Brush.horizontalGradient(if (style == SyButtonStyle.PRIMARY)
+                Brush.horizontalGradient(if (style == SyButtonStyle.PRIMARY && enabled)
                     listOf(c.primary, c.primaryPressed) else listOf(fill, fill))
             ).padding(horizontal = 16.dp, vertical = 11.dp),
             horizontalArrangement = Arrangement.Center,
@@ -110,7 +111,7 @@ fun SyButton(
                 if (text.isNotEmpty()) Spacer(Modifier.width(8.dp))
             }
             if (text.isNotEmpty()) {
-                Text(text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(text, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             }
         }
     }
