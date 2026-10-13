@@ -124,6 +124,7 @@ internal fun LocalModeDrawer(
     onMiniMaxQuota: (() -> Unit)? = null,
     onUsage: (() -> Unit)? = null,
     onImmersiveReader: (() -> Unit)? = null,
+    globalSearchOpenRequest: Int = 0,
 ) {
     val colors = DsTheme.colors
     val sy = LocalSyPalette.current
@@ -168,6 +169,9 @@ internal fun LocalModeDrawer(
     }
     var historyQuery by rememberSaveable(usageMode) { mutableStateOf("") }
     var searchOpen by rememberSaveable(usageMode) { mutableStateOf(false) }
+    LaunchedEffect(globalSearchOpenRequest) {
+        if (globalSearchOpenRequest > 0) searchOpen = true
+    }
     var selectionOpen by remember { mutableStateOf(false) }
     var renameTargetId by remember { mutableStateOf<String?>(null) }
     var deleteCandidateIds by remember { mutableStateOf<Set<String>>(emptySet()) }

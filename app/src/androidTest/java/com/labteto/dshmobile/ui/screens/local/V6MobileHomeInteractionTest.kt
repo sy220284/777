@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -16,6 +17,23 @@ import org.junit.Test
 /** Test real Compose V6 destinations and the selected message-to-Work handoff. */
 class V6MobileHomeInteractionTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun mobileSearchUsesTheExistingSearchAction() {
+        var opens = 0
+        compose.setContent {
+            DshTheme {
+                V6MobileHomeNavigation(
+                    mode = LocalUsageMode.CHAT,
+                    onSessions = {},
+                    onPersona = {},
+                    onWorkspace = {},
+                    onSearch = { opens++ },
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("搜索").performClick()
+        compose.runOnIdle { assertEquals(1, opens) }
+    }
 
     @Test fun chatTabDestinationsUseTheExistingSessionAndPersonaActions() {
         var destination = ""

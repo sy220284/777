@@ -1,11 +1,14 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.shenyan.designsystem.components.SyIconButton
+import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 
@@ -47,10 +50,12 @@ internal fun V6MobileHomeNavigation(
     onSessions: () -> Unit,
     onPersona: () -> Unit,
     onWorkspace: () -> Unit,
+    onSearch: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val tabs = v6MobileHomeDestinations(mode)
-    FluidSectionNavigation(
+    Row(modifier = modifier.fillMaxWidth()) {
+        FluidSectionNavigation(
         labels = tabs.map { destination ->
             stringResource(
                 when (destination) {
@@ -72,7 +77,16 @@ internal fun V6MobileHomeNavigation(
                 V6MobileHomeDestination.WORKSPACE -> onWorkspace()
             }
         },
-        modifier = modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp),
+        modifier = Modifier.weight(1f).padding(top = 4.dp, bottom = 4.dp),
         tag = "v6MobileHomeNavigation",
-    )
+        )
+        onSearch?.let { search ->
+            SyIconButton(
+                icon = SyEntryIcons.Search,
+                contentDescription = stringResource(R.string.common_search),
+                onClick = search,
+                modifier = Modifier.padding(start = 4.dp),
+            )
+        }
+    }
 }

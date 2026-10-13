@@ -163,6 +163,7 @@ fun LocalHarnessScreen(
     val sessionTitleOverrides by viewModel.sessionTitleOverrides.collectAsStateWithLifecycle()
     val projectRecoveryNotice by viewModel.projectRecoveryNotice.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
+    var openGlobalSearchRequest by rememberSaveable { mutableIntStateOf(0) }
     val syWideViewport = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 1024
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -522,6 +523,10 @@ fun LocalHarnessScreen(
                 showNewSessionMode = true
             },
             onOpenDrawer = { scope.launch { drawerState.open() } },
+            onOpenGlobalSearch = {
+                openGlobalSearchRequest++
+                scope.launch { drawerState.open() }
+            },
             onOpenPersonaGallery = {
                 // Preserve the same unsaved-persona guard used by the drawer.
                 if (viewModel.hasUnsavedCurrentPersona()) {
@@ -816,6 +821,7 @@ fun LocalHarnessScreen(
                 modeSwitchEnabled = shell.sessionId.isNotBlank() &&
                     localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
                 drawerOpen = syWideViewport || drawerState.isOpen,
+                globalSearchOpenRequest = openGlobalSearchRequest,
                 pinnedSessionIds = pinnedSessionIds,
                 sessionTitleOverrides = sessionTitleOverrides,
                 currentGalleryId = shell.galleryId,

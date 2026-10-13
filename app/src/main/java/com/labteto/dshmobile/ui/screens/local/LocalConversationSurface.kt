@@ -180,6 +180,7 @@ internal fun LocalConversationSurface(
     skillDisplayNames: Map<String, String> = emptyMap(),
     onConsumeComposerHandoff: () -> Unit = {},
     onOpenDrawer: (() -> Unit)? = null,
+    onOpenGlobalSearch: () -> Unit = {},
     onOpenPersonaGallery: () -> Unit = {},
     onOpenWorkspaceFiles: () -> Unit = {},
     onUseWorkCapability: ((String) -> Unit)? = null,
@@ -624,15 +625,8 @@ internal fun LocalConversationSurface(
                         )
                     }
                 }
-                if (showV6MobileNavigation && state.usageMode == LocalUsageMode.CHAT) {
-                    SyIconButton(
-                        icon = SyEntryIcons.Search,
-                        contentDescription = stringResource(R.string.sy_v6_search_messages),
-                        onClick = { showLoadedMessageSearch = true },
-                        containerColor = colors.bgLayer1,
-                        tint = colors.labelPrimary,
-                    )
-                }
+                // Search lives on V6's secondary navigation row to protect
+                // the 393dp top bar from clipping current persona/session actions.
                 // 隐藏大卡片后仍可从顶部直接查看，不占用聊天记录和输入区。
                 if (state.usageMode == LocalUsageMode.WORK &&
                     teamCardDismissed && state.team.visible) {
@@ -650,6 +644,8 @@ internal fun LocalConversationSurface(
                     onSessions = { onOpenDrawer?.invoke() },
                     onPersona = onOpenPersonaGallery,
                     onWorkspace = onOpenWorkspaceFiles,
+                    onSearch = if (state.usageMode == LocalUsageMode.CHAT)
+                        ({ showLoadedMessageSearch = true }) else onOpenGlobalSearch,
                 )
             }
         }
@@ -1192,6 +1188,10 @@ internal fun LocalConversationSurface(
                 requestedSearchMessageId = hit.messageId
             },
             onDismiss = { showLoadedMessageSearch = false },
+            onSearchAll = {
+                showLoadedMessageSearch = false
+                onOpenGlobalSearch()
+            },
         )
     }
     if (readerOpen) {

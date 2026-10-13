@@ -20,6 +20,8 @@ import com.labteto.dshmobile.local.model.visibleAssistantText
 import com.labteto.dshmobile.local.presentation.editableChatUserText
 import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -69,6 +71,7 @@ internal fun V6LoadedConversationSearchSheet(
     transcript: List<LocalTranscriptItem>,
     onSelect: (V6LoadedMessageSearchHit) -> Unit,
     onDismiss: () -> Unit,
+    onSearchAll: () -> Unit = {},
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val results = remember(query, transcript) { v6SearchLoadedConversation(transcript, query) }
@@ -112,5 +115,11 @@ internal fun V6LoadedConversationSearchSheet(
                 }
             }
         }
+        SyButton(
+            text = stringResource(R.string.sy_v6_search_all),
+            onClick = onSearchAll,
+            modifier = Modifier.fillMaxWidth(),
+            variant = SyButtonVariant.Outline,
+        )
     }
 }

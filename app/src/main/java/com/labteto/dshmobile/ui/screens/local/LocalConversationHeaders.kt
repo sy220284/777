@@ -31,6 +31,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyIconButton
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsMetrics
@@ -132,7 +133,7 @@ internal fun ChatSurfaceHeader(
             }
             if (!groupEnabled && tuningEnabled) {
                 SyIconButton(
-                    icon = FeatherIcons.User,
+                    icon = SyEntryIcons.Persona,
                     contentDescription = stringResource(R.string.local_character_tuning_open),
                     onClick = onOpenCharacterTuning,
                     enabled = !running,
@@ -152,7 +153,7 @@ internal fun ChatSurfaceHeader(
             )
         }
         SyIconButton(
-            icon = FeatherIcons.Plus,
+            icon = SyEntryIcons.NewSession,
             contentDescription = stringResource(R.string.chatlist_new_session),
             onClick = onNewSession,
             tint = colors.labelSecondary,
@@ -216,13 +217,13 @@ internal fun WorkSurfaceHeader(
             Spacer(Modifier.width(DsSpacing.xsmall))
         }
         SyIconButton(
-            icon = FeatherIcons.CheckSquare,
+            icon = SyEntryIcons.RunCenter,
             contentDescription = stringResource(R.string.local_execution_console),
             onClick = onOpenRunCenter,
             tint = colors.labelSecondary,
         )
         SyIconButton(
-            icon = FeatherIcons.Plus,
+            icon = SyEntryIcons.NewSession,
             contentDescription = stringResource(R.string.chatlist_new_session),
             onClick = onNewSession,
             tint = colors.labelSecondary,
