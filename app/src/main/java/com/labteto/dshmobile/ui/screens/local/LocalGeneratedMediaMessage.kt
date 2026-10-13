@@ -289,9 +289,12 @@ internal fun LocalGeneratedVideoTaskRow(
                         variant = SyButtonVariant.Ghost,
                         onClick = { shareMediaFile(context, savedVideo, "video/mp4") { error = it } })
                 } else {
-                    SyButton(text = resources.getString(R.string.media_chat_open_video), size = SyButtonSize.Small,
-                        variant = SyButtonVariant.Ghost,
-                        onClick = { openMediaUrl(context, task.downloadUrl) { error = it } })
+                    // A local-only video has no remote open action; keep the nullable URL guarded.
+                    task.downloadUrl?.takeIf(String::isNotBlank)?.let { remoteUrl ->
+                        SyButton(text = resources.getString(R.string.media_chat_open_video), size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
+                            onClick = { openMediaUrl(context, remoteUrl) { error = it } })
+                    }
                 }
             }
         } else {
