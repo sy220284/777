@@ -3,21 +3,8 @@
   "base": "main f7d59d0d",
   "verifiedDate": "2026-10-13",
   "remainingProductionFiles": [
-    "app/src/main/java/com/labteto/dshmobile/ui/components/ConversationScrollShortcut.kt",
     "app/src/main/java/com/labteto/dshmobile/ui/components/Markdown.kt",
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt",
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDialogs.kt",
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt",
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkProcessComponents.kt",
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryOverviewComponentsV3.kt",
     "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/ChatAutomationScreen.kt",
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskCardComponents.kt",
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskEditorComponents.kt",
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt",
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowser.kt",
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
-    "app/src/main/java/com/labteto/dshmobile/ui/sidebar/SidebarAvatarPicker.kt",
     "app/src/main/java/com/labteto/dshmobile/ui/theme/AppBackground.kt"
   ]
 }

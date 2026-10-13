@@ -27,7 +27,6 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -202,14 +201,14 @@ internal fun WorkProcessRow(
                 Text(
                     stringResource(if (running) R.string.local_work_thinking else R.string.local_work_thought),
                     style = DsType.small13.withReadingWeight(),
-                    color = DsTheme.colors.labelTertiary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                 )
             }
         }
         return
     }
 
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val backgroundState = LocalAppBackgroundState.current
     val processSurface = if (backgroundState.hasImage || backgroundState.fluidGlass) {
         colors.wallpaperSurface(
@@ -257,7 +256,7 @@ internal fun WorkOperationIcon(
     Icon(
         imageVector = icon,
         contentDescription = null,
-        tint = if (running) DsTheme.colors.success else DsTheme.colors.labelSecondary,
+        tint = if (running) com.shenyan.designsystem.foundation.LocalSyColors.current.successInk else com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         modifier = Modifier.size(18.dp),
     )
 }

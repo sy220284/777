@@ -52,7 +52,6 @@ import com.shenyan.designsystem.components.SySwitchControl
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -107,7 +106,7 @@ internal fun PluginInventoryBrowser(
     onSaveSkillDocument: ((String, String) -> Unit)? = null,
     onSetSkillModelInvocable: ((String, Boolean) -> Unit)? = null,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val skillCreationPrompt = stringResource(R.string.skills_create_in_chat_prompt)
     var query by rememberSaveable { mutableStateOf("") }
     var selectedCategory by rememberSaveable { mutableIntStateOf(0) }
@@ -234,7 +233,7 @@ internal fun PluginInventoryBrowser(
                 Text(
                     stringResource(R.string.skills_import_hint),
                     style = DsType.small13.withReadingWeight(),
-                    color = colors.labelTertiary,
+                    color = colors.textTertiary,
                     modifier = Modifier.padding(horizontal = DsSpacing.comfortable),
                 )
                 if (onCreateSkill != null) {
@@ -313,7 +312,7 @@ internal fun PluginInventoryBrowser(
                     Text(
                         error ?: stringResource(if (loading) R.string.common_loading else if (skillsOnly) R.string.skills_catalog_empty else R.string.tools_catalog_empty),
                         style = DsType.std14.withReadingWeight(),
-                        color = colors.labelSecondary,
+                        color = colors.textSecondary,
                     )
                     if (error != null && onRetry != null) {
                         SyButton(text = stringResource(R.string.common_retry), onClick = onRetry)
@@ -346,21 +345,21 @@ internal fun PluginInventoryBrowser(
                                     Icon(
                                         imageVector = item.icon,
                                         contentDescription = null,
-                                        tint = colors.labelSecondary,
+                                        tint = colors.textSecondary,
                                         modifier = Modifier.padding(8.dp).size(24.dp),
                                     )
                                 }
                                 Column(Modifier.weight(1f)) {
                                     Text(
                                         item.name,
-                                        color = colors.labelPrimary,
+                                        color = colors.text,
                                         style = DsType.std14Strong.withReadingWeight(),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                     Text(
                                         item.detail,
-                                        color = colors.labelTertiary,
+                                        color = colors.textTertiary,
                                         style = DsType.small13.withReadingWeight(),
                                     )
                                 }
@@ -414,15 +413,15 @@ internal fun PluginInventoryBrowser(
             Text(
                 item.id.removePrefix("local:").removePrefix("service:"),
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
             Text(
                 item.detail,
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
             if (item.installedSkill && !item.modelInvocable) {
-                Text(stringResource(R.string.skills_manual_only), style = DsType.small13.withReadingWeight(), color = colors.labelTertiary)
+                Text(stringResource(R.string.skills_manual_only), style = DsType.small13.withReadingWeight(), color = colors.textTertiary)
             }
 
 
@@ -446,7 +445,7 @@ internal fun PluginInventoryBrowser(
                     Text(
                         stringResource(R.string.skills_auto_invocation),
                         style = DsType.std14.withReadingWeight(),
-                        color = colors.labelSecondary,
+                        color = colors.textSecondary,
                     )
                     SySwitchControl(
                         checked = item.modelInvocable,
@@ -539,7 +538,7 @@ internal fun PluginInventoryBrowser(
             },
         ) {
             Text(stringResource(R.string.skills_remove_message, id),
-                style = DsType.std14.withReadingWeight(), color = colors.labelSecondary)
+                style = DsType.std14.withReadingWeight(), color = colors.textSecondary)
         }
     }
 
@@ -564,7 +563,7 @@ internal fun PluginInventoryBrowser(
             Text(
                 stringResource(R.string.skills_edit_hint),
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
             SyTextField(
                 value = editedSkillDisplayName,

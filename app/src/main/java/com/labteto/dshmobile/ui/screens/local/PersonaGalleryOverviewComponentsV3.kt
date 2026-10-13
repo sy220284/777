@@ -63,7 +63,6 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -108,7 +107,7 @@ internal fun PersonaGalleryDetailHeaderV3(
     onChoosePortrait: () -> Unit,
     onManagePortrait: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val portrait by produceState<ImageBitmap?>(
         initialValue = null,
         key1 = entry.portraitPath,
@@ -158,7 +157,7 @@ internal fun PersonaGalleryDetailHeaderV3(
             ) {
                 Surface(
                     shape = RoundedCornerShape(18.dp),
-                    color = colors.characterAccentTertiary,
+                    color = colors.lilac.copy(alpha = .18f),
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(frameLayout.imageAspectRatio),
@@ -184,13 +183,13 @@ internal fun PersonaGalleryDetailHeaderV3(
                                 Icon(
                                     FeatherIcons.User,
                                     contentDescription = null,
-                                    tint = colors.characterAccent,
+                                    tint = colors.lilac,
                                     modifier = Modifier.size(32.dp),
                                 )
                                 Text(
                                     stringResource(R.string.persona_gallery_portrait_photo_empty),
                                     style = DsType.small13.withReadingWeight(),
-                                    color = colors.labelSecondary,
+                                    color = colors.textSecondary,
                                     textAlign = TextAlign.Center,
                                 )
                             }
@@ -203,7 +202,7 @@ internal fun PersonaGalleryDetailHeaderV3(
         Text(
             entry.persona.name,
             style = DsType.title22.withReadingWeight().copy(fontFamily = DsType.contentFont),
-            color = colors.labelPrimary,
+            color = colors.text,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
@@ -212,7 +211,7 @@ internal fun PersonaGalleryDetailHeaderV3(
             Text(
                 subtitle,
                 style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
@@ -221,7 +220,7 @@ internal fun PersonaGalleryDetailHeaderV3(
         Text(
             relationSummary,
             style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
-            color = colors.labelSecondary,
+            color = colors.textSecondary,
             textAlign = TextAlign.Center,
         )
     }
@@ -260,12 +259,12 @@ internal fun PersonaGalleryAddPanel(
                 Text(
                     stringResource(R.string.persona_gallery_add_title),
                     style = DsType.base16Strong.withReadingWeight(),
-                    color = DsTheme.colors.labelPrimary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                 )
                 Text(
                     stringResource(R.string.persona_gallery_add_hint),
                     style = DsType.caption11.withReadingWeight(),
-                    color = DsTheme.colors.labelTertiary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                 )
             }
         }
@@ -314,14 +313,14 @@ internal fun PersonaGalleryAddPanel(
                                 Text(
                                     preset.persona.name,
                                     style = DsType.std14Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                                    color = DsTheme.colors.labelPrimary,
+                                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 Text(
                                     preset.franchise + " · " + preset.summary,
                                     style = DsType.caption11.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                                    color = DsTheme.colors.labelTertiary,
+                                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -357,7 +356,7 @@ internal fun PersonaGallerySectionLabel(title: String) {
     Text(
         title,
         style = DsType.caption11.withReadingWeight(),
-        color = DsTheme.colors.labelTertiary,
+        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
         modifier = Modifier.padding(start = DsSpacing.small, top = DsSpacing.xsmall),
     )
 }
@@ -381,18 +380,18 @@ internal fun PersonaGalleryEmptyState(
             Icon(
                 FeatherIcons.User,
                 contentDescription = null,
-                tint = DsTheme.colors.labelTertiary,
+                tint = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                 modifier = Modifier.size(28.dp),
             )
             Text(
                 title,
                 style = DsType.base16Strong.withReadingWeight(),
-                color = DsTheme.colors.labelPrimary,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
             )
             Text(
                 body,
                 style = DsType.small13.withReadingWeight(),
-                color = DsTheme.colors.labelTertiary,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
             )
             SyButton(
                 text = primary,
@@ -426,10 +425,10 @@ internal fun CompactPersonaRow(
 ) {
     var dragDistance by remember(entry.id) { mutableFloatStateOf(0f) }
     val tick = rememberHapticPulse(minIntervalMillis = 65L)
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val backgroundState = LocalAppBackgroundState.current
     val rowColor = when {
-        selected -> colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, base = colors.accentTertiary)
+        selected -> colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, base = colors.selected)
         backgroundState.hasImage -> colors.wallpaperSurface(WallpaperSurfaceLevel.CARD)
         else -> Color.Transparent
     }
@@ -461,7 +460,7 @@ internal fun CompactPersonaRow(
                     Text(
                         entry.persona.name,
                         style = DsType.std14Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                        color = DsTheme.colors.labelPrimary,
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
@@ -470,7 +469,7 @@ internal fun CompactPersonaRow(
                         Icon(
                             FeatherIcons.Pin,
                             contentDescription = null,
-                            tint = DsTheme.colors.labelCaption,
+                            tint = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                             modifier = Modifier.size(14.dp),
                         )
                     }
@@ -484,7 +483,7 @@ internal fun CompactPersonaRow(
                         )
                     },
                     style = DsType.caption11.withReadingWeight(),
-                    color = DsTheme.colors.labelTertiary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -493,7 +492,7 @@ internal fun CompactPersonaRow(
                 Icon(
                     FeatherIcons.ChevronRight,
                     contentDescription = null,
-                    tint = DsTheme.colors.labelCaption,
+                    tint = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                     modifier = Modifier.size(18.dp),
                 )
             }
@@ -504,7 +503,7 @@ internal fun CompactPersonaRow(
                         if (pinned) R.string.persona_gallery_unpin else R.string.persona_gallery_pin,
                     ),
                     onClick = onTogglePin,
-                    tint = if (pinned) DsTheme.colors.accent else DsTheme.colors.labelTertiary,
+                    tint = if (pinned) com.shenyan.designsystem.foundation.LocalSyColors.current.primary else com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                 )
                 Box(
                     modifier = Modifier
@@ -530,7 +529,7 @@ internal fun CompactPersonaRow(
                     Icon(
                         FeatherIcons.Menu,
                         contentDescription = stringResource(R.string.persona_gallery_reorder),
-                        tint = if (dragEnabled) DsTheme.colors.labelSecondary else DsTheme.colors.labelCaption,
+                        tint = if (dragEnabled) com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary else com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                         modifier = Modifier.size(20.dp),
                     )
                 }

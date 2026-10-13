@@ -86,7 +86,6 @@ import com.labteto.dshmobile.ui.shenyan.SyUserBubble
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -148,7 +147,7 @@ internal fun LocalMessageRow(
     onCreateMedia: ((LocalHarnessMessage, LocalMediaKind) -> Unit)? = null,
     onConvertToWork: ((LocalHarnessMessage) -> Unit)? = null,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val pulse = rememberHapticPulse()
     val backgroundState = LocalAppBackgroundState.current
     val clipboard = LocalClipboardManager.current
@@ -289,7 +288,7 @@ internal fun LocalMessageRow(
                     )
                     .border(
                         width = 1.dp,
-                        color = colors.borderL1,
+                        color = colors.border,
                         shape = DsShapes.characterBubble,
                     )
                     .padding(horizontal = 14.dp, vertical = 10.dp)
@@ -305,7 +304,7 @@ internal fun LocalMessageRow(
                         Text(
                             speaker,
                             style = DsType.small13Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                            color = colors.characterAccent,
+                            color = colors.lilac,
                         )
                     }
                 }
@@ -429,7 +428,7 @@ private fun LocalAssistantMessageContent(
                     Text(
                         text = stringResource(R.string.local_character_inner_thought) + " · " + innerThought,
                         style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                        color = DsTheme.colors.labelTertiary,
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                     )
                 }
                 if (body.isNotBlank()) {
@@ -456,7 +455,7 @@ private fun LocalTranscriptImage(
     image: LocalMessageBlock.Image,
     workspacePath: String,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var bitmap by remember(workspacePath, image.relativePath) {
         mutableStateOf<ImageBitmap?>(null)
     }
@@ -489,7 +488,7 @@ private fun LocalTranscriptImage(
         .aspectRatio(ratio)
         .clip(DsShapes.block)
         .background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))
-        .border(1.dp, colors.borderL3, DsShapes.block)
+        .border(1.dp, colors.border, DsShapes.block)
     val loaded = bitmap
     if (loaded != null) {
         Image(
@@ -506,7 +505,7 @@ private fun LocalTranscriptImage(
             Icon(
                 FeatherIcons.Image,
                 contentDescription = image.name,
-                tint = colors.labelTertiary,
+                tint = colors.textTertiary,
                 modifier = Modifier.size(24.dp),
             )
         }
@@ -515,28 +514,28 @@ private fun LocalTranscriptImage(
 
 @Composable
 private fun LocalTranscriptUnknown(block: LocalMessageBlock.Unknown) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SyMaterialSurface(
         shape = DsShapes.block,
         tier = SyMaterialTier.L3_CARD,
-        border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderL3),
+        border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
     ) {
         Text(
             text = stringResource(R.string.local_unknown_message_block, block.kind),
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
             style = DsType.small13.withReadingWeight(),
-            color = colors.labelSecondary,
+            color = colors.textSecondary,
         )
     }
 }
 
 @Composable
 private fun LocalTranscriptFile(file: LocalMessageBlock.File) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SyMaterialSurface(
         shape = DsShapes.block,
         tier = SyMaterialTier.L3_CARD,
-        border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderL3),
+        border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
@@ -546,13 +545,13 @@ private fun LocalTranscriptFile(file: LocalMessageBlock.File) {
             Icon(
                 FeatherIcons.Tool,
                 contentDescription = null,
-                tint = colors.labelSecondary,
+                tint = colors.textSecondary,
                 modifier = Modifier.size(18.dp),
             )
             Text(
                 file.name,
                 style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                color = colors.labelPrimary,
+                color = colors.text,
             )
         }
     }
@@ -566,7 +565,7 @@ private fun MessageVariantControls(
     onSelectVariant: (String, Int) -> Unit,
 ) {
     val info = branchInfo ?: return
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     CompactMessageAction(
         icon = FeatherIcons.ArrowLeft,
         contentDescription = stringResource(R.string.local_previous_variant),
@@ -576,7 +575,7 @@ private fun MessageVariantControls(
     Text(
         text = stringResource(R.string.local_variant_position, info.index + 1, info.count),
         style = DsType.caption11.withReadingWeight(),
-        color = colors.labelTertiary,
+        color = colors.textTertiary,
     )
     CompactMessageAction(
         icon = FeatherIcons.ChevronRight,
@@ -594,7 +593,7 @@ internal fun CompactMessageAction(
     enabled: Boolean = true,
     iconSize: androidx.compose.ui.unit.Dp = 18.dp,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Surface(
         onClick = onClick,
         enabled = enabled,
@@ -606,7 +605,7 @@ internal fun CompactMessageAction(
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = if (enabled) colors.labelTertiary else colors.labelTertiary.copy(alpha = 0.38f),
+                tint = if (enabled) colors.textTertiary else colors.textTertiary.copy(alpha = 0.38f),
                 modifier = Modifier.size(iconSize),
             )
         }
@@ -628,7 +627,7 @@ internal fun ChatThinkingRow(
         Text(
             stringResource(if (streaming) R.string.local_process_thinking else R.string.local_work_thought),
             style = DsType.small13.withReadingWeight(),
-            color = DsTheme.colors.labelSecondary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         )
     }
 }

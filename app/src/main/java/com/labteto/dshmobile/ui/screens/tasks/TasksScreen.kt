@@ -55,7 +55,6 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.rememberSyToast
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -130,7 +129,7 @@ private fun WorkTasksScreen(
     initialSelectedTaskId: String?,
     entryRequest: Int,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val visibleTasks = state.tasks.filter { it.mode == AutomationMode.WORK }
     var listFilter by rememberSaveable { mutableStateOf(WorkTaskListFilter.ALL) }
     val filteredTasks = visibleTasks.filter { workTaskMatchesFilter(it.status, listFilter) }
@@ -235,7 +234,7 @@ private fun WorkTasksScreen(
                                 icon = FeatherIcons.Plus,
                                 contentDescription = stringResource(R.string.tasks_new),
                                 onClick = { createMenuOpen = true },
-                                tint = colors.labelPrimary,
+                                tint = colors.text,
                             )
                             SyPopupMenu(
                                 expanded = createMenuOpen,
@@ -323,7 +322,7 @@ private fun WorkTasksScreen(
                                     Text(
                                         stringResource(R.string.tasks_filter_empty),
                                         style = DsType.small13.withReadingWeight(),
-                                        color = colors.labelSecondary,
+                                        color = colors.textSecondary,
                                     )
                                     SyButton(
                                         text = stringResource(R.string.tasks_filter_all),
@@ -356,7 +355,7 @@ private fun TaskEmptyState(
     onManualCreate: () -> Unit,
     onCreateViaChat: (() -> Unit)?,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Box(Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.align(Alignment.Center).fillMaxWidth()
@@ -367,19 +366,19 @@ private fun TaskEmptyState(
             Image(
                 painter = painterResource(R.drawable.ic_ui_task_empty),
                 contentDescription = null,
-                colorFilter = ColorFilter.tint(colors.labelTertiary.copy(alpha = 0.72f)),
+                colorFilter = ColorFilter.tint(colors.textTertiary.copy(alpha = 0.72f)),
                 modifier = Modifier.padding(bottom = DsSpacing.medium),
             )
             Text(
                 stringResource(R.string.tasks_empty_title),
                 style = DsType.base16Strong.withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
                 textAlign = TextAlign.Center,
             )
             Text(
                 stringResource(R.string.tasks_empty_subtitle),
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelTertiary,
+                color = colors.textTertiary,
                 textAlign = TextAlign.Center,
             )
         }
@@ -391,15 +390,15 @@ private fun TaskEmptyState(
             Surface(
                 onClick = onManualCreate,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                color = colors.brandPrimary,
-                contentColor = colors.onBrandPrimary,
+                color = colors.primary,
+                contentColor = colors.onPrimary,
                 shape = DsShapes.buttonCapsule,
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(DsSpacing.medium)) {
                     Text(
                         stringResource(R.string.tasks_create_manual),
                         style = DsType.std14Strong.withReadingWeight(),
-                        color = colors.onBrandPrimary,
+                        color = colors.onPrimary,
                     )
                 }
             }
@@ -413,7 +412,7 @@ private fun TaskEmptyState(
                     Text(
                         stringResource(R.string.tasks_create_via_chat),
                         style = DsType.std14Strong.withReadingWeight(),
-                        color = colors.labelPrimary,
+                        color = colors.text,
                     )
                 }
             }

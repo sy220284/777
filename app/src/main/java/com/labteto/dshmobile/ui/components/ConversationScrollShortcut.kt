@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
@@ -99,17 +98,17 @@ fun ConversationScrollShortcut(
     onClick: (ConversationScrollTarget) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val backgroundState = LocalAppBackgroundState.current
     val surfaceColor = colors.wallpaperSurface(
         level = WallpaperSurfaceLevel.FLOATING,
         region = BackgroundRegion.BOTTOM,
-        base = colors.bgLayer1,
+        base = colors.materialL3,
     )
     val borderColor = if (backgroundState.hasImage && backgroundState.adaptiveContrast) {
-        colors.borderL1.copy(alpha = 0.72f)
+        colors.border.copy(alpha = 0.72f)
     } else {
-        colors.borderL1
+        colors.border
     }
 
     AnimatedContent(
@@ -146,7 +145,7 @@ fun ConversationScrollShortcut(
                             if (direction == ConversationScrollTarget.START) FeatherIcons.ArrowUp
                             else FeatherIcons.ArrowDown,
                             contentDescription = label,
-                            tint = colors.labelPrimary,
+                            tint = colors.text,
                             modifier = Modifier.size(19.dp),
                         )
                     }

@@ -36,7 +36,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyGroupCard
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
@@ -69,7 +68,7 @@ internal fun ColumnScope.TaskEditorPane(
     var notify by state.notify
     var createError by state.createError
     var showSchedulePicker by rememberSaveable { mutableStateOf(false) }
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
 
     Column(
         modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
@@ -81,7 +80,7 @@ internal fun ColumnScope.TaskEditorPane(
                     if (editingTaskId != null) R.string.tasks_edit else R.string.tasks_new,
                 ),
                 style = DsType.base16Strong.withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
             )
             SyTextField(
                 value = prompt,
@@ -102,7 +101,7 @@ internal fun ColumnScope.TaskEditorPane(
             Text(
                 stringResource(R.string.tasks_schedule_label),
                 style = DsType.small13Strong.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
             CadenceRow(
                 first = AutomationCadence.ONCE,
@@ -166,12 +165,12 @@ internal fun ColumnScope.TaskEditorPane(
                     Text(
                         stringResource(R.string.tasks_notify_title),
                         style = DsType.small13Strong.withReadingWeight(),
-                        color = colors.labelPrimary,
+                        color = colors.text,
                     )
                     Text(
                         stringResource(R.string.tasks_notify_hint),
                         style = DsType.caption11.withReadingWeight(),
-                        color = colors.labelTertiary,
+                        color = colors.textTertiary,
                     )
                 }
                 SySwitchControl(
@@ -183,7 +182,7 @@ internal fun ColumnScope.TaskEditorPane(
                 Text(
                     it,
                     style = DsType.small13.withReadingWeight(),
-                    color = colors.error,
+                    color = colors.dangerInk,
                 )
             }
         }
@@ -375,7 +374,7 @@ private fun TaskSchedulePicker(
                 Text(
                     stringResource(R.string.app_schedule_future_hint),
                     style = DsType.caption11.withReadingWeight(),
-                    color = DsTheme.colors.warnLabel,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.warningInk,
                 )
             }
             Row(

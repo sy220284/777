@@ -59,7 +59,6 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.rememberSidebarAvatarStore
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.io.File
@@ -115,21 +114,21 @@ internal fun SidebarAvatarPicker(modifier: Modifier = Modifier) {
         Surface(
             modifier = Modifier.size(44.dp),
             shape = CircleShape,
-            color = DsTheme.colors.characterAccentTertiary,
-            border = BorderStroke(1.dp, DsTheme.colors.characterAccent.copy(alpha = 0.55f)),
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.lilac.copy(alpha = .18f),
+            border = BorderStroke(1.dp, com.shenyan.designsystem.foundation.LocalSyColors.current.lilac.copy(alpha = 0.55f)),
         ) {
             SidebarAvatarImage(source = source, contentDescription = stringResource(R.string.sidebar_avatar_open))
         }
         Surface(
             modifier = Modifier.align(Alignment.BottomEnd).size(17.dp),
             shape = CircleShape,
-            color = DsTheme.colors.accent,
-            border = BorderStroke(1.5.dp, DsTheme.colors.sidebar),
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.primary,
+            border = BorderStroke(1.5.dp, com.shenyan.designsystem.foundation.LocalSyColors.current.materialL2),
         ) {
             Icon(
                 FeatherIcons.Image,
                 contentDescription = null,
-                tint = DsTheme.colors.onAccent,
+                tint = com.shenyan.designsystem.foundation.LocalSyColors.current.onPrimary,
                 modifier = Modifier.padding(3.5.dp),
             )
         }
@@ -210,7 +209,7 @@ private fun SidebarAvatarSheet(
     onCustom: () -> Unit,
     onReset: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val presets = remember {
         PersonaPresetCatalog.presets.filter { it.artwork != null }
     }
@@ -243,14 +242,14 @@ private fun SidebarAvatarSheet(
             Text(
                 text = it,
                 style = DsType.small13.withReadingWeight(),
-                color = colors.error,
+                color = colors.dangerInk,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.tiny),
             )
         }
         Text(
             text = stringResource(R.string.sidebar_avatar_presets),
             style = DsType.small13Strong.withReadingWeight(),
-            color = colors.labelSecondary,
+            color = colors.textSecondary,
             modifier = Modifier.padding(top = DsSpacing.xsmall),
         )
         LazyVerticalGrid(
@@ -266,10 +265,10 @@ private fun SidebarAvatarSheet(
                     onClick = { onPreset(preset) },
                     enabled = !busy,
                     shape = DsShapes.block,
-                    color = if (isSelected) colors.characterAccentTertiary else colors.sidebarNavHover,
+                    color = if (isSelected) colors.lilac.copy(alpha = .18f) else colors.materialL1,
                     border = BorderStroke(
                         if (isSelected) 2.dp else 1.dp,
-                        if (isSelected) colors.characterAccent else colors.borderL1,
+                        if (isSelected) colors.lilac else colors.border,
                     ),
                 ) {
                     Column(
@@ -280,7 +279,7 @@ private fun SidebarAvatarSheet(
                         Surface(
                             modifier = Modifier.size(52.dp),
                             shape = CircleShape,
-                            color = colors.characterAccentTertiary,
+                            color = colors.lilac.copy(alpha = .18f),
                         ) {
                             SidebarAvatarImage(
                                 source = SidebarAvatarSource.Bundled(assetPath),
@@ -290,7 +289,7 @@ private fun SidebarAvatarSheet(
                         Text(
                             text = preset.persona.name,
                             style = DsType.caption11.withReadingWeight(),
-                            color = colors.labelSecondary,
+                            color = colors.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             textAlign = TextAlign.Center,
@@ -359,7 +358,7 @@ internal fun SidebarAvatarImage(
                 .fillMaxSize()
                 .background(
                     Brush.linearGradient(
-                        listOf(DsTheme.colors.characterAccentTertiary, DsTheme.colors.sidebarNavAccent),
+                        listOf(com.shenyan.designsystem.foundation.LocalSyColors.current.lilac.copy(alpha = .18f), com.shenyan.designsystem.foundation.LocalSyColors.current.selected),
                     ),
                 ),
             contentAlignment = Alignment.Center,
@@ -367,7 +366,7 @@ internal fun SidebarAvatarImage(
             Text(
                 text = stringResource(R.string.sidebar_avatar_default_mark),
                 style = DsType.base16Strong.withReadingWeight(),
-                color = DsTheme.colors.characterAccent,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.lilac,
             )
         }
     } else {

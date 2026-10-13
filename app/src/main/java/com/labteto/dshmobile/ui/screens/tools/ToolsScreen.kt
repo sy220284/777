@@ -72,7 +72,6 @@ import com.labteto.dshmobile.ui.screens.settings.SettingsViewModel
 import com.labteto.dshmobile.ui.screens.settings.LocalAgentSettingsCard
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -455,7 +454,7 @@ fun ToolsScreen(
         if (enabled) confirmAutoApproval = true
         else settingsViewModel.configureApprovalMode(LocalApprovalMode.DEFAULT)
     }
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val toast = rememberSyToast()
     var serverId by remember { mutableStateOf("") }
     var endpoint by remember { mutableStateOf("") }
@@ -621,12 +620,12 @@ fun ToolsScreen(
                         Text(
                             stringResource(R.string.cap_center_settings_group),
                             style = DsType.std14.withReadingWeight(),
-                            color = colors.labelTertiary,
+                            color = colors.textTertiary,
                         )
                         Text(
                             stringResource(R.string.cap_center_settings_group_hint),
                             style = DsType.small13.withReadingWeight(),
-                            color = colors.labelSecondary,
+                            color = colors.textSecondary,
                         )
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
@@ -677,7 +676,7 @@ fun ToolsScreen(
                     Text(
                         stringResource(R.string.cap_center_extensions_group),
                         style = DsType.std14.withReadingWeight(),
-                        color = colors.labelTertiary,
+                        color = colors.textTertiary,
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                         val builtinAvailable = "local-builtin" in state.localPlugins
@@ -722,12 +721,12 @@ fun ToolsScreen(
             Text(
                 stringResource(R.string.tools_github_capabilities),
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
             Text(
                 stringResource(R.string.tools_github_write_approval),
                 style = DsType.caption11.withReadingWeight(),
-                color = colors.labelTertiary,
+                color = colors.textTertiary,
             )
             SyTextField(
                 value = githubToken,
@@ -775,7 +774,7 @@ fun ToolsScreen(
                 Text(
                     stringResource(R.string.tools_no_services),
                     style = DsType.small13.withReadingWeight(),
-                    color = colors.labelTertiary,
+                    color = colors.textTertiary,
                 )
             } else {
                 state.servers.forEach { server ->
@@ -791,7 +790,7 @@ fun ToolsScreen(
                             Text(
                                 server.id,
                                 style = DsType.std14Strong.withReadingWeight(),
-                                color = colors.labelPrimary,
+                                color = colors.text,
                             )
                             Text(
                                 stringResource(
@@ -800,7 +799,7 @@ fun ToolsScreen(
                                     server.tools.size,
                                 ),
                                 style = DsType.caption11.withReadingWeight(),
-                                color = colors.labelTertiary,
+                                color = colors.textTertiary,
                             )
                         }
                         SyButton(
@@ -822,7 +821,7 @@ fun ToolsScreen(
                         Text(
                             server.tools.joinToString(" · "),
                             style = DsType.caption11.withReadingWeight(),
-                            color = colors.labelSecondary,
+                            color = colors.textSecondary,
                             modifier = Modifier.padding(bottom = DsSpacing.small),
                         )
                     }
@@ -863,7 +862,7 @@ fun ToolsScreen(
             Text(
                 stringResource(R.string.tools_stdio_title),
                 style = DsType.std14Strong.withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
             )
             SyTextField(
                 value = stdioCommand,
@@ -917,7 +916,7 @@ fun ToolsScreen(
             Text(
                 stringResource(R.string.cap_center_auto_approval_confirm_body),
                 style = DsType.std14.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 SyButton(
@@ -945,7 +944,7 @@ fun ToolsScreen(
             Text(
                 stringResource(R.string.tools_github_clear_confirm_body),
                 style = DsType.std14.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -981,7 +980,7 @@ private fun ToolCapabilityRow(
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     com.shenyan.designsystem.components.SyMaterialFrame(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
@@ -1006,13 +1005,13 @@ private fun ToolCapabilityRow(
                         iconPainter != null -> Icon(
                             painter = iconPainter,
                             contentDescription = null,
-                            tint = colors.labelSecondary,
+                            tint = colors.textSecondary,
                             modifier = Modifier.size(20.dp),
                         )
                         icon != null -> Icon(
                             imageVector = icon,
                             contentDescription = null,
-                            tint = colors.labelSecondary,
+                            tint = colors.textSecondary,
                             modifier = Modifier.size(20.dp),
                         )
                     }
@@ -1029,7 +1028,7 @@ private fun ToolCapabilityRow(
                             title,
                             modifier = Modifier.weight(1f),
                             style = DsType.std14Strong.withReadingWeight(),
-                            color = colors.labelPrimary,
+                            color = colors.text,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -1044,7 +1043,7 @@ private fun ToolCapabilityRow(
                 Icon(
                     FeatherIcons.ChevronRight,
                     contentDescription = null,
-                    tint = colors.labelCaption,
+                    tint = colors.textTertiary,
                     modifier = Modifier.size(16.dp),
                 )
             }
@@ -1062,7 +1061,7 @@ private fun ToolCapabilityStatus(status: String, state: StateDotState) {
         Text(
             status,
             style = DsType.xsmall12.withReadingWeight(),
-            color = DsTheme.colors.labelSecondary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )

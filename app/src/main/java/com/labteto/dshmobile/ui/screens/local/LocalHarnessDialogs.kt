@@ -76,7 +76,6 @@ import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.shenyan.designsystem.components.SySheetChoiceRow
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
@@ -153,7 +152,7 @@ internal fun ChatPersonaPickerDialog(
     onEditCurrent: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val isUnbound = currentPersona.id == PersonaProfile.DEFAULT_PERSONA_ID
     SyResponsiveSheet(
         title = stringResource(R.string.local_persona_picker_title),
@@ -175,20 +174,20 @@ internal fun ChatPersonaPickerDialog(
             Text(
                 stringResource(R.string.local_persona_picker_switch_requires_new_chat),
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
         }
         if (entries.isEmpty()) {
             Text(
                 stringResource(R.string.local_persona_picker_empty),
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelTertiary,
+                color = colors.textTertiary,
             )
         } else {
             Text(
                 "${stringResource(R.string.local_persona_picker_saved)} · ${entries.size}",
                 style = DsType.caption11.withReadingWeight(),
-                color = colors.labelTertiary,
+                color = colors.textTertiary,
             )
             // Keep the sheet header visible; only the portrait grid scrolls.
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -230,7 +229,7 @@ private fun PersonaPickerAvatarTile(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val portrait by produceState<ImageBitmap?>(null, entry.portraitPath) {
         value = withContext(Dispatchers.IO) {
             decodePersonaPortraitBitmap(entry.portraitPath, maxEdgePx = 256)
@@ -244,13 +243,13 @@ private fun PersonaPickerAvatarTile(
         label = "personaAvatarPress",
     )
     val background by animateColorAsState(
-        targetValue = if (selected) colors.accentTertiary
+        targetValue = if (selected) colors.selected
         else colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
         animationSpec = DsAnimations.interactionColor,
         label = "personaAvatarBackground",
     )
     val outline by animateColorAsState(
-        targetValue = if (selected) colors.accent else colors.borderL2,
+        targetValue = if (selected) colors.primary else colors.border,
         animationSpec = DsAnimations.interactionColor,
         label = "personaAvatarOutline",
     )
@@ -297,7 +296,7 @@ private fun PersonaPickerAvatarTile(
                         Icon(
                             imageVector = FeatherIcons.User,
                             contentDescription = null,
-                            tint = colors.characterAccent,
+                            tint = colors.lilac,
                             modifier = Modifier.size(32.dp),
                         )
                     }
@@ -307,13 +306,13 @@ private fun PersonaPickerAvatarTile(
                 Surface(
                     modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).size(26.dp),
                     shape = CircleShape,
-                    color = colors.accent,
-                    border = BorderStroke(2.dp, colors.bgLayer1),
+                    color = colors.primary,
+                    border = BorderStroke(2.dp, colors.materialL3),
                 ) {
                     Icon(
                         imageVector = FeatherIcons.Check,
                         contentDescription = null,
-                        tint = colors.onAccent,
+                        tint = colors.onPrimary,
                         modifier = Modifier.padding(4.dp),
                     )
                 }
@@ -331,7 +330,7 @@ internal fun ApprovalDialog(
     onAutoApprove: () -> Unit,
     onApproveDeviceTurn: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val impactLabel = stringResource(
         when (approval.impact) {
             LocalApprovalImpact.LOW -> R.string.local_approval_impact_low
@@ -344,16 +343,16 @@ internal fun ApprovalDialog(
         Text(
             stringResource(agentOperationLabelRes(approval.toolName)),
             style = DsType.base16Strong.withReadingWeight(),
-            color = colors.labelPrimary,
+            color = colors.text,
         )
         Text(
             stringResource(R.string.local_approval_impact, impactLabel),
             style = DsType.caption11Strong.withReadingWeight(),
             color = when (approval.impact) {
-                LocalApprovalImpact.LOW -> colors.labelTertiary
-                LocalApprovalImpact.MEDIUM -> colors.warnLabel
+                LocalApprovalImpact.LOW -> colors.textTertiary
+                LocalApprovalImpact.MEDIUM -> colors.warningInk
                 LocalApprovalImpact.HIGH,
-                LocalApprovalImpact.CRITICAL -> colors.error
+                LocalApprovalImpact.CRITICAL -> colors.dangerInk
             },
         )
 
@@ -369,12 +368,12 @@ internal fun ApprovalDialog(
                 Text(
                     stringResource(R.string.local_approval_purpose_title),
                     style = DsType.small13Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
+                    color = colors.text,
                 )
                 Text(
                     stringResource(agentApprovalPurposeRes(approval.toolName)),
                     style = DsType.small13.withReadingWeight(),
-                    color = colors.labelSecondary,
+                    color = colors.textSecondary,
                 )
             }
         }
@@ -388,7 +387,7 @@ internal fun ApprovalDialog(
                 },
             ),
             style = DsType.caption11.withReadingWeight(),
-            color = colors.labelTertiary,
+            color = colors.textTertiary,
         )
 
         SyButton(
@@ -413,7 +412,7 @@ internal fun ApprovalDialog(
             Text(
                 stringResource(R.string.local_approval_safe_enabled),
                 style = DsType.caption11.withReadingWeight(),
-                color = colors.labelTertiary,
+                color = colors.textTertiary,
             )
         }
         if (approval.canApproveDeviceTurn) {
@@ -434,14 +433,14 @@ internal fun QuestionDialog(
     onAnswer: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var answer by rememberSaveable(question) { mutableStateOf("") }
     SyResponsiveSheet(
         title = stringResource(R.string.local_question_title),
         onDismiss = onDismiss,
         scrollable = true,
     ) {
-        Text(question, style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary)
+        Text(question, style = DsType.base16Strong.withReadingWeight(), color = colors.text)
         options.forEach { option ->
             SySheetChoiceRow(
                 title = option,
@@ -514,7 +513,7 @@ internal fun ChatPersonaDialog(
         dismissEnabled = !aiGenerating && !saving,
         footer = {
             saveError?.let {
-                Text(it, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error)
+                Text(it, style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk)
             }
         SyButton(
             text = stringResource(R.string.local_persona_save),
@@ -546,7 +545,7 @@ internal fun ChatPersonaDialog(
         Text(
             stringResource(R.string.local_persona_intro_v3),
             style = DsType.small13.withReadingWeight(),
-            color = DsTheme.colors.labelSecondary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         )
 
         SyMaterialSurface(
@@ -561,12 +560,12 @@ internal fun ChatPersonaDialog(
                 Text(
                     stringResource(R.string.local_persona_ai_title),
                     style = DsType.base16Strong.withReadingWeight(),
-                    color = DsTheme.colors.labelPrimary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                 )
                 Text(
                     stringResource(if (creatingNew) R.string.local_persona_ai_new_hint else R.string.local_persona_ai_hint),
                     style = DsType.small13.withReadingWeight(),
-                    color = DsTheme.colors.labelSecondary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                 )
                 SyTextField(
                     value = aiDescription,
@@ -612,13 +611,13 @@ internal fun ChatPersonaDialog(
                     Text(
                         stringResource(R.string.local_persona_ai_working_hint),
                         style = DsType.caption11.withReadingWeight(),
-                        color = DsTheme.colors.labelTertiary,
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                     )
                 } else if (aiSucceeded) {
                     Text(
                         stringResource(if (creatingNew) R.string.local_persona_ai_new_draft else R.string.local_persona_ai_synced),
                         style = DsType.caption11.withReadingWeight(),
-                        color = DsTheme.colors.labelSecondary,
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                     )
                 }
                 aiError?.takeIf(String::isNotBlank)?.let { error ->
@@ -629,7 +628,7 @@ internal fun ChatPersonaDialog(
                         "persona_autofill_failed" -> stringResource(R.string.local_persona_ai_failed)
                         else -> error
                     }
-                    Text(message, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error)
+                    Text(message, style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk)
                 }
             }
         }
@@ -832,7 +831,7 @@ private fun PersonaFormSection(title: String, content: @Composable () -> Unit) {
         modifier = Modifier.fillMaxWidth().padding(top = DsSpacing.small),
         verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
     ) {
-        Text(title, style = DsType.base16Strong.withReadingWeight(), color = DsTheme.colors.labelPrimary)
+        Text(title, style = DsType.base16Strong.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
         content()
     }
 }

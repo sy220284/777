@@ -497,3 +497,32 @@ fun DsColors.rootSurface(): Color = wallpaperSurface(WallpaperSurfaceLevel.PAGE)
 @Composable
 fun com.shenyan.designsystem.foundation.SyColors.rootSurface(): Color =
     LocalAppBackgroundState.current.wallpaperSurface(canvas, WallpaperSurfaceLevel.PAGE)
+
+/** V6 semantic material sampling, preserving custom-wallpaper contrast and region behavior. */
+@Composable
+fun com.shenyan.designsystem.foundation.SyColors.wallpaperSurface(
+    level: WallpaperSurfaceLevel,
+    region: BackgroundRegion = BackgroundRegion.ALL,
+    base: Color = when (level) {
+        WallpaperSurfaceLevel.PAGE, WallpaperSurfaceLevel.CHROME -> canvas
+        WallpaperSurfaceLevel.INPUT -> materialL1
+        WallpaperSurfaceLevel.CARD -> materialL3
+        WallpaperSurfaceLevel.FLOATING, WallpaperSurfaceLevel.SHEET,
+        WallpaperSurfaceLevel.DIALOG, WallpaperSurfaceLevel.MENU -> materialL4
+        WallpaperSurfaceLevel.DRAWER -> materialL2
+    },
+): Color {
+    if (level == WallpaperSurfaceLevel.PAGE) {
+        return LocalAppBackgroundState.current.wallpaperSurface(base, level, region)
+    }
+    val tier = when (level) {
+        WallpaperSurfaceLevel.INPUT -> com.shenyan.designsystem.components.SyMaterialTier.L1_SECTION
+        WallpaperSurfaceLevel.CHROME -> com.shenyan.designsystem.components.SyMaterialTier.L2_BAR
+        WallpaperSurfaceLevel.FLOATING, WallpaperSurfaceLevel.SHEET, WallpaperSurfaceLevel.DRAWER,
+        WallpaperSurfaceLevel.DIALOG, WallpaperSurfaceLevel.MENU -> com.shenyan.designsystem.components.SyMaterialTier.L4_OVERLAY
+        else -> com.shenyan.designsystem.components.SyMaterialTier.L3_CARD
+    }
+    val neutral = base in listOf(canvas, materialL1, materialL2, materialL3, materialL4, surface, surfaceRaised)
+    return if (neutral) com.shenyan.designsystem.components.syMaterialColor(tier)
+        else LocalAppBackgroundState.current.wallpaperSurface(base, level, region)
+}
