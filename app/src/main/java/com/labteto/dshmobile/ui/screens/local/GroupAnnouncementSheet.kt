@@ -104,6 +104,8 @@ internal fun GroupAnnouncementSheet(
     SyResponsiveSheet(
         title = stringResource(R.string.local_group_announcement_title),
         onDismiss = { if (!saving) onDismiss() },
+        dismissEnabled = !saving,
+        scrollable = true,
     ) {
         Text(stringResource(R.string.local_group_announcement_hint),
             style = DsType.small13.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)

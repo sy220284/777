@@ -59,6 +59,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
@@ -240,8 +241,11 @@ internal fun LocalModeDrawer(
     val crossModeSearch = searchOpen && historyQuery.isNotBlank()
     var searchableFiles by remember { mutableStateOf<List<LocalWorkspaceFile>>(emptyList()) }
     var fileSearchFailed by remember { mutableStateOf(false) }
-    LaunchedEffect(searchOpen, drawerOpen) {
+    // Refresh the file snapshot when the user refines a query; do not keep a stale list from
+    // the moment the drawer was opened. Debounce disk enumeration while the user is typing.
+    LaunchedEffect(searchOpen, drawerOpen, historyQuery) {
         if (searchOpen && drawerOpen) {
+            if (historyQuery.isNotBlank()) delay(300)
             fileSearchFailed = false
             try {
                 searchableFiles = withContext(Dispatchers.IO) { loadSearchFiles() }

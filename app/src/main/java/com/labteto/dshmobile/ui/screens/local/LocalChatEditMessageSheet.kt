@@ -54,6 +54,8 @@ internal fun LocalChatEditMessageSheet(
     SyResponsiveSheet(
         title = stringResource(R.string.local_edit_user_message),
         onDismiss = { if (!submitting) onDismiss() },
+        dismissEnabled = !submitting,
+        scrollable = true,
     ) {
         Text(
             stringResource(R.string.local_edit_user_message_hint),
