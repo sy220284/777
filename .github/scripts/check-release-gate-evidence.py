@@ -103,7 +103,7 @@ for paths in (
 CI = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
 # Main pushes are isolated by commit: a newer merge must neither cancel nor
 # replace an older full-validation run. PR refreshes may retire obsolete checks.
-ci_concurrency = CI.split("\\nconcurrency:\\n", 1)[1].split("\\n\\njobs:", 1)[0]
+ci_concurrency = CI.split("\nconcurrency:\n", 1)[1].split("\n\njobs:", 1)[0]
 ci_group = re.search(r"(?m)^  group: (.+)$", ci_concurrency)
 if (ci_group is None or
         "github.event_name" not in ci_group.group(1) or
