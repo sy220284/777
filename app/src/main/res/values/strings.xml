@@ -52,7 +52,6 @@
     <string name="local_artifact_history_scope">当前扫描最近 %1$d 条事件；更多历史可继续展开。</string>
     <string name="local_tool_history_scope">工具活动仅展示最近 32 项，完整证据仍保存在会话事件日志中。</string>
     <string name="local_artifact_file_unavailable">工作区文件 · 当前不可访问</string>
-    <string name="local_run_center_refresh_failed">运行记录读取失败，已保留上次显示的内容，正在尝试恢复。</string>
 
     <string name="local_project_delete_confirm">确定删除“%1$s”吗？关联会话及长期记忆会阻止删除，相关数据不会自动清理。</string>
     <string name="common_search">搜索</string>
@@ -162,7 +161,7 @@
     <string name="local_work_steer_boundary">只中断当前模型生成，不会撤销已执行操作</string>
     <string name="local_queue_message_count">追加 · 待处理 %1$d 条</string>
     <string name="local_queue_count">已排队 %1$d 条</string>
-    <string name="local_execution_console">执行控制台</string>
+
     <string name="local_resource_summary">智能体 %1$d/%2$d · 终端 %3$d/%4$d · 虚拟屏 %5$d/%6$d · 语言服务 %7$d/%8$d</string>
     <string name="local_resource_pressure">资源压力：%1$s</string>
     <string name="local_resource_pressure_low">正常</string>
@@ -1065,7 +1064,6 @@
     <string name="persona_gallery_delete_dialogue_hint">只删除人设图集里的副本，原会话内容保持不变。</string>
     <string name="persona_gallery_archive_deleted">归档对白已删除</string>
 
-
     <string name="local_run_center">任务进度</string>
     <string name="local_workflow_stage">当前阶段：%1$s</string>
     <string name="local_workflow_executing">执行中</string>
@@ -1082,10 +1080,7 @@
     <string name="local_run_plan">计划</string>
     <string name="local_run_tasks_progress">任务 · %1$d/%2$d</string>
     <string name="local_run_background">后台任务</string>
-    <string name="local_run_agent_direct_title">交给 AI 助手处理</string>
-    <string name="local_run_agent_direct_body">描述你想完成的事。助手会独立处理，你可以回来查看进度，也能随时补充要求。</string>
-    <string name="local_run_agent_task_hint">例如：检查当前项目，列出还需要改进的地方</string>
-    <string name="local_run_agent_start">交给助手处理</string>
+
     <string name="local_run_agent_message_hint">给助手补充要求…</string>
     <string name="local_run_agent_send">发送</string>
     <string name="local_run_agent_dormant_hint">助手正在等你的新要求，发送后会接着处理。</string>
@@ -1129,7 +1124,6 @@
     <string name="panel_artifacts_empty">当前还没有标记为成果的文件</string>
     <string name="panel_involved_files_empty">当前任务还没有涉及文件</string>
 
-
     <string name="persona_gallery_unsaved_update_title">人物有新内容未保存</string>
     <string name="persona_gallery_unsaved_update_subtitle">当前人物的剧情或设定有了新变化</string>
     <string name="persona_gallery_unsaved_update_hint">进入图集前保存一次，会把最新对白、关系状态和人设变化写回当前故事线，不会另建重复人物卡。</string>
@@ -1148,7 +1142,6 @@
     <string name="persona_gallery_start_fresh_story">用这个人物开启独立新故事</string>
     <string name="persona_gallery_untitled_story">未命名故事</string>
 
-
     <string name="persona_gallery_current_synced">当前人物与故事已同步</string>
     <string name="persona_gallery_unsaved_badge">有新内容</string>
     <string name="persona_gallery_show_fixed_persona">查看固定人设</string>
@@ -1159,7 +1152,6 @@
     <string name="persona_gallery_discard_draft_body">放弃修改会丢失本次编辑内容。你也可以取消并返回页面保存。</string>
     <string name="persona_gallery_discard_draft_confirm">放弃并返回</string>
 
-
     <string name="local_persona_picker_title">选择人物</string>
     <string name="local_persona_picker_intro">点选头像，开始一段新故事。</string>
     <string name="local_persona_picker_current">当前人物：%1$s</string>
@@ -1168,7 +1160,6 @@
     <string name="local_persona_picker_saved">已创建人物</string>
     <string name="local_persona_picker_empty">还没有保存过人物。可以直接新建人物，保存后就能在这里选择。</string>
     <string name="local_persona_picker_saved_hint">已保存人物</string>
-
 
     <string name="settings_page_chat">聊天</string>
     <string name="settings_chat_subtitle">避用表达与人物表达偏好</string>
@@ -1194,7 +1185,6 @@
     <string name="local_persona_correction_undo">撤销</string>
 
     <string name="local_persona_picker_switch_requires_new_chat">当前对话已经有内容。切换或新建人物请先新建对话，避免不同人物和故事线混在一起。</string>
-
 
     <string name="notif_channel_local_jobs">本机任务</string>
     <string name="settings_notifications_local_jobs">本机通知总开关</string>
@@ -1222,7 +1212,6 @@
     <string name="local_execution_notification_cancelled">本机任务已取消</string>
     <string name="local_execution_notification_background_continues">当前回合已结束，仍有 %1$d 个后台任务继续运行。</string>
     <string name="local_execution_notification_tap">点击返回当前会话</string>
-
 
     <string name="persona_gallery_import_file">导入人物文件</string>
     <string name="persona_gallery_export_file">导出人物卡</string>
@@ -1624,7 +1613,6 @@
     <string name="local_model_image_mode_native_hint">只使用当前模型自身的图片输入能力。</string>
     <string name="local_model_image_mode_tool_hint">图片先由视觉工具解析，再将结果交给当前模型。</string>
 
-
     <string name="tasks_notify_title">执行完成后通知</string>
     <string name="tasks_notify_hint">这项任务完成或产生结果时发送通知</string>
     <string name="tasks_chat_policy_action">互动策略</string>
@@ -1641,7 +1629,6 @@
     <string name="tasks_chat_max_unanswered">连续未回复</string>
     <string name="tasks_chat_max_unanswered_hint">连续 %1$d 次没有收到回复后暂停主动联系。</string>
     <string name="tasks_chat_policy_save_failed">互动策略保存失败，请检查任务状态后重试。</string>
-
 
     <string name="local_character_tuning_expression_variation">模型温度</string>
     <string name="local_character_tuning_expression_variation_low">较低</string>
@@ -1851,7 +1838,7 @@
     <string name="local_reasoning_switch_hint">控制下一轮模型的真实思考模式；执行中的请求不受影响</string>
     <string name="local_reasoning_switch_unsupported">当前模型或协议暂不支持此开关；工具推理请改用支持的 Responses 路线</string>
     <string name="local_character_inner_thought">心声</string>
-    <string name="local_reasoning_work_failed">这一步执行失败，详情请查看任务进度</string>
+    <string name="local_reasoning_work_failed">这一步执行失败，请查看当前会话的错误信息</string>
     <string name="local_work_thinking">正在思考…</string>
     <string name="local_work_thought">已思考</string>
     <string name="local_work_thought_seconds">思考了 %1$d 秒</string>
