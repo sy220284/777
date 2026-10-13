@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -293,6 +294,7 @@ internal fun LocalSessionDrawerRow(
     running: Boolean,
     selected: Boolean,
     selectionOpen: Boolean,
+    drawerVisible: Boolean,
     onClick: () -> Unit,
     onSelectMultiple: () -> Unit,
     onRename: () -> Unit,
@@ -304,27 +306,33 @@ internal fun LocalSessionDrawerRow(
     var menuOpen by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val reveal = with(density) { 76.dp.toPx() }
-    var swipe by remember { mutableStateOf(0f) }
+    var swipe by remember(session.id) { mutableStateOf(0f) }
     val thresholdPulse = rememberHapticPulse()
+    LaunchedEffect(selectionOpen, drawerVisible) {
+        if (selectionOpen || !drawerVisible) swipe = 0f
+    }
 
-    Box(Modifier.fillMaxWidth()) {
-        SyIconButton(
-            icon = FeatherIcons.Trash2,
-            contentDescription = stringResource(R.string.local_delete_session),
-            onClick = {
-                swipe = 0f
-                onDelete()
-            },
-            tint = colors.dangerInk,
-            modifier = Modifier.align(Alignment.CenterEnd),
-        )
+    Box(Modifier.fillMaxWidth().clip(DsShapes.row)) {
+        // The action must not exist at rest, including under a translucent rounded row.
+        if (swipe < 0f && !selectionOpen && drawerVisible) {
+            SyIconButton(
+                icon = FeatherIcons.Trash2,
+                contentDescription = stringResource(R.string.local_delete_session),
+                onClick = {
+                    swipe = 0f
+                    onDelete()
+                },
+                tint = colors.dangerInk,
+                modifier = Modifier.align(Alignment.CenterEnd),
+            )
+        }
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .offset { IntOffset(swipe.roundToInt(), 0) }
-                .pointerInput(reveal, selectionOpen) {
-                    detectHorizontalDragGestures(
+                .pointerInput(reveal, selectionOpen, drawerVisible) {
+                    if (!selectionOpen && drawerVisible) detectHorizontalDragGestures(
                         onHorizontalDrag = { change, amount ->
                             change.consume()
                             val wasPastThreshold = swipe <= -reveal / 2f
@@ -332,6 +340,7 @@ internal fun LocalSessionDrawerRow(
                             if ((swipe <= -reveal / 2f) != wasPastThreshold) thresholdPulse()
                         },
                         onDragEnd = { swipe = if (swipe < -reveal / 2) -reveal else 0f },
+                        onDragCancel = { swipe = 0f },
                     )
                 }
                 .heightIn(min = SyMetric.touch)
@@ -347,7 +356,10 @@ internal fun LocalSessionDrawerRow(
                         label = "sessionRowBackground",
                     ).value,
                 )
-                .combinedClickable(onClick = onClick, onLongClick = { menuOpen = true })
+                .combinedClickable(
+                    onClick = { swipe = 0f; onClick() },
+                    onLongClick = { swipe = 0f; menuOpen = true },
+                )
                 .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapMd),
             verticalAlignment = Alignment.CenterVertically,
         ) {
