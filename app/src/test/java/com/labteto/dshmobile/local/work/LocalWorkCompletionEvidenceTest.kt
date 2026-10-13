@@ -5,6 +5,26 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalWorkCompletionEvidenceTest {
+    @Test
+    fun goalTransitionAndDeliveryUseOneDiagnosticFactProjection() {
+        val work = LocalWorkState(
+            goal = LocalGoal("核查交付", status = "blocked"),
+            todos = listOf(LocalTodoItem("验证", "in_progress")),
+            team = LocalAgentTeamUiState(rebuilding = true),
+        )
+        val evidence = localWorkCompletionEvidence(work)
+        val diagnostic = evidence.toDiagnosticJson()
+        assertFalse(diagnostic["ready_for_goal_completion"]!!.toString().toBoolean())
+        assertTrue(diagnostic["open_todos"]!!.toString() == "1")
+        assertTrue(diagnostic["team_rebuilding"]!!.toString() == "true")
+        assertTrue(diagnostic["blocked_goal"]!!.toString() == "true")
+        assertFalse(resolveWorkGoalTransition(
+            requireNotNull(work.goal), requireNotNull(work.goal).copy(status = "completed"),
+            work,
+        ).accepted)
+    }
+
+
     private fun teamMember(activity: String, resultReady: Boolean = false) =
         LocalAgentTeamMemberUiState(
             id = "member-1", jobId = "job-1", name = "reviewer",

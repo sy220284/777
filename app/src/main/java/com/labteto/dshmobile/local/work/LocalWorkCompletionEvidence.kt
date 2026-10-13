@@ -1,5 +1,11 @@
 package com.labteto.dshmobile.local.work
 
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
 /**
  * One Work-owned view of outstanding obligations. Turn completion only means the model
  * stopped speaking; it is never sufficient evidence that the user's goal was delivered.
@@ -82,4 +88,27 @@ internal fun localWorkCompletionEvidence(
         pendingQuestion = work.pendingQuestion != null,
         deliveryEvidence = deliveryEvidence,
     )
+}
+
+/**
+ * Canonical, read-only Work completion fact projection.
+ *
+ * Goal transition admission, final reply quality and diagnostics consume exactly this
+ * snapshot. No new persistence table, mutable status owner or model-derived success state.
+ */
+internal fun LocalWorkCompletionEvidence.toDiagnosticJson(): JsonObject = buildJsonObject {
+    put("ready_for_goal_completion", readyForGoalCompletion)
+    put("open_todos", openTodos)
+    put("open_team_tasks", openTeamTasks)
+    put("active_team_members", activeTeamMembers)
+    put("pending_team_messages", pendingTeamMessages)
+    put("failed_team_members", failedTeamMembers)
+    put("awaiting_review_members", awaitingReviewMembers)
+    put("team_failure", teamFailure)
+    put("team_rebuilding", teamRebuilding)
+    put("blocked_goal", blockedGoal)
+    put("pending_approval", pendingApproval)
+    put("pending_question", pendingQuestion)
+    put("delivery_missing", JsonArray(deliveryEvidence?.missing.orEmpty().map(::JsonPrimitive)))
+    put("user_reasons", JsonArray(userReasons.map(::JsonPrimitive)))
 }
