@@ -148,20 +148,28 @@ fun SyQuickActionTile(
         shape = RoundedCornerShape(SyMetric.radiusCard),
     ) {
         Column(
-            Modifier.heightIn(min = 92.dp).padding(horizontal = 14.dp, vertical = 18.dp),
+            Modifier.fillMaxWidth().heightIn(min = 108.dp)
+                .padding(horizontal = 10.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
         ) {
-            when {
-                iconPainter != null -> Icon(iconPainter, contentDescription = null,
-                    tint = if (enabled) p.textSecondary else p.textTertiary,
-                    modifier = Modifier.size(22.dp))
-                icon != null -> Icon(icon, contentDescription = null,
-                    tint = if (enabled) p.textSecondary else p.textTertiary,
-                    modifier = Modifier.size(22.dp))
+            Box(
+                modifier = Modifier.size(44.dp)
+                    .background(p.selected.copy(alpha = .65f), RoundedCornerShape(14.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                when {
+                    iconPainter != null -> Icon(iconPainter, contentDescription = null,
+                        tint = if (enabled) p.text else p.textTertiary,
+                        modifier = Modifier.size(26.dp))
+                    icon != null -> Icon(icon, contentDescription = null,
+                        tint = if (enabled) p.text else p.textTertiary,
+                        modifier = Modifier.size(26.dp))
+                }
             }
             Text(label, color = if (enabled) p.text else p.textTertiary,
                 style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
