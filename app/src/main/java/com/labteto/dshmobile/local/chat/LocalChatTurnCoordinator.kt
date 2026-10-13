@@ -102,12 +102,18 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         subjectKey: String? = null,
     ): ChatTurnContext {
         val decisions = subjectKey?.let { persistence?.diaryStore?.decisionsForExperience(it, context) }.orEmpty()
+        val effectiveContext = reconcileDiaryContext(context, decisions)
         val prepared = runner.prepareProfile(
             persona = persona, state = reconcileDiaryState(state, decisions),
-            context = reconcileDiaryContext(context, decisions), userInput = userInput, storyContext = storyContext,
+            context = effectiveContext, userInput = userInput, storyContext = storyContext,
         )
-        return prepared.copy(dynamicPrompt = listOf(prepared.dynamicPrompt, renderDiaryDecisions(decisions))
-            .filter(String::isNotBlank).joinToString("\n\n"))
+        val parts = prepared.dynamicParts + ChatContextPart(
+            ChatContextLayer.HISTORICAL, renderDiaryDecisions(decisions),
+        )
+        return prepared.copy(
+            dynamicPrompt = ChatUnifiedTurnContext.compose(userInput, effectiveContext, parts),
+            dynamicParts = parts,
+        )
     }
 
     internal suspend fun finalize(

@@ -16,6 +16,8 @@ data class ChatContextState(
     /** Plot stages explicitly visited in this story branch, in visit order. */
     val unlockedStoryStages: List<String> = emptyList(),
     val continuity: ChatContinuityState = ChatContinuityState(),
+    /** User-authored, branch-local attention; independent of durable fact lifecycle. */
+    val attention: ChatAttentionState = ChatAttentionState(),
     val processedThroughSequence: Long = -1L,
     val pendingTurns: List<ChatPendingTurn> = emptyList(),
     val pendingThroughSequence: Long = -1L,
@@ -58,6 +60,17 @@ internal fun ChatContextState.withStoryStageSelection(selected: String): ChatCon
 internal fun ChatContextState.visibleStoryStages(): Set<String> =
     (unlockedStoryStages + storyStage).map(String::trim).filter(String::isNotBlank).toSet()
 
+/**
+ * The transcript remains authoritative. These stable IDs bind a projected fact to its
+ * original event rather than relying on a candidate's free-text paraphrase.
+ */
+internal fun chatContinuityEventId(
+    kind: ChatContinuityFactKind,
+    text: String,
+    sourceSequence: Long = 0L,
+): String = "${kind.name.lowercase()}:${sourceSequence}:${normalizeContinuityFact(text).hashCode().toUInt().toString(16)}"
+
+
 internal fun ChatContextState.normalized(): ChatContextState {
     val recentEvents = continuity.recentEvents.cleanRecentContextLines(5, 180)
     val decisions = continuity.decisions.cleanRecentContextLines(4, 180)
@@ -74,6 +87,9 @@ internal fun ChatContextState.normalized(): ChatContextState {
                 sourceUserMessageId = item.sourceUserMessageId.trim().take(160),
                 sourceAssistantMessageId = item.sourceAssistantMessageId.trim().take(160),
                 evidence = item.evidence.trim().take(360),
+                eventId = item.eventId.ifBlank {
+                    chatContinuityEventId(item.kind, item.text, item.sourceSequence)
+                },
             )
         }
         .filter { item ->
@@ -84,6 +100,23 @@ internal fun ChatContextState.normalized(): ChatContextState {
         .toList()
         .takeLast(MAX_CONTINUITY_EVIDENCE)
 
+    val orderedSceneEvents = sceneEvents.sortedBy(ChatSceneEvent::sequence)
+    val latestLocationEvent = orderedSceneEvents.lastOrNull { it.kind == ChatSceneEventKind.LOCATION }
+    val validSceneEvents = orderedSceneEvents
+        .filter(ChatSceneRuntime::isPlausibleRecordedEvent)
+        .distinctBy { event ->
+            listOf(event.sequence.toString(), event.kind.name, event.actor, event.to)
+        }
+        .takeLast(RECENT_SCENE_EVENT_LIMIT)
+    val correctedLocation = if (latestLocationEvent != null &&
+        latestLocationEvent.to == scene.location &&
+        !ChatSceneRuntime.isPlausibleRecordedEvent(latestLocationEvent)
+    ) {
+        // Bad legacy parser output should not remain a hard truth after restoring an archive.
+        // Replay only a known earlier location; otherwise leave the location unknown.
+        validSceneEvents.lastOrNull { it.kind == ChatSceneEventKind.LOCATION }?.to.orEmpty()
+    } else scene.location
+
     return copy(
         storyStage = storyStage.trim().take(160),
         unlockedStoryStages = (unlockedStoryStages + storyStage)
@@ -91,7 +124,7 @@ internal fun ChatContextState.normalized(): ChatContextState {
             .let { stages -> if (storyStage.isBlank()) emptyList() else stages },
         scene = scene.copy(
             sceneTime = scene.sceneTime.trim().take(80),
-            location = scene.location.trim().take(120),
+            location = correctedLocation.trim().take(120),
             participants = scene.participants.cleanContextLines(8, 80),
             positions = scene.positions.cleanContextLines(8, 120),
             activeActions = scene.activeActions.cleanContextLines(6, 120),
@@ -108,12 +141,11 @@ internal fun ChatContextState.normalized(): ChatContextState {
             unfinished = unfinished,
             evidence = groundedEvidence,
         ),
-        sceneEvents = sceneEvents
-            .sortedBy(ChatSceneEvent::sequence)
-            .distinctBy { event ->
-                listOf(event.sequence.toString(), event.kind.name, event.actor, event.to)
-            }
-            .takeLast(RECENT_SCENE_EVENT_LIMIT),
+        sceneEvents = validSceneEvents,
+        attention = attention.copy(
+            lastUserSubject = attention.lastUserSubject.trim().take(260),
+            pausedSubject = attention.pausedSubject.trim().take(80),
+        ),
     )
 }
 
@@ -125,8 +157,11 @@ internal fun ChatContextState.enqueuePending(turn: ChatPendingTurn): ChatContext
     val next = (pendingTurns + turn)
         .distinctBy { pending -> pending.sequence to pending.assistantMessageId }
         .sortedBy(ChatPendingTurn::sequence)
-    return copy(pendingTurns = next, pendingThroughSequence = maxOf(pendingThroughSequence, turn.sequence))
-        .boundedPendingWindow()
+    return copy(
+        pendingTurns = next,
+        pendingThroughSequence = maxOf(pendingThroughSequence, turn.sequence),
+        attention = ChatTurnContextPolicy.advance(attention, turn.userMessage, turn.sequence),
+    ).boundedPendingWindow()
 }
 
 internal fun ChatContextState.boundedPendingWindow(): ChatContextState = copy(
@@ -227,6 +262,7 @@ internal fun ChatContextState.hasUsefulFacts(): Boolean =
         continuity.decisions.isNotEmpty() ||
         continuity.unfinished.isNotEmpty() ||
         pendingTurns.isNotEmpty() ||
+        attention.pausedSubject.isNotBlank() ||
         sceneEvents.isNotEmpty()
 
 internal fun ChatContextState.withLegacyFallback(state: ChatCharacterState): ChatContextState {
@@ -341,6 +377,7 @@ internal fun groundContinuityEvidence(
     previous: ChatContinuityState,
     candidate: ChatContinuityState,
     pendingTurns: List<ChatPendingTurn>,
+    resolvedContinuityIds: List<String> = emptyList(),
 ): ChatContinuityState {
     val orderedTurns = pendingTurns.sortedBy(ChatPendingTurn::sequence)
     val previousEvidence = previous.evidence.associateBy { item ->
@@ -357,12 +394,31 @@ internal fun groundContinuityEvidence(
         limit: Int,
     ): List<String> {
         val retainedPrevious = previousValues.filterNot { previousFact ->
+            val key = kind to normalizeContinuityFact(previousFact)
+            val eventId = previousEvidence[key]?.eventId?.takeIf(String::isNotBlank)
+                ?: chatContinuityEventId(kind, previousFact, previousEvidence[key]?.sourceSequence ?: 0L)
+            val plannerOmittedFact = values.none { incoming ->
+                normalizeContinuityFact(incoming) == normalizeContinuityFact(previousFact) ||
+                    (kind == ChatContinuityFactKind.OPEN_THREAD &&
+                        continuityOpenThreadsShareSubject(previousFact, incoming))
+            }
+            // Resolution must refer to this exact event, be omitted by the model's current
+            // projection AND be supported by the real exchange, never a generic "好".
+            val confirmedByEventId = kind == ChatContinuityFactKind.OPEN_THREAD &&
+                plannerOmittedFact && eventId in resolvedContinuityIds &&
+                ChatContinuityEventIdentity.confirmsQuestion(
+                    previousFact,
+                    orderedTurns,
+                    previousValues.count {
+                        Regex("""(?:是否|有没有|待确认|尚未明确|还没确认)""").containsMatchIn(it)
+                    },
+                )
             continuityRemovalGrounded(
                 kind = kind,
                 fact = previousFact,
                 turns = orderedTurns,
                 activeFactCount = previousValues.size,
-            )
+            ) || confirmedByEventId
         }
         if (values.isEmpty()) return retainedPrevious.takeLast(limit)
         val previousKeys = retainedPrevious.associateBy(::normalizeContinuityFact)
@@ -390,6 +446,14 @@ internal fun groundContinuityEvidence(
                     sourceUserMessageId = direct.first.userMessageId,
                     sourceAssistantMessageId = direct.first.assistantMessageId,
                     evidence = direct.first.rawEvidence(),
+                    eventId = previous.evidence.firstOrNull { item ->
+                        item.kind == kind && kind == ChatContinuityFactKind.OPEN_THREAD &&
+                            continuityOpenThreadsShareSubject(item.text, value)
+                    }?.let { item ->
+                        item.eventId.ifBlank {
+                            chatContinuityEventId(item.kind, item.text, item.sourceSequence)
+                        }
+                    } ?: chatContinuityEventId(kind, value, direct.first.sequence),
                 )
                 return@forEach
             }
@@ -402,7 +466,11 @@ internal fun groundContinuityEvidence(
                     ?.first
                 if (inherited != null) {
                     accepted += value
-                    acceptedEvidence[key] = inherited.copy(kind = kind, text = value)
+                    acceptedEvidence[key] = inherited.copy(
+                        kind = kind,
+                        text = value,
+                        eventId = chatContinuityEventId(kind, value, inherited.sourceSequence),
+                    )
                 }
             }
         }
@@ -494,7 +562,9 @@ private fun continuityRemovalGrounded(
         if (!hasRemovalSignal) return@any false
 
         val score = continuityEvidenceScore(fact, userEvidence)
-        val anchorMatched = continuityRemovalAnchorMatches(fact, userEvidence)
+        val anchorMatched = if (kind == ChatContinuityFactKind.OPEN_THREAD) {
+            ChatContinuityEventIdentity.matchesEvidenceSubject(fact, userEvidence)
+        } else continuityRemovalAnchorMatches(fact, userEvidence)
         when (kind) {
             ChatContinuityFactKind.DECISION ->
                 anchorMatched ||
@@ -533,24 +603,8 @@ private fun continuityAnchorCore(fact: String): String =
         .replace(CONTINUITY_ANCHOR_TIME_NOISE, "")
         .replace(CONTINUITY_ANCHOR_GENERIC_NOISE, "")
 
-private fun continuityOpenThreadsShareSubject(left: String, right: String): Boolean {
-    if (ChatContextAssembler.semanticallySimilar(left, right)) return true
-    val a = continuityAnchorCore(left)
-    val b = continuityAnchorCore(right)
-    if (a.length < 2 || b.length < 2) return false
-    if (a == b) return true
-    val shorter = if (a.length <= b.length) a else b
-    val longer = if (a.length <= b.length) b else a
-    if (shorter.length >= 2 && longer.contains(shorter)) return true
-
-    val aa = continuityBigrams(a)
-    val bb = continuityBigrams(b)
-    if (aa.isEmpty() || bb.isEmpty()) return false
-    val shared = aa.count(bb::contains)
-    if (shared < 2) return false
-    val containment = shared.toDouble() / minOf(aa.size, bb.size).toDouble()
-    return containment >= 0.6
-}
+private fun continuityOpenThreadsShareSubject(left: String, right: String): Boolean =
+    ChatContinuityEventIdentity.sameSubject(left, right)
 
 private val GENERIC_CONTINUITY_ANCHORS = setOf(
     "这个", "那个", "事情", "这事", "那事", "一下", "之后", "然后", "已经",
@@ -656,7 +710,10 @@ internal fun ChatContextState.canonicalFactLines(): List<String> {
     }.distinct()
 }
 
-internal fun renderChatContextForModel(context: ChatContextState): String {
+internal fun renderChatContextForModel(
+    context: ChatContextState,
+    focusQuery: String? = null,
+): String {
     val normalized = context.normalized()
     if (!normalized.hasUsefulFacts()) return ""
 
@@ -665,7 +722,11 @@ internal fun renderChatContextForModel(context: ChatContextState): String {
             .filter { it.sequence > normalized.processedThroughSequence }
             .filter { it.generation == normalized.generation }
             .sortedBy(ChatPendingTurn::sequence)
-        if (pending.isNotEmpty()) {
+        val pausedWeakReply = focusQuery != null &&
+            normalized.attention.pausedSubject.isNotBlank() &&
+            ChatTurnContextPolicy.isWeakReply(focusQuery)
+        if (pending.isNotEmpty() && !pausedWeakReply && (focusQuery == null ||
+                !ChatTurnContextPolicy.isTopicRedirect(focusQuery))) {
             appendLine("【尚未归并｜最高连续性优先】")
             appendLine("最近 ${minOf(pending.size, HOT_WINDOW_PENDING_TURNS)} 个未归并回合的原文已在对话热窗口中，直接以原文为准，不重复注入。")
             val overflowFallback = pending
@@ -703,15 +764,26 @@ internal fun renderChatContextForModel(context: ChatContextState): String {
 
     val continuitySection = buildString {
         val continuity = normalized.continuity
-        if (
-            continuity.recentEvents.isNotEmpty() ||
-            continuity.decisions.isNotEmpty() ||
-            continuity.unfinished.isNotEmpty()
-        ) {
+        // Preserve all facts in storage; only relevant facts participate in this model request.
+        fun relevant(value: String): Boolean =
+            focusQuery == null || ChatTurnContextPolicy.relevant(focusQuery, value, normalized.attention)
+        // A latest completed event is a continuity checkpoint, not another to-do.
+        // Keep it available unless the user explicitly redirects the conversation.
+        val events = if (focusQuery != null && ChatTurnContextPolicy.isTopicRedirect(focusQuery)) {
+            emptyList()
+        } else {
+            val latestCheckpoint = if (normalized.attention.pausedSubject.isBlank()) {
+                continuity.recentEvents.takeLast(1)
+            } else emptyList()
+            (continuity.recentEvents.filter(::relevant) + latestCheckpoint).distinct()
+        }
+        val decisions = continuity.decisions.filter(::relevant)
+        val unfinished = continuity.unfinished.filter(::relevant)
+        if (events.isNotEmpty() || decisions.isNotEmpty() || unfinished.isNotEmpty()) {
             appendLine("【剧情连续性｜当前有效】")
-            if (continuity.recentEvents.isNotEmpty()) appendLine("近期：${continuity.recentEvents.joinToString("；")}")
-            if (continuity.decisions.isNotEmpty()) appendLine("已定：${continuity.decisions.joinToString("；")}")
-            if (continuity.unfinished.isNotEmpty()) append("待续：${continuity.unfinished.joinToString("；")}")
+            if (events.isNotEmpty()) appendLine("近期：${events.joinToString("；")}")
+            if (decisions.isNotEmpty()) appendLine("已定：${decisions.joinToString("；")}")
+            if (unfinished.isNotEmpty()) append("待续：${unfinished.joinToString("；")}")
         }
     }.trim().take(MAX_SOFT_CONTINUITY_CHARS)
 

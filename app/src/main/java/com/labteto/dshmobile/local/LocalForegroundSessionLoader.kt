@@ -61,6 +61,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
     private val usageTracker: DeepSeekUsageTracker,
     private val contextComposer: ContextComposer,
     private val chatRestore: com.labteto.dshmobile.local.chat.LocalChatSessionRestorer,
+    private val chatComposition: com.labteto.dshmobile.local.chat.LocalChatComposition,
     private val workTimelineMemoryRecovery: LocalWorkTimelineMemoryRecovery,
     private val approvalPreferences: LocalApprovalPreferences,
 ) {
@@ -280,6 +281,11 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             }
             if (restoredHistory.usedLegacyFallback || restoredTranscript.needsPersist || restoredChat.needsPersist) {
                 persistCurrent()
+            }
+            // Work is already durable. Restoration must re-admit unprocessed chat turns
+            // even if the user never sends another message after relaunching the app.
+            if (state.usageMode == LocalUsageMode.CHAT && !state.chat.groupChat.enabled) {
+                chatComposition.resumePostTurn(sessionId, log)
             }
         }
     }

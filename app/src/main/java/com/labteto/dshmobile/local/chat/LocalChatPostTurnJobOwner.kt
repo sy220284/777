@@ -6,47 +6,79 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.withContext
 
 /**
- * Process-local owner of the one scheduled direct-chat post-turn consolidation job.
+ * One process-local direct-chat reconciliation lane.
  *
- * Foreground Chat stop/edit/regenerate operations cancel through this owner without reaching into
- * the Runtime Kernel. The coordinator remains responsible for creating jobs; ownership lives here.
+ * Each accepted turn is persisted BEFORE enqueue. A later turn coalesces the next job instead
+ * of cancelling the job currently consolidating the prior batch. Only foreground preemption,
+ * editing, switching and explicit stop cancel the lane; both slots are cancelled together.
+ *
+ * The job owner does not own durable facts. The event log and generation/sequence cursor do.
  */
 internal object LocalChatPostTurnJobOwner {
     private val lock = Any()
-    private var scheduled: Job? = null
+    private var active: Job? = null
+    private var queued: Job? = null
 
-    internal fun replace(job: Job) {
-        val previous = synchronized(lock) {
-            val current = scheduled
-            scheduled = job
-            current
+    /** Jobs must be created LAZY; ownership determines when they may start. */
+    internal fun submit(job: Job) {
+        var superseded: Job? = null
+        val start = synchronized(lock) {
+            if (active == null || active?.isCompleted == true) {
+                superseded = queued
+                queued = null
+                active = job
+                true
+            } else {
+                superseded = queued
+                queued = job
+                false
+            }
         }
-        if (previous !== job) previous?.cancel()
+        if (superseded !== job) superseded?.cancel()
+        if (start) job.start()
     }
 
+    /** On normal completion, advance the coalesced queue without losing a pending signal. */
     internal fun clearIf(job: Job) {
-        synchronized(lock) {
-            if (scheduled === job) scheduled = null
+        val next = synchronized(lock) {
+            when {
+                active === job -> {
+                    active = queued
+                    queued = null
+                    active
+                }
+                queued === job -> {
+                    queued = null
+                    null
+                }
+                else -> null
+            }
         }
+        next?.takeIf { !it.isCancelled }?.start()
     }
 
     internal fun cancel(): Boolean {
-        val job = takeScheduled()
-        job?.cancel()
-        return job != null
+        val jobs = synchronized(lock) {
+            val taken = listOfNotNull(active, queued).distinct()
+            active = null
+            queued = null
+            taken
+        }
+        jobs.forEach { it.cancel() }
+        return jobs.isNotEmpty()
     }
 
     internal suspend fun cancelAndJoin(): Boolean {
-        val job = takeScheduled() ?: return false
+        val jobs = synchronized(lock) {
+            val taken = listOfNotNull(active, queued).distinct()
+            active = null
+            queued = null
+            taken
+        }
+        if (jobs.isEmpty()) return false
         withContext(NonCancellable) {
-            job.cancelAndJoin()
+            jobs.forEach { it.cancelAndJoin() }
         }
         return true
-    }
-
-    private fun takeScheduled(): Job? = synchronized(lock) {
-        val current = scheduled
-        scheduled = null
-        current
     }
 }

@@ -220,6 +220,49 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
         LocalChatPostTurnJobOwner.cancel()
     }
 
+    /**
+     * Re-admit durable work after session restore, without inventing a new user turn.
+     * The same generation, cursor and commit validation as normal refresh still apply.
+     */
+    fun resumePending(
+        expectedSessionId: String,
+        boundEventLog: LocalSessionEventLog,
+        profile: LocalModelProfile,
+        persona: PersonaProfile,
+    ): Boolean {
+        val snapshot = readState()
+        val context = snapshot.chat.chatContext
+        if (snapshot.sessionId != expectedSessionId ||
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            snapshot.chat.groupChat.enabled ||
+            context.pendingThroughSequence <= context.processedThroughSequence
+        ) return false
+
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            refresh(
+                persona = persona,
+                expectedSessionId = expectedSessionId,
+                expectedBaseState = snapshot.chat.chatState,
+                expectedGeneration = context.generation,
+                boundEventLog = boundEventLog,
+                profile = profile,
+            )
+        }
+        LocalChatPostTurnJobOwner.submit(job)
+        job.invokeOnCompletion { LocalChatPostTurnJobOwner.clearIf(job) }
+        return true
+    }
+
+    fun resumePendingIfAny(
+        expectedSessionId: String,
+        boundEventLog: LocalSessionEventLog,
+    ): Boolean {
+        val snapshot = readState()
+        if (snapshot.sessionId != expectedSessionId || !snapshot.modelState.configured) return false
+        val profile = snapshot.modelState.modelSelection.activeProfile ?: return false
+        return resumePending(expectedSessionId, boundEventLog, profile, chatTurnCoordinator.persona(snapshot))
+    }
+
     fun schedule(
         userMessage: String,
         assistantMessage: String,
@@ -232,7 +275,8 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
         sourceUserMessageId: String? = null,
         assistantEventSequence: Long? = null,
     ) {
-        cancelScheduledRefresh()
+        // The durable turn is the queue entry. Submitting a new job only updates the
+        // coalesced signal and must not cancel a currently running consolidation batch.
         val generation = enqueue(
             userMessage = userMessage,
             assistantMessage = assistantMessage,
@@ -253,9 +297,8 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
                 profile = profile,
             )
         }
-        LocalChatPostTurnJobOwner.replace(job)
+        LocalChatPostTurnJobOwner.submit(job)
         job.invokeOnCompletion { LocalChatPostTurnJobOwner.clearIf(job) }
-        job.start()
     }
 
     private fun scheduleRetry(
@@ -297,9 +340,8 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
                 retryAttempt = retryAttempt + 1,
             )
         }
-        LocalChatPostTurnJobOwner.replace(job)
+        LocalChatPostTurnJobOwner.submit(job)
         job.invokeOnCompletion { LocalChatPostTurnJobOwner.clearIf(job) }
-        job.start()
     }
 
     fun enqueue(
@@ -485,6 +527,7 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
             previous = baseContext.continuity,
             candidate = plan.state.continuity,
             pendingTurns = pending,
+            resolvedContinuityIds = plan.resolvedContinuityIds,
         )
         val diaryDecisions = diaryStore.decisionsForExperience(
             chatRelationshipSubjectKey(before.chat.galleryId, before.chat.personaId), baseContext,
@@ -615,8 +658,10 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
                 pending.sequence > nextContext.processedThroughSequence &&
                     pending.generation == expectedGeneration
             }) {
+            // Finishing a batch is progress, not a failure. Reset the failure budget so
+            // a long burst can drain beyond four batches instead of stranding older turns.
             scheduleRetry(
-                persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "remaining-pending",
+                persona, expectedSessionId, expectedGeneration, boundEventLog, profile, 0, "remaining-pending",
             )
         }
     }

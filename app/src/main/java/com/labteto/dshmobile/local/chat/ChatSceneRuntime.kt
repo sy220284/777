@@ -45,6 +45,10 @@ internal data class ChatContinuityCheck(
  * remain in raw dialogue / soft memory rather than being promoted into hard state.
  */
 internal object ChatSceneRuntime {
+    /** Validate an archived scene transition before allowing it to remain authoritative. */
+    fun isPlausibleRecordedEvent(event: ChatSceneEvent): Boolean =
+        event.kind != ChatSceneEventKind.LOCATION || isPlausibleMovementDestination(event.to)
+
     fun extractTurnEvents(
         previous: ChatSceneState,
         userMessage: String,
@@ -189,15 +193,21 @@ internal object ChatSceneRuntime {
             )
         }
 
-        val movement = MOVEMENT_PATTERNS.firstNotNullOfOrNull { regex ->
-            regex.find(compact)?.let { match ->
+        // A movement verb may be followed by an adverbial clause rather than a destination
+        // ("你到了才讲"). Try the next occurrence instead of turning the clause into a place.
+        val movement = MOVEMENT_PATTERNS.asSequence()
+            .flatMap { regex -> regex.findAll(compact) }
+            .mapNotNull { match ->
                 sanitizeLocation(match.groups["target"]?.value.orEmpty())
-                    .takeIf(String::isNotBlank)
-                    ?.let { target -> target to match.value }
+                    .takeIf(::isPlausibleMovementDestination)
+                    ?.takeIf { isRealizedMovement(compact, match.range.first) }
+                    ?.let { target -> Triple(match.range.first, target, match.value) }
             }
-        }
+            // Multiple completed movements in one message end at the latest destination.
+            // Pattern declaration order must never override narrative order.
+            .maxByOrNull { it.first }
         if (movement != null) {
-            val (target, evidence) = movement
+            val (_, target, evidence) = movement
             events += ChatSceneEvent(
                 sequence = sequence,
                 kind = ChatSceneEventKind.LOCATION,
@@ -280,6 +290,22 @@ internal object ChatSceneRuntime {
     private fun normalizeLocation(value: String): String =
         normalize(sanitizeLocation(value))
             .replace(Regex("""(?:这里|那里|这儿|那儿)$"""), "")
+
+    /** Reject grammar tails, not real named places; uncertain transitions stay in raw dialogue. */
+    /** Future plans and hypothetical clauses are not completed scene transitions. */
+    private fun isRealizedMovement(text: String, offset: Int): Boolean {
+        val prefix = text.substring(0, offset).takeLast(64)
+            .split('，', '。', '！', '？', '；', ',', '.', '!', '?', ';', '\n')
+            .lastOrNull().orEmpty().trim()
+        return !Regex("""(?:如果|假如|要是|等到|打算|计划|准备|想要|将要|明天|下次|以后|待会儿|待会|等你|等我)""")
+            .containsMatchIn(prefix)
+    }
+
+    private fun isPlausibleMovementDestination(target: String): Boolean {
+        if (target.isBlank() || looksLikeAbstractState(target)) return false
+        return !Regex("""^(?:才|就|再|又|还|会|要|该|能|不能|没|没有|跟着|然后|之后|以后|时候|马上|现在|先|接着)""")
+            .containsMatchIn(target)
+    }
 
     private fun looksLikeAbstractState(value: String): Boolean {
         val normalized = normalize(value)

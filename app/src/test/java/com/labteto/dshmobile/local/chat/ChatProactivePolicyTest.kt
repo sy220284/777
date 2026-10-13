@@ -239,17 +239,20 @@ class ChatProactivePolicyTest {
     }
 
     @Test
-    fun proactivePromptAnchorsRealUnfinishedPlansWithoutFabricatingUserTurns() {
+    fun proactivePromptAnchorsOnlyTriggerRelevantPlansWithoutFabricatingUserTurns() {
         val persona = PersonaProfile(name = "阿青", coreIdentity = "园艺师")
         val state = ChatCharacterState(
             unresolvedThreads = listOf("还没把旧花盆归还给朋友"),
             currentAgenda = "今天要整理温室里的新苗",
         )
-        val prompt = characterProactiveDirective("用户设置的晚上提醒", persona, state)
-        assertTrue(prompt.contains("还没把旧花盆归还给朋友"))
-        assertTrue(prompt.contains("整理温室里的新苗"))
-        assertTrue(prompt.contains("幕后触发条件，不是用户刚发来的消息"))
-        assertTrue(prompt.contains("延续当前人物、关系和故事"))
+        val unrelated = characterProactiveDirective("用户设置的晚上提醒", persona, state)
+        assertFalse(unrelated.contains("还没把旧花盆归还给朋友"))
+        assertFalse(unrelated.contains("整理温室里的新苗"))
+        assertTrue(unrelated.contains("幕后触发条件，不是用户刚发来的消息"))
+
+        val relevant = characterProactiveDirective("提醒一下旧花盆归还的约定", persona, state)
+        assertTrue(relevant.contains("还没把旧花盆归还给朋友"))
+        assertTrue(relevant.contains("延续当前人物、关系和故事"))
     }
 
     private fun message(
