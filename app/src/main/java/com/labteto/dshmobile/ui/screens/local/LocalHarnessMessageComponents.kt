@@ -72,6 +72,7 @@ import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.ui.shenyan.SyContextActionMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.StateDot
@@ -142,6 +143,7 @@ internal fun LocalMessageRow(
     onLocateSourceMemory: ((LocalHarnessMessage) -> Unit)? = null,
     onReadMessage: ((LocalHarnessMessage) -> Unit)? = null,
     onCreateMedia: ((LocalHarnessMessage, LocalMediaKind) -> Unit)? = null,
+    onConvertToWork: ((LocalHarnessMessage) -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
     val pulse = rememberHapticPulse()
@@ -217,6 +219,16 @@ internal fun LocalMessageRow(
                                         },
                                     ),
                                 )
+                            }
+                            // Design 01 → 02: a chosen USER message opens the real Work
+                            // capability/handoff sheet. The sheet handles confirmation,
+                            // permissions and session linking; a chat menu never runs tools.
+                            if (chatMode && copyText.isNotBlank()) onConvertToWork?.let { convert ->
+                                add(SyMenuItem(
+                                    text = stringResource(R.string.sy_v6_convert_to_work),
+                                    icon = SyEntryIcons.Tasks,
+                                    onClick = { convert(message.copy(content = copyText)) },
+                                ))
                             }
                             if (canEdit) {
                                 add(

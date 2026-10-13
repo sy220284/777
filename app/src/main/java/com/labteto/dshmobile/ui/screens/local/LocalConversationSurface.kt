@@ -840,6 +840,9 @@ internal fun LocalConversationSurface(
                                     mediaInitialKind = kind.name
                                     showMediaStudio = true
                                 },
+                                onConvertToWork = if (state.usageMode == LocalUsageMode.CHAT &&
+                                    onUseWorkCapability != null && !state.loading && !state.running
+                                ) { message -> onUseWorkCapability(message.content) } else null,
                                  onLocateSourceMemory = { message -> onLocateMemoryForMessage(message.id) },
                                 onSelectVariant = onSelectMessageVariant,
                                 onRegenerate = onRegenerate,

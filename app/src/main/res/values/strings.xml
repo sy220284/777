@@ -2323,5 +2323,6 @@
     <string name="sy_v6_mobile_persona">人物档案</string>
     <string name="sy_v6_mobile_work">工作</string>
     <string name="sy_v6_mobile_workspace">文件</string>
+    <string name="sy_v6_convert_to_work">转为任务</string>
 </resources>
 
