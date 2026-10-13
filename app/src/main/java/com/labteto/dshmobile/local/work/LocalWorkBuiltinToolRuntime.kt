@@ -3,6 +3,9 @@ package com.labteto.dshmobile.local.work
 import com.labteto.dshmobile.local.interaction.LocalQuestion
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.tools.string
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -46,9 +49,10 @@ internal class LocalWorkBuiltinToolRuntime(
                 updateContextMetrics = { updateContextMetrics(run) },
             )
             "todo_write" -> progress.updateTodos(args)
-            "create_goal" -> progress.createGoal(args.string("description"),
-                args["artifact_paths"]?.jsonArray.orEmpty().map { it.jsonPrimitive.content },
-                args["verification_commands"]?.jsonArray.orEmpty().map { it.jsonPrimitive.content })
+            "create_goal" -> {
+                val (artifactPaths, verificationCommands) = parseWorkGoalAcceptanceArguments(args)
+                progress.createGoal(args.string("description"), artifactPaths, verificationCommands)
+            }
             "get_goal" -> progress.getGoal()
             "update_goal" -> progress.updateGoal(
                 status = args.string("status"),
@@ -80,4 +84,22 @@ internal class LocalWorkBuiltinToolRuntime(
             "ask_user_question",
         )
     }
+}
+
+/**
+ * The model tool contract requires both acceptance arrays, even when explicitly empty.
+ * Absence is NOT equivalent to "the user requested no artifact or verification": otherwise
+ * update_goal can accept a false completion claim without its intended evidence.
+ */
+internal fun parseWorkGoalAcceptanceArguments(args: JsonObject): Pair<List<String>, List<String>> {
+    fun requiredStringArray(key: String): List<String> {
+        val array = args[key] as? JsonArray
+            ?: error("create_goal.$key 必须显式提供字符串数组；无需此类验收时请传 []，目标未创建")
+        return array.mapIndexed { index, element ->
+            val value = (element as? JsonPrimitive)?.takeIf { it.isString }
+                ?: error("create_goal.$key 第 ${index + 1} 项必须为字符串；目标未创建")
+            value.content
+        }
+    }
+    return requiredStringArray("artifact_paths") to requiredStringArray("verification_commands")
 }

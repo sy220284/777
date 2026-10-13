@@ -119,14 +119,11 @@ internal object LocalToolRouter {
         val compacted = linkedSetOf<String>()
         for (name in enabledOptional) {
             val tool = optionalByName[name] ?: continue // Missing tools remain absent on purpose.
+            // A valid, large MCP/plug-in schema is not an admission error merely because
+            // it has many properties or nested objects. Let the actual model-facing
+            // definition budget decide; runtime argument validation still uses the
+            // complete registered schema.
             val original = tool.schema
-            val complexity = schemaComplexity(original)
-            if (complexity.depth > MAX_OPTIONAL_SCHEMA_DEPTH ||
-                complexity.properties > MAX_OPTIONAL_SCHEMA_PROPERTIES
-            ) {
-                omitted[name] = "参数结构超过当前支持的层级或字段数量；原始工具仍在目录中"
-                continue
-            }
             if (remainingTokens <= 0) {
                 omitted[name] = "本轮可选工具定义预算已用尽；按精确名称重新选择可优先装入"
                 continue
@@ -302,45 +299,10 @@ internal object LocalToolRouter {
     fun conciseDescription(tool: HarnessTool): String =
         description(tool).take(MAX_CAPABILITY_DESCRIPTION_CHARS)
 
-    private data class SchemaComplexity(
-        val depth: Int,
-        val properties: Int,
-    )
-
-    private fun schemaComplexity(schema: kotlinx.serialization.json.JsonElement): SchemaComplexity {
-        fun visit(element: kotlinx.serialization.json.JsonElement, depth: Int): SchemaComplexity =
-            when (element) {
-                is kotlinx.serialization.json.JsonObject -> {
-                    var maxDepth = depth
-                    var properties = (element["properties"] as? kotlinx.serialization.json.JsonObject)?.size ?: 0
-                    element.values.forEach { child ->
-                        val nested = visit(child, depth + 1)
-                        maxDepth = maxOf(maxDepth, nested.depth)
-                        properties += nested.properties
-                    }
-                    SchemaComplexity(maxDepth, properties)
-                }
-                is kotlinx.serialization.json.JsonArray -> {
-                    var maxDepth = depth
-                    var properties = 0
-                    element.forEach { child ->
-                        val nested = visit(child, depth + 1)
-                        maxDepth = maxOf(maxDepth, nested.depth)
-                        properties += nested.properties
-                    }
-                    SchemaComplexity(maxDepth, properties)
-                }
-                else -> SchemaComplexity(depth, 0)
-            }
-        return visit(schema, 1)
-    }
-
     internal const val DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS = 16_000
     private const val MAX_OPTIONAL_TOOL_PROMPT_TOKENS = 24_000
     private const val MAX_OPTIONAL_SCHEMA_TOKENS = 24_000
     private const val MAX_COMPACT_DESCRIPTION_CHARS = 240
-    private const val MAX_OPTIONAL_SCHEMA_DEPTH = 12
-    private const val MAX_OPTIONAL_SCHEMA_PROPERTIES = 256
     private const val MAX_SUMMARY_REQUIREMENTS_PER_FAMILY = 4
     private const val MAX_CAPABILITY_DESCRIPTION_CHARS = 480
     private const val MAX_TASK_CONTEXT_CHARS = 12_000

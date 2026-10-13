@@ -223,6 +223,7 @@ fun AppBackgroundHost(
     surfaceTransparency: Float = 0.5f,
     modifier: Modifier = Modifier,
     fluidGlass: Boolean = true,
+    ambientPalette: com.shenyan.designsystem.foundation.SyColors = com.shenyan.designsystem.foundation.ShenyanPalettes.light,
     content: @Composable () -> Unit,
 ) {
     val loaded = rememberBackground(path)
@@ -238,7 +239,6 @@ fun AppBackgroundHost(
     val windowOnScreen = remember { IntArray(2) }
     var viewportOrigin by remember { mutableStateOf(IntOffset.Zero) }
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
-    val dsColors = DsTheme.colors
     val sceneBackdrop = if (viewportSize.width > 0 && viewportSize.height > 0 &&
         (loaded != null || fluidGlass)
     ) SySceneBackdrop(
@@ -248,7 +248,7 @@ fun AppBackgroundHost(
         image = loaded?.image,
         veil = adaptiveGlobalVeil(state, surfaceBase),
         glowColors = if (loaded == null && fluidGlass) listOf(
-            dsColors.brandPrimary, dsColors.successSecondary, dsColors.characterAccentTertiary,
+            ambientPalette.primary, ambientPalette.mint, ambientPalette.lilac.copy(alpha = .18f),
         ) else emptyList(),
         dark = darkTheme,
         regionColors = loaded?.analysis?.let { listOf(it.top.averageColor, it.middle.averageColor, it.bottom.averageColor) } ?: emptyList(),
@@ -269,7 +269,7 @@ fun AppBackgroundHost(
             LocalAppBackgroundState provides state,
             LocalSySceneBackdrop provides sceneBackdrop,
         ) {
-            if (loaded == null && fluidGlass) FluidGlassBackdrop(darkTheme)
+            if (loaded == null && fluidGlass) FluidGlassBackdrop(darkTheme, ambientPalette)
             loaded?.let { background ->
                 Image(
                     bitmap = background.image,
@@ -288,22 +288,21 @@ fun AppBackgroundHost(
 
 /** Static radial light fields: no bitmap, blur layer or perpetual animation. */
 @Composable
-private fun FluidGlassBackdrop(dark: Boolean) {
+private fun FluidGlassBackdrop(dark: Boolean, colors: com.shenyan.designsystem.foundation.SyColors) {
     // Keep the three designed light fields while sourcing their hues from active semantic colors.
-    val colors = DsTheme.colors
     Canvas(Modifier.fillMaxSize()) {
         val opacity = if (dark) 0.10f else 0.38f
         val extent = maxOf(size.width, size.height)
         drawRect(Brush.radialGradient(
-            colors = listOf(colors.brandPrimary.copy(alpha = opacity), Color.Transparent),
+            colors = listOf(colors.primary.copy(alpha = opacity), Color.Transparent),
             center = Offset(size.width * 0.06f, size.height * 0.08f), radius = extent * 0.72f,
         ))
         drawRect(Brush.radialGradient(
-            colors = listOf(colors.successSecondary.copy(alpha = opacity), Color.Transparent),
+            colors = listOf(colors.mint.copy(alpha = opacity), Color.Transparent),
             center = Offset(size.width * 0.98f, size.height * 0.36f), radius = extent * 0.65f,
         ))
         drawRect(Brush.radialGradient(
-            colors = listOf(colors.characterAccentTertiary.copy(alpha = opacity * 0.45f), Color.Transparent),
+            colors = listOf(colors.lilac.copy(alpha = opacity * 0.45f * .18f), Color.Transparent),
             center = Offset(size.width * 0.24f, size.height * 0.92f), radius = extent * 0.55f,
         ))
     }
@@ -492,3 +491,37 @@ fun DsColors.wallpaperSurface(
 
 @Composable
 fun DsColors.rootSurface(): Color = wallpaperSurface(WallpaperSurfaceLevel.PAGE)
+
+/** V6 root surfaces preserve wallpaper visibility just like the legacy page contract. */
+@Composable
+fun com.shenyan.designsystem.foundation.SyColors.rootSurface(): Color =
+    LocalAppBackgroundState.current.wallpaperSurface(canvas, WallpaperSurfaceLevel.PAGE)
+
+/** V6 semantic material sampling, preserving custom-wallpaper contrast and region behavior. */
+@Composable
+fun com.shenyan.designsystem.foundation.SyColors.wallpaperSurface(
+    level: WallpaperSurfaceLevel,
+    region: BackgroundRegion = BackgroundRegion.ALL,
+    base: Color = when (level) {
+        WallpaperSurfaceLevel.PAGE, WallpaperSurfaceLevel.CHROME -> canvas
+        WallpaperSurfaceLevel.INPUT -> materialL1
+        WallpaperSurfaceLevel.CARD -> materialL3
+        WallpaperSurfaceLevel.FLOATING, WallpaperSurfaceLevel.SHEET,
+        WallpaperSurfaceLevel.DIALOG, WallpaperSurfaceLevel.MENU -> materialL4
+        WallpaperSurfaceLevel.DRAWER -> materialL2
+    },
+): Color {
+    if (level == WallpaperSurfaceLevel.PAGE) {
+        return LocalAppBackgroundState.current.wallpaperSurface(base, level, region)
+    }
+    val tier = when (level) {
+        WallpaperSurfaceLevel.INPUT -> com.shenyan.designsystem.components.SyMaterialTier.L1_SECTION
+        WallpaperSurfaceLevel.CHROME -> com.shenyan.designsystem.components.SyMaterialTier.L2_BAR
+        WallpaperSurfaceLevel.FLOATING, WallpaperSurfaceLevel.SHEET, WallpaperSurfaceLevel.DRAWER,
+        WallpaperSurfaceLevel.DIALOG, WallpaperSurfaceLevel.MENU -> com.shenyan.designsystem.components.SyMaterialTier.L4_OVERLAY
+        else -> com.shenyan.designsystem.components.SyMaterialTier.L3_CARD
+    }
+    val neutral = base in listOf(canvas, materialL1, materialL2, materialL3, materialL4, surface, surfaceRaised)
+    return if (neutral) com.shenyan.designsystem.components.syMaterialColor(tier)
+        else LocalAppBackgroundState.current.wallpaperSurface(base, level, region)
+}

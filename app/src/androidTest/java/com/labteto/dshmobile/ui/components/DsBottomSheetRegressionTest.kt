@@ -41,8 +41,10 @@ class DsBottomSheetRegressionTest {
                 }
             }
         }
+        compose.onNodeWithTag("bottomSheetScrollBody").assertIsDisplayed()
         compose.onNodeWithText("继续工作").assertIsDisplayed().performClick()
         compose.onNodeWithText("选择末条消息").performScrollTo().assertIsDisplayed().performClick()
+        // The pinned action must still be in the viewport after scrolling the body.
         compose.onNodeWithText("继续工作").assertIsDisplayed()
         compose.runOnIdle {
             assertEquals(1, selected)

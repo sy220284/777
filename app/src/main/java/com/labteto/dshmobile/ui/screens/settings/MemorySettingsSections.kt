@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -72,8 +74,6 @@ import com.labteto.dshmobile.ui.shenyan.SyValueRow
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
@@ -124,7 +124,7 @@ internal fun LocalMemorySettingsCard(
     report: (String) -> Unit,
 ) {
     val memorySavedMessage = stringResource(R.string.advanced_memory_saved)
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var userRules by remember(local.userRules) { mutableStateOf(local.userRules) }
     var showRulesEditor by remember { mutableStateOf(false) }
 
@@ -138,11 +138,11 @@ internal fun LocalMemorySettingsCard(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.advanced_auto_recall), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
-                Text(stringResource(R.string.advanced_auto_recall_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
+                Text(stringResource(R.string.advanced_auto_recall), style = DsType.small13Strong.withReadingWeight(), color = colors.text)
+                Text(stringResource(R.string.advanced_auto_recall_hint), style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
             }
             SySwitchControl(
                 checked = local.autoRecall,
@@ -155,11 +155,11 @@ internal fun LocalMemorySettingsCard(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.advanced_auto_memory), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
-                Text(stringResource(R.string.advanced_auto_memory_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
+                Text(stringResource(R.string.advanced_auto_memory), style = DsType.small13Strong.withReadingWeight(), color = colors.text)
+                Text(stringResource(R.string.advanced_auto_memory_hint), style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
             }
             SySwitchControl(
                 checked = local.autoMemory,
@@ -216,7 +216,7 @@ internal fun MemoryManagementCard(
 ) {
     val memoryUpdatedMessage = stringResource(R.string.advanced_memory_updated)
     val memoryDeactivatedMessage = stringResource(R.string.advanced_memory_deactivated)
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(MemoryFilter.ALL) }
     var vaultMode by remember { mutableStateOf(false) }
@@ -238,11 +238,11 @@ internal fun MemoryManagementCard(
         folders.mapNotNull { folder -> folder.records.firstOrNull()?.id?.let { it to folder } }.toMap()
     }
 
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
         if (focusedSource) {
             Text(
                 stringResource(R.string.advanced_memory_from_message),
-                style = DsType.small13.withReadingWeight(), color = colors.labelSecondary,
+                style = DsType.small13.withReadingWeight(), color = colors.textSecondary,
             )
             SyButton(
                 text = stringResource(R.string.advanced_memory_show_all),
@@ -258,7 +258,7 @@ internal fun MemoryManagementCard(
                     else R.string.advanced_memory_empty,
                 ),
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelTertiary,
+                color = colors.textTertiary,
             )
             return@Column
         }
@@ -266,7 +266,7 @@ internal fun MemoryManagementCard(
         Text(
             stringResource(R.string.advanced_memory_manage_hint),
             style = DsType.caption11.withReadingWeight(),
-            color = colors.labelTertiary,
+            color = colors.textTertiary,
         )
         SySearchField(
             value = query,
@@ -316,14 +316,14 @@ internal fun MemoryManagementCard(
         Text(
             stringResource(R.string.advanced_memory_visible_count, filteredRecords.size, records.size),
             style = DsType.caption11.withReadingWeight(),
-            color = colors.labelTertiary,
+            color = colors.textTertiary,
         )
 
         if (visibleRecords.isEmpty()) {
             Text(
                 stringResource(R.string.advanced_memory_filter_empty),
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelTertiary,
+                color = colors.textTertiary,
             )
         }
 
@@ -337,7 +337,7 @@ internal fun MemoryManagementCard(
                             memoryKindLabel(folder.kind),
                         ).joinToString(" / "),
                         style = DsType.small13Strong.withReadingWeight(),
-                        color = colors.labelSecondary,
+                        color = colors.textSecondary,
                     )
                 }
             }
@@ -347,30 +347,30 @@ internal fun MemoryManagementCard(
                 tier = SyMaterialTier.L3_CARD,
             ) {
                 Column(
-                    modifier = Modifier.padding(DsSpacing.medium),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    modifier = Modifier.padding(SyMetric.gapLg),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 ) {
                     Text(
                         listOfNotNull(memoryKindLabel(record.kind), memoryScopeLabel(record.scope),
                             stringResource(R.string.advanced_pinned).takeIf { record.pinned }).joinToString(" · "),
-                        style = DsType.small13.withReadingWeight(), color = colors.labelTertiary,
+                        style = DsType.small13.withReadingWeight(), color = colors.textTertiary,
                     )
                     Text(
                         record.content,
                         style = DsType.std14.withReadingWeight(),
-                        color = colors.labelPrimary,
+                        color = colors.text,
                         maxLines = 4,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                     ) {
                         Text(
                             DateFormat.getDateInstance(DateFormat.SHORT).format(Date(record.updatedAt)),
                             style = DsType.caption11.withReadingWeight(),
-                            color = colors.labelCaption,
+                            color = colors.textTertiary,
                             modifier = Modifier.weight(1f),
                         )
                         SyButton(
@@ -423,7 +423,7 @@ internal fun MemoryManagementCard(
             dismissEnabled = !saving,
             scrollable = true,
             footer = {
-                saveError?.let { Text(it, style = DsType.small13.withReadingWeight(), color = colors.error) }
+                saveError?.let { Text(it, style = DsType.small13.withReadingWeight(), color = colors.dangerInk) }
                 SyButton(
                     text = stringResource(R.string.common_save),
                     onClick = {
@@ -459,11 +459,11 @@ internal fun MemoryManagementCard(
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.advanced_pin), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
-                    Text(stringResource(R.string.advanced_pin_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
+                    Text(stringResource(R.string.advanced_pin), style = DsType.small13Strong.withReadingWeight(), color = colors.text)
+                    Text(stringResource(R.string.advanced_pin_hint), style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
                 }
                 SySwitchControl(checked = pinned, onCheckedChange = { pinned = it }, enabled = !saving)
             }

@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -67,7 +69,7 @@ internal fun LocalWorkHistorySheet(
     }
     SyResponsiveSheet(title = stringResource(R.string.local_run_full_history), onDismiss = onDismiss,
         footer = {
-            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 SyButton(stringResource(R.string.local_run_history_latest), { selected = null; cursor = null; retry++ },
                     variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
                 if (failed) SyButton(stringResource(R.string.common_retry), { retry++ }, size = SyButtonSize.Small)
@@ -77,13 +79,13 @@ internal fun LocalWorkHistorySheet(
         }) {
         val current = page
         val detail = selected
-        if (artifactFailed) Text(stringResource(R.string.local_artifact_open_failed), color = DsTheme.colors.error)
+        if (artifactFailed) Text(stringResource(R.string.local_artifact_open_failed), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk)
         if (detail != null) {
             SyButton(stringResource(R.string.common_back), { selected = null }, variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
             if (evidenceFailed) Text(stringResource(R.string.local_tool_activity_evidence_error))
             SelectionContainer { Text(evidence ?: detail.content, Modifier.weight(1f, fill = false).heightIn(max = 420.dp).verticalScroll(androidx.compose.foundation.rememberScrollState()), style = DsType.small13) }
         } else when {
-            failed -> Text(stringResource(R.string.local_run_history_failed), color = DsTheme.colors.labelSecondary)
+            failed -> Text(stringResource(R.string.local_run_history_failed), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             current == null -> Text(stringResource(R.string.common_loading))
             current.invalidated -> Text(stringResource(R.string.local_run_history_changed))
             current.records.isEmpty() -> Text(stringResource(R.string.local_run_history_page_empty))
@@ -99,7 +101,7 @@ internal fun LocalWorkHistorySheet(
                         else -> true
                     }
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                     SySegmented(
                         segments = listOf(
                             SySegment("all", stringResource(R.string.local_run_history_filter_all)),
@@ -117,10 +119,10 @@ internal fun LocalWorkHistorySheet(
                     if (displayed.isEmpty()) {
                         Text(stringResource(R.string.local_run_history_page_empty),
                             style = DsType.small13.withReadingWeight(),
-                            color = DsTheme.colors.labelSecondary)
+                            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
                     } else LazyColumn(
                         Modifier.fillMaxWidth().heightIn(max = 420.dp),
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                     ) {
                         items(displayed, key = { it.sequence }) { record ->
                         Column {
@@ -129,7 +131,7 @@ internal fun LocalWorkHistorySheet(
                                     "tool/call" -> stringResource(R.string.local_run_history_call)
                                     "tool/execution-started" -> stringResource(R.string.local_run_history_started)
                                     else -> stringResource(R.string.local_run_history_result)
-                                }), style = DsType.small13.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+                                }), style = DsType.small13.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
                             record.artifacts.forEach { artifact ->
                                 SySheetChoiceRow(title = artifact.reference,
                                     subtitle = if (artifact.currentlyAvailable == false) stringResource(R.string.local_artifact_file_unavailable) else null,

@@ -18,7 +18,6 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.shenyan.designsystem.components.SyTextField
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import androidx.compose.material3.Text
@@ -110,7 +109,7 @@ internal fun LocalProjectScreen(
             Text(
                 stringResource(R.string.local_project_new_session_hint),
                 style = DsType.small13.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             )
             if (recovery != null) {
                 Text(requireNotNull(recovery))
@@ -134,7 +133,7 @@ internal fun LocalProjectScreen(
             Text(
                 stringResource(R.string.local_project_select_hint),
                 style = DsType.std14Strong.withReadingWeight(),
-                color = DsTheme.colors.labelPrimary,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
             )
             SyGlassCard {
                 state.projects.forEach { project ->
@@ -176,7 +175,7 @@ internal fun LocalProjectScreen(
                     Text(
                         stringResource(R.string.local_project_current_settings),
                         style = DsType.std14Strong.withReadingWeight(),
-                        color = DsTheme.colors.labelPrimary,
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                     )
                     SyTextField(
                         value = nameDraft,
@@ -227,7 +226,7 @@ internal fun LocalProjectScreen(
         }
         error?.let { message ->
             SyGlassCard(modifier = Modifier.padding(16.dp).semantics { liveRegion = LiveRegionMode.Polite }) {
-                Text(message, style = DsType.small13.withReadingWeight(), color = DsTheme.colors.error)
+                Text(message, style = DsType.small13.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk)
             }
         }
     }

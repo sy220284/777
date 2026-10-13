@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.animateScrollBy
@@ -29,8 +31,6 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -264,7 +264,7 @@ internal fun LocalTranscriptPagingStatus(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     if (error != null) {
         SyButton(
             text = stringResource(R.string.local_transcript_retry_older),
@@ -277,16 +277,16 @@ internal fun LocalTranscriptPagingStatus(
     if (!loading) return
 
     Row(
-        modifier = modifier.fillMaxWidth().padding(vertical = DsSpacing.small),
+        modifier = modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CircularProgressIndicator(modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(DsSpacing.small))
+        Spacer(Modifier.width(SyMetric.gapMd))
         Text(
             stringResource(R.string.local_transcript_loading_older),
             style = DsType.small13.withReadingWeight(),
-            color = colors.labelSecondary,
+            color = colors.textSecondary,
         )
     }
 }

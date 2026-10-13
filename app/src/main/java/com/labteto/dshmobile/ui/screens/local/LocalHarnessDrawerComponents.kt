@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
@@ -62,8 +64,6 @@ import com.labteto.dshmobile.ui.components.relativeTime
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlin.math.roundToInt
@@ -225,7 +225,7 @@ internal fun DrawerQuickAction(
     modifier: Modifier = Modifier,
     badge: String? = null,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val sy = LocalSyPalette.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -242,7 +242,7 @@ internal fun DrawerQuickAction(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = DsSpacing.touchTarget)
+            .heightIn(min = SyMetric.touch)
             .clip(DsShapes.row)
             .background(feedbackColor)
             .hoverable(interaction)
@@ -251,15 +251,15 @@ internal fun DrawerQuickAction(
                 indication = LocalIndication.current,
                 onClick = onClick,
             )
-            .padding(horizontal = DsSpacing.small),
+            .padding(horizontal = SyMetric.gapMd),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         SyIconBox(icon = icon)
         Text(
             title,
             style = DsType.drawerItem.withReadingWeight(),
-            color = colors.labelPrimary,
+            color = colors.text,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
@@ -276,20 +276,20 @@ internal fun DrawerSectionTitle(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = DsSpacing.small, top = DsSpacing.medium, bottom = DsSpacing.tiny),
+            .padding(start = SyMetric.gapMd, top = SyMetric.gapLg, bottom = SyMetric.gapXs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             title,
             style = DsType.drawerSection.withReadingWeight(),
-            color = DsTheme.colors.labelSecondary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             modifier = Modifier.weight(1f),
         )
         count?.let {
             Text(
                 it.toString(),
                 style = DsType.navigationSupporting.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             )
         }
     }
@@ -313,7 +313,7 @@ internal fun LocalSessionDrawerRow(
     onDelete: () -> Unit,
     searchModeLabel: String? = null,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var menuOpen by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val reveal = with(density) { 76.dp.toPx() }
@@ -328,7 +328,7 @@ internal fun LocalSessionDrawerRow(
                 swipe = 0f
                 onDelete()
             },
-            tint = colors.error,
+            tint = colors.dangerInk,
             modifier = Modifier.align(Alignment.CenterEnd),
         )
 
@@ -347,21 +347,21 @@ internal fun LocalSessionDrawerRow(
                         onDragEnd = { swipe = if (swipe < -reveal / 2) -reveal else 0f },
                     )
                 }
-                .heightIn(min = DsSpacing.touchTarget)
+                .heightIn(min = SyMetric.touch)
                 .clip(DsShapes.row)
                 .background(
                     animateColorAsState(
                         targetValue = when {
-                            selected -> colors.accentTertiary
-                            current -> colors.bgLayer1
-                            else -> colors.sidebar
+                            selected -> colors.selected
+                            current -> colors.materialL3
+                            else -> colors.materialL2
                         },
                         animationSpec = DsAnimations.interactionColor,
                         label = "sessionRowBackground",
                     ).value,
                 )
                 .combinedClickable(onClick = onClick, onLongClick = { menuOpen = true })
-                .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
+                .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapMd),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (selectionOpen) {
@@ -375,12 +375,12 @@ internal fun LocalSessionDrawerRow(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                 ) {
                     Text(
                         displayTitle,
                         style = DsType.drawerSession.copy(fontWeight = if (current) DsType.drawerItem.fontWeight else DsType.drawerSession.fontWeight).withReadingWeight(),
-                        color = colors.labelPrimary,
+                        color = colors.text,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
@@ -389,7 +389,7 @@ internal fun LocalSessionDrawerRow(
                         Icon(
                             FeatherIcons.Pin,
                             contentDescription = null,
-                            tint = colors.labelCaption,
+                            tint = colors.textTertiary,
                             modifier = Modifier.size(14.dp),
                         )
                     }
@@ -398,7 +398,7 @@ internal fun LocalSessionDrawerRow(
                     Text(
                         mode,
                         style = DsType.caption11.withReadingWeight(),
-                        color = colors.labelSecondary,
+                        color = colors.textSecondary,
                         maxLines = 1,
                     )
                 }

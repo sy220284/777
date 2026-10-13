@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -53,9 +57,6 @@ import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.rememberSyToast
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -130,7 +131,7 @@ private fun WorkTasksScreen(
     initialSelectedTaskId: String?,
     entryRequest: Int,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val visibleTasks = state.tasks.filter { it.mode == AutomationMode.WORK }
     var listFilter by rememberSaveable { mutableStateOf(WorkTaskListFilter.ALL) }
     val filteredTasks = visibleTasks.filter { workTaskMatchesFilter(it.status, listFilter) }
@@ -235,7 +236,7 @@ private fun WorkTasksScreen(
                                 icon = FeatherIcons.Plus,
                                 contentDescription = stringResource(R.string.tasks_new),
                                 onClick = { createMenuOpen = true },
-                                tint = colors.labelPrimary,
+                                tint = colors.text,
                             )
                             SyPopupMenu(
                                 expanded = createMenuOpen,
@@ -260,8 +261,8 @@ private fun WorkTasksScreen(
 
                 Column(
                     modifier = Modifier.weight(1f)
-                        .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                        .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                 ) {
                     when {
                         showCreate -> TaskEditorPane(
@@ -289,7 +290,7 @@ private fun WorkTasksScreen(
                         }
                         else -> Column(
                             modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                         ) {
                             // Screen 19: show the real schedule state in the same glass tab
                             // language as the work/history pages; never fabricate budget figures.
@@ -316,14 +317,14 @@ private fun WorkTasksScreen(
                             )
                             if (filteredTasks.isEmpty()) {
                                 Column(
-                                    modifier = Modifier.fillMaxWidth().padding(DsSpacing.large),
+                                    modifier = Modifier.fillMaxWidth().padding(SyMetric.gapSection),
                                     horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                                 ) {
                                     Text(
                                         stringResource(R.string.tasks_filter_empty),
                                         style = DsType.small13.withReadingWeight(),
-                                        color = colors.labelSecondary,
+                                        color = colors.textSecondary,
                                     )
                                     SyButton(
                                         text = stringResource(R.string.tasks_filter_all),
@@ -334,8 +335,8 @@ private fun WorkTasksScreen(
                             } else {
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = DsSpacing.medium),
-                                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = SyMetric.gapLg),
+                                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                                 ) {
                                     items(filteredTasks, key = AutomationTask::id) { task ->
                                         TaskSummaryRow(task = task, onClick = { selectedTaskId = task.id })
@@ -356,50 +357,50 @@ private fun TaskEmptyState(
     onManualCreate: () -> Unit,
     onCreateViaChat: (() -> Unit)?,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Box(Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.align(Alignment.Center).fillMaxWidth()
-                .padding(horizontal = DsSpacing.xlarge),
+                .padding(horizontal = SyMetric.gapPage),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             Image(
                 painter = painterResource(R.drawable.ic_ui_task_empty),
                 contentDescription = null,
-                colorFilter = ColorFilter.tint(colors.labelTertiary.copy(alpha = 0.72f)),
-                modifier = Modifier.padding(bottom = DsSpacing.medium),
+                colorFilter = ColorFilter.tint(colors.textTertiary.copy(alpha = 0.72f)),
+                modifier = Modifier.padding(bottom = SyMetric.gapLg),
             )
             Text(
                 stringResource(R.string.tasks_empty_title),
                 style = DsType.base16Strong.withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
                 textAlign = TextAlign.Center,
             )
             Text(
                 stringResource(R.string.tasks_empty_subtitle),
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelTertiary,
+                color = colors.textTertiary,
                 textAlign = TextAlign.Center,
             )
         }
         Column(
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                .padding(bottom = DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                .padding(bottom = SyMetric.gapLg),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             Surface(
                 onClick = onManualCreate,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                color = colors.brandPrimary,
-                contentColor = colors.onBrandPrimary,
-                shape = DsShapes.buttonCapsule,
+                color = colors.primary,
+                contentColor = colors.onPrimary,
+                shape = RoundedCornerShape(SyMetric.radiusControl),
             ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(DsSpacing.medium)) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(SyMetric.gapLg)) {
                     Text(
                         stringResource(R.string.tasks_create_manual),
                         style = DsType.std14Strong.withReadingWeight(),
-                        color = colors.onBrandPrimary,
+                        color = colors.onPrimary,
                     )
                 }
             }
@@ -407,13 +408,13 @@ private fun TaskEmptyState(
                 onClick = onCreateViaChat,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                 tier = SyMaterialTier.L1_SECTION,
-                shape = DsShapes.buttonCapsule,
+                shape = RoundedCornerShape(SyMetric.radiusControl),
             ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(DsSpacing.medium)) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(SyMetric.gapLg)) {
                     Text(
                         stringResource(R.string.tasks_create_via_chat),
                         style = DsType.std14Strong.withReadingWeight(),
-                        color = colors.labelPrimary,
+                        color = colors.text,
                     )
                 }
             }

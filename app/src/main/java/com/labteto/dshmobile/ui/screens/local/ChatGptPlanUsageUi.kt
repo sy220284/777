@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,8 +25,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
@@ -37,7 +37,7 @@ internal fun ChatGptPlanUsageBar(profile: LocalModelProfile?) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
     ) {
         SyPill(text = stringResource(R.string.chatgpt_using_plan), selected = true)
         Spacer(Modifier.weight(1f))
@@ -83,25 +83,25 @@ internal fun LocalConversationErrorCard(
     val uriHandler = LocalUriHandler.current
     val usageError = sendRejectMessage == null && isChatGptPlanUsageError(stateError)
     val modelRecovery = sendRejectMessage == null && isChatGptModelRecoveryError(stateError)
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
 
     Surface(
-        color = colors.warnTertiary,
+        color = colors.warning.copy(alpha = .18f),
         shape = DsShapes.block,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = DsSpacing.medium),
+            .padding(horizontal = SyMetric.gapLg),
     ) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
         ) {
             Text(
                 message,
                 style = DsType.small13.withReadingWeight(),
-                color = colors.error,
+                color = colors.dangerInk,
             )
             when {
                 showConnectAction -> {

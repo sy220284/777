@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -60,8 +62,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.io.ByteArrayOutputStream
@@ -103,28 +103,28 @@ internal fun LocalCreationJobMessageRow(
     ) {
         job.prompt?.let { prompt ->
             Text(prompt, style = DsType.small13.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary, maxLines = 2,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, maxLines = 2,
                 overflow = TextOverflow.Ellipsis)
         }
         when (job.phase) {
             LocalMediaCreationPhase.PREPARING, LocalMediaCreationPhase.SAVING, LocalMediaCreationPhase.SUBMITTING -> {
                 androidx.compose.material3.LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth(),
-                    color = DsTheme.colors.labelSecondary,
-                    trackColor = DsTheme.colors.bgLayer1,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
+                    trackColor = com.shenyan.designsystem.foundation.LocalSyColors.current.materialL3,
                 )
                 Text(resources.getString(R.string.media_chat_creating_hint),
-                    style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+                    style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
             LocalMediaCreationPhase.OUTCOME_UNKNOWN, LocalMediaCreationPhase.FAILED, LocalMediaCreationPhase.SAVE_FAILED -> {
                 Text(job.error ?: resources.getString(R.string.media_chat_creation_uncertain_hint),
-                    style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+                    style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
                 Text(resources.getString(R.string.media_chat_creation_safe_retry),
-                    style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+                    style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
             LocalMediaCreationPhase.SUCCEEDED -> {
                 Text(resources.getString(R.string.media_chat_creation_saved),
-                    style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+                    style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
         }
     }
@@ -149,7 +149,7 @@ internal fun LocalGeneratedMediaResultRow(
     MediaMessageCard(title = label, subtitle = "${result.provider} · ${result.model}") {
         result.description?.takeIf(String::isNotBlank)?.let {
             Text(it, style = DsType.small13.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary, maxLines = 3,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, maxLines = 3,
                 overflow = TextOverflow.Ellipsis)
         }
         when (result.kind) {
@@ -161,7 +161,7 @@ internal fun LocalGeneratedMediaResultRow(
                         else result.remoteUrl?.let { url -> openMediaUrl(context, url) { error = it } }
                     },
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                     if (file != null) {
                         SyButton(text = resources.getString(R.string.media_chat_view_image), size = SyButtonSize.Small,
                             onClick = { viewMediaFile(context, file, imageMime(file)) { error = it } })
@@ -183,15 +183,15 @@ internal fun LocalGeneratedMediaResultRow(
                     SyButton(text = resources.getString(R.string.media_chat_share_audio), size = SyButtonSize.Small,
                         variant = SyButtonVariant.Ghost,
                         onClick = { shareMediaFile(context, file, "audio/mpeg") { error = it } })
-                } else Text(resources.getString(R.string.media_chat_audio_missing), color = DsTheme.colors.labelSecondary)
+                } else Text(resources.getString(R.string.media_chat_audio_missing), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
             LocalMediaKind.TRANSCRIBE.name -> {
                 result.textOutput?.let { text ->
                     androidx.compose.foundation.text.selection.SelectionContainer {
                         Text(text, style = DsType.std14.withReadingWeight(),
-                            color = DsTheme.colors.labelPrimary)
+                            color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                         SyButton(text = resources.getString(R.string.media_chat_insert_text), size = SyButtonSize.Small,
                             onClick = { onInsertText(text) })
                         SyButton(text = resources.getString(R.string.media_chat_copy), size = SyButtonSize.Small,
@@ -204,9 +204,15 @@ internal fun LocalGeneratedMediaResultRow(
                 }
             }
         }
-        error?.let { Text(it, style = DsType.caption11, color = DsTheme.colors.labelSecondary) }
+        error?.let { Text(it, style = DsType.caption11, color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary) }
     }
 }
+
+/** A downloaded local video remains playable even after its signed remote URL expires. */
+internal fun canPlayGeneratedVideo(
+    phase: LocalMediaVideoPhase, localFileExists: Boolean, downloadUrl: String?,
+): Boolean = phase == LocalMediaVideoPhase.SUCCEEDED &&
+    (localFileExists || !downloadUrl.isNullOrBlank())
 
 @Composable
 internal fun LocalGeneratedVideoTaskRow(
@@ -217,7 +223,9 @@ internal fun LocalGeneratedVideoTaskRow(
     val resources = LocalResources.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val savedVideo = remember(task.id, task.fileName) { viewModel.videoFile(task) }
+    // A retry may make the local file available without changing its persisted filename.
+    val savedVideo = remember(task) { viewModel.videoFile(task) }
+    val localVideo = savedVideo?.takeIf(File::isFile)
     val offer = remember(task.offerId, task.routeFingerprint, offers) {
         offers.firstOrNull { task.belongsTo(it) }
     }
@@ -256,12 +264,12 @@ internal fun LocalGeneratedVideoTaskRow(
     MediaMessageCard(title = phase, subtitle = "${task.provider} · ${task.model}") {
         task.description?.let {
             Text(it, style = DsType.small13.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary, maxLines = 3,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, maxLines = 3,
                 overflow = TextOverflow.Ellipsis)
         }
-        if (task.phase == LocalMediaVideoPhase.SUCCEEDED && task.downloadUrl != null) {
+        if (canPlayGeneratedVideo(task.phase, savedVideo?.isFile == true, task.downloadUrl)) {
             if (showingPlayer) {
-                InlineVideoPlayer(task.downloadUrl, savedVideo, onError = { error = it })
+                InlineVideoPlayer(task.downloadUrl.orEmpty(), localVideo, onError = { error = it })
             } else {
                 SyMaterialSurface(shape = DsShapes.block, tier = SyMaterialTier.L3_CARD,
                     modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
@@ -271,26 +279,29 @@ internal fun LocalGeneratedVideoTaskRow(
                     }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 if (showingPlayer) SyButton(
                     text = resources.getString(R.string.media_chat_collapse_video),
                     size = SyButtonSize.Small,
                     onClick = { showingPlayer = false },
                 )
-                if (savedVideo != null) {
+                if (localVideo != null) {
                     SyButton(text = resources.getString(R.string.media_chat_share_video), size = SyButtonSize.Small,
                         variant = SyButtonVariant.Ghost,
-                        onClick = { shareMediaFile(context, savedVideo, "video/mp4") { error = it } })
+                        onClick = { shareMediaFile(context, localVideo, "video/mp4") { error = it } })
                 } else {
-                    SyButton(text = resources.getString(R.string.media_chat_open_video), size = SyButtonSize.Small,
-                        variant = SyButtonVariant.Ghost,
-                        onClick = { openMediaUrl(context, task.downloadUrl) { error = it } })
+                    // A local-only video has no remote open action; keep the nullable URL guarded.
+                    task.downloadUrl?.takeIf(String::isNotBlank)?.let { remoteUrl ->
+                        SyButton(text = resources.getString(R.string.media_chat_open_video), size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
+                            onClick = { openMediaUrl(context, remoteUrl) { error = it } })
+                    }
                 }
             }
         } else {
             task.lastError?.let {
                 Text(it, style = DsType.caption11.withReadingWeight(),
-                    color = DsTheme.colors.labelSecondary)
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
             if (task.phase in setOf(LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING)) {
                 SyButton(text = if (refreshing) resources.getString(R.string.media_chat_polling) else resources.getString(R.string.media_chat_refresh_progress),
@@ -308,14 +319,14 @@ internal fun LocalGeneratedVideoTaskRow(
                     })
             } else if (task.phase == LocalMediaVideoPhase.OUTCOME_UNKNOWN) {
                 Text(resources.getString(R.string.media_chat_check_remote_task),
-                    color = DsTheme.colors.labelSecondary, style = DsType.caption11.withReadingWeight())
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, style = DsType.caption11.withReadingWeight())
             }
             if (offer == null && task.phase in setOf(LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING)) {
                 Text(resources.getString(R.string.media_chat_account_missing),
-                    color = DsTheme.colors.labelSecondary, style = DsType.caption11.withReadingWeight())
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, style = DsType.caption11.withReadingWeight())
             }
         }
-        if (task.phase == LocalMediaVideoPhase.SUCCEEDED && savedVideo == null) {
+        if (task.phase == LocalMediaVideoPhase.SUCCEEDED && localVideo == null) {
             SyButton(text = resources.getString(R.string.media_retry_save), size = SyButtonSize.Small,
                 onClick = { scope.launch {
                     try { viewModel.retryVideoSave(task.id); error = null }
@@ -331,9 +342,9 @@ internal fun LocalGeneratedVideoTaskRow(
         }
         task.lastError?.takeIf { task.phase == LocalMediaVideoPhase.SUCCEEDED }?.let {
             Text(it, style = DsType.caption11.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary)
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
         }
-        error?.let { Text(it, color = DsTheme.colors.labelSecondary,
+        error?.let { Text(it, color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             style = DsType.caption11.withReadingWeight()) }
     }
 }
@@ -343,18 +354,18 @@ private fun MediaMessageCard(
     title: String, subtitle: String, modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SyMaterialSurface(
         modifier = modifier.fillMaxWidth(0.90f).widthIn(max = 470.dp),
         shape = DsShapes.block,
         tier = SyMaterialTier.L3_CARD,
-        border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderL3),
+        border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
     ) {
-        Column(Modifier.padding(DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            Text(title, style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
+        Column(Modifier.padding(SyMetric.gapLg),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+            Text(title, style = DsType.small13Strong.withReadingWeight(), color = colors.text)
             Text(subtitle, style = DsType.caption11.withReadingWeight(),
-                color = colors.labelTertiary)
+                color = colors.textTertiary)
             content()
         }
     }
@@ -377,8 +388,8 @@ private fun MediaInlinePicture(
         ?.coerceIn(0.62f, 1.9f) ?: 1.2f
     val surface = Modifier.fillMaxWidth().aspectRatio(ratio)
         .clip(DsShapes.block)
-        .background(DsTheme.colors.bgLayer1)
-        .border(1.dp, DsTheme.colors.borderL3, DsShapes.block)
+        .background(com.shenyan.designsystem.foundation.LocalSyColors.current.materialL3)
+        .border(1.dp, com.shenyan.designsystem.foundation.LocalSyColors.current.border, DsShapes.block)
     val modifier = if (onOpen != null) surface.clickable(onClick = onOpen) else surface
     if (image != null) {
         Image(bitmap = image, contentDescription = resources.getString(R.string.media_chat_generated_image),
@@ -390,7 +401,7 @@ private fun MediaInlinePicture(
                 resources.getString(if (loading) R.string.media_chat_preview_pending
                     else R.string.media_chat_preview_unavailable),
                 style = DsType.caption11.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             )
         }
     }
@@ -453,6 +464,7 @@ private fun decodeMediaPreview(file: File?, remoteUrl: String?): ImageBitmap? = 
 private fun InlineSpeechPlayer(file: File) {
     val resources = LocalResources.current
     var playing by remember(file.absolutePath) { mutableStateOf(false) }
+    var preparing by remember(file.absolutePath) { mutableStateOf(false) }
     var error by remember(file.absolutePath) { mutableStateOf<String?>(null) }
     var player by remember(file.absolutePath) { mutableStateOf<MediaPlayer?>(null) }
     var durationMs by remember(file.absolutePath) { mutableStateOf(0) }
@@ -467,36 +479,71 @@ private fun InlineSpeechPlayer(file: File) {
         }
     }
     Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
         SyButton(
             text = if (playing) resources.getString(R.string.media_chat_pause_audio)
                 else resources.getString(R.string.media_chat_play_audio),
             size = SyButtonSize.Small,
+            enabled = !preparing,
             onClick = {
+                if (preparing) return@SyButton
+                error = null
                 runCatching {
-                    val current = player ?: MediaPlayer().apply {
-                        setDataSource(file.absolutePath)
-                        prepare()
-                        setOnCompletionListener {
+                    val current = player
+                    if (current == null) {
+                        val created = MediaPlayer()
+                        created.setOnCompletionListener {
                             playing = false
                             positionMs = durationMs
                         }
-                    }.also {
-                        player = it
-                        durationMs = it.duration.coerceAtLeast(0)
-                    }
-                    if (playing) current.pause() else {
+                        created.setOnPreparedListener { ready ->
+                            preparing = false
+                            durationMs = ready.duration.coerceAtLeast(0)
+                            runCatching { ready.start() }
+                                .onSuccess { playing = true }
+                                .onFailure { failure ->
+                                    playing = false
+                                    error = failure.message ?: resources.getString(R.string.media_chat_audio_failed)
+                                    runCatching { ready.release() }
+                                    player = null
+                                }
+                        }
+                        created.setOnErrorListener { _, _, _ ->
+                            preparing = false
+                            playing = false
+                            durationMs = 0
+                            positionMs = 0
+                            error = resources.getString(R.string.media_chat_audio_failed)
+                            player = null
+                            runCatching { created.release() }
+                            true
+                        }
+                        // Own the player before I/O so failed setDataSource cannot leak it.
+                        player = created
+                        created.setDataSource(file.absolutePath)
+                        preparing = true
+                        created.prepareAsync()
+                    } else if (playing) {
+                        current.pause()
+                        playing = false
+                    } else {
                         if (positionMs >= durationMs && durationMs > 0) current.seekTo(0)
                         current.start()
+                        playing = true
                     }
-                    playing = !playing
-                }.onFailure { error = it.message ?: resources.getString(R.string.media_chat_audio_failed) }
+                }.onFailure { failure ->
+                    preparing = false
+                    playing = false
+                    error = failure.message ?: resources.getString(R.string.media_chat_audio_failed)
+                    runCatching { player?.release() }
+                    player = null
+                }
             },
         )
         Text(
             "${formatMediaDuration(positionMs)} / ${formatMediaDuration(durationMs)}",
             style = DsType.caption11.withReadingWeight(),
-            color = DsTheme.colors.labelSecondary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         )
     }
     androidx.compose.material3.Slider(
@@ -509,7 +556,7 @@ private fun InlineSpeechPlayer(file: File) {
         modifier = Modifier.fillMaxWidth(),
     )
     error?.let { Text(it, style = DsType.caption11.withReadingWeight(),
-        color = DsTheme.colors.labelSecondary) }
+        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary) }
 }
 
 private fun formatMediaDuration(ms: Int): String {
@@ -518,24 +565,40 @@ private fun formatMediaDuration(ms: Int): String {
 }
 
 @Composable
-private fun InlineVideoPlayer(url: String, localFile: File?, onError: (String) -> Unit) {
+private fun InlineVideoPlayer(url: String?, localFile: File?, onError: (String) -> Unit) {
     val resources = LocalResources.current
-    val context = LocalContext.current
-    var player by remember(url, localFile?.absolutePath) { mutableStateOf<VideoView?>(null) }
-    DisposableEffect(url, localFile?.absolutePath) {
+    val source = localFile?.takeIf { it.isFile }?.let(Uri::fromFile)
+        ?: url?.takeIf(String::isNotBlank)?.let(Uri::parse)
+    if (source == null) {
+        Text(resources.getString(R.string.media_chat_video_failed),
+            style = DsType.caption11.withReadingWeight(),
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+        return
+    }
+    var player by remember { mutableStateOf<VideoView?>(null) }
+    DisposableEffect(Unit) {
         onDispose { player?.stopPlayback(); player = null }
     }
     AndroidView(
         modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
-        factory = { context ->
-            VideoView(context).apply {
-                val controls = MediaController(context)
+        factory = { viewContext ->
+            VideoView(viewContext).apply {
+                val controls = MediaController(viewContext)
                 controls.setAnchorView(this)
                 setMediaController(controls)
                 setOnPreparedListener { start() }
                 setOnErrorListener { _, _, _ -> onError(resources.getString(R.string.media_chat_video_failed)); true }
-                setVideoURI(localFile?.let { Uri.fromFile(it) } ?: Uri.parse(url))
                 player = this
+            }
+        },
+        update = { view ->
+            // AndroidView retains its native view across recompositions. Update the media source
+            // explicitly instead of leaving an expired URL in a previously created VideoView.
+            val sourceKey = source.toString()
+            if (view.tag != sourceKey) {
+                view.stopPlayback()
+                view.tag = sourceKey
+                view.setVideoURI(source)
             }
         },
     )
@@ -606,7 +669,7 @@ internal fun LocalWorkArtifactMessageRow(
             androidx.compose.foundation.text.selection.SelectionContainer {
                 Text(if (expanded) text.take(16_000) else text.take(2500),
                     style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                    color = DsTheme.colors.labelPrimary)
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
             }
             if (text.length > 2500) {
                 SyButton(
@@ -619,18 +682,18 @@ internal fun LocalWorkArtifactMessageRow(
         } else if (artifact.category == "file") {
             Text(if (file != null) resources.getString(R.string.media_chat_work_file_ready)
                 else resources.getString(R.string.media_chat_work_no_preview),
-                style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+                style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
         } else {
             Text(artifact.reference.take(160),
                 style = DsType.small13.withReadingWeight(),
-                color = DsTheme.colors.labelPrimary)
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
         }
         if (artifact.versionAtCreation != null && artifact.versionNow != null &&
             artifact.versionAtCreation != artifact.versionNow) {
             Text(resources.getString(R.string.media_chat_work_file_changed), style = DsType.caption11.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary)
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             if (artifact.category == "file") {
                 SyButton(resources.getString(R.string.media_chat_view_entire_file), onClick = onOpen, size = SyButtonSize.Small)
                 if (file != null) {
@@ -646,7 +709,7 @@ internal fun LocalWorkArtifactMessageRow(
             }
         }
         error?.let { Text(it, style = DsType.caption11.withReadingWeight(),
-            color = DsTheme.colors.labelSecondary) }
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary) }
     }
 }
 
