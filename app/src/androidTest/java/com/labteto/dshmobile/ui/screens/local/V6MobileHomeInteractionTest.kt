@@ -7,6 +7,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.test.platform.app.InstrumentationRegistry
+import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.theme.DshTheme
@@ -31,7 +33,9 @@ class V6MobileHomeInteractionTest {
                 )
             }
         }
-        compose.onNodeWithContentDescription("搜索").performClick()
+        val searchDescription = InstrumentationRegistry.getInstrumentation().targetContext
+            .getString(R.string.common_search)
+        compose.onNodeWithContentDescription(searchDescription).performClick()
         compose.runOnIdle { assertEquals(1, opens) }
     }
 
