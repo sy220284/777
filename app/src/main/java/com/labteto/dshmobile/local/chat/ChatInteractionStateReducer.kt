@@ -103,15 +103,18 @@ internal class ChatInteractionStateReducer {
         val signals = extractInteractionPerformanceSignals(assistantMessage)
         val resetRequested = isInteractionResetIntent(userMessage)
         val assistantIntensity = if (resetRequested) 0 else assistantInitiatedInteractionIntensity(assistantMessage)
+        val assistantIntimateAction = assistantIntensity == 5
         val finalIntensity = if (resetRequested) 0 else maxOf(state.interactionIntensity, assistantIntensity)
         val finalIntent = when {
             resetRequested -> ChatInteractionIntent.NORMAL.name
+            assistantIntimateAction -> ChatInteractionIntent.INTIMATE.name
             finalIntensity > 0 && state.interactionIntent == ChatInteractionIntent.NORMAL.name ->
                 ChatInteractionIntent.FLIRTING.name
             else -> state.interactionIntent
         }
         val finalStrength = when {
             resetRequested -> 0
+            assistantIntimateAction -> 100
             finalIntent == ChatInteractionIntent.FLIRTING.name &&
                 state.interactionIntent == ChatInteractionIntent.NORMAL.name ->
                 maxOf(state.interactionIntentStrength, 2)
