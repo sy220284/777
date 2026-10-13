@@ -96,16 +96,24 @@ internal class LocalWorkTurnToolRuntime(
         // The request evidence already records the exact schema digest. Only record a separate
         // fact when a selected capability could not reach the model; no parallel tool registry.
         if (selection.omittedReasons.isNotEmpty()) {
-            binding.eventLog.append("tool/schema-admission", buildJsonObject {
-                put("version", 1)
-                put("enabled_optional_count", enabled.size)
-                put("omitted_total", selection.omittedReasons.size)
-                put("omitted", buildJsonObject {
-                    selection.omittedReasons.entries.take(24).forEach { (name, reason) ->
-                        put(name, reason)
-                    }
+            // Diagnostics are observational, not a new admission gate. A failed diagnostic
+            // write must not make an otherwise legitimate model request unavailable.
+            try {
+                binding.eventLog.append("tool/schema-admission", buildJsonObject {
+                    put("version", 1)
+                    put("enabled_optional_count", enabled.size)
+                    put("omitted_total", selection.omittedReasons.size)
+                    put("omitted", buildJsonObject {
+                        selection.omittedReasons.entries.take(24).forEach { (name, reason) ->
+                            put(name, reason)
+                        }
+                    })
                 })
-            })
+            } catch (error: Exception) {
+                com.labteto.dshmobile.observability.AppLog.failure(
+                    "LocalWorkToolSurface", "record_schema_admission", error,
+                )
+            }
         }
         return selection.schemas
     }
