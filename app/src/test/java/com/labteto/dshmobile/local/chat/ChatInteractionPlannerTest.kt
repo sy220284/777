@@ -1284,7 +1284,7 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun continuitySanitizerKeepsNewestEntriesWhenModelReturnsTooMany() {
+    fun continuitySanitizerBoundsRecentEventsButPreservesAllActiveItems() {
         val payload = """{
           "state":{
             "continuity":{
@@ -1305,8 +1305,8 @@ class ChatInteractionPlannerTest {
         )!!.state
 
         assertEquals(listOf("事件2", "事件3", "事件4", "事件5", "事件6"), state.continuity.recentEvents)
-        assertEquals(listOf("决定2", "决定3", "决定4", "决定5"), state.continuity.decisions)
-        assertEquals(listOf("待续2", "待续3", "待续4", "待续5"), state.continuity.unfinished)
+        assertEquals(listOf("决定1", "决定2", "决定3", "决定4", "决定5"), state.continuity.decisions)
+        assertEquals(listOf("待续1", "待续2", "待续3", "待续4", "待续5"), state.continuity.unfinished)
     }
 
     @Test
