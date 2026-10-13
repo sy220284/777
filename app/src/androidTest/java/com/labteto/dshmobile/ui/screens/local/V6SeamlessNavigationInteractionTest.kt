@@ -15,8 +15,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/** Test real Compose V6 destinations and the selected message-to-Work handoff. */
-class V6MobileHomeInteractionTest {
+/** Regression: compact drawer entries, shared top bar and message-to-Work handoff. */
+class V6SeamlessNavigationInteractionTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun drawerShowsOnlyFeatureEntriesWithoutInventoryBadges() {

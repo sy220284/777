@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
+import com.labteto.dshmobile.ui.theme.rootSurface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import com.labteto.dshmobile.ui.shenyan.SyDimensions
@@ -142,7 +143,7 @@ internal fun LocalModeDrawer(
         // A functional 64dp rail: never leave a collapsed sidebar full of clipped labels.
         Column(
             Modifier.width(SyDimensions.navigationCollapsed).fillMaxHeight()
-                .background(com.shenyan.designsystem.components.syMaterialColor(SyMaterialTier.L4_OVERLAY)).safeDrawingPadding(),
+                .background(colors.rootSurface()).safeDrawingPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
