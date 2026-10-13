@@ -209,19 +209,6 @@
 │  │     ├─ 自动工作任务执行入口
 │  │     ├─ 后台任务触发和恢复
 │  │     └─ 工作任务与计划、审批的联系
-│  ├─ 项目功能
-│  │  ├─ 项目档案
-│  │  │  ├─ 项目新建、列表与切换
-│  │  │  ├─ 项目名称与项目身份管理
-│  │  │  └─ 项目删除及关联引用保护（存在引用时阻止删除）
-│  │  ├─ 项目指令
-│  │  │  ├─ 项目长期规则和上下文
-│  │  │  ├─ 项目规则应用到工作／子代理／聊天
-│  │  │  └─ 规则文件不可读时拒绝执行
-│  │  └─ 项目关联
-│  │     ├─ 会话与项目绑定
-│  │     ├─ 项目范围的记忆与资料关联
-│  │     └─ 项目身份与工作目录分离
 │  ├─ 自动化功能
 │  │  ├─ 自动任务目录
 │  │  │  ├─ 新建、查看、编辑和删除
@@ -563,8 +550,7 @@
 
 - **应用外壳与统一交互**：`app/src/main/java/com/labteto/dshmobile/ui/screens/local/`、`app/src/main/java/com/labteto/dshmobile/ui/components/`、`app/src/main/java/com/labteto/dshmobile/ui/sidebar/`
 - **聊天功能**：`app/src/main/java/com/labteto/dshmobile/local/chat/`、`app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryOverviewV3.kt`、`app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryScreen.kt`
-- **工作与智能体功能**：`app/src/main/java/com/labteto/dshmobile/local/work/`、`app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt`、`app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalRunCenterScreen.kt`
-- **项目功能**：`app/src/main/java/com/labteto/dshmobile/local/project/`、`app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiContribution.kt`
+- **工作与智能体功能**：`app/src/main/java/com/labteto/dshmobile/local/work/`、`app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt`
 - **自动化功能**：`app/src/main/java/com/labteto/dshmobile/automation/`、`app/src/main/java/com/labteto/dshmobile/local/automation/`、`app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/`
 - **工具与扩展功能**：`app/src/main/java/com/labteto/dshmobile/local/tools/`、`harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/`、`app/src/main/java/com/labteto/dshmobile/ui/screens/tools/`
 - **设置与个人配置**：`app/src/main/java/com/labteto/dshmobile/ui/screens/settings/`、`app/src/main/java/com/labteto/dshmobile/local/model/`、`app/src/main/java/com/labteto/dshmobile/local/usage/`

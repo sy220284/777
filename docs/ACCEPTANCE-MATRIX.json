@@ -238,45 +238,6 @@
       ]
     },
     {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目新建、列表与切换",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiRegressionTest.kt#selectedProjectStartsExactlyOneWorkSession"
-      ]
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目删除及关联引用保护（存在引用时阻止删除）",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt#offscreenSessionReferencesPreventProjectDeletionUntilAllAreRemoved",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiRegressionTest.kt#failedProjectDeletionPreservesSelectionAndAllowsExplicitRetry",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiRegressionTest.kt#cancellingProjectDeletionDoesNotInvokeAnyWrite",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiRegressionTest.kt#doubleDeleteIsBlockedWhileTheFirstRequestIsAwaitingStorage",
-        "app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt#queuedDeletionCannotResurrectProjectReferenceAfterRestart"
-      ]
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目指令 / 项目长期规则和上下文",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt#missingProjectAfterCatalogResetRejectsColdSessionBeforeWorkRulesAreSilentlyDropped"
-      ]
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目指令 / 规则文件不可读时拒绝执行",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/project/LocalProjectCatalogTest.kt#unavailableProjectCannotBeConsumedAsEmptyRules"
-      ]
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 会话与项目绑定",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt#missingProjectAfterCatalogResetRejectsColdSessionBeforeWorkRulesAreSilentlyDropped"
-      ]
-    },
-    {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 单次、重复与每月日程",
       "state": "automated_partial",
       "evidence": [
@@ -477,13 +438,6 @@
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinatorTest.kt#deniedApprovalNeverRecordsExecutorStart"
-      ]
-    },
-    {
-      "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 会话创建、读写、删除和归档",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt#offscreenSessionReferencesPreventProjectDeletionUntilAllAreRemoved"
       ]
     },
     {
