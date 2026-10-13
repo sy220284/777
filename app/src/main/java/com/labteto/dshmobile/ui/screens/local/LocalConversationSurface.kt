@@ -125,6 +125,74 @@ import kotlinx.coroutines.withContext
 /** Optional introduction is wrapped so Compose never tracks a nullable enum via ordinal(). */
 internal data class LocalModeIntro(val usageMode: LocalUsageMode)
 
+/** Parameter boundary for the 61-argument Compose shell. Keeps the original public
+ * callsite intact while cutting the renderer's DEX register pressure on API 36/37.
+ * No mutable business state, run scheduling, permissions or model calls are duplicated.
+ */
+internal class LocalConversationSurfaceArgs(
+    val state: LocalConversationSurfaceState,
+    val workActions: LocalWorkFeatureUiActions?,
+    val onOpenWorkArtifact: (String) -> Unit,
+    val readRequest: Long,
+    val onReaderDismissed: () -> Unit,
+    val activeModelProfile: LocalModelProfile?,
+    val sendFeedback: LocalSendFeedbackState,
+    val streamingState: StateFlow<LocalHarnessStreamingState>,
+    val gallery: List<PersonaGalleryEntry>,
+    val transcriptHistory: LocalTranscriptHistoryState,
+    val modeIntro: LocalModeIntro?,
+    val onConfigure: () -> Unit,
+    val onSelectModel: (String) -> Unit,
+    val onSend: (String, List<LocalImportedAttachment>) -> LocalSendResult,
+    val onSendTeam: (String, List<LocalImportedAttachment>) -> LocalSendResult,
+    val onTeamMemberOutput: (String) -> String,
+    val onSendTeamMemberMessage: suspend (String, String) -> LocalWorkUiActionResult,
+    val onStopTeamMember: suspend (String) -> LocalWorkUiActionResult,
+    val onStopTeam: suspend () -> LocalWorkUiActionResult,
+    val onEditAndResend: suspend (String, String) -> LocalChatUserEditResult,
+    val onLocateMemoryForMessage: (String) -> Unit,
+    val onSelectMessageVariant: suspend (String, Int) -> Boolean,
+    val onRegenerate: (String) -> Boolean,
+    val onGenerateReplySuggestions: suspend () -> Boolean,
+    val onLoadOlderTranscript: suspend (String) -> Result<Int>,
+    val onImportAttachment: suspend (android.net.Uri) -> LocalImportedAttachment,
+    val onStop: () -> Unit,
+    val onNewSession: () -> Unit,
+    val onExitGroupChat: () -> Unit,
+    val onOpenRunCenter: () -> Unit,
+    val sessionTitle: String,
+    val sessionPinned: Boolean,
+    val onTogglePinSession: () -> Unit,
+    val onRenameSession: (String) -> Boolean,
+    val onDeleteSession: () -> Unit,
+    val onConfigureChatPersona: suspend (PersonaProfile) -> Result<Unit>,
+    val onConfigureGroupMembers: (List<String>) -> Boolean,
+    val onSelectGalleryPersona: (String) -> Boolean,
+    val onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
+    val onSaveGroupAnnouncement: suspend (String) -> Result<Unit>,
+    val onUndoPersonaCorrection: (Long, String, String) -> Unit,
+    val onPlanModeChange: (Boolean) -> Unit,
+    val onApprove: (String) -> Unit,
+    val onDeny: (String) -> Unit,
+    val onAutoApprovePending: (String) -> Unit,
+    val onApproveDeviceTurn: (String) -> Unit,
+    val onDisableDeviceTurn: () -> Unit,
+    val onAnswerQuestion: (String, String) -> Boolean,
+    val onCancelQuestion: (String) -> Unit,
+    val composerHandoff: List<String>,
+    val skillDisplayNames: Map<String, String>,
+    val onConsumeComposerHandoff: () -> Unit,
+    val onOpenDrawer: (() -> Unit)?,
+    val onOpenGlobalSearch: () -> Unit,
+    val onOpenPersonaGallery: () -> Unit,
+    val onOpenWorkspaceFiles: () -> Unit,
+    val onUseWorkCapability: ((String) -> Unit)?,
+    val usageRevision: StateFlow<Long>?,
+    val loadTurnSummaries: (String) -> Map<String, com.labteto.dshmobile.local.TokenUsageAggregate>,
+    val loadTurnUsage: (String, String) -> com.labteto.dshmobile.local.TokenUsageGroupDetail?,
+    val loadUsageRequest: (String) -> com.labteto.dshmobile.local.TokenUsageRecord?,
+)
+
 @Composable
 internal fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
@@ -189,6 +257,136 @@ internal fun LocalConversationSurface(
     loadTurnUsage: (String, String) -> com.labteto.dshmobile.local.TokenUsageGroupDetail? = { _, _ -> null },
     loadUsageRequest: (String) -> com.labteto.dshmobile.local.TokenUsageRecord? = { null },
 ) {
+    val args = LocalConversationSurfaceArgs(
+        state = state,
+        workActions = workActions,
+        onOpenWorkArtifact = onOpenWorkArtifact,
+        readRequest = readRequest,
+        onReaderDismissed = onReaderDismissed,
+        activeModelProfile = activeModelProfile,
+        sendFeedback = sendFeedback,
+        streamingState = streamingState,
+        gallery = gallery,
+        transcriptHistory = transcriptHistory,
+        modeIntro = modeIntro,
+        onConfigure = onConfigure,
+        onSelectModel = onSelectModel,
+        onSend = onSend,
+        onSendTeam = onSendTeam,
+        onTeamMemberOutput = onTeamMemberOutput,
+        onSendTeamMemberMessage = onSendTeamMemberMessage,
+        onStopTeamMember = onStopTeamMember,
+        onStopTeam = onStopTeam,
+        onEditAndResend = onEditAndResend,
+        onLocateMemoryForMessage = onLocateMemoryForMessage,
+        onSelectMessageVariant = onSelectMessageVariant,
+        onRegenerate = onRegenerate,
+        onGenerateReplySuggestions = onGenerateReplySuggestions,
+        onLoadOlderTranscript = onLoadOlderTranscript,
+        onImportAttachment = onImportAttachment,
+        onStop = onStop,
+        onNewSession = onNewSession,
+        onExitGroupChat = onExitGroupChat,
+        onOpenRunCenter = onOpenRunCenter,
+        sessionTitle = sessionTitle,
+        sessionPinned = sessionPinned,
+        onTogglePinSession = onTogglePinSession,
+        onRenameSession = onRenameSession,
+        onDeleteSession = onDeleteSession,
+        onConfigureChatPersona = onConfigureChatPersona,
+        onConfigureGroupMembers = onConfigureGroupMembers,
+        onSelectGalleryPersona = onSelectGalleryPersona,
+        onAutoFillChatPersona = onAutoFillChatPersona,
+        onSaveGroupAnnouncement = onSaveGroupAnnouncement,
+        onUndoPersonaCorrection = onUndoPersonaCorrection,
+        onPlanModeChange = onPlanModeChange,
+        onApprove = onApprove,
+        onDeny = onDeny,
+        onAutoApprovePending = onAutoApprovePending,
+        onApproveDeviceTurn = onApproveDeviceTurn,
+        onDisableDeviceTurn = onDisableDeviceTurn,
+        onAnswerQuestion = onAnswerQuestion,
+        onCancelQuestion = onCancelQuestion,
+        composerHandoff = composerHandoff,
+        skillDisplayNames = skillDisplayNames,
+        onConsumeComposerHandoff = onConsumeComposerHandoff,
+        onOpenDrawer = onOpenDrawer,
+        onOpenGlobalSearch = onOpenGlobalSearch,
+        onOpenPersonaGallery = onOpenPersonaGallery,
+        onOpenWorkspaceFiles = onOpenWorkspaceFiles,
+        onUseWorkCapability = onUseWorkCapability,
+        usageRevision = usageRevision,
+        loadTurnSummaries = loadTurnSummaries,
+        loadTurnUsage = loadTurnUsage,
+        loadUsageRequest = loadUsageRequest,
+    )
+    LocalConversationSurfaceBody(args)
+}
+
+@Composable
+private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
+    val state = args.state
+    val workActions = args.workActions
+    val onOpenWorkArtifact = args.onOpenWorkArtifact
+    val readRequest = args.readRequest
+    val onReaderDismissed = args.onReaderDismissed
+    val activeModelProfile = args.activeModelProfile
+    val sendFeedback = args.sendFeedback
+    val streamingState = args.streamingState
+    val gallery = args.gallery
+    val transcriptHistory = args.transcriptHistory
+    val modeIntro = args.modeIntro
+    val onConfigure = args.onConfigure
+    val onSelectModel = args.onSelectModel
+    val onSend = args.onSend
+    val onSendTeam = args.onSendTeam
+    val onTeamMemberOutput = args.onTeamMemberOutput
+    val onSendTeamMemberMessage = args.onSendTeamMemberMessage
+    val onStopTeamMember = args.onStopTeamMember
+    val onStopTeam = args.onStopTeam
+    val onEditAndResend = args.onEditAndResend
+    val onLocateMemoryForMessage = args.onLocateMemoryForMessage
+    val onSelectMessageVariant = args.onSelectMessageVariant
+    val onRegenerate = args.onRegenerate
+    val onGenerateReplySuggestions = args.onGenerateReplySuggestions
+    val onLoadOlderTranscript = args.onLoadOlderTranscript
+    val onImportAttachment = args.onImportAttachment
+    val onStop = args.onStop
+    val onNewSession = args.onNewSession
+    val onExitGroupChat = args.onExitGroupChat
+    val onOpenRunCenter = args.onOpenRunCenter
+    val sessionTitle = args.sessionTitle
+    val sessionPinned = args.sessionPinned
+    val onTogglePinSession = args.onTogglePinSession
+    val onRenameSession = args.onRenameSession
+    val onDeleteSession = args.onDeleteSession
+    val onConfigureChatPersona = args.onConfigureChatPersona
+    val onConfigureGroupMembers = args.onConfigureGroupMembers
+    val onSelectGalleryPersona = args.onSelectGalleryPersona
+    val onAutoFillChatPersona = args.onAutoFillChatPersona
+    val onSaveGroupAnnouncement = args.onSaveGroupAnnouncement
+    val onUndoPersonaCorrection = args.onUndoPersonaCorrection
+    val onPlanModeChange = args.onPlanModeChange
+    val onApprove = args.onApprove
+    val onDeny = args.onDeny
+    val onAutoApprovePending = args.onAutoApprovePending
+    val onApproveDeviceTurn = args.onApproveDeviceTurn
+    val onDisableDeviceTurn = args.onDisableDeviceTurn
+    val onAnswerQuestion = args.onAnswerQuestion
+    val onCancelQuestion = args.onCancelQuestion
+    val composerHandoff = args.composerHandoff
+    val skillDisplayNames = args.skillDisplayNames
+    val onConsumeComposerHandoff = args.onConsumeComposerHandoff
+    val onOpenDrawer = args.onOpenDrawer
+    val onOpenGlobalSearch = args.onOpenGlobalSearch
+    val onOpenPersonaGallery = args.onOpenPersonaGallery
+    val onOpenWorkspaceFiles = args.onOpenWorkspaceFiles
+    val onUseWorkCapability = args.onUseWorkCapability
+    val usageRevision = args.usageRevision
+    val loadTurnSummaries = args.loadTurnSummaries
+    val loadTurnUsage = args.loadTurnUsage
+    val loadUsageRequest = args.loadUsageRequest
+
     val turnUsage = LocalChatTurnUsageController(
         sessionId = state.sessionId,
         enabled = state.usageMode == LocalUsageMode.CHAT,
