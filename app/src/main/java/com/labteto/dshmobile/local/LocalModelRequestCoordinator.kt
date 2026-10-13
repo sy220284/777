@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.labteto.dshmobile.harness.agent.AgentRequestEvent
 import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
@@ -33,6 +35,7 @@ import com.labteto.dshmobile.local.model.LocalRequestReconstruction
 import com.labteto.dshmobile.local.model.reconstructLocalModelRequest
 import com.labteto.dshmobile.local.model.LocalStreamPreview
 import com.labteto.dshmobile.local.model.modelFailureKind
+import com.labteto.dshmobile.local.model.modelTransportFailureKind
 import com.labteto.dshmobile.local.model.redactModelImages
 import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.model.toRunModelSurface
@@ -79,6 +82,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.attach(context)
     }
 
+    private val networkContext: Context = context
     private val resourceScheduler
         get() = runtimeStateStore.resourceScheduler
     private val streamingPreviewStore
@@ -454,6 +458,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
 
         var failureContextDiagnosticLogged = false
         var lastProviderError: LocalModelException? = null
+        val networkPathAtStart = describeModelNetworkPath(networkContext)
         var attemptStartedNanos = System.nanoTime()
         var providerStartedNanos: Long? = null
         val attemptEvidence = LocalModelAttemptStreamEvidence()
@@ -503,6 +508,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 providerError?.code?.let { append("code=$it ") }
                                 providerError?.let {
                                     append("failure_kind=${modelFailureKind(it)} admission_state=${it.admissionState.name.lowercase()} ")
+                                    modelTransportFailureKind(it)?.let { kind -> append("transport_kind=$kind ") }
+                                    append("network_path=${describeModelNetworkPath(networkContext)} ")
                                 }
                                 append("origin=${if (localPreflight) "local_preflight" else "provider_or_transport"} ")
                                 append("retryable=${event.retryable} profile_id=${frozenProfile.id} ")
@@ -552,6 +559,9 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             providerError?.let { error ->
                                 put("code", error.code)
                                 put("failure_kind", modelFailureKind(error))
+                                modelTransportFailureKind(error)?.let { put("transport_kind", it) }
+                                put("network_path_at_start", networkPathAtStart)
+                                put("network_path_at_failure", describeModelNetworkPath(networkContext))
                                 put("admission_state", error.admissionState.name.lowercase())
                                 put("continuation_eligible", error.continuationEligible)
                                 error.status?.let { put("status", it) }
@@ -839,6 +849,9 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 error.providerCode?.let { put("provider_code", it) }
                                 error.providerParam?.let { put("provider_param", it) }
                                 put("failure_kind", modelFailureKind(error))
+                                modelTransportFailureKind(error)?.let { put("transport_kind", it) }
+                                put("network_path_at_start", networkPathAtStart)
+                                put("network_path_at_failure", describeModelNetworkPath(networkContext))
                                 put("admission_state", error.admissionState.name.lowercase())
                                 put("continuation_eligible", error.continuationEligible)
                                 error.cause?.let { put("cause_type", it::class.java.simpleName) }
@@ -1010,3 +1023,19 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         const val PROVIDER_ATTEMPT_EVIDENCE_VERSION = 2
     }
 }
+
+/** Coarse network facts only; never logs addresses, Wi-Fi names or VPN node identifiers. */
+private fun describeModelNetworkPath(context: Context): String = runCatching {
+    val manager = context.getSystemService(ConnectivityManager::class.java) ?: return@runCatching "unavailable"
+    val active = manager.activeNetwork ?: return@runCatching "offline"
+    val caps = manager.getNetworkCapabilities(active) ?: return@runCatching "unknown"
+    buildList {
+        if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) add("vpn")
+        if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) add("wifi")
+        if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) add("cellular")
+        if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) add("ethernet")
+        if (isEmpty()) add("other")
+        add(if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) "validated" else "unvalidated")
+        if (manager.getLinkProperties(active)?.httpProxy != null) add("system_proxy")
+    }.joinToString("+")
+}.getOrDefault("unavailable")
