@@ -30,8 +30,8 @@ internal class LocalWorkProgressCoordinator(
             args.containsKey("items") -> {
                 val array = args["items"] as? JsonArray ?: error("update_plan.items 必须是字符串数组；未修改原计划")
                 array.mapIndexed { index, element ->
-                    val item = element as? JsonPrimitive
-                    require(item?.isString == true) { "计划第 ${index + 1} 项必须是字符串；未修改原计划" }
+                    val item = (element as? JsonPrimitive)?.takeIf { it.isString }
+                        ?: error("计划第 ${index + 1} 项必须是字符串；未修改原计划")
                     item.content
                 }
             }
@@ -68,9 +68,9 @@ internal class LocalWorkProgressCoordinator(
         val items = raw.mapIndexed { index, element ->
             val item = element as? JsonObject
                 ?: error("任务清单第 ${index + 1} 项不是对象；未修改原任务")
-            val contentValue = item["content"] as? JsonPrimitive
-            val statusValue = item["status"] as? JsonPrimitive
-            require(contentValue?.isString == true && statusValue?.isString == true) {
+            val contentValue = (item["content"] as? JsonPrimitive)?.takeIf { it.isString }
+            val statusValue = (item["status"] as? JsonPrimitive)?.takeIf { it.isString }
+            require(contentValue != null && statusValue != null) {
                 "任务清单第 ${index + 1} 项缺少有效 content/status 字符串；未修改原任务"
             }
             val content = contentValue.content.trim()
