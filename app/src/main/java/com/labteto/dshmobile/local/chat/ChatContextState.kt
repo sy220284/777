@@ -147,6 +147,10 @@ internal fun ChatContextState.normalized(): ChatContextState {
         attention = attention.copy(
             lastUserSubject = attention.lastUserSubject.trim().take(260),
             pausedSubject = attention.pausedSubject.trim().take(80),
+            recentUserSubjects = attention.recentUserSubjects
+                .map { it.trim().take(260) }.filter(String::isNotBlank).distinct().takeLast(8),
+            pausedSubjects = attention.pausedSubjects
+                .map { it.trim().take(80) }.filter(String::isNotBlank).distinct().takeLast(8),
         ),
     )
 }
