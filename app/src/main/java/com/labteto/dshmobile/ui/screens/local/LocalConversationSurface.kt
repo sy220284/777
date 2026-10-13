@@ -101,6 +101,7 @@ import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.shenyan.designsystem.components.SySheetChoiceRow
 import com.shenyan.designsystem.components.SyQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsMetrics
@@ -261,6 +262,8 @@ internal fun LocalConversationSurface(
     var teamCardDismissed by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
+    var showLoadedMessageSearch by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var requestedSearchMessageId by remember(state.sessionId) { mutableStateOf<String?>(null) }
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
     var showCharacterTuning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showGroupMemberPicker by rememberSaveable { mutableStateOf(false) }
@@ -360,6 +363,22 @@ internal fun LocalConversationSurface(
         showPlanReview = planReview != null,
         showStreamingTail = showStreamingTail,
     )
+    // The search sheet returns a stable message ID, not an index from a stale list.
+    // Translate to the actual LazyColumn slot only after the current projection is ready.
+    LaunchedEffect(requestedSearchMessageId, transcriptItems) {
+        val targetId = requestedSearchMessageId ?: return@LaunchedEffect
+        val index = transcriptItems.indexOfFirst {
+            it is LocalTranscriptItem.Message && it.message.id == targetId
+        }
+        if (index >= 0) {
+            val preceding = listOf(
+                mediaPage.unavailable, mediaPage.hasMore, showTranscriptPagingRow,
+                showEmptyWorkbench, showEmptyGroupSetup, planReview != null,
+            ).count { it }
+            listState.scrollToItem(preceding + index)
+        }
+        requestedSearchMessageId = null
+    }
     val messageEditingEnabled = true
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT
     val messageActionsEnabled =
@@ -604,6 +623,15 @@ internal fun LocalConversationSurface(
                             onDeleteSession = onDeleteSession,
                         )
                     }
+                }
+                if (showV6MobileNavigation && state.usageMode == LocalUsageMode.CHAT) {
+                    SyIconButton(
+                        icon = SyEntryIcons.Search,
+                        contentDescription = stringResource(R.string.sy_v6_search_messages),
+                        onClick = { showLoadedMessageSearch = true },
+                        containerColor = colors.bgLayer1,
+                        tint = colors.labelPrimary,
+                    )
                 }
                 // 隐藏大卡片后仍可从顶部直接查看，不占用聊天记录和输入区。
                 if (state.usageMode == LocalUsageMode.WORK &&
@@ -1156,6 +1184,16 @@ internal fun LocalConversationSurface(
 
     }
 
+    if (showLoadedMessageSearch && state.usageMode == LocalUsageMode.CHAT) {
+        V6LoadedConversationSearchSheet(
+            transcript = transcriptItems,
+            onSelect = { hit ->
+                showLoadedMessageSearch = false
+                requestedSearchMessageId = hit.messageId
+            },
+            onDismiss = { showLoadedMessageSearch = false },
+        )
+    }
     if (readerOpen) {
         val message = (transcriptHistory.olderMessages + state.messages).firstOrNull { it.id == readerMessageId }
         FluidMessageReader(

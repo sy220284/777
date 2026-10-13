@@ -2324,5 +2324,11 @@
     <string name="sy_v6_mobile_work">工作</string>
     <string name="sy_v6_mobile_workspace">文件</string>
     <string name="sy_v6_convert_to_work">转为任务</string>
+    <string name="sy_v6_search_messages">查找聊天消息</string>
+    <string name="sy_v6_search_loaded_scope">搜索当前会话已加载的消息，可直接定位；更早历史请先上滑加载</string>
+    <string name="sy_v6_search_message_hint">输入消息内容关键词</string>
+    <string name="sy_v6_search_no_messages">当前已加载消息中没有匹配内容</string>
+    <string name="sy_v6_search_user">我发送的消息</string>
+    <string name="sy_v6_search_assistant">回复消息</string>
 </resources>
 
