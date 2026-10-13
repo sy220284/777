@@ -7,7 +7,7 @@
 - PR [#664](https://github.com/sy220284/777/pull/664) 已合并，不再按 Draft 或旧 head 作为验收依据。
 - 三主题：暖纸、烟熏玻璃、哑光黑；手机原稿为 393dp/412dp，材质分级 L1–L5；[26 枚 V6 入口图标](SY-ENTRY-ICONS.zh-CN.md)描边为 1.75。
 - 共享材质绘制入口是 com.shenyan.designsystem.components.SyMaterialSurface。根页面、图片显示、透明命中层等具有独立业务语义的 Compose Surface 不是一概退役对象。
-- 旧 DsButton / DsCard / DsSegmented / DsCheckbox / DsBottomSheet / DsSearchField / DsToastHost 直接绘制接口退出；历史 DsTheme.colors 消费者仍在，后续迁移必须保持实际业务、阅读设置和强调色一致。
+- 旧 DsButton / DsCard / DsSegmented / DsCheckbox / DsBottomSheet / DsSearchField / DsToastHost 直接绘制接口退出；生产 UI 和背景宿主已切换到 canonical LocalSyColors；DsColors 仅留在主题根部维护历史偏好及材质投影，不再作为业务页面直接读取入口。
 - 当前会话尝试读取/写入既有在线 Figma 文件时被 Starter MCP 配额拒绝，不能将离线设计稿说成已同步 Figma。
 - 原生多主题、多状态、Android 16/17 的 38 屏视觉验收证据仍不完整，正式通过 0/38；固定数据组件截图不代替业务流程与人工对照。
 

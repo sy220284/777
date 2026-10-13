@@ -2,9 +2,5 @@
   "description": "V6 remaining active legacy DsTheme.colors consumers, strictly no new paths. Reduce this list as callers migrate to LocalSyColors.",
   "base": "main f7d59d0d",
   "verifiedDate": "2026-10-13",
-  "remainingProductionFiles": [
-    "app/src/main/java/com/labteto/dshmobile/ui/components/Markdown.kt",
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-    "app/src/main/java/com/labteto/dshmobile/ui/theme/AppBackground.kt"
-  ]
+  "remainingProductionFiles": []
 }

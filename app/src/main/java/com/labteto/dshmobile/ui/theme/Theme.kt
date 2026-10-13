@@ -319,9 +319,10 @@ fun DshTheme(
             surfaceBase = themed.bgBase,
             surfaceTransparency = wallpaperSurfaceTransparency.coerceIn(0f, 1f),
             fluidGlass = preference != ThemePreference.MATTE_BLACK,
+            ambientPalette = controlPalette,
         ) {
             // One canonical visual theme owns all Material3 colour and shape tokens.
-            // Legacy DsColors remains available ONLY to screens still being migrated.
+            // Canonical V6 palette owns production controls; DsColors now only projects retained preferences.
             val syMode = when (preference) {
                 ThemePreference.LIGHT -> SyMode.LIGHT
                 ThemePreference.DARK -> SyMode.DARK

@@ -37,7 +37,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -89,9 +88,6 @@ import com.labteto.dshmobile.ui.shenyan.rememberSyToast
 import com.labteto.dshmobile.ui.theme.AccentPalettes
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
-import com.labteto.dshmobile.ui.theme.DsColors
-import com.labteto.dshmobile.ui.theme.LocalDsColors
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -171,8 +167,6 @@ private val usageDetailSelectionStateSaver =
         save = { state -> encodeUsageDetailSelection(state.value) },
         restore = { saved -> mutableStateOf(decodeUsageDetailSelection(saved)) },
     )
-/** Settings consume the same readable ink hierarchy as every other native feature. */
-internal fun settingsInkColors(colors: DsColors): DsColors = colors
 
 @Composable
 fun SettingsScreen(
@@ -195,7 +189,7 @@ fun SettingsScreen(
     // Re-probe after returning from Android settings; a stale permission badge is misleading.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshDeviceCapabilities() }
     val memories by viewModel.memories.collectAsStateWithLifecycle()
-    val colors = settingsInkColors(DsTheme.colors)
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val toast = rememberSyToast()
     val context = LocalContext.current
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -349,7 +343,6 @@ fun SettingsScreen(
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
-        CompositionLocalProvider(LocalDsColors provides colors) {
         Box {
             Column(
                 modifier = Modifier
@@ -465,7 +458,7 @@ fun SettingsScreen(
                         Text(
                             "${stringResource(R.string.app_name)} ${BuildConfig.VERSION_NAME}",
                             style = DsType.caption11.withReadingWeight(),
-                            color = colors.labelCaption,
+                            color = colors.textTertiary,
                             modifier = Modifier.fillMaxWidth()
                                 .padding(top = DsSpacing.small)
                                 .wrapContentWidth(Alignment.CenterHorizontally),
@@ -518,7 +511,7 @@ fun SettingsScreen(
                             Text(
                                 stringResource(R.string.settings_appearance_preview),
                                 style = DsType.std14Strong.withReadingWeight(),
-                                color = colors.labelPrimary,
+                                color = colors.text,
                             )
                             AppearanceReadingPreview()
                         }
@@ -559,14 +552,14 @@ fun SettingsScreen(
                                 Text(
                                     stringResource(R.string.settings_chat_filter_disabled_notice),
                                     style = DsType.small13.withReadingWeight(),
-                                    color = colors.labelSecondary,
+                                    color = colors.textSecondary,
                                 )
                             }
 
                             Text(
                                 stringResource(R.string.settings_chat_custom_filters_title, customFilters.size),
                                 style = DsType.small13Strong.withReadingWeight(),
-                                color = colors.labelPrimary,
+                                color = colors.text,
                             )
                             Text(
                                 stringResource(
@@ -575,7 +568,7 @@ fun SettingsScreen(
                                     MAX_CUSTOM_CHAT_FILTER_CHARS,
                                 ),
                                 style = DsType.caption11.withReadingWeight(),
-                                color = colors.labelTertiary,
+                                color = colors.textTertiary,
                             )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -615,13 +608,13 @@ fun SettingsScreen(
                             Text(
                                 stringResource(R.string.settings_chat_persona_filters_title, personaFilters.size),
                                 style = DsType.small13Strong.withReadingWeight(),
-                                color = colors.labelPrimary,
+                                color = colors.text,
                             )
                             if (personaFilters.isEmpty()) {
                                 Text(
                                     stringResource(R.string.settings_chat_persona_filters_empty),
                                     style = DsType.caption11.withReadingWeight(),
-                                    color = colors.labelTertiary,
+                                    color = colors.textTertiary,
                                 )
                             } else {
                                 personaFilters.forEach { phrase -> ChatFilterPhraseRow(phrase = phrase) }
@@ -647,7 +640,7 @@ fun SettingsScreen(
                                     Text(
                                         stringResource(R.string.settings_chat_guard_hits_title),
                                         style = DsType.small13Strong.withReadingWeight(),
-                                        color = colors.labelPrimary,
+                                        color = colors.text,
                                     )
                                     localHarness.styleGuardHits.takeLast(8).asReversed().forEach { hit ->
                                         ChatFilterPhraseRow(phrase = hit)
@@ -813,7 +806,7 @@ fun SettingsScreen(
                             Text(
                                 stringResource(R.string.settings_approval_mode_subtitle),
                                 style = DsType.small13.withReadingWeight(),
-                                color = colors.labelSecondary,
+                                color = colors.textSecondary,
                             )
                             SySegmented(
                                 segments = listOf(
@@ -838,7 +831,7 @@ fun SettingsScreen(
                                     },
                                 ),
                                 style = DsType.caption11.withReadingWeight(),
-                                color = colors.labelSecondary,
+                                color = colors.textSecondary,
                             )
                         }
                         DeviceCapabilitiesCard(deviceCapabilities, viewModel, requestPostingPermission)
@@ -957,17 +950,17 @@ fun SettingsScreen(
                                     BuildConfig.VERSION_CODE,
                                 ),
                                 style = DsType.std14Strong.withReadingWeight(),
-                                color = colors.labelPrimary,
+                                color = colors.text,
                             )
                             Text(
                                 updateStatus ?: stringResource(R.string.settings_update_not_checked),
                                 style = DsType.small13.withReadingWeight(),
-                                color = colors.labelSecondary,
+                                color = colors.textSecondary,
                             )
                             Text(
                                 stringResource(R.string.settings_update_action_description),
                                 style = DsType.caption11.withReadingWeight(),
-                                color = colors.labelTertiary,
+                                color = colors.textTertiary,
                             )
                             SyButton(
                                 text = stringResource(R.string.settings_update_check),
@@ -1009,7 +1002,6 @@ fun SettingsScreen(
             }
             SyToastHost(toast, modifier = Modifier.fillMaxWidth())
         }
-        }
     }
 
     if (showDiagnostic) {
@@ -1037,7 +1029,7 @@ private fun ChatFilterPhraseRow(
     removeLabel: String? = null,
     onRemove: (() -> Unit)? = null,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -1046,7 +1038,7 @@ private fun ChatFilterPhraseRow(
         Text(
             text = "• " + phrase,
             style = DsType.caption11.withReadingWeight(),
-            color = colors.labelSecondary,
+            color = colors.textSecondary,
             modifier = Modifier.weight(1f),
         )
         if (removeLabel != null && onRemove != null) {
