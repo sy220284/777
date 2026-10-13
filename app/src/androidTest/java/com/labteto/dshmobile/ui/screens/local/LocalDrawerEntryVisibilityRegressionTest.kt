@@ -2,10 +2,16 @@ package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.session.LocalSessionSummary
+import androidx.compose.runtime.mutableStateOf
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -151,6 +157,62 @@ class LocalDrawerEntryVisibilityRegressionTest {
         compose.onNodeWithText(title).performClick()
         compose.runOnIdle { assertEquals(2, opens); available.value = false }
         compose.onNodeWithText(title).assertDoesNotExist()
+    }
+
+
+    @Test
+    fun sessionDeleteActionOnlyExistsWhileSwipedAndResetsWhenDrawerCloses() {
+        val title = "滑动删除可见性测试会话标题足够长"
+        val session = LocalSessionSummary(
+            id = "swipe-regression",
+            title = title,
+            updatedAt = 10L,
+            usageMode = LocalUsageMode.WORK,
+        )
+        val selectionOpen = mutableStateOf(false)
+        val drawerVisible = mutableStateOf(true)
+        var deleteRequests = 0
+        compose.setContent {
+            DshTheme {
+                LocalSessionDrawerRow(
+                    session = session,
+                    displayTitle = title,
+                    galleryEntry = null,
+                    current = true,
+                    pinned = false,
+                    running = false,
+                    selected = false,
+                    selectionOpen = selectionOpen.value,
+                    drawerVisible = drawerVisible.value,
+                    onClick = {},
+                    onSelectMultiple = {},
+                    onRename = {},
+                    onTogglePinned = {},
+                    onDelete = { deleteRequests++ },
+                )
+            }
+        }
+
+        val deleteLabel = context.getString(R.string.local_delete_session)
+        // Default state: the trash control is absent, not merely covered by the glass surface.
+        compose.onNodeWithContentDescription(deleteLabel).assertDoesNotExist()
+        compose.onNodeWithText(title).performTouchInput { swipeLeft() }
+        compose.onNodeWithContentDescription(deleteLabel).assertExists()
+        compose.onNodeWithText(title).performTouchInput { swipeRight() }
+        compose.onNodeWithContentDescription(deleteLabel).assertDoesNotExist()
+
+        compose.onNodeWithText(title).performTouchInput { swipeLeft() }
+        compose.onNodeWithContentDescription(deleteLabel).performClick()
+        compose.runOnIdle { assertEquals(1, deleteRequests) }
+        compose.onNodeWithContentDescription(deleteLabel).assertDoesNotExist()
+
+        compose.onNodeWithText(title).performTouchInput { swipeLeft() }
+        compose.runOnIdle { selectionOpen.value = true }
+        compose.onNodeWithContentDescription(deleteLabel).assertDoesNotExist()
+        compose.runOnIdle { selectionOpen.value = false }
+        compose.onNodeWithText(title).performTouchInput { swipeLeft() }
+        compose.runOnIdle { drawerVisible.value = false }
+        compose.onNodeWithContentDescription(deleteLabel).assertDoesNotExist()
     }
 
 }
