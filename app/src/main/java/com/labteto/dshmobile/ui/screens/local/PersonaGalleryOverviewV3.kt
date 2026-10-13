@@ -123,6 +123,7 @@ internal fun PersonaGalleryOverviewV3(
     onRequestHidePreset: (String) -> Unit,
     onSyncCurrent: () -> Unit,
     onDeleteSelected: suspend (Set<String>) -> Result<Unit>,
+    animateCards: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -413,7 +414,8 @@ internal fun PersonaGalleryOverviewV3(
                 if (!managing) {
                     FluidPersonaGalleryGrid(pinnedEntries + regularEntries, onSelectEntry,
                         onLongClick = { id -> managing = true; if (id !in selectedIds) selectedIds.add(id) },
-                        modifier = Modifier.weight(1f).fillMaxWidth())
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        animateOnEntrance = animateCards)
                 } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f).fillMaxWidth(),

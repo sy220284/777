@@ -212,6 +212,9 @@ internal fun PersonaGalleryScreen(
     }
     // New sidebar navigation owns its target; internal detail/list Back stays local.
     var selectedId by rememberSaveable(entryOpenVersion) { mutableStateOf(initialEntryId) }
+    // Returning from a selected persona must restore the first gallery card immediately.
+    // A fresh gallery entry may cascade once, but a detail -> list Back is not a new entry.
+    var galleryCascadeSeen by rememberSaveable { mutableStateOf(initialEntryId != null) }
     val selected = entries.firstOrNull { it.id == selectedId }
     var selectedStoryId by rememberSaveable(selectedId) { mutableStateOf<String?>(null) }
     val selectedStory = selected?.stories?.firstOrNull { it.id == selectedStoryId }
@@ -377,6 +380,7 @@ internal fun PersonaGalleryScreen(
         } else if (hasLocalStoryEdits) {
             confirmDiscardStoryDraft = true
         } else {
+            galleryCascadeSeen = true
             selectedId = null
             selectedStoryId = null
             deletingCharacter = false
@@ -804,7 +808,9 @@ internal fun PersonaGalleryScreen(
                     canSave = canSave,
                     busy = busy,
                     errorMessage = error,
+                    animateCards = !galleryCascadeSeen,
                     onSelectEntry = { id ->
+                        galleryCascadeSeen = true
                         selectedId = id
                         selectedStoryId = null
                         error = null

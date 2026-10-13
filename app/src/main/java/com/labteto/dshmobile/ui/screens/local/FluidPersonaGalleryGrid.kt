@@ -42,15 +42,18 @@ import kotlinx.coroutines.withContext
 /** Design 06: artwork cards on a compact two-column grid; management keeps the real reorder flow. */
 @Composable
 internal fun FluidPersonaGalleryGrid(entries: List<PersonaGalleryEntry>, onSelect: (String) -> Unit,
-    onLongClick: (String) -> Unit, modifier: Modifier = Modifier) {
+    onLongClick: (String) -> Unit, modifier: Modifier = Modifier,
+    animateOnEntrance: Boolean = true) {
     LazyVerticalGrid(GridCells.Fixed(2), modifier,
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
         verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
         itemsIndexed(entries, key = { _, entry -> entry.id }) { index, entry ->
             // Screen 06: reference 360ms cascade, 80ms stagger. The first ten
             // cards animate once; a long gallery must never queue hundreds of delays.
-            var appeared by rememberSaveable(entry.id) {
-                mutableStateOf(index >= DsAnimations.cascadeMaxItems)
+            // The V6 reveal is a first-entry flourish, not a mandatory animation
+            // each time a detail screen returns to the same gallery list.
+            var appeared by rememberSaveable(entry.id, animateOnEntrance) {
+                mutableStateOf(!animateOnEntrance || index >= DsAnimations.cascadeMaxItems)
             }
             LaunchedEffect(entry.id) {
                 if (!appeared) {
