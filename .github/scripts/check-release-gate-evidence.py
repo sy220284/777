@@ -127,12 +127,25 @@ if release_equivalent([
 
 if '.event == "push"' not in RELEASE or '.conclusion == "success"' not in RELEASE:
     fail("full validation must come from a successful main push workflow")
-# 定时批次只处理触发时的 SHA，不能被新合并换包或中止。
+# GitHub schedule 会漏触发：可信 main push CI 成功时检查，定时和手动兜底。
+# 两个入口都必须继续冻结事件时的主线 SHA，不能被后续合并换包或中止。
 triggers = RELEASE.split("'on':\n", 1)[1].split("\npermissions:", 1)[0]
 if "cron: '13,43 * * * *'" not in triggers:
-    fail("release must check every 30 minutes off the busy hourly boundary")
-if re.search(r"(?m)^  (?:workflow_run|push):", triggers):
-    fail("CI completion or tag push still triggers immediate release")
+    fail("release must retain the half-hour fallback away from the busy hour boundary")
+if not re.search(r"(?m)^  workflow_run:\n    workflows: \[CI\]\n    types: \[completed\]\n    branches: \[main\]$", triggers):
+    fail("release must respond only to completed CI workflows on main")
+if re.search(r"(?m)^  (?:push|pull_request|pull_request_target|release):", triggers):
+    fail("release must not bypass complete main CI validation via push/PR/tag events")
+required_trigger_fence = (
+    "github.event_name != 'workflow_run'",
+    "github.event.workflow_run.event == 'push'",
+    "github.event.workflow_run.conclusion == 'success'",
+    "github.event.workflow_run.head_branch == 'main'",
+    "github.event.workflow_run.head_repository.full_name == github.repository",
+)
+check_release = RELEASE.split("  check-release:\n", 1)[1].split("\n  release:", 1)[0]
+if not all(fence in check_release.split("    runs-on:", 1)[0] for fence in required_trigger_fence):
+    fail("release trigger must exclude untrusted and failed upstream runs")
 if "workflow_dispatch:" not in triggers:
     fail("manual release recovery entry was removed")
 if not re.search(r"(?m)^  cancel-in-progress: false$", RELEASE):
@@ -150,4 +163,4 @@ if "if: steps.freshness" in RELEASE:
 if "target_commitish: ${{ needs.check-release.outputs.release_sha }}" not in RELEASE:
     fail("publication is not pinned to the validated candidate")
 
-print("Release-eligibility evidence, half-hour scheduling and immutable batch regression passed")
+print("Release-eligibility evidence, CI completion trigger, half-hour fallback and immutable batch regression passed")
