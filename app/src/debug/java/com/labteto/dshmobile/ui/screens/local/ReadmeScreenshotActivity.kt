@@ -194,7 +194,6 @@ private fun NavigationScreenshot() {
             onSearchTask = {},
             onSearchFile = {},
             onOpenRunCenter = {},
-            onProjects = {},
             onOpenGroupChat = {},
             onOpenPersonaGallery = {},
             onOpenPersonaSearchResult = {},
