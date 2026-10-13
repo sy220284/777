@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -29,7 +31,6 @@ import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
@@ -45,13 +46,13 @@ internal fun GroupAnnouncementCard(
         shape = DsShapes.block,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny)
+            .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs)
             .clickable(onClick = onClick),
     ) {
-        Column(Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)) {
+        Column(Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(

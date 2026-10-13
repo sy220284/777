@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,7 +34,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SySlider
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlin.coroutines.cancellation.CancellationException
@@ -102,7 +103,7 @@ internal fun CharacterBehaviorTuningDialog(
                     variant = SyButtonVariant.Ghost,
                     enabled = !saving,
                 )
-                Spacer(Modifier.width(DsSpacing.small))
+                Spacer(Modifier.width(SyMetric.gapMd))
                 SyButton(
                     text = stringResource(R.string.local_character_tuning_done),
                     enabled = !saving,
@@ -130,7 +131,7 @@ internal fun CharacterBehaviorTuningDialog(
         },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             LocalPersonaHeaderAvatar(name = personaName, portraitPath = portraitPath)
             Column {
                 Text(personaName, style = DsType.base16Strong.withReadingWeight(), color = colors.text)

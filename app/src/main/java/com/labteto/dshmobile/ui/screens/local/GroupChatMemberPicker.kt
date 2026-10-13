@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -43,7 +45,6 @@ import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -127,9 +128,9 @@ internal fun GroupChatMemberPickerSheet(
             horizontalPadding = 0.dp, verticalPadding = 0.dp,
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(DsSpacing.medium),
+                modifier = Modifier.fillMaxWidth().padding(SyMetric.gapLg),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 Icon(
                     FeatherIcons.Shield,
@@ -168,7 +169,7 @@ internal fun GroupChatMemberPickerSheet(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                 ) {
                     items(filteredEntries, key = PersonaGalleryEntry::id) { entry ->
                         val checked = entry.id in selected
@@ -193,9 +194,9 @@ internal fun GroupChatMemberPickerSheet(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+                                    .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                             ) {
                                 Surface(
                                     shape = CircleShape,
@@ -205,7 +206,7 @@ internal fun GroupChatMemberPickerSheet(
                                         entry.persona.name.trim().take(1).ifBlank { avatarFallback },
                                         style = DsType.std14Strong.withReadingWeight(),
                                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.lilac,
-                                        modifier = Modifier.padding(DsSpacing.small),
+                                        modifier = Modifier.padding(SyMetric.gapMd),
                                     )
                                 }
                                 Column(Modifier.weight(1f)) {

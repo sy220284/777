@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,7 +21,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.work.LocalWorkflowProgress
 import com.labteto.dshmobile.local.presentation.WorkflowStage
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -57,7 +58,7 @@ internal fun WorkflowProgressSection(progress: LocalWorkflowProgress) {
     val reduced = com.labteto.dshmobile.ui.shenyan.LocalSyReducedMotion.current
     val isBlocked = progress.blockedReason != null || progress.stage == WorkflowStage.STALLED
     val progressStatus = workflowProgressVisualStatus(progress)
-    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
         // The stage changes in place rather than posting an unconditional completion toast.
         AnimatedContent(
             targetState = progress.stage,

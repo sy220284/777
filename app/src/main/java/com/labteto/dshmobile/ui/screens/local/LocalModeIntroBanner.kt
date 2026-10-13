@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -13,7 +15,6 @@ import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -27,7 +28,7 @@ internal fun LocalModeIntroBanner(intro: LocalModeIntro?) {
         tier = SyMaterialTier.L3_CARD,
         shape = DsShapes.block,
         modifier = Modifier.fillMaxWidth()
-            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
+            .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs),
     ) {
         Text(
             stringResource(
@@ -36,7 +37,7 @@ internal fun LocalModeIntroBanner(intro: LocalModeIntro?) {
             ),
             style = DsType.small13.withReadingWeight(),
             color = colors.textSecondary,
-            modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
         )
     }
 }
