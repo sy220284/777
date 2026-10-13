@@ -1216,10 +1216,10 @@ class LocalToolExecutionCoordinatorTest {
         val registry = ToolRegistry().apply {
             register(tool(name = "web_search", access = ToolAccess.NETWORK,
                 approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                family = "网络") { ToolResult("ok") })
+                family = "网络", keywords = setOf("联网")) { ToolResult("ok") })
             register(tool(name = "workspace_write", access = ToolAccess.WORKSPACE_WRITE,
                 approval = ToolApprovalPolicy.MUTATION, exposure = ToolExposure.OPTIONAL,
-                family = "文件") { ToolResult("ok") })
+                family = "文件", keywords = setOf("写入")) { ToolResult("ok") })
         }
         val execution = coordinator(registry, networkSearchEnabled = { false })
         val projection = LocalToolSchemaProjection(registry, execution)
