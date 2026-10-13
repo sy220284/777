@@ -161,7 +161,6 @@ fun LocalHarnessScreen(
     val transcriptHistory by viewModel.transcriptHistory.collectAsStateWithLifecycle()
     val pinnedSessionIds by viewModel.pinnedSessionIds.collectAsStateWithLifecycle()
     val sessionTitleOverrides by viewModel.sessionTitleOverrides.collectAsStateWithLifecycle()
-    val projectRecoveryNotice by viewModel.projectRecoveryNotice.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     var openGlobalSearchRequest by rememberSaveable { mutableIntStateOf(0) }
     val syWideViewport = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 1024
@@ -322,7 +321,7 @@ fun LocalHarnessScreen(
     }
 
     // Only a settled session/mode transition commits navigation. This covers every entry point,
-    // including tasks, gallery, notifications, projects and drawer history.
+    // including tasks, gallery, notifications and drawer history.
     LaunchedEffect(shell.sessionId, shell.usageMode, shell.loading) {
         if (!shell.loading && shell.sessionId.isNotBlank()) {
             if (settledSessionId.isNotBlank() &&
@@ -503,17 +502,6 @@ fun LocalHarnessScreen(
         taskUsage = viewModel::taskUsage,
         requestUsage = viewModel::requestUsage,
     )
-    val projectActions = LocalProjectUiActions(
-        catalog = viewModel.projectCatalog,
-        recoveryNotice = viewModel.projectRecoveryNotice,
-        backupAndReset = viewModel::backupAndResetProjectCatalog,
-        createProjectWorkSession = viewModel::createProjectWorkSession,
-        create = viewModel::createProject,
-        select = viewModel::selectProject,
-        rename = viewModel::renameProject,
-        delete = viewModel::deleteProject,
-        updateInstructions = viewModel::updateProjectInstructions,
-    )
     val automationActions = LocalAutomationFeatureUiActions(
         switchSession = { switchToSessionAndShowConversation(it) },
     )
@@ -627,12 +615,6 @@ fun LocalHarnessScreen(
                 memorySourceMessageId = null
                 popFeature()
             },
-            onOpenFromDrawer = ::openFeatureFromDrawer,
-            onCloseDrawer = { scope.launch { drawerState.close() } },
-        ),
-        localProjectFeatureUiContribution(
-            actions = projectActions,
-            onPopFeature = ::popFeature,
             onOpenFromDrawer = ::openFeatureFromDrawer,
             onCloseDrawer = { scope.launch { drawerState.close() } },
         ),
@@ -890,7 +872,6 @@ fun LocalHarnessScreen(
                     filesMode = LocalFilesMode.WORKSPACE
                     requestedFilePath = path
                 },
-                onProjects = { openDrawerEntry(LocalFeatureDrawerEntry.PROJECT) },
                 onOpenRunCenter = { openDrawerEntry(LocalFeatureDrawerEntry.RUN_CENTER) },
                 onOpenGroupChat = { openDrawerEntry(LocalFeatureDrawerEntry.GROUP_CHAT) },
                 onOpenPersonaGallery = {
@@ -1089,7 +1070,6 @@ fun LocalHarnessScreen(
         } else {
             NewSessionModeDialog(
                 usageMode = shell.usageMode,
-                projectAvailable = projectRecoveryNotice == null,
                 onDismiss = ::dismissNewSessionMode,
                 onSelect = { mode ->
                     if (viewModel.createSession(mode)) {
