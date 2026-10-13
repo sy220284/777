@@ -227,6 +227,29 @@ class LocalSubagentContextTest {
     }
 
     @Test
+    fun inheritedContextRetainsRecentCorrectionAndInitialConstraintsWithoutBrokenUtf16() {
+        val context = "最初约束：禁止写入" + "旧历史".repeat(800) +
+            "最新修正：仍然只读，且不得重试已执行的工具"
+        val result = requireNotNull(boundedSubagentContextWithNotice(context, 240))
+        assertEquals(true, result.length <= 240)
+        assertEquals(true, result.startsWith("最初约束"))
+        assertEquals(true, result.contains("最新修正：仍然只读"))
+        assertEquals(true, result.contains("父级资料已截断"))
+
+        val emoji = "A".repeat(150) + "\uD83D\uDE80" + "B".repeat(150)
+        val bounded = requireNotNull(boundedSubagentContextWithNotice(emoji, 90))
+        assertEquals(true, bounded.length <= 90)
+        assertEquals(false, bounded.indices.any { i ->
+            Character.isHighSurrogate(bounded[i]) &&
+                (i + 1 == bounded.length || !Character.isLowSurrogate(bounded[i + 1]))
+        })
+        assertEquals(false, bounded.indices.any { i ->
+            Character.isLowSurrogate(bounded[i]) &&
+                (i == 0 || !Character.isHighSurrogate(bounded[i - 1]))
+        })
+    }
+
+    @Test
     fun truncatedInheritedInstructionsAreLabeledRatherThanSilentlyAppearingComplete() {
         val longContext = "必须保留当前真实约束".repeat(1_500)
         val bounded = requireNotNull(boundedSubagentContextWithNotice(longContext, 1_000))

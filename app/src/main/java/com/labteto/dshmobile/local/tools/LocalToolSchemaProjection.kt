@@ -22,7 +22,14 @@ internal class LocalToolSchemaProjection(
         allowMutation: Boolean,
         allowVirtualScreen: Boolean,
         enabledOptional: Set<String>,
-    ): JsonArray {
+    ): JsonArray = subagentSelection(allowMutation, allowVirtualScreen, enabledOptional).schemas
+
+    /** The same admission decision feeds subagent visibility and diagnostics. */
+    internal fun subagentSelection(
+        allowMutation: Boolean,
+        allowVirtualScreen: Boolean,
+        enabledOptional: Set<String>,
+    ): LocalToolRouter.ToolSchemaSelection {
         val enabled = enabledOptional +
             if (allowVirtualScreen) SUBAGENT_VIRTUAL_SCREEN_TOOLS else emptySet()
         val tools = registry.names()
@@ -36,10 +43,27 @@ internal class LocalToolSchemaProjection(
                     tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) ||
                     (allowVirtualScreen && tool.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS)
             }
-        return LocalToolRouter.visibleSchemas(
+        val selection = LocalToolRouter.selectSchemas(
             if (allowMutation) tools else tools.map(HarnessTool::forReadOnlyModelScope),
             enabled,
         )
+        val unavailable = enabled.mapNotNull { name ->
+            val registered = registry.get(name)
+            val reason = when {
+                registered == null -> "已选工具未注册或已卸载；请重新发现能力"
+                !executionCoordinator.isNetworkSearchPermitted(name) -> "网络搜索设置已关闭"
+                name in SUBAGENT_EXCLUDED_TOOLS -> "此工具仅允许父智能体使用"
+                name in SUBAGENT_VIRTUAL_SCREEN_TOOLS && !allowVirtualScreen ->
+                    "本次子任务未授权虚拟屏幕"
+                !allowMutation && (name == "download_file" ||
+                    registered.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) &&
+                    !(allowVirtualScreen && name in SUBAGENT_VIRTUAL_SCREEN_TOOLS)) ->
+                    "子智能体当前只读，不允许此工具"
+                else -> null
+            }
+            reason?.let { name to it }
+        }.toMap()
+        return selection.copy(omittedReasons = unavailable + selection.omittedReasons)
     }
 
     fun modelSchemas(
@@ -49,8 +73,24 @@ internal class LocalToolSchemaProjection(
         history: List<JsonObject>,
         enabledOptional: Set<String>? = null,
         agentTeamMode: Boolean = false,
-    ): JsonArray {
-        if (!policy.toolsEnabled) return JsonArray(emptyList())
+    ): JsonArray = modelSelection(
+        policy, modelState, planModeEnabled, history, enabledOptional, agentTeamMode,
+    ).schemas
+
+    /** Single source for the model-facing tool surface and omitted capability reasons. */
+    internal fun modelSelection(
+        policy: LocalAgentRunPolicy,
+        modelState: LocalModelState,
+        planModeEnabled: Boolean,
+        history: List<JsonObject>,
+        enabledOptional: Set<String>? = null,
+        agentTeamMode: Boolean = false,
+    ): LocalToolRouter.ToolSchemaSelection {
+        if (!policy.toolsEnabled) return LocalToolRouter.ToolSchemaSelection(
+            schemas = JsonArray(emptyList()),
+            omittedReasons = emptyMap(),
+            compactedNames = emptySet(),
+        )
         val promptBudget = if (agentTeamMode) LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS
             else optionalToolPromptBudgetForRoute(modelState, history)
         val enabled = enabledOptional ?: executionCoordinator.enabledOptionalSnapshot()
@@ -60,11 +100,23 @@ internal class LocalToolSchemaProjection(
             .filter { tool ->
                 !planModeEnabled || LocalToolPolicy.allowedInPlan(tool.name, tool.access)
             }
-        return LocalToolRouter.visibleSchemas(
+        val selection = LocalToolRouter.selectSchemas(
             tools = if (planModeEnabled) tools.map(HarnessTool::forReadOnlyModelScope) else tools,
             enabledOptional = enabled,
             maxOptionalDefinitionTokens = promptBudget,
         )
+        val unavailable = enabled.mapNotNull { name ->
+            val registered = registry.get(name)
+            val reason = when {
+                registered == null -> "已选工具未注册或已卸载；请重新发现能力"
+                !executionCoordinator.isNetworkSearchPermitted(name) -> "网络搜索设置已关闭"
+                planModeEnabled && !LocalToolPolicy.allowedInPlan(name, registered.access) ->
+                    "规划模式不允许此工具；退出规划模式后可重新选择"
+                else -> null
+            }
+            reason?.let { name to it }
+        }.toMap()
+        return selection.copy(omittedReasons = unavailable + selection.omittedReasons)
     }
 
     fun names(schemas: JsonArray): List<String> = schemas.mapNotNull { element ->

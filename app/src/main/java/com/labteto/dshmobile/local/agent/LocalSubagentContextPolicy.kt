@@ -23,10 +23,20 @@ internal fun boundedSubagentContextWithNotice(context: String, maxChars: Int): S
     val trimmed = context.trim().takeIf(String::isNotEmpty) ?: return null
     val limit = maxChars.coerceAtLeast(1)
     if (trimmed.length <= limit) return trimmed
-    val notice = "\n[父级资料已截断；必要时请向父级补充原始约束与证据]"
+    // Keep initial stable constraints AND the newest corrections/revocations. Taking only the
+    // prefix silently loses late user directives during long Work/Agent Team sessions.
+    val notice = "\n[父级资料已截断（省略中段）；必要时请向父级补充原始约束与证据]\n"
     val visible = (limit - notice.length).coerceAtLeast(0)
-    return if (visible == 0) truncateWithoutSplittingSurrogatePair(notice, limit)
-    else truncateWithoutSplittingSurrogatePair(trimmed, visible) + notice
+    if (visible == 0) return truncateWithoutSplittingSurrogatePair(notice, limit)
+    val prefixBudget = visible / 3
+    val suffixBudget = visible - prefixBudget
+    val prefix = truncateWithoutSplittingSurrogatePair(trimmed, prefixBudget)
+    val rawStart = (trimmed.length - suffixBudget).coerceAtLeast(0)
+    val safeStart = if (rawStart in 1 until trimmed.length &&
+        Character.isLowSurrogate(trimmed[rawStart]) &&
+        Character.isHighSurrogate(trimmed[rawStart - 1])
+    ) rawStart + 1 else rawStart
+    return prefix + notice + trimmed.substring(safeStart)
 }
 
 internal fun inheritedHistoryBeforeToolCall(
