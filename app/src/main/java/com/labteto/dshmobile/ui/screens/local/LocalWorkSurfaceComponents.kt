@@ -40,7 +40,6 @@ import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
@@ -58,7 +57,7 @@ internal fun ExecutionStatusCard(
     modifier: Modifier = Modifier,
     showHeader: Boolean = true,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var technicalDetailsExpanded by remember(state.sessionId) { mutableStateOf(false) }
     var showAll by remember(state.sessionId) { mutableStateOf(false) }
     val completed = state.todos.count { it.status == "completed" }
@@ -111,7 +110,7 @@ internal fun ExecutionStatusCard(
                     Text(
                         stringResource(R.string.local_run_center),
                         style = DsType.base16Strong.withReadingWeight(),
-                        color = colors.labelPrimary,
+                        color = colors.text,
                     )
                 }
             }
@@ -135,10 +134,10 @@ internal fun ExecutionStatusCard(
                     Text(
                         stringResource(R.string.local_run_current_goal),
                         style = DsType.caption11Strong.withReadingWeight(),
-                        color = colors.labelTertiary,
+                        color = colors.textTertiary,
                     )
-                    Text(goal.description, style = DsType.std14Strong.withReadingWeight().copy(fontFamily = DsType.contentFont), color = colors.labelPrimary)
-                    Text(localGoalStatusLabel(goal.status), style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                    Text(goal.description, style = DsType.std14Strong.withReadingWeight().copy(fontFamily = DsType.contentFont), color = colors.text)
+                    Text(localGoalStatusLabel(goal.status), style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
                 }
             }
 
@@ -150,7 +149,7 @@ internal fun ExecutionStatusCard(
                 Text(
                     stringResource(R.string.local_workflow_waiting_user),
                     style = DsType.small13Strong.withReadingWeight(),
-                    color = colors.warnLabel,
+                    color = colors.warningInk,
                 )
             }
 
@@ -173,13 +172,13 @@ internal fun ExecutionStatusCard(
                     Text(
                         stringResource(R.string.local_run_plan),
                         style = DsType.caption11Strong.withReadingWeight(),
-                        color = colors.labelTertiary,
+                        color = colors.textTertiary,
                     )
                     (if (showAll) state.plan else state.plan.take(5)).forEachIndexed { index, step ->
                         Text(
                             (index + 1).toString().padStart(2, '0') + "  " + step,
                             style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                            color = colors.labelSecondary,
+                            color = colors.textSecondary,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -192,7 +191,7 @@ internal fun ExecutionStatusCard(
                     Text(
                         stringResource(R.string.local_run_tasks_progress, completed, total),
                         style = DsType.caption11Strong.withReadingWeight(),
-                        color = colors.labelTertiary,
+                        color = colors.textTertiary,
                     )
                     (if (showAll) state.todos else state.todos.sortedBy { it.status == "completed" }.take(5)).forEach { todo ->
                         val marker = when (todo.status) {
@@ -204,9 +203,9 @@ internal fun ExecutionStatusCard(
                             marker + "  " + todo.content,
                             style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
                             color = if (todo.status == "completed") {
-                                colors.labelTertiary
+                                colors.textTertiary
                             } else {
-                                colors.labelSecondary
+                                colors.textSecondary
                             },
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -243,7 +242,7 @@ internal fun ExecutionStatusCard(
                 Text(
                     stringResource(R.string.local_queue_count, state.queuedInputCount),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelSecondary,
+                    color = colors.textSecondary,
                 )
             }
 
@@ -257,10 +256,10 @@ internal fun ExecutionStatusCard(
                 visible = technicalDetailsExpanded,
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             ) {
-                    Text(resourceSummary, style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
-                    Text(pressureSummary, style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
-                    Text(contextSummary, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
-                    Text(contextSourceSummary, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
+                    Text(resourceSummary, style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                    Text(pressureSummary, style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                    Text(contextSummary, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+                    Text(contextSourceSummary, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
                     if (
                         state.conversationMode == LocalConversationMode.CONTINUATION &&
                         !state.handoffSummary.isNullOrBlank()
@@ -268,12 +267,12 @@ internal fun ExecutionStatusCard(
                         Text(
                             stringResource(R.string.local_context_handoff),
                             style = DsType.caption11Strong.withReadingWeight(),
-                            color = colors.labelTertiary,
+                            color = colors.textTertiary,
                         )
                         Text(
                             state.handoffSummary.orEmpty(),
                             style = DsType.caption11.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                            color = colors.labelSecondary,
+                            color = colors.textSecondary,
                             maxLines = 3,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -296,7 +295,7 @@ internal fun RunCenterJobsSection(
     onStopJob: (String) -> String,
     onSendAgentMessage: suspend (String, String) -> LocalWorkUiActionResult,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val scope = rememberCoroutineScope()
     var agentMessageDraft by remember(sessionId) { mutableStateOf("") }
     var agentMessageFeedback by remember(sessionId) { mutableStateOf("") }
@@ -341,7 +340,7 @@ internal fun RunCenterJobsSection(
                 stringResource(R.string.local_run_background)
             },
             style = DsType.caption11Strong.withReadingWeight(),
-            color = if (attention) colors.warnLabel else colors.labelTertiary,
+            color = if (attention) colors.warningInk else colors.textTertiary,
         )
         (if (showAll) orderedJobs else orderedJobs.take(4)).forEach { job ->
             val expanded = expandedJobId == job.id
@@ -352,7 +351,7 @@ internal fun RunCenterJobsSection(
                 border = if (job.isAgent) {
                     BorderStroke(
                         1.dp,
-                        if (active) colors.accent.copy(alpha = 0.26f) else colors.borderL2,
+                        if (active) colors.primary.copy(alpha = 0.26f) else colors.border,
                     )
                 } else {
                     null
@@ -373,7 +372,7 @@ internal fun RunCenterJobsSection(
                             Icon(
                                 painter = painterResource(R.drawable.ic_ui_create_subagent),
                                 contentDescription = null,
-                                tint = if (active) colors.accent else colors.labelSecondary,
+                                tint = if (active) colors.primary else colors.textSecondary,
                                 modifier = Modifier.size(20.dp),
                             )
                         } else {
@@ -394,7 +393,7 @@ internal fun RunCenterJobsSection(
                             } else {
                                 DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont)
                             },
-                            color = if (job.isAgent || attention) colors.labelPrimary else colors.labelSecondary,
+                            color = if (job.isAgent || attention) colors.text else colors.textSecondary,
                             modifier = Modifier.weight(1f),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -403,9 +402,9 @@ internal fun RunCenterJobsSection(
                             localJobStatusLabel(job.status),
                             style = DsType.caption11Strong.withReadingWeight(),
                             color = when {
-                                attention -> colors.warnLabel
-                                active -> colors.accent
-                                else -> colors.labelTertiary
+                                attention -> colors.warningInk
+                                active -> colors.primary
+                                else -> colors.textTertiary
                             },
                         )
                         SyButton(
@@ -438,14 +437,14 @@ internal fun RunCenterJobsSection(
                         Text(
                             stringResource(R.string.local_run_job_output),
                             style = DsType.caption11Strong.withReadingWeight(),
-                            color = colors.labelTertiary,
+                            color = colors.textTertiary,
                         )
                         Text(
                             expandedJobOutput.ifBlank {
                                 stringResource(R.string.local_run_job_output_empty)
                             },
                             style = DsType.caption11.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                            color = colors.labelSecondary,
+                            color = colors.textSecondary,
                             maxLines = 12,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -453,7 +452,7 @@ internal fun RunCenterJobsSection(
                             Text(
                                 outputFailedMessage,
                                 style = DsType.caption11.withReadingWeight(),
-                                color = colors.error,
+                                color = colors.dangerInk,
                             )
                         }
                         if (job.isAgent) {
@@ -461,7 +460,7 @@ internal fun RunCenterJobsSection(
                                 Text(
                                     stringResource(R.string.local_run_agent_dormant_hint),
                                     style = DsType.caption11.withReadingWeight(),
-                                    color = colors.labelSecondary,
+                                    color = colors.textSecondary,
                                 )
                             }
                             if (job.pendingMessageCount > 0) {
@@ -471,7 +470,7 @@ internal fun RunCenterJobsSection(
                                         job.pendingMessageCount,
                                     ),
                                     style = DsType.caption11.withReadingWeight(),
-                                    color = colors.labelTertiary,
+                                    color = colors.textTertiary,
                                 )
                             }
                             if (job.canMessage) {
@@ -520,7 +519,7 @@ internal fun RunCenterJobsSection(
                                     Text(
                                         agentMessageFeedback,
                                         style = DsType.caption11.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                                        color = colors.labelSecondary,
+                                        color = colors.textSecondary,
                                     )
                                 }
                             }
@@ -561,7 +560,7 @@ internal fun RunCenterJobsSection(
                             Text(
                                 jobActionFeedback,
                                 style = DsType.caption11.withReadingWeight(),
-                                color = colors.labelSecondary,
+                                color = colors.textSecondary,
                             )
                         }
                     }

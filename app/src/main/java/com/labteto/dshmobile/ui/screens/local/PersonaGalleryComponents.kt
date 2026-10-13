@@ -75,7 +75,6 @@ import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
@@ -149,12 +148,12 @@ internal fun DeletePresetConfirmDialog(
         Text(
             stringResource(R.string.persona_gallery_preset_delete_confirm, preset.persona.name),
             style = DsType.small13.withReadingWeight(),
-            color = DsTheme.colors.labelPrimary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
         )
         Text(
             stringResource(R.string.persona_gallery_preset_delete_hint),
             style = DsType.caption11.withReadingWeight(),
-            color = DsTheme.colors.labelTertiary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SyButton(
@@ -188,12 +187,12 @@ internal fun DeleteCharacterConfirm(
                 entry.totalDialogueCount(),
             ),
             style = DsType.small13.withReadingWeight(),
-            color = DsTheme.colors.error,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk,
         )
         Text(
             stringResource(R.string.persona_gallery_delete_saved_hint),
             style = DsType.caption11.withReadingWeight(),
-            color = DsTheme.colors.labelTertiary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SyButton(
@@ -234,28 +233,28 @@ internal fun StoryDetailSection(
             Text(
                 stringResource(R.string.persona_gallery_story_relation),
                 style = DsType.std14Strong.withReadingWeight(),
-                color = DsTheme.colors.labelPrimary,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
             )
             Text(
                 stringResource(R.string.persona_gallery_current_relation, story.chatState.relationshipState),
                 style = DsType.small13.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             )
             story.chatState.currentFocus.takeIf(String::isNotBlank)?.let { focus ->
-                Text(focus, style = DsType.small13.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+                Text(focus, style = DsType.small13.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
             story.chatState.dynamics.sharedMoments.takeLast(4).takeIf { it.isNotEmpty() }?.let { moments ->
                 Text(
                     stringResource(R.string.persona_gallery_shared_moments, moments.joinToString("；")),
                     style = DsType.small13.withReadingWeight(),
-                    color = DsTheme.colors.labelSecondary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                 )
             }
             story.chatState.unresolvedThreads.takeLast(3).takeIf { it.isNotEmpty() }?.let { threads ->
                 Text(
                     stringResource(R.string.persona_gallery_unresolved, threads.joinToString("；")),
                     style = DsType.small13.withReadingWeight(),
-                    color = DsTheme.colors.labelSecondary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                 )
             }
         }
@@ -270,7 +269,7 @@ internal fun StoryDetailSection(
             story.title.ifBlank { stringResource(R.string.persona_gallery_untitled_story) },
             modifier = Modifier.weight(1f),
             style = DsType.std14Strong.withReadingWeight(),
-            color = DsTheme.colors.labelPrimary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -292,20 +291,20 @@ internal fun StoryDetailSection(
                 Icon(
                     FeatherIcons.Clock,
                     contentDescription = null,
-                    tint = DsTheme.colors.labelSecondary,
+                    tint = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     stringResource(R.string.persona_gallery_archived_dialogue),
                     style = DsType.std14.withReadingWeight(),
-                    color = DsTheme.colors.labelPrimary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                 )
             }
             Text(
                 stringResource(R.string.persona_gallery_history_long_press_hint),
                 style = DsType.caption11.withReadingWeight(),
-                color = DsTheme.colors.labelTertiary,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
             )
             val history = story.history.filter { it.role == "user" || it.role == "assistant" }
             history.takeLast(visibleHistory).forEach { line ->
@@ -323,19 +322,19 @@ internal fun StoryDetailSection(
                     Text(
                         stringResource(R.string.persona_gallery_delete_dialogue_confirm),
                         style = DsType.small13.withReadingWeight(),
-                        color = DsTheme.colors.error,
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk,
                     )
                     Text(
                         "${if (line.role == "user") stringResource(R.string.persona_gallery_user) else entry.persona.name}：${line.content}",
                         style = DsType.caption11.withReadingWeight(),
-                        color = DsTheme.colors.labelSecondary,
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         stringResource(R.string.persona_gallery_delete_dialogue_hint),
                         style = DsType.caption11.withReadingWeight(),
-                        color = DsTheme.colors.labelTertiary,
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         SyButton(
@@ -376,7 +375,7 @@ internal fun StoryDetailSection(
                 stringResource(R.string.persona_gallery_story_notes),
                 modifier = Modifier.weight(1f),
                 style = DsType.std14Strong.withReadingWeight(),
-                color = DsTheme.colors.labelPrimary,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
             )
             SyButton(
                 text = stringResource(
@@ -404,7 +403,7 @@ internal fun StoryDetailSection(
             Text(
                 notes.ifBlank { stringResource(R.string.persona_gallery_notes_empty) },
                 style = DsType.small13.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             )
         }
     }
@@ -421,7 +420,7 @@ internal fun GalleryStoryCard(
     SyMaterialSurface(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
-        tint = if (selected) DsTheme.colors.accentTertiary else androidx.compose.ui.graphics.Color.Transparent,
+        tint = if (selected) com.shenyan.designsystem.foundation.LocalSyColors.current.selected else androidx.compose.ui.graphics.Color.Transparent,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -432,7 +431,7 @@ internal fun GalleryStoryCard(
                 Text(
                     story.title.ifBlank { stringResource(R.string.persona_gallery_untitled_story) },
                     style = (if (selected) DsType.std14Strong else DsType.std14).withReadingWeight(),
-                    color = DsTheme.colors.labelPrimary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -443,7 +442,7 @@ internal fun GalleryStoryCard(
                         if (selected) listOf(stringResource(R.string.persona_gallery_current_story_badge), summary)
                             .filter(String::isNotBlank).joinToString(" · ") else summary,
                         style = DsType.caption11.withReadingWeight(),
-                        color = DsTheme.colors.labelSecondary,
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -481,7 +480,7 @@ private fun ArchivedDialogueRow(
         Text(
             text,
             style = DsType.small13.withReadingWeight(),
-            color = DsTheme.colors.labelSecondary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             modifier = Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
         )
     }
@@ -497,17 +496,17 @@ internal fun PersonaHero(persona: PersonaProfile, subtitle: String) {
                 Text(
                     persona.name,
                     style = DsType.large20.withReadingWeight(),
-                    color = DsTheme.colors.labelPrimary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                 )
                 Text(
                     persona.coreIdentity.ifBlank { subtitle },
                     style = DsType.small13.withReadingWeight(),
-                    color = DsTheme.colors.labelSecondary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (persona.coreIdentity.isNotBlank()) {
-                    Text(subtitle, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelTertiary)
+                    Text(subtitle, style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary)
                 }
             }
         }
@@ -521,14 +520,14 @@ private fun PersonaAvatar(name: String, large: Boolean = false) {
     val initial = name.trim().firstOrNull()?.toString().orEmpty().ifBlank { fallback }
     Surface(
         shape = CircleShape,
-        color = DsTheme.colors.accent.copy(alpha = 0.13f),
+        color = com.shenyan.designsystem.foundation.LocalSyColors.current.primary.copy(alpha = 0.13f),
         modifier = Modifier.size(size),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
                 initial,
                 style = (if (large) DsType.large20 else DsType.std14Strong).withReadingWeight(),
-                color = DsTheme.colors.accent,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.primary,
             )
         }
     }
@@ -543,7 +542,7 @@ internal fun GalleryPill(text: String) {
         Text(
             text,
             style = DsType.caption11.withReadingWeight(),
-            color = DsTheme.colors.labelSecondary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
         )
     }
@@ -561,7 +560,7 @@ internal fun PersonaDetails(persona: PersonaProfile) {
         Text(
             stringResource(R.string.persona_gallery_fixed_persona),
             style = DsType.std14Strong.withReadingWeight(),
-            color = DsTheme.colors.labelPrimary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
         )
         scalars.forEach { (title, value) -> PersonaDetailRow(title, value) }
         details.forEach { fact ->
@@ -619,8 +618,8 @@ internal fun PersonaDetails(persona: PersonaProfile) {
 @Composable
 private fun PersonaDetailRow(title: String, value: String) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(title, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelTertiary)
-        Text(value, style = DsType.small13.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+        Text(title, style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary)
+        Text(value, style = DsType.small13.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
     }
 }
 
@@ -636,14 +635,14 @@ internal fun PersonaInspectionPanel(
                 Icon(
                     FeatherIcons.User,
                     contentDescription = null,
-                    tint = DsTheme.colors.characterAccent,
+                    tint = com.shenyan.designsystem.foundation.LocalSyColors.current.lilac,
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     stringResource(R.string.persona_gallery_inspection_clean),
                     style = DsType.small13.withReadingWeight(),
-                    color = DsTheme.colors.labelSecondary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                 )
             }
         }
@@ -654,32 +653,32 @@ internal fun PersonaInspectionPanel(
         Text(
             stringResource(R.string.persona_gallery_conflict_count, result.conflicts.size),
             style = DsType.std14Strong.withReadingWeight(),
-            color = DsTheme.colors.labelPrimary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
         )
         result.conflicts.forEach { conflict ->
             SyGlassCard {
                 Text(
                     personaFieldLabel(conflict.field),
                     style = DsType.caption11.withReadingWeight(),
-                    color = DsTheme.colors.error,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk,
                 )
                 if (conflict.fixedValue.isNotBlank()) {
                     Text(
                         stringResource(R.string.persona_gallery_fixed_value, conflict.fixedValue),
                         style = DsType.small13.withReadingWeight(),
-                        color = DsTheme.colors.labelSecondary,
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                     )
                 }
                 Text(
                     stringResource(R.string.persona_gallery_observed_value, conflict.observedValue),
                     style = DsType.small13.withReadingWeight(),
-                    color = DsTheme.colors.labelPrimary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                 )
                 if (conflict.reason.isNotBlank()) {
                     Text(
                         conflict.reason,
                         style = DsType.caption11.withReadingWeight(),
-                        color = DsTheme.colors.labelTertiary,
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                     )
                 }
             }
@@ -690,7 +689,7 @@ internal fun PersonaInspectionPanel(
         Text(
             stringResource(R.string.persona_gallery_suggestions_title),
             style = DsType.std14Strong.withReadingWeight(),
-            color = DsTheme.colors.labelPrimary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
         )
         result.suggestions.forEach { suggestion ->
             val key = suggestionKey(suggestion)
@@ -707,18 +706,18 @@ internal fun PersonaInspectionPanel(
                         Text(
                             personaFieldLabel(suggestion.field),
                             style = DsType.caption11.withReadingWeight(),
-                            color = DsTheme.colors.accent,
+                            color = com.shenyan.designsystem.foundation.LocalSyColors.current.primary,
                         )
                         Text(
                             suggestion.value,
                             style = DsType.small13.withReadingWeight(),
-                            color = DsTheme.colors.labelPrimary,
+                            color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                         )
                         if (suggestion.evidence.isNotBlank()) {
                             Text(
                                 stringResource(R.string.persona_gallery_evidence, suggestion.evidence),
                                 style = DsType.caption11.withReadingWeight(),
-                                color = DsTheme.colors.labelTertiary,
+                                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                             )
                         }
                     }

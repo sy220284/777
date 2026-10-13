@@ -61,7 +61,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.io.ByteArrayOutputStream
@@ -103,28 +102,28 @@ internal fun LocalCreationJobMessageRow(
     ) {
         job.prompt?.let { prompt ->
             Text(prompt, style = DsType.small13.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary, maxLines = 2,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, maxLines = 2,
                 overflow = TextOverflow.Ellipsis)
         }
         when (job.phase) {
             LocalMediaCreationPhase.PREPARING, LocalMediaCreationPhase.SAVING, LocalMediaCreationPhase.SUBMITTING -> {
                 androidx.compose.material3.LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth(),
-                    color = DsTheme.colors.labelSecondary,
-                    trackColor = DsTheme.colors.bgLayer1,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
+                    trackColor = com.shenyan.designsystem.foundation.LocalSyColors.current.materialL3,
                 )
                 Text(resources.getString(R.string.media_chat_creating_hint),
-                    style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+                    style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
             LocalMediaCreationPhase.OUTCOME_UNKNOWN, LocalMediaCreationPhase.FAILED, LocalMediaCreationPhase.SAVE_FAILED -> {
                 Text(job.error ?: resources.getString(R.string.media_chat_creation_uncertain_hint),
-                    style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+                    style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
                 Text(resources.getString(R.string.media_chat_creation_safe_retry),
-                    style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+                    style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
             LocalMediaCreationPhase.SUCCEEDED -> {
                 Text(resources.getString(R.string.media_chat_creation_saved),
-                    style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+                    style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
         }
     }
@@ -149,7 +148,7 @@ internal fun LocalGeneratedMediaResultRow(
     MediaMessageCard(title = label, subtitle = "${result.provider} · ${result.model}") {
         result.description?.takeIf(String::isNotBlank)?.let {
             Text(it, style = DsType.small13.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary, maxLines = 3,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, maxLines = 3,
                 overflow = TextOverflow.Ellipsis)
         }
         when (result.kind) {
@@ -183,13 +182,13 @@ internal fun LocalGeneratedMediaResultRow(
                     SyButton(text = resources.getString(R.string.media_chat_share_audio), size = SyButtonSize.Small,
                         variant = SyButtonVariant.Ghost,
                         onClick = { shareMediaFile(context, file, "audio/mpeg") { error = it } })
-                } else Text(resources.getString(R.string.media_chat_audio_missing), color = DsTheme.colors.labelSecondary)
+                } else Text(resources.getString(R.string.media_chat_audio_missing), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
             LocalMediaKind.TRANSCRIBE.name -> {
                 result.textOutput?.let { text ->
                     androidx.compose.foundation.text.selection.SelectionContainer {
                         Text(text, style = DsType.std14.withReadingWeight(),
-                            color = DsTheme.colors.labelPrimary)
+                            color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                         SyButton(text = resources.getString(R.string.media_chat_insert_text), size = SyButtonSize.Small,
@@ -204,7 +203,7 @@ internal fun LocalGeneratedMediaResultRow(
                 }
             }
         }
-        error?.let { Text(it, style = DsType.caption11, color = DsTheme.colors.labelSecondary) }
+        error?.let { Text(it, style = DsType.caption11, color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary) }
     }
 }
 
@@ -256,7 +255,7 @@ internal fun LocalGeneratedVideoTaskRow(
     MediaMessageCard(title = phase, subtitle = "${task.provider} · ${task.model}") {
         task.description?.let {
             Text(it, style = DsType.small13.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary, maxLines = 3,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, maxLines = 3,
                 overflow = TextOverflow.Ellipsis)
         }
         if (task.phase == LocalMediaVideoPhase.SUCCEEDED && task.downloadUrl != null) {
@@ -290,7 +289,7 @@ internal fun LocalGeneratedVideoTaskRow(
         } else {
             task.lastError?.let {
                 Text(it, style = DsType.caption11.withReadingWeight(),
-                    color = DsTheme.colors.labelSecondary)
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
             if (task.phase in setOf(LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING)) {
                 SyButton(text = if (refreshing) resources.getString(R.string.media_chat_polling) else resources.getString(R.string.media_chat_refresh_progress),
@@ -308,11 +307,11 @@ internal fun LocalGeneratedVideoTaskRow(
                     })
             } else if (task.phase == LocalMediaVideoPhase.OUTCOME_UNKNOWN) {
                 Text(resources.getString(R.string.media_chat_check_remote_task),
-                    color = DsTheme.colors.labelSecondary, style = DsType.caption11.withReadingWeight())
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, style = DsType.caption11.withReadingWeight())
             }
             if (offer == null && task.phase in setOf(LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING)) {
                 Text(resources.getString(R.string.media_chat_account_missing),
-                    color = DsTheme.colors.labelSecondary, style = DsType.caption11.withReadingWeight())
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, style = DsType.caption11.withReadingWeight())
             }
         }
         if (task.phase == LocalMediaVideoPhase.SUCCEEDED && savedVideo == null) {
@@ -331,9 +330,9 @@ internal fun LocalGeneratedVideoTaskRow(
         }
         task.lastError?.takeIf { task.phase == LocalMediaVideoPhase.SUCCEEDED }?.let {
             Text(it, style = DsType.caption11.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary)
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
         }
-        error?.let { Text(it, color = DsTheme.colors.labelSecondary,
+        error?.let { Text(it, color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             style = DsType.caption11.withReadingWeight()) }
     }
 }
@@ -343,18 +342,18 @@ private fun MediaMessageCard(
     title: String, subtitle: String, modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SyMaterialSurface(
         modifier = modifier.fillMaxWidth(0.90f).widthIn(max = 470.dp),
         shape = DsShapes.block,
         tier = SyMaterialTier.L3_CARD,
-        border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderL3),
+        border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
     ) {
         Column(Modifier.padding(DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            Text(title, style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
+            Text(title, style = DsType.small13Strong.withReadingWeight(), color = colors.text)
             Text(subtitle, style = DsType.caption11.withReadingWeight(),
-                color = colors.labelTertiary)
+                color = colors.textTertiary)
             content()
         }
     }
@@ -377,8 +376,8 @@ private fun MediaInlinePicture(
         ?.coerceIn(0.62f, 1.9f) ?: 1.2f
     val surface = Modifier.fillMaxWidth().aspectRatio(ratio)
         .clip(DsShapes.block)
-        .background(DsTheme.colors.bgLayer1)
-        .border(1.dp, DsTheme.colors.borderL3, DsShapes.block)
+        .background(com.shenyan.designsystem.foundation.LocalSyColors.current.materialL3)
+        .border(1.dp, com.shenyan.designsystem.foundation.LocalSyColors.current.border, DsShapes.block)
     val modifier = if (onOpen != null) surface.clickable(onClick = onOpen) else surface
     if (image != null) {
         Image(bitmap = image, contentDescription = resources.getString(R.string.media_chat_generated_image),
@@ -390,7 +389,7 @@ private fun MediaInlinePicture(
                 resources.getString(if (loading) R.string.media_chat_preview_pending
                     else R.string.media_chat_preview_unavailable),
                 style = DsType.caption11.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             )
         }
     }
@@ -496,7 +495,7 @@ private fun InlineSpeechPlayer(file: File) {
         Text(
             "${formatMediaDuration(positionMs)} / ${formatMediaDuration(durationMs)}",
             style = DsType.caption11.withReadingWeight(),
-            color = DsTheme.colors.labelSecondary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         )
     }
     androidx.compose.material3.Slider(
@@ -509,7 +508,7 @@ private fun InlineSpeechPlayer(file: File) {
         modifier = Modifier.fillMaxWidth(),
     )
     error?.let { Text(it, style = DsType.caption11.withReadingWeight(),
-        color = DsTheme.colors.labelSecondary) }
+        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary) }
 }
 
 private fun formatMediaDuration(ms: Int): String {
@@ -606,7 +605,7 @@ internal fun LocalWorkArtifactMessageRow(
             androidx.compose.foundation.text.selection.SelectionContainer {
                 Text(if (expanded) text.take(16_000) else text.take(2500),
                     style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                    color = DsTheme.colors.labelPrimary)
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
             }
             if (text.length > 2500) {
                 SyButton(
@@ -619,16 +618,16 @@ internal fun LocalWorkArtifactMessageRow(
         } else if (artifact.category == "file") {
             Text(if (file != null) resources.getString(R.string.media_chat_work_file_ready)
                 else resources.getString(R.string.media_chat_work_no_preview),
-                style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+                style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
         } else {
             Text(artifact.reference.take(160),
                 style = DsType.small13.withReadingWeight(),
-                color = DsTheme.colors.labelPrimary)
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
         }
         if (artifact.versionAtCreation != null && artifact.versionNow != null &&
             artifact.versionAtCreation != artifact.versionNow) {
             Text(resources.getString(R.string.media_chat_work_file_changed), style = DsType.caption11.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary)
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             if (artifact.category == "file") {
@@ -646,7 +645,7 @@ internal fun LocalWorkArtifactMessageRow(
             }
         }
         error?.let { Text(it, style = DsType.caption11.withReadingWeight(),
-            color = DsTheme.colors.labelSecondary) }
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary) }
     }
 }
 

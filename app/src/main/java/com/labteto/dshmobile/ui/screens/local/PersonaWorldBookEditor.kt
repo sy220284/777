@@ -30,7 +30,6 @@ import com.shenyan.designsystem.components.SySwitchControl
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.util.UUID
@@ -42,18 +41,18 @@ internal fun PersonaWorldBookEditor(
     entries: List<PersonaLoreEntry>,
     onChange: (List<PersonaLoreEntry>) -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     // A different character's world-book must not inherit the previous editor selection.
     var expandedIndex by rememberSaveable(entries.firstOrNull()?.id) { mutableIntStateOf(0) }
     Text(
         stringResource(R.string.local_persona_lore_title),
         style = DsType.base16Strong.withReadingWeight(),
-        color = colors.labelPrimary,
+        color = colors.text,
     )
     Text(
         stringResource(R.string.local_persona_lore_hint),
         style = DsType.small13.withReadingWeight(),
-        color = colors.labelSecondary,
+        color = colors.textSecondary,
     )
     // The reference layout has a stable entry list and a separate editing panel.
     // Keep the original PersonaProfile draft callback as the single owner of data.
@@ -73,7 +72,7 @@ internal fun PersonaWorldBookEditor(
                     Text(
                         stringResource(R.string.local_persona_lore_empty),
                         style = DsType.small13.withReadingWeight(),
-                        color = colors.labelSecondary,
+                        color = colors.textSecondary,
                     )
                 }
                 entries.forEachIndexed { index, entry ->
@@ -89,14 +88,14 @@ internal fun PersonaWorldBookEditor(
                             Text(
                                 entry.title.ifBlank { stringResource(R.string.local_persona_lore_entry_number, index + 1) },
                                 style = DsType.small13Strong.withReadingWeight(),
-                                color = colors.labelPrimary,
+                                color = colors.text,
                             )
                             if (entry.keywords.isNotEmpty()) {
                                 Text(
                                     stringResource(R.string.local_persona_lore_entry_keywords) + " · " +
                                         entry.keywords.take(3).joinToString(" · "),
                                     style = DsType.caption11.withReadingWeight(),
-                                    color = colors.labelTertiary,
+                                    color = colors.textTertiary,
                                 )
                             }
                         }
@@ -139,7 +138,7 @@ internal fun PersonaWorldBookEditor(
                     Text(
                         stringResource(R.string.local_persona_lore_entry_number, index + 1),
                         style = DsType.base16Strong.withReadingWeight(),
-                        color = colors.labelPrimary,
+                        color = colors.text,
                     )
                     SyTextField(
                         value = entry.title,
@@ -188,7 +187,7 @@ internal fun PersonaWorldBookEditor(
                             stringResource(R.string.local_persona_lore_always_on),
                             modifier = Modifier.weight(1f),
                             style = DsType.small13.withReadingWeight(),
-                            color = colors.labelPrimary,
+                            color = colors.text,
                         )
                         SySwitchControl(
                             checked = entry.alwaysOn,
@@ -198,7 +197,7 @@ internal fun PersonaWorldBookEditor(
                     Text(
                         stringResource(R.string.local_persona_lore_priority, entry.priority),
                         style = DsType.small13.withReadingWeight(),
-                        color = colors.labelSecondary,
+                        color = colors.textSecondary,
                     )
                     SySlider(
                         value = entry.priority.toFloat().coerceIn(0f, 100f),

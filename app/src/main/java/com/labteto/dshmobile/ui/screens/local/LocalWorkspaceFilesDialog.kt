@@ -59,7 +59,6 @@ import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -247,7 +246,7 @@ internal fun LocalWorkspaceFilesDialog(
             selecting || query.isNotBlank()
     BackHandler(enabled = hasInternalBackLayer, onBack = ::navigateBack)
 
-    Surface(Modifier.fillMaxSize(), color = DsTheme.colors.rootSurface()) {
+    Surface(Modifier.fillMaxSize(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 val headerTitle = when {
                     preview != null -> preview?.file?.path?.substringAfterLast('/').orEmpty()
@@ -318,7 +317,7 @@ internal fun LocalWorkspaceFilesDialog(
                                 stringResource(R.string.local_files_selected_count, selected.size),
                                 modifier = Modifier.weight(1f),
                                 style = DsType.small13Strong.withReadingWeight(),
-                                color = DsTheme.colors.labelPrimary,
+                                color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                             )
                             SyButton(
                                 text = stringResource(R.string.common_cancel),
@@ -384,7 +383,7 @@ internal fun LocalWorkspaceFilesDialog(
                         it,
                         modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.xsmall),
                         style = DsType.small13.withReadingWeight(),
-                        color = DsTheme.colors.error,
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk,
                     )
                 }
 
@@ -462,7 +461,7 @@ internal fun LocalWorkspaceFilesDialog(
                     Text(
                         stringResource(R.string.local_files_loading),
                         modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                        color = DsTheme.colors.labelTertiary,
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                     )
                 }
             }
@@ -479,20 +478,20 @@ private fun LocalFilesEmpty(title: String, body: String) {
         Image(
             painter = painterResource(R.drawable.ic_ui_project_empty),
             contentDescription = null,
-            colorFilter = ColorFilter.tint(DsTheme.colors.labelTertiary.copy(alpha = 0.72f)),
+            colorFilter = ColorFilter.tint(com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary.copy(alpha = 0.72f)),
             modifier = Modifier.size(100.dp),
         )
         Text(
             title,
             style = DsType.base16Strong.withReadingWeight(),
-            color = DsTheme.colors.labelPrimary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = DsSpacing.small),
         )
         Text(
             body,
             style = DsType.small13.withReadingWeight(),
-            color = DsTheme.colors.labelTertiary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = DsSpacing.xsmall),
         )
@@ -511,7 +510,7 @@ private fun ConversationLocalFileList(
                 Text(
                     stringResource(R.string.panel_artifacts),
                     style = DsType.small13Strong.withReadingWeight(),
-                    color = DsTheme.colors.labelSecondary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                     modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                 )
             }
@@ -524,7 +523,7 @@ private fun ConversationLocalFileList(
                 Text(
                     stringResource(R.string.app_project_context),
                     style = DsType.small13Strong.withReadingWeight(),
-                    color = DsTheme.colors.labelSecondary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                     modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                 )
             }
@@ -602,15 +601,15 @@ private fun LocalDirectoryRow(
     name: String,
     onClick: () -> Unit,
 ) {
-    val colors = DsTheme.colors
-    val dark = colors.bgBase.luminance() < 0.5f
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    val dark = colors.canvas.luminance() < 0.5f
     Surface(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = DsSpacing.medium),
         shape = DsShapes.row,
-        color = colors.bgBase,
+        color = colors.canvas,
     ) {
         Row(
             modifier = Modifier
@@ -635,21 +634,21 @@ private fun LocalDirectoryRow(
                 Text(
                     name,
                     style = DsType.std14Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
+                    color = colors.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     stringResource(R.string.panel_folder),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
+                    color = colors.textTertiary,
                     maxLines = 1,
                 )
             }
             Icon(
                 FeatherIcons.ChevronRight,
                 contentDescription = null,
-                tint = colors.labelCaption,
+                tint = colors.textTertiary,
                 modifier = Modifier.size(16.dp),
             )
         }
@@ -659,13 +658,13 @@ private fun LocalDirectoryRow(
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val controls = LocalFileSelectionUi.current
     val canShare = isShareableWorkspacePath(file.path)
     val selecting = canShare && controls?.active == true
     val selected = controls?.selected?.contains(file.path) == true
     val fileName = file.path.substringAfterLast('/')
-    val dark = colors.bgBase.luminance() < 0.5f
+    val dark = colors.canvas.luminance() < 0.5f
     val fileIconRes = workspaceFileIcon(fileName, dark)
     Surface(
         modifier = Modifier
@@ -676,7 +675,7 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
                 onLongClick = if (canShare) ({ controls?.begin?.invoke(file.path) }) else null,
             ),
         shape = DsShapes.row,
-        color = colors.bgBase,
+        color = colors.canvas,
     ) {
         Row(
             modifier = Modifier
@@ -698,14 +697,14 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
                 Text(
                     fileName,
                     style = DsType.std14Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
+                    color = colors.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     "${file.path} · ${formatBytes(file.bytes)}",
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
+                    color = colors.textTertiary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -719,7 +718,7 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
                 Icon(
                     FeatherIcons.ChevronRight,
                     contentDescription = null,
-                    tint = colors.labelCaption,
+                    tint = colors.textTertiary,
                     modifier = Modifier.size(16.dp),
                 )
             }
@@ -736,20 +735,20 @@ private fun LocalFilePreviewBody(preview: LocalWorkspaceFilePreview) {
         Text(
             "${preview.file.path} · ${formatBytes(preview.file.bytes)}",
             style = DsType.caption11.withReadingWeight(),
-            color = DsTheme.colors.labelSecondary,
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         )
         if (preview.text == null) {
             Text(
                 stringResource(R.string.local_files_binary_hint),
                 modifier = Modifier.padding(vertical = DsSpacing.medium),
-                color = DsTheme.colors.labelTertiary,
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
             )
         } else {
             if (preview.truncated) {
                 Text(
                     stringResource(R.string.local_files_truncated_hint),
                     style = DsType.caption11.withReadingWeight(),
-                    color = DsTheme.colors.labelTertiary,
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                 )
             }
             SelectionContainer {

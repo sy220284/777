@@ -38,7 +38,6 @@ import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.shenyan.designsystem.components.SyGroupCard
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -51,7 +50,7 @@ internal fun LocalConfiguration(
     onSave: (String, String, String) -> Unit,
     onClearCredential: () -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var apiKey by remember { mutableStateOf("") }
     var model by rememberSaveable(state.model) { mutableStateOf(state.model) }
     var baseUrl by rememberSaveable(state.baseUrl) { mutableStateOf(state.baseUrl) }
@@ -66,7 +65,7 @@ internal fun LocalConfiguration(
             Text(
                 stringResource(R.string.local_harness_title),
                 style = DsType.large20.withReadingWeight(),
-                color = colors.labelPrimary,
+                color = colors.text,
                 modifier = Modifier.weight(1f),
             )
             if (canCancel) {
@@ -75,15 +74,15 @@ internal fun LocalConfiguration(
         }
 
         SyGlassCard(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            Text(stringResource(R.string.local_on_device_execution_title), style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary)
+            Text(stringResource(R.string.local_on_device_execution_title), style = DsType.base16Strong.withReadingWeight(), color = colors.text)
             Text(
                 stringResource(R.string.local_on_device_execution_hint),
                 style = DsType.std14.withReadingWeight(),
-                color = colors.labelSecondary,
+                color = colors.textSecondary,
             )
         }
 
-        Text(stringResource(R.string.local_model_section_title), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
+        Text(stringResource(R.string.local_model_section_title), style = DsType.std14.withReadingWeight(), color = colors.textTertiary)
         SyGroupCard {
             SyTextField(
                 value = apiKey,
@@ -103,7 +102,7 @@ internal fun LocalConfiguration(
             )
             Spacer(Modifier.height(DsSpacing.medium))
             Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                Text(stringResource(R.string.models_title), style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
+                Text(stringResource(R.string.models_title), style = DsType.std14Strong.withReadingWeight(), color = colors.text)
                 ModelChoice("deepseek-flash", stringResource(R.string.local_model_flash_label), model) { model = it }
                 ModelChoice("deepseek-v4-pro", stringResource(R.string.local_model_pro_label), model) { model = it }
             }
@@ -118,7 +117,7 @@ internal fun LocalConfiguration(
             )
         }
 
-        state.error?.let { Text(it, style = DsType.small13.withReadingWeight(), color = colors.error) }
+        state.error?.let { Text(it, style = DsType.small13.withReadingWeight(), color = colors.dangerInk) }
 
         SyButton(
             text = stringResource(R.string.local_model_save_enter),
@@ -147,6 +146,6 @@ internal fun ModelChoice(id: String, label: String, selected: String, onSelect: 
         verticalAlignment = Alignment.CenterVertically,
     ) {
         SyRadioControl(selected = selected == id, onClick = { onSelect(id) })
-        Text(label, style = DsType.std14.withReadingWeight(), color = DsTheme.colors.labelPrimary)
+        Text(label, style = DsType.std14.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
     }
 }

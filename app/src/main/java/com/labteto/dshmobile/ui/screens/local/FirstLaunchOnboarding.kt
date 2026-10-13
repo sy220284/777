@@ -47,7 +47,6 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -66,7 +65,7 @@ internal fun FirstLaunchOnboarding(
     onStart: (LocalUsageMode) -> Unit,
     onConfigureModel: (LocalUsageMode) -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var step by rememberSaveable { mutableIntStateOf(0) }
     var mode by rememberSaveable { mutableStateOf(LocalUsageMode.CHAT) }
     BackHandler {
@@ -89,7 +88,7 @@ internal fun FirstLaunchOnboarding(
                 Box(contentAlignment = Alignment.Center) {
                     Icon(if (step == 2) FeatherIcons.Shield else if (mode == LocalUsageMode.CHAT)
                         FeatherIcons.MessageCircle else FeatherIcons.Zap,
-                        contentDescription = null, tint = colors.labelPrimary, modifier = Modifier.size(28.dp))
+                        contentDescription = null, tint = colors.text, modifier = Modifier.size(28.dp))
                 }
             }
             Spacer(Modifier.height(DsSpacing.xlarge))
@@ -119,13 +118,13 @@ internal fun FirstLaunchOnboarding(
                     Text(
                         stringResource(title),
                         style = DsType.large20.withReadingWeight(),
-                        color = colors.labelPrimary,
+                        color = colors.text,
                         textAlign = TextAlign.Center,
                     )
                     Text(
                         stringResource(subtitle),
                         style = DsType.std14.withReadingWeight(),
-                        color = colors.labelSecondary,
+                        color = colors.textSecondary,
                         textAlign = TextAlign.Center,
                     )
                     if (current == 1) {
@@ -162,7 +161,7 @@ internal fun FirstLaunchOnboarding(
                             .width(if (index == step) 24.dp else 8.dp)
                             .height(3.dp)
                             .background(
-                                if (index == step) colors.accent else colors.borderL2,
+                                if (index == step) colors.primary else colors.border,
                                 RoundedCornerShape(2.dp),
                             ),
                     )

@@ -20,7 +20,6 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.work.LocalWorkflowProgress
 import com.labteto.dshmobile.local.presentation.WorkflowStage
 import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -54,7 +53,7 @@ internal fun workCompletionCardKey(sessionId: String, progress: LocalWorkflowPro
 
 @Composable
 internal fun WorkflowProgressSection(progress: LocalWorkflowProgress) {
-    val colors = DsTheme.colors
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val reduced = com.labteto.dshmobile.ui.shenyan.LocalSyReducedMotion.current
     val isBlocked = progress.blockedReason != null || progress.stage == WorkflowStage.STALLED
     val progressStatus = workflowProgressVisualStatus(progress)
@@ -71,11 +70,11 @@ internal fun WorkflowProgressSection(progress: LocalWorkflowProgress) {
             Text(
                 stringResource(R.string.local_workflow_stage, workflowStageLabel(stage)),
                 style = DsType.caption11Strong.withReadingWeight(),
-                color = if (isBlocked) colors.warnLabel else colors.labelTertiary,
+                color = if (isBlocked) colors.warningInk else colors.textTertiary,
             )
         }
-        Text(progress.task, style = DsType.small13.withReadingWeight(), color = colors.labelPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(stringResource(R.string.local_workflow_processed, progress.completed, progress.total), style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+        Text(progress.task, style = DsType.small13.withReadingWeight(), color = colors.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(stringResource(R.string.local_workflow_processed, progress.completed, progress.total), style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
         if (progress.total > 0) {
             SyProgressBar(
                 value = progress.completed.coerceAtLeast(0).toFloat() /
@@ -85,8 +84,8 @@ internal fun WorkflowProgressSection(progress: LocalWorkflowProgress) {
             )
         }
         progress.blockedReason?.let { reason ->
-            Text(stringResource(R.string.local_workflow_blocked, reason), style = DsType.small13.withReadingWeight(), color = colors.error)
-            if (progress.needsUserAction) Text(stringResource(R.string.local_workflow_user_action), style = DsType.caption11.withReadingWeight(), color = colors.error)
+            Text(stringResource(R.string.local_workflow_blocked, reason), style = DsType.small13.withReadingWeight(), color = colors.dangerInk)
+            if (progress.needsUserAction) Text(stringResource(R.string.local_workflow_user_action), style = DsType.caption11.withReadingWeight(), color = colors.dangerInk)
         }
     }
 }
