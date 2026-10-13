@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot": "4f291e7b8d51",
+  "snapshot": "d83459ad8b53",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
   "code_files_scanned": 1519,
   "production_sources_scanned": 853,
@@ -9193,34 +9193,10 @@
   "followup_production_or_compatibility": 9,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "93a6c0d6dd29",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRequestConfiguration.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/ModelStreamLineReader.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkSteeringChoice.kt"
-    ],
-    "removed_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/V6MobileHomeNavigation.kt"
-    ],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/AnthropicMessagesClient.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/OpenAiResponsesClient.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalog.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/ChatGptPlanUsageUi.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureNavigation.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawerComponents.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AppSettingsComponents.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/ChatGptAccountPanel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-      "app/src/main/java/com/shenyan/designsystem/components/ShenyanChrome.kt"
-    ],
+    "baseline": "4f291e7b8d51",
+    "added_production_files": [],
+    "removed_production_files": [],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],

@@ -3484,36 +3484,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "4f291e7b8d51",
+  "source_snapshot": "d83459ad8b53",
   "observed_delta": {
-    "baseline": "93a6c0d6dd29",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRequestConfiguration.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/ModelStreamLineReader.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkSteeringChoice.kt"
-    ],
-    "removed_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/V6MobileHomeNavigation.kt"
-    ],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/AnthropicMessagesClient.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/OpenAiResponsesClient.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalog.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/ChatGptPlanUsageUi.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureNavigation.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawerComponents.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AppSettingsComponents.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/ChatGptAccountPanel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-      "app/src/main/java/com/shenyan/designsystem/components/ShenyanChrome.kt"
-    ],
+    "baseline": "4f291e7b8d51",
+    "added_production_files": [],
+    "removed_production_files": [],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
