@@ -2035,6 +2035,8 @@
     <string name="minimax_quota_weekly_label">本周</string>
     <string name="minimax_quota_reset_after">%1$s后重置</string>
     <string name="minimax_quota_title">MiniMax 套餐额度</string>
+    <string name="minimax_quota_loading_profile">正在加载当前模型配置…</string>
+    <string name="minimax_quota_no_profile">当前模型不支持 MiniMax 官方套餐查询。请在模型设置中选择 MiniMax 官方接口配置。</string>
     <string name="minimax_quota_entry_hint">查询当前账户的官方剩余额度或余额</string>
     <string name="minimax_quota_model">当前模型：%1$s</string>
     <string name="minimax_quota_disclaimer">数据来自 MiniMax 官方账户接口，与本机模型 Token 消耗分别统计。</string>

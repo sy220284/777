@@ -9,21 +9,52 @@ class SettingsNavigationTest {
         listOf(SettingsDestination.MODELS, SettingsDestination.PERMISSIONS,
             SettingsDestination.MEMORY_MANAGEMENT, SettingsDestination.USAGE,
             SettingsDestination.MINIMAX_QUOTA, SettingsDestination.ACCOUNT).forEach { entry ->
-            assertNull("Direct entry $entry must close the feature", settingsBackDestination(entry, entry))
+            assertNull("Direct entry $entry must close the feature", settingsNavigationPop(listOf(entry)))
         }
     }
 
-    @Test fun ordinarySettingsBrowseReturnsThroughItsParent() {
-        assertEquals(SettingsDestination.ROOT,
-            settingsBackDestination(SettingsDestination.MODELS, SettingsDestination.ROOT))
-        assertEquals(SettingsDestination.MEMORY,
-            settingsBackDestination(SettingsDestination.MEMORY_MANAGEMENT, SettingsDestination.ROOT))
-        assertNull(settingsBackDestination(SettingsDestination.ROOT, SettingsDestination.ROOT))
+    @Test fun ordinarySettingsBrowseReturnsThroughItsVisitedParents() {
+        val root = listOf(SettingsDestination.ROOT)
+        val memory = settingsNavigationPush(root, SettingsDestination.MEMORY)
+        val management = settingsNavigationPush(memory, SettingsDestination.MEMORY_MANAGEMENT)
+        assertEquals(memory, settingsNavigationPop(management))
+        assertEquals(root, settingsNavigationPop(memory))
+        assertNull(settingsNavigationPop(root))
     }
 
     @Test fun nestedDirectEntryUnwindsBeforeClosingItsCaller() {
-        assertEquals(SettingsDestination.MEMORY,
-            settingsBackDestination(SettingsDestination.MEMORY_MANAGEMENT, SettingsDestination.MEMORY))
-        assertNull(settingsBackDestination(SettingsDestination.MEMORY, SettingsDestination.MEMORY))
+        val entry = listOf(SettingsDestination.MEMORY)
+        val nested = settingsNavigationPush(entry, SettingsDestination.MEMORY_MANAGEMENT)
+        assertEquals(entry, settingsNavigationPop(nested))
+        assertNull(settingsNavigationPop(entry))
+    }
+
+    @Test fun quotaConfigurationAndCrossLinksKeepTheirActualSource() {
+        listOf(
+            SettingsDestination.MINIMAX_QUOTA to SettingsDestination.MODELS,
+            SettingsDestination.USAGE to SettingsDestination.PRICING,
+            SettingsDestination.MODELS to SettingsDestination.MODEL_USAGE,
+            SettingsDestination.ADVANCED to SettingsDestination.SESSION_STORAGE,
+            SettingsDestination.ADVANCED to SettingsDestination.SESSION,
+        ).forEach { (source, target) ->
+            val entry = listOf(source)
+            val nested = settingsNavigationPush(entry, target)
+            assertEquals(listOf(source, target), nested)
+            assertEquals(entry, settingsNavigationPop(nested))
+            assertNull(settingsNavigationPop(entry))
+        }
+    }
+
+    @Test fun usageDetailsReturnToTheLogOrSummaryThatOpenedThem() {
+        listOf(SettingsDestination.USAGE, SettingsDestination.USAGE_LOG).forEach { source ->
+            val entry = listOf(source)
+            assertEquals(entry, settingsNavigationPop(settingsNavigationPush(entry, SettingsDestination.USAGE_DETAIL)))
+        }
+    }
+
+    @Test fun repeatedCurrentPageDoesNotCreateAnExtraBackStep() {
+        val entry = listOf(SettingsDestination.MINIMAX_QUOTA)
+        assertEquals(entry, settingsNavigationPush(entry, SettingsDestination.MINIMAX_QUOTA))
+        assertNull(settingsNavigationPop(entry))
     }
 }

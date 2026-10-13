@@ -1004,14 +1004,12 @@ fun LocalHarnessScreen(
             onRefreshCapabilities = { workCapabilityOpenVersion += 1 },
             onConfigureModel = {
                 workCapabilityConfiguring = true
-                settingsDestination = SettingsDestination.MODELS
-                settingsEntryRequest++
+                prepareSettingsEntry(SettingsDestination.MODELS)
                 pushFeature(LocalFeaturePage.SETTINGS)
             },
             onConfigureDevice = {
                 workCapabilityConfiguring = true
-                settingsDestination = SettingsDestination.PERMISSIONS
-                settingsEntryRequest++
+                prepareSettingsEntry(SettingsDestination.PERMISSIONS)
                 pushFeature(LocalFeaturePage.SETTINGS)
             },
             onContinue = {
@@ -1039,11 +1037,11 @@ fun LocalHarnessScreen(
                 finishFirstLaunch()
                 if (selectedMode != shell.usageMode) viewModel.switchUsageMode(selectedMode)
             },
-            onConfigureModel = { selectedMode ->
+            onConfigureModel = { _ ->
                 finishFirstLaunch()
-                if (selectedMode != shell.usageMode) viewModel.switchUsageMode(selectedMode)
-                settingsDestination = SettingsDestination.MODELS
-                settingsEntryRequest++
+                // Model settings are global. Switching sessions here would complete later
+                // and reset navigation after the user has already entered configuration.
+                prepareSettingsEntry(SettingsDestination.MODELS)
                 pushFeature(LocalFeaturePage.SETTINGS)
             },
         )

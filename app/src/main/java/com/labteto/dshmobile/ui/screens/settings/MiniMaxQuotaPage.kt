@@ -27,19 +27,25 @@ import kotlinx.coroutines.CancellationException
 
 /** Provider quota and local token consumption have separate authoritative sources. */
 @Composable
-internal fun MiniMaxQuotaPage(profile: LocalModelProfile, viewModel: SettingsViewModel) {
+internal fun MiniMaxQuotaPage(
+    profile: LocalModelProfile?,
+    loadingProfile: Boolean,
+    onConfigureModel: () -> Unit,
+    queryQuota: suspend (LocalModelProfile) -> MiniMaxProviderUsage,
+) {
     val colors = DsTheme.colors
     var refresh by remember(profile) { mutableIntStateOf(0) }
     var loading by remember(profile) { mutableStateOf(true) }
     var usage by remember(profile) { mutableStateOf<MiniMaxProviderUsage?>(null) }
     var error by remember(profile) { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(profile, refresh) {
+    LaunchedEffect(profile, refresh, loadingProfile) {
+        if (loadingProfile || profile == null) return@LaunchedEffect
         loading = true
         usage = null
         error = null
         try {
-            usage = viewModel.queryMiniMaxQuota(profile)
+            usage = queryQuota(profile)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
@@ -47,6 +53,29 @@ internal fun MiniMaxQuotaPage(profile: LocalModelProfile, viewModel: SettingsVie
         } finally {
             loading = false
         }
+    }
+
+    // Missing or temporarily stale configuration changes content, never navigation.
+    if (loadingProfile || profile == null) {
+        AppSettingsSection {
+            Column(
+                modifier = Modifier.padding(DsSpacing.comfortable),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            ) {
+                Text(
+                    stringResource(if (loadingProfile) R.string.minimax_quota_loading_profile else R.string.minimax_quota_no_profile),
+                    style = DsType.std14Strong.withReadingWeight(), color = colors.labelSecondary,
+                )
+                if (!loadingProfile) {
+                    SyButton(
+                        text = stringResource(R.string.work_capability_configure_model),
+                        onClick = onConfigureModel,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+        return
     }
 
     AppSettingsSection {

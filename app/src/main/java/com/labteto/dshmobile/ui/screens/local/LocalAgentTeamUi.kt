@@ -269,8 +269,8 @@ internal fun LocalAgentTeamSheet(
     var selectedMemberId by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmStopAll by remember { mutableStateOf(false) }
     var stopAllBusy by remember { mutableStateOf(false) }
-    LaunchedEffect(team.members.map { it.id }, selectedMemberId) {
-        if (selectedMemberId != null && team.members.none { it.id == selectedMemberId }) {
+    LaunchedEffect(team.rebuilding, team.members.map { it.id }, selectedMemberId) {
+        if (!team.rebuilding && selectedMemberId != null && team.members.none { it.id == selectedMemberId }) {
             selectedMemberId = null
         }
     }

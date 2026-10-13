@@ -40,10 +40,9 @@ internal fun localSettingsFeatureUiContribution(
 ) { page ->
     check(page == LocalFeaturePage.SETTINGS) { "Settings received non-SETTINGS route: $page" }
     SettingsScreen(
-        onClose = {
-            onSettingsDestinationChange(SettingsDestination.ROOT)
-            onPopFeature()
-        },
+        // Keep the outgoing subpage intact during the exit animation. Every new entry
+        // already supplies its destination and version; resetting here flashes ROOT.
+        onClose = onPopFeature,
         initialDestination = settingsDestination,
         entryRequest = settingsEntryRequest,
         memorySourceSessionId = memorySourceSessionId,

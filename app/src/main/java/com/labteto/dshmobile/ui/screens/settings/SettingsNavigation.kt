@@ -1,7 +1,9 @@
 package com.labteto.dshmobile.ui.screens.settings
 
-/** A direct subpage entry returns to its caller; deeper settings still unwind locally. */
-internal fun settingsBackDestination(
-    current: SettingsDestination,
-    entry: SettingsDestination,
-): SettingsDestination? = if (current == entry) null else current.parentDestination()
+/** Cross-links return through their actual source, including direct feature entries. */
+internal fun settingsNavigationPush(
+    stack: List<SettingsDestination>, destination: SettingsDestination,
+): List<SettingsDestination> = if (stack.lastOrNull() == destination) stack else stack + destination
+
+internal fun settingsNavigationPop(stack: List<SettingsDestination>): List<SettingsDestination>? =
+    stack.dropLast(1).takeIf { it.isNotEmpty() }

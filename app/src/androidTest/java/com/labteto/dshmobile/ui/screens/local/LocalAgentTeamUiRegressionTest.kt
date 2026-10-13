@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -17,6 +18,33 @@ import org.junit.Test
 
 class LocalAgentTeamUiRegressionTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test
+    fun rebuildingPreservesExpandedMemberUntilASettledRemoval() {
+        val initial = LocalAgentTeamUiState(members = listOf(member()))
+        val team = mutableStateOf(initial)
+        compose.setContent {
+            DshTheme {
+                LocalAgentTeamSheet(
+                    team = team.value, onMemberOutput = { "" },
+                    onSendMemberMessage = { _, _ -> LocalWorkUiActionResult(true, "已投递") },
+                    onStopMember = { LocalWorkUiActionResult(true, "已停止") },
+                    onStopAll = { LocalWorkUiActionResult(true, "已停止") },
+                    onLeadFollowup = {}, onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithText("核验助手").performScrollTo().performClick()
+        compose.onNodeWithText("给助手发消息…").assertExists()
+        compose.runOnIdle { team.value = LocalAgentTeamUiState(rebuilding = true) }
+        compose.waitForIdle()
+        compose.runOnIdle { team.value = initial }
+        compose.onNodeWithText("给助手发消息…").assertExists()
+        compose.runOnIdle { team.value = LocalAgentTeamUiState() }
+        compose.waitForIdle()
+        compose.runOnIdle { team.value = initial }
+        compose.onNodeWithText("给助手发消息…").assertDoesNotExist()
+    }
 
     @Test
     fun rebuildingStatusDoesNotPretendToRecruitMembers() {
