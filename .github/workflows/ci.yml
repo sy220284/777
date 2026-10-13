@@ -11,8 +11,9 @@ permissions:
   actions: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  # Preserve completed full-validation evidence when a docs-only main push follows.
+  # Validate each main commit independently; later merges cannot queue-block its full matrix.
+  # Keep PR runs replaceable, and separate manual CI from the publish-authorizing main push.
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

@@ -101,6 +101,18 @@ for paths in (
 # CI and release must observe old as well as new paths on file moves. GitHub
 # Compare uses previous_filename; local git diff disables rename coalescing.
 CI = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+# Main pushes are isolated by commit: a newer merge must neither cancel nor
+# replace an older full-validation run. PR refreshes may retire obsolete checks.
+ci_concurrency = CI.split("\nconcurrency:\n", 1)[1].split("\n\njobs:", 1)[0]
+ci_group = re.search(r"(?m)^  group: (.+)$", ci_concurrency)
+if (ci_group is None or
+        "github.event_name" not in ci_group.group(1) or
+        "github.sha" not in ci_group.group(1) or
+        "github.event.pull_request.number" not in ci_group.group(1)):
+    fail("CI must use distinct concurrency groups per event and main commit / PR")
+if "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" not in ci_concurrency:
+    fail("CI must not cancel main push validation or preserve obsolete PR checks")
+
 if CI.count("git diff --no-renames --name-only --diff-filter=ACMRD") < 2:
     fail("CI rename detection can conceal a removed product source")
 if "git diff --no-renames --name-only --diff-filter=ACMRD" not in RELEASE:
