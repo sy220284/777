@@ -310,6 +310,7 @@ fun DshTheme(
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
+    val reducedMotion = rememberSyReducedMotion()
     val projected = resolveV6ThemePalette(preference, accentKey, systemDark)
     val dark = projected.dark
     val themed = projected.page
