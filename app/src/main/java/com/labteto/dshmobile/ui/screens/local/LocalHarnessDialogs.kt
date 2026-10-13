@@ -89,7 +89,6 @@ internal fun NewSessionModeDialog(
     usageMode: LocalUsageMode,
     onDismiss: () -> Unit,
     onSelect: (LocalConversationMode) -> Unit,
-    projectAvailable: Boolean = true,
 ) {
     val chatMode = usageMode == LocalUsageMode.CHAT
     SyResponsiveSheet(
@@ -104,13 +103,6 @@ internal fun NewSessionModeDialog(
             ),
             onClick = { onSelect(LocalConversationMode.CONTINUATION) },
         )
-        if (!chatMode && projectAvailable) {
-            SySheetChoiceRow(
-                modifier = Modifier.heightIn(min = 72.dp),
-                title = stringResource(R.string.local_project_start_work_session),
-                onClick = { onSelect(LocalConversationMode.PROJECT) },
-            )
-        }
         SySheetChoiceRow(
             modifier = Modifier.heightIn(min = 72.dp),
             title = stringResource(
