@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,7 +39,6 @@ import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberHapticTickFeedback
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlin.math.roundToInt
@@ -161,8 +162,8 @@ internal fun LocalComposerCapabilityPanel(
     val basicReasoning = LocalReasoningControls.requiresBasicReasoning(profile, usageMode)
     val effectiveMode = LocalReasoningControls.effectiveMode(reasoningMode, modes, basicReasoning)
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+        Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
     ) {
         if (panel == "reasoning") {
             Text(

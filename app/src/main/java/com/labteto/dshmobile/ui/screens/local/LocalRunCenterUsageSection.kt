@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -23,7 +25,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.screens.settings.UsageGroupDetailPage
 import com.labteto.dshmobile.ui.screens.settings.UsageRequestDetailPage
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -78,7 +79,7 @@ internal fun LocalRunCenterUsageSection(
             loading = false
         }
     }
-    Column(Modifier.padding(horizontal = DsSpacing.medium)) {
+    Column(Modifier.padding(horizontal = SyMetric.gapLg)) {
         SyButton(
             text = if (failed) stringResource(R.string.local_run_usage_unavailable)
                 else snapshot?.let {
