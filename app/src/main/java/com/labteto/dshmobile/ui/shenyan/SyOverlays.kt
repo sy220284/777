@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
@@ -54,6 +56,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -249,6 +252,7 @@ fun SyContextActionMenu(
 ) {
     if (!expanded || items.isEmpty()) return
     val p = LocalSyColors.current
+    val maxMenuWidth = (LocalConfiguration.current.screenWidthDp.dp - 24.dp).coerceAtLeast(220.dp)
     val provider = remember {
         object : PopupPositionProvider {
             override fun calculatePosition(
@@ -276,26 +280,34 @@ fun SyContextActionMenu(
             focusable = true, dismissOnBackPress = true,
             dismissOnClickOutside = true, clippingEnabled = true)) {
         SyMaterialSurface(
+            modifier = Modifier.widthIn(max = maxMenuWidth),
             tier = SyMaterialTier.L4_OVERLAY,
             shape = RoundedCornerShape(SyMetric.radiusControl),
             border = BorderStroke(1.dp, p.border),
             shadowElevation = 12.dp,
         ) {
-            Row(Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            // Wrap actions rather than allowing the popup to run off the display.
+            FlowRow(
+                modifier = Modifier.widthIn(max = maxMenuWidth).padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 items.forEach { item ->
                     Column(
-                        Modifier.widthIn(min = 64.dp).heightIn(min = 64.dp)
+                        Modifier.width(96.dp).heightIn(min = 72.dp)
                             .clickable { onDismiss(); item.onClick() }
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                            .padding(horizontal = 6.dp, vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
                     ) {
                         item.icon?.let {
-                            Icon(it, contentDescription = null, modifier = Modifier.size(18.dp),
+                            Icon(it, contentDescription = null, modifier = Modifier.size(22.dp),
                                 tint = if (item.danger) p.dangerInk else p.textSecondary)
                         }
                         Text(item.text, color = if (item.danger) p.dangerInk else p.text,
-                            style = MaterialTheme.typography.labelSmall)
+                            style = MaterialTheme.typography.labelSmall,
+                            textAlign = TextAlign.Center, maxLines = 2,
+                            overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
