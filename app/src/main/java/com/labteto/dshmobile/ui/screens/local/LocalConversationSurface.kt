@@ -132,6 +132,11 @@ internal data class LocalModeIntro(val usageMode: LocalUsageMode)
  */
 internal class LocalConversationSurfaceArgs(
     val state: LocalConversationSurfaceState,
+    val documents: com.labteto.dshmobile.uicontract.UiDocumentUiPort,
+    val documentForms: com.labteto.dshmobile.uicontract.UiDocumentFormUiPort,
+    val documentIdentity: com.labteto.dshmobile.uicontract.UiSessionIdentity?,
+    val reading: com.labteto.dshmobile.uicontract.ConversationReadingUiPort,
+    val drafts: com.labteto.dshmobile.uicontract.ConversationDraftUiPort,
     val workActions: LocalWorkFeatureUiActions?,
     val onOpenWorkArtifact: (String) -> Unit,
     val readRequest: Long,
@@ -263,6 +268,11 @@ internal fun LocalConversationSurface(
 ) {
     val args = LocalConversationSurfaceArgs(
         state = state,
+        documents = documents,
+        documentForms = documentForms,
+        documentIdentity = documentIdentity,
+        reading = reading,
+        drafts = drafts,
         workActions = workActions,
         onOpenWorkArtifact = onOpenWorkArtifact,
         readRequest = readRequest,
@@ -329,6 +339,11 @@ internal fun LocalConversationSurface(
 @Composable
 private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val state = args.state
+    val documents = args.documents
+    val documentForms = args.documentForms
+    val documentIdentity = args.documentIdentity
+    val reading = args.reading
+    val drafts = args.drafts
     val workActions = args.workActions
     val onOpenWorkArtifact = args.onOpenWorkArtifact
     val readRequest = args.readRequest

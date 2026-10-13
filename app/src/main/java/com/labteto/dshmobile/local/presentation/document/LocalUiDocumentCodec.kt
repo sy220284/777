@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.presentation.document
 
 import com.labteto.dshmobile.harness.tools.JsonSchemaValidator
 import com.labteto.dshmobile.uicontract.UiDocument
+import com.labteto.dshmobile.uicontract.validate
 import com.labteto.dshmobile.uicontract.UiDocumentSource
 import com.labteto.dshmobile.uicontract.UiDocumentBudget
 import com.labteto.dshmobile.uicontract.UiSceneId

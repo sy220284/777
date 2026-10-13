@@ -1591,7 +1591,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/document/LocalUiDocumentCodec.kt",
-      "sha256": "9647699665317af6"
+      "sha256": "a8f4e31b184a94c8"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/profile/UserProfileStore.kt",
@@ -1803,7 +1803,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt",
-      "sha256": "85f4271e9b4071cb"
+      "sha256": "c2a04e6595314589"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLogRegistry.kt",
@@ -2647,7 +2647,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "sha256": "ddfcbe91afe90621"
+      "sha256": "a280967f4074a85e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationTemperatureUi.kt",
@@ -2739,7 +2739,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalModelPickerSheet.kt",
-      "sha256": "5760d142dda5329f"
+      "sha256": "090eb26fb8207e1f"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaGalleryUiController.kt",
@@ -3535,15 +3535,16 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "ad13c692ecc3",
+  "source_snapshot": "8a83e5eaf8ee",
   "observed_delta": {
-    "baseline": "2258af242e74",
+    "baseline": "ad13c692ecc3",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalUiDocumentGeneration.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/document/LocalUiDocumentCodec.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalModelPickerSheet.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

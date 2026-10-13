@@ -74,10 +74,11 @@ internal fun LocalModelPickerSheet(
             }
             profiles.forEach { profile ->
                 val selected = profile.id == activeProfileId
+                val contextOverride = profile.contextWindowTokensOverride
                 val detail = when {
                     selected -> stringResource(R.string.app_model_current)
-                    profile.contextWindowTokensOverride != null -> stringResource(
-                        R.string.app_model_context, profile.contextWindowTokensOverride,
+                    contextOverride != null -> stringResource(
+                        R.string.app_model_context, contextOverride,
                     )
                     else -> stringResource(R.string.app_model_available)
                 }

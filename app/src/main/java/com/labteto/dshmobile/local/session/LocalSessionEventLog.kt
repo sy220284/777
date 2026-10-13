@@ -203,10 +203,6 @@ class LocalSessionEventLog(
         beforeSequenceExclusive: Long = Long.MAX_VALUE,
     ): Event? = delegate.latest(type, beforeSequenceExclusive)?.toLocalEvent()
 
-    fun <K> latestMatchingByKey(types: Set<String>, requiredKeys: Set<K>, keyOf: (Event) -> K?): Map<K, Event> =
-        delegate.latestMatchingByKey(types, requiredKeys) { keyOf(it.toLocalEvent()) }
-            .mapValues { it.value.toLocalEvent() }
-
     fun latestOf(types: Set<String>): Event? =
         delegate.latestOf(types)?.toLocalEvent()
 
