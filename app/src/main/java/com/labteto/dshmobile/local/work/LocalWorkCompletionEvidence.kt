@@ -104,7 +104,7 @@ internal fun LocalWorkCompletionEvidence.toDiagnosticJson(): JsonObject = buildJ
     put("pending_team_messages", pendingTeamMessages)
     put("failed_team_members", failedTeamMembers)
     put("awaiting_review_members", awaitingReviewMembers)
-    put("team_failure", teamFailure)
+    put("team_has_failure", teamFailure)
     put("team_rebuilding", teamRebuilding)
     put("blocked_goal", blockedGoal)
     put("pending_approval", pendingApproval)
