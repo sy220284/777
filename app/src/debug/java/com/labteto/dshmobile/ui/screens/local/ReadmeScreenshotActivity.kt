@@ -35,6 +35,9 @@ import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalSessionSummary
+import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
+import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.work.LocalGoal
 import com.labteto.dshmobile.local.work.LocalTodoItem
 import com.labteto.dshmobile.ui.shenyan.SyComposerAction
@@ -203,6 +206,14 @@ private fun ChatScreenshot() {
             onRenameSession = {},
             onDeleteSession = {},
         )
+        // Production mobile navigation, not the previous standalone chat-header mock.
+        V6MobileHomeNavigation(
+            mode = LocalUsageMode.CHAT,
+            onSessions = {},
+            onPersona = {},
+            onWorkspace = {},
+            onSearch = {},
+        )
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -245,30 +256,29 @@ private fun ChatScreenshot() {
                 onRegenerate = { true },
             )
         }
-        SyConversationComposer {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SyComposerAction(
-                    icon = Icons.Outlined.AttachFile,
-                    contentDescription = "添加附件",
-                    onClick = {},
-                )
-                SyComposerField(
-                    value = "",
-                    onValueChange = {},
-                    placeholder = "和神里绫华说点什么…",
-                    modifier = Modifier.weight(1f),
-                )
-                SyComposerAction(
-                    icon = Icons.Filled.ArrowUpward,
-                    contentDescription = "发送",
-                    onClick = {},
-                    tint = DsTheme.colors.accent,
-                )
-            }
-        }
+        // Render the exact shipping conversation composer with deterministic read-only
+        // sample state; do not compare the deprecated generic SyConversationComposer.
+        LocalConversationComposer(
+            state = LocalConversationSurfaceState(
+                loading = false,
+                configured = true,
+                sessionId = "design-chat",
+                usageMode = LocalUsageMode.CHAT,
+                chatPersona = PersonaProfile(id = "design-persona", name = "神里绫华"),
+            ),
+            activeModelProfile = null,
+            input = "",
+            attachments = emptyList(),
+            onInputChange = {},
+            onRemoveAttachment = {},
+            onClearAttachments = {},
+            onOpenAttachmentPicker = {},
+            onShowReplySuggestions = {},
+            onGenerateReplySuggestions = { false },
+            onSend = { _, _ -> LocalSendResult.Empty },
+            onStop = {},
+            onPlanModeChange = {},
+        )
     }
 }
 
