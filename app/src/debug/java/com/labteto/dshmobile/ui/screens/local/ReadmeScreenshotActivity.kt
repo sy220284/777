@@ -195,7 +195,6 @@ private fun NavigationScreenshot() {
             onSearchFile = {},
             onOpenRunCenter = {},
             onProjects = {},
-            groupMemberCount = 3,
             onOpenGroupChat = {},
             onOpenPersonaGallery = {},
             onOpenPersonaSearchResult = {},
@@ -233,14 +232,6 @@ private fun ChatScreenshot() {
             onTogglePin = {},
             onRenameSession = {},
             onDeleteSession = {},
-        )
-        // Production mobile navigation, not the previous standalone chat-header mock.
-        V6MobileHomeNavigation(
-            mode = LocalUsageMode.CHAT,
-            onSessions = {},
-            onPersona = {},
-            onWorkspace = {},
-            onSearch = {},
         )
         Column(
             modifier = Modifier

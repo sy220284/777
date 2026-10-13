@@ -3,7 +3,6 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
@@ -16,63 +15,65 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/** Test real Compose V6 destinations and the selected message-to-Work handoff. */
-class V6MobileHomeInteractionTest {
+/** Regression: compact drawer entries, shared top bar and message-to-Work handoff. */
+class V6SeamlessNavigationInteractionTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun mobileSearchUsesTheExistingSearchAction() {
+    @Test fun drawerShowsOnlyFeatureEntriesWithoutInventoryBadges() {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        var opened = ""
+        compose.setContent {
+            DshTheme {
+                DrawerQuickActions(
+                    usageMode = LocalUsageMode.CHAT,
+                    onOpenGroupChat = { opened = "group" },
+                    onOpenPersonaGallery = { opened = "gallery" },
+                    onOpenDiary = {},
+                    onTasks = {},
+                    onWorkspaceFiles = {},
+                    onProjects = {},
+                    onOpenRunCenter = {},
+                    onTools = {},
+                )
+            }
+        }
+        compose.onNodeWithText(ctx.getString(R.string.persona_gallery_title)).performClick()
+        compose.runOnIdle { assertEquals("gallery", opened) }
+        compose.onNodeWithText(ctx.getString(R.string.local_group_chat_title)).performClick()
+        compose.runOnIdle { assertEquals("group", opened) }
+        compose.onNodeWithText("2").assertDoesNotExist()
+    }
+
+    @Test fun flatSettingsEntryRemainsClickable() {
         var opens = 0
         compose.setContent {
             DshTheme {
-                V6MobileHomeNavigation(
-                    mode = LocalUsageMode.CHAT,
-                    onSessions = {},
-                    onPersona = {},
-                    onWorkspace = {},
-                    onSearch = { opens++ },
+                DrawerQuickAction(
+                    icon = com.labteto.dshmobile.ui.components.SyEntryIcons.Settings,
+                    title = "设置",
+                    onClick = { opens++ },
                 )
             }
         }
-        val searchDescription = InstrumentationRegistry.getInstrumentation().targetContext
-            .getString(R.string.common_search)
-        compose.onNodeWithContentDescription(searchDescription).performClick()
+        compose.onNodeWithText("设置").performClick()
         compose.runOnIdle { assertEquals(1, opens) }
     }
 
-    @Test fun chatTabDestinationsUseTheExistingSessionAndPersonaActions() {
-        var destination = ""
+    @Test fun sharedTopBarBackActionRemainsAvailableWithoutABackgroundPanel() {
+        var backs = 0
         compose.setContent {
             DshTheme {
-                V6MobileHomeNavigation(
-                    mode = LocalUsageMode.CHAT,
-                    onSessions = { destination = "sessions" },
-                    onPersona = { destination = "persona" },
-                    onWorkspace = { destination = "files" },
+                com.shenyan.designsystem.components.SyTopBar(
+                    title = "消耗计算",
+                    onBack = { backs++ },
+                    backContentDescription = "返回",
+                    backIcon = com.labteto.dshmobile.ui.components.FeatherIcons.ChevronLeft,
                 )
             }
         }
-        compose.onNodeWithTag("v6MobileHomeNavigation:0").performClick()
-        compose.runOnIdle { assertEquals("sessions", destination) }
-        compose.onNodeWithTag("v6MobileHomeNavigation:2").performClick()
-        compose.runOnIdle { assertEquals("persona", destination) }
-        compose.onNodeWithTag("v6MobileHomeNavigation:1").performClick()
-        compose.runOnIdle { assertEquals("persona", destination) } // active page is a no-op
-    }
-
-    @Test fun workTabOpensRealWorkspaceActionInsteadOfPersona() {
-        var route = ""
-        compose.setContent {
-            DshTheme {
-                V6MobileHomeNavigation(
-                    mode = LocalUsageMode.WORK,
-                    onSessions = { route = "sessions" },
-                    onPersona = { route = "persona" },
-                    onWorkspace = { route = "files" },
-                )
-            }
-        }
-        compose.onNodeWithTag("v6MobileHomeNavigation:2").performClick()
-        compose.runOnIdle { assertEquals("files", route) }
+        compose.onNodeWithText("消耗计算").assertExists()
+        compose.onNodeWithContentDescription("返回").performClick()
+        compose.runOnIdle { assertEquals(1, backs) }
     }
 
     @Test fun selectedUserMessageOpensTheRealWorkHandoffWithExactText() {

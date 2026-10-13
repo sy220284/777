@@ -411,11 +411,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val rootSurfaceColor = colors.rootSurface()
     // Custom wallpapers remain visible behind the chat toolbar; work mode still gets its
     // stable root work surface from rootSurfaceColor above.
-    // V5: chat and work headers use solid top chrome, not a nested glass layer.
-    val topSurfaceColor = LocalSyPalette.current.topBar
-    val showV6MobileNavigation = v6MobileHomeNavigationVisible(
-        LocalConfiguration.current.screenWidthDp, onOpenDrawer != null,
-    )
+    // Background is painted once by the app scene, not in a separate header slab.
     val scope = rememberCoroutineScope()
     val appContext = LocalContext.current
     // Global ceiling changes must also refresh the exact per-model persona/Work projection.
@@ -743,13 +739,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         }
     }
 
-    Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().background(rootSurfaceColor)) {
+    Column(Modifier.fillMaxSize().background(rootSurfaceColor).safeDrawingPadding().imePadding()) {
         Column(
-            Modifier.fillMaxWidth().background(topSurfaceColor)
+            Modifier.fillMaxWidth()
                 .padding(horizontal = DsMetrics.screenHorizontal, vertical = SyMetric.gapMd),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (onOpenDrawer != null && !showV6MobileNavigation) SyIconButton(
+                if (onOpenDrawer != null) SyIconButton(
                     icon = FeatherIcons.Menu,
                     contentDescription = stringResource(R.string.app_open_navigation),
                     onClick = onOpenDrawer,
@@ -819,16 +815,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         tint = colors.textSecondary,
                     )
                 }
-            }
-            if (showV6MobileNavigation) {
-                V6MobileHomeNavigation(
-                    mode = state.usageMode,
-                    onSessions = { onOpenDrawer?.invoke() },
-                    onPersona = onOpenPersonaGallery,
-                    onWorkspace = onOpenWorkspaceFiles,
-                    onSearch = if (state.usageMode == LocalUsageMode.CHAT)
-                        ({ loadedSearchState.open = true }) else onOpenGlobalSearch,
-                )
             }
         }
 

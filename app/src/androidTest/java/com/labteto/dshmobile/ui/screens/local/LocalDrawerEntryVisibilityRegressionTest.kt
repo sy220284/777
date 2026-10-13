@@ -22,8 +22,6 @@ class LocalDrawerEntryVisibilityRegressionTest {
             DshTheme {
                 DrawerQuickActions(
                     usageMode = LocalUsageMode.WORK,
-                    groupMemberCount = 0,
-                    galleryCount = 0,
                     onOpenGroupChat = {},
                     onOpenPersonaGallery = {},
                     onOpenDiary = {},
@@ -52,8 +50,6 @@ class LocalDrawerEntryVisibilityRegressionTest {
             DshTheme {
                 DrawerQuickActions(
                     usageMode = LocalUsageMode.CHAT,
-                    groupMemberCount = 0,
-                    galleryCount = 0,
                     onOpenGroupChat = {},
                     onOpenPersonaGallery = {},
                     onOpenDiary = {},
@@ -79,7 +75,7 @@ class LocalDrawerEntryVisibilityRegressionTest {
         compose.setContent {
             DshTheme {
                 DrawerQuickActions(
-                    usageMode = LocalUsageMode.WORK, groupMemberCount = 0, galleryCount = 0,
+                    usageMode = LocalUsageMode.WORK,
                     onOpenGroupChat = {}, onOpenPersonaGallery = {}, onOpenDiary = {},
                     onTasks = { opened += "tasks" },
                     onWorkspaceFiles = { opened += "workspace" },
@@ -112,7 +108,7 @@ class LocalDrawerEntryVisibilityRegressionTest {
         compose.setContent {
             DshTheme {
                 DrawerQuickActions(
-                    usageMode = LocalUsageMode.CHAT, groupMemberCount = 0, galleryCount = 0,
+                    usageMode = LocalUsageMode.CHAT,
                     onOpenGroupChat = { opened += "group" },
                     onOpenPersonaGallery = { opened += "gallery" },
                     onOpenDiary = { opened += "diary" },
@@ -142,7 +138,7 @@ class LocalDrawerEntryVisibilityRegressionTest {
         compose.setContent {
             DshTheme {
                 DrawerQuickActions(
-                    usageMode = mode.value, groupMemberCount = 0, galleryCount = 0,
+                    usageMode = mode.value,
                     onOpenGroupChat = {}, onOpenPersonaGallery = {}, onOpenDiary = {},
                     onTasks = {}, onWorkspaceFiles = {}, onProjects = {}, onOpenRunCenter = {},
                     onTools = {}, onMiniMaxQuota = if (available.value) { { opens++ } } else null,

@@ -8,6 +8,7 @@ import com.shenyan.designsystem.components.SyMaterialSurface
 
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -43,6 +45,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
+import com.labteto.dshmobile.ui.theme.rootSurface
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import com.labteto.dshmobile.ui.shenyan.SyDimensions
 import androidx.compose.ui.focus.FocusRequester
@@ -69,7 +73,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyIconButton
 import com.shenyan.designsystem.components.SyCategoryRow
-import com.shenyan.designsystem.components.SyGroupCard
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.sidebar.SidebarAvatarPicker
@@ -116,7 +119,6 @@ internal fun LocalModeDrawer(
     onSearchFile: (String) -> Unit,
     onProjects: () -> Unit,
     onOpenRunCenter: () -> Unit,
-    groupMemberCount: Int,
     onOpenGroupChat: () -> Unit,
     onOpenPersonaGallery: () -> Unit,
     onOpenPersonaSearchResult: (String) -> Unit,
@@ -141,7 +143,7 @@ internal fun LocalModeDrawer(
         // A functional 64dp rail: never leave a collapsed sidebar full of clipped labels.
         Column(
             Modifier.width(SyDimensions.navigationCollapsed).fillMaxHeight()
-                .background(com.shenyan.designsystem.components.syMaterialColor(SyMaterialTier.L4_OVERLAY)).safeDrawingPadding(),
+                .background(colors.rootSurface()).safeDrawingPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -301,13 +303,16 @@ internal fun LocalModeDrawer(
     ModalDrawerSheet(
         drawerShape = androidx.compose.ui.graphics.RectangleShape,
         drawerContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+        windowInsets = WindowInsets(0, 0, 0, 0), // Edge-to-edge backdrop, inset content only.
         modifier = Modifier.fillMaxHeight().width(
             if (docked) SyDimensions.navigationExpanded
             else LocalConfiguration.current.screenWidthDp.dp * DsMetrics.drawerWidthFraction
         ),
     ) {
-        SyMaterialSurface(modifier = Modifier.fillMaxHeight(), tier = SyMaterialTier.L4_OVERLAY,
-            shape = androidx.compose.ui.graphics.RectangleShape) {
+        // Sample the same app scene under a light overlay, rather than a solid drawer slab.
+        SyMaterialSurface(modifier = Modifier.fillMaxHeight(), tier = SyMaterialTier.L1_SECTION,
+            shape = androidx.compose.ui.graphics.RectangleShape,
+            shadowElevation = 0.dp, border = BorderStroke(0.dp, Color.Transparent)) {
         Column(Modifier.fillMaxHeight().safeDrawingPadding()) {
             Column(
                 modifier = Modifier
@@ -400,8 +405,6 @@ internal fun LocalModeDrawer(
                     ) {
                         DrawerQuickActions(
                             usageMode = usageMode,
-                            groupMemberCount = groupMemberCount,
-                            galleryCount = gallery.size,
                             onOpenGroupChat = onOpenGroupChat,
                             onOpenPersonaGallery = onOpenPersonaGallery,
                             onOpenDiary = onOpenDiary,
@@ -617,14 +620,11 @@ internal fun LocalModeDrawer(
                         }
                     }
                 } else {
-                    SyGroupCard {
-                        SyCategoryRow(
-                            icon = SyEntryIcons.Settings,
-                            title = stringResource(R.string.settings_title),
-                            titleTextStyle = DsType.navigationItem,
-                            onClick = onSettings,
-                        )
-                    }
+                    DrawerQuickAction(
+                        icon = SyEntryIcons.Settings,
+                        title = stringResource(R.string.settings_title),
+                        onClick = onSettings,
+                    )
                 }
             }
         }

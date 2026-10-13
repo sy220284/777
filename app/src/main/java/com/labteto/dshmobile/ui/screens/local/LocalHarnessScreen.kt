@@ -877,7 +877,6 @@ fun LocalHarnessScreen(
                 },
                 onProjects = { openDrawerEntry(LocalFeatureDrawerEntry.PROJECT) },
                 onOpenRunCenter = { openDrawerEntry(LocalFeatureDrawerEntry.RUN_CENTER) },
-                groupMemberCount = shell.groupChat.members.size,
                 onOpenGroupChat = { openDrawerEntry(LocalFeatureDrawerEntry.GROUP_CHAT) },
                 onOpenPersonaGallery = {
                     openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY)
