@@ -16,7 +16,7 @@ html = (source / "app.html").read_text(encoding="utf-8")
 tokens = json.loads((source / "semantic-design-tokens.json").read_text(encoding="utf-8"))
 if "shenyan.mobile.design.v6" != tokens.get("schema"):
     parser.error("Only normalized mobile V6 tokens are accepted")
-ids = re.findall(r"'([0-9]{2})':\\{n:'", html)
+ids = re.findall(r"'([0-9]{2})':\{n:'", html)
 if sorted(ids) != [f"{n:02d}" for n in range(1, 39)]:
     parser.error("The prototype must include exactly the same 38 screens")
 if "function toggleDesktopSidebar" in html or "sy-desktop-toggle" in html and 'type="button"' in html.split("sy-desktop-toggle",1)[-1][:90]:
@@ -33,7 +33,7 @@ if any(p.relative_to(source).parts[0] not in allowed_roots for p in allfiles):
     parser.error("Found unapproved files: old editions or unexpected content")
 for path in allfiles:
     name = path.relative_to(source).as_posix()
-    if re.search(r"(?:^|/)(?:compose-v[2-5]|history-v\\d|_preview-v|supplements|references)(?:/|$)", name, re.I):
+    if re.search(r"(?:^|/)(?:compose-v[2-5]|history-v\d|_preview-v|supplements|references)(?:/|$)", name, re.I):
         parser.error("Legacy assets are forbidden: " + name)
     if path.suffix.lower() in {".apk", ".ttf", ".otf"}:
         parser.error("APK/font binary not allowed in this design archive: " + name)
@@ -41,7 +41,7 @@ for path in allfiles:
         ElementTree.parse(path)
 rows = [hashlib.sha256(p.read_bytes()).hexdigest()+"  "+p.relative_to(source).as_posix()
         for p in allfiles]
-manifest = ("\\n".join(rows)+"\\n").encode()
+manifest = ("\n".join(rows)+"\n").encode()
 output.parent.mkdir(parents=True, exist_ok=True)
 with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED, compresslevel=8) as z:
     for path in allfiles:
