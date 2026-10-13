@@ -14,7 +14,6 @@ internal const val BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS = 240L
 internal const val MAX_PATCH_CHARS = 512_000
 internal const val MAX_TOOL_RESULT_CHARS = 50_000
 internal const val MAX_EVENT_CHARS = 65_536
-internal const val MAX_ATTACHMENT_BYTES = 20L * 1024L * 1024L
 internal const val MAX_HANDOFF_CHARS = 3_500
 internal const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
 internal const val CHAT_RECENT_HISTORY_MESSAGES = 20

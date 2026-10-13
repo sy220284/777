@@ -115,4 +115,27 @@ if release_equivalent([
 
 if '.event == "push"' not in RELEASE or '.conclusion == "success"' not in RELEASE:
     fail("full validation must come from a successful main push workflow")
-print("Release-eligibility evidence and scope regression passed")
+# 定时批次只处理触发时的 SHA，不能被新合并换包或中止。
+triggers = RELEASE.split("'on':\n", 1)[1].split("\npermissions:", 1)[0]
+if "cron: '0,30 * * * *'" not in triggers:
+    fail("release must check on both half-hour UTC boundaries")
+if re.search(r"(?m)^  (?:workflow_run|push):", triggers):
+    fail("CI completion or tag push still triggers immediate release")
+if "workflow_dispatch:" not in triggers:
+    fail("manual release recovery entry was removed")
+if not re.search(r"(?m)^  cancel-in-progress: false$", RELEASE):
+    fail("a newer release run can cancel the running batch")
+if "ref: ${{ github.sha }}" not in RELEASE:
+    fail("scheduled checkout does not pin the trigger snapshot")
+if 'BATCH_SHA="$(git rev-parse HEAD)"' not in RELEASE:
+    fail("release batch does not freeze its starting SHA")
+if 'release_equivalent_to_batch "$RELEASE_SHA" "$BATCH_SHA"' not in RELEASE:
+    fail("release gate does not compare to the frozen batch")
+if "git/ref/heads/main" in RELEASE or "Recheck main before publish" in RELEASE:
+    fail("release still follows new main commits during an active build")
+if "if: steps.freshness" in RELEASE:
+    fail("new merges can still veto a completed release build")
+if "target_commitish: ${{ needs.check-release.outputs.release_sha }}" not in RELEASE:
+    fail("publication is not pinned to the validated candidate")
+
+print("Release-eligibility evidence, half-hour scheduling and immutable batch regression passed")

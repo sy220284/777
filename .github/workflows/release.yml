@@ -1,16 +1,9 @@
 name: Release APK
 
 'on':
-  # 主线 CI 成功后直接发布；每 30 分钟定时任务做漏触发补偿。
-  workflow_run:
-    workflows: ['CI']
-    types: [completed]
-    branches: [main]
-  push:
-    tags:
-      - 'v*'
+  # 仅在每小时 00/30 分尝试发布（UTC）；不因 CI 完成或标签推送立即发布。
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '0,30 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -18,6 +11,7 @@ permissions:
   actions: read
 
 concurrency:
+  # 当前发布批次不可被下一次触发打断；尚未开始的下一批只需处理最新快照。
   group: release-${{ github.repository }}
   cancel-in-progress: false
 
@@ -32,13 +26,11 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.sha }}
       - name: Detect tested release candidate
         id: detect
         env:
           GH_TOKEN: ${{ github.token }}
-          WORKFLOW_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
-          WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
 
@@ -47,30 +39,18 @@ jobs:
             echo "version=" >> "$GITHUB_OUTPUT"
           }
 
-          if [ "$GITHUB_EVENT_NAME" = "workflow_run" ]; then
-            RELEASE_SHA="$WORKFLOW_RUN_SHA"
-            if [ "$WORKFLOW_RUN_CONCLUSION" != "success" ]; then
-              echo "CI 未成功，本次不进入发布：$WORKFLOW_RUN_CONCLUSION"
-              skip_release
-              exit 0
-            fi
-          else
-            RELEASE_SHA="$(git rev-parse HEAD)"
-          fi
+          # 本批次只处理调度事件创建时的主线提交，发布中发生的新合并留给下一批。
+          BATCH_SHA="$(git rev-parse HEAD)"
+          RELEASE_SHA="$BATCH_SHA"
 
-          IS_TAG=false
-          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            IS_TAG=true
-          fi
-
-          release_equivalent_to_main() {
+          release_equivalent_to_batch() {
             release_sha="$1"
-            main_sha="$2"
-            if [ "$release_sha" = "$main_sha" ]; then
+            batch_sha="$2"
+            if [ "$release_sha" = "$batch_sha" ]; then
               return 0
             fi
 
-            comparison="$(gh api "repos/$GITHUB_REPOSITORY/compare/$release_sha...$main_sha" 2>/dev/null || true)"
+            comparison="$(gh api "repos/$GITHUB_REPOSITORY/compare/$release_sha...$batch_sha" 2>/dev/null || true)"
             status="$(printf '%s' "$comparison" | jq -r '.status // empty')"
             if [ "$status" != "ahead" ]; then
               return 1
@@ -112,50 +92,41 @@ jobs:
             return 1
           }
 
-          if [ "$IS_TAG" = "false" ]; then
-            MAIN_SHA="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
-            git fetch --no-tags origin main --depth=1 >/dev/null 2>&1
-            git show FETCH_HEAD:.github/scripts/classify-ci-scope.py > "$RUNNER_TEMP/classify-ci-scope.py"
+          # 比对目标固定为本次触发快照，绝不追随发布期间变化的 main。
+          cp .github/scripts/classify-ci-scope.py "$RUNNER_TEMP/classify-ci-scope.py"
 
-            if [ "$GITHUB_EVENT_NAME" != "workflow_run" ] && ! has_full_main_validation "$RELEASE_SHA"; then
-              echo "当前提交没有完整主线 CI 发布验收；寻找发布等价的全量通过候选。"
-              FOUND_CANDIDATE=false
-              while IFS= read -r candidate_sha; do
-                [ -n "$candidate_sha" ] || continue
-                # Check change impact first; do not issue expensive jobs queries for
-                # commits that would change the APK relative to the selected candidate.
-                if release_equivalent_to_main "$candidate_sha" "$MAIN_SHA" &&
-                   has_full_main_validation "$candidate_sha"; then
-                  RELEASE_SHA="$candidate_sha"
-                  FOUND_CANDIDATE=true
-                  echo "找到最近完整验证且发布等价候选：$RELEASE_SHA -> $MAIN_SHA"
-                  break
-                fi
-              done < <(
-                gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs?branch=main&status=success&per_page=100" \
-                  --jq '.workflow_runs[] | select(.name == "CI" and .event == "push" and .conclusion == "success") | .head_sha' |
-                  awk '!seen[$0]++' |
-                  head -n 50
-              )
-              if [ "$FOUND_CANDIDATE" != "true" ]; then
-                echo "当前 main 与最近完整验证的发布等价候选不匹配，本次不发布。"
-                skip_release
-                exit 0
+          if ! has_full_main_validation "$RELEASE_SHA"; then
+            echo "本批次提交未完成主线完整 CI；寻找与本批次产物等价的已验证候选。"
+            FOUND_CANDIDATE=false
+            while IFS= read -r candidate_sha; do
+              [ -n "$candidate_sha" ] || continue
+              if release_equivalent_to_batch "$candidate_sha" "$BATCH_SHA" &&
+                 has_full_main_validation "$candidate_sha"; then
+                RELEASE_SHA="$candidate_sha"
+                FOUND_CANDIDATE=true
+                echo "找到本批次等价的完整验证候选：$RELEASE_SHA -> $BATCH_SHA"
+                break
               fi
-            fi
-
-            if ! release_equivalent_to_main "$RELEASE_SHA" "$MAIN_SHA"; then
-              echo "候选提交已经被影响发布产物的 main 变更淘汰：$RELEASE_SHA != $MAIN_SHA"
+            done < <(
+              gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs?branch=main&status=success&per_page=100" \
+                --jq '.workflow_runs[] | select(.name == "CI" and .event == "push" and .conclusion == "success") | .head_sha' |
+                awk '!seen[$0]++' |
+                head -n 50
+            )
+            if [ "$FOUND_CANDIDATE" != "true" ]; then
+              echo "本批次没有符合完整验收的构建候选，本次跳过，下一批重新检查。"
               skip_release
               exit 0
             fi
-            if [ "$RELEASE_SHA" != "$MAIN_SHA" ]; then
-              echo "main 仅有不影响发布产物的变更，继续发布已验证候选：$RELEASE_SHA -> $MAIN_SHA"
-            fi
-          elif [ "$IS_TAG" = "true" ] && ! has_full_main_validation "$RELEASE_SHA"; then
-            echo "标签提交缺少与该 SHA 完全对应的主线完整验收，跳过发布：$RELEASE_SHA"
+          fi
+
+          if ! release_equivalent_to_batch "$RELEASE_SHA" "$BATCH_SHA"; then
+            echo "候选提交与本批次快照产物不等价：$RELEASE_SHA != $BATCH_SHA"
             skip_release
             exit 0
+          fi
+          if [ "$RELEASE_SHA" != "$BATCH_SHA" ]; then
+            echo "本批次只有不影响 APK 的变更：$RELEASE_SHA -> $BATCH_SHA"
           fi
 
           echo "release_sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
@@ -190,25 +161,6 @@ jobs:
           if ! has_full_main_validation "$RELEASE_SHA"; then
             echo "缺少与发布提交一致的完整 main CI 验收（双模拟器、ARM64、x86），拒绝发布。"
             skip_release
-            exit 0
-          fi
-
-          if [ "$IS_TAG" = "true" ]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-            if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" >/dev/null 2>&1; then
-              echo "标签已有 Release：$GITHUB_REF_NAME"
-              skip_release
-              exit 0
-            fi
-            if [ -n "$MAX_RELEASE_TAG" ]; then
-              HIGHEST_TAG="$(printf '%s\n%s\n' "$GITHUB_REF_NAME" "$MAX_RELEASE_TAG" | sort -V | tail -n 1)"
-              if [ "$HIGHEST_TAG" != "$GITHUB_REF_NAME" ]; then
-                echo "::error::拒绝发布倒退版本：$GITHUB_REF_NAME < $MAX_RELEASE_TAG"
-                exit 1
-              fi
-            fi
-            echo "should_release=true" >> "$GITHUB_OUTPUT"
-            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -507,41 +459,7 @@ jobs:
             ls -lh
           )
 
-      - name: Recheck main before publish
-        id: freshness
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_SHA: ${{ needs.check-release.outputs.release_sha }}
-        run: |
-          set -euo pipefail
-          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            echo "current=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          MAIN_SHA="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
-          if [ "$MAIN_SHA" = "$RELEASE_SHA" ]; then
-            echo "current=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          comparison="$(gh api "repos/$GITHUB_REPOSITORY/compare/$RELEASE_SHA...$MAIN_SHA" 2>/dev/null || true)"
-          status="$(printf '%s' "$comparison" | jq -r '.status // empty')"
-          changes="$RUNNER_TEMP/release-change-files.txt"
-          printf '%s' "$comparison" | jq -r '.files[]?.filename' > "$changes"
-          git fetch --no-tags origin main --depth=1 >/dev/null 2>&1
-          git show FETCH_HEAD:.github/scripts/classify-ci-scope.py > "$RUNNER_TEMP/classify-ci-scope.py"
-
-          changed_file_count="$(printf '%s' "$comparison" | jq -r '.files | length // 0')"
-          if [ "$status" = "ahead" ] && [ "$changed_file_count" -lt 300 ] && python3 "$RUNNER_TEMP/classify-ci-scope.py" --paths-file "$changes" --release-safe; then
-            echo "current=true" >> "$GITHUB_OUTPUT"
-            echo "构建期间 main 仅增加不影响发布产物的变更，继续发布已验证候选。"
-          else
-            echo "current=false" >> "$GITHUB_OUTPUT"
-            echo "构建期间 main 已出现影响发布产物的变更：$MAIN_SHA，本次旧版本不发布。"
-          fi
-
       - name: Publish GitHub Release
-        if: steps.freshness.outputs.current == 'true'
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}

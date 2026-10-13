@@ -4,7 +4,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
@@ -52,6 +54,11 @@ class LocalChatTurnUsageTest {
         val initial = context.getString(R.string.local_chat_turn_usage_incomplete, 30L)
         awaitText(initial)
         compose.onNodeWithText(initial).performClick()
+        // Scrollable bottom-sheet content must have positive, visible height on phones.
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithTag("bottomSheetScrollBody").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("bottomSheetScrollBody").assertIsDisplayed()
         awaitText("回合-chat-a")
         assertEquals("chat-a/user-1", opened.get())
         compose.runOnIdle { tokens.set(50); version.value += 1 }

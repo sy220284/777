@@ -9,7 +9,6 @@ import com.labteto.dshmobile.local.files.LocalWorkspaceToolGuide
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.runtime.LocalBundledRuntimeManager
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
-import com.labteto.dshmobile.local.runtime.MAX_ATTACHMENT_BYTES
 import com.labteto.dshmobile.local.runtime.localSharedStorageRoots
 import com.labteto.dshmobile.local.tools.LocalSandboxBoundary
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
@@ -52,7 +51,6 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     private val attachmentImporter = LocalAttachmentImporter(
         context = context,
         workspace = workspace,
-        maxAttachmentBytes = MAX_ATTACHMENT_BYTES,
     )
 
     internal val coordinator = LocalConversationFilesCoordinator(
