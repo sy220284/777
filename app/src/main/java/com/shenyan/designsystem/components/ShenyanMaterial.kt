@@ -208,7 +208,7 @@ fun SySceneBackgroundSurface(
             if (origin != next) origin = next
         },
     ) {
-        if (scene != null) SyPaintAlignedScene(scene, origin)
+        if (scene != null) SyPaintAlignedScene(scene, origin, Modifier.matchParentSize())
         else Box(Modifier.matchParentSize().background(canvas))
         content()
     }
@@ -219,10 +219,12 @@ fun SySceneBackgroundSurface(
  * The parent material alone performs the blur; foreground remains sharp.
  */
 @Composable
-private fun SyPaintAlignedScene(scene: SySceneBackdrop, surfaceOrigin: IntOffset) {
+private fun SyPaintAlignedScene(
+    scene: SySceneBackdrop, surfaceOrigin: IntOffset, modifier: Modifier = Modifier.fillMaxSize(),
+) {
     val dx = surfaceOrigin.x - scene.viewportOrigin.x
     val dy = surfaceOrigin.y - scene.viewportOrigin.y
-    Canvas(Modifier.fillMaxSize()) {
+    Canvas(modifier) {
         val viewport = scene.viewportSize
         if (viewport.width <= 0 || viewport.height <= 0) return@Canvas
         drawRect(scene.canvas)
