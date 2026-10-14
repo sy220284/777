@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.model
 import com.labteto.dshmobile.local.DeepSeekClient
 import com.labteto.dshmobile.local.documentedContextWindowTokens
 import com.labteto.dshmobile.local.operationalInputLimitTokens
+import com.labteto.dshmobile.local.estimatePromptBreakdown
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import java.io.File
 import java.nio.file.Files
@@ -265,6 +266,29 @@ class LocalKimiCompatibilityTest {
         } finally {
             root.deleteRecursively()
         }
+    }
+
+    @Test fun base64VideoIsNeverCountedAsNaturalLanguageTokensOrCachedAsGiantKey() {
+        val content = buildJsonObject {
+            put("role", "user")
+            put("content", buildJsonArray {
+                add(buildJsonObject {
+                    put("type", "text")
+                    put("text", "概述这段视频")
+                })
+                add(buildJsonObject {
+                    put("type", "video_url")
+                    put("video_url", buildJsonObject {
+                        put("url", "data:video/mp4;base64," + "A".repeat(100_000))
+                    })
+                })
+            })
+        }
+        val estimate = estimatePromptBreakdown(listOf(content), JsonArray(emptyList()))
+        assertTrue(estimate.estimatedInputTokens in 16_000..40_000)
+        val redacted = redactModelImages(listOf(content))
+        assertFalse(redacted.toString().contains("data:video/"))
+        assertFalse(redacted.toString().contains("AAAAA"))
     }
 
     @Test fun oversizedKimiVideoFailsBeforeReadingOrEncoding() = runBlocking {
