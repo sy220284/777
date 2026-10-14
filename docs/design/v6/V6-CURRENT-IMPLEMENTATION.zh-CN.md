@@ -108,8 +108,8 @@
 
 ### 关键源码与 PR 追溯
 
-- [主线功能路由](../../../../app/src/main/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalog.kt)；[V6 视觉令牌](../../../../app/src/main/java/com/shenyan/designsystem/foundation/ShenyanFoundation.kt)；[材质](../../../../app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterial.kt)；[材质取色](../../../../app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterialColor.kt)。
-- [设置导航](../../../../app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt)、[输入框](../../../../app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt)、[消息](../../../../app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt)、[工具技能](../../../../app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt)。
+- [主线功能路由](../../../app/src/main/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalog.kt)；[V6 视觉令牌](../../../app/src/main/java/com/shenyan/designsystem/foundation/ShenyanFoundation.kt)；[材质](../../../app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterial.kt)；[材质取色](../../../app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterialColor.kt)。
+- [设置导航](../../../app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt)、[输入框](../../../app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt)、[消息](../../../app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt)、[工具技能](../../../app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt)。
 - 已合并：[#693](https://github.com/sy220284/777/pull/693)、[#694](https://github.com/sy220284/777/pull/694)、[#696–#704](https://github.com/sy220284/777/pulls?q=is%3Apr+is%3Amerged+693..704)、[#708](https://github.com/sy220284/777/pull/708)、[#709](https://github.com/sy220284/777/pull/709)、[#710](https://github.com/sy220284/777/pull/710)。
 - **未合并**：[#711 技能/插件布局](https://github.com/sy220284/777/pull/711)、[#705 UI 3.0 R4](https://github.com/sy220284/777/pull/705)。R4 独立 UI Pack、双包接管和动态交互能力仍在迁移中，不能写成本版本生产已完成。
 
