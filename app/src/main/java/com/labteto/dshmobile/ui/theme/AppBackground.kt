@@ -224,6 +224,7 @@ val LocalAppBackgroundState = staticCompositionLocalOf { AppBackgroundState() }
 
 private data class LoadedBackground(
     val image: ImageBitmap,
+    val bitmap: Bitmap,
     val analysis: BackgroundAnalysis,
 )
 
@@ -246,18 +247,31 @@ fun AppBackgroundHost(
     content: @Composable () -> Unit,
 ) {
     val loaded = rememberBackground(path)
+    val view = LocalView.current
+    val windowOnScreen = remember { IntArray(2) }
+    var viewportOrigin by remember { mutableStateOf(IntOffset.Zero) }
+    var viewportSize by remember { mutableStateOf(IntSize.Zero) }
+
+    // ContentScale.Crop displays only the centre of many landscape wallpapers on a phone.
+    // Sample what is actually visible, off the UI thread; do not tint cards from off-screen pixels.
+    var croppedAnalysis by remember(path, loaded) { mutableStateOf<Pair<IntSize, BackgroundAnalysis>?>(null) }
+    LaunchedEffect(loaded, viewportSize) {
+        if (loaded != null && viewportSize.width > 0 && viewportSize.height > 0) {
+            val analysis = withContext(Dispatchers.Default) {
+                analyzeBackground(loaded.bitmap, viewportSize)
+            }
+            croppedAnalysis = viewportSize to analysis
+        }
+    }
+    val visibleAnalysis = croppedAnalysis?.takeIf { it.first == viewportSize }?.second ?: loaded?.analysis
     val state = AppBackgroundState(
         image = loaded?.image,
-        analysis = loaded?.analysis,
+        analysis = visibleAnalysis,
         adaptiveContrast = adaptiveEnabled,
         darkTheme = darkTheme,
         surfaceTransparency = surfaceTransparency.coerceIn(0f, 1f),
         fluidGlass = fluidGlass,
     )
-    val view = LocalView.current
-    val windowOnScreen = remember { IntArray(2) }
-    var viewportOrigin by remember { mutableStateOf(IntOffset.Zero) }
-    var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     val sceneBackdrop = if (viewportSize.width > 0 && viewportSize.height > 0 &&
         (loaded != null || fluidGlass)
     ) SySceneBackdrop(
@@ -270,8 +284,8 @@ fun AppBackgroundHost(
             ambientPalette.primary, ambientPalette.mint, ambientPalette.lilac.copy(alpha = .18f),
         ) else emptyList(),
         dark = darkTheme,
-        regionColors = loaded?.analysis?.let { listOf(it.top.averageColor, it.middle.averageColor, it.bottom.averageColor) } ?: emptyList(),
-        regionExtremes = loaded?.analysis?.let { analysis -> listOf(analysis.top, analysis.middle, analysis.bottom)
+        regionColors = visibleAnalysis?.let { listOf(it.top.averageColor, it.middle.averageColor, it.bottom.averageColor) } ?: emptyList(),
+        regionExtremes = visibleAnalysis?.let { analysis -> listOf(analysis.top, analysis.middle, analysis.bottom)
             .map { listOf(it.darkestColor, it.brightestColor) } } ?: emptyList(),
         surfaceTransparency = state.surfaceTransparency,
         adaptiveContrast = adaptiveEnabled,
@@ -376,6 +390,7 @@ private fun rememberBackground(path: String?): LoadedBackground? {
                     BitmapFactory.decodeFile(path, options)?.let { bitmap ->
                         LoadedBackground(
                             image = bitmap.asImageBitmap(),
+                            bitmap = bitmap,
                             analysis = analyzeBackground(bitmap),
                         )
                     }
@@ -399,19 +414,27 @@ private data class PixelSample(
  * constant for phone wallpapers of any resolution while still catching bright/dark, saturated and
  * visually busy areas.
  */
-internal fun analyzeBackground(bitmap: Bitmap): BackgroundAnalysis {
+internal fun analyzeBackground(bitmap: Bitmap, viewport: IntSize? = null): BackgroundAnalysis {
     if (bitmap.width <= 0 || bitmap.height <= 0) return BackgroundAnalysis()
 
-    val columns = minOf(24, bitmap.width)
-    val rows = minOf(36, bitmap.height)
+    val visible = viewport?.takeIf { it.width > 0 && it.height > 0 }
+    val ratio = visible?.let { it.width.toDouble() / it.height }
+    val cropWidth = if (ratio != null && bitmap.width.toDouble() / bitmap.height > ratio)
+        (bitmap.height * ratio).roundToInt().coerceIn(1, bitmap.width) else bitmap.width
+    val cropHeight = if (ratio != null && bitmap.width.toDouble() / bitmap.height < ratio)
+        (bitmap.width / ratio).roundToInt().coerceIn(1, bitmap.height) else bitmap.height
+    val cropX = (bitmap.width - cropWidth) / 2
+    val cropY = (bitmap.height - cropHeight) / 2
+    val columns = minOf(24, cropWidth)
+    val rows = minOf(36, cropHeight)
     val previousRow = FloatArray(columns) { Float.NaN }
     val samples = ArrayList<PixelSample>(columns * rows)
 
     for (row in 0 until rows) {
         var left = Float.NaN
-        val y = (((row + 0.5f) * bitmap.height) / rows).toInt().coerceIn(0, bitmap.height - 1)
+        val y = (cropY + ((row + 0.5f) * cropHeight / rows).toInt()).coerceIn(0, bitmap.height - 1)
         for (column in 0 until columns) {
-            val x = (((column + 0.5f) * bitmap.width) / columns).toInt().coerceIn(0, bitmap.width - 1)
+            val x = (cropX + ((column + 0.5f) * cropWidth / columns).toInt()).coerceIn(0, bitmap.width - 1)
             val color = bitmap.getPixel(x, y)
             val red = AndroidColor.red(color) / 255f
             val green = AndroidColor.green(color) / 255f
