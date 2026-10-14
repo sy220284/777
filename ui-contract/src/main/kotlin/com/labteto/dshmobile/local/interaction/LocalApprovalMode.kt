@@ -5,5 +5,3 @@ enum class LocalApprovalMode {
     MANUAL,
     AUTO,
 }
-
-

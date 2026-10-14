@@ -123,4 +123,3 @@ data class AutomationTask(
     val runReceipts: List<AutomationRunReceipt> = emptyList(),
     val dispatchPolicy: AutomationDispatchPolicy? = null,
 )
-

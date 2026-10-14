@@ -17,5 +17,3 @@ data class LocalSessionStorageStatus(
         const val LOW_FREE_SPACE_BYTES = 512L * 1024L * 1024L
     }
 }
-
-

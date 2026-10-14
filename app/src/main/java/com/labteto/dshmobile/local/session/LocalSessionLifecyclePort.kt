@@ -24,5 +24,7 @@ internal interface LocalSessionLifecyclePort {
 
     fun switchSession(sessionId: String): Boolean
 
+    suspend fun deleteSessionIds(ids: Set<String>): Set<String>
+
     suspend fun deleteSessions(ids: Set<String>): Int
 }

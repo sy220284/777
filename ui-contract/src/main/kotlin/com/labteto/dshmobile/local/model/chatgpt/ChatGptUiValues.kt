@@ -48,4 +48,3 @@ data class ChatGptUiState(
                 phase == ChatGptAuthPhase.CONNECTED
         } == true
 }
-

@@ -25,5 +25,3 @@ sealed interface MiniMaxProviderUsage {
         val notInPlan: Boolean = false,
     )
 }
-
-

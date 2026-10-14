@@ -7,4 +7,3 @@ data class LocalSettingsMemoryContext(
     val projectId: String?,
     val lineageId: String,
 )
-

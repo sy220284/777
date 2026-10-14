@@ -20,5 +20,7 @@ interface ConversationUiPack {
         workMode: Boolean,
         onClose: () -> Unit,
         attachments: com.labteto.dshmobile.uicontract.AttachmentUiPort? = null,
+        sessions: com.labteto.dshmobile.uicontract.SessionUiPort? = null,
+        transcript: com.labteto.dshmobile.uicontract.TranscriptUiPort? = null,
     )
 }

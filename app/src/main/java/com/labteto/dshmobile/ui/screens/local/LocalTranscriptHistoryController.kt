@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import com.labteto.dshmobile.local.presentation.LocalSessionUiFacade
-import com.labteto.dshmobile.local.session.LocalTranscriptPageCursor
+import com.labteto.dshmobile.uicontract.TranscriptUiPort
+import com.labteto.dshmobile.uicontract.UiTranscriptCursor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 
 /** Owns transcript-history paging state for the local conversation UI. */
 internal class LocalTranscriptHistoryController(
-    session: LocalSessionUiFacade,
+    session: TranscriptUiPort,
     private val currentSessionId: () -> String,
     liveMessages: () -> List<com.labteto.dshmobile.local.session.LocalHarnessMessage>,
     private val scope: CoroutineScope,
@@ -20,7 +20,8 @@ internal class LocalTranscriptHistoryController(
     private val _history = MutableStateFlow(LocalTranscriptHistoryState())
     val history: StateFlow<LocalTranscriptHistoryState> = _history.asStateFlow()
 
-    private var cursor: LocalTranscriptPageCursor? = null
+    private var loadGeneration = 0L
+    private var cursor: UiTranscriptCursor? = null
     private var initializedSessionId: String? = null
 
     suspend fun prepare(sessionId: String, force: Boolean = false) {
@@ -31,11 +32,13 @@ internal class LocalTranscriptHistoryController(
         val current = _history.value
         if (!force && current.sessionId == sessionId && initializedSessionId == sessionId) return
 
+        val generation = ++loadGeneration
         cursor = null
         initializedSessionId = null
         _history.value = LocalTranscriptHistoryState(sessionId = sessionId, loading = true)
         try {
             val loaded = loader.bootstrap(sessionId) ?: return
+            if (generation != loadGeneration) return
             cursor = loaded.nextCursor
             initializedSessionId = sessionId
             _history.value = LocalTranscriptHistoryState(
@@ -46,7 +49,7 @@ internal class LocalTranscriptHistoryController(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            if (currentSessionId() != sessionId) return
+            if (generation != loadGeneration || currentSessionId() != sessionId) return
             cursor = null
             initializedSessionId = null
             _history.value = LocalTranscriptHistoryState(
@@ -63,6 +66,7 @@ internal class LocalTranscriptHistoryController(
         }
 
         val startCursor = cursor ?: return Result.success(0)
+        val generation = loadGeneration
         val current = _history.value
         if (current.loading) return Result.success(0)
         _history.value = current.copy(loading = true, error = null)
@@ -73,6 +77,7 @@ internal class LocalTranscriptHistoryController(
                 olderMessages = current.olderMessages,
                 startCursor = startCursor,
             ) ?: return Result.success(0)
+            if (generation != loadGeneration) return Result.success(0)
             cursor = loaded.nextCursor
             val latest = _history.value
             if (latest.sessionId != sessionId) return Result.success(0)
@@ -86,7 +91,7 @@ internal class LocalTranscriptHistoryController(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            if (_history.value.sessionId == sessionId) {
+            if (generation == loadGeneration && _history.value.sessionId == sessionId) {
                 _history.value = _history.value.copy(
                     loading = false,
                     error = error.message ?: error::class.java.simpleName,
@@ -97,6 +102,7 @@ internal class LocalTranscriptHistoryController(
     }
 
     fun refreshAfterTimelineRewrite() {
+        loadGeneration++
         val sessionId = currentSessionId()
         cursor = null
         initializedSessionId = null
@@ -105,6 +111,7 @@ internal class LocalTranscriptHistoryController(
     }
 
     private fun reset() {
+        loadGeneration++
         cursor = null
         initializedSessionId = null
         _history.value = LocalTranscriptHistoryState()

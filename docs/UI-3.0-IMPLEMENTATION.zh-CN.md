@@ -8,7 +8,7 @@
 |---|---|---|
 | S-1 | MCP 未检测健康使用中立标识；Chat/群聊显示真实共享队列；Work 审批使用 Owner 签发的实际等待身份 | 实时 MCP 选中/连接/授权观测与插件故障隔离完整旅程；可读性和辅助技术复现 |
 | S0 | 77 项现行 Scene、7 条顶级路由、21 个设置页面与行内更新；4 项退役场景保留历史索引；22 项旧问题有阶段去向 | 全部隐性入口的真实旅程核对，逐动作能力/回执/恢复矩阵完善 |
-| S1 | `:ui-contract` 中立协议；Chat/Work 文本/附件发送、编辑、重生成、停止、审批/提问，Chat 分支选择；Tools、Automation、Media、Settings、Usage、Memory 中立端口；Host 草稿、阅读锚点和动态表单共享状态；模型不可变公开值抽离 | 附件完整预览、人物/图库/群聊、Work 计划/成果扩展命令和共享会话全量契约迁移；生产旧回调全面退出 |
+| S1 | `:ui-contract` 中立协议；Chat/Work 文本/附件发送、编辑、重生成、停止、审批/提问，Chat 分支选择；Tools、Automation、Media、Settings、Usage、Memory 中立端口；Host 草稿、阅读锚点和动态表单共享状态；模型不可变公开值抽离 | 附件完整预览、人物/图库/群聊、Work 计划/成果扩展命令和共享文件全量契约迁移；生产旧回调全面退出 |
 | S2 | `:ui-pack-next` 独立 Material 会话包与 V6 共用真实会话命令/交互 Port；三项显式渲染夹具测试 | 当前 Codex 与 App 的真实发送/审批/恢复旅程，不能标记 S2 已验收 |
 | S3 | 会话草稿/阅读位置归 Host；Next 独立编译；V6 的 16 个基础组件文件和对应单测已抽至 `:ui-pack-v6` | 全部 V6 页面抽离至独立 Pack、完整 Host 导航/注册切换、同触点视觉修复；本阶段未完成 |
 | S4 | 受限 UiDocument 协议、既有 Schema 引擎验证、本地模板与可选模型生成、真实用量分类、Shared Session Sidecar、双包原生表单/按钮、文本回退；真实阶段/队列/审批/错误绑定、原子 revision 准入和逐卡历史回退 | Work 运行内发布、进度/证据/媒体绑定、更新与版本迁移完整闭环、历史检索增量化与表单留存预算 |
@@ -91,3 +91,11 @@ Chat/Work 的编辑、重新生成、停止以及 Chat 分支选择通过带前�
 Work 提问新增真实 waiter 签发的 nonce；模型 callId 复用不能复用旧回答/取消权限。V6 的计划审核与问题弹窗、Next 的问题面板均通过中立命令回答原等待者。此变更没有新增执行 Owner，也未修改审批策略。
 
 当前批次 `:ui-contract:compileTestKotlin`、`:ui-host:compileDebugKotlin`、`:ui-pack-next:compileDebugKotlin`、`:app:compileDebugKotlin`、`:app:compileDebugAndroidTestKotlin`、`:app:compileDebugUnitTestKotlin` 编译通过；架构与 UI 设计边界检查通过。新增回归源码覆盖模型 callId 复用、迟到文档版本、逐卡损坏和附件草稿隔离，尚未运行设备验收或最终 CI，旧 CI 不能证明当前 head。
+
+## Session 与历史分页端口批次（待合并）
+
+`SessionUiPort` 接入真实创建、显式目标切换、模式导航、上下文接续和批量删除。导航回执表示请求进入原导航 inbox，创建回执只表示准入。删除 Owner 返回实际处理 ID 集合；Host 只清理对应偏好与文本/附件草稿，失败回执不假定副作用为零。旧 Project 创建不重新开放。
+
+`TranscriptUiPort` 保留原 Session 范围授权及有界分页，UI 只持有 Owner 签发的不透明游标；投影抑制/恢复状态留在原 pager。消息和媒体块的不可变值迁入协议模块，持久化 FQN/字段保持兼容。读取绑定日志实例和 reset generation；异步 UI 历史加载也绑定本次加载 generation，旧读取不能覆盖编辑后的刷新结果。Next 新增真正的历史分页入口、会话选择及 Chat/Work 模式导航，仍不是全应用替换包。
+
+发现自动 CI 在范围检查阶段被前批新增文件末尾空行阻断，已修正源码，并将差异检查扩展为对比当前主线整个 PR；没有修改门禁。最新必要编译通过；41 项协议及选定 JVM 回归通过（身份/等待者、revision、逐卡损坏、草稿隔离、Session 命令和历史迟到结果）。模拟器/真实业务验收、最新完整 CI、完整 V6/Next 页面与其他剩余实现仍未完成。

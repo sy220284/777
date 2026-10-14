@@ -507,16 +507,11 @@ private fun LocalTranscriptImage(
         }
         loading = false
     }
-    val ratio = if (
-        image.width != null &&
-        image.height != null &&
-        image.width > 0 &&
-        image.height > 0
-    ) {
-        (image.width.toFloat() / image.height.toFloat()).coerceIn(0.45f, 2.2f)
-    } else {
-        1f
-    }
+    val width = image.width
+    val height = image.height
+    val ratio = if (width != null && height != null && width > 0 && height > 0) {
+        (width.toFloat() / height.toFloat()).coerceIn(0.45f, 2.2f)
+    } else 1f
     val modifier = Modifier
         .fillMaxWidth(0.72f)
         .widthIn(max = 440.dp)

@@ -8,5 +8,3 @@ enum class LocalConversationMode {
     PROJECT,
     CONTINUATION,
 }
-
-

@@ -40,12 +40,8 @@ internal class LocalConversationUiStateStore(context: Context) {
         return true
     }
 
-    suspend fun deleteSessions(
-        ids: Set<String>,
-        delete: suspend (Set<String>) -> Int,
-    ): Int {
-        val deleted = delete(ids)
-        if (deleted <= 0) return deleted
+    fun forgetSessions(ids: Set<String>) {
+        if (ids.isEmpty()) return
 
         val pinned = _pinnedSessionIds.value - ids
         val titles = _sessionTitleOverrides.value - ids
@@ -55,7 +51,6 @@ internal class LocalConversationUiStateStore(context: Context) {
             putStringSet(PINNED_SESSION_IDS, pinned)
             ids.forEach { remove(SESSION_TITLE_PREFIX + it) }
         }.apply()
-        return deleted
     }
 
     private companion object {

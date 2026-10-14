@@ -3,6 +3,7 @@ package com.labteto.dshmobile.uipack.next
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -66,7 +67,7 @@ object NextConversationUiPack : ConversationUiPack {
             .map(::UiSceneId).toSet(),
         requiredCapabilities = setOf("chat.send_text", "work.send_text", "work.answer_approval",
             "ui_document.generate", "ui_document.generate_local", "ui_document.prepare_input", "attachment.import",
-            "chat.edit", "chat.regenerate", "chat.select_variant", "chat.stop",
+            "chat.edit", "chat.regenerate", "chat.select_variant", "chat.stop", "session.transcript_read",
             "work.edit", "work.regenerate", "work.stop", "work.answer_question")
             .map(::UiCapabilityId).toSet(),
         windowClasses = UiWindowClass.entries.toSet(),
@@ -85,7 +86,11 @@ object NextConversationUiPack : ConversationUiPack {
         workMode: Boolean,
         onClose: () -> Unit,
         attachments: com.labteto.dshmobile.uicontract.AttachmentUiPort?,
+        sessions: com.labteto.dshmobile.uicontract.SessionUiPort?,
+        transcript: com.labteto.dshmobile.uicontract.TranscriptUiPort?,
     ) {
+        val sessionSnapshot = sessions?.snapshots?.collectAsStateWithLifecycle(initialValue = sessions.snapshot())?.value
+        var sessionChooser by remember { mutableStateOf(false) }
         val initialChat = remember(chat) { chat.snapshot() }
         val initialWork = remember(work) { work.snapshot() }
         val chatSnapshot by chat.snapshots.collectAsStateWithLifecycle(initialValue = initialChat)
@@ -95,7 +100,15 @@ object NextConversationUiPack : ConversationUiPack {
         )?.value
         val identity = if (workMode) workSnapshot.identity else chatSnapshot.identity
         val phase = if (workMode) workSnapshot.phase else chatSnapshot.phase
-        val messages = if (workMode) workSnapshot.messages else chatSnapshot.messages
+        val hotMessages = if (workMode) workSnapshot.messages else chatSnapshot.messages
+        var olderMessages by remember(identity) { mutableStateOf(emptyList<UiMessageSnapshot>()) }
+        var historyCursor by remember(identity) { mutableStateOf<com.labteto.dshmobile.uicontract.UiTranscriptCursor?>(null) }
+        var historyAvailable by remember(identity) { mutableStateOf(true) }
+        var historyLoading by remember(identity) { mutableStateOf(false) }
+        val hotMessageIds = remember(hotMessages) { hotMessages.map { it.id }.toSet() }
+        val messages = remember(olderMessages, hotMessages) { olderMessages.filterNot { it.id in hotMessageIds } + hotMessages }
+        val messageIds = remember(messages) { messages.map { it.id }.toSet() }
+        val historyHeaderCount = if (transcript != null && historyAvailable) 1 else 0
         val send = if (workMode) workSnapshot.send else chatSnapshot.send
         val queued = if (workMode) workSnapshot.queuedInputCount else chatSnapshot.queuedInputCount
         val error = if (workMode) workSnapshot.error else chatSnapshot.error
@@ -112,27 +125,30 @@ object NextConversationUiPack : ConversationUiPack {
             val anchor = reading.anchor(sessionId)
             val index = messages.indexOfFirst { it.id == anchor?.messageId }
             if (anchor != null && !anchor.followingTail && index >= 0) {
-                listState.scrollToItem(index, anchor.offsetPx)
+                listState.scrollToItem(index + historyHeaderCount, anchor.offsetPx)
             } else if (messages.isNotEmpty()) {
                 readingAnchorMissing = anchor != null && !anchor.followingTail && index < 0
-                listState.scrollToItem(messages.lastIndex)
+                listState.scrollToItem(messages.lastIndex + historyHeaderCount)
             }
             readingReady = true
         }
-        LaunchedEffect(identity?.sessionId, readingReady, messages.lastOrNull()?.id) {
+        LaunchedEffect(identity?.sessionId, readingReady, messages.lastOrNull()?.id, approval?.pendingId, question?.pendingId) {
             val sessionId = identity?.sessionId ?: return@LaunchedEffect
             if (readingReady && reading.anchor(sessionId)?.followingTail == true && messages.isNotEmpty()) {
-                listState.scrollToItem(messages.lastIndex)
+                listState.scrollToItem(messages.lastIndex + historyHeaderCount + (if (approval != null) 1 else 0) + (if (question != null) 1 else 0))
             }
         }
         LaunchedEffect(identity?.sessionId, readingReady, messages) {
             val sessionId = identity?.sessionId ?: return@LaunchedEffect
             if (!readingReady) return@LaunchedEffect
             snapshotFlow {
-                val first = listState.layoutInfo.visibleItemsInfo.firstOrNull()
+                val first = listState.layoutInfo.visibleItemsInfo.firstOrNull {
+                    val key = it.key as? String
+                    key != null && key.startsWith("message:") && key.removePrefix("message:") in messageIds
+                }
                 com.labteto.dshmobile.uicontract.UiReadingAnchor(
-                    messages.getOrNull(first?.index ?: -1)?.id,
-                    listState.firstVisibleItemScrollOffset,
+                    (first?.key as? String)?.removePrefix("message:"),
+                    first?.offset?.let { (-it).coerceAtLeast(0) } ?: 0,
                     !listState.canScrollForward,
                 )
             }.collect { anchor ->
@@ -200,6 +216,7 @@ object NextConversationUiPack : ConversationUiPack {
                 UiCommandReceipt.OutcomeUnknown -> unknown
             }
         }
+        MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
         if (editing != null) AlertDialog(onDismissRequest = { editing = null },
             title = { Text(stringResource(R.string.next_edit)) },
             text = { OutlinedTextField(replacement, { replacement = it }, label = { Text(stringResource(R.string.next_input)) }) },
@@ -213,13 +230,33 @@ object NextConversationUiPack : ConversationUiPack {
                     result.result == com.labteto.dshmobile.local.session.LocalUserMessageEditResult.COMMITTED_NOT_STARTED)) editing = null
             }, enabled = identity != null && replacement.isNotBlank()) { Text(stringResource(R.string.next_edit_send)) } },
             dismissButton = { TextButton(onClick = { editing = null }) { Text(stringResource(R.string.next_cancel)) } })
-        MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
+        if (sessionChooser && sessions != null && sessionSnapshot != null) AlertDialog(onDismissRequest = { sessionChooser = false },
+            title = { Text(stringResource(R.string.next_sessions)) },
+            text = { LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                items(sessionSnapshot.sessions, key = { it.id }) { session ->
+                    TextButton(onClick = { show(sessions.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.Open(session.id))); sessionChooser = false }) {
+                        Text(session.title)
+                    }
+                }
+            } }, confirmButton = { TextButton(onClick = { sessionChooser = false }) { Text(stringResource(R.string.next_close)) } })
             Surface(Modifier.fillMaxSize()) {
                 Column(Modifier.safeDrawingPadding().imePadding().padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.next_title), style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.semantics { heading() })
                     Text(stringResource(R.string.next_scope), style = MaterialTheme.typography.bodySmall)
+                    if (sessions != null && sessionSnapshot != null) {
+                        TextButton(onClick = { sessionChooser = true }) { Text(stringResource(R.string.next_sessions)) }
+                        TextButton(onClick = { show(sessions.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.SelectMode(com.labteto.dshmobile.local.LocalUsageMode.CHAT))) }) {
+                            Text(stringResource(R.string.next_chat_mode))
+                        }
+                        TextButton(onClick = { show(sessions.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.SelectMode(com.labteto.dshmobile.local.LocalUsageMode.WORK))) }) {
+                            Text(stringResource(R.string.next_work_mode))
+                        }
+                        TextButton(onClick = { show(sessions.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.Create(
+                            sessionSnapshot.identity, com.labteto.dshmobile.local.session.LocalConversationMode.INDEPENDENT, sessionSnapshot.usageMode))) },
+                            enabled = !sessionSnapshot.loading) { Text(stringResource(R.string.next_new_session)) }
+                    }
                     TextButton(onClick = onClose) { Text(stringResource(R.string.next_close)) }
                     Text(stringResource(when (phase) {
                         UiExecutionPhase.IDLE -> R.string.next_idle
@@ -236,7 +273,33 @@ object NextConversationUiPack : ConversationUiPack {
                     if (documentSnapshot?.error != null) Text(stringResource(R.string.next_document_history_unavailable))
                     if (readingAnchorMissing) Text(stringResource(R.string.next_reading_anchor_unavailable))
                     LazyColumn(Modifier.weight(1f), state = listState, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        items(messages, key = UiMessageSnapshot::id) { message ->
+                        if (transcript != null && historyAvailable) item(key = "load_older") {
+                            TextButton(onClick = {
+                                val target = identity ?: return@TextButton
+                                if (historyLoading) return@TextButton
+                                historyLoading = true
+                                importScope.launch {
+                                    try {
+                                        val page = transcript.transcriptPage(target.sessionId, historyCursor, 200)
+                                        val current = if (workMode) work.snapshot().identity else chat.snapshot().identity
+                                        if (current == target) {
+                                            val rows = page.messages.map { row -> UiMessageSnapshot(row.id, when (row.role) {
+                                                "user" -> UiMessageRole.USER; "assistant" -> UiMessageRole.ASSISTANT
+                                                "tool" -> UiMessageRole.TOOL; else -> UiMessageRole.SYSTEM
+                                            }, row.content, row.createdAt, proactive = row.proactive) }
+                                            olderMessages = (rows + olderMessages).distinctBy { it.id }
+                                            historyCursor = page.nextCursor
+                                            historyAvailable = page.nextCursor != null
+                                        }
+                                    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                                    catch (failure: Exception) { receipt = failure.message }
+                                    finally { historyLoading = false }
+                                }
+                            }, enabled = identity != null && !historyLoading && status != UiSceneStatus.LOADING) {
+                                Text(stringResource(R.string.next_load_older))
+                            }
+                        }
+                        items(messages, key = { "message:${it.id}" }) { message ->
                             Column {
                                 Text(stringResource(when (message.role) {
                                     UiMessageRole.USER -> R.string.next_role_user

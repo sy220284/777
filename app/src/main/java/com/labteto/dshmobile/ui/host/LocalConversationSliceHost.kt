@@ -35,5 +35,7 @@ internal fun LocalConversationSliceHost(
         workMode = shell.usageMode == LocalUsageMode.WORK,
         onClose = onClose,
         attachments = viewModel.attachmentUiPort,
+        sessions = viewModel.sessionUiPort,
+        transcript = viewModel.transcriptUiPort,
     )
 }

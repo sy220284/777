@@ -49,10 +49,10 @@ internal fun NextUiDocument(snapshot: UiDocumentSnapshot, identity: UiSessionIde
         Text(document.title, Modifier.semantics { heading() })
             if (snapshot.provenance.origin == com.labteto.dshmobile.uicontract.UiDocumentOrigin.LOCAL) {
                 Text(stringResource(R.string.next_document_local_source))
-            } else {
+            } else if (snapshot.provenance.origin == com.labteto.dshmobile.uicontract.UiDocumentOrigin.MODEL) {
                 Text(stringResource(R.string.next_document_model_source, snapshot.provenance.model))
                 if (!snapshot.provenance.usageReported) Text(stringResource(R.string.next_document_usage_unknown))
-            }
+            } else { Text(stringResource(R.string.next_document_history_incomplete)) }
             document.nodes.forEach { node ->
                 NextDocumentNode(node, values, snapshot, identity != null,
                     update = { id, text -> forms.update(key, id, text) },

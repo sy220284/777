@@ -21,5 +21,3 @@ data class DeepSeekUsageSnapshot(
     val cacheHitRate: Double
         get() = if (cacheMeasuredTokens <= 0L) 0.0 else cacheHitTokens.toDouble() / cacheMeasuredTokens.toDouble()
 }
-
-

@@ -1,15 +1,15 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
-import com.labteto.dshmobile.local.presentation.LocalSessionUiFacade
-import com.labteto.dshmobile.local.session.LocalTranscriptPage
-import com.labteto.dshmobile.local.session.LocalTranscriptPageCursor
+import com.labteto.dshmobile.uicontract.TranscriptUiPort
+import com.labteto.dshmobile.uicontract.UiTranscriptPage
+import com.labteto.dshmobile.uicontract.UiTranscriptCursor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal data class LocalTranscriptHistoryLoadResult(
     val olderMessages: List<LocalHarnessMessage>,
-    val nextCursor: LocalTranscriptPageCursor?,
+    val nextCursor: UiTranscriptCursor?,
     val loadedRawMessages: Int = 0,
 )
 
@@ -20,14 +20,14 @@ internal data class LocalTranscriptHistoryLoadResult(
  * loader only decides how many bounded pages are needed to satisfy the separate foreground quota.
  */
 internal class LocalTranscriptHistoryLoader(
-    private val session: LocalSessionUiFacade,
+    private val session: TranscriptUiPort,
     private val currentSessionId: () -> String,
     private val liveMessages: () -> List<LocalHarnessMessage>,
 ) {
     suspend fun bootstrap(sessionId: String): LocalTranscriptHistoryLoadResult? {
         var olderMessages = emptyList<LocalHarnessMessage>()
-        var pageCursor: LocalTranscriptPageCursor? = null
-        var nextCursor: LocalTranscriptPageCursor? = null
+        var pageCursor: UiTranscriptCursor? = null
+        var nextCursor: UiTranscriptCursor? = null
         var needsMoreVisibleDialogue = true
         var cursorAdvanced = true
         var loadedPages = 0
@@ -66,10 +66,10 @@ internal class LocalTranscriptHistoryLoader(
     suspend fun olderBatch(
         sessionId: String,
         olderMessages: List<LocalHarnessMessage>,
-        startCursor: LocalTranscriptPageCursor,
+        startCursor: UiTranscriptCursor,
     ): LocalTranscriptHistoryLoadResult? {
         var accumulated = olderMessages
-        var nextCursor: LocalTranscriptPageCursor? = startCursor
+        var nextCursor: UiTranscriptCursor? = startCursor
         var loadedRawMessages = 0
         val initialVisibleCount = userVisibleDialogueMessageCount(
             mergeLocalTranscriptHistory(accumulated, liveMessages()),
@@ -114,8 +114,8 @@ internal class LocalTranscriptHistoryLoader(
 
     private suspend fun readPage(
         sessionId: String,
-        cursor: LocalTranscriptPageCursor?,
-    ): LocalTranscriptPage = withContext(Dispatchers.IO) {
+        cursor: UiTranscriptCursor?,
+    ): UiTranscriptPage = withContext(Dispatchers.IO) {
         session.transcriptPage(
             sessionId = sessionId,
             cursor = cursor,

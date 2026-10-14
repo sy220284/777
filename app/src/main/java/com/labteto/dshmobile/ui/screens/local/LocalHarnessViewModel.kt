@@ -46,7 +46,8 @@ class LocalHarnessViewModel @Inject constructor(
     val attachmentUiPort: com.labteto.dshmobile.uicontract.AttachmentUiPort,
     private val uiPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val chatUi: LocalChatUiFacade,
-    private val sessionUi: LocalSessionUiFacade,
+    val sessionUiPort: com.labteto.dshmobile.uicontract.SessionUiPort,
+    val transcriptUiPort: com.labteto.dshmobile.uicontract.TranscriptUiPort,
     private val toolsUi: LocalToolsUiFacade,
     private val usageUi: com.labteto.dshmobile.uicontract.UsageUiPort,
     private val approvalPreferences: LocalApprovalPreferences,
@@ -123,7 +124,7 @@ class LocalHarnessViewModel @Inject constructor(
     val gallery = personaGalleryController.gallery
     val personaPresets: List<PersonaPreset> = personaGalleryController.personaPresets
     private val transcriptHistoryController = LocalTranscriptHistoryController(
-        session = sessionUi,
+        session = transcriptUiPort,
         currentSessionId = { state.value.sessionId },
         liveMessages = { state.value.messages },
         scope = viewModelScope,
@@ -320,7 +321,16 @@ class LocalHarnessViewModel @Inject constructor(
     }
     fun toggleSessionPinned(sessionId: String) = conversationUiState.toggleSessionPinned(sessionId)
     fun renameSession(sessionId: String, title: String): Boolean = conversationUiState.renameSession(sessionId, title)
-    suspend fun deleteSessions(ids: Set<String>): Int = conversationUiState.deleteSessions(ids, runtime.session::deleteSessions)
+    suspend fun deleteSessions(ids: Set<String>): Int {
+        val receipt = sessionUiPort.delete(ids)
+        val deleted = when (receipt) {
+            is com.labteto.dshmobile.uicontract.UiSessionDeletionReceipt.Deleted -> receipt.sessionIds
+            is com.labteto.dshmobile.uicontract.UiSessionDeletionReceipt.Failed -> error(receipt.message ?: "会话删除未完成，请重新读取列表")
+        }
+        deleted.forEach { conversationDraftUiPort.updateDraft(it, ""); conversationDraftUiPort.clearAttachments(it) }
+        conversationUiState.forgetSessions(deleted)
+        return deleted.size
+    }
     suspend fun importAttachment(uri: Uri, identity: com.labteto.dshmobile.uicontract.UiSessionIdentity?): LocalImportedAttachment {
         val expected = identity ?: error("会话已改变，请重新选择附件")
         return when (val receipt = attachmentUiPort.import(com.labteto.dshmobile.uicontract.ImportUiAttachmentCommand(expected, uri.toString()))) {
@@ -394,19 +404,17 @@ class LocalHarnessViewModel @Inject constructor(
             LocalUsageMode.WORK -> workConversationUiPort.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.Stop(identity))
         }
     }
-    internal fun workHandoffSummary(): String = runtime.session.currentHandoffSummary()
-    internal fun createWorkContinuation(sourceSessionId: String, summary: String): Boolean {
+    internal fun workHandoffSummary(): String = captureUiSendIdentity()?.let(sessionUiPort::handoffSummary).orEmpty()
+    internal fun createWorkContinuation(sourceSessionId: String, summary: String, identity: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Boolean {
         if (state.value.sessionId != sourceSessionId || state.value.usageMode != LocalUsageMode.CHAT) return false
-        return runtime.session.createSession(
-            mode = LocalConversationMode.CONTINUATION,
-            usageMode = LocalUsageMode.WORK,
-            handoffSummaryOverride = summary,
-        )
+        return sessionUiPort.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.Create(
+            identity, LocalConversationMode.CONTINUATION, LocalUsageMode.WORK, summary)) == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
     }
-    fun newSession() = runtime.session.createSession(LocalConversationMode.INDEPENDENT, state.value.usageMode)
-    fun createSession(mode: LocalConversationMode) = runtime.session.createSession(mode, state.value.usageMode)
+    fun newSession() = createSession(LocalConversationMode.INDEPENDENT, state.value.usageMode, captureUiSendIdentity())
+    fun createSession(mode: LocalConversationMode, usageMode: LocalUsageMode, identity: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Boolean = sessionUiPort.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.Create(
+        identity, mode, usageMode)) == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
     fun setPlanMode(enabled: Boolean) = runtime.work.setPlanMode(enabled)
-    fun switchUsageMode(mode: LocalUsageMode) = runtime.session.switchUsageMode(mode)
+    fun switchUsageMode(mode: LocalUsageMode) { sessionUiPort.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.SelectMode(mode)) }
     suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = personaGalleryController.configureChatPersona(profile)
     fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) {
         viewModelScope.launch {
@@ -416,6 +424,6 @@ class LocalHarnessViewModel @Inject constructor(
 
     suspend fun autoFillChatPersona(description: String): Result<PersonaProfile> =
         chatModelAssistController.autoFillCurrentPersona(description)
-    fun switchSession(sessionId: String) = runtime.session.switchSession(sessionId)
+    fun switchSession(sessionId: String): Boolean = sessionUiPort.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.Open(sessionId)) == com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued
     fun clearCredential() = runtime.model.clearCredential()
 }

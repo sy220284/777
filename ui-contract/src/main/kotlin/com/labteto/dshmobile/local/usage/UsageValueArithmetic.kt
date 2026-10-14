@@ -5,4 +5,3 @@ fun saturatingUsageAdd(left: Long, right: Long): Long {
     val safeRight = right.coerceAtLeast(0L)
     return if (safeLeft > Long.MAX_VALUE - safeRight) Long.MAX_VALUE else safeLeft + safeRight
 }
-

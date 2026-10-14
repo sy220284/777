@@ -1,0 +1,28 @@
+package com.labteto.dshmobile.uicontract
+
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.local.session.LocalSessionSummary
+import kotlinx.coroutines.flow.Flow
+
+data class UiSessionsSnapshot(val identity: UiSessionIdentity?, val usageMode: LocalUsageMode,
+    val loading: Boolean, val sessions: List<LocalSessionSummary>, val error: String?)
+sealed interface SessionUiCommand {
+    /** Navigation has an explicit target and does not retarget a domain mutation. */
+    data class Open(val sessionId: String) : SessionUiCommand
+    data class SelectMode(val mode: LocalUsageMode) : SessionUiCommand
+    data class Create(val identity: UiSessionIdentity?, val mode: LocalConversationMode,
+        val usageMode: LocalUsageMode, val handoffSummary: String? = null) : SessionUiCommand
+}
+sealed interface UiSessionDeletionReceipt {
+    data class Deleted(val sessionIds: Set<String>) : UiSessionDeletionReceipt
+    /** Cleanup may have partially committed. Refresh the real catalog before another attempt. */
+    data class Failed(val message: String?) : UiSessionDeletionReceipt
+}
+interface SessionUiPort {
+    val snapshots: Flow<UiSessionsSnapshot>
+    fun snapshot(): UiSessionsSnapshot
+    fun submit(command: SessionUiCommand): UiCommandReceipt
+    fun handoffSummary(identity: UiSessionIdentity): String?
+    suspend fun delete(sessionIds: Set<String>): UiSessionDeletionReceipt
+}

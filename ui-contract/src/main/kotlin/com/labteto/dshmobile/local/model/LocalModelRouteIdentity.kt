@@ -12,4 +12,3 @@ data class LocalModelRouteIdentity(
     val protocol: String = "",
     val fingerprint: String = "",
 )
-

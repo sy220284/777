@@ -2,7 +2,7 @@ package com.labteto.dshmobile.uicontract
 
 import kotlinx.coroutines.flow.Flow
 
-enum class UiDocumentOrigin { MODEL, LOCAL }
+enum class UiDocumentOrigin { MODEL, LOCAL, UNKNOWN }
 data class UiDocumentProvenance(val requestId: String?, val model: String, val usageReported: Boolean,
     val origin: UiDocumentOrigin = UiDocumentOrigin.MODEL)
 data class UiDocumentSnapshot(

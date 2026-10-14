@@ -5,5 +5,3 @@ enum class LocalImageInputMode {
     NATIVE,
     TOOL,
 }
-
-

@@ -49,10 +49,10 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
         Text(document.title, Modifier.semantics { heading() })
         if (snapshot.provenance.origin == com.labteto.dshmobile.uicontract.UiDocumentOrigin.LOCAL) {
             Text(stringResource(R.string.ui_document_local_source))
-        } else {
+        } else if (snapshot.provenance.origin == com.labteto.dshmobile.uicontract.UiDocumentOrigin.MODEL) {
             Text(stringResource(R.string.ui_document_model_source, snapshot.provenance.model))
             if (!snapshot.provenance.usageReported) Text(stringResource(R.string.ui_document_usage_unknown))
-        }
+        } else { Text(stringResource(R.string.ui_document_history_incomplete)) }
         document.nodes.forEach { node ->
             LocalDocumentNode(node, values, snapshot, identity != null,
                 update = { id, text -> forms.update(key, id, text) },

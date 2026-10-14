@@ -70,4 +70,3 @@ data class MemoryRecord(
     val createdAt: Long,
     val updatedAt: Long,
 )
-

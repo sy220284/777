@@ -214,6 +214,7 @@ fun LocalHarnessScreen(
     var composerHandoff by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var installedSkillDisplayNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var pendingWorkCapability by rememberSaveable { mutableStateOf<String?>(null) }
+    var workHandoffSourceIdentity by remember { mutableStateOf<com.labteto.dshmobile.uicontract.UiSessionIdentity?>(null) }
     var workHandoffSourceSessionId by rememberSaveable { mutableStateOf("") }
     var workHandoffSummary by rememberSaveable { mutableStateOf("") }
     var workHandoffMessageIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
@@ -416,6 +417,7 @@ fun LocalHarnessScreen(
         } else {
             pendingWorkCapability = prompt
             workHandoffSourceSessionId = shell.sessionId
+            workHandoffSourceIdentity = viewModel.captureUiSendIdentity()?.takeIf { it.sessionId == shell.sessionId }
             workHandoffSummary = viewModel.workHandoffSummary()
             workHandoffMessageIds = emptyList()
             workHandoffSearch = ""
@@ -1032,6 +1034,7 @@ fun LocalHarnessScreen(
                     workHandoffSummaryWithSelectedMessages(
                         workHandoffSummary, workHandoffSourceSessionId, handoffMessages, workHandoffMessageIds,
                     ),
+                    workHandoffSourceIdentity,
                 )
                 if (workCapabilityConfirmed) pendingUsageMode = LocalUsageMode.WORK
                 else workCapabilityFailed = true
@@ -1090,7 +1093,7 @@ fun LocalHarnessScreen(
                 usageMode = shell.usageMode,
                 onDismiss = ::dismissNewSessionMode,
                 onSelect = { mode ->
-                    if (viewModel.createSession(mode)) {
+                    if (viewModel.createSession(mode, sendMode, sendIdentity)) {
                         showNewSessionMode = false
                         conversationOpenedFromDrawer = newSessionOpenedFromDrawer
                         newSessionOpenedFromDrawer = false

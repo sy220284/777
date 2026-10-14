@@ -186,4 +186,3 @@ data class TokenUsageGroupDetail(
     val agents: List<TokenUsageAgentSummary>,
     val records: List<TokenUsageRecord>,
 )
-
