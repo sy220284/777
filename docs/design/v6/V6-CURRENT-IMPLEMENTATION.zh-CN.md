@@ -1,6 +1,6 @@
 # 神言神语 V6 · 现行实现反向设计规范
 
-> **状态：候选 V6.1 设计基线（文档 PR，待合并）** · 基准主线：`3a69089de1d95fe655b550bf59cb4816e25720a7`（2026-10-14）
+> **状态：候选 V6.1 设计基线（文档 PR，待合并）** · 基准主线：`3cdd12f3395876b2d495721336d5d378b562a03c`（2026-10-14）
 > **判定顺序：真实生产 Compose + 已合并代码 > 本 V6 设计规范/交互原型 > Figma、截图及素材 > 历史方案。** UI 包之间的通用接口、替换和验收另遵守 [UI 3.0 权威规范](../UI-3.0.zh-CN.md)；业务事实与权限遵守架构 3.0。这里不是一套要求旧代码反向符合的“新 UI 构想”。
 >
 > **适用：Android 手机 V6 包。** 393dp / 412dp 为既有设计参考尺寸，另需检查 320/360dp、系统字体放大、手势导航、IME。离线原型是可编辑的视觉/流程投影，不能当作 Compose 渲染截图或真机验证。
@@ -76,7 +76,7 @@
 
 **加号与媒体**：一级加号弹层单行四项 `拍照 / 图片 / 文件 / 多模态创作`，不再用四个大图标卡嵌套白色板；团队/共享为轻量图标文字行。不同媒体实际请求/生成/归档/失败应保留原 Feature 的身份、真实状态和可用动作，不能让设计稿预设“都已生成”。
 
-**技能 / 插件（#711 仍待合并）**：主线当前材质高光仍有紧凑 `Row` 错误测量风险；PR #711 计划用不参与布局测量的 `Canvas(matchParentSize())` 修复。设计目标为 40dp 图标区，标题不受按钮挤压、描述独占一行区域且最多两行、卡片底部独立操作行，详情看完整说明；搜索覆盖说明，加载/安装时保留已有项，受影响动作禁用，预置技能无安装回调不显示假“添加”。**只有该 PR 真正合并并复验之后才标记为生产已实现。** 不得在规范中把当前 bug 写成需要保留的“设计特征”。
+**技能 / 插件（#711 已合并）**：主线通过不参与布局测量的 `Canvas(matchParentSize())` 修复顶部装饰性高光撑宽紧凑 `Row` 的问题。现行布局为 40dp 图标区，标题不受按钮挤压、描述独占一行区域且最多两行、卡片底部独立操作行，详情看完整说明；搜索覆盖说明，加载/安装时保留已有项，受影响动作禁用，预置技能无安装回调不显示假“添加”。Android 16/17 的自动化测试与合并门禁已通过；放大字体、实际触摸与 TalkBack 的设备视觉验收仍须单独记录。
 
 **外观**：主题支持暖纸/烟熏玻璃/哑光黑以及系统跟随；外观页不再展示大面积演示和冗余讲解，只有短助手行+一条用户气泡阅读预览。页面尾部“高级外观”**默认折叠**，同页展开四组：色彩与背景、材质与透明度、动效与动画、组件视觉；包含环境光、智能对比、透明度、节奏、强调强度与恢复默认。壁纸模式环境光滑块不可用，不能假装对壁纸生效。设置即时保存/投影由真实设置存储承担。
 
@@ -111,7 +111,7 @@
 - [主线功能路由](../../../app/src/main/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalog.kt)；[V6 视觉令牌](../../../app/src/main/java/com/shenyan/designsystem/foundation/ShenyanFoundation.kt)；[材质](../../../app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterial.kt)；[材质取色](../../../app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterialColor.kt)。
 - [设置导航](../../../app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt)、[输入框](../../../app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt)、[消息](../../../app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt)、[工具技能](../../../app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt)。
 - 已合并：[#693](https://github.com/sy220284/777/pull/693)、[#694](https://github.com/sy220284/777/pull/694)、[#696–#704](https://github.com/sy220284/777/pulls?q=is%3Apr+is%3Amerged+693..704)、[#708](https://github.com/sy220284/777/pull/708)、[#709](https://github.com/sy220284/777/pull/709)、[#710](https://github.com/sy220284/777/pull/710)。
-- **未合并**：[#711 技能/插件布局](https://github.com/sy220284/777/pull/711)、[#705 UI 3.0 R4](https://github.com/sy220284/777/pull/705)。R4 独立 UI Pack、双包接管和动态交互能力仍在迁移中，不能写成本版本生产已完成。
+- **已合并**：[#711 技能/插件布局](https://github.com/sy220284/777/pull/711)。**未合并**：[#705 UI 3.0 R4](https://github.com/sy220284/777/pull/705)。R4 独立 UI Pack、双包接管和动态交互能力仍在迁移中，不能写成本版本生产已完成。
 
 ### Figma 状态
 
