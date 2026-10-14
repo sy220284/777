@@ -17,6 +17,35 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree
 
+# Keep the historical 26-icon editable sheet in Git, but never export retired
+# Projects / RunCenter tiles in the currently supported 24-icon design pack.
+SVG_NS = "{http://www.w3.org/2000/svg}"
+RETIRED = {"Projects", "RunCenter"}
+
+def active_entry_icon_sheet(raw: bytes) -> bytes:
+    root = ElementTree.fromstring(raw)
+    top_level_tiles = root.findall(f"{SVG_NS}g")
+    if len(top_level_tiles) != 26:
+        raise ValueError(f"Expected 26 source icon tiles, found {len(top_level_tiles)}")
+    removed = set()
+    for tile in top_level_tiles:
+        labels = {el.text for el in tile.findall(f"{SVG_NS}text")}
+        matching = labels & RETIRED
+        if matching:
+            removed.update(matching)
+            root.remove(tile)
+    if removed != RETIRED or len(root.findall(f"{SVG_NS}g")) != 24:
+        raise ValueError(f"Retired icon mismatch: {removed}, expected {RETIRED}")
+    for child in root.findall(f"{SVG_NS}text"):
+        if child.text and "26 枚" in child.text:
+            child.text = child.text.replace("26 枚", "24 枚")
+    ElementTree.register_namespace("", SVG_NS[1:-1])
+    cleaned = ElementTree.tostring(root, encoding="utf-8", xml_declaration=True)
+    ElementTree.fromstring(cleaned)
+    if any(name.encode("utf-8") in cleaned for name in RETIRED):
+        raise ValueError("Retired entry icon still exists in exported sheet")
+    return cleaned
+
 parser = argparse.ArgumentParser(description="Package current V6 mobile design and semantic sources")
 parser.add_argument("--source", type=Path, required=True, help="Repository docs/design/v6 directory")
 parser.add_argument("--output", type=Path, required=True, help="Destination ZIP archive")
@@ -58,14 +87,14 @@ for item in allowed_files:
     if item.suffix.lower() in {".svg", ".xml"}:
         ElementTree.parse(item)
 
-rows = [
-    hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.relative_to(source).as_posix()
-    for p in allowed_files
-]
+payload = {p.relative_to(source).as_posix(): p.read_bytes() for p in allowed_files}
+# The V6 deliverable is not the historical overview sheet: filter at export time.
+payload["sy-entry-icons.svg"] = active_entry_icon_sheet(payload["sy-entry-icons.svg"])
+rows = [hashlib.sha256(data).hexdigest() + "  " + name for name, data in payload.items()]
 output.parent.mkdir(parents=True, exist_ok=True)
 with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED, compresslevel=8) as z:
-    for item in allowed_files:
-        z.write(item, item.relative_to(source).as_posix())
+    for name, data in payload.items():
+        z.writestr(name, data)
     z.writestr("MANIFEST.sha256", "\n".join(rows) + "\n")
 with zipfile.ZipFile(output) as z:
     if z.testzip() is not None:
@@ -75,7 +104,7 @@ with zipfile.ZipFile(output) as z:
         if hashlib.sha256(z.read(filename)).hexdigest() != sha:
             raise SystemExit("ZIP manifest checksum mismatch: " + filename)
 print(json.dumps({
-    "archive": str(output), "files": len(allowed_files)+1,
+    "archive": str(output), "files": len(payload)+1, "activeEntryIcons": 24,
     "bytes": output.stat().st_size, "routes": routes,
     "sourceOfTruth": manifest["sourceOfTruth"],
     "warning": "HTML preview and ZIP are not Android device/Figma verification",
