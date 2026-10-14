@@ -31,3 +31,11 @@ Figma 当前 Starter MCP 配额耗尽，未写入可编辑画布；仓库设计�
 - 外部重绘 ZIP 保留新渲染图和独立源文件；**GitHub 仓库源码及生成导出内容已对齐，但仓库 ZIP 与已交付外部完整 ZIP 仍是两种体量的工件**（前者无 59 张 PNG），不要混淆两者内容数量。Android 原生、Figma 在线画布仍单独验收。
 
 - 当前可编辑源由 `mobile/index.html`、`mobile/v6.css`、`mobile/v6.js` 和 `assets/icons`、`assets/portraits` 的现行 SVG 组成；`build-standalone.py` 可重复构建单文件 `mobile/app.html`，CI 对照确保离线版本不会与设计源分叉。
+
+## V6.3 全量非核心图标重绘
+
+- **61 枚常用操作图标**：保留原 `FeatherIcons.*` API 名称以避免调用层改动，但 **每枚路径已经按 V6 网格重绘**，可编辑 SVG 放在 `assets/icons-actions/`，同源 Kotlin 为 `ui/components/FeatherIcons.kt`。
+- **20 枚文件图标（10 类 × 浅/深主题）**：统一 40dp、1.75 描边和语义色，清理原 52×68 带渐变的旧款，Android XML 与设计 SVG 同源输出；源为 `file-icons.json` 和 `generate-file-icons.py`。
+- **11 枚独立资源图标**：加号、发送、停止、勾选、模型、插件、子代理、任务、项目及空态插图。保持发送/停止白色对比和空态插画尺寸，旧项目功能不恢复。
+- **1 处 Material 搜索默认图标**已在设计系统 `SySearchBar` 内换成 V6 搜索线条；应用启动、通知栏蝴蝶与透明启动占位是明确的品牌/系统例外，不作为 24dp 操作图标强制重绘。
+- [图标质量核验脚本](audit-all-icons.py) 逐项比较 Kotlin/Android XML 与可编辑 SVG 的真实 pathData、尺寸、描边、目录数量，运行于 CI，不仅依赖 README 统计。
