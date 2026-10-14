@@ -17,7 +17,6 @@ internal enum class LocalFeatureDrawerEntry {
     TOOLS,
     MINIMAX_QUOTA,
     USAGE,
-    IMMERSIVE_READER,
     SETTINGS,
 }
 

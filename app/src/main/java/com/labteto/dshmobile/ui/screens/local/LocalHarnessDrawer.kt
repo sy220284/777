@@ -126,7 +126,6 @@ internal fun LocalModeDrawer(
     onSettings: () -> Unit,
     onMiniMaxQuota: (() -> Unit)? = null,
     onUsage: (() -> Unit)? = null,
-    onImmersiveReader: (() -> Unit)? = null,
     globalSearchOpenRequest: Int = 0,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
@@ -409,7 +408,6 @@ internal fun LocalModeDrawer(
                             onTools = onTools,
                             onMiniMaxQuota = onMiniMaxQuota,
                             onUsage = onUsage,
-                            onImmersiveReader = onImmersiveReader,
                         )
                     }
                 }

@@ -381,32 +381,23 @@ fun SettingsScreen(
                 ) {
                 when (shownPage) {
                     SettingsDestination.ROOT -> {
-                        AppSettingsMenuGroup(stringResource(R.string.settings_group_common)) {
+                        AppSettingsMenuGroup(stringResource(R.string.settings_group_appearance_experience)) {
                             AppSettingsRow(icon = SyEntryIcons.Appearance,
                                 title = stringResource(R.string.settings_page_appearance),
                                 onClick = { openPage(SettingsDestination.APPEARANCE) }, compact = true)
                             AppSettingsDivider()
-                            AppSettingsRow(icon = SyEntryIcons.Memory,
-                                title = stringResource(R.string.settings_page_memory),
-                                onClick = { openPage(SettingsDestination.MEMORY) }, compact = true)
-                            AppSettingsDivider()
-                            AppSettingsRow(icon = SyEntryIcons.SessionStorage,
-                                title = stringResource(R.string.fluid_settings_session_storage),
-                                onClick = { openPage(SettingsDestination.SESSION_STORAGE) }, compact = true)
+                            AppSettingsRow(
+                                icon = SyEntryIcons.Notifications,
+                                title = stringResource(R.string.settings_page_notifications),
+                                onClick = { openPage(SettingsDestination.NOTIFICATIONS) },
+                                compact = true,
+                            )
                         }
-                        AppSettingsMenuGroup(stringResource(R.string.settings_group_models_experience)) {
+                        AppSettingsMenuGroup(stringResource(R.string.settings_group_models_account)) {
                             AppSettingsRow(
                                 icon = SyEntryIcons.Models,
                                 title = stringResource(R.string.settings_page_models),
                                 onClick = { openPage(SettingsDestination.MODELS) },
-                                compact = true,
-                            )
-                            AppSettingsDivider()
-                            AppSettingsRow(
-                                icon = SyEntryIcons.Performance,
-                                title = stringResource(R.string.settings_model_performance_title),
-                                reservedEntryHeight = 72.dp,
-                                onClick = { openPage(SettingsDestination.MODEL_PERFORMANCE) },
                                 compact = true,
                             )
                             AppSettingsDivider()
@@ -418,11 +409,21 @@ fun SettingsScreen(
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = SyEntryIcons.Notifications,
-                                title = stringResource(R.string.settings_page_notifications),
-                                onClick = { openPage(SettingsDestination.NOTIFICATIONS) },
+                                icon = SyEntryIcons.Performance,
+                                title = stringResource(R.string.settings_model_performance_title),
+                                reservedEntryHeight = 72.dp,
+                                onClick = { openPage(SettingsDestination.MODEL_PERFORMANCE) },
                                 compact = true,
                             )
+                        }
+                        AppSettingsMenuGroup(stringResource(R.string.settings_group_memory_data)) {
+                            AppSettingsRow(icon = SyEntryIcons.Memory,
+                                title = stringResource(R.string.settings_page_memory),
+                                onClick = { openPage(SettingsDestination.MEMORY) }, compact = true)
+                            AppSettingsDivider()
+                            AppSettingsRow(icon = SyEntryIcons.SessionStorage,
+                                title = stringResource(R.string.fluid_settings_session_storage),
+                                onClick = { openPage(SettingsDestination.SESSION_STORAGE) }, compact = true)
                         }
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_system_maintenance)) {
                             AppSettingsRow(
