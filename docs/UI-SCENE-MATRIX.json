@@ -19,7 +19,39 @@
       "recovery": "Shared Session + Chat branch + draft + reading anchor",
       "v6": 1,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "send": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "resend": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "regenerate": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "select_variant": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "conversation.work",
@@ -35,7 +67,27 @@
       "recovery": "Shared Session + Work run identity + draft",
       "v6": 2,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "send": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "stop": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "answer_question": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "conversation.header",
@@ -51,7 +103,27 @@
       "recovery": "Session metadata + explicit delete confirmation",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "rename": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "pin": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "delete": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "conversation.timeline",
@@ -66,7 +138,21 @@
       "recovery": "Session EventLog cursor + message/branch anchor",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "load_older": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "locate_message": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "conversation.composer",
@@ -82,7 +168,27 @@
       "recovery": "Session-keyed draft; rejected send retains input",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "send": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "queue": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "import_attachment": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "conversation.reply_status",
@@ -96,7 +202,15 @@
       "recovery": "Model request/Work events; no invented percentages",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "stop": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "conversation.message_actions",
@@ -113,7 +227,33 @@
       "recovery": "Message ID + branch/variant; old interactions invalidated",
       "v6": 11,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "edit": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "regenerate": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "copy": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "select_variant": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "conversation.edit",
@@ -127,7 +267,15 @@
       "recovery": "Message ID + edit draft; owner admission",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "edit_and_resend": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "conversation.reader",
@@ -142,7 +290,21 @@
       "recovery": "Reading position + drawer origin",
       "v6": 5,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "read": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "close": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "conversation.model_picker",
@@ -156,7 +318,15 @@
       "recovery": "Exact account/profile; running admission",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "select_profile": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "conversation.attachments",
@@ -170,7 +340,15 @@
       "recovery": "Android picker + attachment import owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "import_attachment": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "chat.persona_picker",
@@ -184,7 +362,15 @@
       "recovery": "Gallery/persona identity",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "select_persona": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "chat.persona_editor",
@@ -199,7 +385,21 @@
       "recovery": "Persona draft; explicitly frozen model request",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "configure_persona": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "auto_fill": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "chat.character_tuning",
@@ -213,7 +413,15 @@
       "recovery": "Chat profile values; no invented relationship facts",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "configure_behavior": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "chat.group_members",
@@ -227,7 +435,15 @@
       "recovery": "Member gallery IDs + current session",
       "v6": 10,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "configure_members": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "chat.group_announcement",
@@ -241,7 +457,15 @@
       "recovery": "Current group session + owner validation",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "save_announcement": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "chat.reply_suggestions",
@@ -256,7 +480,21 @@
       "recovery": "Current turn + bounded generated suggestions",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "generate_suggestions": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "send": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "chat.branches",
@@ -271,7 +509,21 @@
       "recovery": "Chat branch identity + context generation",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "select_variant": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "regenerate": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "work.approval",
@@ -286,7 +538,21 @@
       "recovery": "Existing pending callId + interaction waiter",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "approve": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "deny": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "work.steering_choice",
@@ -301,7 +567,21 @@
       "recovery": "Composer draft + explicit steering choice; queue/execution remain original Work owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "select_steering": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "dismiss_steering": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "work.question",
@@ -316,7 +596,21 @@
       "recovery": "Existing question callId + owner waiter",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "answer_question": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "cancel_question": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "work.plan_review",
@@ -330,7 +624,15 @@
       "recovery": "Real pending plan question ID",
       "v6": 19,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "answer_question": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "work.team",
@@ -347,7 +649,33 @@
       "recovery": "Team run/member identities + EventLog projection",
       "v6": 17,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "start_team": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "message_member": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "stop_member": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "stop_team": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "work.capabilities",
@@ -361,7 +689,15 @@
       "recovery": "Tool descriptions; execution authority remains owner",
       "v6": 14,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "use_capability": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "workspace.preview",
@@ -377,7 +713,27 @@
       "recovery": "Workspace relative path + project identity",
       "v6": 16,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "preview": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "share": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "open_artifact": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "chat.gallery",
@@ -394,7 +750,33 @@
       "recovery": "Gallery/story identities + revision",
       "v6": 6,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "save": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "import": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "export": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "start_story": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "chat.gallery_profile",
@@ -410,7 +792,27 @@
       "recovery": "Saved profile/story identity; draft",
       "v6": 7,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "edit": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "inspect": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "apply_suggestions": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "chat.world_book",
@@ -424,7 +826,15 @@
       "recovery": "Owner profile data; no second memory store",
       "v6": 8,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "edit_world_book": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "chat.gallery_delete",
@@ -440,7 +850,27 @@
       "recovery": "Explicit target IDs + confirmation",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "delete_persona": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "delete_story": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "delete_history": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "chat.gallery_portrait",
@@ -455,7 +885,21 @@
       "recovery": "Android file picker + gallery identity",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "import_portrait": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "remove_portrait": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "chat.diary",
@@ -470,7 +914,21 @@
       "recovery": "Subject ID + entry ID + expected revision",
       "v6": 9,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "correct_diary": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "deactivate_diary": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "automation.tasks",
@@ -488,7 +946,39 @@
       "recovery": "Task ID + durable schedule generation",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "create": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "enable": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "run": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "delete": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "automation.editor",
@@ -502,7 +992,15 @@
       "recovery": "Task draft + generation; scheduler remains owner",
       "v6": 13,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "save_task": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "automation.persona_interaction",
@@ -516,7 +1014,15 @@
       "recovery": "Chat target + Automation task generation",
       "v6": 12,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "configure_schedule": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "tools.mcp",
@@ -532,7 +1038,27 @@
       "recovery": "Registry snapshot; connection health unknown until observed",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "connect": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "disconnect": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "list_tools": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "tools.github",
@@ -547,7 +1073,21 @@
       "recovery": "Existing encrypted credential owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "save_credentials": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "clear_credentials": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "tools.plugins",
@@ -564,7 +1104,33 @@
       "recovery": "Plugin lifecycle/resource admission",
       "v6": 18,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "install": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "enable": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "disable": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "remove": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "media.creation",
@@ -580,7 +1146,27 @@
       "recovery": "Media owner task/profile identity; unknown outcome no blind replay",
       "v6": 38,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "create": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "query": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "save": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "media.result",
@@ -596,7 +1182,27 @@
       "recovery": "Media sidecar task ID + session origin",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "preview": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "save": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "play": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "shell.new_session",
@@ -612,7 +1218,27 @@
       "recovery": "Committed session selects mode; draft not silently dropped",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "create_chat": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "create_work": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "create_group": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "shell.search",
@@ -627,7 +1253,21 @@
       "recovery": "Source session/task/file anchor + return chain",
       "v6": 33,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "search": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "open_result": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "shell.onboarding",
@@ -642,7 +1282,21 @@
       "recovery": "Explicit onboarding preference",
       "v6": 31,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "configure": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "finish": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "shell.empty",
@@ -657,7 +1311,21 @@
       "recovery": "No inferred successful state",
       "v6": 34,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "configure": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "create_session": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "shell.error",
@@ -671,7 +1339,15 @@
       "recovery": "Owner error/retry capability; sensitive values excluded",
       "v6": 35,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "retry_if_owner_allows": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "shell.notifications",
@@ -685,7 +1361,15 @@
       "recovery": "Notification source session + consumed deep link",
       "v6": 36,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open_session": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "system.permissions",
@@ -699,7 +1383,15 @@
       "recovery": "Android grants; UI cannot manufacture authorization",
       "v6": 32,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "request_permission": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.root",
@@ -714,7 +1406,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.session",
@@ -729,7 +1435,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.appearance",
@@ -744,7 +1464,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.chat",
@@ -759,7 +1493,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.models",
@@ -774,7 +1522,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.model_performance",
@@ -789,7 +1551,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.account",
@@ -804,7 +1580,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.model_usage",
@@ -819,7 +1609,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.minimax_quota",
@@ -834,7 +1638,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.pricing",
@@ -849,7 +1667,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.usage",
@@ -864,7 +1696,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.usage_log",
@@ -879,7 +1725,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.usage_detail",
@@ -894,7 +1754,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.memory",
@@ -909,7 +1783,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.memory_settings",
@@ -924,7 +1812,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.memory_management",
@@ -939,7 +1841,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.permissions",
@@ -954,7 +1870,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.notifications",
@@ -969,7 +1899,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.advanced",
@@ -984,7 +1928,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.session_storage",
@@ -999,7 +1957,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.diagnostics",
@@ -1014,7 +1986,21 @@
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "open": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "settings.update",
@@ -1029,7 +2015,21 @@
       "recovery": "Settings ROOT; existing update owner retains download/install status; standalone page retired in #697",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "check_update": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "observe_download_install_status": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "route.home",
@@ -1044,7 +2044,21 @@
       "recovery": "LocalFeatureCatalog + contribution restore policy",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "navigate": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "back": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "route.persona_gallery",
@@ -1059,7 +2073,21 @@
       "recovery": "LocalFeatureCatalog + contribution restore policy",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "navigate": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "back": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "route.diary",
@@ -1074,7 +2102,21 @@
       "recovery": "LocalFeatureCatalog + contribution restore policy",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "navigate": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "back": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "route.workspace",
@@ -1089,7 +2131,21 @@
       "recovery": "LocalFeatureCatalog + contribution restore policy",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "navigate": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "back": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "route.tasks",
@@ -1104,7 +2160,21 @@
       "recovery": "LocalFeatureCatalog + contribution restore policy",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "navigate": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "back": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "route.tools",
@@ -1119,7 +2189,21 @@
       "recovery": "LocalFeatureCatalog + contribution restore policy",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "navigate": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "back": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "route.settings",
@@ -1134,7 +2218,21 @@
       "recovery": "LocalFeatureCatalog + contribution restore policy",
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "navigate": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "back": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "conversation.ui_document",
@@ -1150,7 +2248,27 @@
       "recovery": "Shared Session ui.document.published sidecar + source message/context/profile/project identity; Host SavedStateHandle form values",
       "v6": null,
       "implementation": "V6 和 Next 原生渲染；Next 不支持页面导航并明确禁用该动作；Work 运行内发布和绑定事实尚未实现",
-      "acceptance": "协议/Schema 自动化校验；真实模型、恢复和双包业务旅程待验收"
+      "acceptance": "协议/Schema 自动化校验；真实模型、恢复和双包业务旅程待验收",
+      "actionProof": {
+        "prepare_user_input": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "open_registered_scene": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "answer_current_approval": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     },
     {
       "id": "conversation.ui_document_generate",
@@ -1165,7 +2283,21 @@
       "recovery": "One captured model route/request; actual provider usage; cancelled generation is not replayed",
       "v6": null,
       "implementation": "V6 和 Next 显式确认后调用共享模型生成 Owner；不新增工具权限、不隐式付费重试",
-      "acceptance": "编译/协议自动化验证；真实模型收费与取消旅程待验收"
+      "acceptance": "编译/协议自动化验证；真实模型收费与取消旅程待验收",
+      "actionProof": {
+        "acknowledge_additional_model_request": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "generate_document": {
+          "ownerPort": null,
+          "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
     }
   ],
   "v6ReferenceCoverage": [
@@ -1421,5 +2553,6 @@
       "implementation": "主线 #702 已退役；仅作历史索引",
       "acceptance": "不计入当前场景覆盖"
     }
-  ]
+  ],
+  "actionProofStatus": "PENDING_ACTION_LEVEL_EVIDENCE"
 }
