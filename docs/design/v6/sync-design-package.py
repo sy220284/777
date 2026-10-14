@@ -81,7 +81,7 @@ if any(s in html for s in ("S03Board", "S02v2Work", "mobile-screen-tabs", "38 åœ
 entry_svg = source / "sy-entry-icons.svg"
 root = ElementTree.parse(entry_svg).getroot()
 ns = "{http://www.w3.org/2000/svg}"
-icon_labels = [node.text for node in root.findall(ns + "text") if node.text and re.fullmatch(r"[A-Za-z][A-Za-z0-9]+", node.text)]
+icon_labels = [node.text for node in root.iter(ns + "text") if node.text and re.fullmatch(r"[A-Za-z][A-Za-z0-9]+", node.text)]
 expected_icons = int(manifest["iconInventory"]["activeCount"])
 retired_names = set(manifest["iconInventory"]["retired"])
 if len(icon_labels) != expected_icons or len(set(icon_labels)) != expected_icons:
