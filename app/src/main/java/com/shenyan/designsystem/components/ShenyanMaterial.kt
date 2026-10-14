@@ -183,6 +183,37 @@ fun SyMachineText(text: String, modifier: Modifier = Modifier) {
     )
 }
 
+/**
+ * Paint the exact root background behind a compact overlay, without a separate glass/white plate.
+ * This intentionally samples the same scene and screen coordinates as the app's background host.
+ * In previews without a scene, fall back to the active theme canvas (never hardcoded white).
+ */
+@Composable
+fun SySceneBackgroundSurface(
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(SyMetric.radiusSheet),
+    content: @Composable () -> Unit,
+) {
+    val canvas = LocalSyColors.current.canvas
+    val scene = LocalSySceneBackdrop.current
+    val view = LocalView.current
+    val windowOnScreen = remember { IntArray(2) }
+    var origin by remember { mutableStateOf(IntOffset.Zero) }
+    Box(
+        modifier.clip(shape).onGloballyPositioned { coordinates ->
+            view.rootView.getLocationOnScreen(windowOnScreen)
+            val point = coordinates.positionInWindow()
+            val next = IntOffset(point.x.roundToInt() + windowOnScreen[0],
+                point.y.roundToInt() + windowOnScreen[1])
+            if (origin != next) origin = next
+        },
+    ) {
+        if (scene != null) SyPaintAlignedScene(scene, origin)
+        else Box(Modifier.matchParentSize().background(canvas))
+        content()
+    }
+}
+
 /** Renders only the wallpaper / designed static light fields, not sibling UI layers.
  * Coordinates reproduce ContentScale.Crop and the three root radial brushes exactly.
  * The parent material alone performs the blur; foreground remains sharp.
@@ -213,7 +244,7 @@ private fun SyPaintAlignedScene(scene: SySceneBackdrop, surfaceOrigin: IntOffset
             scene.glowColors.take(3).forEachIndexed { index, color ->
                 val (x, y) = centers[index]
                 drawRect(Brush.radialGradient(
-                    colors = listOf(color.copy(alpha = opacity * if (index == 2) .45f else 1f), Color.Transparent),
+                    colors = listOf(color.copy(alpha = color.alpha * opacity * if (index == 2) .45f else 1f), Color.Transparent),
                     center = Offset(viewport.width * x - dx, viewport.height * y - dy),
                     radius = extent * radii[index],
                 ))
