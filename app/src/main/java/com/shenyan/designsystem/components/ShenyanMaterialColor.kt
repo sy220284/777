@@ -12,8 +12,8 @@ import com.shenyan.designsystem.foundation.SySceneBackdrop
 
 /** The same fill policy is used by drawn glass and platform controls' container colours. */
 @Composable
-fun syMaterialColor(tier: SyMaterialTier): Color =
-    syResolveMaterialFill(LocalSyColors.current, tier, LocalSySceneBackdrop.current)
+fun syMaterialColor(tier: SyMaterialTier, regionY: Float = .5f): Color =
+    syResolveMaterialFill(LocalSyColors.current, tier, LocalSySceneBackdrop.current, regionY)
 
 internal fun syContrastRatio(ink: Color, background: Color): Float {
     val a = ink.compositeOver(background).luminance()
