@@ -2295,5 +2295,12 @@
     <string name="sy_v6_search_user">我发送的消息</string>
     <string name="sy_v6_search_assistant">回复消息</string>
     <string name="sy_v6_search_all">搜索其他会话、人物、任务与文件</string>
+    <!-- Compact model-list accessible capability labels. -->
+    <string name="local_model_capability_image_understand">图片理解</string>
+    <string name="local_model_capability_image_or_generate">图片理解或生成</string>
+    <string name="local_model_capability_video_understand">视频理解</string>
+    <string name="local_model_capability_video_or_generate">视频理解或生成</string>
+    <string name="local_model_capability_speech_services">语音生成或转写</string>
+    <string name="local_model_kimi_k3_context_invalid">Kimi K3 上下文只能设置 4096～1048576；留空使用 256K 默认值</string>
 </resources>
 
