@@ -364,6 +364,11 @@ internal fun LocalModelSettingsCard(
                 SyButton(stringResource(R.string.advanced_save_model_settings), onClick = {
                     if (!savedRoute && apiKey.isBlank() && credentialSourceProfileId == null) {
                         testStatus = "请填写该模型的密钥"
+                    } else if (selectedPreset?.provider == "Kimi Code" && selectedPreset.model == "k3" &&
+                        contextWindowTokens.isNotBlank() &&
+                        contextWindowTokens.toIntOrNull() !in 4_096..1_048_576
+                    ) {
+                        testStatus = "Kimi K3 上下文只能设置 4096～1048576；留空使用 256K 默认值"
                     } else {
                         saving = true
                         val savedGeneration = editorGeneration
@@ -473,6 +478,8 @@ internal fun LocalModelSettingsCard(
                                 editorGeneration++
                                 testStatus = null
                             }
+                            Text("K3 默认 256K；仅已开通 Pro/Allegretto 及以上会员时填写 1048576。",
+                                style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
                         }
                         ModelCapabilityTags(LocalModelPresets.clientCapabilitiesFor(preset.model, preset.baseUrl))
                         if (preset.capabilities.any { it == LocalModelCapability.VIDEO || it == LocalModelCapability.AUDIO }) {
