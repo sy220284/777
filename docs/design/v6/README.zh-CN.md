@@ -29,3 +29,5 @@ Figma 当前 Starter MCP 配额耗尽，未写入可编辑画布；仓库设计�
 - SVG 总览实物只保留现行 **24 枚**入口图标，HTML 同步内嵌同一组可编辑 SVG 数据，不再将保留于 Kotlin 的两枚退役路径导入有效设计包。
 - `sync-design-package.py` 与 CI 静态门禁检查 **SVG 实际枚数、HTML 实际图标键名及退役过滤**，避免“文档写 24 枚但实际打包了 26 枚”。旧屏幕 PNG 未纳入现行仓库打包输入。
 - 外部重绘 ZIP 保留新渲染图和独立源文件；**GitHub 仓库源码及生成导出内容已对齐，但仓库 ZIP 与已交付外部完整 ZIP 仍是两种体量的工件**（前者无 59 张 PNG），不要混淆两者内容数量。Android 原生、Figma 在线画布仍单独验收。
+
+- 当前可编辑源由 `mobile/index.html`、`mobile/v6.css`、`mobile/v6.js` 和 `assets/icons`、`assets/portraits` 的现行 SVG 组成；`build-standalone.py` 可重复构建单文件 `mobile/app.html`，CI 对照确保离线版本不会与设计源分叉。
