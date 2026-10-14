@@ -53,6 +53,14 @@ class AppearancePolicyTest {
     }
 
     @Test
+    fun wallpaperSurfaceRegionQueriesTrackTheirOwnVerticalBands() {
+        assertEquals(.15f, BackgroundRegion.TOP.sampleY(), .0001f)
+        assertEquals(.50f, BackgroundRegion.MIDDLE.sampleY(), .0001f)
+        assertEquals(.50f, BackgroundRegion.ALL.sampleY(), .0001f)
+        assertEquals(.88f, BackgroundRegion.BOTTOM.sampleY(), .0001f)
+    }
+
+    @Test
     fun wallpaperTransparencyPreferenceHasVisibleMonotonicRange() {
         val opaque = resolveWallpaperAlpha(
             adaptiveAlpha = 0.58f,
