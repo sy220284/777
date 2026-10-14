@@ -21,16 +21,14 @@ internal fun syContrastRatio(ink: Color, background: Color): Float {
     return (maxOf(a, b) + .05f) / (minOf(a, b) + .05f)
 }
 
-/** Constant-time cached region sampling; no bitmap decode/read occurs in composition or drawing.
- * Tint prevents a neutral white slab over coloured wallpaper. WCAG 4.5:1 secondary-text contrast
- * bounds its strength and, when adaptive contrast is enabled, the required backing opacity.
+/**
+ * All five tiers draw from one root scene: the theme canvas, its static glow or the actual
+ * wallpaper's sampled region. Tiers change opacity/contrast, never switch to a white palette.
+ * Colour sampling is cached by AppBackgroundHost; this resolver never reads bitmap pixels.
  */
 internal fun syResolveMaterialFill(
     colors: SyColors, tier: SyMaterialTier, scene: SySceneBackdrop?, regionY: Float = .5f,
 ): Color {
-    fun contrast(background: Color): Float = listOf(colors.text, colors.textSecondary,
-        colors.textTertiary, colors.successInk, colors.warningInk, colors.dangerInk)
-        .minOf { syContrastRatio(it, background) }
     val token = when (tier) {
         SyMaterialTier.L1_SECTION -> colors.materialL1
         SyMaterialTier.L2_BAR -> colors.materialL2
@@ -38,28 +36,50 @@ internal fun syResolveMaterialFill(
         SyMaterialTier.L4_OVERLAY -> colors.materialL4
         SyMaterialTier.L5_SOLID -> colors.materialL5
     }
-    // Opaque accessibility/Matte palettes keep their exact semantic tiers and never sample.
-    if (colors.materialL3.alpha == 1f || scene == null || scene.regionColors.isEmpty()) return token
+    // Matte is intentionally solid; detached previews fall back to the same canvas-based tokens.
+    if (colors.materialL3.alpha == 1f || scene == null) return token
+
     val index = when {
-        scene.regionColors.size < 3 -> 0
         regionY < .30f -> 0
         regionY < .74f -> 1
         else -> 2
     }
-    val sample = scene.regionColors[index].let { scene.veil?.compositeOver(it) ?: it }
-    val backgrounds = listOf(sample) + scene.regionExtremes.getOrNull(index).orEmpty()
-        .map { scene.veil?.compositeOver(it) ?: it }
-    val neutral = colors.materialL5.copy(alpha = 1f)
-    var strength = .30f
-    var tinted = lerp(neutral, sample, strength)
-    // Keep tint only while the resulting solid can still protect the active theme's ink.
+    val sample = when {
+        scene.regionColors.isNotEmpty() -> {
+            val colour = scene.regionColors.getOrElse(index) { scene.regionColors.last() }
+            scene.veil?.compositeOver(colour) ?: colour
+        }
+        scene.glowColors.size >= 3 -> {
+            // FluidGlassBackdrop's matching top/middle/bottom light fields.
+            lerp(scene.canvas, scene.glowColors[index].copy(alpha = 1f),
+                if (scene.dark) .055f else if (index == 2) .045f else .14f)
+        }
+        else -> scene.canvas
+    }
+    val backgrounds = if (scene.regionColors.isNotEmpty()) {
+        listOf(sample) + scene.regionExtremes.getOrNull(index).orEmpty()
+            .map { scene.veil?.compositeOver(it) ?: it }
+    } else listOf(sample)
+    fun contrast(background: Color): Float = listOf(
+        colors.text, colors.textSecondary, colors.textTertiary,
+        colors.successInk, colors.warningInk, colors.dangerInk,
+    ).minOf { syContrastRatio(it, background) }
+
+    // The root palette defines the anchor, with only a restrained influence from the scene.
+    // Fall back toward the root's readable solid token on extreme wallpaper colours.
+    val anchor = colors.materialL5.copy(alpha = 1f)
+    var strength = if (scene.regionColors.isNotEmpty()) .30f else .18f
+    var tinted = lerp(anchor, sample.copy(alpha = 1f), strength)
     while (contrast(tinted) < 4.5f && strength > 0f) {
         strength = (strength - .03f).coerceAtLeast(0f)
-        tinted = lerp(neutral, sample, strength)
+        tinted = lerp(anchor, sample.copy(alpha = 1f), strength)
     }
     if (tier == SyMaterialTier.L5_SOLID) return tinted
-    var alpha = (token.alpha + (.5f - scene.surfaceTransparency.coerceIn(0f, 1f)) * .46f).coerceIn(.08f, 1f)
-    fun minimumContrast(opacity: Float) = backgrounds.minOf { contrast(tinted.copy(alpha = opacity).compositeOver(it)) }
+
+    var alpha = (token.alpha +
+        (.5f - scene.surfaceTransparency.coerceIn(0f, 1f)) * .46f).coerceIn(.08f, 1f)
+    fun minimumContrast(opacity: Float) =
+        backgrounds.minOf { contrast(tinted.copy(alpha = opacity).compositeOver(it)) }
     if (scene.adaptiveContrast && minimumContrast(alpha) < 4.5f) {
         var low = alpha
         var high = 1f
