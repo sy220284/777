@@ -161,7 +161,7 @@ fun SyResponsiveSheet(
         ModalBottomSheet(
             onDismissRequest = { if (dismissal.value) onDismiss() },
             sheetState = sheetState,
-            modifier = if (floating) modifier.padding(horizontal = 6.dp) else modifier,
+            modifier = if (floating && !seamlessBackground) modifier.padding(horizontal = 6.dp) else modifier,
             shape = RoundedCornerShape(SyDimensions.cornerOverlay),
             containerColor = Color.Transparent,
             scrimColor = if (seamlessBackground) Color.Transparent else p.scrim,
