@@ -4,7 +4,9 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.webkit.MimeTypeMap
-import com.labteto.dshmobile.uicontract.*
+import com.labteto.dshmobile.uicontract.PersonaPortraitUiCommand
+import com.labteto.dshmobile.uicontract.PersonaPortraitUiPort
+import com.labteto.dshmobile.uicontract.UiPersonaPortraitReceipt
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.UUID

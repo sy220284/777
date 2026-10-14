@@ -1,6 +1,10 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.uicontract.*
+import com.labteto.dshmobile.uicontract.ExportPersonaDocumentCommand
+import com.labteto.dshmobile.uicontract.ImportPersonaDocumentCommand
+import com.labteto.dshmobile.uicontract.PersonaTransferUiPort
+import com.labteto.dshmobile.uicontract.UiPersonaExportReceipt
+import com.labteto.dshmobile.uicontract.UiPersonaImportReceipt
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
