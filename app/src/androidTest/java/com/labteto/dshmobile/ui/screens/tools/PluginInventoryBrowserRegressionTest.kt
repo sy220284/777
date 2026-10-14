@@ -226,9 +226,9 @@ class PluginInventoryBrowserRegressionTest {
                 }
             }
         }
-        val icon = compose.onNodeWithTag("plugin-inventory-icon-local:android-automation")
+        val icon = compose.onNodeWithTag("plugin-inventory-icon-local:android-automation", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
-        val title = compose.onNodeWithTag("plugin-inventory-title-local:android-automation")
+        val title = compose.onNodeWithTag("plugin-inventory-title-local:android-automation", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
         val card = compose.onNodeWithTag("plugin-inventory-card-local:android-automation")
             .getUnclippedBoundsInRoot()
@@ -252,9 +252,9 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        val title = compose.onNodeWithTag("plugin-inventory-title-skill:research-check")
+        val title = compose.onNodeWithTag("plugin-inventory-title-skill:research-check", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
-        val details = compose.onNodeWithTag("plugin-inventory-detail-skill:research-check")
+        val details = compose.onNodeWithTag("plugin-inventory-detail-skill:research-check", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
         val card = compose.onNodeWithTag("plugin-inventory-card-skill:research-check")
             .getUnclippedBoundsInRoot()
