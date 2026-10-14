@@ -43,6 +43,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val documentsFactory: com.labteto.dshmobile.local.presentation.LocalUiDocumentUiPortFactory,
     private val savedStateHandle: androidx.lifecycle.SavedStateHandle,
     private val runtime: LocalUiRuntime,
+    val attachmentUiPort: com.labteto.dshmobile.uicontract.AttachmentUiPort,
     private val uiPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val chatUi: LocalChatUiFacade,
     private val sessionUi: LocalSessionUiFacade,
@@ -131,6 +132,10 @@ class LocalHarnessViewModel @Inject constructor(
     val conversationDraftUiPort: com.labteto.dshmobile.uicontract.ConversationDraftUiPort =
         LocalSessionDraftCache.restore(savedStateHandle.get<List<String>>("conversation_drafts").orEmpty()) {
             savedStateHandle["conversation_drafts"] = ArrayList(it)
+        }.apply {
+            restoreAttachments(savedStateHandle.get<List<String>>("conversation_attachment_drafts").orEmpty()) {
+                savedStateHandle["conversation_attachment_drafts"] = ArrayList(it)
+            }
         }
 
     val conversationReadingUiPort: com.labteto.dshmobile.uicontract.ConversationReadingUiPort =
@@ -233,29 +238,17 @@ class LocalHarnessViewModel @Inject constructor(
         identity: com.labteto.dshmobile.uicontract.UiSessionIdentity?,
         mode: LocalUsageMode,
     ): LocalSendResult {
-        // Text sends share the stable port with the independent verification pack. Attachment
-        // import and token contracts are a later slice; their current owner entry stays intact.
-        if (attachments.isEmpty() && text.isNotBlank()) {
-            val receipt = when (mode) {
-                LocalUsageMode.CHAT -> identity?.let {
-                    chatUiPort.submit(com.labteto.dshmobile.uicontract.ChatUiCommand.SendText(it, text))
-                }
-                LocalUsageMode.WORK -> identity?.let {
-                    workConversationUiPort.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.SendText(it, text))
-                }
-            }
-            return receipt?.toLegacySendResult()
-                ?: LocalSendResult.rejected(com.labteto.dshmobile.local.send.LocalSendRejectReason.SESSION_TRANSITION)
+        val expected = identity ?: return LocalSendResult.rejected(com.labteto.dshmobile.local.send.LocalSendRejectReason.SESSION_TRANSITION)
+        val receipt = when (mode) {
+            LocalUsageMode.CHAT -> chatUiPort.submit(com.labteto.dshmobile.uicontract.ChatUiCommand.SendMessage(expected, text, attachments))
+            LocalUsageMode.WORK -> workConversationUiPort.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.SendMessage(expected, text, attachments))
         }
-        return when (state.value.usageMode) {
-            LocalUsageMode.WORK -> runtime.work.send(text, attachments)
-            LocalUsageMode.CHAT -> runtime.chat.send(text, attachments)
-        }
+        return receipt.toLegacySendResult()
     }
-    internal fun sendWithTeam(
-        text: String,
-        attachments: List<LocalImportedAttachment> = emptyList(),
-    ): LocalSendResult = runtime.work.sendWithTeam(text, attachments)
+    internal fun sendWithTeam(text: String, attachments: List<LocalImportedAttachment>, identity: com.labteto.dshmobile.uicontract.UiSessionIdentity?): LocalSendResult {
+        val expected = identity ?: return LocalSendResult.rejected(com.labteto.dshmobile.local.send.LocalSendRejectReason.SESSION_TRANSITION)
+        return workConversationUiPort.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.SendWithTeam(expected, text, attachments)).toLegacySendResult()
+    }
 
     suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
     internal suspend fun diaryEntries(subjectKey: String): List<ChatDiaryEntry> =
@@ -285,11 +278,16 @@ class LocalHarnessViewModel @Inject constructor(
     }
     suspend fun setGroupChatAnnouncement(text: String): Result<Unit> = runtime.chat.setGroupChatAnnouncement(text)
 
-    suspend fun editAndResendUserMessage(messageId: String, text: String): LocalChatUserEditResult {
+    suspend fun editAndResendUserMessage(messageId: String, text: String, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?, mode: LocalUsageMode): LocalChatUserEditResult {
+        val identity = expected ?: return LocalChatUserEditResult.UNAVAILABLE
         val result = withContext(Dispatchers.IO) {
-            when (state.value.usageMode) {
-                LocalUsageMode.WORK -> runtime.work.editAndResendUserMessage(messageId, text)
-                LocalUsageMode.CHAT -> runtime.chat.editAndResendUserMessage(messageId, text)
+            val receipt = when (mode) {
+                LocalUsageMode.WORK -> workConversationUiPort.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.EditUserMessage(identity, messageId, text))
+                LocalUsageMode.CHAT -> chatUiPort.submit(com.labteto.dshmobile.uicontract.ChatUiCommand.EditUserMessage(identity, messageId, text))
+            }
+            when (receipt) {
+                is com.labteto.dshmobile.uicontract.UiCommandReceipt.MessageEdited -> receipt.result
+                else -> LocalChatUserEditResult.UNAVAILABLE
             }
         }
         if (result == LocalChatUserEditResult.SENT ||
@@ -301,9 +299,10 @@ class LocalHarnessViewModel @Inject constructor(
         return result
     }
 
-    suspend fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean {
+    suspend fun selectChatMessageVariant(messageId: String, targetIndex: Int, identity: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Boolean {
+        val expected = identity ?: return false
         val selected = withContext(Dispatchers.IO) {
-            runtime.chat.selectChatMessageVariant(messageId, targetIndex)
+            chatUiPort.submit(com.labteto.dshmobile.uicontract.ChatUiCommand.SelectVariant(expected, messageId, targetIndex)) == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
         }
         if (selected) refreshTranscriptHistoryAfterTimelineRewrite()
         return selected
@@ -311,14 +310,25 @@ class LocalHarnessViewModel @Inject constructor(
 
     private fun refreshTranscriptHistoryAfterTimelineRewrite() =
         transcriptHistoryController.refreshAfterTimelineRewrite()
-    fun regenerateReply(messageId: String): Boolean = when (state.value.usageMode) {
-        LocalUsageMode.WORK -> runtime.work.regenerateReply(messageId)
-        LocalUsageMode.CHAT -> runtime.chat.regenerateReply(messageId)
+    fun regenerateReply(messageId: String, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?, mode: LocalUsageMode): Boolean {
+        val identity = expected ?: return false
+        val receipt = when (mode) {
+            LocalUsageMode.WORK -> workConversationUiPort.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.RegenerateReply(identity, messageId))
+            LocalUsageMode.CHAT -> chatUiPort.submit(com.labteto.dshmobile.uicontract.ChatUiCommand.RegenerateReply(identity, messageId))
+        }
+        return receipt == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
     }
     fun toggleSessionPinned(sessionId: String) = conversationUiState.toggleSessionPinned(sessionId)
     fun renameSession(sessionId: String, title: String): Boolean = conversationUiState.renameSession(sessionId, title)
     suspend fun deleteSessions(ids: Set<String>): Int = conversationUiState.deleteSessions(ids, runtime.session::deleteSessions)
-    suspend fun importAttachment(uri: Uri): LocalImportedAttachment = runtime.session.importAttachment(uri)
+    suspend fun importAttachment(uri: Uri, identity: com.labteto.dshmobile.uicontract.UiSessionIdentity?): LocalImportedAttachment {
+        val expected = identity ?: error("会话已改变，请重新选择附件")
+        return when (val receipt = attachmentUiPort.import(com.labteto.dshmobile.uicontract.ImportUiAttachmentCommand(expected, uri.toString()))) {
+            is com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Imported -> receipt.attachment
+            is com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Rejected -> error("会话已改变，请重新选择附件")
+            is com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Failed -> error(receipt.message ?: "附件导入失败")
+        }
+    }
     suspend fun workspaceFiles() = runtime.session.workspaceFilesForUi()
     suspend fun conversationFiles(sessionId: String) = runtime.session.conversationFilesForUi(sessionId)
     suspend fun previewWorkspaceFile(path: String) = runtime.session.previewWorkspaceFileForUi(path)
@@ -374,12 +384,14 @@ class LocalHarnessViewModel @Inject constructor(
     fun enableDeviceApprovalLease(callId: String) = runtime.work.enableDeviceApprovalLease(callId)
     fun disableDeviceApprovalLease() = runtime.work.disableDeviceApprovalLease()
     fun disableAutoApproval() = runtime.work.disableAutoApproval()
-    fun answerQuestion(callId: String, answer: String) = runtime.work.answerQuestion(callId, answer)
-    fun cancelQuestion(callId: String) = runtime.work.cancelQuestion(callId)
-    fun stop() {
-        when (state.value.usageMode) {
-            LocalUsageMode.CHAT -> runtime.chat.stop()
-            LocalUsageMode.WORK -> runtime.work.stop()
+    fun answerQuestion(pendingId: String, answer: String?, identity: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Boolean =
+        identity?.let { workConversationUiPort.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.AnswerQuestion(it, pendingId, answer)) } ==
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
+    fun stop(expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?, mode: LocalUsageMode) {
+        val identity = expected ?: return
+        when (mode) {
+            LocalUsageMode.CHAT -> chatUiPort.submit(com.labteto.dshmobile.uicontract.ChatUiCommand.Stop(identity))
+            LocalUsageMode.WORK -> workConversationUiPort.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.Stop(identity))
         }
     }
     internal fun workHandoffSummary(): String = runtime.session.currentHandoffSummary()

@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "snapshot": "6e99d3056474",
+  "snapshot": "2afadefc35dc",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
-  "code_files_scanned": 1547,
-  "production_sources_scanned": 884,
-  "feature_nodes": 530,
-  "functional_leaves": 437,
+  "code_files_scanned": 1555,
+  "production_sources_scanned": 887,
+  "feature_nodes": 531,
+  "functional_leaves": 438,
   "existing_executable_test_mappings": 122,
   "leaf_evidence": [
     {
@@ -292,7 +292,7 @@
       "workflow_evidence": []
     },
     {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送与审批端口（迁移中）",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送、分支与交互端口（迁移中）",
       "verification": "没有可确认的现行入口证据",
       "test_reference_count": 0,
       "historical_grade": null,
@@ -309,7 +309,28 @@
         "separate_product_entry": false,
         "production_sources_confirmed": 1,
         "test_methods_confirmed": 1,
-        "explanation": "新增端口已通过生产 DI 接入 V6 普通文本发送与 Debug 验证包；只覆盖文本发送和 Work 审批，完整 Feature 端口及真实双包旅程仍待验收。"
+        "explanation": "生产端口接入 V6/Next 的文本与附件发送、编辑、重生成、停止、Chat 分支及 Work 审批/提问；业务准入仍由原 Owner 执行。完整 Feature 端口及真实双包旅程尚未完成。"
+      }
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）",
+      "verification": "没有可确认的现行入口证据",
+      "test_reference_count": 0,
+      "historical_grade": null,
+      "existing_production_sources": [],
+      "missing_production_sources": [],
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "explicit_test_candidates": [],
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "ui_contract_migration_slice",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 2,
+        "test_methods_confirmed": 1,
+        "explanation": "本地类型输入可制作状态、原文清单和回复表单，复用生产 Codec/Session 定义 Owner；新增模型调用为零的实现路径不依赖模型网关。工具 Schema 与结构化结果自动适配、媒体/证据节点及真实设备验收仍待实现。"
       }
     },
     {
@@ -8185,7 +8206,7 @@
   "evidence_grade_summary": {
     "真实测试映射（仅局部）": 122,
     "具名源码声明存在（静态，待调用链复核）": 195,
-    "没有可确认的现行入口证据": 21,
+    "没有可确认的现行入口证据": 22,
     "历史生产文件仍存在（待入口复核）": 75,
     "旧源码已失效，需核实迁移或退役": 1,
     "具名源码及仪表测试声明存在（静态，未执行）": 6,
@@ -8735,7 +8756,7 @@
       }
     },
     {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送与审批端口（迁移中）",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送、分支与交互端口（迁移中）",
       "issue": "缺少可确认的现行源码入口",
       "domain": "共享工具或其他能力",
       "inspect": "按用户实际功能入口检查共享工具模块",
@@ -8752,7 +8773,28 @@
         "separate_product_entry": false,
         "production_sources_confirmed": 1,
         "test_methods_confirmed": 1,
-        "explanation": "新增端口已通过生产 DI 接入 V6 普通文本发送与 Debug 验证包；只覆盖文本发送和 Work 审批，完整 Feature 端口及真实双包旅程仍待验收。"
+        "explanation": "生产端口接入 V6/Next 的文本与附件发送、编辑、重生成、停止、Chat 分支及 Work 审批/提问；业务准入仍由原 Owner 执行。完整 Feature 端口及真实双包旅程尚未完成。"
+      }
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "共享工具或其他能力",
+      "inspect": "按用户实际功能入口检查共享工具模块",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "ui_contract_migration_slice",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 2,
+        "test_methods_confirmed": 1,
+        "explanation": "本地类型输入可制作状态、原文清单和回复表单，复用生产 Codec/Session 定义 Owner；新增模型调用为零的实现路径不依赖模型网关。工具 Schema 与结构化结果自动适配、媒体/证据节点及真实设备验收仍待实现。"
       }
     },
     {
@@ -9161,182 +9203,23 @@
       }
     }
   ],
-  "followup_investigated_descriptions": 21,
-  "followup_production_or_compatibility": 14,
+  "followup_investigated_descriptions": 22,
+  "followup_production_or_compatibility": 15,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "c4aa6a1797dd",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalAutomationUiPortComposition.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/automation/AutomationValues.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/LocalUsageMode.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/TokenUsageValues.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/interaction/LocalApprovalMode.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/memory/MemoryValues.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/model/DeepSeekUsageSnapshot.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/model/LocalImageInputMode.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/model/LocalMediaValues.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/model/LocalModelRouteIdentity.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/model/MiniMaxProviderUsage.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/model/chatgpt/ChatGptUiValues.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/presentation/LocalSettingsMemoryContext.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/session/LocalConversationMode.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/session/LocalSessionStorageStatus.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/usage/UsageValueArithmetic.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/AutomationUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/MediaUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/MemoryUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/SettingsUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiDesignTokens.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UsageUiPort.kt"
-    ],
+    "baseline": "73abf471dbaf",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/automation/AutomationUserActivityPolicy.kt",
-      "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkerSettlementCoordinator.kt",
-      "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomation.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessModels.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatAutomationPolicy.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/interaction/LocalApprovalPreferences.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryModels.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/DeepSeekBilling.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaCatalog.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaCreationJobStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaResultStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaVideoTaskStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelModels.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalUiDocumentGeneration.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/MiniMaxProviderQuota.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptModels.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalMediaCreationRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsDataFacade.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiDocumentUiAdapter.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUsageUiFacade.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/document/LocalUiDocumentCodec.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionStorageManager.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/session/LocalUiDocumentSessionStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/usage/UsageArithmetic.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalDynamicDocument.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalGeneratedMediaMessage.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioSheet.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioViewModel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AgentDeviceSettingsSections.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AgentRuntimeSettingsCard.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AgentWorkerModelSettings.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/ChatGptAccountPanel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalModelSettingsSections.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsController.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsSections.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MiniMaxQuotaPage.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/AutomationPlannerUiController.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/ChatAutomationScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskCardComponents.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksViewModel.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiDocument.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiDocumentUiPort.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextUiDocument.kt"
+      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationUiPack.kt"
     ],
-    "moved_unchanged_files": [
-      {
-        "previous": "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelSelectionState.kt",
-        "current": "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/model/LocalModelSelectionState.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/shenyan/designsystem/components/ShenyanBasics.kt",
-        "current": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanBasics.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/shenyan/designsystem/components/ShenyanChrome.kt",
-        "current": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanChrome.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/shenyan/designsystem/components/ShenyanCompound.kt",
-        "current": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanCompound.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/shenyan/designsystem/components/ShenyanDataViews.kt",
-        "current": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanDataViews.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/shenyan/designsystem/components/ShenyanEntrance.kt",
-        "current": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanEntrance.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/shenyan/designsystem/components/ShenyanFeedback.kt",
-        "current": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanFeedback.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/shenyan/designsystem/components/ShenyanFormControls.kt",
-        "current": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanFormControls.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/shenyan/designsystem/components/ShenyanForms.kt",
-        "current": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanForms.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterial.kt",
-        "current": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanMaterial.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterialColor.kt",
-        "current": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanMaterialColor.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/shenyan/designsystem/components/ShenyanMessage.kt",
-        "current": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanMessage.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/shenyan/designsystem/components/ShenyanSections.kt",
-        "current": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanSections.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/shenyan/designsystem/features/ShenyanChat.kt",
-        "current": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/features/ShenyanChat.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/shenyan/designsystem/features/ShenyanSystem.kt",
-        "current": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/features/ShenyanSystem.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/shenyan/designsystem/features/ShenyanWork.kt",
-        "current": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/features/ShenyanWork.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/shenyan/designsystem/foundation/ShenyanFoundation.kt",
-        "current": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/foundation/ShenyanFoundation.kt",
-        "basis": "文件内容指纹完全相同"
-      }
-    ],
+    "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
     "added_ui": [],
     "removed_ui": []
   },
-  "source_verified_registrations": 6,
+  "source_verified_registrations": 7,
   "explicit_retirements": 0,
   "changes_applied": [],
   "pending_changes": [],

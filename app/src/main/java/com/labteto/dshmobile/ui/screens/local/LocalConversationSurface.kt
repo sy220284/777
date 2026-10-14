@@ -479,12 +479,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
     var editingUserMessage by remember { mutableStateOf<LocalHarnessMessage?>(null) }
     var renameSessionOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
-    val attachments = remember(state.sessionId) { mutableStateListOf<LocalImportedAttachment>() }
+    val attachmentDrafts by drafts.attachments.collectAsStateWithLifecycle()
+    val attachments = attachmentDrafts[state.sessionId].orEmpty()
     val listState = rememberLazyListState()
     var composerTailViewportAnchor by remember(state.sessionId) { mutableStateOf<Int?>(null) }
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
     var transcriptInitialPositionReady by rememberSaveable(state.sessionId) { mutableStateOf(false) }
-    var planReviewBusy by remember(state.pendingQuestion?.callId) { mutableStateOf(false) }
+    var planReviewBusy by remember(state.pendingQuestion?.requestId) { mutableStateOf(false) }
     val pagedOlderMessages = if (transcriptHistory.sessionId == state.sessionId) {
         transcriptHistory.olderMessages
     } else {
@@ -627,8 +628,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             scope.launch {
                 try {
                     val imported = onImportAttachment(uri)
-                    attachmentError = when (localComposerAttachmentDecision(attachments, imported)) {
-                        LocalComposerAttachmentDecision.ACCEPT -> { attachments += imported; null }
+                    attachmentError = when (localComposerAttachmentDecision(drafts.attachments.value[state.sessionId].orEmpty(), imported)) {
+                        LocalComposerAttachmentDecision.ACCEPT -> { drafts.addAttachment(state.sessionId, imported); null }
                         LocalComposerAttachmentDecision.DUPLICATE -> null
                         LocalComposerAttachmentDecision.IMAGE_LIMIT -> imageLimitMessage
                     }
@@ -656,8 +657,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 uris.take(available).forEach { uri ->
                     try {
                         val imported = onImportAttachment(uri)
-                        when (localComposerAttachmentDecision(attachments, imported)) {
-                            LocalComposerAttachmentDecision.ACCEPT -> attachments += imported
+                        when (localComposerAttachmentDecision(drafts.attachments.value[state.sessionId].orEmpty(), imported)) {
+                            LocalComposerAttachmentDecision.ACCEPT -> drafts.addAttachment(state.sessionId, imported)
                             LocalComposerAttachmentDecision.DUPLICATE -> Unit
                             LocalComposerAttachmentDecision.IMAGE_LIMIT -> failure = imageLimitMessage
                         }
@@ -676,9 +677,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             scope.launch {
                 try {
                     val imported = onImportAttachment(uri)
-                    attachmentError = when (localComposerAttachmentDecision(attachments, imported)) {
+                    attachmentError = when (localComposerAttachmentDecision(drafts.attachments.value[state.sessionId].orEmpty(), imported)) {
                         LocalComposerAttachmentDecision.ACCEPT -> {
-                            attachments += imported
+                            drafts.addAttachment(state.sessionId, imported)
                             null
                         }
                         LocalComposerAttachmentDecision.DUPLICATE -> null
@@ -700,7 +701,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     LaunchedEffect(state.sessionId) {
         transcriptInitialPositionReady = false
         scrollHint.hide()
-        attachments.clear()
         attachmentError = null
         showReplySuggestions = false
     }
@@ -1025,20 +1025,20 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             busy = planReviewBusy,
                             onApprove = {
                                 if (!planReviewBusy) {
-                                    val callId = state.pendingQuestion?.callId
+                                    val callId = state.pendingQuestion?.requestId
                                     if (callId != null && onAnswerQuestion(callId, review.approve)) planReviewBusy = true
                                 }
                             },
                             onDecline = {
                                 review.decline?.let { decline ->
                                     if (!planReviewBusy) {
-                                        val callId = state.pendingQuestion?.callId
+                                        val callId = state.pendingQuestion?.requestId
                                         if (callId != null && onAnswerQuestion(callId, decline)) planReviewBusy = true
                                     }
                                 }
                             },
                             onRegenerate = {
-                                val callId = state.pendingQuestion?.callId
+                                val callId = state.pendingQuestion?.requestId
                                 if (!planReviewBusy && callId != null && onAnswerQuestion(callId, review.regenerate)) {
                                     planReviewBusy = true
                                 }
@@ -1086,9 +1086,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 onSelectVariant = onSelectMessageVariant,
                                 onRegenerate = onRegenerate,
                             )
-                            if (state.messages.lastOrNull()?.id == transcriptItem.message.id && !state.running && !state.loading) {
+                            if (state.messages.lastOrNull()?.id == transcriptItem.message.id && !state.loading) {
                                 LocalUiDocumentGenerateButton(documentIdentity, state.usageMode == LocalUsageMode.WORK,
-                                    transcriptItem.message.id, transcriptItem.message.content, documents)
+                                    transcriptItem.message.id, transcriptItem.message.content, documents, allowAiDesign = !state.running)
                             }
                             documentSnapshot.documents.filter { it.document.source.messageId == transcriptItem.message.id }.forEach {
                                 LocalDynamicDocument(it, documentIdentity, documents, documentForms)
@@ -1318,8 +1318,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             input = input,
             attachments = attachments,
             onInputChange = { drafts.updateDraft(state.sessionId, it) },
-            onRemoveAttachment = { index -> attachments.removeAt(index) },
-            onClearAttachments = attachments::clear,
+            onRemoveAttachment = { index -> attachments.getOrNull(index)?.let { drafts.removeAttachment(state.sessionId, it.relativePath) } },
+            onClearAttachments = { drafts.clearAttachments(state.sessionId) },
             onOpenAttachmentPicker = { showAttachmentPicker = true },
             onShowReplySuggestions = { showReplySuggestions = true },
             onGenerateReplySuggestions = onGenerateReplySuggestions,
@@ -1435,10 +1435,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         QuestionDialog(
             question = question.question,
             options = question.options,
-            onAnswer = { answer -> onAnswerQuestion(question.callId, answer) },
-            onDismiss = { onCancelQuestion(question.callId) },
+            onAnswer = { answer -> onAnswerQuestion(question.requestId.orEmpty(), answer) },
+            onDismiss = { onCancelQuestion(question.requestId.orEmpty()) },
             requireConfirmation = workActions != null,
-            questionId = question.callId,
+            questionId = question.requestId ?: question.callId,
         )
     }
     if (

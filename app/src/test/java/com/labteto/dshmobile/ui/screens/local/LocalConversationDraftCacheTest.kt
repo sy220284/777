@@ -6,6 +6,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalConversationDraftCacheTest {
+    @Test fun attachmentDraftsSurvivePackSwitchAndSavedStateWithoutMixingSessions() {
+        val owner = LocalSessionDraftCache()
+        val attachment = com.labteto.dshmobile.local.attachment.LocalImportedAttachment("file", ".dsh/attachments/id.txt", "text/plain", 12, "id")
+        owner.addAttachment("a", attachment)
+        owner.addAttachment("a", attachment)
+        owner.addAttachment("b", attachment.copy(name = "other"))
+        val restored = LocalSessionDraftCache()
+        restored.restoreAttachments(owner.saveAttachments())
+        assertEquals(owner.attachments.value, restored.attachments.value)
+        assertEquals(1, restored.attachments.value.getValue("a").size)
+        restored.clearAttachments("a")
+        assertFalse("a" in restored.attachments.value)
+        assertTrue("b" in restored.attachments.value)
+    }
+
     @Test
     fun keepsOnlyTwelveMostRecentlyTouchedSessionDrafts() {
         val drafts = LocalSessionDraftCache()

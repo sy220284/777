@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "baseline": "d69f6513",
+  "baseline": "3a69089d",
   "scope": "S0 源码场景审计；不是独立 UI Pack 覆盖或设备验收证明",
   "scenes": [
     {

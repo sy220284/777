@@ -16,6 +16,7 @@ private const val LOCAL_QUESTION_EMPTY_RESPONSE = "用户未提供文字回答"
  * same semantics without receiving a writable application aggregate.
  */
 internal interface LocalInteractionStatePort {
+    fun pendingQuestion(): LocalQuestion?
     fun pendingApproval(): LocalApproval?
     fun setPendingApproval(approval: LocalApproval?)
     fun clearPendingApproval(callId: String)
@@ -44,9 +45,9 @@ internal class LocalInteractionCoordinator(
     }
 
     private data class QuestionWaiter(
-        val callId: String,
+        val question: LocalQuestion,
         val response: CompletableDeferred<String>,
-    )
+    ) { val callId: String get() = question.callId }
 
     private val interactionMutex = Mutex()
     private val waiterLock = Any()
@@ -96,6 +97,7 @@ internal class LocalInteractionCoordinator(
         interactionMutex.lock()
         try {
             val response = CompletableDeferred<String>()
+            val activeQuestion = question.copy(requestId = UUID.randomUUID().toString())
             synchronized(waiterLock) {
                 if (generation != cancellationGeneration) {
                     throw CancellationException("用户交互所属回合已取消")
@@ -103,9 +105,9 @@ internal class LocalInteractionCoordinator(
                 check(approvalWaiter == null && questionWaiter == null) {
                     "已有用户交互正在等待处理"
                 }
-                questionWaiter = QuestionWaiter(question.callId, response)
+                questionWaiter = QuestionWaiter(activeQuestion, response)
             }
-            state.setPendingQuestion(question)
+            state.setPendingQuestion(activeQuestion)
             return try {
                 response.await().trim().ifBlank { LOCAL_QUESTION_EMPTY_RESPONSE }
             } finally {
@@ -153,6 +155,19 @@ internal class LocalInteractionCoordinator(
             if (!commit(pending)) return@synchronized false
             waiter.response.complete(true)
         }
+
+    fun pendingQuestionForUi(): LocalQuestion? = synchronized(waiterLock) {
+        val waiter = questionWaiter ?: return@synchronized null
+        if (waiter.response.isCompleted || state.pendingQuestion()?.requestId != waiter.question.requestId) null
+        else waiter.question
+    }
+
+    fun answerQuestionFromUi(requestId: String, answer: String?): Boolean = synchronized(waiterLock) {
+        val waiter = questionWaiter ?: return@synchronized false
+        if (waiter.response.isCompleted || waiter.question.requestId != requestId ||
+            state.pendingQuestion()?.requestId != requestId) return@synchronized false
+        waiter.response.complete(answer?.trim() ?: LOCAL_QUESTION_CANCELLED_RESPONSE)
+    }
 
     fun answerQuestion(callId: String, answer: String): Boolean =
         synchronized(waiterLock) {

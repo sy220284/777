@@ -47,8 +47,12 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
     SyGlassCard(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
         if (snapshot.recoveryNotice != null) Text(stringResource(R.string.ui_document_history_incomplete))
         Text(document.title, Modifier.semantics { heading() })
-        Text(stringResource(R.string.ui_document_model_source, snapshot.provenance.model))
-        if (!snapshot.provenance.usageReported) Text(stringResource(R.string.ui_document_usage_unknown))
+        if (snapshot.provenance.origin == com.labteto.dshmobile.uicontract.UiDocumentOrigin.LOCAL) {
+            Text(stringResource(R.string.ui_document_local_source))
+        } else {
+            Text(stringResource(R.string.ui_document_model_source, snapshot.provenance.model))
+            if (!snapshot.provenance.usageReported) Text(stringResource(R.string.ui_document_usage_unknown))
+        }
         document.nodes.forEach { node ->
             LocalDocumentNode(node, values, snapshot, identity != null,
                 update = { id, text -> forms.update(key, id, text) },

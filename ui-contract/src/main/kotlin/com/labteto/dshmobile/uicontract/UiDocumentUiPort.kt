@@ -2,7 +2,9 @@ package com.labteto.dshmobile.uicontract
 
 import kotlinx.coroutines.flow.Flow
 
-data class UiDocumentProvenance(val requestId: String?, val model: String, val usageReported: Boolean)
+enum class UiDocumentOrigin { MODEL, LOCAL }
+data class UiDocumentProvenance(val requestId: String?, val model: String, val usageReported: Boolean,
+    val origin: UiDocumentOrigin = UiDocumentOrigin.MODEL)
 data class UiDocumentSnapshot(
     val document: UiDocument,
     val provenance: UiDocumentProvenance,
@@ -42,6 +44,7 @@ sealed interface UiDocumentReceipt {
 interface UiDocumentUiPort {
     val snapshots: Flow<UiDocumentsSceneSnapshot>
     fun snapshot(): UiDocumentsSceneSnapshot
+    suspend fun generateLocal(command: GenerateLocalUiDocumentCommand): UiDocumentReceipt
     suspend fun generate(command: GenerateUiDocumentCommand): UiDocumentReceipt
     fun submit(identity: UiSessionIdentity, request: UiDocumentActionRequest): UiDocumentReceipt
 }

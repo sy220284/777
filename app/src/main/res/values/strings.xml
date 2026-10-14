@@ -2312,5 +2312,10 @@
     <string name="local_model_capability_video_or_generate">视频理解或生成</string>
     <string name="local_model_capability_speech_services">语音生成或转写</string>
     <string name="local_model_kimi_k3_context_invalid">Kimi K3 上下文只能设置 4096～1048576；留空使用 256K 默认值</string>
+    <string name="ui_document_local_source">本地生成 · 复用已有数据，无新增模型请求</string>
+    <string name="ui_document_local_status">本地状态卡</string>
+    <string name="ui_document_local_message">本地内容卡</string>
+    <string name="ui_document_local_form">本地回复表单</string>
+    <string name="ui_document_ai_design">AI 辅助设计（额外请求）</string>
 </resources>
 

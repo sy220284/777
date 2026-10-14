@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.session
 
 import com.labteto.dshmobile.local.presentation.document.LocalUiDocumentCodec
 import com.labteto.dshmobile.uicontract.UiDocument
+import com.labteto.dshmobile.uicontract.matches
 import com.labteto.dshmobile.uicontract.UiDocumentBudget
 import com.labteto.dshmobile.uicontract.UiDocumentSource
 import com.labteto.dshmobile.uicontract.UiDocumentProvenance
@@ -37,8 +38,19 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
     private val mutableRevision = MutableStateFlow(0L)
     val revision = mutableRevision.asStateFlow()
 
-    fun publish(source: UiDocumentSource, definition: JsonObject, provenance: UiDocumentProvenance,
-        pendingApprovalId: String?) {
+    /** The Session sidecar owns revision admission for every producer, including local templates. */
+    @Synchronized
+    fun publish(document: UiDocument, provenance: UiDocumentProvenance, pendingApprovalId: String?,
+        expected: UiDocument?, budget: UiDocumentBudget, knownScenes: Set<UiSceneId>): Boolean {
+        val source = document.source
+        val current = read(source.sessionId, setOf(source.messageId), budget, knownScenes)
+            .firstOrNull { it.recoveryNotice == null && it.document.source == source }?.document
+        if (current != expected) return false
+        if (current == null) {
+            if (document.revision != 0L) return false
+        } else if (!com.labteto.dshmobile.uicontract.UiDocumentPatch(document.documentId, current.revision, document).matches(current)) return false
+        val definition = LocalUiDocumentCodec.encode(document)
+        LocalUiDocumentCodec.decode(definition.toString(), source, budget, knownScenes, pendingApprovalId).getOrThrow()
         logs.get(source.sessionId).append(UI_DOCUMENT_EVENT, buildJsonObject {
             put("source", buildJsonObject {
                 put("sessionId", source.sessionId); put("messageId", source.messageId)
@@ -49,11 +61,12 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
             put("definition", definition)
             put("provenance", buildJsonObject {
                 provenance.requestId?.let { put("requestId", it) }
-                put("model", provenance.model); put("usageReported", provenance.usageReported)
+                put("model", provenance.model); put("usageReported", provenance.usageReported); put("origin", provenance.origin.name)
             })
             pendingApprovalId?.let { put("admittedApprovalId", it) }
         })
         mutableRevision.update { it + 1L }
+        return true
     }
 
     fun read(sessionId: String, messageIds: Set<String>, budget: UiDocumentBudget,
@@ -64,9 +77,12 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
             sessionId, messageIds.toSet(), budget, knownScenes.toSet())
         lastRead?.takeIf { it.key == key }?.let { return it.records }
         val found = log.latestMatchingByKey(setOf(UI_DOCUMENT_EVENT), messageIds) { event ->
-            event.data["source"]?.jsonObject?.get("messageId")?.jsonPrimitive?.content
+            runCatching { event.data["source"]?.jsonObject?.get("messageId")?.jsonPrimitive?.content }.getOrNull()
         }
         val records = found.values.sortedBy { it.sequence }.mapNotNull { event ->
+            val anchorId = runCatching { event.data["source"]?.jsonObject?.get("messageId")?.jsonPrimitive?.content }
+                .getOrNull()?.takeIf { it in messageIds } ?: return@mapNotNull null
+            try {
             val value = event.data
             val anchor = value.getValue("source").jsonObject
             val source = UiDocumentSource(anchor.getValue("sessionId").jsonPrimitive.content,
@@ -78,16 +94,28 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
             val definition = value.getValue("definition")
             val decoded = LocalUiDocumentCodec.decode(definition.toString(), source,
                 budget, knownScenes, value["admittedApprovalId"]?.jsonPrimitive?.content)
-            val fallback = definition.jsonObject["fallbackText"]?.jsonPrimitive?.content.orEmpty()
+            val fallback = runCatching { definition.jsonObject["fallbackText"]?.jsonPrimitive?.content }.getOrNull().orEmpty()
                 .takeIf { it.length <= budget.maxTextChars }.orEmpty()
             // An incompatible historical card is readable but cannot regain executable actions.
             val document = decoded.getOrNull() ?: UiDocument(1, "unavailable:${event.sequence}", source, 0,
                 "", if (fallback.isBlank()) emptyList() else listOf(UiDocumentNode.Text("fallback", fallback)),
-                emptyList(), fallback)
+                emptyList(), "")
             val provenance = value.getValue("provenance").jsonObject
             LocalUiDocumentRecord(document, UiDocumentProvenance(provenance["requestId"]?.jsonPrimitive?.content,
-                provenance.getValue("model").jsonPrimitive.content, provenance.getValue("usageReported").jsonPrimitive.boolean),
+                provenance.getValue("model").jsonPrimitive.content, provenance.getValue("usageReported").jsonPrimitive.boolean,
+                provenance["origin"]?.jsonPrimitive?.content?.let(com.labteto.dshmobile.uicontract.UiDocumentOrigin::valueOf)
+                    ?: com.labteto.dshmobile.uicontract.UiDocumentOrigin.MODEL),
                 if (decoded.isFailure) "ui_document_history_incomplete" else null)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) {
+                // A log-indexed message anchor is sufficient for read-only fallback, never actions.
+                val fallback = runCatching { event.data["definition"]?.jsonObject?.get("fallbackText")?.jsonPrimitive?.content }
+                    .getOrNull()?.takeIf { it.length <= budget.maxTextChars }.orEmpty()
+                val source = UiDocumentSource(sessionId, anchorId, -1L, null, null)
+                LocalUiDocumentRecord(UiDocument(1, "unavailable:${event.sequence}", source, 0L, "",
+                    if (fallback.isBlank()) emptyList() else listOf(UiDocumentNode.Text("fallback", fallback)), emptyList(), ""),
+                    UiDocumentProvenance(null, "", false), "ui_document_history_incomplete")
+            }
         }
         if (!log.isClosed && log.resetGeneration == key.reset && mutableRevision.value == key.revision) {
             lastRead = ReadCache(key, records)

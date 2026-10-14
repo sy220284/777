@@ -53,6 +53,7 @@ internal class LocalWorkRunBinding(
     val executionControl = LocalWorkExecutionControl()
 
     private val interactionStatePort = object : LocalInteractionStatePort {
+        override fun pendingQuestion() = state.value.work.pendingQuestion
         override fun pendingApproval(): LocalApproval? = state.value.work.pendingApproval
 
         override fun setPendingApproval(approval: LocalApproval?) {

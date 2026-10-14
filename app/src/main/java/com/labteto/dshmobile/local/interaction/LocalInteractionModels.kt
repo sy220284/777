@@ -28,4 +28,6 @@ data class LocalQuestion(
     val callId: String,
     val question: String,
     val options: List<String> = emptyList(),
+    /** Issued by the current waiter, never accepted from a model call. */
+    val requestId: String? = null,
 )

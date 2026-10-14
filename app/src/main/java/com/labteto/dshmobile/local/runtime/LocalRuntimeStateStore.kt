@@ -84,6 +84,7 @@ class LocalRuntimeStateStore internal constructor(
     )
 
     private val foregroundInteractionState = object : LocalInteractionStatePort {
+        override fun pendingQuestion() = mutable.value.work.pendingQuestion
         override fun pendingApproval(): LocalApproval? = mutable.value.work.pendingApproval
 
         override fun setPendingApproval(approval: LocalApproval?) {

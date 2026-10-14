@@ -51,4 +51,25 @@
     <string name="next_document_binding_unavailable">当前没有可用事实</string>
     <string name="next_document_binding_value">%1$s：%2$s</string>
     <string name="next_document_history_incomplete">历史交互界面不兼容或不完整，已显示可用文本，操作不可执行。</string>
+    <string name="next_document_local_source">本地生成 · 复用已有数据，无新增模型请求</string>
+    <string name="next_document_local_status">本地状态卡</string>
+    <string name="next_document_local_message">本地内容卡</string>
+    <string name="next_document_local_form">本地回复表单</string>
+    <string name="next_document_ai_design">AI 辅助设计（额外请求）</string>
+    <string name="next_edit">编辑消息</string>
+    <string name="next_edit_send">修改并发送</string>
+    <string name="next_edit_committed">消息已修改，但回复未开始；请查看当前会话。</string>
+    <string name="next_edit_unavailable">原操作所有者未接受操作，请检查当前会话状态。</string>
+    <string name="next_regenerate">重新生成回复</string>
+    <string name="next_stop">停止执行</string>
+    <string name="next_variant">分支 %1$d / %2$d</string>
+    <string name="next_previous_variant">上一分支</string>
+    <string name="next_next_variant">下一分支</string>
+    <string name="next_attach">选择附件</string>
+    <string name="next_remove_attachment">移除附件</string>
+    <string name="next_attachment_failed">附件未添加，请检查会话状态和文件访问权限。</string>
+    <string name="next_reject_question">这项问题已结束，请查看当前任务</string>
+    <string name="next_answer">回答内容</string>
+    <string name="next_submit_answer">提交回答</string>
+    <string name="next_cancel_question">取消回答</string>
 </resources>

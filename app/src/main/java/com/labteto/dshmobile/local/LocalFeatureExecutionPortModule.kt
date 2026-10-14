@@ -74,6 +74,8 @@ internal object LocalFeatureExecutionPortModule {
         runtime: com.labteto.dshmobile.local.work.LocalWorkRuntime,
     ): com.labteto.dshmobile.local.work.LocalWorkApprovalUiPort =
         object : com.labteto.dshmobile.local.work.LocalWorkApprovalUiPort {
+            override fun pendingQuestion() = runtime.pendingQuestionForUi()
+            override fun answerQuestion(pendingId: String, answer: String?) = runtime.answerQuestionFromUi(pendingId, answer)
             override fun pendingApproval() = runtime.pendingApprovalForUi()
             override fun answerApproval(pendingId: String, approved: Boolean) = runtime.answerApproval(pendingId, approved)
         }

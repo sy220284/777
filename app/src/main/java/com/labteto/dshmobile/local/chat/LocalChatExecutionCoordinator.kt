@@ -24,6 +24,7 @@ import kotlinx.coroutines.isActive
 internal class LocalChatExecutionCoordinator @Inject constructor(
     private val sendCoordinator: LocalChatSendCoordinator,
     private val timeline: LocalChatTimelineCoordinator,
+    private val branches: LocalChatBranchCoordinator,
     private val detachedExecution: LocalChatAutomationExecutionCoordinator,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
@@ -41,6 +42,9 @@ internal class LocalChatExecutionCoordinator @Inject constructor(
         messageId: String,
         replacement: String,
     ): LocalChatUserEditResult = timeline.editAndResendUserMessage(messageId, replacement)
+
+    override fun selectMessageVariant(messageId: String, targetIndex: Int): Boolean =
+        branches.selectVariant(messageId, targetIndex)
 
     override fun regenerateReply(messageId: String): Boolean =
         timeline.regenerateReply(messageId)

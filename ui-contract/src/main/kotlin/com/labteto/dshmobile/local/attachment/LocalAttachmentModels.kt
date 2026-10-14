@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.attachment
 
 
 
+@kotlinx.serialization.Serializable
 data class LocalImportedAttachment(
     val name: String,
     val relativePath: String,

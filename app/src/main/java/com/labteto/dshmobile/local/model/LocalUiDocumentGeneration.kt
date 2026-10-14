@@ -109,9 +109,10 @@ internal class LocalUiDocumentGeneration @Inject constructor(
                     withContext(Dispatchers.IO) {
                       synchronized(state.foregroundRunHandle.lock) {
                         if (!isCurrent(command)) return@withContext false
-                        documents.publish(source, JsonObject(value), UiDocumentProvenance(
-                            reply.requestId.takeIf { it.isNotBlank() }, profile.model, reply.usage.reported), null)
-                        true
+                        val document = LocalUiDocumentCodec.decode(JsonObject(value).toString(), source, budget, knownScenes, null).getOrThrow()
+                        documents.publish(document, UiDocumentProvenance(
+                            reply.requestId.takeIf { it.isNotBlank() }, profile.model, reply.usage.reported), null,
+                            previous, budget, knownScenes)
                       }
                     }.let { published -> if (!published) return@coroutineScope UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY) }
                     return@coroutineScope UiDocumentReceipt.Published(documentId)

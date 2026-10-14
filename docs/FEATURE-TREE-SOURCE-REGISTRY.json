@@ -35,11 +35,19 @@
     },
     {
       "id": "ui.conversation.ports",
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送与审批端口（迁移中）",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送、分支与交互端口（迁移中）",
       "source": "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt",
       "entry": "LocalConversationUiPortComposition",
       "owner": "SHELL",
       "test": "app/src/test/java/com/labteto/dshmobile/local/LocalConversationUiPortTest.kt#staleActivationTransitionAndModeCannotInvokeEitherOwner"
+    },
+    {
+      "id": "ui.document.local_builder",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）",
+      "source": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilder.kt",
+      "entry": "LocalUiDocumentBuilder",
+      "owner": "SHELL",
+      "test": "ui-contract/src/test/kotlin/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilderTest.kt#freeTextCannotAcquireActionsOrBecomeACompletionFact"
     },
     {
       "id": "ui.scene.catalog",

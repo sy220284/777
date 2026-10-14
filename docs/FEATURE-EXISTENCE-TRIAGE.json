@@ -323,7 +323,7 @@
       "conclusion": "对应交付要求、成果版本和记忆来源三个既有能力的跨模块回归集合；独立测试源码存在，执行成功待确认。"
     },
     {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送与审批端口（迁移中）",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送、分支与交互端口（迁移中）",
       "kind": "ui_contract_migration_slice",
       "independent": false,
       "availability": "code_and_tests_present_execution_unverified",
@@ -339,7 +339,7 @@
           "method": "staleActivationTransitionAndModeCannotInvokeEitherOwner"
         }
       ],
-      "conclusion": "新增端口已通过生产 DI 接入 V6 普通文本发送与 Debug 验证包；只覆盖文本发送和 Work 审批，完整 Feature 端口及真实双包旅程仍待验收。"
+      "conclusion": "生产端口接入 V6/Next 的文本与附件发送、编辑、重生成、停止、Chat 分支及 Work 审批/提问；业务准入仍由原 Owner 执行。完整 Feature 端口及真实双包旅程尚未完成。"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / UI 场景覆盖清单与兼容性检查（迁移中）",
@@ -457,6 +457,29 @@
         }
       ],
       "conclusion": "主线退役项目功能后，旧聚合测试不再作为此叶节点的唯一证据。实际共享会话仓库、持久化和删除写入口仍存在；改为溯源真实仓库与其耐久性/删除回归测试，不据此宣称动态文档完整恢复旅程通过。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）",
+      "kind": "ui_contract_migration_slice",
+      "independent": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "source": [
+        {
+          "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilder.kt",
+          "symbol": "LocalUiDocumentBuilder"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiDocumentUiAdapter.kt",
+          "symbol": "LocalUiDocumentUiAdapter"
+        }
+      ],
+      "test": [
+        {
+          "path": "ui-contract/src/test/kotlin/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilderTest.kt",
+          "method": "freeTextCannotAcquireActionsOrBecomeACompletionFact"
+        }
+      ],
+      "conclusion": "本地类型输入可制作状态、原文清单和回复表单，复用生产 Codec/Session 定义 Owner；新增模型调用为零的实现路径不依赖模型网关。工具 Schema 与结构化结果自动适配、媒体/证据节点及真实设备验收仍待实现。"
     }
   ]
 }

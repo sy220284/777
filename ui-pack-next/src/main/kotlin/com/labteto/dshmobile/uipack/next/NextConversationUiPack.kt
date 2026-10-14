@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +21,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.Composable
@@ -59,10 +62,12 @@ object NextConversationUiPack : ConversationUiPack {
     override val manifest = UiPackManifest(
         id = "next-conversation-slice", version = 1, minContractVersion = 1, maxContractVersion = 1,
         scenes = setOf("conversation.chat", "conversation.work", "conversation.composer", "work.approval",
-            "conversation.timeline", "conversation.ui_document", "conversation.ui_document_generate")
+            "conversation.timeline", "conversation.edit", "work.question", "conversation.ui_document", "conversation.ui_document_generate")
             .map(::UiSceneId).toSet(),
         requiredCapabilities = setOf("chat.send_text", "work.send_text", "work.answer_approval",
-            "ui_document.generate", "ui_document.prepare_input")
+            "ui_document.generate", "ui_document.generate_local", "ui_document.prepare_input", "attachment.import",
+            "chat.edit", "chat.regenerate", "chat.select_variant", "chat.stop",
+            "work.edit", "work.regenerate", "work.stop", "work.answer_question")
             .map(::UiCapabilityId).toSet(),
         windowClasses = UiWindowClass.entries.toSet(),
         accessibility = UiAccessibility.entries.toSet(),
@@ -79,6 +84,7 @@ object NextConversationUiPack : ConversationUiPack {
         work: WorkConversationUiPort,
         workMode: Boolean,
         onClose: () -> Unit,
+        attachments: com.labteto.dshmobile.uicontract.AttachmentUiPort?,
     ) {
         val initialChat = remember(chat) { chat.snapshot() }
         val initialWork = remember(work) { work.snapshot() }
@@ -95,6 +101,8 @@ object NextConversationUiPack : ConversationUiPack {
         val error = if (workMode) workSnapshot.error else chatSnapshot.error
         val status = if (workMode) workSnapshot.status else chatSnapshot.status
         val approval = workSnapshot.approval.takeIf { workMode }
+        val question = workSnapshot.question.takeIf { workMode }
+        var questionAnswer by remember(question?.pendingId) { mutableStateOf("") }
         val listState = remember(identity?.sessionId) { LazyListState() }
         var readingAnchorMissing by remember(identity?.sessionId) { mutableStateOf(false) }
         var readingReady by remember(identity?.sessionId) { mutableStateOf(false) }
@@ -147,19 +155,64 @@ object NextConversationUiPack : ConversationUiPack {
                 UiCommandRejection.SESSION_TRANSITION -> R.string.next_reject_transition
                 UiCommandRejection.QUEUE_FULL -> R.string.next_reject_queue_full
                 UiCommandRejection.QUEUE_UNAVAILABLE -> R.string.next_reject_queue_unavailable
+                UiCommandRejection.QUESTION_EXPIRED -> R.string.next_reject_question
                 UiCommandRejection.APPROVAL_EXPIRED -> R.string.next_reject_approval
                 UiCommandRejection.UNSUPPORTED -> R.string.next_reject_unsupported
             })
         }
+        val importScope = rememberCoroutineScope()
+        val attachmentDrafts by drafts.attachments.collectAsStateWithLifecycle()
+        val selectedAttachments = attachmentDrafts[identity?.sessionId].orEmpty()
+        var pickerIdentity by remember { mutableStateOf<com.labteto.dshmobile.uicontract.UiSessionIdentity?>(null) }
+        var importing by remember { mutableStateOf(false) }
+        val importFailed = stringResource(R.string.next_attachment_failed)
+        val pickAttachment = com.labteto.dshmobile.uihost.rememberUiAttachmentPicker { uri ->
+            val target = pickerIdentity
+            val port = attachments
+            if (uri == null || target == null || port == null) { importing = false; pickerIdentity = null }
+            else importScope.launch {
+                try {
+                    when (val result = port.import(com.labteto.dshmobile.uicontract.ImportUiAttachmentCommand(target, uri))) {
+                        is com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Imported -> {
+                            drafts.addAttachment(target.sessionId, result.attachment)
+                        }
+                        else -> receipt = importFailed
+                    }
+                } finally { importing = false; pickerIdentity = null }
+            }
+        }
+        val editCommitted = stringResource(R.string.next_edit_committed)
+        val editUnavailable = stringResource(R.string.next_edit_unavailable)
+        var editing by remember(identity) { mutableStateOf<UiMessageSnapshot?>(null) }
+        var replacement by remember(identity) { mutableStateOf("") }
         fun show(result: UiCommandReceipt) {
             receipt = when (result) {
                 UiCommandReceipt.Accepted -> accepted
                 UiCommandReceipt.Queued -> enqueued
                 is UiCommandReceipt.Rejected -> rejected.format(rejectionLabels.getValue(result.reason))
                 is UiCommandReceipt.Failed -> result.message
+                UiCommandReceipt.NotAdmitted -> editUnavailable
+                is UiCommandReceipt.MessageEdited -> when (result.result) {
+                    com.labteto.dshmobile.local.session.LocalUserMessageEditResult.SENT -> accepted
+                    com.labteto.dshmobile.local.session.LocalUserMessageEditResult.COMMITTED_NOT_STARTED -> editCommitted
+                    else -> editUnavailable
+                }
                 UiCommandReceipt.OutcomeUnknown -> unknown
             }
         }
+        if (editing != null) AlertDialog(onDismissRequest = { editing = null },
+            title = { Text(stringResource(R.string.next_edit)) },
+            text = { OutlinedTextField(replacement, { replacement = it }, label = { Text(stringResource(R.string.next_input)) }) },
+            confirmButton = { TextButton(onClick = {
+                val target = identity ?: return@TextButton
+                val message = editing ?: return@TextButton
+                val result = if (workMode) work.submit(WorkConversationUiCommand.EditUserMessage(target, message.id, replacement))
+                    else chat.submit(ChatUiCommand.EditUserMessage(target, message.id, replacement))
+                show(result)
+                if (result is UiCommandReceipt.MessageEdited && (result.result == com.labteto.dshmobile.local.session.LocalUserMessageEditResult.SENT ||
+                    result.result == com.labteto.dshmobile.local.session.LocalUserMessageEditResult.COMMITTED_NOT_STARTED)) editing = null
+            }, enabled = identity != null && replacement.isNotBlank()) { Text(stringResource(R.string.next_edit_send)) } },
+            dismissButton = { TextButton(onClick = { editing = null }) { Text(stringResource(R.string.next_cancel)) } })
         MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
             Surface(Modifier.fillMaxSize()) {
                 Column(Modifier.safeDrawingPadding().imePadding().padding(16.dp),
@@ -173,6 +226,10 @@ object NextConversationUiPack : ConversationUiPack {
                         UiExecutionPhase.RUNNING -> R.string.next_running
                         UiExecutionPhase.WAITING_FOR_USER -> R.string.next_waiting
                     }))
+                    if (phase != UiExecutionPhase.IDLE) TextButton(onClick = {
+                        identity?.let { target -> show(if (workMode) work.submit(WorkConversationUiCommand.Stop(target))
+                            else chat.submit(ChatUiCommand.Stop(target))) }
+                    }, enabled = identity != null) { Text(stringResource(R.string.next_stop)) }
                     if (queued > 0) Text(stringResource(R.string.next_queued, queued))
                     if (status == UiSceneStatus.LOADING) Text(stringResource(R.string.next_loading))
                     if (status == UiSceneStatus.EMPTY) Text(stringResource(R.string.next_empty))
@@ -188,8 +245,26 @@ object NextConversationUiPack : ConversationUiPack {
                                     UiMessageRole.TOOL -> R.string.next_role_tool
                                 }), style = MaterialTheme.typography.labelMedium)
                                 Text(message.text)
-                                if (documents != null && message.id == messages.lastOrNull()?.id && phase == UiExecutionPhase.IDLE) {
-                                    NextDocumentGenerateButton(identity, workMode, message.id, message.text, documents)
+                                val actionsAvailable = identity != null && phase == UiExecutionPhase.IDLE && queued == 0 && send.available
+                                if (message.editableText != null) TextButton(onClick = {
+                                    editing = message; replacement = message.editableText.orEmpty()
+                                }, enabled = actionsAvailable) { Text(stringResource(R.string.next_edit)) }
+                                if (message.role == UiMessageRole.ASSISTANT && !message.proactive && message.id == messages.lastOrNull()?.id) {
+                                    TextButton(onClick = {
+                                        identity?.let { target -> show(if (workMode)
+                                            work.submit(WorkConversationUiCommand.RegenerateReply(target, message.id))
+                                            else chat.submit(ChatUiCommand.RegenerateReply(target, message.id))) }
+                                    }, enabled = actionsAvailable) { Text(stringResource(R.string.next_regenerate)) }
+                                }
+                                message.branch?.let { branch ->
+                                    Text(stringResource(R.string.next_variant, branch.index + 1, branch.count))
+                                    TextButton(onClick = { identity?.let { show(chat.submit(ChatUiCommand.SelectVariant(it, message.id, branch.index - 1))) } },
+                                        enabled = actionsAvailable && branch.index > 0) { Text(stringResource(R.string.next_previous_variant)) }
+                                    TextButton(onClick = { identity?.let { show(chat.submit(ChatUiCommand.SelectVariant(it, message.id, branch.index + 1))) } },
+                                        enabled = actionsAvailable && branch.index + 1 < branch.count) { Text(stringResource(R.string.next_next_variant)) }
+                                }
+                                if (documents != null && message.id == messages.lastOrNull()?.id && status != UiSceneStatus.LOADING) {
+                                    NextDocumentGenerateButton(identity, workMode, message.id, message.text, documents, allowAiDesign = phase == UiExecutionPhase.IDLE)
                                 }
                                 if (documents != null && forms != null) {
                                     documentSnapshot?.documents?.filter { it.document.source.messageId == message.id }?.forEach {
@@ -198,6 +273,17 @@ object NextConversationUiPack : ConversationUiPack {
                                 }
                                 HorizontalDivider()
                             }
+                        }
+                        if (question != null) item(key = "question:${question.pendingId}") {
+                            Text(question.question, style = MaterialTheme.typography.titleMedium)
+                            question.options.forEach { option -> TextButton(onClick = {
+                                identity?.let { show(work.submit(WorkConversationUiCommand.AnswerQuestion(it, question.pendingId, option))) }
+                            }, enabled = identity != null) { Text(option) } }
+                            OutlinedTextField(questionAnswer, { questionAnswer = it }, label = { Text(stringResource(R.string.next_answer)) })
+                            Button(onClick = { identity?.let { show(work.submit(WorkConversationUiCommand.AnswerQuestion(it, question.pendingId, questionAnswer))) } },
+                                enabled = identity != null && questionAnswer.isNotBlank()) { Text(stringResource(R.string.next_submit_answer)) }
+                            TextButton(onClick = { identity?.let { show(work.submit(WorkConversationUiCommand.AnswerQuestion(it, question.pendingId, null))) } },
+                                enabled = identity != null) { Text(stringResource(R.string.next_cancel_question)) }
                         }
                         if (approval != null) item(key = "approval:${approval.pendingId}") {
                             Text(approval.toolName, style = MaterialTheme.typography.titleMedium)
@@ -217,14 +303,23 @@ object NextConversationUiPack : ConversationUiPack {
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     if (!send.available) send.reason?.let { Text(rejectionLabels.getValue(it)) }
                     receipt?.let { Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
+                    if (attachments != null) TextButton(onClick = {
+                        pickerIdentity = identity; importing = true; pickAttachment()
+                    }, enabled = identity != null && !importing) { Text(stringResource(R.string.next_attach)) }
+                    selectedAttachments.forEach { attachment ->
+                        Text("${attachment.name} (${attachment.bytes} B)")
+                        TextButton(onClick = { identity?.let { drafts.removeAttachment(it.sessionId, attachment.relativePath) } }) {
+                            Text(stringResource(R.string.next_remove_attachment))
+                        }
+                    }
                     OutlinedTextField(value = draft, onValueChange = { text -> identity?.let { drafts.updateDraft(it.sessionId, text) } }, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.next_input)) }, maxLines = 5)
-                    Button(enabled = send.available && draft.isNotBlank() && identity != null, onClick = {
+                    Button(enabled = send.available && (draft.isNotBlank() || selectedAttachments.isNotEmpty()) && identity != null, onClick = {
                         val target = identity ?: return@Button
-                        val result = if (workMode) work.submit(WorkConversationUiCommand.SendText(target, draft))
-                            else chat.submit(ChatUiCommand.SendText(target, draft))
+                        val result = if (workMode) work.submit(WorkConversationUiCommand.SendMessage(target, draft, selectedAttachments))
+                            else chat.submit(ChatUiCommand.SendMessage(target, draft, selectedAttachments))
                         show(result)
-                        if (result == UiCommandReceipt.Accepted || result == UiCommandReceipt.Queued) drafts.updateDraft(target.sessionId, "")
+                        if (result == UiCommandReceipt.Accepted || result == UiCommandReceipt.Queued) { drafts.updateDraft(target.sessionId, ""); drafts.clearAttachments(target.sessionId) }
                     }) { Text(stringResource(if (phase == UiExecutionPhase.IDLE) R.string.next_send else R.string.next_queue)) }
                 }
             }

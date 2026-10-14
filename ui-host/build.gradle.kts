@@ -18,4 +18,14 @@ dependencies {
     api(project(":ui-contract"))
     implementation(platform(libs.androidx.compose.bom))
     implementation("androidx.compose.runtime:runtime")
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.core.ktx)
+    constraints {
+        listOf("lifecycle-common-java8", "lifecycle-process", "lifecycle-runtime",
+            "lifecycle-runtime-ktx", "lifecycle-viewmodel", "lifecycle-viewmodel-ktx",
+            "lifecycle-viewmodel-savedstate").forEach { artifact ->
+            implementation("androidx.lifecycle:$artifact:${libs.versions.lifecycle.get()}")
+        }
+        implementation("androidx.tracing:tracing:1.2.0")
+    }
 }

@@ -22,7 +22,8 @@ class LocalChatAutomationExecutionAdapterTest {
                 replacement: String,
             ): LocalChatUserEditResult = error("unused")
 
-            override fun regenerateReply(messageId: String): Boolean = false
+            override fun selectMessageVariant(messageId: String, targetIndex: Int) = false
+        override fun regenerateReply(messageId: String): Boolean = false
 
             override suspend fun execute(request: LocalChatExecutionRequest): LocalChatExecutionResult {
                 captured = request

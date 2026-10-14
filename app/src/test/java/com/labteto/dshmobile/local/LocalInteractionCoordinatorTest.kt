@@ -20,6 +20,7 @@ class LocalInteractionCoordinatorTest {
         var question: LocalQuestion? = null
         var deviceLease: Boolean = false
 
+        override fun pendingQuestion() = question
         override fun pendingApproval(): LocalApproval? = approval
         override fun setPendingApproval(approval: LocalApproval?) { this.approval = approval }
         override fun clearPendingApproval(callId: String) { if (approval?.callId == callId) approval = null }
@@ -28,6 +29,26 @@ class LocalInteractionCoordinatorTest {
         override fun clearPendingInteractions() { approval = null; question = null }
         override fun deviceApprovalLeaseEnabled(): Boolean = deviceLease
         override fun setDeviceApprovalLease(enabled: Boolean) { deviceLease = enabled }
+    }
+
+    @Test fun reusedQuestionCallIdDoesNotReuseUiAnswerAuthority() = runTest {
+        val state = TestState()
+        val coordinator = LocalInteractionCoordinator(state)
+        val modelQuestion = LocalQuestion("same-call", "Continue?", requestId = "untrusted")
+        val first = async { coordinator.awaitQuestion(modelQuestion) }
+        runCurrent()
+        val firstId = requireNotNull(coordinator.pendingQuestionForUi()?.requestId)
+        assertFalse(firstId == "untrusted")
+        assertTrue(coordinator.answerQuestionFromUi(firstId, "first"))
+        assertFalse(coordinator.answerQuestionFromUi(firstId, "replay"))
+        assertEquals("first", first.await())
+        val second = async { coordinator.awaitQuestion(modelQuestion) }
+        runCurrent()
+        val secondId = requireNotNull(coordinator.pendingQuestionForUi()?.requestId)
+        assertFalse(firstId == secondId)
+        assertFalse(coordinator.answerQuestionFromUi(firstId, "stale"))
+        assertTrue(coordinator.answerQuestionFromUi(secondId, null))
+        assertEquals(LOCAL_QUESTION_CANCELLED_RESPONSE, second.await())
     }
 
     @Test

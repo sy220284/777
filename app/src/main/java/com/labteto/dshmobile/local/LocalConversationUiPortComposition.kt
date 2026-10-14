@@ -32,12 +32,12 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 /**
- * Application composition adapter for the first text-send/approval slice. All writes still go to
+ * Application composition adapter for conversation commands and real interaction waiters. All writes still go to
  * Chat/Work owners. The shared foreground lock makes identity checking and owner admission atomic
  * with session transitions. UI receives no runtime, mutable domain object or executor.
  */
 @Singleton
-// FEATURE_TREE: {"id":"ui.conversation.ports","path":"第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送与审批端口（迁移中）","entry":"LocalConversationUiPortComposition","owner":"SHELL","test":"app/src/test/java/com/labteto/dshmobile/local/LocalConversationUiPortTest.kt#staleActivationTransitionAndModeCannotInvokeEitherOwner"}
+// FEATURE_TREE: {"id":"ui.conversation.ports","path":"第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送、分支与交互端口（迁移中）","entry":"LocalConversationUiPortComposition","owner":"SHELL","test":"app/src/test/java/com/labteto/dshmobile/local/LocalConversationUiPortTest.kt#staleActivationTransitionAndModeCannotInvokeEitherOwner"}
 class LocalConversationUiPortComposition @Inject internal constructor(
     private val stateStore: LocalRuntimeStateStore,
     private val chatOwner: LocalChatExecutionPort,
@@ -68,11 +68,16 @@ class LocalConversationUiPortComposition @Inject internal constructor(
             val state = stateStore.state.value
             val rejection = admission(state, command.identity(), LocalUsageMode.CHAT)
             if (rejection != null) {
-                publishSendIdentityRejection(state.sessionId)
+                if (command is ChatUiCommand.SendText || command is ChatUiCommand.SendMessage) publishSendIdentityRejection(state.sessionId)
                 return@synchronized rejection
             }
             when (command) {
+                is ChatUiCommand.SelectVariant -> operationReceipt(chatOwner.selectMessageVariant(command.messageId, command.targetIndex))
+                is ChatUiCommand.SendMessage -> chatOwner.send(command.text, command.attachments).toUiReceipt()
                 is ChatUiCommand.SendText -> chatOwner.send(command.text).toUiReceipt()
+                is ChatUiCommand.EditUserMessage -> UiCommandReceipt.MessageEdited(chatOwner.editAndResendUserMessage(command.messageId, command.replacement))
+                is ChatUiCommand.RegenerateReply -> operationReceipt(chatOwner.regenerateReply(command.messageId))
+                is ChatUiCommand.Stop -> operationReceipt(chatOwner.cancel(command.identity.sessionId))
             }
         }
     }
@@ -86,6 +91,8 @@ class LocalConversationUiPortComposition @Inject internal constructor(
                 approvalOwner.pendingApproval()?.takeIf {
                 it.requestId == state.work.pendingApproval?.requestId
             } else null
+            val question = if (active && !state.loading && !stateStore.sessionTransitioning)
+                approvalOwner.pendingQuestion()?.takeIf { it.requestId == state.work.pendingQuestion?.requestId } else null
             WorkConversationSceneSnapshot(
                 identity = identity(state).takeIf { active },
                 status = if (active) status(state) else UiSceneStatus.EMPTY,
@@ -106,21 +113,38 @@ class LocalConversationUiPortComposition @Inject internal constructor(
                     })
                 },
                 error = state.error.takeIf { active },
+                question = question?.let { com.labteto.dshmobile.uicontract.UiQuestionSnapshot(requireNotNull(it.requestId), it.question, it.options.toList()) },
             )
         }
         override fun submit(command: WorkConversationUiCommand): UiCommandReceipt = synchronized(stateStore.foregroundRunHandle.lock) {
             val state = stateStore.state.value
             val expected = when (command) {
+                is WorkConversationUiCommand.SendMessage -> command.identity
+                is WorkConversationUiCommand.SendWithTeam -> command.identity
+                is WorkConversationUiCommand.AnswerQuestion -> command.identity
                 is WorkConversationUiCommand.SendText -> command.identity
+                is WorkConversationUiCommand.EditUserMessage -> command.identity
+                is WorkConversationUiCommand.RegenerateReply -> command.identity
+                is WorkConversationUiCommand.Stop -> command.identity
                 is WorkConversationUiCommand.AnswerApproval -> command.identity
             }
             val rejection = admission(state, expected, LocalUsageMode.WORK)
             if (rejection != null) {
-                if (command is WorkConversationUiCommand.SendText) publishSendIdentityRejection(state.sessionId)
+                if (command is WorkConversationUiCommand.SendText || command is WorkConversationUiCommand.SendMessage || command is WorkConversationUiCommand.SendWithTeam) publishSendIdentityRejection(state.sessionId)
                 return@synchronized rejection
             }
             when (command) {
+                is WorkConversationUiCommand.SendMessage -> workOwner.send(command.text, command.attachments).toUiReceipt()
+                is WorkConversationUiCommand.SendWithTeam -> workOwner.sendWithTeam(command.text, command.attachments).toUiReceipt()
+                is WorkConversationUiCommand.AnswerQuestion -> {
+                    if (state.work.pendingQuestion?.requestId != command.pendingId || !approvalOwner.answerQuestion(command.pendingId, command.answer))
+                        UiCommandReceipt.Rejected(UiCommandRejection.QUESTION_EXPIRED)
+                    else UiCommandReceipt.Accepted
+                }
                 is WorkConversationUiCommand.SendText -> workOwner.send(command.text).toUiReceipt()
+                is WorkConversationUiCommand.EditUserMessage -> UiCommandReceipt.MessageEdited(workOwner.editAndResendUserMessage(command.messageId, command.replacement))
+                is WorkConversationUiCommand.RegenerateReply -> operationReceipt(workOwner.regenerateReply(command.messageId))
+                is WorkConversationUiCommand.Stop -> operationReceipt(workOwner.cancel(command.identity.sessionId))
                 is WorkConversationUiCommand.AnswerApproval -> {
                     if (state.work.pendingApproval?.requestId != command.pendingId ||
                         approvalOwner.pendingApproval()?.requestId != command.pendingId ||
@@ -157,7 +181,12 @@ class LocalConversationUiPortComposition @Inject internal constructor(
 }
 
 private fun ChatUiCommand.identity(): UiSessionIdentity = when (this) {
+    is ChatUiCommand.SelectVariant -> identity
+    is ChatUiCommand.SendMessage -> identity
     is ChatUiCommand.SendText -> identity
+    is ChatUiCommand.EditUserMessage -> identity
+    is ChatUiCommand.RegenerateReply -> identity
+    is ChatUiCommand.Stop -> identity
 }
 
 private fun status(state: LocalHarnessState): UiSceneStatus = when {
@@ -173,7 +202,12 @@ private fun messages(state: LocalHarnessState): List<UiMessageSnapshot> = state.
         "assistant" -> UiMessageRole.ASSISTANT
         "tool" -> UiMessageRole.TOOL
         else -> UiMessageRole.SYSTEM
-    }, it.content, it.createdAt)
+    }, it.content, it.createdAt,
+        if (it.role == "user") com.labteto.dshmobile.local.chat.editableChatUserText(it) else null,
+        if (state.usageMode == LocalUsageMode.CHAT && !state.chat.groupChat.enabled)
+            com.labteto.dshmobile.local.chat.chatBranchInfo(state.chat.chatBranches, it.id)?.let { info ->
+                com.labteto.dshmobile.uicontract.UiMessageBranch(info.index, info.count)
+            } else null, it.proactive)
 }
 
 internal fun LocalSendResult.toUiReceipt(): UiCommandReceipt = when (disposition) {
@@ -188,3 +222,6 @@ internal fun LocalSendResult.toUiReceipt(): UiCommandReceipt = when (disposition
         LocalSendRejectReason.QUEUE_UNAVAILABLE -> UiCommandRejection.QUEUE_UNAVAILABLE
     }, rejectLimit)
 }
+
+private fun operationReceipt(admitted: Boolean): UiCommandReceipt =
+    if (admitted) UiCommandReceipt.Accepted else UiCommandReceipt.NotAdmitted

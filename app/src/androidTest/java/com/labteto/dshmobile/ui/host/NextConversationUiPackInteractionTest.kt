@@ -65,7 +65,7 @@ class NextConversationUiPackInteractionTest {
         compose.onNode(hasSetTextAction()).assertTextContains("retain draft")
         compose.onNodeWithText("输入队列已满", substring = true).assertIsDisplayed()
         compose.runOnIdle {
-            assertEquals(listOf(ChatUiCommand.SendText(identity, "retain draft")), chat.commands)
+            assertEquals(listOf(ChatUiCommand.SendMessage(identity, "retain draft", emptyList())), chat.commands)
             chat.receipt = UiCommandReceipt.Accepted
         }
         compose.onNodeWithText("发送").performClick()

@@ -47,8 +47,12 @@ internal fun NextUiDocument(snapshot: UiDocumentSnapshot, identity: UiSessionIde
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (snapshot.recoveryNotice != null) Text(stringResource(R.string.next_document_history_incomplete))
         Text(document.title, Modifier.semantics { heading() })
-            Text(stringResource(R.string.next_document_model_source, snapshot.provenance.model))
-            if (!snapshot.provenance.usageReported) Text(stringResource(R.string.next_document_usage_unknown))
+            if (snapshot.provenance.origin == com.labteto.dshmobile.uicontract.UiDocumentOrigin.LOCAL) {
+                Text(stringResource(R.string.next_document_local_source))
+            } else {
+                Text(stringResource(R.string.next_document_model_source, snapshot.provenance.model))
+                if (!snapshot.provenance.usageReported) Text(stringResource(R.string.next_document_usage_unknown))
+            }
             document.nodes.forEach { node ->
                 NextDocumentNode(node, values, snapshot, identity != null,
                     update = { id, text -> forms.update(key, id, text) },

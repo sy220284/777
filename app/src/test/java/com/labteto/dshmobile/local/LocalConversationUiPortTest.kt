@@ -43,6 +43,7 @@ class LocalConversationUiPortTest {
             return result
         }
         override fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult = error("unused")
+        override fun selectMessageVariant(messageId: String, targetIndex: Int) = false
         override fun regenerateReply(messageId: String) = false
         override suspend fun execute(request: LocalChatExecutionRequest): LocalChatExecutionResult = error("unused")
         override fun cancel(sessionId: String) = false
@@ -68,6 +69,8 @@ class LocalConversationUiPortTest {
         val state = store.initialize(LocalHarnessState(sessionId = "a", usageMode = mode,
             loading = false, modelState = LocalModelState(configured = true)))
         val port = LocalConversationUiPortComposition(store, chat, work, object : LocalWorkApprovalUiPort {
+            override fun pendingQuestion(): LocalQuestion? = null
+            override fun answerQuestion(pendingId: String, answer: String?) = false
             override fun pendingApproval(): LocalApproval? = null
             override fun answerApproval(pendingId: String, approved: Boolean) = false
         })
@@ -76,6 +79,8 @@ class LocalConversationUiPortTest {
     @Test fun bootstrapSnapshotDoesNotQueryAnUninitializedWorkOwner() {
         val port = LocalConversationUiPortComposition(LocalRuntimeStateStore(), ChatOwner(), WorkOwner(),
             object : LocalWorkApprovalUiPort {
+                override fun pendingQuestion(): LocalQuestion? = null
+                override fun answerQuestion(pendingId: String, answer: String?) = false
                 override fun pendingApproval(): LocalApproval? = error("Work owner cannot resolve a session before bootstrap")
                 override fun answerApproval(pendingId: String, approved: Boolean): Boolean = error("No command during bootstrap")
             })
@@ -115,6 +120,21 @@ class LocalConversationUiPortTest {
                 assertEquals(null, chat.identity)
             }
         }
+    }
+
+    @Test fun staleTimelineAndStopCommandsCannotReachAnOwner() {
+        val f = Fixture(LocalUsageMode.CHAT)
+        val stale = requireNotNull(f.port.chat.snapshot().identity).copy(activationId = "obsolete")
+        listOf<ChatUiCommand>(ChatUiCommand.EditUserMessage(stale, "m", "changed"),
+            ChatUiCommand.RegenerateReply(stale, "m"), ChatUiCommand.SelectVariant(stale, "m", 0),
+            ChatUiCommand.Stop(stale)).forEach { command ->
+            assertEquals(UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY), f.port.chat.submit(command))
+        }
+        val work = Fixture(LocalUsageMode.WORK)
+        val staleWork = requireNotNull(work.port.work.snapshot().identity).copy(activationId = "obsolete")
+        listOf<WorkConversationUiCommand>(WorkConversationUiCommand.EditUserMessage(staleWork, "m", "changed"),
+            WorkConversationUiCommand.RegenerateReply(staleWork, "m"), WorkConversationUiCommand.Stop(staleWork))
+            .forEach { command -> assertEquals(UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY), work.port.work.submit(command)) }
     }
 
     @Test fun staleActivationTransitionAndModeCannotInvokeEitherOwner() {
@@ -161,6 +181,7 @@ class LocalConversationUiPortTest {
     @Test fun onlyRealPendingApprovalWaiterCanBeResolvedAndDuplicateIsRejected() = runTest {
         val f = Fixture(LocalUsageMode.WORK)
         val interaction = LocalInteractionCoordinator(object : LocalInteractionStatePort {
+            override fun pendingQuestion() = f.state.value.work.pendingQuestion
             override fun pendingApproval() = f.state.value.work.pendingApproval
             override fun setPendingApproval(approval: LocalApproval?) {
                 f.state.value = f.state.value.copy(work = f.state.value.work.copy(pendingApproval = approval))
@@ -174,6 +195,8 @@ class LocalConversationUiPortTest {
         })
         val port = LocalConversationUiPortComposition(f.store, f.chat, f.work,
             object : LocalWorkApprovalUiPort {
+                override fun pendingQuestion() = interaction.pendingQuestionForUi()
+                override fun answerQuestion(pendingId: String, answer: String?) = interaction.answerQuestionFromUi(pendingId, answer)
                 override fun pendingApproval() = interaction.pendingApprovalForUi()
                 override fun answerApproval(pendingId: String, approved: Boolean) = interaction.answerApprovalFromUi(pendingId, approved)
             })

@@ -105,6 +105,37 @@ internal object LocalUiDocumentCodec {
         document
     }
 
+    /** Local builders and persisted updates use exactly the same schema as model definitions. */
+    fun encode(document: UiDocument): JsonObject {
+        fun node(value: UiDocumentNode): JsonObject = buildJsonObject {
+            put("id", value.id)
+            when (value) {
+                is UiDocumentNode.Text -> { put("type", "text"); put("text", value.text) }
+                is UiDocumentNode.BoundText -> { put("type", "bound_text"); put("label", value.label); put("binding", value.binding.name) }
+                is UiDocumentNode.Column -> { put("type", "column"); put("children", JsonArray(value.children.map(::node))) }
+                is UiDocumentNode.Row -> { put("type", "row"); put("children", JsonArray(value.children.map(::node))) }
+                is UiDocumentNode.Disclosure -> { put("type", "disclosure"); put("title", value.title); put("children", JsonArray(value.children.map(::node))) }
+                is UiDocumentNode.Field -> { put("type", if (value.multiline) "textarea" else "field"); put("label", value.label); put("initial", value.initial); put("required", value.required) }
+                is UiDocumentNode.Select -> { put("type", "select"); put("label", value.label); put("options", JsonArray(value.options.map(::JsonPrimitive))); put("initial", value.initial) }
+                is UiDocumentNode.Switch -> { put("type", "switch"); put("label", value.label); put("initial", value.initial) }
+                is UiDocumentNode.Button -> { put("type", "button"); put("label", value.label); put("actionId", value.actionId) }
+            }
+        }
+        return buildJsonObject {
+            put("schemaVersion", document.schemaVersion); put("documentId", document.documentId)
+            put("revision", document.revision); put("title", document.title); put("fallbackText", document.fallbackText)
+            put("nodes", JsonArray(document.nodes.map(::node)))
+            put("actions", JsonArray(document.actions.map { action -> buildJsonObject {
+                put("id", action.id)
+                when (action) {
+                    is UiDocumentAction.SendUserInput -> { put("type", "send_user_input"); put("text", action.text); put("fieldIds", JsonArray(action.fieldIds.map(::JsonPrimitive))) }
+                    is UiDocumentAction.OpenKnownScene -> { put("type", "open_known_feature"); put("sceneId", action.sceneId.value) }
+                    is UiDocumentAction.AnswerApproval -> { put("type", "answer_approval"); put("pendingId", action.pendingId); put("approved", action.approved) }
+                }
+            } }))
+        }
+    }
+
     private fun checkSchema(value: JsonObject, schema: JsonObject) {
         JsonSchemaValidator.validate(value, schema)?.let { error(it) }
     }

@@ -19,5 +19,6 @@ interface ConversationUiPack {
         work: WorkConversationUiPort,
         workMode: Boolean,
         onClose: () -> Unit,
+        attachments: com.labteto.dshmobile.uicontract.AttachmentUiPort? = null,
     )
 }

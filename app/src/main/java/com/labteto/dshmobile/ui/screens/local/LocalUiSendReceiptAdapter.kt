@@ -16,7 +16,7 @@ internal fun UiCommandReceipt.toLegacySendResult(): LocalSendResult = when (this
         UiCommandRejection.STALE_IDENTITY, UiCommandRejection.SESSION_TRANSITION -> LocalSendRejectReason.SESSION_TRANSITION
         UiCommandRejection.QUEUE_FULL -> LocalSendRejectReason.QUEUE_FULL
         UiCommandRejection.QUEUE_UNAVAILABLE -> LocalSendRejectReason.QUEUE_UNAVAILABLE
-        UiCommandRejection.APPROVAL_EXPIRED, UiCommandRejection.UNSUPPORTED -> error("Non-send rejection in text-send receipt")
+        UiCommandRejection.QUESTION_EXPIRED, UiCommandRejection.APPROVAL_EXPIRED, UiCommandRejection.UNSUPPORTED -> error("Non-send rejection in text-send receipt")
     }, limit)
-    is UiCommandReceipt.Failed, UiCommandReceipt.OutcomeUnknown -> error("Non-admission receipt in text-send port")
+    UiCommandReceipt.NotAdmitted, is UiCommandReceipt.MessageEdited, is UiCommandReceipt.Failed, UiCommandReceipt.OutcomeUnknown -> error("Non-admission receipt in text-send port")
 }

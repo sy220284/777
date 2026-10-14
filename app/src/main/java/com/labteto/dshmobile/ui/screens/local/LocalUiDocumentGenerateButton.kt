@@ -24,15 +24,27 @@ import kotlinx.coroutines.launch
 
 @Composable
 internal fun LocalUiDocumentGenerateButton(identity: UiSessionIdentity?, workMode: Boolean,
-    messageId: String, prompt: String, port: UiDocumentUiPort) {
+    messageId: String, prompt: String, port: UiDocumentUiPort, allowAiDesign: Boolean = true) {
     var open by remember(identity, messageId) { mutableStateOf(false) }
     var input by remember(identity, messageId) { mutableStateOf(prompt) }
     var pending by remember(identity, messageId) { mutableStateOf(false) }
     var receipt by remember(identity, messageId) { mutableStateOf<UiDocumentReceipt?>(null) }
     val scope = rememberCoroutineScope()
-    SyButton(stringResource(R.string.ui_document_generate), { open = true },
-        enabled = identity != null && !pending, loading = pending, variant = SyButtonVariant.Ghost)
-    if (open) SyDialog(stringResource(R.string.ui_document_generate), onDismiss = { if (!pending) open = false }) {
+    fun makeLocal(template: com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate) {
+        val target = identity ?: return
+        if (pending) return
+        pending = true
+        scope.launch {
+            try { receipt = port.generateLocal(com.labteto.dshmobile.uicontract.GenerateLocalUiDocumentCommand(target, workMode, messageId, template)) }
+            finally { pending = false }
+        }
+    }
+    SyButton(stringResource(R.string.ui_document_local_status), { makeLocal(com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.STATUS) }, enabled = identity != null && !pending, variant = SyButtonVariant.Ghost)
+    SyButton(stringResource(R.string.ui_document_local_message), { makeLocal(com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.MESSAGE) }, enabled = identity != null && !pending, variant = SyButtonVariant.Ghost)
+    SyButton(stringResource(R.string.ui_document_local_form), { makeLocal(com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.REPLY_FORM) }, enabled = identity != null && !pending, variant = SyButtonVariant.Ghost)
+    SyButton(stringResource(R.string.ui_document_ai_design), { open = true },
+        enabled = identity != null && !pending && allowAiDesign, loading = pending, variant = SyButtonVariant.Ghost)
+    if (open) SyDialog(stringResource(R.string.ui_document_ai_design), onDismiss = { if (!pending) open = false }) {
         Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             Text(stringResource(R.string.ui_document_extra_request_consent))
             SyTextField(input, { input = it }, enabled = !pending, minLines = 2,

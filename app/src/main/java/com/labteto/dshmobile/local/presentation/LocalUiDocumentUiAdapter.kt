@@ -50,21 +50,22 @@ internal class LocalUiDocumentUiAdapter(
 ) : UiDocumentUiPort {
     private data class Context(val identity: UiSessionIdentity?, val workMode: Boolean, val messages: Set<String>,
         val phase: UiExecutionPhase, val queued: Int, val approvalTool: String?, val error: String?)
-    private val contexts = state.state.map { snapshot ->
+    private val contexts = state.state.map { synchronized(state.foregroundRunHandle.lock) {
+        val snapshot = state.state.value
         val workMode = snapshot.usageMode == LocalUsageMode.WORK
         val chat = conversations.chat.snapshot()
         val work = conversations.work.snapshot()
         Context(state.uiBindingIdentity(snapshot), workMode, snapshot.messages.map { it.id }.toSet(),
             if (workMode) work.phase else chat.phase, if (workMode) work.queuedInputCount else chat.queuedInputCount,
             work.approval?.toolName.takeIf { workMode }, if (workMode) work.error else chat.error)
-    }.distinctUntilChanged()
+    } }.distinctUntilChanged()
     override val snapshots: StateFlow<UiDocumentsSceneSnapshot> = combine(contexts, store.revision, generation.generating) { context, _, busy ->
         try {
             val id = context.identity
             val records = id?.let { store.read(it.sessionId, context.messages, generation.budget, knownScenes) }.orEmpty()
             UiDocumentsSceneSnapshot(id?.sessionId, records.map { record ->
                 val document = record.document
-                val current = sourceMatches(document.source, id, context.workMode)
+                val current = record.recoveryNotice == null && sourceMatches(document.source, id, context.workMode)
                 UiDocumentSnapshot(document, record.provenance, document.actions.associate { action ->
                     val reason = when {
                         !current -> UiCommandRejection.STALE_IDENTITY
@@ -91,6 +92,42 @@ internal class LocalUiDocumentUiAdapter(
 
     override fun snapshot() = snapshots.value
     override suspend fun generate(command: GenerateUiDocumentCommand) = generation.generate(command, knownScenes, navigationScenes)
+
+    override suspend fun generateLocal(command: com.labteto.dshmobile.uicontract.GenerateLocalUiDocumentCommand): UiDocumentReceipt =
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
+            try {
+                synchronized(state.foregroundRunHandle.lock) {
+                    val current = state.state.value
+                    if (state.sessionTransitioning || state.uiBindingIdentity(current) != command.identity ||
+                        (current.usageMode == LocalUsageMode.WORK) != command.workMode)
+                        return@synchronized UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                    val message = current.messages.firstOrNull { it.id == command.messageId }
+                        ?: return@synchronized UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                    val source = UiDocumentSource(command.identity.sessionId, message.id, command.identity.contextGeneration,
+                        command.identity.profileId, command.identity.projectId, command.workMode)
+                    val approval = conversations.work.snapshot().approval.takeIf { command.workMode }
+                    val data = when (command.template) {
+                        com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.STATUS -> com.labteto.dshmobile.uicontract.UiLocalDocumentData.Status(approval)
+                        com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.MESSAGE -> com.labteto.dshmobile.uicontract.UiLocalDocumentData.ListItems(listOf(message.content))
+                        com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.REPLY_FORM -> com.labteto.dshmobile.uicontract.UiLocalDocumentData.ReplyForm("")
+                    }
+                    val previous = store.read(source.sessionId, setOf(source.messageId), generation.budget, knownScenes)
+                        .firstOrNull { it.recoveryNotice == null && it.document.source == source }?.document
+                    val result = com.labteto.dshmobile.uicontract.LocalUiDocumentBuilder.build(
+                        previous?.documentId ?: java.util.UUID.randomUUID().toString(), source,
+                        previous?.revision?.let { Math.addExact(it, 1) } ?: 0, data, generation.budget, knownScenes)
+                    val document = result.getOrNull() ?: return@synchronized UiDocumentReceipt.Fallback(message.content, "ui_document_unavailable")
+                    val definition = com.labteto.dshmobile.local.presentation.document.LocalUiDocumentCodec.encode(document)
+                    com.labteto.dshmobile.local.presentation.document.LocalUiDocumentCodec.decode(definition.toString(), source,
+                        generation.budget, knownScenes, approval?.pendingId).getOrThrow()
+                    if (store.publish(document, com.labteto.dshmobile.uicontract.UiDocumentProvenance(null, "", false,
+                        com.labteto.dshmobile.uicontract.UiDocumentOrigin.LOCAL), approval?.pendingId, previous, generation.budget, knownScenes))
+                        UiDocumentReceipt.Published(document.documentId)
+                    else UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { UiDocumentReceipt.Failed(failure.message) }
+        }
 
     override fun submit(identity: UiSessionIdentity, request: UiDocumentActionRequest): UiDocumentReceipt {
         return synchronized(state.foregroundRunHandle.lock) {

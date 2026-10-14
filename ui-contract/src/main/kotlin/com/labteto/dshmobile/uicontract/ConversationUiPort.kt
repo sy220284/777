@@ -21,7 +21,7 @@ enum class UiExecutionPhase { IDLE, RUNNING, WAITING_FOR_USER }
 data class UiActionAvailability(val available: Boolean, val reason: UiCommandRejection? = null)
 enum class UiCommandRejection {
     EMPTY_INPUT, LOADING, UNCONFIGURED, STALE_IDENTITY, SESSION_TRANSITION,
-    QUEUE_FULL, QUEUE_UNAVAILABLE, APPROVAL_EXPIRED, UNSUPPORTED,
+    QUEUE_FULL, QUEUE_UNAVAILABLE, APPROVAL_EXPIRED, QUESTION_EXPIRED, UNSUPPORTED,
 }
 
 sealed interface UiCommandReceipt {
@@ -30,11 +30,16 @@ sealed interface UiCommandReceipt {
     data object Queued : UiCommandReceipt
     data class Rejected(val reason: UiCommandRejection, val limit: Int? = null) : UiCommandReceipt
     data class Failed(val message: String) : UiCommandReceipt
+    /** Owner declined an operation without exposing a more specific cause. */
+    data object NotAdmitted : UiCommandReceipt
+    data class MessageEdited(val result: com.labteto.dshmobile.local.session.LocalUserMessageEditResult) : UiCommandReceipt
     data object OutcomeUnknown : UiCommandReceipt
 }
 
 enum class UiMessageRole { USER, ASSISTANT, SYSTEM, TOOL }
-data class UiMessageSnapshot(val id: String, val role: UiMessageRole, val text: String, val createdAt: Long)
+data class UiMessageBranch(val index: Int, val count: Int)
+data class UiMessageSnapshot(val id: String, val role: UiMessageRole, val text: String, val createdAt: Long,
+    val editableText: String? = null, val branch: UiMessageBranch? = null, val proactive: Boolean = false)
 
 data class ChatSceneSnapshot(
     val identity: UiSessionIdentity?,
@@ -47,6 +52,11 @@ data class ChatSceneSnapshot(
 )
 
 sealed interface ChatUiCommand {
+    data class SendMessage(val identity: UiSessionIdentity, val text: String, val attachments: List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment>) : ChatUiCommand
+    data class SelectVariant(val identity: UiSessionIdentity, val messageId: String, val targetIndex: Int) : ChatUiCommand
+    data class EditUserMessage(val identity: UiSessionIdentity, val messageId: String, val replacement: String) : ChatUiCommand
+    data class RegenerateReply(val identity: UiSessionIdentity, val messageId: String) : ChatUiCommand
+    data class Stop(val identity: UiSessionIdentity) : ChatUiCommand
     data class SendText(val identity: UiSessionIdentity, val text: String) : ChatUiCommand
 }
 
@@ -66,6 +76,8 @@ data class UiApprovalSnapshot(
     val impact: UiApprovalImpact,
 )
 
+data class UiQuestionSnapshot(val pendingId: String, val question: String, val options: List<String>)
+
 data class WorkConversationSceneSnapshot(
     val identity: UiSessionIdentity?,
     val status: UiSceneStatus,
@@ -75,9 +87,17 @@ data class WorkConversationSceneSnapshot(
     val send: UiActionAvailability,
     val approval: UiApprovalSnapshot?,
     val error: String?,
+    val question: UiQuestionSnapshot? = null,
 )
 
 sealed interface WorkConversationUiCommand {
+    /** Null is an explicit cancellation answer, not an empty affirmative response. */
+    data class AnswerQuestion(val identity: UiSessionIdentity, val pendingId: String, val answer: String?) : WorkConversationUiCommand
+    data class SendMessage(val identity: UiSessionIdentity, val text: String, val attachments: List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment>) : WorkConversationUiCommand
+    data class EditUserMessage(val identity: UiSessionIdentity, val messageId: String, val replacement: String) : WorkConversationUiCommand
+    data class RegenerateReply(val identity: UiSessionIdentity, val messageId: String) : WorkConversationUiCommand
+    data class SendWithTeam(val identity: UiSessionIdentity, val text: String, val attachments: List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment>) : WorkConversationUiCommand
+    data class Stop(val identity: UiSessionIdentity) : WorkConversationUiCommand
     data class SendText(val identity: UiSessionIdentity, val text: String) : WorkConversationUiCommand
     data class AnswerApproval(
         val identity: UiSessionIdentity,

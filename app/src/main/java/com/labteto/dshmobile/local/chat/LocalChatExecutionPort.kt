@@ -52,6 +52,8 @@ internal interface LocalChatExecutionPort {
         replacement: String,
     ): LocalChatUserEditResult
 
+    fun selectMessageVariant(messageId: String, targetIndex: Int): Boolean
+
     fun regenerateReply(messageId: String): Boolean
 
     suspend fun execute(request: LocalChatExecutionRequest): LocalChatExecutionResult
