@@ -47,6 +47,7 @@ class LocalFeatureEntryDescriptionsRegressionTest {
                 )
             }
         }
+        compose.onNodeWithTag("sySceneBackgroundSurface").assertIsDisplayed()
         compose.onNodeWithText(context.getString(R.string.local_new_session_chat_continue_hint)).assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.local_new_session_chat_independent_hint)).assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.local_new_session_chat_continue)).performClick()
@@ -92,6 +93,7 @@ class LocalFeatureEntryDescriptionsRegressionTest {
                 )
             }
         }
+        compose.onNodeWithTag("sySceneBackgroundSurface").assertIsDisplayed()
         compose.onNodeWithText(context.getString(R.string.local_group_new_session_intro)).assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.local_group_new_group)).performClick()
         compose.runOnIdle { assertEquals("group", selected) }

@@ -147,6 +147,26 @@ class DsBottomSheetRegressionTest {
     }
 
     @Test
+    fun opaquePopupOptOutStillPreservesMenuActions() {
+        var clicked = 0
+        compose.setContent {
+            DshTheme {
+                Box {
+                    SyPopupMenu(
+                        expanded = true,
+                        onDismiss = {},
+                        seamlessBackground = false,
+                        items = listOf(SyMenuItem("受控确认操作", onClick = { clicked++ })),
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("sySeamlessPopupScene").assertDoesNotExist()
+        compose.onNodeWithText("受控确认操作").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1, clicked) }
+    }
+
+    @Test
     fun seamlessPersonaPickerKeepsHeaderAndContentsVisible() {
         compose.setContent {
             DshTheme {
