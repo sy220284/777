@@ -13,10 +13,12 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -94,6 +96,9 @@ class DsBottomSheetRegressionTest {
                 }
             }
         }
+        compose.onNodeWithTag("sySceneBackgroundSurface").assertIsDisplayed()
+        val panel = compose.onNodeWithTag("sySceneBackgroundSurface").getUnclippedBoundsInRoot()
+        assertTrue("Background painter must not expand the compact menu", panel.height.value < 280f)
         compose.onNodeWithText("团队协作").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, selected) }
     }
