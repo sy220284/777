@@ -18,10 +18,13 @@ def svg(path):
 icons = {p.stem: svg(p) for p in sorted((R / "assets/icons").glob("*.svg"))}
 if len(icons) != tokens["iconInventory"]["activeCount"]:
     parser.error("Unexpected active icon count")
+legacy = {p.stem: svg(p) for p in sorted((R / "assets/icons-legacy-redrawn").glob("*.svg"))}
+if len(legacy) != 12: parser.error("Expected 12 redrawn legacy and utility icons")
 people = {i: svg(R / "assets/portraits" / f"persona-{i+1}.svg") for i in range(4)}
 archive = svg(R / "assets/file-icons/archive-light.svg")
 boot = ('<script>\nconst V6_ROUTES=' + json.dumps([x["id"] for x in tokens["routes"]], ensure_ascii=False) +
     ';\nwindow.V6_ASSET_DATA=' + json.dumps(icons, ensure_ascii=False) +
+    ';\nwindow.V6_UTILITY_DATA=' + json.dumps(legacy, ensure_ascii=False) +
     ';\nwindow.V6_PORTRAIT_DATA=' + json.dumps(people, ensure_ascii=False) +
     ';\nwindow.V6_FILE_ICON_DATA=' + json.dumps(archive) + ';\n</script>')
 h = h.replace('<html lang="zh-CN">', '<html lang="zh-CN" data-v6-authoritative="compose-3cdd12f">')
