@@ -1,6 +1,6 @@
 {
   "schema": "777.v6.current-ui/1",
-  "baselineCommit": "3a69089de1d95fe655b550bf59cb4816e25720a7",
+  "baselineCommit": "3cdd12f3395876b2d495721336d5d378b562a03c",
   "asOf": "2026-10-14",
   "platform": "Android mobile",
   "sourceOfTruth": "merged Compose on main",
@@ -152,11 +152,6 @@
   ],
   "pendingPRs": [
     {
-      "number": 711,
-      "scope": "skills/plugin compact card layout and shared material measurement",
-      "merged": false
-    },
-    {
       "number": 705,
       "scope": "UI3.0 independent packs and ports",
       "merged": false
@@ -174,5 +169,8 @@
       "RunCenter"
     ],
     "policy": "Retain legacy Kotlin path declarations but exclude the two retired entry icons from active design packaging."
-  }
+  },
+  "mergedUIFixes": [
+    711
+  ]
 }
