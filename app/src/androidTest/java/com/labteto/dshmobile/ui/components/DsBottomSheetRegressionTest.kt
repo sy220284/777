@@ -98,7 +98,7 @@ class DsBottomSheetRegressionTest {
         }
         compose.onNodeWithTag("sySceneBackgroundSurface").assertIsDisplayed()
         val panel = compose.onNodeWithTag("sySceneBackgroundSurface").getUnclippedBoundsInRoot()
-        assertTrue("Background painter must not expand the compact menu", panel.height.value < 280f)
+        assertTrue("Background painter must not expand the compact menu", (panel.bottom - panel.top).value < 280f)
         compose.onNodeWithText("团队协作").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, selected) }
     }
