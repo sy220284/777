@@ -29,6 +29,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SheetDefaults
 import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SySceneBackgroundSurface
 import com.shenyan.designsystem.components.SyMaterialTier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Text
@@ -143,9 +144,9 @@ fun SyResponsiveSheet(
                     val panelModifier = modifier.width(420.dp).fillMaxHeight()
                         .padding(if (floating) 18.dp else 10.dp)
                     if (seamlessBackground) {
-                        // The attachment menu lives directly over the current app background.
-                        // A lower material tier still paints a solid sheet and cannot remove it.
-                        Box(panelModifier) { SheetBody() }
+                        // Paint the root scene at the same screen coordinates, not a white plate
+                        // and not transparency that reveals chat bubbles underneath the menu.
+                        SySceneBackgroundSurface(panelModifier) { SheetBody() }
                     } else {
                         SyMaterialSurface(
                             modifier = panelModifier,
@@ -169,7 +170,7 @@ fun SyResponsiveSheet(
             contentWindowInsets = { WindowInsets.navigationBars },
         ) {
             if (seamlessBackground) {
-                SheetBody()
+                SySceneBackgroundSurface(Modifier.fillMaxWidth()) { SheetBody() }
             } else {
                 SyMaterialSurface(tier = surfaceTier,
                     shape = RoundedCornerShape(SyDimensions.cornerOverlay)) { SheetBody() }
