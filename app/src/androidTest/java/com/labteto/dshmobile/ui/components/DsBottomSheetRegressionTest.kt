@@ -1,9 +1,12 @@
 package com.labteto.dshmobile.ui.components
 
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.shenyan.designsystem.components.SySheetChoiceRow
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Text
@@ -101,6 +104,85 @@ class DsBottomSheetRegressionTest {
         assertTrue("Background painter must not expand the compact menu", (panel.bottom - panel.top).value < 280f)
         compose.onNodeWithText("团队协作").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, selected) }
+    }
+
+    @Test
+    fun seamlessSuggestionPopupKeepsActionsAccessible() {
+        var selected = 0
+        compose.setContent {
+            DshTheme {
+                Box {
+                    SyButton(text = "试试这些", onClick = {})
+                    SyPopupMenu(
+                        expanded = true,
+                        onDismiss = {},
+                        seamlessBackground = true,
+                        items = listOf(SyMenuItem("联网调研", onClick = { selected++ })),
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("sySeamlessPopupScene").assertIsDisplayed()
+        compose.onNodeWithText("联网调研").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1, selected) }
+    }
+
+    @Test
+    fun defaultPopupMenuUsesContinuousBackground() {
+        var clicked = 0
+        compose.setContent {
+            DshTheme {
+                Box {
+                    SyPopupMenu(
+                        expanded = true,
+                        onDismiss = {},
+                        items = listOf(SyMenuItem("编辑任务", onClick = { clicked++ })),
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("sySeamlessPopupScene").assertIsDisplayed()
+        compose.onNodeWithText("编辑任务").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1, clicked) }
+    }
+
+    @Test
+    fun opaquePopupOptOutStillPreservesMenuActions() {
+        var clicked = 0
+        compose.setContent {
+            DshTheme {
+                Box {
+                    SyPopupMenu(
+                        expanded = true,
+                        onDismiss = {},
+                        seamlessBackground = false,
+                        items = listOf(SyMenuItem("受控确认操作", onClick = { clicked++ })),
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("sySeamlessPopupScene").assertDoesNotExist()
+        compose.onNodeWithText("受控确认操作").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1, clicked) }
+    }
+
+    @Test
+    fun seamlessPersonaPickerKeepsHeaderAndContentsVisible() {
+        compose.setContent {
+            DshTheme {
+                SyResponsiveSheet(
+                    title = "选择人物",
+                    subtitle = "点选头像，开始一段新故事。",
+                    onDismiss = {},
+                    seamlessBackground = true,
+                ) {
+                    Text("人物头像")
+                }
+            }
+        }
+        compose.onNodeWithTag("sySceneBackgroundSurface").assertIsDisplayed()
+        compose.onNodeWithText("选择人物").assertIsDisplayed()
+        compose.onNodeWithText("人物头像").assertIsDisplayed()
     }
 
     @Test

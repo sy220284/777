@@ -4,6 +4,7 @@ import com.shenyan.designsystem.foundation.SyMetric
 
 
 import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -80,6 +81,7 @@ internal fun GroupChatMemberPickerSheet(
     SyResponsiveSheet(
         title = stringResource(R.string.local_group_chat_members_title),
         onDismiss = onDismiss,
+        seamlessBackground = true,
         scrollable = true,
         footer = {
         Text(
@@ -160,7 +162,9 @@ internal fun GroupChatMemberPickerSheet(
                                         }
                                     },
                                 ),
-                            tint = if (checked) com.shenyan.designsystem.foundation.LocalSyColors.current.selected else androidx.compose.ui.graphics.Color.Transparent,
+                            tier = SyMaterialTier.L1_SECTION,
+                            tint = if (checked) com.shenyan.designsystem.foundation.LocalSyColors.current.selected.copy(alpha = .18f)
+                                else androidx.compose.ui.graphics.Color.Transparent,
                         ) {
                             Row(
                                 modifier = Modifier
