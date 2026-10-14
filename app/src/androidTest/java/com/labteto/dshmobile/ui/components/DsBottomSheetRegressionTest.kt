@@ -80,6 +80,25 @@ class DsBottomSheetRegressionTest {
     }
 
     @Test
+    fun seamlessAttachmentSheetKeepsActionClickableWithoutMaterialBackdrop() {
+        var selected = 0
+        compose.setContent {
+            DshTheme {
+                SyResponsiveSheet(
+                    title = null,
+                    onDismiss = {},
+                    showDragHandle = false,
+                    seamlessBackground = true,
+                ) {
+                    SySheetChoiceRow(title = "团队协作", onClick = { selected++ })
+                }
+            }
+        }
+        compose.onNodeWithText("团队协作").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1, selected) }
+    }
+
+    @Test
     fun shortChoiceSheetUsesFullRowAsActionTarget() {
         var selected = 0
         compose.setContent {
