@@ -90,7 +90,6 @@ import com.labteto.dshmobile.ui.shenyan.SyUserBubble
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -152,7 +151,6 @@ internal fun LocalMessageRow(
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val pulse = rememberHapticPulse()
-    val backgroundState = LocalAppBackgroundState.current
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     val copiedMessage = stringResource(R.string.chat_copy_success)
@@ -282,6 +280,8 @@ internal fun LocalMessageRow(
         else -> {
             var actionsOpen by remember(message.id) { mutableStateOf(false) }
             val readingLayer = chatMode
+            val visibleContent = if (groupMode) groupMessageVisibleContent(message) else message.content
+            val copyableContent = if (chatMode) extractLocalCharacterThought(visibleContent, streaming).second else visibleContent
             val readingModifier = if (readingLayer) {
                 Modifier
                     .fillMaxWidth(0.91f)
@@ -315,8 +315,6 @@ internal fun LocalMessageRow(
                         )
                     }
                 }
-                val visibleContent = if (groupMode) groupMessageVisibleContent(message) else message.content
-                val copyableContent = if (chatMode) extractLocalCharacterThought(visibleContent, streaming).second else visibleContent
                 FluidMessageActionSheet(actionsOpen, { actionsOpen = false }, buildList {
                     if (copyableContent.isNotBlank()) add(SyMenuItem(
                         text = stringResource(R.string.common_copy), icon = FeatherIcons.Copy,
