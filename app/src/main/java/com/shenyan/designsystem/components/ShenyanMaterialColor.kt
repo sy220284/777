@@ -58,16 +58,31 @@ internal fun syResolveMaterialFill(
         tinted = lerp(neutral, sample, strength)
     }
     if (tier == SyMaterialTier.L5_SOLID) return tinted
-    var alpha = (token.alpha + (.5f - scene.surfaceTransparency.coerceIn(0f, 1f)) * .46f).coerceIn(.08f, 1f)
+
+    val transparency = scene.surfaceTransparency.coerceIn(0f, 1f)
+    // A vivid wallpaper should be allowed to colour the glass. The contrast-safe solid tint
+    // above is the starting point, not a mandate to paint an almost-white opaque slab.
+    tinted = lerp(neutral, sample, (strength + .12f * transparency).coerceAtMost(.42f))
+    val desiredAlpha = (token.alpha + (.5f - transparency) * .46f).coerceIn(.08f, 1f)
+    if (!scene.adaptiveContrast) return tinted.copy(alpha = desiredAlpha)
+
+    // Find the contrast-safe backing at the "clearer" end, but do not let that safety
+    // estimate silently override the user's transparency slider. In particular, sampling
+    // both bright and dark pixels used to drive almost every card to alpha=1.
     fun minimumContrast(opacity: Float) = backgrounds.minOf { contrast(tinted.copy(alpha = opacity).compositeOver(it)) }
-    if (scene.adaptiveContrast && minimumContrast(alpha) < 4.5f) {
-        var low = alpha
+    var contrastAlpha = desiredAlpha
+    if (minimumContrast(contrastAlpha) < 4.5f) {
+        var low = contrastAlpha
         var high = 1f
         repeat(10) {
             val mid = (low + high) / 2f
             if (minimumContrast(mid) < 4.5f) low = mid else high = mid
         }
-        alpha = high
+        contrastAlpha = high
     }
-    return tinted.copy(alpha = alpha)
+    // The default still gets a substantial adaptive lift; choosing "airier" progressively
+    // prioritises a real see-through surface. "Clearer" retains full contrast protection.
+    val adaptiveWeight = 1f - .44f * transparency
+    val alpha = desiredAlpha + (contrastAlpha - desiredAlpha) * adaptiveWeight
+    return tinted.copy(alpha = alpha.coerceIn(.08f, 1f))
 }
