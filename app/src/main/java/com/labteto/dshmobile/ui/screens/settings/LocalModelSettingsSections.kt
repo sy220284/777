@@ -366,7 +366,7 @@ internal fun LocalModelSettingsCard(
                         testStatus = "请填写该模型的密钥"
                     } else if (selectedPreset?.provider == "Kimi Code" && selectedPreset.model == "k3" &&
                         contextWindowTokens.isNotBlank() &&
-                        contextWindowTokens.toIntOrNull() !in 4_096..1_048_576
+                        (contextWindowTokens.toIntOrNull() ?: -1) !in 4_096..1_048_576
                     ) {
                         testStatus = "Kimi K3 上下文只能设置 4096～1048576；留空使用 256K 默认值"
                     } else {
