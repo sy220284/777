@@ -52,6 +52,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionOnScreen
+import com.shenyan.designsystem.foundation.LocalSySceneBackdrop
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -201,11 +204,26 @@ fun SyPopupMenu(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val p = LocalSyColors.current
+    val scene = LocalSySceneBackdrop.current
+    var regionY by remember { mutableStateOf(.5f) }
     DropdownMenu(
         expanded = expanded, onDismissRequest = onDismiss,
-        modifier = modifier,
-        shape = RoundedCornerShape(13.dp),
-        containerColor = containerColor ?: com.shenyan.designsystem.components.syMaterialColor(SyMaterialTier.L4_OVERLAY),
+        modifier = modifier.onGloballyPositioned { coordinates ->
+            val backdrop = scene ?: return@onGloballyPositioned
+            if (backdrop.viewportSize.height <= 0) return@onGloballyPositioned
+            val centre = coordinates.positionOnScreen().y + coordinates.size.height / 2f
+            val fraction = (centre - backdrop.viewportOrigin.y) / backdrop.viewportSize.height
+            // Sample the same top/middle/bottom bands as every on-screen glass surface.
+            val sampled = when {
+                fraction < .30f -> .15f
+                fraction < .74f -> .50f
+                else -> .88f
+            }
+            if (regionY != sampled) regionY = sampled
+        },
+        shape = RoundedCornerShape(SyMetric.radiusControl),
+        containerColor = containerColor ?: com.shenyan.designsystem.components.syMaterialColor(
+            SyMaterialTier.L4_OVERLAY, regionY),
         tonalElevation = 0.dp,
         border = BorderStroke(1.dp, p.border),
         properties = PopupProperties(

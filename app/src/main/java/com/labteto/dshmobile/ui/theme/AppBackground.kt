@@ -192,8 +192,7 @@ internal fun resolveWallpaperAlpha(
     maxAlpha: Float,
     transparency: Float,
 ): Float {
-    val preference = transparency.coerceIn(0f, 1f)
-    val adjustment = (0.5f - preference) * 0.46f
+    val adjustment = com.shenyan.designsystem.foundation.SyMaterialPolicy.adjustment(transparency)
     val lower = (minAlpha - 0.18f).coerceAtLeast(0.14f)
     val upper = (maxAlpha + 0.08f).coerceAtMost(0.98f)
     return (adaptiveAlpha + adjustment).coerceIn(lower, upper)
@@ -302,42 +301,17 @@ fun AppBackgroundHost(
             LocalAppBackgroundState provides state,
             LocalSySceneBackdrop provides sceneBackdrop,
         ) {
-            if (loaded == null && fluidGlass) FluidGlassBackdrop(darkTheme, ambientPalette)
-            loaded?.let { background ->
-                Image(
-                    bitmap = background.image,
-                    contentDescription = null,
+            // Main canvas and every overlay use the same position-aligned scene painter.
+            // This avoids a second gradient/image implementation drifting in colour or crop.
+            if (loaded != null || fluidGlass) {
+                com.shenyan.designsystem.components.SySceneBackgroundSurface(
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
-                adaptiveGlobalVeil(state, surfaceBase)?.let { veil ->
-                    Box(Modifier.fillMaxSize().background(veil))
-                }
+                    shape = androidx.compose.foundation.shape.RectangleShape,
+                    fallbackColor = surfaceBase,
+                ) {}
             }
             content()
         }
-    }
-}
-
-/** Static radial light fields: no bitmap, blur layer or perpetual animation. */
-@Composable
-private fun FluidGlassBackdrop(dark: Boolean, colors: com.shenyan.designsystem.foundation.SyColors) {
-    // Keep the three designed light fields while sourcing their hues from active semantic colors.
-    Canvas(Modifier.fillMaxSize()) {
-        val opacity = if (dark) 0.10f else 0.38f
-        val extent = maxOf(size.width, size.height)
-        drawRect(Brush.radialGradient(
-            colors = listOf(colors.primary.copy(alpha = opacity), Color.Transparent),
-            center = Offset(size.width * 0.06f, size.height * 0.08f), radius = extent * 0.72f,
-        ))
-        drawRect(Brush.radialGradient(
-            colors = listOf(colors.mint.copy(alpha = opacity), Color.Transparent),
-            center = Offset(size.width * 0.98f, size.height * 0.36f), radius = extent * 0.65f,
-        ))
-        drawRect(Brush.radialGradient(
-            colors = listOf(colors.lilac.copy(alpha = opacity * 0.45f * .18f), Color.Transparent),
-            center = Offset(size.width * 0.24f, size.height * 0.92f), radius = extent * 0.55f,
-        ))
     }
 }
 

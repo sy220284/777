@@ -89,7 +89,8 @@ internal fun syResolveMaterialFill(
     // A vivid wallpaper should be allowed to colour the glass. The contrast-safe solid tint
     // above is the starting point, not a mandate to paint an almost-white opaque slab.
     tinted = lerp(tinted, sample.copy(alpha = 1f), .12f * transparency)
-    val desiredAlpha = (token.alpha + (.5f - transparency) * .46f).coerceIn(.08f, 1f)
+    val desiredAlpha = (token.alpha +
+        com.shenyan.designsystem.foundation.SyMaterialPolicy.adjustment(transparency)).coerceIn(.08f, 1f)
     if (!scene.adaptiveContrast) return tinted.copy(alpha = desiredAlpha)
 
     // Find the contrast-safe backing at the "clearer" end, but do not let that safety

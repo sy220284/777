@@ -72,7 +72,7 @@ fun SyIconButton(
     val pressed by interaction.collectIsPressedAsState()
     val hovered by interaction.collectIsHoveredAsState()
     val scale by animateFloatAsState(
-        if (pressed && enabled && !motion) .96f else 1f,
+        if (pressed && enabled && !motion) SyMotion.pressedScale else 1f,
         animationSpec = tween(if (motion) 0 else SyMotion.pressMs),
         label = "syIconPress",
     )

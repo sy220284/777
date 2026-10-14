@@ -1,6 +1,7 @@
 package com.shenyan.designsystem.foundation
 
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
@@ -129,7 +130,20 @@ object SyMetric {
     val radiusCard = 18.dp
     val radiusSheet = 24.dp
 }
+/** Opacity response shared by V6 glass and retained legacy surface adapters. */
+object SyMaterialPolicy {
+    const val transparencyStrength = .46f
+    fun adjustment(transparency: Float): Float =
+        (.5f - transparency.coerceIn(0f, 1f)) * transparencyStrength
+}
+
 object SyMotion {
+    // One motion vocabulary for the current V6 UI pack. Timing variants belong here,
+    // not in screens or a second DsAnimations token collection.
+    val ease = CubicBezierEasing(.22f, 1f, .36f, 1f)
+    const val pressedScale = .985f
+    const val reducedMotionMs = 0
+    fun duration(ms: Int, reducedMotion: Boolean): Int = if (reducedMotion) reducedMotionMs else ms
     const val pressMs = 80
     const val selectMs = 200
     const val dialogMs = 280
@@ -141,6 +155,20 @@ object SyMotion {
     const val toastMs = 200
     const val sidebarMs = 280
     const val sidebarContentDelayMs = 60
+    const val progressMs = 340
+    const val composerRevealMs = 190
+    const val composerFadeMs = 120
+    const val chevronMs = 150
+    const val interactionColorMs = 140
+    const val fadeMs = 150
+    const val pagePopMs = 320
+    const val pagePeerMs = 160
+    const val pageEnterFadeMs = 150
+    const val pageExitFadeMs = 110
+    const val livePulseMs = 900
+    const val holdStartMs = 420L
+    const val holdRepeatMs = 90L
+    const val hapticIntervalMs = 45L
 }
 
 /** 明确传入 reduceMotion；由宿主根据系统动画缩放/无障碍设置确定，不擅自读取旧项目开关。 */

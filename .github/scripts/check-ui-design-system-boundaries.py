@@ -123,6 +123,29 @@ for path in UI.rglob("*.kt"):
             violations.append(f"{relative}:{line}: {match.group(0).strip()} -> {hint}")
 
 
+# Keep the main V6 transition owners on one SyMotion vocabulary. Other feature
+# delays (network, debounce, accessibility speech) are intentionally not animation tokens.
+CANONICAL_MOTION_FILES = (
+    "theme/Animation.kt",
+    "screens/local/LocalFeatureAnimatedHost.kt",
+    "screens/local/FluidDesignNavigation.kt",
+    "shenyan/SyResponsiveSheet.kt",
+)
+INLINE_MOTION_DURATION = re.compile(r"\\btween\\s*(?:<[^>]+>)?\\s*\\(\\s*[1-9][0-9]{1,3}\\b")
+for relative in CANONICAL_MOTION_FILES:
+    file = UI / relative
+    source = mask_non_code(file.read_text(encoding="utf-8"))
+    for match in INLINE_MOTION_DURATION.finditer(source):
+        line = source.count("\\n", 0, match.start()) + 1
+        violations.append(f"{relative}:{line}: inline animation duration; use SyMotion semantic token")
+
+# The app and overlays must not drift into separate wallpaper/glow drawing algorithms.
+background_host = (UI / "theme/AppBackground.kt").read_text(encoding="utf-8")
+if "FluidGlassBackdrop(" in mask_non_code(background_host):
+    violations.append("theme/AppBackground.kt: duplicate root background painter; use SySceneBackgroundSurface")
+if "SySceneBackgroundSurface(" not in mask_non_code(background_host):
+    violations.append("theme/AppBackground.kt: root is no longer using the shared scene painter")
+
 # V6 hardening: prevent deleted visual APIs and retired design references from returning.
 RETIRED_DRAWING_CALL = re.compile(
     r"\bDs(?:Button|Card|Segmented|Checkbox|BottomSheet|SearchField|ToastHost|TopBar|ProgressBar)\s*\("

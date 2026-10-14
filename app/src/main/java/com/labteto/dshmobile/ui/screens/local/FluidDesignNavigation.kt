@@ -129,11 +129,11 @@ internal fun FluidSectionSwap(
         AnimatedContent(targetState = section, modifier = surfaceModifier, label = "fluidSectionSwap",
             transitionSpec = {
                 if (reduceMotion) {
-                    fadeIn(tween(80)).togetherWith(fadeOut(tween(80)))
+                    fadeIn(tween(0)).togetherWith(fadeOut(tween(0)))
                 } else {
                     val direction = if (targetState > initialState) 1 else -1
-                    (slideInHorizontally(DsAnimations.featurePagePeer) { direction * offset } + fadeIn(tween(380)))
-                        .togetherWith(slideOutHorizontally(DsAnimations.featurePagePeer) { -direction * offset } + fadeOut(tween(140)))
+                    (slideInHorizontally(DsAnimations.featurePagePeer) { direction * offset } + fadeIn(tween(SyMotion.pagePeerMs)))
+                        .togetherWith(slideOutHorizontally(DsAnimations.featurePagePeer) { -direction * offset } + fadeOut(tween(SyMotion.pagePeerMs)))
                 }
             },
         ) { selectedSection ->
@@ -173,7 +173,7 @@ internal fun Modifier.localWorkCompletionSharedBounds(key: String?): Modifier {
         this@localWorkCompletionSharedBounds.sharedBounds(
             sharedContentState = rememberSharedContentState(key),
             animatedVisibilityScope = visibility,
-            boundsTransform = { _, _ -> tween(380) },
+            boundsTransform = { _, _ -> tween(SyMotion.morphMs) },
         )
     }
 }

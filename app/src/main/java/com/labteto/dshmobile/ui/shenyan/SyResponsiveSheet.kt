@@ -30,6 +30,7 @@ import androidx.compose.material3.SheetValue
 import com.shenyan.designsystem.components.SyMaterialSurface
 import com.shenyan.designsystem.components.SySceneBackgroundSurface
 import com.shenyan.designsystem.components.SyMaterialTier
+import com.shenyan.designsystem.foundation.SyMotion
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -136,8 +137,8 @@ fun SyResponsiveSheet(
                 AnimatedVisibility(
                     visible = true,
                     enter = slideInHorizontally(tween(
-                        if (reducedMotion) 80 else SyDurations.sheet,
-                        easing = CubicBezierEasing(.22f, 1f, .36f, 1f)
+                        SyMotion.duration(SyDurations.sheet, reducedMotion),
+                        easing = SyMotion.ease
                     )) { fullWidth -> fullWidth },
                 ) {
                     val panelModifier = modifier.width(420.dp).fillMaxHeight()

@@ -24,9 +24,9 @@ import com.shenyan.designsystem.foundation.SyMotion
  */
 /** Specific animation specs retained for screen-level semantics; shared timings come from V6 SyMotion. */
 object DsAnimations {
-    private val fluidEase = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
+    private val fluidEase = SyMotion.ease
     val modal: FiniteAnimationSpec<Float> = tween(SyMotion.dialogMs, easing = fluidEase)
-    val progress: FiniteAnimationSpec<Float> = tween(340, easing = fluidEase)
+    val progress: FiniteAnimationSpec<Float> = tween(SyMotion.progressMs, easing = fluidEase)
     val pushOffset: Dp = 20.dp
     /** Quick and settled — direct manipulation should feel tactile without visible rebound. */
     val fastSpring = spring<Float>(
@@ -56,13 +56,13 @@ object DsAnimations {
      * Composer single-row ↔ two-row reveal. Short and unbouncy so it follows the platform IME
      * instead of finishing with a delayed spring settle.
      */
-    val composerReveal: FiniteAnimationSpec<IntSize> = tween(190, easing = FastOutSlowInEasing)
+    val composerReveal: FiniteAnimationSpec<IntSize> = tween(SyMotion.composerRevealMs, easing = FastOutSlowInEasing)
 
     /** Controls fade slightly faster than the geometry changes. */
-    val composerFade: FiniteAnimationSpec<Float> = tween(120, easing = FastOutSlowInEasing)
+    val composerFade: FiniteAnimationSpec<Float> = tween(SyMotion.composerFadeMs, easing = FastOutSlowInEasing)
 
     /** Chevron rotation on a disclosure row. */
-    val chevron: AnimationSpec<Float> = tween(150, easing = FastOutSlowInEasing)
+    val chevron: AnimationSpec<Float> = tween(SyMotion.chevronMs, easing = FastOutSlowInEasing)
 
     /** Tab and content swaps. Short — a long swap on a large list costs a full relayout. */
     val tabSwap: FiniteAnimationSpec<Float> = tween(SyMotion.sheetMs, easing = fluidEase)
@@ -83,7 +83,7 @@ object DsAnimations {
     )
 
     /** Subtle surface feedback for selectable rows and tabs. */
-    val interactionColor: FiniteAnimationSpec<Color> = tween(140, easing = fluidEase)
+    val interactionColor: FiniteAnimationSpec<Color> = tween(SyMotion.interactionColorMs, easing = fluidEase)
 
     /** Item placement inside a lazy list when rows are inserted, removed, or reordered. */
     val listItem: FiniteAnimationSpec<IntOffset> = spring(
@@ -98,17 +98,17 @@ object DsAnimations {
     val panelSlide: FiniteAnimationSpec<IntOffset> = tween(SyMotion.sheetMs, easing = fluidEase)
 
     /** Full-page hierarchy transition. Short enough to preserve direct manipulation on a phone. */
-    val pageSlide: FiniteAnimationSpec<IntOffset> = tween(480, easing = fluidEase)
+    val pageSlide: FiniteAnimationSpec<IntOffset> = tween(SyMotion.pushMs, easing = fluidEase)
 
     /** Page opacity settles slightly before geometry so navigation never feels floaty. */
-    val pageFade: FiniteAnimationSpec<Float> = tween(140, easing = FastOutSlowInEasing)
+    val pageFade: FiniteAnimationSpec<Float> = tween(SyMotion.interactionColorMs, easing = FastOutSlowInEasing)
 
     /**
      * Feature hierarchy push. Kept separate from [pageSlide] because overlays still need the
      * slightly broader generic page motion while navigation pages use a calmer spatial grammar.
      */
     val featurePageForward: FiniteAnimationSpec<IntOffset> =
-        tween(480, easing = fluidEase)
+        tween(SyMotion.pushMs, easing = fluidEase)
 
     /** Feature hierarchy pop mirrors push but settles a touch faster. */
     val featurePageBackward: FiniteAnimationSpec<IntOffset> =
@@ -116,15 +116,15 @@ object DsAnimations {
 
     /** Switching between drawer peers is mostly a cross-fade with only a tiny positional cue. */
     val featurePagePeer: FiniteAnimationSpec<IntOffset> =
-        tween(SyMotion.sheetMs, easing = fluidEase)
+        tween(SyMotion.pagePeerMs, easing = fluidEase)
 
     /** Incoming page opacity: finishes before the larger geometry motion. */
     val featurePageEnterFade: FiniteAnimationSpec<Float> =
-        tween(150, easing = FastOutSlowInEasing)
+        tween(SyMotion.pageEnterFadeMs, easing = FastOutSlowInEasing)
 
     /** Outgoing page opacity leaves first so navigation feels crisp instead of floaty. */
     val featurePageExitFade: FiniteAnimationSpec<Float> =
-        tween(110, easing = FastOutSlowInEasing)
+        tween(SyMotion.pageExitFadeMs, easing = FastOutSlowInEasing)
 
     /** Cancelled predictive-back gestures return without overshoot. */
     val predictiveBackSettle: FiniteAnimationSpec<Float> = spring(
@@ -136,13 +136,13 @@ object DsAnimations {
     val predictiveBackMaxOffset: Dp = 32.dp
 
     /** One half of the restrained breathing loop used only by live loading/running semantics. */
-    val semanticPulse = tween<Float>(900, easing = FastOutSlowInEasing)
+    val semanticPulse = tween<Float>(SyMotion.livePulseMs, easing = FastOutSlowInEasing)
 
     /** Scale animation duration for press effects */
     const val scaleDuration = SyMotion.pressMs
 
     /** Fade animation duration for opacity changes */
-    const val fadeDuration = 150
+    const val fadeDuration = SyMotion.fadeMs
 
     /** Standard transition duration for layout changes */
     const val transitionDuration = SyMotion.toolExpandMs

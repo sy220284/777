@@ -106,7 +106,7 @@ fun SyMaterialSurface(
     val interaction = interactionSource ?: defaultInteraction
     val pressed by interaction.collectIsPressedAsState()
     val press by animateFloatAsState(
-        if (pressed && enabled && onClick != null && !LocalSyReduceMotion.current) .985f else 1f,
+        if (pressed && enabled && onClick != null && !LocalSyReduceMotion.current) SyMotion.pressedScale else 1f,
         tween(if (LocalSyReduceMotion.current) 0 else SyMotion.pressMs), label = "materialPress",
     )
     // Without a spatial backing, use the same palette over its canvas rather than letting
@@ -193,10 +193,11 @@ fun SyMachineText(text: String, modifier: Modifier = Modifier) {
 fun SySceneBackgroundSurface(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(SyMetric.radiusSheet),
+    fallbackColor: Color? = null,
     content: @Composable () -> Unit,
 ) {
-    val canvas = LocalSyColors.current.canvas
     val scene = LocalSySceneBackdrop.current
+    val canvas = fallbackColor ?: scene?.canvas ?: LocalSyColors.current.canvas
     val view = LocalView.current
     val windowOnScreen = remember { IntArray(2) }
     var origin by remember { mutableStateOf(IntOffset.Zero) }

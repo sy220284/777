@@ -46,13 +46,14 @@ internal fun LocalFeatureAnimatedHost(
     val pushOffset = with(LocalDensity.current) { DsAnimations.pushOffset.roundToPx() }
     val settledBackProgress = predictiveBackProgress.coerceIn(0f, 1f)
     val reduced = LocalSyReducedMotion.current
-    val ease = CubicBezierEasing(.22f, 1f, .36f, 1f)
-    val push = tween<IntOffset>(if (reduced) 80 else SyDurations.page, easing = ease)
-    val pop = tween<IntOffset>(if (reduced) 80 else 320, easing = ease)
-    val peer = tween<IntOffset>(if (reduced) 80 else 280, easing = ease)
-    val fadeEnter = tween<Float>(if (reduced) 80 else 150,
-        delayMillis = if (reduced) 0 else SyDurations.sidebarDelay, easing = ease)
-    val fadeExit = tween<Float>(if (reduced) 80 else 110, easing = ease)
+    val ease = com.shenyan.designsystem.foundation.SyMotion.ease
+    val motion = com.shenyan.designsystem.foundation.SyMotion
+    val push = tween<IntOffset>(motion.duration(motion.pushMs, reduced), easing = ease)
+    val pop = tween<IntOffset>(motion.duration(motion.pagePopMs, reduced), easing = ease)
+    val peer = tween<IntOffset>(motion.duration(motion.pagePeerMs, reduced), easing = ease)
+    val fadeEnter = tween<Float>(motion.duration(motion.pageEnterFadeMs, reduced),
+        delayMillis = motion.duration(motion.sidebarContentDelayMs, reduced), easing = ease)
+    val fadeExit = tween<Float>(motion.duration(motion.pageExitFadeMs, reduced), easing = ease)
 
     SharedTransitionLayout(modifier = modifier) {
         val sharedScope = this
@@ -129,7 +130,7 @@ internal fun Modifier.localArtifactSharedBounds(workspace: String, file: String)
         this@localArtifactSharedBounds.sharedBounds(
             sharedContentState = rememberSharedContentState(localArtifactTransitionKey(workspace, file)),
             animatedVisibilityScope = visibility,
-            boundsTransform = { _, _ -> tween(SyDurations.page) },
+            boundsTransform = { _, _ -> tween(com.shenyan.designsystem.foundation.SyMotion.morphMs) },
         )
     }
 }
