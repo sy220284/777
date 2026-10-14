@@ -1553,54 +1553,47 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             showDragHandle = false,
             floating = true,
             scrollable = true,
+            surfaceTier = SyMaterialTier.L1_SECTION,
         ) {
-            // Two balanced rows keep every action and glyph visible on narrow phones.
-            // The former horizontal list clipped the fourth tile at the sheet edge.
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    SyQuickActionTile(
-                        icon = FeatherIcons.Camera,
-                        label = stringResource(R.string.composer_camera),
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            showAttachmentPicker = false
-                            if (attachments.count { it.mediaType.startsWith("image/") } >= MAX_LOCAL_IMAGE_SELECTION) {
-                                attachmentError = imageLimitMessage
-                            } else takePhoto()
-                        },
-                    )
-                    SyQuickActionTile(
-                        icon = FeatherIcons.Image,
-                        label = stringResource(R.string.local_attachment_image),
-                        modifier = Modifier.weight(1f),
-                        onClick = { showAttachmentPicker = false; imagePicker.launch(arrayOf("image/*")) },
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    SyQuickActionTile(
-                        icon = FeatherIcons.Folder,
-                        label = stringResource(R.string.local_attachment_file),
-                        modifier = Modifier.weight(1f),
-                        onClick = { showAttachmentPicker = false; filePicker.launch(arrayOf("*/*")) },
-                    )
-                    SyQuickActionTile(
-                        icon = FeatherIcons.Sparkles,
-                        label = stringResource(R.string.media_studio_entry),
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            showAttachmentPicker = false
-                            mediaInitialPrompt = ""
-                            mediaInitialKind = com.labteto.dshmobile.local.model.LocalMediaKind.IMAGE.name
-                            showMediaStudio = true
-                        },
-                    )
-                }
+            // Four compact icon-and-label actions in one horizontal row.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                SyQuickActionTile(
+                    icon = FeatherIcons.Camera,
+                    label = stringResource(R.string.composer_camera),
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        showAttachmentPicker = false
+                        if (attachments.count { it.mediaType.startsWith("image/") } >= MAX_LOCAL_IMAGE_SELECTION) {
+                            attachmentError = imageLimitMessage
+                        } else takePhoto()
+                    },
+                )
+                SyQuickActionTile(
+                    icon = FeatherIcons.Image,
+                    label = stringResource(R.string.local_attachment_image),
+                    modifier = Modifier.weight(1f),
+                    onClick = { showAttachmentPicker = false; imagePicker.launch(arrayOf("image/*")) },
+                )
+                SyQuickActionTile(
+                    icon = FeatherIcons.Folder,
+                    label = stringResource(R.string.local_attachment_file),
+                    modifier = Modifier.weight(1f),
+                    onClick = { showAttachmentPicker = false; filePicker.launch(arrayOf("*/*")) },
+                )
+                SyQuickActionTile(
+                    icon = FeatherIcons.Sparkles,
+                    label = stringResource(R.string.media_studio_entry),
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        showAttachmentPicker = false
+                        mediaInitialPrompt = ""
+                        mediaInitialKind = com.labteto.dshmobile.local.model.LocalMediaKind.IMAGE.name
+                        showMediaStudio = true
+                    },
+                )
             }
             if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) {
                 SySheetChoiceRow(
