@@ -20,6 +20,32 @@ internal object LocalKimiPolicy {
             uri.rawQuery == null
     }.getOrDefault(false)
 
+    /** Kimi Code video input is supported on the subscription models except K3-256K. */
+    fun videoInputSupported(model: String, baseUrl: String): Boolean =
+        isOfficial(baseUrl) && model.trim().lowercase() in
+            setOf("k3", "kimi-for-coding", "kimi-for-coding-highspeed")
+
+    /** Only advertise client-implemented formats, not all server-side formats. */
+    fun videoMediaType(name: String, mediaType: String): String? {
+        val normalized = mediaType.substringBefore(';').trim().lowercase()
+        val byExtension = when (name.substringAfterLast('.', "").lowercase()) {
+            "mp4", "m4v" -> "video/mp4"
+            "mov" -> "video/quicktime"
+            "webm" -> "video/webm"
+            "avi" -> "video/x-msvideo"
+            "mkv" -> "video/x-matroska"
+            "mpeg", "mpg" -> "video/mpeg"
+            else -> null
+        }
+        val allowed = setOf("video/mp4", "video/quicktime", "video/webm",
+            "video/x-msvideo", "video/x-matroska", "video/mpeg")
+        return when {
+            normalized in allowed && (byExtension == null || byExtension == normalized) -> normalized
+            normalized in setOf("application/octet-stream", "") -> byExtension
+            else -> null
+        }
+    }
+
     fun selection(model: String): LocalReasoningSelection? =
         if (model.trim().lowercase() in controllable) {
             // Selecting Fast cannot silently switch K3 to a different non-thinking model.
