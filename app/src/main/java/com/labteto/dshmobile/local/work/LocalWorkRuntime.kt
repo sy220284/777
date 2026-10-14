@@ -28,7 +28,7 @@ class LocalWorkRuntime @Inject internal constructor(
     private val planMode: LocalWorkPlanModeCoordinator,
     private val execution: LocalWorkExecutionPort,
     private val agentUi: LocalWorkAgentUiPort,
-) {
+) : com.labteto.dshmobile.uicontract.WorkReadUiPort {
     internal fun send(
         text: String,
         attachments: List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = emptyList(),
@@ -47,9 +47,9 @@ class LocalWorkRuntime @Inject internal constructor(
 
     internal fun regenerateReply(messageId: String): Boolean = execution.regenerateReply(messageId)
 
-    internal fun artifactsForUi(
+    override fun artifactsForUi(
         sessionId: String,
-        eventLimit: Int = 384,
+        eventLimit: Int,
     ): List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem> {
         if (sessionId != runtimeStateStore.currentSessionId) return emptyList()
         val boundedScan = eventLimit.coerceIn(384, 4_096)
@@ -65,7 +65,7 @@ class LocalWorkRuntime @Inject internal constructor(
         }
     }
 
-    internal fun historyPageForUi(sessionId: String, cursor: com.labteto.dshmobile.local.presentation.LocalWorkHistoryCursor?): com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi {
+    override fun historyPageForUi(sessionId: String, cursor: com.labteto.dshmobile.local.presentation.LocalWorkHistoryCursor?): com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi {
         if (sessionId != runtimeStateStore.currentSessionId) return com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi(emptyList(), null, true)
         val log = eventLogs.get(sessionId)
         val generation = log.resetGeneration
@@ -117,7 +117,7 @@ class LocalWorkRuntime @Inject internal constructor(
     }
 
     /** Same authoritative EventLog across app restarts; source version checked on display. */
-    internal fun requirementEvidenceForUi(sessionId: String): List<LocalRequirementEvidenceLink> {
+    override fun requirementEvidenceForUi(sessionId: String): List<LocalRequirementEvidenceLink> {
         val snapshot = runtimeStateStore.state.value
         if (sessionId != runtimeStateStore.currentSessionId ||
             snapshot.sessionId != sessionId || snapshot.usageMode != LocalUsageMode.WORK
@@ -132,10 +132,10 @@ class LocalWorkRuntime @Inject internal constructor(
     }
 
     /** Read the authoritative EventLog revision; no parallel persisted tool activity stream. */
-    internal fun eventSequenceForUi(sessionId: String): Long =
+    override fun eventSequenceForUi(sessionId: String): Long =
         if (sessionId == runtimeStateStore.currentSessionId) eventLogs.get(sessionId).latestSequence() else -1L
 
-    internal fun toolActivitiesForUi(sessionId: String): List<LocalToolActivityUiItem> {
+    override fun toolActivitiesForUi(sessionId: String): List<LocalToolActivityUiItem> {
         if (sessionId != runtimeStateStore.currentSessionId) return emptyList()
         return toolActivity.snapshot(eventLogs.get(sessionId)).state.activities.takeLast(32).map { activity ->
             val phase = when (activity.phase) {
@@ -162,7 +162,7 @@ class LocalWorkRuntime @Inject internal constructor(
     }
 
     /** Exact bounded lookup; the selected event must still belong to this session and call. */
-    internal fun toolEvidenceForUi(sessionId: String, callId: String, sequence: Long): String? {
+    override fun toolEvidenceForUi(sessionId: String, callId: String, sequence: Long): String? {
         if (sessionId != runtimeStateStore.currentSessionId || sequence <= 0L) return null
         val event = eventLogs.get(sessionId).pageAfter(sequence - 1L, limit = 1).singleOrNull()
             ?.takeIf { it.sequence == sequence && it.data["id"]?.jsonPrimitive?.contentOrNull == callId }
@@ -257,3 +257,10 @@ internal fun localWorkArtifactFileAvailable(root: File, relative: String): Boole
     val target = File(root, relative).canonicalFile.toPath()
     target != canonicalRoot && target.startsWith(canonicalRoot) && java.nio.file.Files.isRegularFile(target)
 }.getOrDefault(false)
+
+@dagger.Module
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+internal abstract class LocalWorkReadUiPortBindings {
+    @dagger.Binds @Singleton
+    abstract fun reads(implementation: LocalWorkRuntime): com.labteto.dshmobile.uicontract.WorkReadUiPort
+}

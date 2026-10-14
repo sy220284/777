@@ -162,6 +162,15 @@ internal class LocalInteractionCoordinator(
         else waiter.question
     }
 
+    fun resolveApprovalFromUi(requestId: String, commit: (LocalApproval) -> Boolean): Boolean = synchronized(waiterLock) {
+        val waiter = approvalWaiter ?: return@synchronized false
+        val pending = state.pendingApproval() ?: return@synchronized false
+        if (waiter.response.isCompleted || waiter.approval.requestId != requestId || pending.requestId != requestId)
+            return@synchronized false
+        if (!commit(pending)) return@synchronized false
+        waiter.response.complete(true)
+    }
+
     fun answerQuestionFromUi(requestId: String, answer: String?): Boolean = synchronized(waiterLock) {
         val waiter = questionWaiter ?: return@synchronized false
         if (waiter.response.isCompleted || waiter.question.requestId != requestId ||

@@ -5,7 +5,6 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.chat.ChatDiaryDelta
@@ -20,7 +19,6 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.local.presentation.LocalChatUiFacade
-import com.labteto.dshmobile.local.presentation.LocalSessionUiFacade
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
 import com.labteto.dshmobile.local.presentation.LocalToolsUiFacade
 import com.labteto.dshmobile.local.presentation.projectChatSurfaceState
@@ -35,6 +33,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -43,6 +43,8 @@ class LocalHarnessViewModel @Inject constructor(
     private val documentsFactory: com.labteto.dshmobile.local.presentation.LocalUiDocumentUiPortFactory,
     private val savedStateHandle: androidx.lifecycle.SavedStateHandle,
     private val runtime: LocalUiRuntime,
+    val workReadUiPort: com.labteto.dshmobile.uicontract.WorkReadUiPort,
+    val filesUiPort: com.labteto.dshmobile.uicontract.FilesUiPort,
     val attachmentUiPort: com.labteto.dshmobile.uicontract.AttachmentUiPort,
     private val uiPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val chatUi: LocalChatUiFacade,
@@ -50,7 +52,7 @@ class LocalHarnessViewModel @Inject constructor(
     val transcriptUiPort: com.labteto.dshmobile.uicontract.TranscriptUiPort,
     private val toolsUi: LocalToolsUiFacade,
     private val usageUi: com.labteto.dshmobile.uicontract.UsageUiPort,
-    private val approvalPreferences: LocalApprovalPreferences,
+    val workPolicyUiPort: com.labteto.dshmobile.uicontract.WorkPolicyUiPort,
     private val networkSearchSettings: LocalNetworkSearchSettings,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
@@ -93,7 +95,7 @@ class LocalHarnessViewModel @Inject constructor(
         accessibilityActive = accessibilityActive, notificationAccessActive = notificationAccessActive,
     )
 
-    val approvalMode = approvalPreferences.approvalMode
+    val approvalMode = workPolicyUiPort.snapshots.map { it.approvalMode }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), workPolicyUiPort.snapshot().approvalMode)
     val networkSearchEnabled = networkSearchSettings.enabled
     fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)
     val chatUiPort: com.labteto.dshmobile.uicontract.ChatUiPort = uiPorts.chat
@@ -339,24 +341,24 @@ class LocalHarnessViewModel @Inject constructor(
             is com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Failed -> error(receipt.message ?: "附件导入失败")
         }
     }
-    suspend fun workspaceFiles() = runtime.session.workspaceFilesForUi()
-    suspend fun conversationFiles(sessionId: String) = runtime.session.conversationFilesForUi(sessionId)
-    suspend fun previewWorkspaceFile(path: String) = runtime.session.previewWorkspaceFileForUi(path)
-    fun artifactsForUi(sessionId: String) = runtime.work.artifactsForUi(sessionId)
+    suspend fun workspaceFiles() = filesUiPort.workspaceFiles()
+    suspend fun conversationFiles(sessionId: String) = filesUiPort.conversationFiles(sessionId)
+    suspend fun previewWorkspaceFile(path: String) = filesUiPort.previewWorkspaceFile(path)
+    fun artifactsForUi(sessionId: String) = workReadUiPort.artifactsForUi(sessionId)
     fun historyPageForUi(sessionId: String, cursor: com.labteto.dshmobile.local.presentation.LocalWorkHistoryCursor?) =
-        runtime.work.historyPageForUi(sessionId, cursor)
+        workReadUiPort.historyPageForUi(sessionId, cursor)
 
     fun artifactHistoryForUi(sessionId: String, eventLimit: Int) =
-        runtime.work.artifactsForUi(sessionId, eventLimit)
-    fun toolActivitiesForUi(sessionId: String) = runtime.work.toolActivitiesForUi(sessionId)
+        workReadUiPort.artifactsForUi(sessionId, eventLimit)
+    fun toolActivitiesForUi(sessionId: String) = workReadUiPort.toolActivitiesForUi(sessionId)
     fun toolEvidenceForUi(sessionId: String, callId: String, sequence: Long) =
-        runtime.work.toolEvidenceForUi(sessionId, callId, sequence)
-    internal fun requirementEvidenceForUi(sessionId: String) = runtime.work.requirementEvidenceForUi(sessionId)
+        workReadUiPort.toolEvidenceForUi(sessionId, callId, sequence)
+    internal fun requirementEvidenceForUi(sessionId: String) = workReadUiPort.requirementEvidenceForUi(sessionId)
     fun linkRequirementEvidenceForUi(
         sessionId: String, index: Int,
         artifact: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem,
     ) = runtime.work.linkRequirementEvidenceForUi(sessionId, index, artifact)
-    fun eventSequenceForUi(sessionId: String) = runtime.work.eventSequenceForUi(sessionId)
+    fun eventSequenceForUi(sessionId: String) = workReadUiPort.eventSequenceForUi(sessionId)
     internal fun teamMemberOutput(jobId: String): String = runtime.work.backgroundJobOutputForUi(jobId)
 
     internal suspend fun sendTeamMemberMessage(
@@ -388,12 +390,6 @@ class LocalHarnessViewModel @Inject constructor(
         } ?: com.labteto.dshmobile.uicontract.UiCommandReceipt.Rejected(
             com.labteto.dshmobile.uicontract.UiCommandRejection.STALE_IDENTITY,
         )
-    fun useDefaultApproval() = runtime.work.useDefaultApproval()
-    fun enableAutoApproval() = runtime.work.enableAutoApproval()
-    fun enableAutoApprovalForPending(callId: String) = runtime.work.enableAutoApprovalForPending(callId)
-    fun enableDeviceApprovalLease(callId: String) = runtime.work.enableDeviceApprovalLease(callId)
-    fun disableDeviceApprovalLease() = runtime.work.disableDeviceApprovalLease()
-    fun disableAutoApproval() = runtime.work.disableAutoApproval()
     fun answerQuestion(pendingId: String, answer: String?, identity: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Boolean =
         identity?.let { workConversationUiPort.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.AnswerQuestion(it, pendingId, answer)) } ==
             com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
@@ -413,7 +409,6 @@ class LocalHarnessViewModel @Inject constructor(
     fun newSession() = createSession(LocalConversationMode.INDEPENDENT, state.value.usageMode, captureUiSendIdentity())
     fun createSession(mode: LocalConversationMode, usageMode: LocalUsageMode, identity: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Boolean = sessionUiPort.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.Create(
         identity, mode, usageMode)) == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
-    fun setPlanMode(enabled: Boolean) = runtime.work.setPlanMode(enabled)
     fun switchUsageMode(mode: LocalUsageMode) { sessionUiPort.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.SelectMode(mode)) }
     suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = personaGalleryController.configureChatPersona(profile)
     fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) {

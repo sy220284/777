@@ -40,6 +40,23 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
         return Target(runtime.foregroundInteractions, events.get(sessionId))
     }
 
+    internal fun setApprovalModeFromUi(mode: LocalApprovalMode) = synchronized(modeLock) {
+        setGlobalMode(mode, currentTarget())
+    }
+
+    internal fun enableAutoApprovalForPendingFromUi(requestId: String): Boolean = synchronized(modeLock) {
+        val target = currentTarget() ?: return@synchronized false
+        target.interactions.resolveApprovalFromUi(requestId) {
+            setGlobalMode(LocalApprovalMode.AUTO, target, skipTargetWaiter = true)
+            true
+        }
+    }
+
+    internal fun enableDeviceApprovalLeaseFromUi(requestId: String): Boolean {
+        val target = currentTarget() ?: return false
+        return target.interactions.resolveApprovalFromUi(requestId) { grantDeviceLease(target, it) }
+    }
+
     internal fun enableAutoApproval() = synchronized(modeLock) {
         val target = currentTarget() ?: return@synchronized
         setGlobalMode(LocalApprovalMode.AUTO, target)
@@ -66,7 +83,7 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
 
     private fun setGlobalMode(
         mode: LocalApprovalMode,
-        target: Target,
+        target: Target?,
         skipTargetWaiter: Boolean = false,
     ) {
         // This is the durable authority; Session snapshots do not store this device-wide setting.
@@ -75,7 +92,7 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
         runs.forEachBinding { binding ->
             active += Target(binding.interactions, binding.eventLog)
         }
-        if (active.none { it.interactions === target.interactions }) active += target
+        if (target != null && active.none { it.interactions === target.interactions }) active += target
         var logFailure: Exception? = null
         active.forEach { owner ->
             val pending = owner.interactions.pendingApproval()
@@ -95,7 +112,7 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
                 pending != null &&
                 (mode == LocalApprovalMode.AUTO ||
                     (mode == LocalApprovalMode.DEFAULT && pending.canAutoApproveSafely)) &&
-                !(skipTargetWaiter && owner.interactions === target.interactions)
+                !(skipTargetWaiter && owner.interactions === target?.interactions)
             ) {
                 owner.interactions.answerApproval(pending.callId, true)
             }
@@ -107,32 +124,33 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
 
     internal fun enableDeviceApprovalLease(callId: String) {
         val target = currentTarget() ?: return
-        target.interactions.resolveApproval(callId) { pending ->
-            if (!pending.canApproveDeviceTurn) {
-                target.log.append("approval/device-lease-rejected", buildJsonObject {
-                    put("reason", "pending-tool-requires-explicit-approval")
-                    put("tool", pending.toolName)
-                })
-                false
-            } else {
-                target.log.append("approval/device-lease", buildJsonObject { put("active", true) })
-                target.interactions.setDeviceApprovalLease(true)
-                true
-            }
-        }
+        target.interactions.resolveApproval(callId) { grantDeviceLease(target, it) }
     }
 
-    internal fun disableDeviceApprovalLease(sessionId: String) {
+    private fun grantDeviceLease(target: Target, pending: com.labteto.dshmobile.local.interaction.LocalApproval): Boolean {
+        if (!pending.canApproveDeviceTurn) {
+            target.log.append("approval/device-lease-rejected", buildJsonObject {
+                put("reason", "pending-tool-requires-explicit-approval"); put("tool", pending.toolName)
+            })
+            return false
+        }
+        target.log.append("approval/device-lease", buildJsonObject { put("active", true) })
+        target.interactions.setDeviceApprovalLease(true)
+        return true
+    }
+
+    internal fun disableDeviceApprovalLease(sessionId: String): Boolean {
         val target = runs[sessionId]?.let { Target(it.interactions, it.eventLog) }
             ?: runtime.state.value
                 .takeIf { it.sessionId == sessionId }
                 ?.let { Target(runtime.foregroundInteractions, events.get(sessionId)) }
-            ?: return
+            ?: return false
         target.log.append("approval/device-lease", buildJsonObject { put("active", false) })
         target.interactions.setDeviceApprovalLease(false)
         // The visible mirror may lag or no longer collect a detached binding during transition.
         if (runtime.state.value.sessionId == sessionId) {
             runtime.foregroundInteractions.setDeviceApprovalLease(false)
         }
+        return true
     }
 }

@@ -32,7 +32,7 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     bundledRuntimeManager: LocalBundledRuntimeManager,
     runtimeStateStore: LocalRuntimeStateStore,
     eventLogs: LocalSessionEventLogRegistry,
-) {
+) : com.labteto.dshmobile.uicontract.FilesUiPort {
     internal val workspace = LocalWorkspace(
         root = File(context.filesDir, "local-harness/workspace"),
         extraSearchPaths = bundledRuntimeManager::searchPaths,
@@ -64,12 +64,19 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment =
         withContext(Dispatchers.IO) { attachmentImporter.import(uri) }
 
-    internal suspend fun workspaceFiles(): List<LocalWorkspaceFile> =
+    override suspend fun workspaceFiles(): List<LocalWorkspaceFile> =
         withContext(Dispatchers.IO) { coordinator.workspaceFiles() }
 
-    internal suspend fun conversationFiles(sessionId: String): LocalConversationFiles =
+    override suspend fun conversationFiles(sessionId: String): LocalConversationFiles =
         withContext(Dispatchers.IO) { coordinator.conversationFiles(sessionId) }
 
-    internal suspend fun previewWorkspaceFile(path: String): LocalWorkspaceFilePreview =
+    override suspend fun previewWorkspaceFile(path: String): LocalWorkspaceFilePreview =
         withContext(Dispatchers.IO) { coordinator.preview(path) }
+}
+
+@dagger.Module
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+internal abstract class LocalFilesUiPortBindings {
+    @dagger.Binds @Singleton
+    abstract fun files(implementation: LocalSessionFilesRuntime): com.labteto.dshmobile.uicontract.FilesUiPort
 }

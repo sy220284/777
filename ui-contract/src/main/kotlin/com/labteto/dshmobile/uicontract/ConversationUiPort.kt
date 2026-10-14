@@ -74,6 +74,7 @@ data class UiApprovalSnapshot(
     val summary: String,
     val arguments: String,
     val impact: UiApprovalImpact,
+    val canApproveDeviceTurn: Boolean = false,
 )
 
 data class UiQuestionSnapshot(val pendingId: String, val question: String, val options: List<String>)

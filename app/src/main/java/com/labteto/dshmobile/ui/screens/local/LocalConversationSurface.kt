@@ -1422,10 +1422,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         ApprovalDialog(
             approval = approval,
             safeAutoApprovalEnabled = state.safeAutoApprovalEnabled,
-            onApprove = { onApprove(approval.callId) },
-            onDeny = { onDeny(approval.callId) },
-            onAutoApprove = { onAutoApprovePending(approval.callId) },
-            onApproveDeviceTurn = { onApproveDeviceTurn(approval.callId) },
+            onApprove = { onApprove(approval.requestId.orEmpty()) },
+            onDeny = { onDeny(approval.requestId.orEmpty()) },
+            onAutoApprove = { onAutoApprovePending(approval.requestId.orEmpty()) },
+            onApproveDeviceTurn = { onApproveDeviceTurn(approval.requestId.orEmpty()) },
         )
     }
     state.pendingQuestion

@@ -37,5 +37,8 @@ internal fun LocalConversationSliceHost(
         attachments = viewModel.attachmentUiPort,
         sessions = viewModel.sessionUiPort,
         transcript = viewModel.transcriptUiPort,
+        policy = viewModel.workPolicyUiPort,
+        workReads = viewModel.workReadUiPort,
+        files = viewModel.filesUiPort,
     )
 }

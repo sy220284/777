@@ -452,6 +452,14 @@ fun LocalHarnessScreen(
         }
         notice?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show() }
     }
+    fun submitPolicy(command: com.labteto.dshmobile.uicontract.WorkPolicyUiCommand) {
+        when (val result = viewModel.workPolicyUiPort.submit(command)) {
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted -> Unit
+            else -> android.widget.Toast.makeText(context,
+                (result as? com.labteto.dshmobile.uicontract.UiCommandReceipt.Failed)?.message
+                    ?: resources.getString(R.string.local_ui_context_changed), android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
     val shellActions = LocalShellFeatureUiActions(
         streamingState = viewModel.streamingState,
         selectModel = viewModel::selectModel,
@@ -478,16 +486,16 @@ fun LocalHarnessScreen(
         autoFillChatPersona = viewModel::autoFillChatPersona,
         saveGroupAnnouncement = viewModel::setGroupChatAnnouncement,
         undoPersonaCorrection = viewModel::undoChatPersonaCorrection,
-        setPlanMode = viewModel::setPlanMode,
+        setPlanMode = { enabled -> sendIdentity?.let { submitPolicy(com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.SetPlanMode(it, enabled)) } },
         approve = { pendingId -> answerApprovalFromFrame(pendingId, true) },
         deny = { pendingId -> answerApprovalFromFrame(pendingId, false) },
-        enableAutoApproval = viewModel::enableAutoApproval,
-        useDefaultApproval = viewModel::useDefaultApproval,
+        enableAutoApproval = { submitPolicy(com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.SetApprovalMode(sendIdentity, com.labteto.dshmobile.local.interaction.LocalApprovalMode.AUTO)) },
+        useDefaultApproval = { submitPolicy(com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.SetApprovalMode(sendIdentity, com.labteto.dshmobile.local.interaction.LocalApprovalMode.DEFAULT)) },
         setNetworkSearchEnabled = viewModel::setNetworkSearchEnabled,
-        enableAutoApprovalForPending = viewModel::enableAutoApprovalForPending,
-        enableDeviceApprovalLease = viewModel::enableDeviceApprovalLease,
-        disableDeviceApprovalLease = viewModel::disableDeviceApprovalLease,
-        disableAutoApproval = viewModel::disableAutoApproval,
+        enableAutoApprovalForPending = { id -> sendIdentity?.let { submitPolicy(com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.ApproveWithAutoMode(it, id)) } },
+        enableDeviceApprovalLease = { id -> sendIdentity?.let { submitPolicy(com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.ApproveDeviceTurn(it, id)) } },
+        disableDeviceApprovalLease = { sendIdentity?.let { submitPolicy(com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.RevokeDeviceTurn(it)) } },
+        disableAutoApproval = { submitPolicy(com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.SetApprovalMode(sendIdentity, com.labteto.dshmobile.local.interaction.LocalApprovalMode.MANUAL)) },
         answerQuestion = { pendingId, answer -> viewModel.answerQuestion(pendingId, answer, sendIdentity) },
         cancelQuestion = { pendingId -> viewModel.answerQuestion(pendingId, null, sendIdentity); Unit },
         usageRevision = viewModel.usageRevision,

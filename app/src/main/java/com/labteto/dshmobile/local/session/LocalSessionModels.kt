@@ -58,11 +58,3 @@ data class LocalHarnessSession(
     /** Highest SessionEvent sequence already reflected in the materialized user-facing transcript. */
     val transcriptProjectedThroughSequence: Long? = null,
 )
-
-/** Current-session file projection derived from its durable tool event log. */
-data class LocalConversationFiles(
-    val artifacts: List<LocalWorkspaceFile> = emptyList(),
-    val involved: List<LocalWorkspaceFile> = emptyList(),
-) {
-    val isEmpty: Boolean get() = artifacts.isEmpty() && involved.isEmpty()
-}

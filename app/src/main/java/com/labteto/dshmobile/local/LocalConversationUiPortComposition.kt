@@ -110,7 +110,7 @@ class LocalConversationUiPortComposition @Inject internal constructor(
                         com.labteto.dshmobile.local.interaction.LocalApprovalImpact.MEDIUM -> UiApprovalImpact.MEDIUM
                         com.labteto.dshmobile.local.interaction.LocalApprovalImpact.HIGH -> UiApprovalImpact.HIGH
                         com.labteto.dshmobile.local.interaction.LocalApprovalImpact.CRITICAL -> UiApprovalImpact.CRITICAL
-                    })
+                    }, canApproveDeviceTurn = it.canApproveDeviceTurn)
                 },
                 error = state.error.takeIf { active },
                 question = question?.let { com.labteto.dshmobile.uicontract.UiQuestionSnapshot(requireNotNull(it.requestId), it.question, it.options.toList()) },

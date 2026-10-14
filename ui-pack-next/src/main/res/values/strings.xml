@@ -77,4 +77,20 @@
     <string name="next_work_mode">工作模式</string>
     <string name="next_new_session">新建独立会话</string>
     <string name="next_load_older">加载更早记录</string>
+    <string name="next_policy_confirm">确认审批策略变更</string>
+    <string name="next_auto_policy_effect">将批准当前请求，并开启自动审批；后续工具请求将按自动模式处理。</string>
+    <string name="next_device_policy_effect">将批准当前请求，并授权当前设备回合的操作；你可以撤销本轮授权。</string>
+    <string name="next_approve_auto">批准并开启自动审批</string>
+    <string name="next_approve_device">批准并授权设备回合</string>
+    <string name="next_revoke_device">撤销设备回合授权</string>
+    <string name="next_enable_plan">开启计划模式</string>
+    <string name="next_disable_plan">关闭计划模式</string>
+    <string name="next_workspace_files">工作区文件</string>
+    <string name="next_binary_file">二进制文件：当前不提供文本预览</string>
+    <string name="next_partial_preview">仅显示部分内容</string>
+    <string name="next_disable_auto">关闭自动审批</string>
+    <string name="next_work_facts">工作成果与事件</string>
+    <string name="next_work_history_expired">历史已重置，请重新打开。</string>
+    <string name="next_artifact_unavailable">文件当前不可读取</string>
+    <string name="next_artifact_changed">文件内容已发生变化</string>
 </resources>

@@ -9,19 +9,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.longOrNull
 
-/** User-selected evidence reference. The link by itself does not assert a test or task passed. */
-internal data class LocalRequirementEvidenceLink(
-    val requirementIndex: Int,
-    val requirement: String,
-    val artifactPath: String,
-    val artifactSequence: Long,
-    val sourceCallId: String,
-    val versionAtLink: String,
-    val eventSequence: Long,
-    /** SHA-256 of the actual current file, null when unreadable or removed. */
-    val versionNow: String? = null,
-)
-
 internal fun projectRequirementEvidenceLinks(
     events: List<LocalSessionEventLog.Event>,
     todos: List<LocalTodoItem>,

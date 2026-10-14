@@ -88,7 +88,11 @@ object NextConversationUiPack : ConversationUiPack {
         attachments: com.labteto.dshmobile.uicontract.AttachmentUiPort?,
         sessions: com.labteto.dshmobile.uicontract.SessionUiPort?,
         transcript: com.labteto.dshmobile.uicontract.TranscriptUiPort?,
+        policy: com.labteto.dshmobile.uicontract.WorkPolicyUiPort?,
+        workReads: com.labteto.dshmobile.uicontract.WorkReadUiPort?,
+        files: com.labteto.dshmobile.uicontract.FilesUiPort?,
     ) {
+        val policySnapshot = policy?.snapshots?.collectAsStateWithLifecycle(initialValue = policy.snapshot())?.value
         val sessionSnapshot = sessions?.snapshots?.collectAsStateWithLifecycle(initialValue = sessions.snapshot())?.value
         var sessionChooser by remember { mutableStateOf(false) }
         val initialChat = remember(chat) { chat.snapshot() }
@@ -115,6 +119,7 @@ object NextConversationUiPack : ConversationUiPack {
         val status = if (workMode) workSnapshot.status else chatSnapshot.status
         val approval = workSnapshot.approval.takeIf { workMode }
         val question = workSnapshot.question.takeIf { workMode }
+        var policyConsent by remember(identity) { mutableStateOf<com.labteto.dshmobile.uicontract.WorkPolicyUiCommand?>(null) }
         var questionAnswer by remember(question?.pendingId) { mutableStateOf("") }
         val listState = remember(identity?.sessionId) { LazyListState() }
         var readingAnchorMissing by remember(identity?.sessionId) { mutableStateOf(false) }
@@ -177,6 +182,35 @@ object NextConversationUiPack : ConversationUiPack {
             })
         }
         val importScope = rememberCoroutineScope()
+        var workFactsOpen by remember(identity) { mutableStateOf(false) }
+        var workFactsLoading by remember(identity) { mutableStateOf(false) }
+        var workArtifacts by remember(identity) { mutableStateOf(emptyList<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem>()) }
+        var workHistory by remember(identity) { mutableStateOf<com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi?>(null) }
+        fun loadWorkFacts(older: Boolean) {
+            val target = identity ?: return
+            val owner = workReads ?: return
+            if (workFactsLoading) return
+            val cursor = if (older) workHistory?.older ?: return else null
+            workFactsLoading = true
+            importScope.launch {
+                try {
+                    val facts = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        owner.artifactsForUi(target.sessionId) to owner.historyPageForUi(target.sessionId, cursor)
+                    }
+                    if (work.snapshot().identity != target) return@launch
+                    workArtifacts = facts.first
+                    // Each page replaces the previous bounded page; do not retain the entire log in UI state.
+                    workHistory = facts.second
+                    workFactsOpen = true
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (failure: Exception) { if (work.snapshot().identity == target) receipt = failure.message }
+                finally { workFactsLoading = false }
+            }
+        }
+        var fileChooser by remember { mutableStateOf(false) }
+        var fileRows by remember { mutableStateOf(emptyList<com.labteto.dshmobile.local.tools.LocalWorkspaceFile>()) }
+        var filePreview by remember { mutableStateOf<com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview?>(null) }
+        var fileLoading by remember { mutableStateOf(false) }
         val attachmentDrafts by drafts.attachments.collectAsStateWithLifecycle()
         val selectedAttachments = attachmentDrafts[identity?.sessionId].orEmpty()
         var pickerIdentity by remember { mutableStateOf<com.labteto.dshmobile.uicontract.UiSessionIdentity?>(null) }
@@ -217,6 +251,49 @@ object NextConversationUiPack : ConversationUiPack {
             }
         }
         MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
+        if (workFactsOpen) AlertDialog(onDismissRequest = { workFactsOpen = false },
+            title = { Text(stringResource(R.string.next_work_facts)) },
+            text = { LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                if (workHistory?.invalidated == true) item { Text(stringResource(R.string.next_work_history_expired)) }
+                items(workArtifacts, key = { "${it.asOfSequence}:${it.category}:${it.reference}" }) { artifact ->
+                    Text(artifact.reference)
+                    Text("${artifact.category} · #${artifact.asOfSequence}")
+                    if (artifact.currentlyAvailable == false) Text(stringResource(R.string.next_artifact_unavailable))
+                    if (artifact.versionAtCreation != null && artifact.versionNow != null && artifact.versionAtCreation != artifact.versionNow)
+                        Text(stringResource(R.string.next_artifact_changed))
+                }
+                items(workHistory?.records ?: emptyList(), key = { it.sequence }) { record ->
+                    Text("#${record.sequence} ${record.name}")
+                    Text(record.content)
+                }
+                if (workHistory?.older != null) item { TextButton(onClick = { loadWorkFacts(true) }, enabled = !workFactsLoading) {
+                    Text(stringResource(R.string.next_load_older))
+                } }
+            } }, confirmButton = { TextButton(onClick = { workFactsOpen = false }) { Text(stringResource(R.string.next_close)) } })
+        if (fileChooser && files != null) AlertDialog(onDismissRequest = { fileChooser = false; filePreview = null },
+            title = { Text(stringResource(R.string.next_workspace_files)) },
+            text = { LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                item { filePreview?.let { preview ->
+                    Text(preview.file.path)
+                    Text(preview.text ?: stringResource(R.string.next_binary_file))
+                    if (preview.truncated) Text(stringResource(R.string.next_partial_preview))
+                } }
+                items(fileRows, key = { it.path }) { file -> TextButton(onClick = {
+                    if (!fileLoading) { fileLoading = true; importScope.launch {
+                        try { filePreview = files.previewWorkspaceFile(file.path) }
+                        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                        catch (failure: Exception) { receipt = failure.message }
+                        finally { fileLoading = false }
+                    } }
+                }, enabled = !fileLoading) { Text(file.path) } }
+            } }, confirmButton = { TextButton(onClick = { fileChooser = false; filePreview = null }) { Text(stringResource(R.string.next_close)) } })
+        if (policyConsent != null && policy != null) AlertDialog(onDismissRequest = { policyConsent = null },
+            title = { Text(stringResource(R.string.next_policy_confirm)) },
+            text = { Text(stringResource(if (policyConsent is com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.ApproveWithAutoMode)
+                R.string.next_auto_policy_effect else R.string.next_device_policy_effect)) },
+            confirmButton = { TextButton(onClick = { policyConsent?.let { show(policy.submit(it)) }; policyConsent = null }) {
+                Text(stringResource(R.string.next_approve))
+            } }, dismissButton = { TextButton(onClick = { policyConsent = null }) { Text(stringResource(R.string.next_cancel)) } })
         if (editing != null) AlertDialog(onDismissRequest = { editing = null },
             title = { Text(stringResource(R.string.next_edit)) },
             text = { OutlinedTextField(replacement, { replacement = it }, label = { Text(stringResource(R.string.next_input)) }) },
@@ -257,6 +334,17 @@ object NextConversationUiPack : ConversationUiPack {
                             sessionSnapshot.identity, com.labteto.dshmobile.local.session.LocalConversationMode.INDEPENDENT, sessionSnapshot.usageMode))) },
                             enabled = !sessionSnapshot.loading) { Text(stringResource(R.string.next_new_session)) }
                     }
+                    if (workMode && workReads != null) TextButton(onClick = { loadWorkFacts(false) }, enabled = identity != null && !workFactsLoading) {
+                        Text(stringResource(R.string.next_work_facts))
+                    }
+                    if (files != null) TextButton(onClick = {
+                        if (!fileLoading) { fileLoading = true; importScope.launch {
+                            try { fileRows = files.workspaceFiles(); fileChooser = true }
+                            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                            catch (failure: Exception) { receipt = failure.message }
+                            finally { fileLoading = false }
+                        } }
+                    }, enabled = !fileLoading) { Text(stringResource(R.string.next_workspace_files)) }
                     TextButton(onClick = onClose) { Text(stringResource(R.string.next_close)) }
                     Text(stringResource(when (phase) {
                         UiExecutionPhase.IDLE -> R.string.next_idle
@@ -267,6 +355,19 @@ object NextConversationUiPack : ConversationUiPack {
                         identity?.let { target -> show(if (workMode) work.submit(WorkConversationUiCommand.Stop(target))
                             else chat.submit(ChatUiCommand.Stop(target))) }
                     }, enabled = identity != null) { Text(stringResource(R.string.next_stop)) }
+                    if (policy != null && policySnapshot?.approvalMode == com.labteto.dshmobile.local.interaction.LocalApprovalMode.AUTO) {
+                        TextButton(onClick = { show(policy.submit(com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.SetApprovalMode(identity,
+                            com.labteto.dshmobile.local.interaction.LocalApprovalMode.MANUAL))) }) { Text(stringResource(R.string.next_disable_auto)) }
+                    }
+                    if (workMode && policy != null && policySnapshot != null) {
+                        TextButton(onClick = { identity?.let { show(policy.submit(com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.SetPlanMode(it, !policySnapshot.planMode))) } },
+                            enabled = identity != null && phase == UiExecutionPhase.IDLE) {
+                            Text(stringResource(if (policySnapshot.planMode) R.string.next_disable_plan else R.string.next_enable_plan))
+                        }
+                        if (policySnapshot.deviceApprovalLease) TextButton(onClick = {
+                            identity?.let { show(policy.submit(com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.RevokeDeviceTurn(it))) }
+                        }) { Text(stringResource(R.string.next_revoke_device)) }
+                    }
                     if (queued > 0) Text(stringResource(R.string.next_queued, queued))
                     if (status == UiSceneStatus.LOADING) Text(stringResource(R.string.next_loading))
                     if (status == UiSceneStatus.EMPTY) Text(stringResource(R.string.next_empty))
@@ -352,6 +453,14 @@ object NextConversationUiPack : ConversationUiPack {
                             Text(approval.toolName, style = MaterialTheme.typography.titleMedium)
                             Text(approval.summary)
                             Text(approval.arguments, style = MaterialTheme.typography.bodySmall)
+                            if (policy != null) {
+                                TextButton(onClick = { identity?.let { policyConsent = com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.ApproveWithAutoMode(it, approval.pendingId) } }) {
+                                    Text(stringResource(R.string.next_approve_auto))
+                                }
+                                if (approval.canApproveDeviceTurn) TextButton(onClick = {
+                                    identity?.let { policyConsent = com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.ApproveDeviceTurn(it, approval.pendingId) }
+                                }) { Text(stringResource(R.string.next_approve_device)) }
+                            }
                             // Vertical actions stay reachable when system font size is large.
                             Column {
                                 Button(onClick = {
