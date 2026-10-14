@@ -150,7 +150,18 @@ fun SyMaterialSurface(
                 content()
             }
             if (materialFill.alpha < 1f) {
-                Box(Modifier.align(Alignment.TopCenter).fillMaxWidth(.93f).height(1.dp).background(c.materialSheen))
+                // A decorative highlight must never participate in Box measurement.
+                // fillMaxWidth() here made compact surfaces stretch to the entire Row,
+                // squeezing adjacent labels into single-character vertical columns.
+                Canvas(Modifier.matchParentSize()) {
+                    val y = 0.5.dp.toPx()
+                    drawLine(
+                        color = c.materialSheen,
+                        start = Offset(size.width * .035f, y),
+                        end = Offset(size.width * .965f, y),
+                        strokeWidth = 1.dp.toPx(),
+                    )
+                }
             }
         }
     }
