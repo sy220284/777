@@ -232,9 +232,9 @@ class PluginInventoryBrowserRegressionTest {
             .getUnclippedBoundsInRoot()
         val card = compose.onNodeWithTag("plugin-inventory-card-local:android-automation")
             .getUnclippedBoundsInRoot()
-        assertTrue("Icon material should not stretch across the row", icon.width <= 48.dp)
-        assertTrue("Plugin title must have readable horizontal space", title.width >= 100.dp)
-        assertTrue("Plugin card should not become a tall empty slab", card.height < 220.dp)
+        assertTrue("Icon material should not stretch across the row", (icon.right - icon.left) <= 48.dp)
+        assertTrue("Plugin title must have readable horizontal space", (title.right - title.left) >= 100.dp)
+        assertTrue("Plugin card should not become a tall empty slab", (card.bottom - card.top) < 220.dp)
     }
 
     @Test
@@ -258,9 +258,9 @@ class PluginInventoryBrowserRegressionTest {
             .getUnclippedBoundsInRoot()
         val card = compose.onNodeWithTag("plugin-inventory-card-skill:research-check")
             .getUnclippedBoundsInRoot()
-        assertTrue("Skill title should not be a one-character column", title.width >= 100.dp)
-        assertTrue("Description should use the whole card width", details.width > title.width)
-        assertTrue("Skill card should remain compact", card.height < 180.dp)
+        assertTrue("Skill title should not be a one-character column", (title.right - title.left) >= 100.dp)
+        assertTrue("Description should use the whole card width", (details.right - details.left) > (title.right - title.left))
+        assertTrue("Skill card should remain compact", (card.bottom - card.top) < 180.dp)
     }
 
     @Test
