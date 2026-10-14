@@ -32,6 +32,6 @@ class ChatBubbleLayoutTest {
         val bubble = compose.onNodeWithTag("messageActionSurface:bubble-layout").getUnclippedBoundsInRoot()
         val toolbar = compose.onNodeWithTag("messageActionToolbar:bubble-layout").getUnclippedBoundsInRoot()
         assertTrue("The toolbar should start beneath the chat bubble", toolbar.top >= bubble.bottom)
-        assertTrue("The bubble must contain readable text", bubble.height.value > 0f)
+        assertTrue("The bubble must contain readable text", (bubble.bottom - bubble.top).value > 0f)
     }
 }
