@@ -1063,16 +1063,6 @@
     <string name="persona_gallery_archive_deleted">归档对白已删除</string>
 
     <string name="local_run_center">任务进度</string>
-    <string name="local_workflow_stage">当前阶段：%1$s</string>
-    <string name="local_workflow_executing">执行中</string>
-    <string name="local_workflow_reassigning">重新指派</string>
-    <string name="local_workflow_verifying">验收中</string>
-    <string name="local_workflow_completed">已完成</string>
-    <string name="local_workflow_stalled">受阻</string>
-    <string name="local_workflow_processed">已处理 %1$d/%2$d</string>
-    <string name="local_workflow_blocked">受阻原因：%1$s</string>
-    <string name="local_workflow_user_action">请核对结果，再决定如何继续。</string>
-    <string name="local_workflow_waiting_user">等待你审批或回答。</string>
     <string name="local_work_history_title">最近任务</string>
     <string name="local_run_current_goal">当前目标</string>
     <string name="local_run_plan">计划</string>
@@ -2091,7 +2081,6 @@
     <string name="media_studio_capability_transcribe">录音转写</string>
     <string name="media_studio_kind_speech">语音</string>
     <string name="media_studio_kind_image">图片</string>
-    <string name="fluid_tool_output">工具输出</string>
     <string name="fluid_persona_relationship">关系</string>
     <string name="fluid_persona_events">事件</string>
     <string name="fluid_persona_memories">记忆</string>
