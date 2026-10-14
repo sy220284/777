@@ -9,12 +9,21 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import com.labteto.dshmobile.uicontract.PersonaGalleryUiPort
+import com.labteto.dshmobile.uicontract.PersonaGalleryUiCommand
+import com.labteto.dshmobile.uicontract.UiCommandReceipt
+import com.labteto.dshmobile.uicontract.UiPersonaGalleryEntry
+import com.labteto.dshmobile.uicontract.UiPersonaGalleryStory
+import com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Singleton
 class ChatPersonaGalleryStore internal constructor(
     private val file: File,
     private val json: Json,
-) {
+) : PersonaGalleryUiPort {
     @Inject constructor(@ApplicationContext context: Context, json: Json) :
         this(File(context.filesDir, "local-harness/chat/persona-gallery-v6.json"), json)
 
@@ -26,6 +35,36 @@ class ChatPersonaGalleryStore internal constructor(
     private val archiveDeletionJournal = PersonaGalleryArchiveDeletionJournal(file, json)
 
     private var excludedHistoryReconciled = false
+
+    override suspend fun read(): UiPersonaGalleryReadReceipt = withContext(Dispatchers.IO) {
+        try {
+            UiPersonaGalleryReadReceipt.Available(list().map { entry ->
+                UiPersonaGalleryEntry(entry.id, entry.persona.name, entry.stories.map { story ->
+                    UiPersonaGalleryStory(story.id, story.title, story.notes, story.historyTotalCount)
+                })
+            })
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            UiPersonaGalleryReadReceipt.Failed(failure.message)
+        }
+    }
+
+    override suspend fun submit(command: PersonaGalleryUiCommand): UiCommandReceipt = withContext(Dispatchers.IO) {
+        try {
+            val changed = when (command) {
+                is PersonaGalleryUiCommand.RenameStory -> renameStory(command.galleryId, command.storyId, command.title)
+                is PersonaGalleryUiCommand.DeleteHistoryMessage -> deleteHistoryMessage(command.galleryId, command.storyId, command.messageKey)
+            }
+            if (changed) UiCommandReceipt.Accepted else UiCommandReceipt.NotAdmitted
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            // Archive deletion may already have durably recorded its exclusion before an IO failure.
+            // Failed is not a claim that nothing was written; the next read performs owner recovery.
+            UiCommandReceipt.Failed(failure.message ?: "人物图库写入失败，请重新读取确认状态")
+        }
+    }
 
     private fun recoverDurableHistoryExclusions(document: GalleryDocument): GalleryDocument {
         if (excludedHistoryReconciled) return document

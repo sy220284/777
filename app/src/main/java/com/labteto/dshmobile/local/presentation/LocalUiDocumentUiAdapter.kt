@@ -141,6 +141,17 @@ internal class LocalUiDocumentUiAdapter(
                                 ),
                             )
                         }
+                        com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.WORK_TOOL_RESULT -> {
+                            if (!command.workMode) return@synchronized UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+                            val activity = workReads.toolActivitiesForUi(source.sessionId)
+                                .filter { it.finishedSequence != null }.maxByOrNull { it.finishedSequence!! }
+                                ?: return@synchronized UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+                            val result = workReads.toolEvidenceForUi(source.sessionId, activity.callId, activity.finishedSequence!!)
+                                ?: return@synchronized UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                            com.labteto.dshmobile.uicontract.UiLocalDocumentData.StructuredResult(
+                                "${activity.name} · ${activity.phase.name} · 事件 ${activity.finishedSequence} · ${activity.callId} · 返回数据快照（未核验）", result,
+                            )
+                        }
                     }
                     val previous = store.read(source.sessionId, setOf(source.messageId), generation.budget, knownScenes)
                         .firstOrNull { it.recoveryNotice == null && it.document.source == source }?.document

@@ -7,8 +7,10 @@ sealed interface UiLocalDocumentData {
     /** Receives Owner-issued typed data; never guess a table from untrusted free text. */
     data class TableData(val title: String, val headers: List<String>, val rows: List<List<String>>) : UiLocalDocumentData
     data class ReplyForm(val initial: String) : UiLocalDocumentData
+    /** Owner-selected tool result. JSON fields are content, never action or layout instructions. */
+    data class StructuredResult(val title: String, val encoded: String) : UiLocalDocumentData
 }
-enum class UiLocalDocumentTemplate { STATUS, MESSAGE, REPLY_FORM, FACTS_TABLE, WORK_TOOL_ACTIVITY }
+enum class UiLocalDocumentTemplate { STATUS, MESSAGE, REPLY_FORM, FACTS_TABLE, WORK_TOOL_ACTIVITY, WORK_TOOL_RESULT }
 data class GenerateLocalUiDocumentCommand(val identity: UiSessionIdentity, val workMode: Boolean,
     val messageId: String, val template: UiLocalDocumentTemplate)
 
@@ -57,6 +59,11 @@ object LocalUiDocumentBuilder {
                 nodes = listOf(UiDocumentNode.Field("reply", "回复内容", data.initial, true, true),
                     UiDocumentNode.Button("prepare", "放入草稿，确认后发送", "prepare_reply"))
                 actions += UiDocumentAction.SendUserInput("prepare_reply", "", listOf("reply"))
+            }
+            is UiLocalDocumentData.StructuredResult -> {
+                title = data.title
+                fallback = data.encoded
+                nodes = LocalStructuredUiDataAdapter.nodes(data.encoded, budget)
             }
         }
         val document = UiDocument(1, documentId, source, revision, title, nodes, actions, fallback)

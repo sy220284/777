@@ -49,6 +49,7 @@ class LocalHarnessViewModel @Inject constructor(
     val filesUiPort: com.labteto.dshmobile.uicontract.FilesUiPort,
     val attachmentUiPort: com.labteto.dshmobile.uicontract.AttachmentUiPort,
     val chatGroupUiPort: com.labteto.dshmobile.uicontract.ChatGroupUiPort,
+    val personaGalleryUiPort: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort,
     private val uiPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val chatUi: LocalChatUiFacade,
     private val businessSessions: com.labteto.dshmobile.uicontract.SessionUiPort,
@@ -119,6 +120,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val personaGalleryController = LocalPersonaGalleryUiController(
         runtime = runtime,
         chatUi = chatUi,
+        galleryPort = personaGalleryUiPort,
         appContext = appContext,
         scope = viewModelScope,
     )

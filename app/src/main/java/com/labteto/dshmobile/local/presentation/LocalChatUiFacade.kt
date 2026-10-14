@@ -48,11 +48,8 @@ class LocalChatUiFacade @Inject constructor(
     internal fun updateGalleryPortrait(id: String, path: String) = gallery.updatePortraitPath(id, path)
     internal fun updateStoryDetails(id: String, storyId: String, notes: String, storyStage: String) =
         gallery.updateStoryDetails(id, storyId, notes, storyStage)
-    internal fun renameStory(id: String, storyId: String, title: String) = gallery.renameStory(id, storyId, title)
     internal fun deleteGallery(id: String) = gallery.delete(id)
     internal fun deleteStory(id: String, storyId: String) = gallery.deleteStory(id, storyId)
-    internal fun deleteHistoryMessage(id: String, storyId: String, messageKey: String) =
-        gallery.deleteHistoryMessage(id, storyId, messageKey)
 
     internal fun exportPersonaDocument(id: String, format: PersonaTransferFormat, diaryEntries: List<ChatDiaryEntry>): PersonaTransferDocument =
         gallery.exportPersonaDocument(id, format, diaryEntries)

@@ -40,6 +40,11 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 internal object LocalFeatureExecutionPortModule {
     @Provides
+    @Singleton
+    fun providePersonaGalleryUiPort(store: com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore):
+        com.labteto.dshmobile.uicontract.PersonaGalleryUiPort = store
+
+    @Provides
     fun provideHistorySummaryProvider(): com.labteto.dshmobile.local.model.LocalHistorySummaryProvider =
         LocalFeatureHistorySummaries
 

@@ -29,5 +29,6 @@ interface ConversationUiPack {
         shell: com.labteto.dshmobile.uicontract.ConversationShellUiPort? = null,
         team: com.labteto.dshmobile.uicontract.WorkTeamUiPort? = null,
         groups: com.labteto.dshmobile.uicontract.ChatGroupUiPort? = null,
+        gallery: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort? = null,
     )
 }

@@ -147,4 +147,13 @@
     <string name="next_evidence_refresh">刷新来源</string>
     <string name="next_delete_session">删除会话</string>
     <string name="next_delete_session_effect">删除所选会话及相关记录。操作完成后清理对应草稿、表单和阅读状态。</string>
+    <string name="next_gallery_archive">人物图库 · 故事归档</string>
+    <string name="next_gallery_unavailable">图库读取或更新未完成，请刷新确认状态</string>
+    <string name="next_gallery_saved">故事标题已保存</string>
+    <string name="next_gallery_story_summary">%1$s · %2$d 条消息</string>
+    <string name="next_gallery_story_title">故事标题</string>
+    <string name="next_gallery_save">保存标题</string>
+    <string name="next_gallery_close">关闭</string>
+    <string name="next_gallery_refresh">刷新</string>
+    <string name="next_document_local_tool_result">本地整理工具结果</string>
 </resources>

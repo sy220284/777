@@ -1,12 +1,12 @@
 {
   "schema": "777.ui-r4.code-tasks/1",
   "asOf": "2026-10-14",
-  "baseline": "bd940747",
+  "baseline": "18821533",
   "scope": "整个 R4，非单一功能",
   "verificationPolicy": "用户要求延后测试、编译、设备和 CI 跟进；代码状态不代表验收通过",
   "sceneCount": 78,
-  "actionCount": 169,
-  "sourceMappedActions": 30,
+  "actionCount": 172,
+  "sourceMappedActions": 33,
   "tasks": [
     {
       "id": "S-1-01",
@@ -41,8 +41,10 @@
     {
       "id": "S1-02",
       "task": "图库/故事/立绘/导入导出/删除完整 Owner 端口",
-      "codeStatus": "CODE_PENDING",
-      "verification": "DEFERRED"
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED",
+      "implemented": "Gallery Owner 直接实现读取、故事重命名、归档消息删除；V6 旧调用替换，Next 原生只读列表与标题编辑。",
+      "remaining": "保存、人物选择/编辑、故事详情、开始故事、完整删除联动、立绘、导入导出仍待迁移。"
     },
     {
       "id": "S1-03",
@@ -162,7 +164,9 @@
       "id": "S4-01",
       "task": "可信工具 Schema 与结构化结果适配",
       "codeStatus": "CODE_PARTIAL",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "implemented": "原 Work 工具结果按真实 callId/finishedSequence 读取，本地 JSON 对象/数组自动生成只读折叠和表格，普通文本原样显示；双包入口，无模型调用。",
+      "remaining": "可信 Schema 驱动的交互字段与真实动作绑定、更多业务结果适配仍待实现。"
     },
     {
       "id": "S4-02",

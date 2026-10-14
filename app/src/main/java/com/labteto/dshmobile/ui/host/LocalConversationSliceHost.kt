@@ -56,6 +56,7 @@ internal fun LocalConversationSliceHost(
             team = viewModel.workTeamUiPort,
             shell = viewModel.conversationShellUiPort,
             evidence = viewModel.workEvidenceUiPort,
+            gallery = viewModel.personaGalleryUiPort,
         ),
         windowClass = windowClass,
         dark = isSystemInDarkTheme(),
@@ -86,6 +87,7 @@ internal fun LocalConversationSliceHost(
             team = viewModel.workTeamUiPort,
             shell = viewModel.conversationShellUiPort,
             evidence = viewModel.workEvidenceUiPort,
+            gallery = viewModel.personaGalleryUiPort,
         )
         is UiPackAdmission.Rejected, is UiPackAdmission.UnknownPack -> MaterialTheme {
             Surface(modifier = Modifier.fillMaxSize()) {

@@ -34,6 +34,7 @@ import kotlinx.coroutines.withContext
 internal class LocalPersonaGalleryUiController(
     private val runtime: LocalUiRuntime,
     private val chatUi: LocalChatUiFacade,
+    private val galleryPort: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort,
     private val appContext: Context,
     private val scope: CoroutineScope,
 ) {
@@ -318,9 +319,9 @@ suspend fun editGalleryStoryDetails(id: String, storyId: String, notes: String, 
     Unit
 }
 
-suspend fun renameGalleryStory(id: String, storyId: String, title: String): Result<Unit> = runCatching {
+suspend fun renameGalleryStory(id: String, storyId: String, title: String): Result<Unit> = runSuspendResult {
+    requireGalleryCommit(galleryPort.submit(com.labteto.dshmobile.uicontract.PersonaGalleryUiCommand.RenameStory(id, storyId, title)))
     withContext(Dispatchers.IO) {
-        check(chatUi.renameStory(id, storyId, title)) { "图集故事已不存在" }
         _gallery.value = chatUi.galleryEntries()
     }
 }
@@ -373,10 +374,18 @@ suspend fun deleteGalleryHistoryMessage(
     id: String,
     storyId: String,
     messageKey: String,
-): Result<Unit> = runCatching {
+): Result<Unit> = runSuspendResult {
+    requireGalleryCommit(galleryPort.submit(com.labteto.dshmobile.uicontract.PersonaGalleryUiCommand.DeleteHistoryMessage(id, storyId, messageKey)))
     withContext(Dispatchers.IO) {
-        check(chatUi.deleteHistoryMessage(id, storyId, messageKey)) { "gallery_archive_missing" }
         _gallery.value = chatUi.galleryEntries()
+    }
+}
+
+private fun requireGalleryCommit(receipt: com.labteto.dshmobile.uicontract.UiCommandReceipt) {
+    when (receipt) {
+        com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted -> Unit
+        is com.labteto.dshmobile.uicontract.UiCommandReceipt.Failed -> error(receipt.message)
+        else -> error("图集故事或消息已不存在，或输入无效")
     }
 }
 

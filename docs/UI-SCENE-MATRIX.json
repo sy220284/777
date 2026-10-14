@@ -773,7 +773,10 @@
         "save",
         "import",
         "export",
-        "start_story"
+        "start_story",
+        "read_archive",
+        "rename_story",
+        "delete_history_message"
       ],
       "recovery": "Gallery/story identities + revision",
       "v6": 6,
@@ -801,6 +804,24 @@
         "start_story": {
           "ownerPort": null,
           "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "read_archive": {
+          "ownerPort": "PersonaGalleryUiPort.read",
+          "receiptType": "UiPersonaGalleryReadReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "rename_story": {
+          "ownerPort": "PersonaGalleryUiPort.submit(PersonaGalleryUiCommand.RenameStory)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "delete_history_message": {
+          "ownerPort": "PersonaGalleryUiPort.submit(PersonaGalleryUiCommand.DeleteHistoryMessage)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }

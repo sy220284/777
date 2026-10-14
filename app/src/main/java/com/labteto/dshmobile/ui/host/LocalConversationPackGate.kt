@@ -54,6 +54,7 @@ internal object LocalConversationPackGate {
         team: com.labteto.dshmobile.uicontract.WorkTeamUiPort? = null,
         shell: com.labteto.dshmobile.uicontract.ConversationShellUiPort? = null,
         evidence: com.labteto.dshmobile.uicontract.WorkEvidenceUiPort? = null,
+        gallery: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort? = null,
     ): Set<UiCapabilityId> = buildSet {
         if (chat != null && drafts != null) {
             listOf("chat.send_text", "chat.edit", "chat.regenerate",
@@ -73,6 +74,7 @@ internal object LocalConversationPackGate {
         if (team != null) add(UiCapabilityId("work.team_control"))
         if (shell != null) add(UiCapabilityId("shell.session_preferences"))
         if (evidence != null) add(UiCapabilityId("work.evidence_reference"))
+        if (gallery != null) add(UiCapabilityId("chat.gallery_archive"))
     }
 
     fun admit(

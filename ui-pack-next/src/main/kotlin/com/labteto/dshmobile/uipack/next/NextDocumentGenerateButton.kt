@@ -40,6 +40,7 @@ internal fun NextDocumentGenerateButton(identity: UiSessionIdentity?, workMode: 
     TextButton(onClick = { makeLocal(com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.REPLY_FORM) }, enabled = identity != null && !pending) { Text(stringResource(R.string.next_document_local_form)) }
     TextButton(onClick = { makeLocal(com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.FACTS_TABLE) }, enabled = identity != null && !pending) { Text(stringResource(R.string.next_document_local_table)) }
     if (workMode) TextButton(onClick = { makeLocal(com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.WORK_TOOL_ACTIVITY) }, enabled = identity != null && !pending) { Text(stringResource(R.string.next_document_local_tool_events)) }
+    if (workMode) TextButton(onClick = { makeLocal(com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.WORK_TOOL_RESULT) }, enabled = identity != null && !pending) { Text(stringResource(R.string.next_document_local_tool_result)) }
     TextButton(onClick = { open = true }, enabled = identity != null && !pending && allowAiDesign) {
         Text(stringResource(R.string.next_document_ai_design))
     }
