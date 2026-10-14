@@ -43,6 +43,7 @@ internal class LocalUiDocumentUiAdapter(
     private val conversations: LocalConversationUiPortComposition,
     private val generation: LocalUiDocumentGeneration,
     private val store: LocalUiDocumentSessionStore,
+    private val workReads: com.labteto.dshmobile.uicontract.WorkReadUiPort,
     private val drafts: ConversationDraftUiPort,
     private val knownScenes: Set<UiSceneId>,
     private val navigationScenes: Set<UiSceneId>,
@@ -110,6 +111,19 @@ internal class LocalUiDocumentUiAdapter(
                         com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.STATUS -> com.labteto.dshmobile.uicontract.UiLocalDocumentData.Status(approval)
                         com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.MESSAGE -> com.labteto.dshmobile.uicontract.UiLocalDocumentData.ListItems(listOf(message.content))
                         com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.REPLY_FORM -> com.labteto.dshmobile.uicontract.UiLocalDocumentData.ReplyForm("")
+                        com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.WORK_TOOL_ACTIVITY -> {
+                            if (!command.workMode) return@synchronized UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+                            // The existing Work Owner projects a bounded event-log view. This is a
+                            // frozen snapshot, not a verified requirement or resumable tool action.
+                            val tools = workReads.toolActivitiesForUi(source.sessionId).takeLast(8)
+                            com.labteto.dshmobile.uicontract.UiLocalDocumentData.TableData(
+                                title = "工具事件（制作时快照；完成不等于核验）",
+                                headers = listOf("工具", "真实阶段", "错误码"),
+                                rows = tools.map { activity ->
+                                    listOf(activity.name, activity.phase.name, activity.errorCode.orEmpty())
+                                },
+                            )
+                        }
                         com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.FACTS_TABLE -> {
                             // A point-in-time Owner snapshot; not an automatically updating task status.
                             val chatSnapshot = conversations.chat.snapshot()
@@ -190,9 +204,10 @@ class LocalUiDocumentUiPortFactory @javax.inject.Inject internal constructor(
     private val conversations: LocalConversationUiPortComposition,
     private val generation: LocalUiDocumentGeneration,
     private val store: LocalUiDocumentSessionStore,
+    private val workReads: com.labteto.dshmobile.uicontract.WorkReadUiPort,
 ) {
     fun create(scope: CoroutineScope, drafts: ConversationDraftUiPort, knownScenes: Set<UiSceneId>,
         navigationScenes: Set<UiSceneId> = knownScenes,
         navigate: (UiSceneId) -> Unit): UiDocumentUiPort =
-        LocalUiDocumentUiAdapter(scope, state, conversations, generation, store, drafts, knownScenes, navigationScenes, navigate)
+        LocalUiDocumentUiAdapter(scope, state, conversations, generation, store, workReads, drafts, knownScenes, navigationScenes, navigate)
 }

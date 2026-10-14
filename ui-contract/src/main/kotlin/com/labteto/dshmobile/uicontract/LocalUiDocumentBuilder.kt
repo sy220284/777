@@ -8,7 +8,7 @@ sealed interface UiLocalDocumentData {
     data class TableData(val title: String, val headers: List<String>, val rows: List<List<String>>) : UiLocalDocumentData
     data class ReplyForm(val initial: String) : UiLocalDocumentData
 }
-enum class UiLocalDocumentTemplate { STATUS, MESSAGE, REPLY_FORM, FACTS_TABLE }
+enum class UiLocalDocumentTemplate { STATUS, MESSAGE, REPLY_FORM, FACTS_TABLE, WORK_TOOL_ACTIVITY }
 data class GenerateLocalUiDocumentCommand(val identity: UiSessionIdentity, val workMode: Boolean,
     val messageId: String, val template: UiLocalDocumentTemplate)
 

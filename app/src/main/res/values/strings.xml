@@ -2321,5 +2321,6 @@
     <string name="ui_pack_back_to_stable">返回原界面</string>
     <string name="ui_document_local_table">本地事实表格</string>
     <string name="ui_document_table_empty">没有可显示的行</string>
+    <string name="ui_document_local_tool_events">本地工具事件表格</string>
 </resources>
 

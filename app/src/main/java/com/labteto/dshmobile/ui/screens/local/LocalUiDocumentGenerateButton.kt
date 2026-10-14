@@ -43,6 +43,7 @@ internal fun LocalUiDocumentGenerateButton(identity: UiSessionIdentity?, workMod
     SyButton(stringResource(R.string.ui_document_local_message), { makeLocal(com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.MESSAGE) }, enabled = identity != null && !pending, variant = SyButtonVariant.Ghost)
     SyButton(stringResource(R.string.ui_document_local_form), { makeLocal(com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.REPLY_FORM) }, enabled = identity != null && !pending, variant = SyButtonVariant.Ghost)
     SyButton(stringResource(R.string.ui_document_local_table), { makeLocal(com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.FACTS_TABLE) }, enabled = identity != null && !pending, variant = SyButtonVariant.Ghost)
+    if (workMode) SyButton(stringResource(R.string.ui_document_local_tool_events), { makeLocal(com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.WORK_TOOL_ACTIVITY) }, enabled = identity != null && !pending, variant = SyButtonVariant.Ghost)
     SyButton(stringResource(R.string.ui_document_ai_design), { open = true },
         enabled = identity != null && !pending && allowAiDesign, loading = pending, variant = SyButtonVariant.Ghost)
     if (open) SyDialog(stringResource(R.string.ui_document_ai_design), onDismiss = { if (!pending) open = false }) {

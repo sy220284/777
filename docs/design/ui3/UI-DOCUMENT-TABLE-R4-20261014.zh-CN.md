@@ -25,3 +25,12 @@
 ## 设计边界
 
 共享层定义受限、只读的表格数据；不规定材质、颜色、字号、圆角。V6 继续使用 V6 当前基础组件；Next 保持独立 Material 渲染。不得通过一个表格伪造已核验、已收费、任务成功或可重试等业务判断。
+
+
+## 本轮第二个提交：Work EventLog 的工具活动只读表格
+
+**本轮新增** `WORK_TOOL_ACTIVITY` 入口仅在 Work 模式提供。适配器仍由激活身份锁准入，通过已经存在的 `WorkReadUiPort.toolActivitiesForUi(sessionId)` 读取原 Work Owner 的有界 EventLog 投影，最多选取最近 8 条工具活动，并使用同一 `UiLocalDocumentData.TableData → LocalUiDocumentBuilder → Codec → Session sidecar → V6/Next` 管线生成**零额外模型请求**的静态工具事件表格。显示工具名、`LocalToolUiPhase` 原始阶段、错误码；不进行工具重试、不授予审批、不把 `COMPLETED` 解释为“需求已核验”。Chat 模式调用这一模板明确拒绝。
+
+**此前已有、非本轮贡献**：`WorkReadUiPort`、工具活动 EventLog 投影、阶段枚举和原 Work Owner、双包现有生成按钮、身份与归档逻辑。
+
+**仍待补齐**：基于工具 Schema 的自适应字段/交互控件、实时增量投影而非静态快照、证据/媒体节点、跨进程完整恢复、两包实际设备验证。此增量在尚未获成功 CI 证据前仅标记源码已提交。
