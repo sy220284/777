@@ -128,3 +128,15 @@ Work 提问新增真实 waiter 签发的 nonce；模型 callId 复用不能复�
 **仍未完成：** 此次是独立的**准入机制**，尚未接入生产全局 UI Pack 选择和 UI Host 场景路由；全量 V6 页面独立拆分、Next 全 App 覆盖、S2 双包真实动作验收、S4 扩展与 S5 设备回归均未宣告完成。在线 Figma 未修改（当前连接为 View，且没有指定画板 key/节点）。
 
 **最新已观察到的 CI 阻断（非新代码验证）：** 早于本轮提交的 `2d243b92` 工作流 `38528990824` 中静态门禁和 JVM 单测成功，但 Android 构建/设备链因 `:ui-host:debugRuntimeClasspath` 对 `androidx.emoji2:emoji2:1.2.0` 的 Gradle 依赖元数据校验失败而阻断。暂未核实官方 artifact 的 SHA-256，**不得为通过 CI 关闭依赖安全校验或填写猜测校验和**。最新提交尚无完整 CI/真机回执。
+
+
+## 2026-10-14 本轮继续：Pack 准入接入真实 Next 入口（本次对话）
+
+**此前已有，非本次贡献：** `UiPackRegistry` 的类定义及静态兼容检查、Next 的 debug 切片入口、既有 Port / Manifest / Source-of-truth，见上节 `09822351`，不重复计功。
+
+**本轮新增代码（可逐提交追溯）：**
+- `ea745fa6`：新建 App 组合层 `LocalConversationPackGate`，以 Host 固定的会话必需 Scene 清单和**实际接通的 Chat/Work/Draft/UiDocument/Attachment/Transcript Port**投影可用协议能力；Next 调试切片从硬编码 `NextConversationUiPack.Render` 改为先由 `UiPackRegistry.select` 审核后调用被选中的 Pack `Render`。失败时显示中立错误提示并返回稳定 UI，不隐藏兜底、不进行会话切换。
+- `ea745fa6` 和 `d586ba39`：新增/补全入口回归测试源码，覆盖未知 Pack、缺失 UiDocument 能力、Work 审批能力缺失、完全没有连接真实 Port，以及受限切片可被明确准入。
+- `6fee3ab8`：`ui-host` 的 Gradle 依赖约束选择仓库原有 `gradle/verification-metadata.xml` 已记录 SHA256 的 `androidx.emoji2:emoji2:1.4.0`，替代从传递依赖解析到的未登记 `1.2.0`；**未关闭验证、未编造散列、未改全局安全门禁**。
+
+**局限与验证状态：** 这是**Debug Next 会话切片**的真实准入接线，不是完整应用的包管理器、全局路由或可切换 V6/Next 全套场景。Owner 仍按原规则二次授权，Host 的“端口已接线”不意味着此刻具有执行权限。当前未收到绑定 `d586ba39` 的最新 CI/设备回执；依赖修复是根据原 CI 日志与仓库已验证版本完成的**有依据改动**，仍需重跑 Android CI。仍不声称 S2/S3/S5 验收通过。
