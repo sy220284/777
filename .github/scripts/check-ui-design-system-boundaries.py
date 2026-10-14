@@ -191,6 +191,51 @@ for relative in ("docs/design/v5-p0p1", "docs/design/clear-realm-theme.md",
     if (ROOT / relative).exists():
         violations.append(f"{relative}: retired V5 visual asset or obsolete component returned")
 
+
+# V6 design-source ratchet: the current route and settings inventories must match native owners.
+# Old 38-screen prototypes are not a license to restore retired UI into design materials.
+v6_root = ROOT / "docs/design/v6"
+v6_manifest = json.loads((v6_root / "current-ui.json").read_text(encoding="utf-8"))
+v6_html = (v6_root / "mobile/app.html").read_text(encoding="utf-8")
+v6_spec = (v6_root / "V6-CURRENT-IMPLEMENTATION.zh-CN.md").read_text(encoding="utf-8")
+route_catalog = (ROOT / "app/src/main/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalog.kt").read_text(encoding="utf-8")
+settings_code = (UI / "screens/settings/SettingsScreen.kt").read_text(encoding="utf-8")
+routes_match = re.search(r"internal enum class LocalFeatureRoute\s*\{([^}]+)\}", route_catalog, re.S)
+settings_match = re.search(r"enum class SettingsDestination\s*\{([^}]+)\}", settings_code, re.S)
+def enum_items(match):
+    return re.findall(r"^\s*([A-Z][A-Z_]+)\s*(?:,|$)", match.group(1), re.M) if match else []
+code_routes = enum_items(routes_match)
+code_settings = enum_items(settings_match)
+manifest_routes = [route["id"] for route in v6_manifest["routes"]]
+if not code_routes or code_routes != manifest_routes:
+    violations.append("V6 current-ui.json: current routes differ from native LocalFeatureRoute")
+if not code_settings or code_settings != v6_manifest["settingsDestinations"]:
+    violations.append("V6 current-ui.json: settings destinations differ from SettingsDestination")
+for route in v6_manifest["routes"]:
+    path = ROOT / route["source"]
+    if not path.is_file():
+        violations.append(f"V6 current-ui.json: missing native source -> {route['source']}")
+v6_proto_match = re.search(r"const\s+V6_ROUTES\s*=\s*(\[[^\]]+\])", v6_html)
+if not v6_proto_match or json.loads(v6_proto_match.group(1)) != manifest_routes:
+    violations.append("V6 prototype route list differs from native routes")
+if "data-v6-authoritative=\"compose-" not in v6_html:
+    violations.append("V6 prototype missing source-of-truth marker")
+# Retired UI must never be reinstated in the active interactive prototype.
+for marker in ("S03Board", "S02v2Work", "mobile-screen-tabs", "38 场景", "目标 / 计划 / 审批 / 执行 / 成果"):
+    if marker in v6_html:
+        violations.append(f"V6 prototype reintroduced obsolete reference: {marker}")
+if "Figma" not in v6_spec or "#711" not in v6_spec:
+    violations.append("V6 spec omitted Figma or pending PR #711 state")
+# Also validate local source links in the actual V6 authority.
+for link in re.findall(r"\]\(([^)]+)\)", v6_spec):
+    url = link.split("#")[0].split("?")[0].strip()
+    if not url or re.match(r"^(?:https?:|mailto:|data:)", url):
+        continue
+    dest = (v6_root / url).resolve()
+    if not dest.is_relative_to(ROOT) or not dest.is_file():
+        violations.append(f"V6 spec: broken local link -> {url}")
+
+
 if violations:
     print("UI Design System boundary violations:")
     print("\n".join(f"  - {item}" for item in violations))
