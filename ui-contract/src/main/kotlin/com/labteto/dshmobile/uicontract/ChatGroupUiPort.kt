@@ -13,8 +13,10 @@ data class UiChatGroupManagementSnapshot(
 )
 
 sealed interface ChatGroupUiCommand {
+    val identity: UiSessionIdentity
+
     data class ConfigureMembers(
-        val identity: UiSessionIdentity,
+        override val identity: UiSessionIdentity,
         val galleryIds: List<String>,
     ) : ChatGroupUiCommand
 }
