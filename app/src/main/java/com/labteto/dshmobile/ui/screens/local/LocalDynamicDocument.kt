@@ -40,7 +40,7 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
     port: UiDocumentUiPort, forms: UiDocumentFormUiPort) {
     val document = snapshot.document
     val allValues by forms.values.collectAsStateWithLifecycle()
-    val key = UiDocumentFormKey(document.source.sessionId, document.documentId)
+    val key = UiDocumentFormKey(document.source.sessionId, document.documentId, document.revision)
     val defaults = remember(document) { document.initialFields() }
     val values = defaults + allValues[key].orEmpty()
     var receipt by remember(document.documentId, document.revision) { mutableStateOf<UiDocumentReceipt?>(null) }

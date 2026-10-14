@@ -2,7 +2,10 @@ package com.labteto.dshmobile.uicontract
 
 import kotlinx.coroutines.flow.StateFlow
 
-data class UiDocumentFormKey(val sessionId: String, val documentId: String)
+/** Revision binds form drafts to one immutable document definition. */
+data class UiDocumentFormKey(val sessionId: String, val documentId: String, val revision: Long = 0) {
+    init { require(sessionId.isNotBlank() && documentId.isNotBlank() && revision >= 0) }
+}
 interface UiDocumentFormUiPort {
     val values: StateFlow<Map<UiDocumentFormKey, Map<String, String>>>
     fun update(key: UiDocumentFormKey, fieldId: String, value: String)
