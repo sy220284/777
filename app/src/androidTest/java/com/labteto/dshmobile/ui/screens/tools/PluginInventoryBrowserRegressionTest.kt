@@ -6,9 +6,12 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -200,6 +203,55 @@ class PluginInventoryBrowserRegressionTest {
             org.junit.Assert.assertTrue(prompt.contains("确认"))
             org.junit.Assert.assertTrue(prompt.contains(".dsh/skills/"))
         }
+    }
+
+
+    @Test
+    fun pluginCardsKeepCompactIconsAndReadableText() {
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = listOf("android-automation"),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onUseCapability = {},
+                )
+            }
+        }
+        val icon = compose.onNodeWithTag("plugin-inventory-icon-local:android-automation")
+            .getUnclippedBoundsInRoot()
+        val title = compose.onNodeWithTag("plugin-inventory-title-local:android-automation")
+            .getUnclippedBoundsInRoot()
+        val card = compose.onNodeWithTag("plugin-inventory-card-local:android-automation")
+            .getUnclippedBoundsInRoot()
+        assertTrue("Icon material should not stretch across the row", icon.width <= 48.dp)
+        assertTrue("Plugin title must have readable horizontal space", title.width >= 100.dp)
+        assertTrue("Plugin card should not become a tall empty slab", card.height < 180.dp)
+    }
+
+    @Test
+    fun skillCardsKeepDescriptionsBelowTheActionRow() {
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(),
+                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                        "research-check", "核查改动正确性并追踪异常、复盘及验证修复结果", true,
+                    )),
+                    skillsOnly = true,
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onUseCapability = {},
+                )
+            }
+        }
+        val title = compose.onNodeWithTag("plugin-inventory-title-skill:research-check")
+            .getUnclippedBoundsInRoot()
+        val details = compose.onNodeWithTag("plugin-inventory-detail-skill:research-check")
+            .getUnclippedBoundsInRoot()
+        val card = compose.onNodeWithTag("plugin-inventory-card-skill:research-check")
+            .getUnclippedBoundsInRoot()
+        assertTrue("Skill title should not be a one-character column", title.width >= 100.dp)
+        assertTrue("Description should use the whole card width", details.width > title.width)
+        assertTrue("Skill card should remain compact", card.height < 180.dp)
     }
 
 }
