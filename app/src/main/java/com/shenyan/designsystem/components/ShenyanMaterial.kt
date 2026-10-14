@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import kotlin.math.max
@@ -200,7 +201,7 @@ fun SySceneBackgroundSurface(
     val windowOnScreen = remember { IntArray(2) }
     var origin by remember { mutableStateOf(IntOffset.Zero) }
     Box(
-        modifier.clip(shape).onGloballyPositioned { coordinates ->
+        modifier.clip(shape).testTag("sySceneBackgroundSurface").onGloballyPositioned { coordinates ->
             view.rootView.getLocationOnScreen(windowOnScreen)
             val point = coordinates.positionInWindow()
             val next = IntOffset(point.x.roundToInt() + windowOnScreen[0],
