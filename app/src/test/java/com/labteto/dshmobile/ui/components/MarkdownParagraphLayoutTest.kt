@@ -26,6 +26,5 @@ class MarkdownParagraphLayoutTest {
         assertEquals(source.substringBefore("\n\n"), markdownParagraphDisplayText(dialogue.lines, true))
         assertTrue(blocks[1] is MdBlock.Paragraph)
         assertTrue(blocks[2] is MdBlock.Code)
-        assertEquals(source, source) // the presentation helpers never mutate the stored source
     }
 }
