@@ -209,8 +209,9 @@ fun SySceneBackgroundSurface(
             if (origin != next) origin = next
         },
     ) {
+        // Show the theme canvas immediately while root coordinates are being measured.
+        Box(Modifier.matchParentSize().background(canvas))
         if (scene != null) SyPaintAlignedScene(scene, origin, Modifier.matchParentSize())
-        else Box(Modifier.matchParentSize().background(canvas))
         content()
     }
 }
