@@ -11,7 +11,7 @@ import org.junit.Test
 class LocalConversationPackGateTest {
     private val allConnected = NextConversationUiPack.manifest.requiredCapabilities
 
-    @Test fun connectedSliceIsAdmittedButCannotClaimWholeAppCoverage() {
+    @Test fun explicitlySupportedConversationSliceCanBeAdmitted() {
         assertTrue(LocalConversationPackGate.admit(
             NextConversationUiPack.manifest.id, allConnected, UiWindowClass.COMPACT, false,
         ) is UiPackAdmission.Admitted)
@@ -28,6 +28,17 @@ class LocalConversationPackGateTest {
         assertTrue(result is UiPackAdmission.Rejected)
         result as UiPackAdmission.Rejected
         assertTrue(UiCapabilityId("ui_document.generate_local") in result.compatibility.missingCapabilities)
+    }
+
+    @Test fun missingAllPortConnectionsCannotBeCoveredByPackSelfDeclarations() {
+        val available = LocalConversationPackGate.capabilities(
+            chat = null, work = null, drafts = null, documents = null,
+            forms = null, attachments = null, transcript = null,
+        )
+        assertTrue(available.isEmpty())
+        assertTrue(LocalConversationPackGate.admit(
+            NextConversationUiPack.manifest.id, available, UiWindowClass.COMPACT, false,
+        ) is UiPackAdmission.Rejected)
     }
 
     @Test fun neverSilentlySelectsAnotherPackForUnknownId() {
