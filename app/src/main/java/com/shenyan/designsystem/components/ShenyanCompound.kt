@@ -1,6 +1,5 @@
 package com.shenyan.designsystem.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -61,27 +60,18 @@ fun SyCategoryRow(
 ) {
     val p = LocalSyColors.current
     val shape = RoundedCornerShape(SyMetric.radiusControl)
-    val surface = if (onClick != null) syMaterialColor(SyMaterialTier.L2_BAR) else Color.Transparent
     val textMeasurer = rememberTextMeasurer()
     val titleStyle = titleTextStyle ?: MaterialTheme.typography.bodyMedium
     val valueStyle = MaterialTheme.typography.bodySmall
     val row: @Composable () -> Unit = {
-        Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 12.dp, vertical = 10.dp),
+        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (icon != null || iconPainter != null) {
-                SyMaterialSurface(
-                    tier = SyMaterialTier.L3_CARD,
-                    shape = RoundedCornerShape(SyMetric.radiusControl),
-                    modifier = Modifier.size(42.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        if (iconPainter != null) Icon(iconPainter, contentDescription = null,
-                            modifier = Modifier.size(22.dp), tint = p.textSecondary)
-                        else if (icon != null) Icon(icon, contentDescription = null,
-                            modifier = Modifier.size(22.dp), tint = p.textSecondary)
-                    }
-                }
+                if (iconPainter != null) Icon(iconPainter, contentDescription = null,
+                    modifier = Modifier.size(20.dp), tint = p.textSecondary)
+                else if (icon != null) Icon(icon, contentDescription = null,
+                    modifier = Modifier.size(20.dp), tint = p.textSecondary)
             }
             // The metadata must never steal the width required to display the title.
             // Measure the actual text at the user's font scale, rather than guessing
@@ -127,11 +117,11 @@ fun SyCategoryRow(
         Surface(modifier, shape = shape, color = Color.Transparent) { row() }
     } else {
         Surface(onClick = onClick, modifier = modifier,
-            shape = shape, color = surface) { row() }
+            shape = shape, color = Color.Transparent) { row() }
     }
 }
 
-/** Touch target is 92dp high. No demo action, permission or business data is generated. */
+/** Compact icon and label with a transparent background and a comfortable touch target. */
 @Composable
 fun SyQuickActionTile(
     icon: ImageVector?,
@@ -142,33 +132,29 @@ fun SyQuickActionTile(
     iconPainter: Painter? = null,
 ) {
     val p = LocalSyColors.current
-    SyMaterialSurface(
-        onClick = onClick, enabled = enabled, modifier = modifier,
-        tier = SyMaterialTier.L3_CARD,
-        shape = RoundedCornerShape(SyMetric.radiusCard),
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier,
+        shape = RoundedCornerShape(SyMetric.radiusControl),
+        color = Color.Transparent,
     ) {
         Column(
-            Modifier.fillMaxWidth().heightIn(min = 108.dp)
-                .padding(horizontal = 10.dp, vertical = 12.dp),
+            Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                .padding(horizontal = 2.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+            verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
         ) {
-            Box(
-                modifier = Modifier.size(44.dp)
-                    .background(p.selected.copy(alpha = .65f), RoundedCornerShape(14.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                when {
-                    iconPainter != null -> Icon(iconPainter, contentDescription = null,
-                        tint = if (enabled) p.text else p.textTertiary,
-                        modifier = Modifier.size(26.dp))
-                    icon != null -> Icon(icon, contentDescription = null,
-                        tint = if (enabled) p.text else p.textTertiary,
-                        modifier = Modifier.size(26.dp))
-                }
+            when {
+                iconPainter != null -> Icon(iconPainter, contentDescription = null,
+                    tint = if (enabled) p.text else p.textTertiary,
+                    modifier = Modifier.size(22.dp))
+                icon != null -> Icon(icon, contentDescription = null,
+                    tint = if (enabled) p.text else p.textTertiary,
+                    modifier = Modifier.size(22.dp))
             }
             Text(label, color = if (enabled) p.text else p.textTertiary,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelSmall,
                 textAlign = TextAlign.Center,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
