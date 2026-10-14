@@ -132,14 +132,14 @@ internal class LocalChatPersonaCoordinator internal constructor(
         }
     }
 
-    internal fun bindGallery(galleryId: String, galleryStoryId: String?) {
+    internal fun bindGallery(galleryId: String, galleryStoryId: String?): Boolean {
         val snapshot = state.value
-        if (snapshot.loading || snapshot.kernel.running || snapshot.usageMode != LocalUsageMode.CHAT) return
+        if (snapshot.loading || snapshot.kernel.running || snapshot.usageMode != LocalUsageMode.CHAT) return false
         val lease = LocalSessionRuntimeRegistry.tryAcquire(
             snapshot.sessionId,
             LocalSessionRuntimeKind.MAINTENANCE,
-        ) ?: return
-        try {
+        ) ?: return false
+        return try {
             val current = state.value
             if (
                 current.sessionId != snapshot.sessionId ||
@@ -149,7 +149,7 @@ internal class LocalChatPersonaCoordinator internal constructor(
                 current.chat.personaId != snapshot.chat.personaId ||
                 current.chat.galleryId != snapshot.chat.galleryId ||
                 current.chat.galleryStoryId != snapshot.chat.galleryStoryId
-            ) return
+            ) return false
             val target = current.copy(
                 chat = current.chat.copy(
                     galleryId = galleryId,
@@ -161,8 +161,11 @@ internal class LocalChatPersonaCoordinator internal constructor(
             commitDomainState(target, "gallery-bound")
             publishCommitted(target)
             enqueueSnapshot(snapshot.sessionId)
-        } catch (error: Throwable) {
+            true
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (error: Exception) {
             publishError(snapshot.sessionId, error.message ?: "人物图集绑定失败")
+            false
         } finally {
             lease.close()
         }

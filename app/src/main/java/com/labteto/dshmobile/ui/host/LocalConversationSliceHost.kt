@@ -61,6 +61,8 @@ internal fun LocalConversationSliceHost(
             personaTransfer = viewModel.personaTransferUiPort,
             stories = viewModel.personaStoryUiPort,
             galleryDeletion = viewModel.personaGalleryDeletionUiPort,
+            gallerySave = viewModel.personaGallerySaveUiPort,
+            portraits = viewModel.personaPortraitUiPort,
         ),
         windowClass = windowClass,
         dark = isSystemInDarkTheme(),
@@ -96,6 +98,8 @@ internal fun LocalConversationSliceHost(
             personaTransfer = viewModel.personaTransferUiPort,
             stories = viewModel.personaStoryUiPort,
             galleryDeletion = viewModel.personaGalleryDeletionUiPort,
+            gallerySave = viewModel.personaGallerySaveUiPort,
+            portraits = viewModel.personaPortraitUiPort,
         )
         is UiPackAdmission.Rejected, is UiPackAdmission.UnknownPack -> MaterialTheme {
             Surface(modifier = Modifier.fillMaxSize()) {

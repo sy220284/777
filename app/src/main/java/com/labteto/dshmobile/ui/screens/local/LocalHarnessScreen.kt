@@ -560,7 +560,7 @@ fun LocalHarnessScreen(
         deactivateDiaryEntry = viewModel::deactivateDiaryEntry,
         hasUnsavedCurrentPersona = viewModel::hasUnsavedCurrentPersona,
         currentGalleryHasUnsavedChanges = viewModel::currentGalleryHasUnsavedChanges,
-        saveCurrentToGallery = viewModel::saveCurrentToGallery,
+        saveCurrentToGallery = { notes, id, story, fresh -> viewModel.saveCurrentToGallery(notes, id, story, fresh, sendIdentity) },
         editGalleryStoryDetails = { id, story, notes, stage -> submitStory(com.labteto.dshmobile.uicontract.PersonaStoryUiCommand.SaveDetails(sendIdentity, id, story, notes, stage)) },
         renameGalleryStory = viewModel::renameGalleryStory,
         inspectGalleryPersona = viewModel::inspectGalleryPersona,
@@ -1206,6 +1206,7 @@ fun LocalHarnessScreen(
                     notes = "",
                     existingId = shell.galleryId,
                     existingStoryId = shell.galleryStoryId,
+                    expected = sendIdentity,
                 )
             },
             onContinue = {

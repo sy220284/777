@@ -18,19 +18,19 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 /** Native archive summary and title editing; never enters a V6 page or private Chat state. */
 @Composable
-internal fun NextPersonaGalleryPanel(port: PersonaGalleryUiPort, personas: PersonaSelectionUiPort?, transfer: PersonaTransferUiPort?, stories: PersonaStoryUiPort?, deletion: PersonaGalleryDeletionUiPort?) {
+internal fun NextPersonaGalleryPanel(port: PersonaGalleryUiPort, personas: PersonaSelectionUiPort?, transfer: PersonaTransferUiPort?, stories: PersonaStoryUiPort?, deletion: PersonaGalleryDeletionUiPort?, save: PersonaGallerySaveUiPort?, portraits: PersonaPortraitUiPort?) {
     val selection = personas?.snapshots?.collectAsStateWithLifecycle(initialValue = personas.snapshot())?.value
     var open by remember(selection?.identity) { mutableStateOf(false) }
     if (open) {
         // Leaving the dialog disposes its scope, so late reads cannot reopen or rewrite the editor.
-        key(selection?.identity) { NextPersonaGalleryDialog(port, personas, selection, transfer, stories, deletion) { open = false } }
+        key(selection?.identity) { NextPersonaGalleryDialog(port, personas, selection, transfer, stories, deletion, save, portraits) { open = false } }
     }
     TextButton(onClick = { open = true }) { Text(stringResource(R.string.next_gallery_archive)) }
 }
 
 @Composable
 private fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: PersonaSelectionUiPort?,
-    selection: UiPersonaSelectionSnapshot?, transfer: PersonaTransferUiPort?, stories: PersonaStoryUiPort?, deletion: PersonaGalleryDeletionUiPort?, close: () -> Unit) {
+    selection: UiPersonaSelectionSnapshot?, transfer: PersonaTransferUiPort?, stories: PersonaStoryUiPort?, deletion: PersonaGalleryDeletionUiPort?, save: PersonaGallerySaveUiPort?, portraits: PersonaPortraitUiPort?, close: () -> Unit) {
     var entries by remember(port) { mutableStateOf<List<UiPersonaGalleryEntry>>(emptyList()) }
     var selected by remember(port) { mutableStateOf<Pair<String, UiPersonaGalleryStory>?>(null) }
     var exportId by remember(port) { mutableStateOf<String?>(null) }
@@ -177,6 +177,8 @@ private fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: Perso
         } },
         confirmButton = {
             androidx.compose.foundation.layout.Column {
+                save?.let { NextPersonaGallerySaveActions(it, selection, ::read) { feedback = it } }
+                portraits?.let { NextPersonaPortraitActions(it, exportId, ::read) { feedback = it } }
                 transfer?.let { owner ->
                     Text(stringResource(R.string.next_gallery_export_target,
                         entries.firstOrNull { it.id == exportId }?.name ?: stringResource(R.string.next_gallery_select_export)))

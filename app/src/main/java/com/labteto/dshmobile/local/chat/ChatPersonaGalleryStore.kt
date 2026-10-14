@@ -348,6 +348,12 @@ class ChatPersonaGalleryStore internal constructor(
         return updated
     }
 
+    @Synchronized
+    internal fun replacePortraitForUi(id: String, portraitPath: String): String? {
+        val previous = findEntry(id) ?: return null
+        return if (updatePortraitPath(id, portraitPath) != null) previous.portraitPath else null
+    }
+
     /**
      * Permanently exclude messages removed by an active-chat timeline rewrite.
      *

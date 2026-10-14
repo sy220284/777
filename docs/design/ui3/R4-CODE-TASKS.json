@@ -1,12 +1,12 @@
 {
   "schema": "777.ui-r4.code-tasks/1",
   "asOf": "2026-10-14",
-  "baseline": "3f2511de",
+  "baseline": "828b5434",
   "scope": "整个 R4，非单一功能",
   "verificationPolicy": "用户要求延后测试、编译、设备和 CI 跟进；代码状态不代表验收通过",
   "sceneCount": 78,
   "actionCount": 173,
-  "sourceMappedActions": 41,
+  "sourceMappedActions": 44,
   "tasks": [
     {
       "id": "S-1-01",
@@ -45,8 +45,8 @@
       "task": "图库/故事/立绘/导入导出/删除完整 Owner 端口",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "读取/重命名/归档消息删除、人物选择/开始故事、原人物导入导出事务及双包文档传输；本批故事详情/阶段编辑和人物/故事删除经实际 Chat Owner 端口，双包确认及部分同步回执。",
-      "remaining": "图库保存、人物完整资料编辑、立绘设置/移除及相关全量 UI 移包仍待迁移。"
+      "implemented": "读取/重命名/归档消息删除、人物选择/开始故事、原人物导入导出事务及双包文档传输；本批故事详情/阶段编辑和人物/故事删除经实际 Chat Owner 端口，双包确认及部分同步回执。 本批会话保存/新故事归档与立绘导入/移除迁入 Owner 端口，V6/Next 接通。原会话维护租约保护历史读取，保存与绑定分立回执；真实 Store 捕获替换前立绘路径，保护已提交或共享图片。",
+      "remaining": "人物完整资料/AI 建议编辑与新建、预置人物安装仍需迁移；Next 完整图库页面/立绘预览仍属于 S3 场景移包。"
     },
     {
       "id": "S1-03",
@@ -98,7 +98,8 @@
       "id": "S1-09",
       "task": "全量旧 UI 回调退场",
       "codeStatus": "CODE_PARTIAL",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "implemented": "持续移除群聊、团队、图库故事/删除/保存/立绘的 UI 业务编排；现行大型 UI 回调与其他设置/人物业务尚待迁出。"
     },
     {
       "id": "S1-10",

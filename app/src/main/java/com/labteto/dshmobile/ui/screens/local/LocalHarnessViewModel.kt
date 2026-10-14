@@ -54,6 +54,8 @@ class LocalHarnessViewModel @Inject constructor(
     val personaTransferUiPort: com.labteto.dshmobile.uicontract.PersonaTransferUiPort,
     val personaStoryUiPort: com.labteto.dshmobile.uicontract.PersonaStoryUiPort,
     val personaGalleryDeletionUiPort: com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort,
+    val personaGallerySaveUiPort: com.labteto.dshmobile.uicontract.PersonaGallerySaveUiPort,
+    val personaPortraitUiPort: com.labteto.dshmobile.uicontract.PersonaPortraitUiPort,
     private val uiPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val chatUi: LocalChatUiFacade,
     private val businessSessions: com.labteto.dshmobile.uicontract.SessionUiPort,
@@ -127,6 +129,8 @@ class LocalHarnessViewModel @Inject constructor(
         galleryPort = personaGalleryUiPort,
         selectionPort = personaSelectionUiPort,
         transferPort = personaTransferUiPort,
+        savePort = personaGallerySaveUiPort,
+        portraitPort = personaPortraitUiPort,
         appContext = appContext,
         scope = viewModelScope,
     )
@@ -189,8 +193,9 @@ class LocalHarnessViewModel @Inject constructor(
         existingId: String? = null,
         existingStoryId: String? = null,
         forceNewStory: Boolean = false,
+        expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?,
     ): Result<PersonaGalleryEntry> =
-        personaGalleryController.saveCurrentToGallery(notes, existingId, existingStoryId, forceNewStory)
+        personaGalleryController.saveCurrentToGallery(notes, existingId, existingStoryId, forceNewStory, expected)
     fun hasUnsavedCurrentPersona(): Boolean = personaGalleryController.hasUnsavedCurrentPersona()
     fun currentGalleryNeedsUpdate(): Boolean = personaGalleryController.currentGalleryNeedsUpdate()
     fun currentGalleryHasUnsavedChanges(): Boolean = personaGalleryController.currentGalleryHasUnsavedChanges()

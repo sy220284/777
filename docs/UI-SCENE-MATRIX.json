@@ -785,8 +785,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "save": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "PersonaGallerySaveUiPort.save(SavePersonaGalleryCommand)",
+          "receiptType": "UiPersonaGallerySaveReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -944,14 +944,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "import_portrait": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "PersonaPortraitUiPort.submit(PersonaPortraitUiCommand.Import)",
+          "receiptType": "UiPersonaPortraitReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "remove_portrait": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "PersonaPortraitUiPort.submit(PersonaPortraitUiCommand.Remove)",
+          "receiptType": "UiPersonaPortraitReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }

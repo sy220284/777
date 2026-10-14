@@ -41,6 +41,14 @@ import javax.inject.Singleton
 internal object LocalFeatureExecutionPortModule {
     @Provides
     @Singleton
+    fun providePersonaPortraitUiPort(owner: com.labteto.dshmobile.local.chat.LocalPersonaPortraitOwner):
+        com.labteto.dshmobile.uicontract.PersonaPortraitUiPort = owner
+    @Provides
+    @Singleton
+    fun providePersonaGallerySaveUiPort(runtime: com.labteto.dshmobile.local.chat.LocalChatRuntime):
+        com.labteto.dshmobile.uicontract.PersonaGallerySaveUiPort = runtime
+    @Provides
+    @Singleton
     fun providePersonaGalleryDeletionUiPort(runtime: com.labteto.dshmobile.local.chat.LocalChatRuntime):
         com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort = runtime
     @Provides

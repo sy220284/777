@@ -105,6 +105,8 @@ object NextConversationUiPack : ConversationUiPack {
         personaTransfer: com.labteto.dshmobile.uicontract.PersonaTransferUiPort?,
         stories: com.labteto.dshmobile.uicontract.PersonaStoryUiPort?,
         galleryDeletion: com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort?,
+        gallerySave: com.labteto.dshmobile.uicontract.PersonaGallerySaveUiPort?,
+        portraits: com.labteto.dshmobile.uicontract.PersonaPortraitUiPort?,
     ) {
         val policySnapshot = policy?.snapshots?.collectAsStateWithLifecycle(initialValue = policy.snapshot())?.value
         val sessionSnapshot = sessions?.snapshots?.collectAsStateWithLifecycle(initialValue = sessions.snapshot())?.value
@@ -508,7 +510,7 @@ object NextConversationUiPack : ConversationUiPack {
                     if (!workMode && identity != null && groups != null) {
                         NextChatGroupManager(groups, identity, ::show)
                     }
-                    if (!workMode && gallery != null) NextPersonaGalleryPanel(gallery, personas, personaTransfer, stories, galleryDeletion)
+                    if (!workMode && gallery != null) NextPersonaGalleryPanel(gallery, personas, personaTransfer, stories, galleryDeletion, gallerySave, portraits)
                     if (sessions != null && sessionSnapshot != null) {
                         TextButton(onClick = { sessionChooser = true }) { Text(stringResource(R.string.next_sessions)) }
                         TextButton(onClick = { show(sessions.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.SelectMode(com.labteto.dshmobile.local.LocalUsageMode.CHAT))) }) {

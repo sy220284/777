@@ -1,9 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import android.content.Context
-import android.graphics.BitmapFactory
 import android.net.Uri
-import android.webkit.MimeTypeMap
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.ChatCharacterState
@@ -21,7 +19,6 @@ import com.labteto.dshmobile.local.presentation.samePersonaIdentity
 import com.labteto.dshmobile.local.presentation.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.presentation.LocalChatUiFacade
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
-import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +33,8 @@ internal class LocalPersonaGalleryUiController(
     private val chatUi: LocalChatUiFacade,
     private val galleryPort: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort,
     private val selectionPort: com.labteto.dshmobile.uicontract.PersonaSelectionUiPort,
+    private val savePort: com.labteto.dshmobile.uicontract.PersonaGallerySaveUiPort,
+    private val portraitPort: com.labteto.dshmobile.uicontract.PersonaPortraitUiPort,
     private val transferPort: com.labteto.dshmobile.uicontract.PersonaTransferUiPort,
     private val appContext: Context,
     private val scope: CoroutineScope,
@@ -60,44 +59,22 @@ suspend fun saveCurrentToGallery(
     existingId: String? = null,
     existingStoryId: String? = null,
     forceNewStory: Boolean = false,
-): Result<PersonaGalleryEntry> = runCatching {
-    val snapshot = state.value
-    check(
-        !snapshot.loading &&
-            !snapshot.kernel.running &&
-            snapshot.usageMode == LocalUsageMode.CHAT &&
-            !snapshot.chat.groupChat.enabled
-    ) {
-        "请在单人聊天空闲时保存人设与故事"
-    }
-    val completeHistory = withContext(Dispatchers.IO) {
-        runtime.session.completeTranscriptForUi(snapshot.sessionId)
-    }
-    val archiveHistory = if (
-        snapshot.chat.galleryStoryId == null &&
-        snapshot.chat.gallerySaveSuppressedThrough > 0L
-    ) {
-        completeHistory.filter { message ->
-            message.createdAt > snapshot.chat.gallerySaveSuppressedThrough
+    expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?,
+): Result<PersonaGalleryEntry> = runSuspendResult {
+    val identity = expected ?: error("会话尚未就绪")
+    when (val result = savePort.save(com.labteto.dshmobile.uicontract.SavePersonaGalleryCommand(identity, notes, existingId, existingStoryId, forceNewStory))) {
+        is com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt.Saved -> {
+            if (result.sessionSync == com.labteto.dshmobile.uicontract.UiStorySessionSync.DEFERRED) {
+                withContext(Dispatchers.Main.immediate) {
+                    android.widget.Toast.makeText(appContext, R.string.local_gallery_story_saved_sync_pending, android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+            refresh()
+            gallery.value.firstOrNull { it.id == result.galleryId } ?: error("图库已保存，但条目已变化，请刷新确认")
         }
-    } else {
-        completeHistory
+        com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt.Rejected -> error("请在原单人聊天空闲时保存；会话可能已变化")
+        is com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt.Failed -> error(result.message ?: "图库保存未完成，请刷新确认状态")
     }
-    val outcome = withContext(Dispatchers.IO) {
-        chatUi.saveGallery(
-            persona = snapshot.chat.chatPersona,
-            sourceSessionId = snapshot.sessionId,
-            history = archiveHistory,
-            chatState = snapshot.chat.chatState.withoutLegacyConversationContext(),
-            notes = notes,
-            chatContext = snapshot.chat.chatContext,
-            existingId = existingId ?: snapshot.chat.galleryId,
-            existingStoryId = existingStoryId ?: snapshot.chat.galleryStoryId,
-            forceNewStory = forceNewStory,
-        ).also { _gallery.value = chatUi.galleryEntries() }
-    }
-    runtime.chat.bindChatGallery(outcome.entry.id, outcome.storyId)
-    outcome.entry
 }
 
 fun hasUnsavedCurrentPersona(): Boolean {
@@ -236,71 +213,23 @@ suspend fun applyGallerySuggestions(
     updated
 }
 
-suspend fun setGalleryPortrait(id: String, uri: Uri): Result<PersonaGalleryEntry> = runCatching {
-    val previous = gallery.value.firstOrNull { it.id == id }
-        ?: error("图集条目已不存在")
-    val updated = withContext(Dispatchers.IO) {
-        val resolver = appContext.contentResolver
-        val mimeType = resolver.getType(uri).orEmpty()
-        require(mimeType.startsWith("image/")) { "请选择图片文件" }
-        val extension = MimeTypeMap.getSingleton()
-            .getExtensionFromMimeType(mimeType)
-            ?.lowercase()
-            ?.takeIf { it in setOf("jpg", "jpeg", "png", "webp", "heic", "heif") }
-            ?: "jpg"
-        val portraitDir = File(appContext.filesDir, "local-harness/chat/persona-portraits").apply {
-            check(exists() || mkdirs()) { appContext.getString(R.string.persona_gallery_portrait_dir_failed) }
-        }
-        val safeId = id.replace(Regex("""[^A-Za-z0-9._-]"""), "_").take(80)
-        val target = File(portraitDir, "$safeId-${System.currentTimeMillis()}.$extension")
-        try {
-            resolver.openInputStream(uri)?.use { input ->
-                target.outputStream().buffered().use { output ->
-                    val buffer = ByteArray(16 * 1024)
-                    var total = 0L
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        total += count
-                        require(total <= MAX_PERSONA_PORTRAIT_BYTES) { "人物形象图过大，请选择 20MB 以内的图片" }
-                        output.write(buffer, 0, count)
-                    }
-                }
-            } ?: error("无法读取人物形象图")
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeFile(target.absolutePath, bounds)
-            require(bounds.outWidth > 0 && bounds.outHeight > 0) { "人物形象图无法识别" }
-            val saved = chatUi.updateGalleryPortrait(id, target.absolutePath)
-                ?: error("图集条目已不存在")
-            deleteManagedPortrait(previous.portraitPath, keepPath = target.absolutePath)
-            saved
-        } catch (error: Throwable) {
-            target.delete()
-            throw error
-        }
-    }
-    _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
-    updated
-}
+suspend fun setGalleryPortrait(id: String, uri: Uri): Result<PersonaGalleryEntry> =
+    updatePortrait(com.labteto.dshmobile.uicontract.PersonaPortraitUiCommand.Import(id, uri.toString()))
 
-suspend fun removeGalleryPortrait(id: String): Result<PersonaGalleryEntry> = runCatching {
-    val previous = gallery.value.firstOrNull { it.id == id }
-        ?: error("图集条目已不存在")
-    val updated = withContext(Dispatchers.IO) {
-        chatUi.updateGalleryPortrait(id, "")
-            ?: error("图集条目已不存在")
-    }
-    deleteManagedPortrait(previous.portraitPath)
-    _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
-    updated
-}
+suspend fun removeGalleryPortrait(id: String): Result<PersonaGalleryEntry> =
+    updatePortrait(com.labteto.dshmobile.uicontract.PersonaPortraitUiCommand.Remove(id))
 
-private fun deleteManagedPortrait(path: String, keepPath: String? = null) {
-    if (path.isBlank() || path == keepPath) return
-    runCatching {
-        val root = File(appContext.filesDir, "local-harness/chat/persona-portraits").canonicalFile
-        val candidate = File(path).canonicalFile
-        if (candidate.path.startsWith(root.path + File.separator)) candidate.delete()
+private suspend fun updatePortrait(command: com.labteto.dshmobile.uicontract.PersonaPortraitUiCommand): Result<PersonaGalleryEntry> = runSuspendResult {
+    when (val result = portraitPort.submit(command)) {
+        is com.labteto.dshmobile.uicontract.UiPersonaPortraitReceipt.Updated -> {
+            result.cleanupWarning?.let { warning -> withContext(Dispatchers.Main.immediate) {
+                android.widget.Toast.makeText(appContext, warning, android.widget.Toast.LENGTH_LONG).show()
+            } }
+            refresh()
+            gallery.value.firstOrNull { it.id == result.galleryId } ?: error("立绘已更新，但条目已变化，请刷新确认")
+        }
+        com.labteto.dshmobile.uicontract.UiPersonaPortraitReceipt.Missing -> error("图库人物已不存在")
+        is com.labteto.dshmobile.uicontract.UiPersonaPortraitReceipt.Failed -> error(result.message ?: "立绘更新未完成，请刷新确认")
     }
 }
 

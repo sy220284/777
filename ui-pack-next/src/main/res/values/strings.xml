@@ -178,4 +178,11 @@
     <string name="next_gallery_delete_character">删除人物</string>
     <string name="next_gallery_delete_character_effect">删除此人物、所有故事和归档；清理由应用管理且未被其他人物引用的立绘。操作完成后可能需要重新打开会话同步成员与人物绑定。</string>
     <string name="next_gallery_confirm_delete_character">确认删除此人物及故事</string>
+    <string name="next_gallery_archive_saved">当前会话已保存到图库</string>
+    <string name="next_gallery_save_current">保存当前会话</string>
+    <string name="next_gallery_save_new_story">作为新故事归档</string>
+    <string name="next_gallery_portrait_updated">人物立绘已更新</string>
+    <string name="next_gallery_import_portrait">导入所选人物立绘</string>
+    <string name="next_gallery_remove_portrait">移除所选人物立绘</string>
+    <string name="next_gallery_confirm_remove_portrait">确认移除立绘</string>
 </resources>

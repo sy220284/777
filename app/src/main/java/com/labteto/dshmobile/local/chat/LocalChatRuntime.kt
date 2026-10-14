@@ -12,6 +12,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.uiBindingIdentity
 import com.labteto.dshmobile.uicontract.*
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
 /** Chat/persona capability boundary for the local UI. */
@@ -29,7 +30,53 @@ class LocalChatRuntime @Inject internal constructor(
     private val groupMembership: LocalGroupChatMembershipCoordinator,
     private val replySuggestions: LocalReplySuggestionCoordinator,
     private val gallery: ChatPersonaGalleryStore,
-) : PersonaSelectionUiPort, PersonaStoryUiPort, PersonaGalleryDeletionUiPort {
+) : PersonaSelectionUiPort, PersonaStoryUiPort, PersonaGalleryDeletionUiPort, PersonaGallerySaveUiPort {
+    override suspend fun save(command: SavePersonaGalleryCommand): UiPersonaGallerySaveReceipt =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val before = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+                val current = runtimeStateStore.state.value
+                if (runtimeStateStore.sessionTransitioning || current.loading || current.kernel.running ||
+                    current.usageMode != LocalUsageMode.CHAT || current.chat.groupChat.enabled ||
+                    runtimeStateStore.uiBindingIdentity(current) != command.identity) null else chatState.value
+            } ?: return@withContext UiPersonaGallerySaveReceipt.Rejected
+            val lease = com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry.tryAcquire(before.sessionId,
+                com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind.MAINTENANCE)
+                ?: return@withContext UiPersonaGallerySaveReceipt.Rejected
+            fun sameArchiveSource(): Boolean {
+                val latest = chatState.value
+                return !latest.loading && !latest.kernel.running && latest.usageMode == LocalUsageMode.CHAT && !latest.chat.groupChat.enabled &&
+                    !runtimeStateStore.sessionTransitioning && runtimeStateStore.uiBindingIdentity(runtimeStateStore.state.value) == command.identity &&
+                    latest.chat.chatPersona == before.chat.chatPersona && latest.chat.chatState == before.chat.chatState &&
+                    latest.chat.chatContext == before.chat.chatContext && latest.chat.galleryId == before.chat.galleryId &&
+                    latest.chat.galleryStoryId == before.chat.galleryStoryId && latest.chat.gallerySaveSuppressedThrough == before.chat.gallerySaveSuppressedThrough &&
+                    latest.transcriptIndex.latestDialogueMessageId == before.transcriptIndex.latestDialogueMessageId
+            }
+            try {
+                val history = sessionRuntime.completeTranscriptForUi(before.sessionId)
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                val stillCurrent = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+                    sameArchiveSource()
+                }
+                if (!stillCurrent) return@withContext UiPersonaGallerySaveReceipt.Rejected
+                val archived = if (before.chat.galleryStoryId == null && before.chat.gallerySaveSuppressedThrough > 0L)
+                    history.filter { it.createdAt > before.chat.gallerySaveSuppressedThrough } else history
+                val outcome = gallery.save(before.chat.chatPersona, before.sessionId, archived,
+                    before.chat.chatState.withoutLegacyConversationContext(), command.notes, before.chat.chatContext,
+                    command.existingId ?: before.chat.galleryId, command.existingStoryId ?: before.chat.galleryStoryId, command.forceNewStory)
+                val applied = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+                    // Binding has its own authoritative maintenance admission. Release our IO
+                    // lease under the same foreground lock; another owner may still reject binding.
+                    lease.close()
+                    if (!sameArchiveSource()) false
+                    else personaCoordinator.bindGallery(outcome.entry.id, outcome.storyId)
+                }
+                UiPersonaGallerySaveReceipt.Saved(outcome.entry.id, outcome.storyId,
+                    if (applied) UiStorySessionSync.APPLIED else UiStorySessionSync.DEFERRED)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { UiPersonaGallerySaveReceipt.Failed(failure.message) }
+            finally { lease.close() }
+        }
+
     override suspend fun delete(command: DeletePersonaGalleryCommand): UiPersonaGalleryDeletionReceipt =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
@@ -101,7 +148,7 @@ class LocalChatRuntime @Inject internal constructor(
                 current.chat.groupChat.enabled -> "当前是群聊；可以开始新的单人故事"
                 current.transcriptIndex.hasDialogue -> "已有对话不能替换人物；可以开始新的故事"
                 else -> null
-            })
+            }, canSaveCurrent = ready && !current.chat.groupChat.enabled)
     }
 
     override fun submit(command: PersonaSelectionUiCommand): UiCommandReceipt = try {
@@ -126,8 +173,6 @@ class LocalChatRuntime @Inject internal constructor(
     catch (failure: Exception) { UiCommandReceipt.Failed(failure.message ?: "人物操作未完成，请刷新确认状态") }
 
     internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = behaviorTuning.configure(profile)
-    internal fun bindChatGallery(galleryId: String, galleryStoryId: String?) =
-        personaCoordinator.bindGallery(galleryId, galleryStoryId)
     internal suspend fun syncDefaultChatPersona(profile: PersonaProfile): PersonaProfile =
         personaCoordinator.syncDefault(profile)
     internal fun createGroupChatSession(entries: List<PersonaGalleryEntry>): Boolean {

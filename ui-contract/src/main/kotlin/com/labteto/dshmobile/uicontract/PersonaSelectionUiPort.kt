@@ -7,6 +7,7 @@ data class UiPersonaSelectionSnapshot(
     val canSelectForCurrentChat: Boolean,
     val canStartStory: Boolean,
     val unavailableReason: String?,
+    val canSaveCurrent: Boolean = false,
 )
 
 sealed interface PersonaSelectionUiCommand {

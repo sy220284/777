@@ -1,4 +1,5 @@
 package com.labteto.dshmobile.ui.screens.local
+import com.labteto.dshmobile.local.chat.MAX_PERSONA_PORTRAIT_BYTES
 
 import android.content.Context
 import android.graphics.BitmapFactory
