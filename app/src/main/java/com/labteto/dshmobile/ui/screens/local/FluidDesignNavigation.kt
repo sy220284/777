@@ -127,6 +127,9 @@ internal fun FluidSectionSwap(
 ) {
     val offset = with(LocalDensity.current) { SyMetric.navigationPeerOffset.roundToPx() }
     val reduceMotion = LocalSyReducedMotion.current
+    val tempo = LocalSyMotionTempo.current
+    val slideSpec = tween<IntOffset>(SyMotion.duration(SyMotion.pagePeerMs, reduceMotion, tempo),
+        easing = SyMotion.ease)
     val host: @Composable (Modifier, SharedTransitionScope?) -> Unit = { surfaceModifier, sharedScope ->
         AnimatedContent(targetState = section, modifier = surfaceModifier, label = "fluidSectionSwap",
             transitionSpec = {
@@ -134,8 +137,8 @@ internal fun FluidSectionSwap(
                     fadeIn(tween(0)).togetherWith(fadeOut(tween(0)))
                 } else {
                     val direction = if (targetState > initialState) 1 else -1
-                    (slideInHorizontally(DsAnimations.featurePagePeer) { direction * offset } + fadeIn(tween(SyMotion.duration(SyMotion.pagePeerMs, reduced, tempo))))
-                        .togetherWith(slideOutHorizontally(DsAnimations.featurePagePeer) { -direction * offset } + fadeOut(tween(SyMotion.duration(SyMotion.pagePeerMs, reduced, tempo))))
+                    (slideInHorizontally(slideSpec) { direction * offset } + fadeIn(tween(SyMotion.duration(SyMotion.pagePeerMs, reduced, tempo))))
+                        .togetherWith(slideOutHorizontally(slideSpec) { -direction * offset } + fadeOut(tween(SyMotion.duration(SyMotion.pagePeerMs, reduced, tempo))))
                 }
             },
         ) { selectedSection ->
@@ -168,7 +171,9 @@ private val LocalFluidSectionVisibilityScope =
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 internal fun Modifier.localWorkCompletionSharedBounds(key: String?): Modifier {
-    if (key == null || LocalSyReducedMotion.current) return this
+    val reduced = LocalSyReducedMotion.current
+    val tempo = LocalSyMotionTempo.current
+    if (key == null || reduced) return this
     val shared = LocalFluidSectionSharedScope.current ?: return this
     val visibility = LocalFluidSectionVisibilityScope.current ?: return this
     return with(shared) {

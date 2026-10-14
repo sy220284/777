@@ -40,4 +40,20 @@ class ShenyanGlobalVisualContractTest {
         }
         assertTrue(SyMotion.hapticIntervalMs > 0)
     }
+
+    @Test fun advancedAppearanceDefaultsDoNotShiftTheDesign() {
+        val defaults = com.labteto.dshmobile.connection.AppSettings()
+        assertEquals(.5f, defaults.ambientGlow, .0001f)
+        assertEquals(.5f, defaults.componentEmphasis, .0001f)
+        assertEquals(.5f, defaults.wallpaperSurfaceTransparency, .0001f)
+        assertEquals(1f, defaults.motionDurationScale, .0001f)
+        assertTrue(defaults.backgroundAdaptiveContrast)
+    }
+
+    @Test fun unifiedMotionTempoNeverOverridesReducedMotion() {
+        assertEquals(140, SyMotion.duration(200, false, .7f))
+        assertEquals(200, SyMotion.duration(200, false, 1f))
+        assertEquals(260, SyMotion.duration(200, false, 1.3f))
+        assertEquals(0, SyMotion.duration(200, true, 1.3f))
+    }
 }

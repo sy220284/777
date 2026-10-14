@@ -129,7 +129,10 @@ internal fun localArtifactTransitionKey(workspace: String, file: String): String
 internal fun Modifier.localArtifactSharedBounds(workspace: String, file: String): Modifier {
     val scope = LocalFeatureSharedTransitionScope.current ?: return this
     val visibility = LocalFeatureVisibilityScope.current ?: return this
-    if (LocalSyReducedMotion.current || file.isBlank()) return this
+    val motion = com.shenyan.designsystem.foundation.SyMotion
+    val reduced = LocalSyReducedMotion.current
+    val tempo = com.shenyan.designsystem.foundation.LocalSyMotionTempo.current
+    if (reduced || file.isBlank()) return this
     return with(scope) {
         this@localArtifactSharedBounds.sharedBounds(
             sharedContentState = rememberSharedContentState(localArtifactTransitionKey(workspace, file)),

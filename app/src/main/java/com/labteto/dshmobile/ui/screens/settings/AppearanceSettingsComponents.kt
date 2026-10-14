@@ -150,6 +150,7 @@ internal fun AppearanceAdvancedControls(
         style = DsType.std14Strong.withReadingWeight(), color = colors.text)
     AppearanceAdvancedSlider(
         stringResource(R.string.settings_advanced_ambient), settings.ambientGlow, 0f..1f, onAmbientChange,
+        enabled = settings.backgroundImagePath == null,
     )
     ToggleRow(
         stringResource(R.string.settings_background_adaptive_contrast),
@@ -188,6 +189,7 @@ private fun AppearanceAdvancedSlider(
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     onChange: (Float) -> Unit,
+    enabled: Boolean = true,
 ) {
     val colors = LocalSyColors.current
     Row(
@@ -202,6 +204,7 @@ private fun AppearanceAdvancedSlider(
     SySlider(
         value = value, onValueChange = onChange,
         valueRange = range, steps = 5, hapticSegments = 6,
+        enabled = enabled,
         modifier = Modifier.fillMaxWidth(),
     )
 }
