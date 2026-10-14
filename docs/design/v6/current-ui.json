@@ -168,12 +168,29 @@
       "Projects",
       "RunCenter"
     ],
-    "policy": "Retain legacy Kotlin path declarations but exclude the two retired entry icons from active design packaging."
+    "policy": "Retain legacy Kotlin path declarations but exclude the two retired entry icons from active design packaging.",
+    "actionCount": 61,
+    "fileThemeVariants": 20,
+    "miscDrawableCount": 11,
+    "totalDesignVectors": 128,
+    "preservedSpecialResources": [
+      "ic_notification_butterfly.xml",
+      "splash_icon_transparent.xml",
+      "adaptive launcher icon",
+      "portrait bitmap"
+    ],
+    "auditScript": "docs/design/v6/audit-all-icons.py",
+    "currentEntryCount": 24,
+    "legacyRedrawnCount": 12,
+    "specialCasePolicy": "Notification butterfly, launcher, portrait, and transparent splash are separately validated identity/system assets"
   },
   "mergedUIFixes": [
     711
   ],
   "mergedRelevantPRs": [
     711
-  ]
+  ],
+  "designVersion": "V6.3",
+  "deliveryVersion": "6.3.0",
+  "designStatus": "candidate / PR #715 pending merge"
 }

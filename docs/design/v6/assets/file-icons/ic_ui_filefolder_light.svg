@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+<title>文件夹 · light</title>
+<path d="M10,1H29L37,9V32C37,35.9 33.9,39 30,39H10C6.1,39 3,35.9 3,32V8C3,4.1 6.1,1 10,1Z" fill="#FAF7F2" stroke="#B8AB9B" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M29,1V6C29,7.7 30.3,9 32,9H37" fill="none" stroke="#B8AB9B" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M10 19 V15 H17 L19 17 H29 V27 Q29 29 27 29 H12 Q10 29 10 27 Z" fill="none" stroke="#A06E3A" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

@@ -17,9 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -189,6 +191,25 @@ fun SyConfirmDialog(title: String, body: String, dangerous: Boolean, onConfirm: 
         shape = RoundedCornerShape(SyMetric.radiusSheet))
 }
 
+/** Search glyph is generated with the same 24dp, 1.75 outline as V6.3 actions. */
+private val SyV6SearchIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "SyV6.Search", defaultWidth = 24.dp, defaultHeight = 24.dp,
+        viewportWidth = 24f, viewportHeight = 24f,
+    ).apply {
+        for (data in listOf(
+            "M10.7 4.4 A6.4 6.4 0 1 0 10.7 17.2 A6.4 6.4 0 1 0 10.7 4.4",
+            "M15.5 15.5 L20.5 20.5",
+        )) {
+            addPath(
+                pathData = PathParser().parsePathString(data).toNodes(),
+                stroke = SolidColor(Color.Black), strokeLineWidth = 1.75f,
+                strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round,
+            )
+        }
+    }.build()
+}
+
 @Composable
 fun SySearchBar(
     query: String,
@@ -197,7 +218,7 @@ fun SySearchBar(
     modifier: Modifier = Modifier,
     placeholder: String = "",
     shortcut: String? = null,
-    searchIcon: ImageVector = Icons.Outlined.Search,
+    searchIcon: ImageVector = SyV6SearchIcon,
 ) {
     val colors = LocalSyColors.current
     SyTextField(

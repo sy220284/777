@@ -186,6 +186,22 @@ jobs:
         run: |
           value="$(tr -d '\r\n' < .github/release-version)"
           [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$ ]]
+      - name: Build V6.3 versioned design source package
+        if: ${{ hashFiles('docs/design/v6/V6.3-DELIVERY.zh-CN.md') != '' }}
+        run: |
+          python3 docs/design/v6/build-standalone.py --check
+          python3 docs/design/v6/audit-all-icons.py
+          python3 docs/design/v6/sync-design-package.py \
+            --source docs/design/v6 \
+            --output "$RUNNER_TEMP/shenyan-v6.3-design-source.zip"
+      - name: Upload V6.3 complete editable design sources
+        if: ${{ hashFiles('docs/design/v6/V6.3-DELIVERY.zh-CN.md') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: shenyan-v6.3-design-${{ github.sha }}
+          path: ${{ runner.temp }}/shenyan-v6.3-design-source.zip
+          if-no-files-found: error
+          retention-days: 30
 
   # Architecture validation is independent of the static lane; both start after scope.
   architecture-3-gates:

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
 <title>视频文件 · dark</title>
-<path d="M10,1H29L37,9V32C37,35.9 33.9,39 30,39H10C6.1,39 3,35.9 3,32V8C3,4.1 6.1,1 10,1Z" fill="#35312D" stroke="#6A6156" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M29,1V6C29,7.7 30.3,9 32,9H37" fill="none" stroke="#6A6156" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M13,15H26A2,2 0 0,1 28,17V29A2,2 0 0,1 26,31H13A2,2 0 0,1 11,29V17A2,2 0 0,1 13,15Z M18,19L23,23L18,27Z" fill="none" stroke="#F0B891" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M10,1H29L37,9V32C37,35.9 33.9,39 30,39H10C6.1,39 3,35.9 3,32V8C3,4.1 6.1,1 10,1Z" fill="#35312D" stroke="#6A6156" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M29,1V6C29,7.7 30.3,9 32,9H37" fill="none" stroke="#6A6156" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M13,15H26A2,2 0 0,1 28,17V29A2,2 0 0,1 26,31H13A2,2 0 0,1 11,29V17A2,2 0 0,1 13,15Z M18,19L23,23L18,27Z" fill="none" stroke="#F0B891" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
 </svg>

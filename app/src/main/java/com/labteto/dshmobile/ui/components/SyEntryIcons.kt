@@ -8,172 +8,122 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.dp
 
-/**
- * 神言 V6「暖纸墨线」原创语义入口图标。
- * 24dp / 24-unit grid, rounded 1.75-unit outline, theme tint applied by caller.
- * Purpose-built for 18–22dp glyphs in 40dp icon plates, not a Feather alias or recolor.
- * Canonical editable paths are mirrored in docs/design/v6/sy-entry-icons.svg.
- *
- * Only use for FUNCTION DESTINATIONS; standard navigation/utility controls keep
- * their existing affordance icons, so visual hierarchy remains legible.
- */
+/** V6.2 unified optical glyphs: 24dp, stroke 1.75, round caps and theme tint applied by caller. */
 internal object SyEntryIcons {
-    /** 人物. */
     val Persona: ImageVector by lazy { entryGlyph("Persona",
-        "M12 10.4 C9.7 10.4 8.3 8.9 8.3 6.8 C8.3 4.8 9.8 3.3 12 3.3 C14.2 3.3 15.7 4.8 15.7 6.8 C15.7 8.9 14.3 10.4 12 10.4",
-        "M5 20.2 C5.6 16.2 8.1 13.8 12 13.8 C15.9 13.8 18.4 16.2 19 20.2 M9.4 14.4 L12 16.4 L14.6 14.4",
-        "M17.7 5 L19.2 4.2 L20 5.7") }
-
-    /** 新对话. */
+        "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8",
+        "M5 20v-1.2A5.8 5.8 0 0 1 10.8 13h2.4A5.8 5.8 0 0 1 19 18.8V20") }
     val NewSession: ImageVector by lazy { entryGlyph("NewSession",
-        "M5.3 5.8 C5.3 4.6 6.2 3.7 7.4 3.7 H17 C18.5 3.7 19.4 4.7 19.4 6.2 V14.2 C19.4 15.6 18.4 16.6 17 16.6 H10.2 L6.1 20.2 V16.1 C5.6 15.6 5.3 15 5.3 14.2 Z",
-        "M12.4 7.6 V13.4 M9.5 10.5 H15.3") }
-
-    /** 项目. */
-    val Projects: ImageVector by lazy { entryGlyph("Projects",
-        "M3.8 8.1 V6.5 C3.8 5.6 4.5 5 5.4 5 H9.2 L11 7 H18.6 C19.5 7 20.2 7.7 20.2 8.7 V17.9 C20.2 19 19.4 19.8 18.3 19.8 H5.7 C4.6 19.8 3.8 19 3.8 17.9 Z",
-        "M8 13.5 L12 10.5 L16 13.5 L12 16.6 Z") }
-
-    /** 任务. */
+        "M20 11.5a7.7 7.7 0 0 1-8.5 7.8 8 8 0 0 1-3.8-1.2L4 20l1-4.2A8 8 0 1 1 20 11.5",
+        "M12 7.5v7",
+        "M8.5 11h7") }
     val Tasks: ImageVector by lazy { entryGlyph("Tasks",
-        "M7 3.7 H15.4 L19 7.4 V19.2 C19 20.1 18.3 20.6 17.5 20.6 H7 C6 20.6 5.4 20 5.4 19.1 V5.3 C5.4 4.4 6 3.7 7 3.7 Z M15.2 3.9 V7.6 H18.8",
-        "M8.4 12.2 L10.3 14.1 L14.4 10.1 M8.4 17.5 H15.6") }
-
-    /** 设置. */
+        "M8 4.8h8a3 3 0 0 1 3 3v11.4a1.8 1.8 0 0 1-1.8 1.8H6.8A1.8 1.8 0 0 1 5 19.2V7.8a3 3 0 0 1 3-3Z",
+        "M9 4.8V3.7h6v1.1",
+        "m8.5 13.3 2.4 2.4 4.7-5") }
     val Settings: ImageVector by lazy { entryGlyph("Settings",
-        "M12 3.4 L13.8 5.9 L16.8 5.2 L17.4 8.1 L20.2 9.4 L18.7 12 L20.2 14.6 L17.4 15.9 L16.8 18.8 L13.8 18.1 L12 20.6 L10.2 18.1 L7.2 18.8 L6.6 15.9 L3.8 14.6 L5.3 12 L3.8 9.4 L6.6 8.1 L7.2 5.2 L10.2 5.9 Z",
-        "M12 15.1 C13.7 15.1 15.1 13.7 15.1 12 S13.7 8.9 12 8.9 S8.9 10.3 8.9 12 S10.3 15.1 12 15.1 Z") }
-
-    /** 搜索. */
+        "M10 3.4h4l.8 2.2 1.9.8 2.1-.8 2.6 2.6-.8 2.1.8 1.9 2.2.8v3.8l-2.2.8-.8 1.9.8 2.1-2.6 2.6-2.1-.8-1.9.8-.8 2.2h-4l-.8-2.2-1.9-.8-2.1.8-2.6-2.6.8-2.1-.8-1.9-2.2-.8v-3.8l2.2-.8.8-1.9-.8-2.1L7.4 5.8l2.1.8 1.9-.8Z",
+        "M12 15.1a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2Z") }
     val Search: ImageVector by lazy { entryGlyph("Search",
-        "M10.7 4.3 C14.5 4.3 17.2 7 17.2 10.8 S14.5 17.3 10.7 17.3 S4.2 14.6 4.2 10.8 S6.9 4.3 10.7 4.3 Z",
-        "M15.9 16.1 L20.7 20.7 M9.1 7.8 L11.6 7.8") }
-
-    /** 人物画廊. */
+        "M10.6 17.3a6.7 6.7 0 1 0 0-13.4 6.7 6.7 0 0 0 0 13.4Z",
+        "m15.5 15.5 5 5") }
     val Gallery: ImageVector by lazy { entryGlyph("Gallery",
-        "M5 8.8 V18.3 C5 19.3 5.7 20 6.8 20 H17.8 C18.8 20 19.5 19.3 19.5 18.3 V8.8 C19.5 7.8 18.8 7.1 17.8 7.1 H6.8 C5.7 7.1 5 7.8 5 8.8 Z",
-        "M7.9 7.1 V5.5 C7.9 4.5 8.6 3.9 9.6 3.9 H19.3 C20.2 3.9 20.8 4.6 20.8 5.5 V15.2",
-        "M12.2 13.5 C13.8 13.5 14.7 12.4 14.7 11.1 C14.7 9.7 13.7 8.8 12.2 8.8 C10.7 8.8 9.7 9.7 9.7 11.1 C9.7 12.4 10.7 13.5 12.2 13.5 M8.6 18.1 C8.9 16.1 10.2 15 12.2 15 C14.2 15 15.6 16.1 15.8 18.1") }
-
-    /** 群聊. */
+        "M5 7h13.5A1.5 1.5 0 0 1 20 8.5v10A1.5 1.5 0 0 1 18.5 20h-13A1.5 1.5 0 0 1 4 18.5v-10A1.5 1.5 0 0 1 5.5 7Z",
+        "M8 7V5.5A1.5 1.5 0 0 1 9.5 4h10A1.5 1.5 0 0 1 21 5.5v10",
+        "M12 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z",
+        "M8 17a4 4 0 0 1 8 0") }
     val GroupChat: ImageVector by lazy { entryGlyph("GroupChat",
-        "M8.9 10.6 C10.7 10.6 11.9 9.3 11.9 7.6 C11.9 5.9 10.7 4.6 8.9 4.6 C7.1 4.6 5.9 5.9 5.9 7.6 C5.9 9.3 7.1 10.6 8.9 10.6",
-        "M3.6 18.5 C3.8 15.5 5.8 13.5 8.9 13.5 C11 13.5 12.5 14.3 13.4 15.9",
-        "M15.7 5.8 C17.5 6.1 18.4 7.4 18.2 9.2 C18.1 10.7 17.1 11.8 15.5 12.2 M15.7 14.5 C18.4 14.8 20 16.5 20.4 18.5 M16.8 19.2 L19 21 L21 19.2") }
-
-    /** 日记. */
+        "M9 11a3.3 3.3 0 1 0 0-6.6 3.3 3.3 0 0 0 0 6.6Z",
+        "M3.6 20v-1.5a5.4 5.4 0 0 1 10.8 0V20",
+        "M16 5.6a3 3 0 0 1 0 5.6",
+        "M16.8 14a4.8 4.8 0 0 1 3.6 4.6V20") }
     val Diary: ImageVector by lazy { entryGlyph("Diary",
-        "M6.4 4.2 H18.1 V19.6 H6.4 C5.3 19.6 4.7 18.9 4.7 18 V5.9 C4.7 4.9 5.3 4.2 6.4 4.2 Z M8.3 4.2 V19.6",
-        "M11.3 9 H15.8 M11.3 12.4 H16 M11.3 15.8 H14.6",
-        "M14.8 4.2 V7.2 L16.5 6.2 L18.1 7.2 V4.2") }
-
-    /** 工作区文件. */
+        "M7 3.8h10A2 2 0 0 1 19 5.8v13.4A1.8 1.8 0 0 1 17.2 21H7a2 2 0 0 1-2-2V5.8a2 2 0 0 1 2-2Z",
+        "M8 3.8v17",
+        "M11.5 9h4",
+        "M11.5 13h4") }
     val WorkspaceFiles: ImageVector by lazy { entryGlyph("WorkspaceFiles",
-        "M7.9 3.5 H15.1 L19.6 8 V18.8 C19.6 19.8 18.9 20.5 17.9 20.5 H7.9 C7 20.5 6.3 19.8 6.3 18.8 V5.2 C6.3 4.2 7 3.5 7.9 3.5 Z M15.1 3.5 V8 H19.6",
-        "M3.7 8 V19.8 C3.7 21 4.7 21.7 5.8 21.7 H15.5",
-        "M9.5 12.5 H16.2 M9.5 16 H14.3") }
-
-    /** 运行中心. */
-    val RunCenter: ImageVector by lazy { entryGlyph("RunCenter",
-        "M12 3.6 C16.7 3.6 20.4 7.3 20.4 12 S16.7 20.4 12 20.4 S3.6 16.7 3.6 12 S7.3 3.6 12 3.6 Z",
-        "M10.2 8.3 L16 12 L10.2 15.7 Z M6.6 12 H7.2 M16.9 5.9 L18 5.1") }
-
-    /** 工具. */
+        "M4 7.5A2 2 0 0 1 6 5.5h4l2 2H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z") }
     val Tools: ImageVector by lazy { entryGlyph("Tools",
-        "M6.3 4.5 L9.4 7.6 L7.4 9.6 L4.3 6.5 C3.1 9.7 5.3 12.3 8.5 11.7 L16.2 19.4 C17.2 20.4 18.8 20.4 19.7 19.4 C20.7 18.4 20.7 16.9 19.7 15.9 L12.1 8.3 C12.8 5.1 10 2.9 6.3 4.5 Z",
-        "M6 19.7 L8.9 16.8 M4.5 18.2 L7.5 21.2") }
-
-    /** 用量. */
+        "M14.5 5.8a4.4 4.4 0 0 0-5.2 5.6L4 16.7a2.1 2.1 0 0 0 3 3l5.3-5.3a4.4 4.4 0 0 0 5.6-5.2l-3 2.1-2.1-2.1Z") }
     val Usage: ImageVector by lazy { entryGlyph("Usage",
-        "M4.2 17.2 C4.2 12.8 7.6 9.4 12 9.4 C16.4 9.4 19.8 12.8 19.8 17.2",
-        "M12 17.2 L15.4 12.6 M7.2 17.2 V19.5 H16.8 V17.2",
-        "M6.2 6.5 L8.7 4.6 M12 6.1 V3.2 M17.8 6.5 L15.3 4.6") }
-
-    /** 沉浸阅读. */
+        "M5 19V12",
+        "M10 19V7",
+        "M15 19V10",
+        "M20 19V4",
+        "M3.5 20.5h18") }
     val Reader: ImageVector by lazy { entryGlyph("Reader",
-        "M12 6.2 C9.1 4.2 6.3 4.3 3.7 5.1 V18 C6.8 17.1 9.5 17.5 12 19.4 C14.5 17.5 17.2 17.1 20.3 18 V5.1 C17.7 4.3 14.9 4.2 12 6.2 Z M12 6.2 V19.4",
-        "M6.3 8.7 C7.4 8.5 8.5 8.7 9.6 9.2 M14.4 9.2 C15.5 8.7 16.6 8.5 17.7 8.7") }
-
-    /** 额度. */
+        "M12 6.5C9 4.8 6.8 4.7 4 5.5V19c3-.9 5.5-.6 8 1 2.5-1.6 5-1.9 8-1V5.5c-2.8-.8-5-.7-8 1Z",
+        "M12 6.5V20") }
     val Quota: ImageVector by lazy { entryGlyph("Quota",
-        "M5.2 6.6 H18.8 C19.8 6.6 20.4 7.3 20.4 8.3 V17 C20.4 18 19.8 18.7 18.8 18.7 H5.2 C4.2 18.7 3.6 18 3.6 17 V8.3 C3.6 7.3 4.2 6.6 5.2 6.6 Z",
-        "M3.7 10.3 H20.3 M7.1 15 H10.2 M16.4 13.5 L18 15.1 L16.4 16.7 L14.8 15.1 Z") }
-
-    /** 外观. */
+        "M4 8h16v11.5H4Z",
+        "M4 10.3h16",
+        "M7 15.2h4",
+        "M16.5 13.2l1.6 1.5-1.6 1.5-1.6-1.5Z") }
     val Appearance: ImageVector by lazy { entryGlyph("Appearance",
-        "M12 3.4 C17.2 3.4 20.6 6.9 20.6 11.5 C20.6 13.3 19.5 14.2 17.9 14.2 H15.9 C14.3 14.2 13.7 15 13.7 16.1 C13.7 17.5 12.9 20.6 10.5 20.6 C6.7 20.6 3.4 17 3.4 12 C3.4 7.2 7.2 3.4 12 3.4 Z",
-        "M8 9.1 L8.1 9.1 M12.2 6.8 L12.3 6.8 M16.5 9.7 L16.6 9.7 M7.9 14.9 L8 14.9") }
-
-    /** 记忆. */
+        "M12 3.3a8.7 8.7 0 1 0 0 17.4h1a2 2 0 0 0 1.7-2.8c-.7-1.6-.2-2.8 1.8-2.8h1A3.3 3.3 0 0 0 20.7 12 8.7 8.7 0 0 0 12 3.3Z",
+        "M7.7 10h.2",
+        "M11.5 6.9h.2",
+        "M16.6 10.2h.2",
+        "M8.5 15h.2") }
     val Memory: ImageVector by lazy { entryGlyph("Memory",
-        "M5.2 8.9 C5.2 6.4 7 4.8 9.2 5.2 C11.1 2.9 14 3.4 15.2 5.5 C18.3 5.3 20.2 7.4 19 10.1 C21.6 13 19.3 16.7 15.7 16.7 H8 C4.2 16.7 2.9 12.8 5.2 10.6 Z",
-        "M9.2 16.8 V19.7 H14.7 V16.8 M11.9 19.7 V21.3",
-        "M8.8 10.7 L11.6 12.8 L15.5 8.7") }
-
-    /** 会话存储. */
+        "M5.5 8c0-2.7 2.2-4.5 4.5-4.2a4.3 4.3 0 0 1 7.4 2.8A4.2 4.2 0 0 1 19 14c-.3 2.3-2.2 3.7-4.5 3.7H8.7A5.2 5.2 0 0 1 5.5 8Z",
+        "M8 17.8v2.1",
+        "M12 17.8V21",
+        "M16 17.8v2.1") }
     val SessionStorage: ImageVector by lazy { entryGlyph("SessionStorage",
-        "M4.3 5.2 H19.7 V11 H4.3 Z M5.1 12.8 H18.9 V19.5 H5.1 Z",
-        "M9.2 8.2 H14.8 M9.2 16 H14.8 M4.3 11 H19.7") }
-
-    /** 模型. */
+        "M4 5h16v6H4Z",
+        "M5 13h14v7H5Z",
+        "M9 8h6",
+        "M9 16.5h6") }
     val Models: ImageVector by lazy { entryGlyph("Models",
-        "M12 3.6 L17.6 6.8 V13.2 L12 16.5 L6.4 13.2 V6.8 Z",
-        "M12 3.6 V10.1 M6.4 6.8 L12 10.1 L17.6 6.8 M12 10.1 V16.5",
-        "M16.8 17.5 L19.2 19.9 L21.2 17.9 M4.9 18.6 H10") }
-
-    /** 性能. */
+        "M12 3 20 7.5v9L12 21l-8-4.5v-9Z",
+        "M12 12 4 7.5",
+        "m12 12 8-4.5",
+        "M12 12v9") }
     val Performance: ImageVector by lazy { entryGlyph("Performance",
-        "M4 17.7 C4 13 7.6 9.1 12 9.1 S20 13 20 17.7 M6.4 17.7 H17.6",
-        "M12 17.7 L16.2 12.5 M7.1 12.5 L6.1 11.5 M12 10 V8 M16.9 12.5 L17.9 11.5") }
-
-    /** 账户. */
+        "M3 12h4l2.5-7 4.3 14 2.8-7H21") }
     val Account: ImageVector by lazy { entryGlyph("Account",
-        "M6.3 4.6 H17.7 C18.8 4.6 19.5 5.3 19.5 6.4 V18 C19.5 19 18.8 19.8 17.7 19.8 H6.3 C5.2 19.8 4.5 19 4.5 18 V6.4 C4.5 5.3 5.2 4.6 6.3 4.6 Z",
-        "M12 12.1 C13.5 12.1 14.4 11.1 14.4 9.8 S13.5 7.6 12 7.6 S9.6 8.5 9.6 9.8 S10.5 12.1 12 12.1 Z M8.2 16.9 C8.6 14.6 10 13.5 12 13.5 S15.4 14.6 15.8 16.9") }
-
-    /** 通知. */
+        "M12 11.4a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z",
+        "M5 20v-1a7 7 0 0 1 14 0v1") }
     val Notifications: ImageVector by lazy { entryGlyph("Notifications",
-        "M7.6 9.8 C7.6 6.5 9.4 4.9 12 4.9 S16.4 6.5 16.4 9.8 V13.7 L18.3 16.1 H5.7 L7.6 13.7 Z",
-        "M10.1 18.1 C10.4 19.4 11 20.1 12 20.1 S13.6 19.4 13.9 18.1 M12 3 V4.9",
-        "M18.8 6.2 L20.4 5.5") }
-
-    /** 权限. */
+        "M6 17h12l-1.7-2.2V10a4.3 4.3 0 0 0-8.6 0v4.8Z",
+        "M10 19a2 2 0 0 0 4 0") }
     val Permissions: ImageVector by lazy { entryGlyph("Permissions",
-        "M12 3.2 L19.2 6 V11.8 C19.2 16 16.8 18.8 12 21 C7.2 18.8 4.8 16 4.8 11.8 V6 Z",
-        "M8.7 12.1 L11 14.4 L15.6 9.8") }
-
-    /** 高级. */
+        "M12 3 19 6v6c0 4-2.6 6.7-7 9-4.4-2.3-7-5-7-9V6Z",
+        "m9 12 2 2 4-4") }
     val Advanced: ImageVector by lazy { entryGlyph("Advanced",
-        "M5.9 4.2 V19.8 M12 4.2 V19.8 M18.1 4.2 V19.8",
-        "M3.9 8 H7.9 V11 H3.9 Z M10 13 H14 V16 H10 Z M16.1 6 H20.1 V9 H16.1 Z") }
-
-    /** 更新. */
+        "M4 6h16",
+        "M4 12h16",
+        "M4 18h16",
+        "M9 4v4",
+        "M15 10v4",
+        "M10 16v4") }
     val Updates: ImageVector by lazy { entryGlyph("Updates",
-        "M19.5 9.8 C18.5 5.7 15.8 4 12 4 C7.5 4 4 7.5 4 12 C4 16.5 7.5 20 12 20 C15.4 20 18.3 18 19.4 15.1",
-        "M16.2 9.6 H19.7 V6.1 M8.8 12 H15.3 M12 8.8 L15.3 12 L12 15.2") }
-
-    /** 对话风格. */
+        "M19.7 8.5A8 8 0 0 0 5.3 7",
+        "M5.3 4.5V8h3.5",
+        "M4.3 15.5A8 8 0 0 0 18.7 17",
+        "M18.7 20v-3.5h-3.5") }
     val ChatStyle: ImageVector by lazy { entryGlyph("ChatStyle",
-        "M5.2 4.5 H18.8 C19.8 4.5 20.5 5.3 20.5 6.3 V15.6 C20.5 16.6 19.8 17.3 18.8 17.3 H10.3 L6 20.6 V17.1 C5.2 16.8 4.5 16.2 4.5 15.1 V6.3 C4.5 5.3 5.2 4.5 6.2 4.5 Z",
-        "M8.2 9 H16.7 M8.2 12.9 H13.5") }
-
+        "M5.3 5.3h13.4A1.8 1.8 0 0 1 20.5 7v9.2a1.8 1.8 0 0 1-1.8 1.8h-8L5 21v-3.3A1.8 1.8 0 0 1 3.5 16V7a1.8 1.8 0 0 1 1.8-1.7Z",
+        "M8 10h9",
+        "M8 13.5h6") }
+    val Projects: ImageVector by lazy { entryGlyph("Projects",
+        "M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z") }
+    val RunCenter: ImageVector by lazy { entryGlyph("RunCenter",
+        "M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z",
+        "m10 8 6 4-6 4Z") }
 }
-
-private fun entryGlyph(name: String, vararg strokes: String): ImageVector =
+private fun entryGlyph(name: String, vararg data: String): ImageVector =
     ImageVector.Builder(
-        name = "SyEntry.$name",
-        defaultWidth = 24.dp,
-        defaultHeight = 24.dp,
-        viewportWidth = 24f,
-        viewportHeight = 24f,
+        name = "SyEntry.$name", defaultWidth = 24.dp, defaultHeight = 24.dp,
+        viewportWidth = 24f, viewportHeight = 24f,
     ).apply {
-        strokes.forEach { data ->
+        data.forEach { path ->
             addPath(
-                pathData = PathParser().parsePathString(data).toNodes(),
-                stroke = SolidColor(Color.Black),
-                strokeLineWidth = 1.75f,
-                strokeLineCap = StrokeCap.Round,
-                strokeLineJoin = StrokeJoin.Round,
+                pathData = PathParser().parsePathString(path).toNodes(),
+                stroke = SolidColor(Color.Black), strokeLineWidth = 1.75f,
+                strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round,
             )
         }
     }.build()

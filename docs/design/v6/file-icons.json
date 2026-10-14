@@ -1,13 +1,57 @@
 {
   "grid": 40,
-  "labels": {"audio": "音频文件", "video": "视频文件", "archive": "压缩文件"},
+  "labels": {
+    "audio": "音频文件",
+    "video": "视频文件",
+    "archive": "压缩文件",
+    "code": "代码文件",
+    "excel": "表格文件",
+    "folder": "文件夹",
+    "image": "图像文件",
+    "pdf": "PDF 文件",
+    "txt": "文本文档",
+    "word": "文字处理文档"
+  },
   "themes": {
-    "light": {"paper": "#FAF7F2", "edge": "#B8AB9B", "audio": "#376E5D", "video": "#855431", "archive": "#76608F"},
-    "dark": {"paper": "#35312D", "edge": "#6A6156", "audio": "#9AD4BE", "video": "#F0B891", "archive": "#B9A0D4"}
+    "light": {
+      "paper": "#FAF7F2",
+      "edge": "#B8AB9B",
+      "audio": "#376E5D",
+      "video": "#855431",
+      "archive": "#76608F",
+      "code": "#76608F",
+      "excel": "#3D8068",
+      "folder": "#A06E3A",
+      "image": "#8B6A9F",
+      "pdf": "#B2634B",
+      "txt": "#76665B",
+      "word": "#4D709E"
+    },
+    "dark": {
+      "paper": "#35312D",
+      "edge": "#6A6156",
+      "audio": "#9AD4BE",
+      "video": "#F0B891",
+      "archive": "#B9A0D4",
+      "code": "#C5AEDB",
+      "excel": "#96D1BC",
+      "folder": "#F0BC85",
+      "image": "#CCAEDF",
+      "pdf": "#ECAD93",
+      "txt": "#D9CABC",
+      "word": "#A6C7F0"
+    }
   },
   "glyphs": {
     "audio": "M18,27V16L27,14V25 M18,18L27,16 M18,27A3,3 0 1,1 15,24A3,3 0 0,1 18,27 M27,25A3,3 0 1,1 24,22A3,3 0 0,1 27,25",
     "video": "M13,15H26A2,2 0 0,1 28,17V29A2,2 0 0,1 26,31H13A2,2 0 0,1 11,29V17A2,2 0 0,1 13,15Z M18,19L23,23L18,27Z",
-    "archive": "M18,12H22 M18,16H22 M18,20H22 M18,24H22 M18,28H22V32H18Z"
+    "archive": "M18,12H22 M18,16H22 M18,20H22 M18,24H22 M18,28H22V32H18Z",
+    "code": "M15 18 L11 22 L15 26 M25 18 L29 22 L25 26 M23 16 L18 28",
+    "excel": "M13 16 H27 V28 H13 Z M13 21 H27 M19 16 V28 M14 30 H26",
+    "folder": "M10 19 V15 H17 L19 17 H29 V27 Q29 29 27 29 H12 Q10 29 10 27 Z",
+    "image": "M12 16 H28 V28 H12 Z M15.8 19.1 H16 M13 27 L18 22 L21 24 L24 21 L27 25",
+    "pdf": "M15 15 V28 M15 16 H20 Q23 16 23 19 Q23 22 20 22 H15 M24 25 H28",
+    "txt": "M13 16 H27 M13 20 H27 M13 24 H23 M13 28 H25",
+    "word": "M12 16 L15 28 L19 21 L23 28 L27 16"
   }
 }

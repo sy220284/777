@@ -1,10 +1,10 @@
-# 神言神语 V6 · 现行手机 UI 设计源
+# 神言神语 V6.3 · 当前 Android 手机 UI 完整设计源
 
 > [UI 3.0 权威规范](../UI-3.0.zh-CN.md)决定跨 UI 包接入、替换与验收；V6 只决定当前 Android 手机包内部的视觉和交互。**主线真实 Compose + 已合并 PR 为事实源，任何文档、Figma 和历史素材不得把已删除的入口带回来。**
 
 ## 当前唯一有效交付入口
 
-- **[V6 现行实现反向设计规范](V6-CURRENT-IMPLEMENTATION.zh-CN.md)**：三主题的真实 ARGB、L1–L5 材质、区域透明度、尺寸、动效、触觉、7 条顶层路由、21 个设置二级页、工作/聊天/工具等交互与退役清单。
+- **[V6.3 建立于当前 Compose 的反向设计规范](V6-CURRENT-IMPLEMENTATION.zh-CN.md)**：三主题的真实 ARGB、L1–L5 材质、区域透明度、尺寸、动效、触觉、7 条顶层路由、21 个设置二级页、工作/聊天/工具等交互与退役清单。
 - **[现行页面与退役入口机器清单](current-ui.json)**：`LocalFeatureCatalog` 和 `SettingsDestination` 的对应关系及未合并 UI PR，按现行原生路由组织，不再按历史样张编号。
 - **[打开当前手机单列交互设计稿](mobile/app.html)**：本轮按主线重新组织，只允许当前仍有真实入口的页面/状态。它是离线交互投影，**不是 Android 真实截图，也不是 Figma 已同步证明**。
 - [可复用 SVG 入口图标](sy-entry-icons.svg)、[图标源文件映射](SY-ENTRY-ICONS.zh-CN.md)、[文件类 SVG](assets/file-icons-preview.svg)、[逐场景验收台账](STATUS.zh-CN.md)。其中原代码保留 26 个原始 SVG 路径，**仅 24 个属于当前现行功能入口**；`Projects`、`RunCenter` 为历史退役入口，在新版交付素材中剔除，不以路径存在恢复 UI。详见图标规范。
@@ -31,3 +31,18 @@ Figma 当前 Starter MCP 配额耗尽，未写入可编辑画布；仓库设计�
 - 外部重绘 ZIP 保留新渲染图和独立源文件；**GitHub 仓库源码及生成导出内容已对齐，但仓库 ZIP 与已交付外部完整 ZIP 仍是两种体量的工件**（前者无 59 张 PNG），不要混淆两者内容数量。Android 原生、Figma 在线画布仍单独验收。
 
 - 当前可编辑源由 `mobile/index.html`、`mobile/v6.css`、`mobile/v6.js` 和 `assets/icons`、`assets/portraits` 的现行 SVG 组成；`build-standalone.py` 可重复构建单文件 `mobile/app.html`，CI 对照确保离线版本不会与设计源分叉。
+
+## V6.3 全量重绘与同源资源
+
+- **61 枚常用操作图标**：保留原 `FeatherIcons.*` API 名称以避免调用层改动，但 **每枚路径已经按 V6 网格重绘**，可编辑 SVG 放在 `assets/icons-actions/`，同源 Kotlin 为 `ui/components/FeatherIcons.kt`。
+- **20 枚文件图标（10 类 × 浅/深主题）**：统一 40dp、1.75 描边和语义色，清理原 52×68 带渐变的旧款，Android XML 与设计 SVG 同源输出；源为 `file-icons.json` 和 `generate-file-icons.py`。
+- **11 枚独立资源图标**：加号、发送、停止、勾选、模型、插件、子代理、任务、项目及空态插图。保持发送/停止白色对比和空态插画尺寸，旧项目功能不恢复。
+- **1 处 Material 搜索默认图标**已在设计系统 `SySearchBar` 内换成 V6 搜索线条；应用启动、通知栏蝴蝶与透明启动占位是明确的品牌/系统例外，不作为 24dp 操作图标强制重绘。
+- [图标质量核验脚本](audit-all-icons.py) 逐项比较 Kotlin/Android XML 与可编辑 SVG 的真实 pathData、尺寸、描边、目录数量，运行于 CI，不仅依赖 README 统计。
+
+- [V6.3 全图标三主题检查画廊](icon-gallery.html)：按 24+61+20+11+12 五类展示 SVG 实物，支持暖纸、烟熏玻璃、哑光黑切换。它是设计目测载体，实际 Android 图标以 Compose/XML 为准。
+
+## V6.3 正式交付
+
+- **[V6.3 交付变更与验收](V6.3-DELIVERY.zh-CN.md)**：统一版本口径、全部图标清单和真实交付边界。
+- **[V6.3 图标规范](V6.3-ICON-SYSTEM.zh-CN.md)**：全量 128 个可编辑变体的标准及 Android 对应关系。

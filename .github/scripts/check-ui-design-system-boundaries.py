@@ -338,6 +338,15 @@ for link in re.findall(r"\]\(([^)]+)\)", v6_spec):
         violations.append(f"V6 spec: broken local link -> {url}")
 
 
+# Verify every utility/action/file/standalone glyph actually matches its Compose or Android owner.
+try:
+    icon_result = subprocess.run([sys.executable, str(v6_root / "audit-all-icons.py")],
+                                 capture_output=True, text=True, timeout=20, check=False)
+    if icon_result.returncode != 0:
+        violations.append("V6 complete icon audit failed: " + (icon_result.stdout.strip() or icon_result.stderr.strip())[:1600])
+except (OSError, subprocess.TimeoutExpired) as exc:
+    violations.append("V6 icon audit failed: " + str(exc))
+
 if violations:
     print("UI Design System boundary violations:")
     print("\n".join(f"  - {item}" for item in violations))
