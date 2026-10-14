@@ -131,6 +131,7 @@ class LocalHarnessViewModel @Inject constructor(
         transferPort = personaTransferUiPort,
         savePort = personaGallerySaveUiPort,
         portraitPort = personaPortraitUiPort,
+        deletionPort = personaGalleryDeletionUiPort,
         appContext = appContext,
         scope = viewModelScope,
     )

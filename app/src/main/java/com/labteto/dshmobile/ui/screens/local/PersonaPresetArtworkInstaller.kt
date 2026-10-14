@@ -7,14 +7,18 @@ import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.presentation.LocalChatUiFacade
+import com.labteto.dshmobile.uicontract.DeletePersonaGalleryCommand
+import com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort
+import com.labteto.dshmobile.uicontract.UiPersonaGalleryDeletionReceipt
 import java.io.File
 
 internal class PersonaPresetArtworkInstaller(
     private val appContext: Context,
     private val chatUi: LocalChatUiFacade,
     private val maxPortraitBytes: Long,
+    private val deletionPort: PersonaGalleryDeletionUiPort,
 ) {
-    fun install(preset: PersonaPreset): PersonaGalleryEntry {
+    suspend fun install(preset: PersonaPreset): PersonaGalleryEntry {
         val existingIds = chatUi.galleryEntries().mapTo(hashSetOf(), PersonaGalleryEntry::id)
         val stagedPortrait = stageArtwork(preset)
         var savedId: String? = null
@@ -40,7 +44,18 @@ internal class PersonaPresetArtworkInstaller(
             stagedPortrait?.delete()
             savedId
                 ?.takeIf { it !in existingIds }
-                ?.let(chatUi::deleteGallery)
+                ?.let { id ->
+                    try {
+                        when (val rollback = deletionPort.delete(DeletePersonaGalleryCommand(null, id))) {
+                            is UiPersonaGalleryDeletionReceipt.Deleted, UiPersonaGalleryDeletionReceipt.Missing -> Unit
+                            is UiPersonaGalleryDeletionReceipt.Failed -> error.addSuppressed(
+                                IllegalStateException(rollback.message ?: "Preset rollback incomplete"),
+                            )
+                        }
+                    } catch (rollbackError: Throwable) {
+                        if (rollbackError !== error) error.addSuppressed(rollbackError)
+                    }
+                }
             throw error
         }
     }
