@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.model.ModelStreamLimitKind
 import com.labteto.dshmobile.local.model.LocalModelAdmissionState
 import com.labteto.dshmobile.local.model.LocalModelAdmissionTracker
 import com.labteto.dshmobile.local.model.LocalModelDelta
+import com.labteto.dshmobile.local.model.LocalKimiPolicy
 import com.labteto.dshmobile.local.model.LocalMiniMaxPolicy
 import com.labteto.dshmobile.local.model.LocalMiniMaxThinkingTextSplitter
 import com.labteto.dshmobile.local.model.LocalModelPresets
@@ -83,13 +84,17 @@ class DeepSeekClient @Inject constructor(
             put("model", model)
             put("messages", JsonArray(messages))
             put("stream", false)
-            temperature?.let { put("temperature", it) }
+            // Official Kimi API models reject non-default sampling temperatures.
+            temperature?.takeUnless { LocalKimiPolicy.isOfficial(baseUrl) }
+                ?.let { put("temperature", it) }
             val miniMax = LocalMiniMaxPolicy.isOfficial(baseUrl)
             if (miniMax) {
                 put("reasoning_split", true)
                 LocalMiniMaxPolicy.writeThinking(this, model, reasoningEffort, anthropic = false)
             }
-            if (reasoningEffort != null && !miniMax) {
+            if (LocalKimiPolicy.isOfficial(baseUrl)) {
+                LocalKimiPolicy.writeThinking(this, model, reasoningEffort)
+            } else if (reasoningEffort != null && !miniMax) {
                 val officialDeepSeek = runCatching {
                     URI(normalizeModelBaseUrl(baseUrl)).host.equals("api.deepseek.com", true)
                 }.getOrDefault(false)
@@ -194,14 +199,18 @@ class DeepSeekClient @Inject constructor(
             put("model", model)
             put("messages", JsonArray(messages))
             put("stream", true)
-            temperature?.let { put("temperature", it) }
+            // Official Kimi API models reject non-default sampling temperatures.
+            temperature?.takeUnless { LocalKimiPolicy.isOfficial(baseUrl) }
+                ?.let { put("temperature", it) }
             put("stream_options", buildJsonObject { put("include_usage", true) })
             val miniMax = LocalMiniMaxPolicy.isOfficial(baseUrl)
             if (miniMax) {
                 put("reasoning_split", true)
                 LocalMiniMaxPolicy.writeThinking(this, model, reasoningEffort, anthropic = false)
             }
-            if (reasoningEffort != null && !miniMax) {
+            if (LocalKimiPolicy.isOfficial(baseUrl)) {
+                LocalKimiPolicy.writeThinking(this, model, reasoningEffort)
+            } else if (reasoningEffort != null && !miniMax) {
                 val officialDeepSeek = runCatching {
                     URI(normalizeModelBaseUrl(baseUrl)).host.equals("api.deepseek.com", true)
                 }.getOrDefault(false)
