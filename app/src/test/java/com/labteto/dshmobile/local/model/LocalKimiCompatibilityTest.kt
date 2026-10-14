@@ -14,7 +14,6 @@ import org.junit.Test
 
 class LocalKimiCompatibilityTest {
     private val cn = "https://api.kimi.com/coding/v1"
-    private val global = "https://api.kimi.ai/coding/v1"
     private val json = Json { ignoreUnknownKeys = true }
     private val user = listOf(buildJsonObject {
         put("role", "user")
@@ -31,14 +30,14 @@ class LocalKimiCompatibilityTest {
         assertEquals(expected.keys, LocalModelPresets.entries
             .filter { it.provider == "Kimi Code" }.map { it.model }.toSet())
         for ((id, window) in expected) {
-            for (endpoint in listOf(cn, global)) {
+            val endpoint = cn
+            run {
                 val preset = LocalModelPresets.find(id, endpoint)!!
                 assertEquals("Kimi Code", preset.provider)
                 assertEquals(window, preset.contextWindowTokens)
                 assertEquals(LocalModelProtocol.CHAT_COMPLETIONS, preset.protocol)
                 assertEquals(true, preset.imageInputSupported)
-                assertEquals("https://" + (if (endpoint == cn) "api.kimi.com" else "api.kimi.ai")
-                    + "/coding/v1/chat/completions", preset.chatEndpoint)
+                assertEquals("https://api.kimi.com/coding/v1/chat/completions", preset.chatEndpoint)
                 assertEquals(setOf(LocalModelCapability.TEXT, LocalModelCapability.IMAGE),
                     LocalModelPresets.clientCapabilitiesFor(id, endpoint))
             }
@@ -50,7 +49,9 @@ class LocalKimiCompatibilityTest {
         assertFalse(LocalKimiPolicy.isOfficial("https://api.kimi.com.evil.example/coding/v1"))
         assertFalse(LocalKimiPolicy.isOfficial("https://api.kimi.com/v1"))
         assertFalse(LocalKimiPolicy.isOfficial("https://api.kimi.com/coding/v1?key=foo"))
-        assertTrue(LocalKimiPolicy.isOfficial(global + "/"))
+        assertFalse(LocalKimiPolicy.isOfficial("https://api.kimi.ai/coding/v1"))
+        assertNull(LocalModelPresets.find("k3", "https://api.kimi.ai/coding/v1"))
+        assertTrue(LocalKimiPolicy.isOfficial(cn + "/"))
         assertEquals("Kimi Code 订阅", LocalModelProfile("k", "k3", cn).sourceLabel())
         assertEquals("API Key", LocalModelProfile("other", "k3", "https://proxy.example/v1").sourceLabel())
     }
@@ -143,7 +144,7 @@ class LocalKimiCompatibilityTest {
         }.build()
         val deltas = mutableListOf<LocalModelDelta>()
         val result = DeepSeekClient(http, json).completeStreaming(
-            "member-key", global, "kimi-for-coding", user, JsonArray(emptyList()),
+            "member-key", cn, "kimi-for-coding", user, JsonArray(emptyList()),
             reasoningEffort = "max", onDelta = { deltas += it })
         assertEquals("max", payload?.get("reasoning_effort")?.jsonPrimitive?.content)
         assertEquals("结论", result.content)
