@@ -41,8 +41,9 @@ class LocalKimiCompatibilityTest {
                 assertEquals(LocalModelProtocol.CHAT_COMPLETIONS, preset.protocol)
                 assertEquals(true, preset.imageInputSupported)
                 assertEquals("https://api.kimi.com/coding/v1/chat/completions", preset.chatEndpoint)
-                assertEquals(setOf(LocalModelCapability.TEXT, LocalModelCapability.IMAGE),
-                    LocalModelPresets.clientCapabilitiesFor(id, endpoint))
+                val wired = mutableSetOf(LocalModelCapability.TEXT, LocalModelCapability.IMAGE)
+                if (id != "k3-256k") wired += LocalModelCapability.VIDEO
+                assertEquals(wired, LocalModelPresets.clientCapabilitiesFor(id, endpoint))
             }
         }
         assertFalse(LocalModelCapability.VIDEO in LocalModelPresets.capabilitiesFor("k3-256k", cn))
@@ -187,6 +188,87 @@ class LocalKimiCompatibilityTest {
                     .startsWith("data:image/png;base64,"),
             )
             assertFalse(payload.toString().contains(LOCAL_IMAGE_REF))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test fun videoFromAttachmentReachesKimiOfficialRequestOnlyForVideoCapableModels() = runBlocking {
+        val root = Files.createTempDirectory("kimi-video-").toFile()
+        try {
+            val clip = File(root, "walkthrough.mp4").apply { writeBytes(byteArrayOf(1, 2, 3, 4, 5)) }
+            val durable = buildLocalUserModelMessage("分析这段视频的画面变化",
+                listOf(LocalImportedAttachment(
+                    name = clip.name, relativePath = clip.name,
+                    mediaType = "video/mp4", bytes = clip.length(),
+                )))
+            assertTrue(durable.toString().contains(LOCAL_FILE_REF))
+            assertFalse(durable.toString().contains("base64"))
+            for (id in listOf("k3", "kimi-for-coding", "kimi-for-coding-highspeed")) {
+                val materialized = prepareLocalMultimodalMessages(listOf(durable), root,
+                    LocalImageInputMode.NATIVE, model = id, baseUrl = cn)
+                val content = materialized.single()["content"]!!.jsonArray
+                val video = content.single { it.jsonObject["type"]?.jsonPrimitive?.content == "video_url" }
+                    .jsonObject["video_url"]!!.jsonObject["url"]!!.jsonPrimitive.content
+                assertTrue(video.startsWith("data:video/mp4;base64,"))
+                val native = LocalCanonicalModelCodec.toLegacyMessages(
+                    LocalCanonicalModelCodec.messages(materialized),
+                    LocalModelAdapterIds.OPENAI_CHAT, "subscription-route",
+                )
+                assertEquals("video_url", native.single()["content"]!!.jsonArray.last()
+                    .jsonObject["type"]!!.jsonPrimitive.content)
+                var actual: JsonObject? = null
+                val http = OkHttpClient.Builder().addInterceptor { chain ->
+                    actual = json.parseToJsonElement(Buffer().also {
+                        chain.request().body!!.writeTo(it)
+                    }.readUtf8()).jsonObject
+                    Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                        .code(200).message("OK")
+                        .body("""{"choices":[{"message":{"role":"assistant","content":"视频已分析"},"finish_reason":"stop"}]}"""
+                            .toResponseBody("application/json".toMediaType())).build()
+                }.build()
+                val reply = DeepSeekClient(http, json).complete("member-key", cn, id, native,
+                    JsonArray(emptyList()))
+                assertEquals("视频已分析", reply.content)
+                assertTrue(actual!!.toString().contains("video_url"))
+                assertFalse(actual!!.toString().contains(LOCAL_FILE_REF))
+                assertFalse(durable.toString().contains("base64"))
+            }
+            val unsupported = runCatching {
+                prepareLocalMultimodalMessages(listOf(durable), root,
+                    LocalImageInputMode.NATIVE, model = "k3-256k", baseUrl = cn)
+            }.exceptionOrNull()
+            assertTrue(unsupported is IllegalStateException)
+            assertTrue(unsupported?.message.orEmpty().contains("不支持视频"))
+            val otherProvider = prepareLocalMultimodalMessages(listOf(durable), root,
+                LocalImageInputMode.NATIVE, model = "unknown", baseUrl = "https://other.example/v1")
+            assertFalse(otherProvider.toString().contains("data:video/"))
+            assertFalse(otherProvider.toString().contains("video_url"))
+            val historical = prepareLocalMultimodalMessages(listOf(durable,
+                buildJsonObject { put("role", "assistant"); put("content", "已看完") },
+                buildJsonObject { put("role", "user"); put("content", "继续聊天") }),
+                root, LocalImageInputMode.NATIVE, model = "k3", baseUrl = cn)
+            assertFalse(historical.toString().contains("video_url"))
+            assertTrue(historical.toString().contains("历史文件引用"))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test fun oversizedKimiVideoFailsBeforeReadingOrEncoding() = runBlocking {
+        val root = Files.createTempDirectory("kimi-video-too-large-").toFile()
+        try {
+            val clip = File(root, "clip.mp4")
+            java.io.RandomAccessFile(clip, "rw").use { it.setLength(20L * 1024L * 1024L + 1) }
+            val reference = buildLocalUserModelMessage("查看视频",
+                listOf(LocalImportedAttachment("clip.mp4", "clip.mp4", "video/mp4", clip.length())))
+            val failure = runCatching {
+                prepareLocalMultimodalMessages(listOf(reference), root,
+                    LocalImageInputMode.NATIVE, model = "k3", baseUrl = cn)
+            }.exceptionOrNull()
+            assertTrue(failure is IllegalArgumentException)
+            assertTrue(failure?.message.orEmpty().contains("上限") ||
+                failure?.message.orEmpty().contains("最多"))
         } finally {
             root.deleteRecursively()
         }
