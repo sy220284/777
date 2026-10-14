@@ -275,7 +275,7 @@ internal fun LocalModelSettingsCard(
                             Icon(
                                 FeatherIcons.Image,
                                 contentDescription = if (LocalMediaKind.IMAGE in creatorKinds)
-                                    "图片理解或生成" else "图片理解",
+                                    stringResource(R.string.local_model_capability_image_or_generate) else stringResource(R.string.local_model_capability_image_understand),
                                 tint = colors.textSecondary,
                                 modifier = Modifier.size(15.dp),
                             )
@@ -285,7 +285,7 @@ internal fun LocalModelSettingsCard(
                             Icon(
                                 FeatherIcons.Video,
                                 contentDescription = if (LocalMediaKind.VIDEO in creatorKinds)
-                                    "视频理解或生成" else "视频理解",
+                                    stringResource(R.string.local_model_capability_video_or_generate) else stringResource(R.string.local_model_capability_video_understand),
                                 tint = colors.textSecondary,
                                 modifier = Modifier.size(15.dp),
                             )
@@ -294,7 +294,7 @@ internal fun LocalModelSettingsCard(
                             LocalMediaKind.TRANSCRIBE in creatorKinds) {
                             Icon(
                                 FeatherIcons.Activity,
-                                contentDescription = "语音生成或转写",
+                                contentDescription = stringResource(R.string.local_model_capability_speech_services),
                                 tint = colors.textSecondary,
                                 modifier = Modifier.size(15.dp),
                             )
@@ -366,7 +366,7 @@ internal fun LocalModelSettingsCard(
                         contextWindowTokens.isNotBlank() &&
                         (contextWindowTokens.toIntOrNull() ?: -1) !in 4_096..1_048_576
                     ) {
-                        testStatus = "Kimi K3 上下文只能设置 4096～1048576；留空使用 256K 默认值"
+                        testStatus = context.getString(R.string.local_model_kimi_k3_context_invalid)
                     } else {
                         saving = true
                         val savedGeneration = editorGeneration
