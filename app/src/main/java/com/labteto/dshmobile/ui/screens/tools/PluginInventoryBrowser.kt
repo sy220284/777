@@ -193,7 +193,8 @@ internal fun PluginInventoryBrowser(
         else -> local
     }).filter { item ->
             query.isBlank() || item.name.contains(query.trim(), ignoreCase = true) ||
-                item.id.contains(query.trim(), ignoreCase = true)
+                item.id.contains(query.trim(), ignoreCase = true) ||
+                item.detail.contains(query.trim(), ignoreCase = true)
         }
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
@@ -249,9 +250,7 @@ internal fun PluginInventoryBrowser(
                         stringResource(R.string.skills_import_hint),
                         style = DsType.small13.withReadingWeight(),
                         color = colors.textTertiary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                                            )
                 }
             }
             if (!skillsOnly) LazyRow(
@@ -311,14 +310,14 @@ internal fun PluginInventoryBrowser(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection),
                 )
             }
-            if (loading || error != null || list.isEmpty()) {
+            if (error != null || list.isEmpty()) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(SyMetric.gapPage),
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        error ?: stringResource(if (loading) R.string.common_loading else if (skillsOnly) R.string.skills_catalog_empty else R.string.tools_catalog_empty),
+                        error ?: stringResource(if (loading) R.string.common_loading else if (query.isNotBlank()) R.string.tools_catalog_no_matches else if (skillsOnly) R.string.skills_catalog_empty else R.string.tools_catalog_empty),
                         style = DsType.std14.withReadingWeight(),
                         color = colors.textSecondary,
                     )
@@ -372,10 +371,25 @@ internal fun PluginInventoryBrowser(
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                     )
+
+                                }
+                                Text(
+                                    item.detail,
+                                    modifier = Modifier.fillMaxWidth().testTag("plugin-inventory-detail-${item.id}"),
+                                    color = colors.textTertiary,
+                                    style = DsType.small13.withReadingWeight(),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End,
+                                ) {
                                     val usePrompt = if (item.installedSkill) "@skill:${item.id.substringAfter(":")}\n" else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
                                     SyButton(
+                                        enabled = !loading,
                                         text = stringResource(
-                                            if (item.installablePreset) R.string.skills_install
+                                            if (item.installablePreset && onInstallPreset != null) R.string.skills_install
                                             else if (onUseCapability != null && item.available) R.string.plugin_use
                                             else R.string.tools_catalog_details
                                         ),
@@ -388,14 +402,6 @@ internal fun PluginInventoryBrowser(
                                         },
                                     )
                                 }
-                                Text(
-                                    item.detail,
-                                    modifier = Modifier.fillMaxWidth().testTag("plugin-inventory-detail-${item.id}"),
-                                    color = colors.textTertiary,
-                                    style = DsType.small13.withReadingWeight(),
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
                             }
                         }
                     }
@@ -412,12 +418,13 @@ internal fun PluginInventoryBrowser(
                 val usePrompt = if (item.installedSkill) "@skill:${item.id.substringAfter(":")}\n" else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
                 SyButton(
                     text = stringResource(
-                        if (item.installablePreset) R.string.skills_install
+                        if (item.installablePreset && onInstallPreset != null) R.string.skills_install
                         else if (onUseCapability != null && item.available) R.string.plugin_use
                         else if (item.connectedService) R.string.tools_external_services
                         else R.string.tools_catalog_return_chat,
                     ),
                     modifier = Modifier.fillMaxWidth().testTag("plugin-detail-primary-action"),
+                    enabled = !loading,
                     size = SyButtonSize.Large,
                     onClick = {
                         selectedRow = null
