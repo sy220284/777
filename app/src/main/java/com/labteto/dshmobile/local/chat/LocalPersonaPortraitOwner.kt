@@ -26,6 +26,7 @@ class LocalPersonaPortraitOwner @Inject constructor(
     @ApplicationContext private val context: Context,
     private val gallery: ChatPersonaGalleryStore,
 ) : PersonaPortraitUiPort {
+    override val maxImportBytes: Long get() = MAX_PERSONA_PORTRAIT_BYTES
     override suspend fun submit(command: PersonaPortraitUiCommand): UiPersonaPortraitReceipt = withContext(Dispatchers.IO) {
         var target: File? = null
         try {

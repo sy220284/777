@@ -1,5 +1,4 @@
 package com.labteto.dshmobile.ui.screens.local
-import com.labteto.dshmobile.local.chat.MAX_PERSONA_PORTRAIT_BYTES
 
 import android.content.Context
 import android.graphics.BitmapFactory
@@ -13,6 +12,7 @@ import java.io.File
 internal class PersonaPresetArtworkInstaller(
     private val appContext: Context,
     private val chatUi: LocalChatUiFacade,
+    private val maxPortraitBytes: Long,
 ) {
     fun install(preset: PersonaPreset): PersonaGalleryEntry {
         val existingIds = chatUi.galleryEntries().mapTo(hashSetOf(), PersonaGalleryEntry::id)
@@ -77,7 +77,7 @@ internal class PersonaPresetArtworkInstaller(
                         val count = input.read(buffer)
                         if (count < 0) break
                         total += count
-                        require(total <= MAX_PERSONA_PORTRAIT_BYTES) {
+                        require(total <= maxPortraitBytes) {
                             appContext.getString(R.string.persona_gallery_preset_artwork_too_large)
                         }
                         output.write(buffer, 0, count)

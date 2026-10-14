@@ -12,5 +12,7 @@ sealed interface UiPersonaPortraitReceipt {
     data class Failed(val message: String?) : UiPersonaPortraitReceipt
 }
 interface PersonaPortraitUiPort {
+    /** Owner-defined maximum size for imported/staged portrait images. */
+    val maxImportBytes: Long
     suspend fun submit(command: PersonaPortraitUiCommand): UiPersonaPortraitReceipt
 }

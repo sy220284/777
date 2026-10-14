@@ -268,7 +268,7 @@ internal suspend fun importGalleryPersona(
 suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runCatching {
     val preset = PersonaPresetCatalog.find(id) ?: error(appContext.getString(R.string.ui_r4_gallery_preset_missing))
     val entry = withContext(Dispatchers.IO) {
-        PersonaPresetArtworkInstaller(appContext, chatUi).install(preset).also {
+        PersonaPresetArtworkInstaller(appContext, chatUi, portraitPort.maxImportBytes).install(preset).also {
             _gallery.value = runCatching { chatUi.galleryEntries() }.getOrDefault(_gallery.value)
         }
     }
