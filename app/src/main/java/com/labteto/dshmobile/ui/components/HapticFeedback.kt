@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import com.shenyan.designsystem.foundation.SyMotion
 import kotlin.math.roundToInt
 
 /** Map a finite slider value to a semantic detent. Zero segments disables feedback. */
@@ -18,7 +19,7 @@ internal fun hapticTickIndex(value: Float, start: Float, end: Float, segments: I
 
 /** Reusable, system-aware light pulse with rate limiting for held/dragged controls. */
 @Composable
-fun rememberHapticPulse(minIntervalMillis: Long = 45L): () -> Unit {
+fun rememberHapticPulse(minIntervalMillis: Long = SyMotion.hapticIntervalMs): () -> Unit {
     val haptics = LocalHapticFeedback.current
     val previous = remember { mutableLongStateOf(-1L) }
     return remember(haptics, minIntervalMillis) {

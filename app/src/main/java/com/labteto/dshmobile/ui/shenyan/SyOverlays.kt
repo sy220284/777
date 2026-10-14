@@ -52,6 +52,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionOnScreen
+import com.shenyan.designsystem.foundation.LocalSySceneBackdrop
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -73,6 +76,7 @@ import com.shenyan.designsystem.foundation.LocalSyColors
 import com.shenyan.designsystem.foundation.LocalSyReduceMotion
 import com.shenyan.designsystem.foundation.SyMetric
 import com.shenyan.designsystem.foundation.SyMotion
+import com.shenyan.designsystem.foundation.LocalSyMotionTempo
 import kotlinx.coroutines.delay
 
 /** The only native generic dialog: V5 L4, correct back and explicit scrim behavior. */
@@ -89,7 +93,7 @@ fun SyDialog(
     LaunchedEffect(Unit) { shown = true }
     val scale by animateFloatAsState(
         if (shown) 1f else .92f,
-        tween(if (reduced) 0 else SyMotion.dialogMs), label = "syDialogScale",
+        tween(SyMotion.duration(SyMotion.dialogMs, reduced, LocalSyMotionTempo.current)), label = "syDialogScale",
     )
     Dialog(
         onDismissRequest = onDismiss,
@@ -161,10 +165,10 @@ fun SyToastHost(state: Pair<State<String?>, (String) -> Unit>, modifier: Modifie
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         AnimatedVisibility(
             visible = message != null,
-            enter = fadeIn(tween(if (reduced) 0 else SyMotion.toastMs)) +
-                slideInVertically(tween(if (reduced) 0 else SyMotion.toastMs)) { -it / 3 },
-            exit = fadeOut(tween(if (reduced) 0 else SyMotion.toastMs)) +
-                slideOutVertically(tween(if (reduced) 0 else SyMotion.toastMs)) { -it / 3 },
+            enter = fadeIn(tween(SyMotion.duration(SyMotion.toastMs, reduced, LocalSyMotionTempo.current))) +
+                slideInVertically(tween(SyMotion.duration(SyMotion.toastMs, reduced, LocalSyMotionTempo.current))) { -it / 3 },
+            exit = fadeOut(tween(SyMotion.duration(SyMotion.toastMs, reduced, LocalSyMotionTempo.current))) +
+                slideOutVertically(tween(SyMotion.duration(SyMotion.toastMs, reduced, LocalSyMotionTempo.current))) { -it / 3 },
         ) {
             Box(Modifier.padding(top = 12.dp).semantics {
                 liveRegion = LiveRegionMode.Polite
@@ -201,11 +205,26 @@ fun SyPopupMenu(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val p = LocalSyColors.current
+    val scene = LocalSySceneBackdrop.current
+    var regionY by remember { mutableStateOf(.5f) }
     DropdownMenu(
         expanded = expanded, onDismissRequest = onDismiss,
-        modifier = modifier,
-        shape = RoundedCornerShape(13.dp),
-        containerColor = containerColor ?: com.shenyan.designsystem.components.syMaterialColor(SyMaterialTier.L4_OVERLAY),
+        modifier = modifier.onGloballyPositioned { coordinates ->
+            val backdrop = scene ?: return@onGloballyPositioned
+            if (backdrop.viewportSize.height <= 0) return@onGloballyPositioned
+            val centre = coordinates.positionOnScreen().y + coordinates.size.height / 2f
+            val fraction = (centre - backdrop.viewportOrigin.y) / backdrop.viewportSize.height
+            // Sample the same top/middle/bottom bands as every on-screen glass surface.
+            val sampled = when {
+                fraction < .30f -> .15f
+                fraction < .74f -> .50f
+                else -> .88f
+            }
+            if (regionY != sampled) regionY = sampled
+        },
+        shape = RoundedCornerShape(SyMetric.radiusControl),
+        containerColor = containerColor ?: com.shenyan.designsystem.components.syMaterialColor(
+            SyMaterialTier.L4_OVERLAY, regionY),
         tonalElevation = 0.dp,
         border = BorderStroke(1.dp, p.border),
         properties = PopupProperties(

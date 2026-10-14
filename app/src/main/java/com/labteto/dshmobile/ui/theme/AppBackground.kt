@@ -112,7 +112,9 @@ data class AppBackgroundState(
         val stats = analysis?.region(region)
         if (!hasImage) return base
         if (!adaptiveContrast || stats == null) {
-            return base.copy(alpha = adjustedSurfaceAlpha(base.alpha.coerceAtLeast(0.76f), 0.62f, 1f))
+            // Disabling adaptive contrast must not force a 76% opaque floor onto every
+            // legacy region surface; the user's transparency setting still applies.
+            return base.copy(alpha = adjustedSurfaceAlpha(base.alpha.coerceIn(minAlpha, maxAlpha), minAlpha, maxAlpha))
         }
 
         val complexity = (stats.contrast * 0.52f + stats.detail * 0.48f).coerceIn(0f, 1f)
@@ -190,11 +192,27 @@ internal fun resolveWallpaperAlpha(
     maxAlpha: Float,
     transparency: Float,
 ): Float {
-    val preference = transparency.coerceIn(0f, 1f)
-    val adjustment = (0.5f - preference) * 0.46f
+    val adjustment = com.shenyan.designsystem.foundation.SyMaterialPolicy.adjustment(transparency)
     val lower = (minAlpha - 0.18f).coerceAtLeast(0.14f)
     val upper = (maxAlpha + 0.08f).coerceAtMost(0.98f)
     return (adaptiveAlpha + adjustment).coerceIn(lower, upper)
+}
+
+/** Use the same three vertical sample bands as the on-screen glass renderer. */
+internal fun BackgroundRegion.sampleY(): Float = when (this) {
+    BackgroundRegion.TOP -> .15f
+    BackgroundRegion.MIDDLE, BackgroundRegion.ALL -> .50f
+    BackgroundRegion.BOTTOM -> .88f
+}
+
+/** Bound decoded wallpaper size; keep high-resolution display but avoid huge full-size bitmaps. */
+internal fun wallpaperDecodeSample(width: Int, height: Int, maximumDimension: Int = 3072): Int {
+    if (width <= 0 || height <= 0 || maximumDimension <= 0) return 1
+    var sample = 1
+    while (maxOf(width, height) / sample > maximumDimension && sample <= Int.MAX_VALUE / 2) {
+        sample *= 2
+    }
+    return sample
 }
 
 /** The image painted behind the whole app shell, or null for the plain theme colour. */
@@ -205,6 +223,7 @@ val LocalAppBackgroundState = staticCompositionLocalOf { AppBackgroundState() }
 
 private data class LoadedBackground(
     val image: ImageBitmap,
+    val bitmap: Bitmap,
     val analysis: BackgroundAnalysis,
 )
 
@@ -223,22 +242,36 @@ fun AppBackgroundHost(
     surfaceTransparency: Float = 0.5f,
     modifier: Modifier = Modifier,
     fluidGlass: Boolean = true,
+    ambientGlow: Float = .5f,
     ambientPalette: com.shenyan.designsystem.foundation.SyColors = com.shenyan.designsystem.foundation.ShenyanPalettes.light,
     content: @Composable () -> Unit,
 ) {
     val loaded = rememberBackground(path)
+    val view = LocalView.current
+    val windowOnScreen = remember { IntArray(2) }
+    var viewportOrigin by remember { mutableStateOf(IntOffset.Zero) }
+    var viewportSize by remember { mutableStateOf(IntSize.Zero) }
+
+    // ContentScale.Crop displays only the centre of many landscape wallpapers on a phone.
+    // Sample what is actually visible, off the UI thread; do not tint cards from off-screen pixels.
+    var croppedAnalysis by remember(path, loaded) { mutableStateOf<Pair<IntSize, BackgroundAnalysis>?>(null) }
+    LaunchedEffect(loaded, viewportSize) {
+        if (loaded != null && viewportSize.width > 0 && viewportSize.height > 0) {
+            val analysis = withContext(Dispatchers.Default) {
+                analyzeBackground(loaded.bitmap, viewportSize)
+            }
+            croppedAnalysis = viewportSize to analysis
+        }
+    }
+    val visibleAnalysis = croppedAnalysis?.takeIf { it.first == viewportSize }?.second ?: loaded?.analysis
     val state = AppBackgroundState(
         image = loaded?.image,
-        analysis = loaded?.analysis,
+        analysis = visibleAnalysis,
         adaptiveContrast = adaptiveEnabled,
         darkTheme = darkTheme,
         surfaceTransparency = surfaceTransparency.coerceIn(0f, 1f),
         fluidGlass = fluidGlass,
     )
-    val view = LocalView.current
-    val windowOnScreen = remember { IntArray(2) }
-    var viewportOrigin by remember { mutableStateOf(IntOffset.Zero) }
-    var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     val sceneBackdrop = if (viewportSize.width > 0 && viewportSize.height > 0 &&
         (loaded != null || fluidGlass)
     ) SySceneBackdrop(
@@ -251,10 +284,11 @@ fun AppBackgroundHost(
             ambientPalette.primary, ambientPalette.mint, ambientPalette.lilac.copy(alpha = .18f),
         ) else emptyList(),
         dark = darkTheme,
-        regionColors = loaded?.analysis?.let { listOf(it.top.averageColor, it.middle.averageColor, it.bottom.averageColor) } ?: emptyList(),
-        regionExtremes = loaded?.analysis?.let { analysis -> listOf(analysis.top, analysis.middle, analysis.bottom)
+        regionColors = visibleAnalysis?.let { listOf(it.top.averageColor, it.middle.averageColor, it.bottom.averageColor) } ?: emptyList(),
+        regionExtremes = visibleAnalysis?.let { analysis -> listOf(analysis.top, analysis.middle, analysis.bottom)
             .map { listOf(it.darkestColor, it.brightestColor) } } ?: emptyList(),
         surfaceTransparency = state.surfaceTransparency,
+        ambientGlow = ambientGlow.coerceIn(0f, 1f),
         adaptiveContrast = adaptiveEnabled,
     ) else null
     Box(modifier.fillMaxSize().background(surfaceBase).onGloballyPositioned { coordinates ->
@@ -269,42 +303,18 @@ fun AppBackgroundHost(
             LocalAppBackgroundState provides state,
             LocalSySceneBackdrop provides sceneBackdrop,
         ) {
-            if (loaded == null && fluidGlass) FluidGlassBackdrop(darkTheme, ambientPalette)
-            loaded?.let { background ->
-                Image(
-                    bitmap = background.image,
-                    contentDescription = null,
+            // Main canvas and every overlay use the same position-aligned scene painter.
+            // This avoids a second gradient/image implementation drifting in colour or crop.
+            if (loaded != null || fluidGlass) {
+                com.shenyan.designsystem.components.SySceneBackgroundSurface(
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
-                adaptiveGlobalVeil(state, surfaceBase)?.let { veil ->
-                    Box(Modifier.fillMaxSize().background(veil))
-                }
+                    shape = androidx.compose.ui.graphics.RectangleShape,
+                    fallbackColor = surfaceBase,
+                    tag = "appRootSceneBackground",
+                ) {}
             }
             content()
         }
-    }
-}
-
-/** Static radial light fields: no bitmap, blur layer or perpetual animation. */
-@Composable
-private fun FluidGlassBackdrop(dark: Boolean, colors: com.shenyan.designsystem.foundation.SyColors) {
-    // Keep the three designed light fields while sourcing their hues from active semantic colors.
-    Canvas(Modifier.fillMaxSize()) {
-        val opacity = if (dark) 0.10f else 0.38f
-        val extent = maxOf(size.width, size.height)
-        drawRect(Brush.radialGradient(
-            colors = listOf(colors.primary.copy(alpha = opacity), Color.Transparent),
-            center = Offset(size.width * 0.06f, size.height * 0.08f), radius = extent * 0.72f,
-        ))
-        drawRect(Brush.radialGradient(
-            colors = listOf(colors.mint.copy(alpha = opacity), Color.Transparent),
-            center = Offset(size.width * 0.98f, size.height * 0.36f), radius = extent * 0.65f,
-        ))
-        drawRect(Brush.radialGradient(
-            colors = listOf(colors.lilac.copy(alpha = opacity * 0.45f * .18f), Color.Transparent),
-            center = Offset(size.width * 0.24f, size.height * 0.92f), radius = extent * 0.55f,
-        ))
     }
 }
 
@@ -341,16 +351,25 @@ private fun adaptiveGlobalVeil(state: AppBackgroundState, surfaceBase: Color): C
 
 @Composable
 private fun rememberBackground(path: String?): LoadedBackground? {
-    var loaded by remember(path) { mutableStateOf<LoadedBackground?>(null) }
+    // Keep the previous valid frame visible while decoding a newly selected picture. Reset
+    // immediately on explicit clear; never flash the empty fluid-glass screen between swaps.
+    var loaded by remember { mutableStateOf<LoadedBackground?>(null) }
     LaunchedEffect(path) {
         loaded = if (path == null) {
             null
         } else {
             withContext(Dispatchers.IO) {
                 runCatching {
-                    BitmapFactory.decodeFile(path)?.let { bitmap ->
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeFile(path, bounds)
+                    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
+                    val options = BitmapFactory.Options().apply {
+                        inSampleSize = wallpaperDecodeSample(bounds.outWidth, bounds.outHeight)
+                    }
+                    BitmapFactory.decodeFile(path, options)?.let { bitmap ->
                         LoadedBackground(
                             image = bitmap.asImageBitmap(),
+                            bitmap = bitmap,
                             analysis = analyzeBackground(bitmap),
                         )
                     }
@@ -358,7 +377,7 @@ private fun rememberBackground(path: String?): LoadedBackground? {
             }
         }
     }
-    return loaded
+    return if (path == null) null else loaded
 }
 
 private data class PixelSample(
@@ -374,19 +393,27 @@ private data class PixelSample(
  * constant for phone wallpapers of any resolution while still catching bright/dark, saturated and
  * visually busy areas.
  */
-internal fun analyzeBackground(bitmap: Bitmap): BackgroundAnalysis {
+internal fun analyzeBackground(bitmap: Bitmap, viewport: IntSize? = null): BackgroundAnalysis {
     if (bitmap.width <= 0 || bitmap.height <= 0) return BackgroundAnalysis()
 
-    val columns = minOf(24, bitmap.width)
-    val rows = minOf(36, bitmap.height)
+    val visible = viewport?.takeIf { it.width > 0 && it.height > 0 }
+    val ratio = visible?.let { it.width.toDouble() / it.height }
+    val cropWidth = if (ratio != null && bitmap.width.toDouble() / bitmap.height > ratio)
+        (bitmap.height * ratio).roundToInt().coerceIn(1, bitmap.width) else bitmap.width
+    val cropHeight = if (ratio != null && bitmap.width.toDouble() / bitmap.height < ratio)
+        (bitmap.width / ratio).roundToInt().coerceIn(1, bitmap.height) else bitmap.height
+    val cropX = (bitmap.width - cropWidth) / 2
+    val cropY = (bitmap.height - cropHeight) / 2
+    val columns = minOf(24, cropWidth)
+    val rows = minOf(36, cropHeight)
     val previousRow = FloatArray(columns) { Float.NaN }
     val samples = ArrayList<PixelSample>(columns * rows)
 
     for (row in 0 until rows) {
         var left = Float.NaN
-        val y = (((row + 0.5f) * bitmap.height) / rows).toInt().coerceIn(0, bitmap.height - 1)
+        val y = (cropY + ((row + 0.5f) * cropHeight / rows).toInt()).coerceIn(0, bitmap.height - 1)
         for (column in 0 until columns) {
-            val x = (((column + 0.5f) * bitmap.width) / columns).toInt().coerceIn(0, bitmap.width - 1)
+            val x = (cropX + ((column + 0.5f) * cropWidth / columns).toInt()).coerceIn(0, bitmap.width - 1)
             val color = bitmap.getPixel(x, y)
             val red = AndroidColor.red(color) / 255f
             val green = AndroidColor.green(color) / 255f
@@ -480,12 +507,13 @@ fun DsColors.wallpaperSurface(
     val tier = when (level) {
         WallpaperSurfaceLevel.INPUT -> com.shenyan.designsystem.components.SyMaterialTier.L1_SECTION
         WallpaperSurfaceLevel.CHROME -> com.shenyan.designsystem.components.SyMaterialTier.L2_BAR
-        WallpaperSurfaceLevel.FLOATING, WallpaperSurfaceLevel.SHEET, WallpaperSurfaceLevel.DRAWER,
+        WallpaperSurfaceLevel.DRAWER -> com.shenyan.designsystem.components.SyMaterialTier.L2_BAR
+        WallpaperSurfaceLevel.FLOATING, WallpaperSurfaceLevel.SHEET,
         WallpaperSurfaceLevel.DIALOG, WallpaperSurfaceLevel.MENU -> com.shenyan.designsystem.components.SyMaterialTier.L4_OVERLAY
         else -> com.shenyan.designsystem.components.SyMaterialTier.L3_CARD
     }
     val neutral = base in listOf(bgBase, bgLayer1, bgLayer2, bgLayer3, bgModulePlatform, sidebar)
-    return if (neutral) com.shenyan.designsystem.components.syMaterialColor(tier)
+    return if (neutral) com.shenyan.designsystem.components.syMaterialColor(tier, region.sampleY())
     else LocalAppBackgroundState.current.wallpaperSurface(base, level, region)
 }
 
@@ -517,11 +545,12 @@ fun com.shenyan.designsystem.foundation.SyColors.wallpaperSurface(
     val tier = when (level) {
         WallpaperSurfaceLevel.INPUT -> com.shenyan.designsystem.components.SyMaterialTier.L1_SECTION
         WallpaperSurfaceLevel.CHROME -> com.shenyan.designsystem.components.SyMaterialTier.L2_BAR
-        WallpaperSurfaceLevel.FLOATING, WallpaperSurfaceLevel.SHEET, WallpaperSurfaceLevel.DRAWER,
+        WallpaperSurfaceLevel.DRAWER -> com.shenyan.designsystem.components.SyMaterialTier.L2_BAR
+        WallpaperSurfaceLevel.FLOATING, WallpaperSurfaceLevel.SHEET,
         WallpaperSurfaceLevel.DIALOG, WallpaperSurfaceLevel.MENU -> com.shenyan.designsystem.components.SyMaterialTier.L4_OVERLAY
         else -> com.shenyan.designsystem.components.SyMaterialTier.L3_CARD
     }
     val neutral = base in listOf(canvas, materialL1, materialL2, materialL3, materialL4, surface, surfaceRaised)
-    return if (neutral) com.shenyan.designsystem.components.syMaterialColor(tier)
+    return if (neutral) com.shenyan.designsystem.components.syMaterialColor(tier, region.sampleY())
         else LocalAppBackgroundState.current.wallpaperSurface(base, level, region)
 }

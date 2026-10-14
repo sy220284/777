@@ -28,7 +28,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SySceneBackgroundSurface
 import com.shenyan.designsystem.components.SyMaterialTier
+import com.shenyan.designsystem.foundation.SyMotion
+import com.shenyan.designsystem.foundation.LocalSyMotionTempo
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -60,6 +63,8 @@ fun SyResponsiveSheet(
     dismissEnabled: Boolean = true,
     showDragHandle: Boolean = true,
     floating: Boolean = false,
+    surfaceTier: SyMaterialTier = SyMaterialTier.L4_OVERLAY,
+    seamlessBackground: Boolean = false,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -73,6 +78,7 @@ fun SyResponsiveSheet(
         confirmValueChange = { next -> dismissal.value || next != SheetValue.Hidden },
     )
     val reducedMotion = LocalSyReducedMotion.current
+    val tempo = LocalSyMotionTempo.current
     @Composable fun SheetBody() {
         Column(
             Modifier.fillMaxWidth().imePadding()
@@ -133,16 +139,23 @@ fun SyResponsiveSheet(
                 AnimatedVisibility(
                     visible = true,
                     enter = slideInHorizontally(tween(
-                        if (reducedMotion) 80 else SyDurations.sheet,
-                        easing = CubicBezierEasing(.22f, 1f, .36f, 1f)
+                        SyMotion.duration(SyDurations.sheet, reducedMotion, tempo),
+                        easing = SyMotion.ease
                     )) { fullWidth -> fullWidth },
                 ) {
-                    SyMaterialSurface(
-                        modifier = modifier.width(420.dp).fillMaxHeight()
-                            .padding(if (floating) 18.dp else 10.dp),
-                        shape = RoundedCornerShape(SyDimensions.cornerOverlay),
-                        tier = SyMaterialTier.L4_OVERLAY,
-                    ) { SheetBody() }
+                    val panelModifier = modifier.width(420.dp).fillMaxHeight()
+                        .padding(if (floating) 18.dp else 10.dp)
+                    if (seamlessBackground) {
+                        // Paint the root scene at the same screen coordinates, not a white plate
+                        // and not transparency that reveals chat bubbles underneath the menu.
+                        SySceneBackgroundSurface(panelModifier) { SheetBody() }
+                    } else {
+                        SyMaterialSurface(
+                            modifier = panelModifier,
+                            shape = RoundedCornerShape(SyDimensions.cornerOverlay),
+                            tier = surfaceTier,
+                        ) { SheetBody() }
+                    }
                 }
             }
         }
@@ -150,15 +163,20 @@ fun SyResponsiveSheet(
         ModalBottomSheet(
             onDismissRequest = { if (dismissal.value) onDismiss() },
             sheetState = sheetState,
-            modifier = if (floating) modifier.padding(horizontal = 6.dp) else modifier,
+            modifier = if (floating && !seamlessBackground) modifier.padding(horizontal = 6.dp) else modifier,
             shape = RoundedCornerShape(SyDimensions.cornerOverlay),
             containerColor = Color.Transparent,
-            scrimColor = p.scrim,
+            scrimColor = if (seamlessBackground) Color.Transparent else p.scrim,
+            tonalElevation = 0.dp,
             dragHandle = null,
             contentWindowInsets = { WindowInsets.navigationBars },
         ) {
-            SyMaterialSurface(tier = SyMaterialTier.L4_OVERLAY,
-                shape = RoundedCornerShape(SyDimensions.cornerOverlay)) { SheetBody() }
+            if (seamlessBackground) {
+                SySceneBackgroundSurface(Modifier.fillMaxWidth()) { SheetBody() }
+            } else {
+                SyMaterialSurface(tier = surfaceTier,
+                    shape = RoundedCornerShape(SyDimensions.cornerOverlay)) { SheetBody() }
+            }
         }
     }
 }

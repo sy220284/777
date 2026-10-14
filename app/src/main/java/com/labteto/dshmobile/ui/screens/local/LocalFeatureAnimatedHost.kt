@@ -44,15 +44,20 @@ internal fun LocalFeatureAnimatedHost(
         DsAnimations.predictiveBackMaxOffset.toPx()
     }
     val pushOffset = with(LocalDensity.current) { DsAnimations.pushOffset.roundToPx() }
+    val peerOffset = with(LocalDensity.current) {
+        com.shenyan.designsystem.foundation.SyMetric.navigationPeerOffset.roundToPx()
+    }
     val settledBackProgress = predictiveBackProgress.coerceIn(0f, 1f)
     val reduced = LocalSyReducedMotion.current
-    val ease = CubicBezierEasing(.22f, 1f, .36f, 1f)
-    val push = tween<IntOffset>(if (reduced) 80 else SyDurations.page, easing = ease)
-    val pop = tween<IntOffset>(if (reduced) 80 else 320, easing = ease)
-    val peer = tween<IntOffset>(if (reduced) 80 else 280, easing = ease)
-    val fadeEnter = tween<Float>(if (reduced) 80 else 150,
-        delayMillis = if (reduced) 0 else SyDurations.sidebarDelay, easing = ease)
-    val fadeExit = tween<Float>(if (reduced) 80 else 110, easing = ease)
+    val ease = com.shenyan.designsystem.foundation.SyMotion.ease
+    val motion = com.shenyan.designsystem.foundation.SyMotion
+    val tempo = com.shenyan.designsystem.foundation.LocalSyMotionTempo.current
+    val push = tween<IntOffset>(motion.duration(motion.pushMs, reduced, tempo), easing = ease)
+    val pop = tween<IntOffset>(motion.duration(motion.pagePopMs, reduced, tempo), easing = ease)
+    val peer = tween<IntOffset>(motion.duration(motion.pagePeerMs, reduced, tempo), easing = ease)
+    val fadeEnter = tween<Float>(motion.duration(motion.pageEnterFadeMs, reduced, tempo),
+        delayMillis = motion.duration(motion.sidebarContentDelayMs, reduced, tempo), easing = ease)
+    val fadeExit = tween<Float>(motion.duration(motion.pageExitFadeMs, reduced, tempo), easing = ease)
 
     SharedTransitionLayout(modifier = modifier) {
         val sharedScope = this
@@ -87,10 +92,10 @@ internal fun LocalFeatureAnimatedHost(
 
                 else -> {
                     (
-                        slideInHorizontally(peer) { pushOffset / 4 } +
+                        slideInHorizontally(peer) { peerOffset } +
                             fadeIn(fadeEnter)
                         ).togetherWith(
-                        slideOutHorizontally(peer) { -pushOffset / 4 } +
+                        slideOutHorizontally(peer) { -peerOffset } +
                             fadeOut(fadeExit),
                     )
                 }
@@ -124,12 +129,15 @@ internal fun localArtifactTransitionKey(workspace: String, file: String): String
 internal fun Modifier.localArtifactSharedBounds(workspace: String, file: String): Modifier {
     val scope = LocalFeatureSharedTransitionScope.current ?: return this
     val visibility = LocalFeatureVisibilityScope.current ?: return this
-    if (LocalSyReducedMotion.current || file.isBlank()) return this
+    val motion = com.shenyan.designsystem.foundation.SyMotion
+    val reduced = LocalSyReducedMotion.current
+    val tempo = com.shenyan.designsystem.foundation.LocalSyMotionTempo.current
+    if (reduced || file.isBlank()) return this
     return with(scope) {
         this@localArtifactSharedBounds.sharedBounds(
             sharedContentState = rememberSharedContentState(localArtifactTransitionKey(workspace, file)),
             animatedVisibilityScope = visibility,
-            boundsTransform = { _, _ -> tween(SyDurations.page) },
+            boundsTransform = { _, _ -> tween(motion.duration(motion.morphMs, reduced, tempo)) },
         )
     }
 }

@@ -13,6 +13,7 @@ import com.shenyan.designsystem.components.SyMaterialFrame
 import com.shenyan.designsystem.components.SyMaterialTier
 import com.shenyan.designsystem.foundation.SyMetric
 import com.shenyan.designsystem.foundation.SyMotion
+import com.shenyan.designsystem.foundation.LocalSyMotionTempo
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.style.TextAlign
@@ -42,6 +43,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsType
@@ -63,7 +65,8 @@ internal fun FluidSectionNavigation(
         val sy = LocalSyColors.current
     val pulse = rememberHapticPulse()
     val reduced = LocalSyReducedMotion.current
-    val duration = if (reduced) 0 else SyMotion.selectMs
+    val tempo = LocalSyMotionTempo.current
+    val duration = SyMotion.duration(SyMotion.selectMs, reduced, tempo)
     val tabs: @Composable () -> Unit = {
     Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(if (numbered) 5.dp else 2.dp)) {
         labels.forEachIndexed { index, label ->
@@ -123,17 +126,20 @@ internal fun FluidSectionSwap(
     enableSharedBounds: Boolean = false,
     content: @Composable (Int) -> Unit,
 ) {
-    val offset = with(LocalDensity.current) { 60.dp.roundToPx() }
+    val offset = with(LocalDensity.current) { SyMetric.navigationPeerOffset.roundToPx() }
     val reduceMotion = LocalSyReducedMotion.current
+    val tempo = LocalSyMotionTempo.current
+    val slideSpec = tween<IntOffset>(SyMotion.duration(SyMotion.pagePeerMs, reduceMotion, tempo),
+        easing = SyMotion.ease)
     val host: @Composable (Modifier, SharedTransitionScope?) -> Unit = { surfaceModifier, sharedScope ->
         AnimatedContent(targetState = section, modifier = surfaceModifier, label = "fluidSectionSwap",
             transitionSpec = {
                 if (reduceMotion) {
-                    fadeIn(tween(80)).togetherWith(fadeOut(tween(80)))
+                    fadeIn(tween(0)).togetherWith(fadeOut(tween(0)))
                 } else {
                     val direction = if (targetState > initialState) 1 else -1
-                    (slideInHorizontally(DsAnimations.featurePagePeer) { direction * offset } + fadeIn(tween(380)))
-                        .togetherWith(slideOutHorizontally(DsAnimations.featurePagePeer) { -direction * offset } + fadeOut(tween(140)))
+                    (slideInHorizontally(slideSpec) { direction * offset } + fadeIn(tween(SyMotion.duration(SyMotion.pagePeerMs, reduceMotion, tempo))))
+                        .togetherWith(slideOutHorizontally(slideSpec) { -direction * offset } + fadeOut(tween(SyMotion.duration(SyMotion.pagePeerMs, reduceMotion, tempo))))
                 }
             },
         ) { selectedSection ->
@@ -166,14 +172,16 @@ private val LocalFluidSectionVisibilityScope =
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 internal fun Modifier.localWorkCompletionSharedBounds(key: String?): Modifier {
-    if (key == null || LocalSyReducedMotion.current) return this
+    val reduced = LocalSyReducedMotion.current
+    val tempo = LocalSyMotionTempo.current
+    if (key == null || reduced) return this
     val shared = LocalFluidSectionSharedScope.current ?: return this
     val visibility = LocalFluidSectionVisibilityScope.current ?: return this
     return with(shared) {
         this@localWorkCompletionSharedBounds.sharedBounds(
             sharedContentState = rememberSharedContentState(key),
             animatedVisibilityScope = visibility,
-            boundsTransform = { _, _ -> tween(380) },
+            boundsTransform = { _, _ -> tween(SyMotion.duration(SyMotion.morphMs, reduced, tempo)) },
         )
     }
 }

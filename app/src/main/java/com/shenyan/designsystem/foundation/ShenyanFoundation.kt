@@ -1,6 +1,8 @@
 package com.shenyan.designsystem.foundation
 
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.CubicBezierEasing
+import kotlin.math.roundToInt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
@@ -50,20 +52,21 @@ data class SyColors(
 
 private val Light = SyColors(
     canvas = Color(0xFFEDE6DA), topBar = Color(0xFFF6F1E9),
-    materialL1 = Color(0x4DFFFFFF), materialL2 = Color(0x75FFFFFF),
-    materialL3 = Color(0xA3FFFFFF), materialL4 = Color(0xE0FAF7F2),
-    materialL5 = Color(0xFFFAF7F2), materialSheen = Color(0xB8FFFFFF),
-    surface = Color(0xA3FFFFFF), surfaceRaised = Color(0x75FFFFFF), surfaceSolid = Color(0xFFFAF7F2),
-    border = Color(0xCCFFFFFF), text = Color(0xFF3A342D),
+    // All material tiers share the warm canvas hue; increasing opacity, not whiteness, adds depth.
+    materialL1 = Color(0x4DEDE6DA), materialL2 = Color(0x75F1E8DC),
+    materialL3 = Color(0xA3F1E8DC), materialL4 = Color(0xE0F1E8DC),
+    materialL5 = Color(0xFFF1E8DC), materialSheen = Color(0x66F6F0E6),
+    surface = Color(0xA3F1E8DC), surfaceRaised = Color(0x75F1E8DC), surfaceSolid = Color(0xFFF1E8DC),
+    border = Color(0x66D3C5B5), text = Color(0xFF3A342D),
     textSecondary = Color(0xFF6A6156), textTertiary = Color(0xFF70665A),
     selected = Color(0xFFF2C7A8), overlay = Color(0x335A4837)
 )
 private val Dark = SyColors(
     canvas = Color(0xFF24211E), topBar = Color(0xFF292521),
-    materialL1 = Color(0x0EFFF5E4), materialL2 = Color(0x16FFF5E4),
-    materialL3 = Color(0x1FFFF5E4), materialL4 = Color(0xE0312B26),
+    materialL1 = Color(0x1A302B27), materialL2 = Color(0x29302B27),
+    materialL3 = Color(0x4035302B), materialL4 = Color(0xE0312B26),
     materialL5 = Color(0xFF35312D), materialSheen = Color(0x29FFF1DE),
-    surface = Color(0x1FFFF5E4), surfaceRaised = Color(0x16FFF5E4), surfaceSolid = Color(0xFF35312D),
+    surface = Color(0x4035302B), surfaceRaised = Color(0x29302B27), surfaceSolid = Color(0xFF35312D),
     border = Color(0x21FFFFFF), text = Color(0xFFF5F0E8),
     textSecondary = Color(0xFFD9D0C5), textTertiary = Color(0xFFB8AB9B),
     selected = Color(0xFF60422F), overlay = Color(0x5C000000)
@@ -107,6 +110,7 @@ data class SySceneBackdrop(
     val regionColors: List<Color> = emptyList(),
     val regionExtremes: List<List<Color>> = emptyList(),
     val surfaceTransparency: Float = .5f,
+    val ambientGlow: Float = .5f,
     val adaptiveContrast: Boolean = true,
 )
 
@@ -116,6 +120,9 @@ val LocalSySceneBackdrop = staticCompositionLocalOf<SySceneBackdrop?> { null }
 /** 非业务状态量统一设计，用户自定义字体缩放交由 Compose sp / 系统处理。 */
 object SyMetric {
     val touch = 48.dp
+    // Navigation geometry is V6 pack-owned, shared by feature stack and peer swaps.
+    val navigationPushOffset = 20.dp
+    val navigationPeerOffset = 6.dp
     val gapXs = 2.dp
     val gapSm = 6.dp
     val gapMd = 10.dp
@@ -128,7 +135,22 @@ object SyMetric {
     val radiusCard = 18.dp
     val radiusSheet = 24.dp
 }
+/** Opacity response shared by V6 glass and retained legacy surface adapters. */
+object SyMaterialPolicy {
+    const val transparencyStrength = .46f
+    fun adjustment(transparency: Float): Float =
+        (.5f - transparency.coerceIn(0f, 1f)) * transparencyStrength
+}
+
 object SyMotion {
+    // One motion vocabulary for the current V6 UI pack. Timing variants belong here,
+    // not in screens or a second DsAnimations token collection.
+    val ease = CubicBezierEasing(.22f, 1f, .36f, 1f)
+    const val pressedScale = .985f
+    const val reducedMotionMs = 0
+    fun duration(ms: Int, reducedMotion: Boolean, tempo: Float = 1f): Int =
+        if (reducedMotion) reducedMotionMs
+        else (ms * tempo.coerceIn(.7f, 1.3f)).roundToInt()
     const val pressMs = 80
     const val selectMs = 200
     const val dialogMs = 280
@@ -140,10 +162,26 @@ object SyMotion {
     const val toastMs = 200
     const val sidebarMs = 280
     const val sidebarContentDelayMs = 60
+    const val progressMs = 340
+    const val composerRevealMs = 190
+    const val composerFadeMs = 120
+    const val chevronMs = 150
+    const val interactionColorMs = 140
+    const val fadeMs = 150
+    const val pagePopMs = 320
+    const val pagePeerMs = 160
+    const val pageEnterFadeMs = 150
+    const val pageExitFadeMs = 110
+    const val livePulseMs = 900
+    const val holdStartMs = 420L
+    const val holdRepeatMs = 90L
+    const val hapticIntervalMs = 45L
 }
 
 /** 明确传入 reduceMotion；由宿主根据系统动画缩放/无障碍设置确定，不擅自读取旧项目开关。 */
 val LocalSyReduceMotion = staticCompositionLocalOf { false }
+/** One app-wide tempo for the V6 animation owners; no unsupported platform locals. */
+val LocalSyMotionTempo = staticCompositionLocalOf { 1f }
 val LocalSyReduceTransparency = staticCompositionLocalOf { false }
 
 @Composable

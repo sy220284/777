@@ -61,17 +61,18 @@ fun SyButton(
     val repeatAction by rememberUpdatedState(onHoldRepeat)
     LaunchedEffect(pressed, enabled, loading) {
         if (!pressed || !enabled || loading || repeatAction == null) return@LaunchedEffect
-        delay(420L)
+        delay(SyMotion.holdStartMs)
         while (true) {
             val action = repeatAction ?: break
             action()
-            delay(90L)
+            delay(SyMotion.holdRepeatMs)
         }
     }
     val reduceMotion = LocalSyReduceMotion.current
+    val tempo = LocalSyMotionTempo.current
     val scale by animateFloatAsState(
-        if (pressed && enabled && !reduceMotion) .97f else 1f,
-        animationSpec = tween(if (reduceMotion) 0 else SyMotion.pressMs),
+        if (pressed && enabled && !reduceMotion) SyMotion.pressedScale else 1f,
+        animationSpec = tween(SyMotion.duration(SyMotion.pressMs, reduceMotion, tempo)),
         label = "syButtonPress",
     )
     val fill = if (!enabled) syMaterialColor(SyMaterialTier.L2_BAR) else when (style) {
@@ -80,8 +81,8 @@ fun SyButton(
         // INFO is the visibly emphasized secondary action, not the unselected ghost style.
         SyButtonStyle.INFO -> c.selected
         SyButtonStyle.SECONDARY -> syMaterialColor(SyMaterialTier.L2_BAR)
-        SyButtonStyle.GHOST, SyButtonStyle.OUTLINE ->
-            if (LocalSySceneBackdrop.current?.image != null) syMaterialColor(SyMaterialTier.L1_SECTION) else Color.Transparent
+        SyButtonStyle.GHOST -> Color.Transparent
+        SyButtonStyle.OUTLINE -> syMaterialColor(SyMaterialTier.L1_SECTION)
     }
     val foreground = if (!enabled) c.textTertiary else when (style) {
         SyButtonStyle.PRIMARY -> c.onPrimary
@@ -100,9 +101,10 @@ fun SyButton(
             BorderStroke(1.dp, c.border) else null,
     ) {
         Row(
-            Modifier.background(
-                Brush.horizontalGradient(if (style == SyButtonStyle.PRIMARY && enabled)
-                    listOf(c.primary, c.primaryPressed) else listOf(fill, fill))
+            Modifier.then(
+                if (style == SyButtonStyle.PRIMARY && enabled)
+                    Modifier.background(Brush.horizontalGradient(listOf(c.primary, c.primaryPressed)))
+                else Modifier
             ).padding(horizontal = if (compact) 12.dp else 16.dp, vertical = if (compact) 8.dp else 11.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
@@ -147,14 +149,14 @@ fun SyTabs(tabs: List<SyOption>, selectedId: String, onSelect: (String) -> Unit,
         tabs.forEach { tab ->
             val fill by animateColorAsState(
                 if (tab.id == selectedId) c.selected else syMaterialColor(SyMaterialTier.L2_BAR),
-                tween(if (LocalSyReduceMotion.current) 0 else SyMotion.selectMs), label = "tabSelection",
+                tween(SyMotion.duration(SyMotion.selectMs, LocalSyReduceMotion.current, LocalSyMotionTempo.current)), label = "tabSelection",
             )
             Surface(onClick = { onSelect(tab.id) }, enabled = tab.enabled,
                 modifier = Modifier.heightIn(min = SyMetric.touch).semantics {
                     selected = tab.id == selectedId
                     role = Role.Tab
                 },
-                shape = RoundedCornerShape(13.dp),
+                shape = RoundedCornerShape(SyMetric.radiusControl),
                 color = fill,
                 border = BorderStroke(1.dp, c.border)) {
                 Box(Modifier.padding(horizontal = 15.dp, vertical = 11.dp), contentAlignment = Alignment.Center) {
@@ -223,7 +225,7 @@ fun SySearchBar(
 
 @Composable
 fun SyToast(text: String, modifier: Modifier = Modifier) {
-    Surface(modifier, color = LocalSyColors.current.text, shape = RoundedCornerShape(13.dp)) {
+    Surface(modifier, color = LocalSyColors.current.text, shape = RoundedCornerShape(SyMetric.radiusControl)) {
         Text(text, Modifier.padding(14.dp), color = LocalSyColors.current.canvas)
     }
 }
@@ -311,7 +313,7 @@ fun SySwitchControl(
 @Composable
 fun SyListItem(title: String, description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     SyMaterialSurface(onClick = onClick, modifier = modifier.fillMaxWidth().heightIn(min = SyMetric.touch), tier = SyMaterialTier.L3_CARD,
-        shape = RoundedCornerShape(13.dp)) {
+        shape = RoundedCornerShape(SyMetric.radiusControl)) {
         Column(Modifier.padding(13.dp)) { Text(title); Text(description, style = MaterialTheme.typography.bodySmall, color = LocalSyColors.current.textSecondary) }
     }
 }
@@ -339,7 +341,7 @@ fun SyStatusTag(label: String, phase: SyPhase, modifier: Modifier = Modifier) {
 @Composable
 fun SyFileRow(fileName: String, detail: String, onOpen: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     SyMaterialSurface(onClick = onOpen, enabled = enabled, modifier = modifier.fillMaxWidth().heightIn(min = SyMetric.touch),
-        tier = SyMaterialTier.L3_CARD, shape = RoundedCornerShape(13.dp)) {
+        tier = SyMaterialTier.L3_CARD, shape = RoundedCornerShape(SyMetric.radiusControl)) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("▤", Modifier.padding(end = 12.dp))
             Column(Modifier.weight(1f)) { Text(fileName, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(detail, style = MaterialTheme.typography.bodySmall) }
@@ -349,7 +351,7 @@ fun SyFileRow(fileName: String, detail: String, onOpen: () -> Unit, modifier: Mo
 
 @Composable
 fun SyNote(text: String, modifier: Modifier = Modifier) {
-    SyMaterialSurface(modifier, tier = SyMaterialTier.L2_BAR, shape = RoundedCornerShape(13.dp)) {
+    SyMaterialSurface(modifier, tier = SyMaterialTier.L2_BAR, shape = RoundedCornerShape(SyMetric.radiusControl)) {
         Text(text, Modifier.padding(13.dp), color = LocalSyColors.current.textSecondary)
     }
 }
