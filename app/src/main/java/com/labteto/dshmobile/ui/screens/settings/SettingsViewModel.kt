@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import com.labteto.dshmobile.R
@@ -160,6 +161,11 @@ class SettingsViewModel @Inject constructor(
             val source = appContext.contentResolver.openInputStream(uri)
                 ?: error("Cannot open the picked image")
             source.use { input -> staging.outputStream().use { output -> input.copyTo(output) } }
+            // Validate the staged bytes before persisting a reference or deleting the last
+            // usable wallpaper. An image/* provider is allowed to return undecodable data.
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(staging.absolutePath, bounds)
+            check(bounds.outWidth > 0 && bounds.outHeight > 0) { "Invalid background image" }
             check(staging.renameTo(target)) { "Cannot commit the background image" }
         } finally {
             staging.delete()
