@@ -69,9 +69,10 @@ fun SyButton(
         }
     }
     val reduceMotion = LocalSyReduceMotion.current
+    val tempo = LocalSyMotionTempo.current
     val scale by animateFloatAsState(
         if (pressed && enabled && !reduceMotion) SyMotion.pressedScale else 1f,
-        animationSpec = tween(if (reduceMotion) 0 else SyMotion.pressMs),
+        animationSpec = tween(SyMotion.duration(SyMotion.pressMs, reduceMotion, tempo)),
         label = "syButtonPress",
     )
     val fill = if (!enabled) syMaterialColor(SyMaterialTier.L2_BAR) else when (style) {
@@ -148,7 +149,7 @@ fun SyTabs(tabs: List<SyOption>, selectedId: String, onSelect: (String) -> Unit,
         tabs.forEach { tab ->
             val fill by animateColorAsState(
                 if (tab.id == selectedId) c.selected else syMaterialColor(SyMaterialTier.L2_BAR),
-                tween(if (LocalSyReduceMotion.current) 0 else SyMotion.selectMs), label = "tabSelection",
+                tween(SyMotion.duration(SyMotion.selectMs, LocalSyReduceMotion.current, LocalSyMotionTempo.current)), label = "tabSelection",
             )
             Surface(onClick = { onSelect(tab.id) }, enabled = tab.enabled,
                 modifier = Modifier.heightIn(min = SyMetric.touch).semantics {

@@ -51,12 +51,13 @@ internal fun LocalFeatureAnimatedHost(
     val reduced = LocalSyReducedMotion.current
     val ease = com.shenyan.designsystem.foundation.SyMotion.ease
     val motion = com.shenyan.designsystem.foundation.SyMotion
-    val push = tween<IntOffset>(motion.duration(motion.pushMs, reduced), easing = ease)
-    val pop = tween<IntOffset>(motion.duration(motion.pagePopMs, reduced), easing = ease)
-    val peer = tween<IntOffset>(motion.duration(motion.pagePeerMs, reduced), easing = ease)
-    val fadeEnter = tween<Float>(motion.duration(motion.pageEnterFadeMs, reduced),
-        delayMillis = motion.duration(motion.sidebarContentDelayMs, reduced), easing = ease)
-    val fadeExit = tween<Float>(motion.duration(motion.pageExitFadeMs, reduced), easing = ease)
+    val tempo = com.shenyan.designsystem.foundation.LocalSyMotionTempo.current
+    val push = tween<IntOffset>(motion.duration(motion.pushMs, reduced, tempo), easing = ease)
+    val pop = tween<IntOffset>(motion.duration(motion.pagePopMs, reduced, tempo), easing = ease)
+    val peer = tween<IntOffset>(motion.duration(motion.pagePeerMs, reduced, tempo), easing = ease)
+    val fadeEnter = tween<Float>(motion.duration(motion.pageEnterFadeMs, reduced, tempo),
+        delayMillis = motion.duration(motion.sidebarContentDelayMs, reduced, tempo), easing = ease)
+    val fadeExit = tween<Float>(motion.duration(motion.pageExitFadeMs, reduced, tempo), easing = ease)
 
     SharedTransitionLayout(modifier = modifier) {
         val sharedScope = this
@@ -133,7 +134,7 @@ internal fun Modifier.localArtifactSharedBounds(workspace: String, file: String)
         this@localArtifactSharedBounds.sharedBounds(
             sharedContentState = rememberSharedContentState(localArtifactTransitionKey(workspace, file)),
             animatedVisibilityScope = visibility,
-            boundsTransform = { _, _ -> tween(com.shenyan.designsystem.foundation.SyMotion.morphMs) },
+            boundsTransform = { _, _ -> tween(motion.duration(motion.morphMs, reduced, tempo)) },
         )
     }
 }

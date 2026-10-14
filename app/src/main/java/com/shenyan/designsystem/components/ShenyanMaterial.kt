@@ -107,7 +107,7 @@ fun SyMaterialSurface(
     val pressed by interaction.collectIsPressedAsState()
     val press by animateFloatAsState(
         if (pressed && enabled && onClick != null && !LocalSyReduceMotion.current) SyMotion.pressedScale else 1f,
-        tween(if (LocalSyReduceMotion.current) 0 else SyMotion.pressMs), label = "materialPress",
+        tween(SyMotion.duration(SyMotion.pressMs, LocalSyReduceMotion.current, LocalSyMotionTempo.current)), label = "materialPress",
     )
     // Without a spatial backing, use the same palette over its canvas rather than letting
     // unrelated content show through. Nested cards inherit their parent's backing.

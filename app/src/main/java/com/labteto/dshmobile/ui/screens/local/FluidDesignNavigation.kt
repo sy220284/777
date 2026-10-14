@@ -13,6 +13,7 @@ import com.shenyan.designsystem.components.SyMaterialFrame
 import com.shenyan.designsystem.components.SyMaterialTier
 import com.shenyan.designsystem.foundation.SyMetric
 import com.shenyan.designsystem.foundation.SyMotion
+import com.shenyan.designsystem.foundation.LocalSyMotionTempo
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.style.TextAlign
@@ -63,7 +64,8 @@ internal fun FluidSectionNavigation(
         val sy = LocalSyColors.current
     val pulse = rememberHapticPulse()
     val reduced = LocalSyReducedMotion.current
-    val duration = if (reduced) 0 else SyMotion.selectMs
+    val tempo = LocalSyMotionTempo.current
+    val duration = SyMotion.duration(SyMotion.selectMs, reduced, tempo)
     val tabs: @Composable () -> Unit = {
     Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(if (numbered) 5.dp else 2.dp)) {
         labels.forEachIndexed { index, label ->
@@ -132,8 +134,8 @@ internal fun FluidSectionSwap(
                     fadeIn(tween(0)).togetherWith(fadeOut(tween(0)))
                 } else {
                     val direction = if (targetState > initialState) 1 else -1
-                    (slideInHorizontally(DsAnimations.featurePagePeer) { direction * offset } + fadeIn(tween(SyMotion.pagePeerMs)))
-                        .togetherWith(slideOutHorizontally(DsAnimations.featurePagePeer) { -direction * offset } + fadeOut(tween(SyMotion.pagePeerMs)))
+                    (slideInHorizontally(DsAnimations.featurePagePeer) { direction * offset } + fadeIn(tween(SyMotion.duration(SyMotion.pagePeerMs, reduced, tempo))))
+                        .togetherWith(slideOutHorizontally(DsAnimations.featurePagePeer) { -direction * offset } + fadeOut(tween(SyMotion.duration(SyMotion.pagePeerMs, reduced, tempo))))
                 }
             },
         ) { selectedSection ->
@@ -173,7 +175,7 @@ internal fun Modifier.localWorkCompletionSharedBounds(key: String?): Modifier {
         this@localWorkCompletionSharedBounds.sharedBounds(
             sharedContentState = rememberSharedContentState(key),
             animatedVisibilityScope = visibility,
-            boundsTransform = { _, _ -> tween(SyMotion.morphMs) },
+            boundsTransform = { _, _ -> tween(SyMotion.duration(SyMotion.morphMs, reduced, tempo)) },
         )
     }
 }

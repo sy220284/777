@@ -31,6 +31,7 @@ import com.shenyan.designsystem.components.SyMaterialSurface
 import com.shenyan.designsystem.components.SySceneBackgroundSurface
 import com.shenyan.designsystem.components.SyMaterialTier
 import com.shenyan.designsystem.foundation.SyMotion
+import com.shenyan.designsystem.foundation.LocalSyMotionTempo
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -77,6 +78,7 @@ fun SyResponsiveSheet(
         confirmValueChange = { next -> dismissal.value || next != SheetValue.Hidden },
     )
     val reducedMotion = LocalSyReducedMotion.current
+    val tempo = LocalSyMotionTempo.current
     @Composable fun SheetBody() {
         Column(
             Modifier.fillMaxWidth().imePadding()
@@ -137,7 +139,7 @@ fun SyResponsiveSheet(
                 AnimatedVisibility(
                     visible = true,
                     enter = slideInHorizontally(tween(
-                        SyMotion.duration(SyDurations.sheet, reducedMotion),
+                        SyMotion.duration(SyDurations.sheet, reducedMotion, tempo),
                         easing = SyMotion.ease
                     )) { fullWidth -> fullWidth },
                 ) {

@@ -334,15 +334,9 @@ fun DshTheme(
         textScale = clampedTextScale,
         textWeightAdjustment = textWeightAdjustment.coerceIn(0, 2),
     )
-    val systemMotionScale = androidx.compose.ui.platform.LocalMotionDurationScale.current
     val userMotionScale = motionDurationScale.coerceIn(.7f, 1.3f)
-    val effectiveMotion = remember(systemMotionScale, userMotionScale) {
-        object : androidx.compose.ui.MotionDurationScale {
-            override val scaleFactor: Float get() = systemMotionScale.scaleFactor * userMotionScale
-        }
-    }
     CompositionLocalProvider(
-        androidx.compose.ui.platform.LocalMotionDurationScale provides effectiveMotion,
+        com.shenyan.designsystem.foundation.LocalSyMotionTempo provides userMotionScale,
         LocalDsColors provides themed,
         LocalDsReadingPreferences provides readingPreferences,
         LocalDensity provides Density(

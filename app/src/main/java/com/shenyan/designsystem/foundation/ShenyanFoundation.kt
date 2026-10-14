@@ -2,6 +2,7 @@ package com.shenyan.designsystem.foundation
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.core.CubicBezierEasing
+import kotlin.math.roundToInt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
@@ -147,7 +148,9 @@ object SyMotion {
     val ease = CubicBezierEasing(.22f, 1f, .36f, 1f)
     const val pressedScale = .985f
     const val reducedMotionMs = 0
-    fun duration(ms: Int, reducedMotion: Boolean): Int = if (reducedMotion) reducedMotionMs else ms
+    fun duration(ms: Int, reducedMotion: Boolean, tempo: Float = 1f): Int =
+        if (reducedMotion) reducedMotionMs
+        else (ms * tempo.coerceIn(.7f, 1.3f)).roundToInt()
     const val pressMs = 80
     const val selectMs = 200
     const val dialogMs = 280
@@ -177,6 +180,8 @@ object SyMotion {
 
 /** 明确传入 reduceMotion；由宿主根据系统动画缩放/无障碍设置确定，不擅自读取旧项目开关。 */
 val LocalSyReduceMotion = staticCompositionLocalOf { false }
+/** One app-wide tempo for the V6 animation owners; no unsupported platform locals. */
+val LocalSyMotionTempo = staticCompositionLocalOf { 1f }
 val LocalSyReduceTransparency = staticCompositionLocalOf { false }
 
 @Composable

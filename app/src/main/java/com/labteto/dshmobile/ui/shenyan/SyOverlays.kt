@@ -76,6 +76,7 @@ import com.shenyan.designsystem.foundation.LocalSyColors
 import com.shenyan.designsystem.foundation.LocalSyReduceMotion
 import com.shenyan.designsystem.foundation.SyMetric
 import com.shenyan.designsystem.foundation.SyMotion
+import com.shenyan.designsystem.foundation.LocalSyMotionTempo
 import kotlinx.coroutines.delay
 
 /** The only native generic dialog: V5 L4, correct back and explicit scrim behavior. */
@@ -92,7 +93,7 @@ fun SyDialog(
     LaunchedEffect(Unit) { shown = true }
     val scale by animateFloatAsState(
         if (shown) 1f else .92f,
-        tween(if (reduced) 0 else SyMotion.dialogMs), label = "syDialogScale",
+        tween(SyMotion.duration(SyMotion.dialogMs, reduced, LocalSyMotionTempo.current)), label = "syDialogScale",
     )
     Dialog(
         onDismissRequest = onDismiss,
@@ -164,10 +165,10 @@ fun SyToastHost(state: Pair<State<String?>, (String) -> Unit>, modifier: Modifie
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         AnimatedVisibility(
             visible = message != null,
-            enter = fadeIn(tween(if (reduced) 0 else SyMotion.toastMs)) +
-                slideInVertically(tween(if (reduced) 0 else SyMotion.toastMs)) { -it / 3 },
-            exit = fadeOut(tween(if (reduced) 0 else SyMotion.toastMs)) +
-                slideOutVertically(tween(if (reduced) 0 else SyMotion.toastMs)) { -it / 3 },
+            enter = fadeIn(tween(SyMotion.duration(SyMotion.toastMs, reduced, LocalSyMotionTempo.current))) +
+                slideInVertically(tween(SyMotion.duration(SyMotion.toastMs, reduced, LocalSyMotionTempo.current))) { -it / 3 },
+            exit = fadeOut(tween(SyMotion.duration(SyMotion.toastMs, reduced, LocalSyMotionTempo.current))) +
+                slideOutVertically(tween(SyMotion.duration(SyMotion.toastMs, reduced, LocalSyMotionTempo.current))) { -it / 3 },
         ) {
             Box(Modifier.padding(top = 12.dp).semantics {
                 liveRegion = LiveRegionMode.Polite
