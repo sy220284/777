@@ -25,8 +25,13 @@ RETIRED = {"Projects", "RunCenter"}
 def active_entry_icon_sheet(raw: bytes) -> bytes:
     root = ElementTree.fromstring(raw)
     top_level_tiles = root.findall(f"{SVG_NS}g")
+    if len(top_level_tiles) == 24:
+        labels = [next((e.text for e in tile.findall(f"{SVG_NS}text") if e.text and e.text.isascii()), "") for tile in top_level_tiles]
+        if len(set(labels)) != 24 or RETIRED.intersection(labels):
+            raise ValueError("The checked-in active icon sheet contains duplicate or retired labels")
+        return raw
     if len(top_level_tiles) != 26:
-        raise ValueError(f"Expected 26 source icon tiles, found {len(top_level_tiles)}")
+        raise ValueError(f"Expected 24 active or 26 historical icon tiles, found {len(top_level_tiles)}")
     removed = set()
     for tile in top_level_tiles:
         labels = {el.text for el in tile.findall(f"{SVG_NS}text")}
