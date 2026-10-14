@@ -50,18 +50,19 @@ data class SyColors(
 
 private val Light = SyColors(
     canvas = Color(0xFFEDE6DA), topBar = Color(0xFFF6F1E9),
-    materialL1 = Color(0x4DFFFFFF), materialL2 = Color(0x75FFFFFF),
-    materialL3 = Color(0xA3FFFFFF), materialL4 = Color(0xE0FAF7F2),
-    materialL5 = Color(0xFFFAF7F2), materialSheen = Color(0xB8FFFFFF),
-    surface = Color(0xA3FFFFFF), surfaceRaised = Color(0x75FFFFFF), surfaceSolid = Color(0xFFFAF7F2),
+    // All material tiers share the warm canvas hue; increasing opacity, not whiteness, adds depth.
+    materialL1 = Color(0x4DEDE6DA), materialL2 = Color(0x75F1E8DC),
+    materialL3 = Color(0xA3F1E8DC), materialL4 = Color(0xE0F1E8DC),
+    materialL5 = Color(0xFFF1E8DC), materialSheen = Color(0x66F6F0E6),
+    surface = Color(0xA3F1E8DC), surfaceRaised = Color(0x75F1E8DC), surfaceSolid = Color(0xFFF1E8DC),
     border = Color(0xCCFFFFFF), text = Color(0xFF3A342D),
     textSecondary = Color(0xFF6A6156), textTertiary = Color(0xFF70665A),
     selected = Color(0xFFF2C7A8), overlay = Color(0x335A4837)
 )
 private val Dark = SyColors(
     canvas = Color(0xFF24211E), topBar = Color(0xFF292521),
-    materialL1 = Color(0x0EFFF5E4), materialL2 = Color(0x16FFF5E4),
-    materialL3 = Color(0x1FFFF5E4), materialL4 = Color(0xE0312B26),
+    materialL1 = Color(0x1A302B27), materialL2 = Color(0x29302B27),
+    materialL3 = Color(0x4035302B), materialL4 = Color(0xE0312B26),
     materialL5 = Color(0xFF35312D), materialSheen = Color(0x29FFF1DE),
     surface = Color(0x1FFFF5E4), surfaceRaised = Color(0x16FFF5E4), surfaceSolid = Color(0xFF35312D),
     border = Color(0x21FFFFFF), text = Color(0xFFF5F0E8),
