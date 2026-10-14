@@ -10,6 +10,10 @@ from pathlib import Path
 import re
 import json
 import sys
+import subprocess
+import tempfile
+import zipfile
+from xml.etree import ElementTree
 
 ROOT = Path(__file__).resolve().parents[2]
 UI = ROOT / "app/src/main/java/com/labteto/dshmobile/ui"
@@ -285,6 +289,35 @@ else:
             violations.append("V6 offline HTML icon inventory differs from current editable SVG")
     except json.JSONDecodeError:
         violations.append("V6 offline HTML icon map invalid")
+
+# Run the actual exporter in CI; a passing manifest/parser check alone cannot prove
+# that the user's ZIP will omit retired icons or preserve file hashes.
+try:
+    with tempfile.TemporaryDirectory(prefix="v6-export-") as tmp:
+        archive = Path(tmp) / "v6-current.zip"
+        process = subprocess.run(
+            [sys.executable, str(v6_root / "sync-design-package.py"),
+             "--source", str(v6_root), "--output", str(archive)],
+            capture_output=True, text=True, timeout=40, check=False,
+        )
+        if process.returncode:
+            violations.append("V6 ZIP exporter failed: " + (process.stderr or process.stdout).strip()[-900:])
+        else:
+            with zipfile.ZipFile(archive) as exported:
+                if exported.testzip() is not None:
+                    violations.append("V6 ZIP CRC validation failed")
+                sheet = ElementTree.fromstring(exported.read("sy-entry-icons.svg"))
+                ns = "{http://www.w3.org/2000/svg}"
+                groups = sheet.findall(f"{ns}g")
+                names = [
+                    next((t.text for t in g.findall(f"{ns}text")
+                          if t.text and t.text.isascii()), "")
+                    for g in groups
+                ]
+                if len(names) != active_count or len(set(names)) != active_count or retired_icons.intersection(names):
+                    violations.append("V6 exported ZIP contains an incorrect/retired icon inventory")
+except (OSError, KeyError, ValueError, TimeoutError, zipfile.BadZipFile) as exc:
+    violations.append(f"V6 ZIP exporter validation failed: {exc}")
 
 # Also validate local source links in the actual V6 authority.
 for link in re.findall(r"\]\(([^)]+)\)", v6_spec):
