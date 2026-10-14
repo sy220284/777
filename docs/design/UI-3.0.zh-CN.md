@@ -55,7 +55,7 @@ Chat / Work / Project / Automation / Tools / Settings 的既有业务 Owner
           业务 Owner 重新做准入、授权与执行
 ```
 
-现有 `LocalFeatureCatalog` 维持产品功能的**单一归属**和既有 9 条一级路由；新 UI 包不得注册第二份业务所有权。不同 UI 包可为同一个 Scene 提供不同的渲染器，不得为同一业务任务建立不同的执行真相。
+现有 `LocalFeatureCatalog` 维持产品功能的**单一归属**和当前 7 条一级路由；新 UI 包不得注册第二份业务所有权。不同 UI 包可为同一个 Scene 提供不同的渲染器，不得为同一业务任务建立不同的执行真相。
 
 ### 3.1 业务插座（Feature UI Port）
 

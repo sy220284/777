@@ -1,36 +1,57 @@
 #!/usr/bin/env python3
-"""Editable, exact vector asset sheet; this is a design preview, not a device screenshot."""
+"""Generate V6 palette/material swatches from the actual Compose SyColors source.
+
+This is an editable SVG palette reference, not wallpaper color sampling or device proof.
+Keep file icon SVG originals in assets/file-icons; do not use historic white-glass sheets.
+"""
 from pathlib import Path
-import xml.etree.ElementTree as ET
+import re
 
 root = Path(__file__).resolve().parent
-themes = [
-    ('Light', '#EDE6DA', '#F6F1E9', '#3A342D', ['#FFFFFF']*3 + ['#FAF7F2']*2, [.30, .46, .64, .88, 1], 'light'),
-    ('Dark', '#24211E', '#292521', '#F5F0E8', ['#FFF5E4']*3 + ['#312B26', '#35312D'], [.055, .085, .12, .88, 1], 'dark'),
-    ('Matte', '#0F0F10', '#18181A', '#F5F0E8', ['#181819', '#1E1E20', '#232324', '#29292B', '#29292B'], [1]*5, 'dark'),
+repo = root.parents[2]
+source = (repo / "app/src/main/java/com/shenyan/designsystem/foundation/ShenyanFoundation.kt").read_text(encoding="utf-8")
+fields = ("canvas", "topBar", "text", "materialL1", "materialL2", "materialL3", "materialL4", "materialL5", "border")
+def read_theme(name):
+    m = re.search(r"private val " + name + r" = SyColors\((.*?)\n\)", source, re.S)
+    if not m:
+        raise RuntimeError("Missing Compose palette " + name)
+    return {field: re.search(r"\b" + field + r"\s*=\s*Color\(0x([0-9A-Fa-f]{8})\)", m.group(1)).group(1).upper() for field in fields}
+def rgba(value):
+    return "#" + value[2:], round(int(value[:2], 16) / 255, 4)
+
+lines = [
+'<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">',
+'<title>神言神语 V6 · 按原生 Compose 同源令牌生成的三主题材质与图标来源预览</title>',
+'<rect width="1200" height="630" fill="#181615"/>',
+'<text x="22" y="35" fill="#F5F0E8" font-size="22" font-family="sans-serif">V6 · 真实色彩与材质五层 · 2026-10-14</text>',
+'<text x="22" y="60" fill="#B8AB9B" font-size="13" font-family="sans-serif">数据取自 ShenyanFoundation.kt；示意层不是 Android 真实模糊 / 壁纸混色截图</text>',
 ]
-svg = ['<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="530" viewBox="0 0 1200 530">',
-       '<title>Shenyan V6 · File assets and material tiers</title>',
-       '<rect width="1200" height="530" fill="#EDE6DA"/>',
-       '<text x="24" y="35" fill="#3A342D" font-family="sans-serif" font-size="22" font-weight="600">Shenyan V6 · File assets and material tiers</text>']
-for i, (name, bg, bar, ink, fills, alpha, icon_theme) in enumerate(themes):
-    x = 18 + i*398
-    svg.append(f'<g transform="translate({x},55)"><rect width="386" height="455" rx="22" fill="{bg}"/>')
-    if name != 'Matte':
-        svg.append('<defs><radialGradient id="glow'+str(i)+'"><stop stop-color="#E8A87C" stop-opacity=".32"/><stop offset="1" stop-color="#E8A87C" stop-opacity="0"/></radialGradient></defs>')
-        svg.append(f'<ellipse cx="70" cy="205" rx="160" ry="150" fill="url(#glow{i})"/>')
-    svg.append(f'<rect x="14" y="14" width="358" height="48" rx="12" fill="{bar}"/><text x="30" y="45" fill="{ink}" font-family="sans-serif" font-size="18" font-weight="600">{name}</text>')
-    svg.append(f'<text x="26" y="91" fill="{ink}" font-family="sans-serif" font-size="13">Audio / Video / Archive</text>')
-    for j, kind in enumerate(['audio', 'video', 'archive']):
-        icon = ET.parse(root / f'assets/file-icons/ic_ui_file{kind}_{icon_theme}.svg').getroot()
-        paths = ''.join(ET.tostring(child, encoding='unicode') for child in icon if child.tag.endswith('path'))
-        svg.append(f'<g transform="translate({32+j*119},110) scale(1.7)">{paths}</g>')
-        svg.append(f'<text x="{32+j*119}" y="201" fill="{ink}" font-family="sans-serif" font-size="13">{kind.title()}</text>')
-    for j, (fill, a) in enumerate(zip(fills, alpha)):
-        y = 222+j*40
-        svg.append(f'<rect x="22" y="{y}" width="342" height="33" rx="9" fill="{fill}" fill-opacity="{a}" stroke="{ink}" stroke-opacity=".10"/>')
-        svg.append(f'<text x="36" y="{y+22}" fill="{ink}" font-family="sans-serif" font-size="12">L{j+1} · {round(a*100,1)}% opacity</text>')
-    svg.append(f'<text x="26" y="439" fill="{ink}" font-family="sans-serif" font-size="11">40dp vector grid · opaque top bar · 48dp touch target</text></g>')
-svg.append('</svg>')
-(root / 'assets/file-icons-preview.svg').write_text('\n'.join(svg)+'\n')
-print('Created editable three-theme asset preview')
+for i, name in enumerate(("Light", "Dark", "Matte")):
+    f = read_theme(name)
+    can, _ = rgba(f["canvas"])
+    ink, _ = rgba(f["text"])
+    edge, edge_a = rgba(f["border"])
+    x = 18 + 395*i
+    lines += [
+        f'<g transform="translate({x},82)">',
+        f'<rect x="0" y="0" width="382" height="531" rx="22" fill="{can}"/>',
+        f'<rect x="15" y="15" width="352" height="58" rx="13" fill="none" stroke="{edge}" stroke-opacity="{edge_a}"/>',
+        f'<text x="32" y="49" font-family="sans-serif" font-size="19" fill="{ink}" font-weight="600">{name}</text>',
+        f'<text x="28" y="101" font-family="sans-serif" font-size="13" fill="{ink}">共用场景 / 无额外不透明顶栏</text>',
+    ]
+    for level in range(1, 6):
+        val = f["materialL" + str(level)]
+        fill, alpha = rgba(val)
+        y = 113 + level*60
+        lines += [
+            f'<rect x="22" y="{y}" width="338" height="46" rx="13" fill="{fill}" fill-opacity="{alpha}" stroke="{edge}" stroke-opacity="{edge_a}"/>',
+            f'<text x="40" y="{y+29}" font-family="sans-serif" font-size="14" fill="{ink}">L{level} · {round(alpha*100)}% alpha · {val}</text>',
+        ]
+    lines += [
+        f'<text x="23" y="470" font-family="sans-serif" font-size="12" fill="{ink}">文件图标源：assets/file-icons/</text>',
+        f'<text x="23" y="495" font-family="sans-serif" font-size="12" fill="{ink}">当前入口图标源：sy-entry-icons.svg</text>',
+        '</g>',
+    ]
+lines += ['</svg>']
+(root / "assets/file-icons-preview.svg").write_text("\n".join(lines) + "\n", encoding="utf-8")
+print("Generated palette/asset-source preview from Compose ShenyanFoundation.kt")

@@ -10,6 +10,10 @@ from pathlib import Path
 import re
 import json
 import sys
+import subprocess
+import tempfile
+import zipfile
+from xml.etree import ElementTree
 
 ROOT = Path(__file__).resolve().parents[2]
 UI = ROOT / "app/src/main/java/com/labteto/dshmobile/ui"
@@ -190,6 +194,137 @@ for relative in ("docs/design/v5-p0p1", "docs/design/clear-realm-theme.md",
                  "app/src/main/java/com/shenyan/designsystem/layout/SyAdaptiveShell.kt"):
     if (ROOT / relative).exists():
         violations.append(f"{relative}: retired V5 visual asset or obsolete component returned")
+
+
+# V6 design-source ratchet: the current route and settings inventories must match native owners.
+# Old 38-screen prototypes are not a license to restore retired UI into design materials.
+v6_root = ROOT / "docs/design/v6"
+v6_manifest = json.loads((v6_root / "current-ui.json").read_text(encoding="utf-8"))
+v6_html = (v6_root / "mobile/app.html").read_text(encoding="utf-8")
+v6_spec = (v6_root / "V6-CURRENT-IMPLEMENTATION.zh-CN.md").read_text(encoding="utf-8")
+route_catalog = (ROOT / "app/src/main/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalog.kt").read_text(encoding="utf-8")
+settings_code = (UI / "screens/settings/SettingsScreen.kt").read_text(encoding="utf-8")
+routes_match = re.search(r"internal enum class LocalFeatureRoute\s*\{([^}]+)\}", route_catalog, re.S)
+settings_match = re.search(r"enum class SettingsDestination\s*\{([^}]+)\}", settings_code, re.S)
+def enum_items(match):
+    return re.findall(r"^\s*([A-Z][A-Z_]+)\s*(?:,|$)", match.group(1), re.M) if match else []
+code_routes = enum_items(routes_match)
+code_settings = enum_items(settings_match)
+manifest_routes = [route["id"] for route in v6_manifest["routes"]]
+if not code_routes or code_routes != manifest_routes:
+    violations.append("V6 current-ui.json: current routes differ from native LocalFeatureRoute")
+if not code_settings or code_settings != v6_manifest["settingsDestinations"]:
+    violations.append("V6 current-ui.json: settings destinations differ from SettingsDestination")
+for route in v6_manifest["routes"]:
+    path = ROOT / route["source"]
+    if not path.is_file():
+        violations.append(f"V6 current-ui.json: missing native source -> {route['source']}")
+v6_proto_match = re.search(r"const\s+V6_ROUTES\s*=\s*(\[[^\]]+\])", v6_html)
+if not v6_proto_match or json.loads(v6_proto_match.group(1)) != manifest_routes:
+    violations.append("V6 prototype route list differs from native routes")
+if "data-v6-authoritative=\"compose-" not in v6_html:
+    violations.append("V6 prototype missing source-of-truth marker")
+# Retired UI must never be reinstated in the active interactive prototype.
+for marker in ("S03Board", "S02v2Work", "mobile-screen-tabs", "38 场景", "目标 / 计划 / 审批 / 执行 / 成果"):
+    if marker in v6_html:
+        violations.append(f"V6 prototype reintroduced obsolete reference: {marker}")
+if "Figma" not in v6_spec or "#711" not in v6_spec:
+    violations.append("V6 spec omitted Figma or pending PR #711 state")
+
+# Exact Compose -> HTML token parity; labels alone are not enough to prevent reintroducing old white glass.
+v6_foundation = (ROOT / "app/src/main/java/com/shenyan/designsystem/foundation/ShenyanFoundation.kt").read_text(encoding="utf-8")
+v6_preview = (v6_root / "assets/file-icons-preview.svg").read_text(encoding="utf-8")
+def read_primitive_style(css, selector, name):
+    m = re.search(re.escape(selector) + r"\s*\{([^}]+)\}", css)
+    if not m:
+        return None
+    val = re.search(r"--" + re.escape(name) + r"\s*:\s*([^;]+)\s*;", m.group(1))
+    return val.group(1).strip() if val else None
+for theme, selector in (("Light", ":root"), ("Dark", 'body[data-theme="dark"]'), ("Matte", 'body[data-theme="matte"]')):
+    palette = re.search(r"private val " + theme + r" = SyColors\((.*?)\n\)", v6_foundation, re.S)
+    if not palette:
+        violations.append(f"V6 palette missing from Compose: {theme}")
+        continue
+    def native_argb(name):
+        m = re.search(r"\b" + name + r"\s*=\s*Color\(0x([0-9A-Fa-f]{8})\)", palette.group(1))
+        return m.group(1).upper() if m else None
+    for name, css_key in (("canvas", "canvas"), ("materialL1","l1"), ("materialL2","l2"), ("materialL3","l3"), ("materialL4","l4"), ("materialL5","l5")):
+        value = native_argb(name)
+        css_value = read_primitive_style(v6_html, selector, css_key)
+        if not value or not css_value:
+            violations.append(f"V6 {theme} {name}: source token missing")
+            continue
+        expected_rgb = "#" + value[2:]
+        alpha = int(value[:2], 16)/255
+        if css_value.upper() == expected_rgb and alpha == 1:
+            pass
+        else:
+            rgba = re.fullmatch(r"rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([0-9.]+)\s*\)", css_value)
+            if not rgba:
+                violations.append(f"V6 {theme} {name}: invalid CSS token -> {css_value}")
+                continue
+            vals = tuple(int(x) for x in rgba.groups()[:3])
+            expected_vals = tuple(int(value[i:i+2],16) for i in (2,4,6))
+            if vals != expected_vals or abs(float(rgba.group(4))-alpha) > .003:
+                violations.append(f"V6 {theme} {name}: CSS drifted from Compose 0x{value}")
+        if name.startswith("materialL") and value not in v6_preview:
+            violations.append(f"V6 material SVG preview outdated: {theme} {name} 0x{value}")
+
+# Ensure active HTML icons and editable SVG deliverables match the manifest.
+v6_svg = (v6_root / "sy-entry-icons.svg").read_text(encoding="utf-8")
+labels = re.findall(r'<text\b[^>]*>([A-Za-z][A-Za-z0-9]+)</text>', v6_svg)
+icon_map_match = re.search(r'window\.V6_ASSET_DATA\s*=\s*(\{.*?\})\s*;', v6_html, re.S)
+active_count = v6_manifest.get("iconInventory", {}).get("activeCount", 24)
+retired_icons = set(v6_manifest.get("iconInventory", {}).get("retired", []))
+if len(labels) != active_count or len(set(labels)) != active_count:
+    violations.append("V6 SVG sheet must have 24 distinct active icon glyphs")
+if retired_icons.intersection(labels):
+    violations.append("V6 SVG sheet still includes a retired entry icon")
+if not icon_map_match:
+    violations.append("V6 offline HTML missing embedded icon assets")
+else:
+    try:
+        offline_names = set(json.loads(icon_map_match.group(1)))
+        if offline_names != set(labels):
+            violations.append("V6 offline HTML icon inventory differs from current editable SVG")
+    except json.JSONDecodeError:
+        violations.append("V6 offline HTML icon map invalid")
+
+# Run the actual exporter in CI; a passing manifest/parser check alone cannot prove
+# that the user's ZIP will omit retired icons or preserve file hashes.
+try:
+    with tempfile.TemporaryDirectory(prefix="v6-export-") as tmp:
+        archive = Path(tmp) / "v6-current.zip"
+        process = subprocess.run(
+            [sys.executable, str(v6_root / "sync-design-package.py"),
+             "--source", str(v6_root), "--output", str(archive)],
+            capture_output=True, text=True, timeout=40, check=False,
+        )
+        if process.returncode:
+            violations.append("V6 ZIP exporter failed: " + (process.stderr or process.stdout).strip()[-900:])
+        else:
+            with zipfile.ZipFile(archive) as exported:
+                if exported.testzip() is not None:
+                    violations.append("V6 ZIP CRC validation failed")
+                sheet = ElementTree.fromstring(exported.read("sy-entry-icons.svg"))
+                ns = "{http://www.w3.org/2000/svg}"
+                groups = sheet.findall(f"{ns}g")
+                names = [t.text for t in sheet.iter(f"{ns}text")
+                         if t.text and re.fullmatch(r"[A-Za-z][A-Za-z0-9]+", t.text)]
+                if len(names) != active_count or len(set(names)) != active_count or retired_icons.intersection(names):
+                    violations.append("V6 exported ZIP contains an incorrect/retired icon inventory")
+except (OSError, KeyError, ValueError, TimeoutError, zipfile.BadZipFile) as exc:
+    violations.append(f"V6 ZIP exporter validation failed: {exc}")
+
+# Also validate local source links in the actual V6 authority.
+for link in re.findall(r"\]\(([^)]+)\)", v6_spec):
+    url = link.split("#")[0].split("?")[0].strip()
+    if not url or re.match(r"^(?:https?:|mailto:|data:)", url):
+        continue
+    dest = (v6_root / url).resolve()
+    if not dest.is_relative_to(ROOT) or not dest.is_file():
+        violations.append(f"V6 spec: broken local link -> {url}")
+
 
 if violations:
     print("UI Design System boundary violations:")
