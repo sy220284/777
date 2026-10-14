@@ -106,6 +106,7 @@ internal fun LocalModelSettingsCard(
     val catalogFailureFormat = stringResource(R.string.local_model_catalog_failure)
     val catalogUnavailable = stringResource(R.string.local_model_catalog_unavailable)
     val catalogTestFailureFormat = stringResource(R.string.local_model_catalog_test_failure)
+    val kimiK3ContextInvalid = stringResource(R.string.local_model_kimi_k3_context_invalid)
     val scope = rememberCoroutineScope()
     val apiProfiles = local.modelProfiles.apiModelSettingsProfiles()
     var showEditor by remember { mutableStateOf(false) }
@@ -366,7 +367,7 @@ internal fun LocalModelSettingsCard(
                         contextWindowTokens.isNotBlank() &&
                         (contextWindowTokens.toIntOrNull() ?: -1) !in 4_096..1_048_576
                     ) {
-                        testStatus = context.getString(R.string.local_model_kimi_k3_context_invalid)
+                        testStatus = kimiK3ContextInvalid
                     } else {
                         saving = true
                         val savedGeneration = editorGeneration
