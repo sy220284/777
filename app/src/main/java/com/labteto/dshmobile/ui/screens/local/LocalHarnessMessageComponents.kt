@@ -346,12 +346,15 @@ internal fun LocalMessageRow(
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     if (chatMode) {
-                        MessageVariantControls(
-                            messageId = message.id,
-                            branchInfo = branchInfo,
-                            enabled = canSelectVariant && !selectingVariant,
-                            onSelectVariant = selectVariantWithFeedback,
-                        )
+                        // 分支切换作为一个整体换行，窄屏不拆散左右箭头与页码。
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            MessageVariantControls(
+                                messageId = message.id,
+                                branchInfo = branchInfo,
+                                enabled = canSelectVariant && !selectingVariant,
+                                onSelectVariant = selectVariantWithFeedback,
+                            )
+                        }
                     }
                     if (copyableContent.isNotBlank()) {
                         CompactMessageAction(
