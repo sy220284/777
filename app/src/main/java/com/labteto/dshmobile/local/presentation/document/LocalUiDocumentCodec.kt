@@ -35,6 +35,7 @@ internal object LocalUiDocumentCodec {
     private val integer = buildJsonObject { put("type", "integer"); put("minimum", 0) }
     private val objects = buildJsonObject { put("type", "array"); put("items", buildJsonObject { put("type", "object") }) }
     private val strings = buildJsonObject { put("type", "array"); put("items", text) }
+    private val stringRows = buildJsonObject { put("type", "array"); put("items", strings) }
     private val root = schema(listOf("schemaVersion", "documentId", "revision", "title", "nodes", "actions", "fallbackText"), mapOf(
         "schemaVersion" to integer, "documentId" to text, "revision" to integer, "title" to text,
         "nodes" to objects, "actions" to objects, "fallbackText" to text,
@@ -57,6 +58,7 @@ internal object LocalUiDocumentCodec {
             val kind = value.string("type")
             val properties = when (kind) {
                 "text" -> mapOf("text" to text)
+                "table" -> mapOf("headers" to strings, "rows" to stringRows)
                 "bound_text" -> mapOf("label" to text, "binding" to text)
                 "column", "row" -> mapOf("children" to objects)
                 "disclosure" -> mapOf("title" to text, "children" to objects)
@@ -71,6 +73,8 @@ internal object LocalUiDocumentCodec {
             fun children() = value.array("children").map { node(it.jsonObject, depth + 1) }
             return when (kind) {
                 "text" -> UiDocumentNode.Text(id, value.string("text"))
+                "table" -> UiDocumentNode.Table(id, value.array("headers").map { it.jsonPrimitive.content },
+                    value.array("rows").map { row -> row.jsonArray.map { it.jsonPrimitive.content } })
                 "bound_text" -> UiDocumentNode.BoundText(id, value.string("label"), UiDocumentBinding.valueOf(value.string("binding")))
                 "column" -> UiDocumentNode.Column(id, children())
                 "row" -> UiDocumentNode.Row(id, children())
@@ -111,6 +115,11 @@ internal object LocalUiDocumentCodec {
             put("id", value.id)
             when (value) {
                 is UiDocumentNode.Text -> { put("type", "text"); put("text", value.text) }
+                is UiDocumentNode.Table -> {
+                    put("type", "table")
+                    put("headers", JsonArray(value.headers.map(::JsonPrimitive)))
+                    put("rows", JsonArray(value.rows.map { row -> JsonArray(row.map(::JsonPrimitive)) }))
+                }
                 is UiDocumentNode.BoundText -> { put("type", "bound_text"); put("label", value.label); put("binding", value.binding.name) }
                 is UiDocumentNode.Column -> { put("type", "column"); put("children", JsonArray(value.children.map(::node))) }
                 is UiDocumentNode.Row -> { put("type", "row"); put("children", JsonArray(value.children.map(::node))) }

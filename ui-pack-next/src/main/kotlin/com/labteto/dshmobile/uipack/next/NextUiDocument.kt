@@ -82,6 +82,15 @@ private fun NextDocumentNode(node: UiDocumentNode, values: Map<String, String>, 
     active: Boolean, update: (String, String) -> Unit, submit: (String) -> Unit) {
     when (node) {
         is UiDocumentNode.Text -> Text(node.text)
+        is UiDocumentNode.Table -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            node.rows.forEachIndexed { index, row ->
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text((index + 1).toString(), style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+                    node.headers.zip(row).forEach { (header, value) -> Text("${header}: ${value}") }
+                }
+            }
+            if (node.rows.isEmpty()) Text(stringResource(R.string.next_document_table_empty))
+        }
         is UiDocumentNode.BoundText -> {
             val value = when (val bound = snapshot.bindings[node.binding]) {
                 is UiDocumentBoundValue.Text -> bound.value

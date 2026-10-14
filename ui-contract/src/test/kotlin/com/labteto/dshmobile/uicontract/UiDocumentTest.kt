@@ -40,6 +40,20 @@ class UiDocumentTest {
         assertTrue(repeated.nodes.size == 2)
     }
 
+    @Test fun tableShapeAndCellBudgetsAreValidated() {
+        val table = document(listOf(UiDocumentNode.Table("facts", listOf("field", "value"),
+            listOf(listOf("phase", "RUNNING"), listOf("queued", "2")))), emptyList())
+        assertTrue(table.validate(budget, emptySet(), null).valid)
+        assertTrue(table.copy(nodes = listOf(UiDocumentNode.Table("facts", listOf("field", "value"),
+            listOf(listOf("only one"))))).validate(budget, emptySet(), null).problems.contains("table_shape"))
+        assertTrue(table.copy(nodes = listOf(UiDocumentNode.Table("facts", listOf("field", "value"),
+            List(30) { listOf("key", "value") }))).validate(budget, emptySet(), null).problems.contains("table_budget"))
+        val combined = table.copy(nodes = List(3) { i ->
+            UiDocumentNode.Table("table_$i", listOf("key", "value"), listOf(listOf("a", "b")))
+        })
+        assertTrue(combined.validate(budget, emptySet(), null).problems.contains("table_budget"))
+    }
+
     @Test fun patchesCannotCrossMessagesOrApplyToAnOldRevision() {
         val current = document(listOf(UiDocumentNode.Text("text", "old")), emptyList())
         val updated = current.copy(revision = 1, nodes = listOf(UiDocumentNode.Text("text", "new")))

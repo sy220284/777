@@ -31,6 +31,8 @@ sealed interface UiDocumentBoundValue {
 sealed interface UiDocumentNode {
     val id: String
     data class Text(override val id: String, val text: String) : UiDocumentNode
+    /** Read-only presentation data. A table never authorizes tools, payment or progress claims. */
+    data class Table(override val id: String, val headers: List<String>, val rows: List<List<String>>) : UiDocumentNode
     data class BoundText(override val id: String, val label: String, val binding: UiDocumentBinding) : UiDocumentNode
     data class Column(override val id: String, val children: List<UiDocumentNode>) : UiDocumentNode
     data class Row(override val id: String, val children: List<UiDocumentNode>) : UiDocumentNode
@@ -87,6 +89,17 @@ fun UiDocument.validate(
         if (node.id.isBlank() || nodesById.put(node.id, node) != null) problems += "node_identity"
         when (node) {
             is UiDocumentNode.Text -> textChars += node.text.length
+            is UiDocumentNode.Table -> {
+                val cells = node.headers.size.toLong() + node.rows.sumOf { it.size.toLong() }
+                val nextCount = count.toLong() + cells
+                if (nextCount > budget.maxNodes) problems += "table_budget"
+                count = nextCount.coerceAtMost(budget.maxNodes.toLong() + 1).toInt()
+                if (node.headers.isEmpty() || node.headers.size > 8 || node.headers.any { it.isBlank() } ||
+                    node.headers.distinct().size != node.headers.size ||
+                    node.rows.any { it.size != node.headers.size }) problems += "table_shape"
+                textChars += node.headers.sumOf { it.length.toLong() } +
+                    node.rows.sumOf { row -> row.sumOf { it.length.toLong() } }
+            }
             is UiDocumentNode.BoundText -> textChars += node.label.length
             is UiDocumentNode.Column -> node.children.forEach { walk(it, depth + 1) }
             is UiDocumentNode.Row -> node.children.forEach { walk(it, depth + 1) }

@@ -110,6 +110,23 @@ internal class LocalUiDocumentUiAdapter(
                         com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.STATUS -> com.labteto.dshmobile.uicontract.UiLocalDocumentData.Status(approval)
                         com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.MESSAGE -> com.labteto.dshmobile.uicontract.UiLocalDocumentData.ListItems(listOf(message.content))
                         com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.REPLY_FORM -> com.labteto.dshmobile.uicontract.UiLocalDocumentData.ReplyForm("")
+                        com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.FACTS_TABLE -> {
+                            // A point-in-time Owner snapshot; not an automatically updating task status.
+                            val chatSnapshot = conversations.chat.snapshot()
+                            val workSnapshot = conversations.work.snapshot()
+                            val activePhase = if (command.workMode) workSnapshot.phase.name else chatSnapshot.phase.name
+                            val activeStatus = if (command.workMode) workSnapshot.status.name else chatSnapshot.status.name
+                            val activeQueued = if (command.workMode) workSnapshot.queuedInputCount else chatSnapshot.queuedInputCount
+                            com.labteto.dshmobile.uicontract.UiLocalDocumentData.TableData(
+                                title = "会话事实（制作时快照）",
+                                headers = listOf("字段", "Owner 读取值"),
+                                rows = listOf(
+                                    listOf("会话状态", activeStatus),
+                                    listOf("执行阶段", activePhase),
+                                    listOf("排队输入", activeQueued.toString()),
+                                ),
+                            )
+                        }
                     }
                     val previous = store.read(source.sessionId, setOf(source.messageId), generation.budget, knownScenes)
                         .firstOrNull { it.recoveryNotice == null && it.document.source == source }?.document

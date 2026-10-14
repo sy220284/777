@@ -37,6 +37,15 @@ class LocalUiDocumentCodecTest {
         assertTrue(decode(value, "waiter").isSuccess)
     }
 
+    @Test fun boundedTableRoundTripsAndRejectsMalformedRowsAndUnexpectedProperties() {
+        val input = raw("""{"id":"table","type":"table","headers":["field","value"],"rows":[["phase","RUNNING"]]}""")
+        val value = decode(input).getOrThrow()
+        assertTrue(value.actions.isEmpty())
+        assertEquals(value, decode(LocalUiDocumentCodec.encode(value).toString()).getOrThrow())
+        assertTrue(decode(raw("""{"id":"table","type":"table","headers":["field","value"],"rows":[["bad"]]}""")).isFailure)
+        assertTrue(decode(raw("""{"id":"table","type":"table","headers":["field"],"rows":[["x"]],"script":"execute"}""")).isFailure)
+    }
+
     @Test fun oversizedInputFailsBeforeParsingRatherThanSilentlyTruncating() {
         val value = raw("""{"id":"text","type":"text","text":"${"x".repeat(4096)}"}""")
         val result = decode(value)

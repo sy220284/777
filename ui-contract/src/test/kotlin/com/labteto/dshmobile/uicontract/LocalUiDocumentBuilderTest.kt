@@ -27,6 +27,17 @@ class LocalUiDocumentBuilderTest {
         assertTrue(document.actions.all { it is UiDocumentAction.AnswerApproval })
     }
 
+    @Test fun typedTableIsReadOnlyAndCannotInventActions() {
+        val input = UiLocalDocumentData.TableData("Snapshot", listOf("Field", "Value"),
+            listOf(listOf("Phase", "RUNNING"), listOf("Queue", "2")))
+        val result = LocalUiDocumentBuilder.build("typed", source, 0, input, budget, emptySet()).getOrThrow()
+        assertTrue(result.actions.isEmpty())
+        assertEquals(listOf("Field", "Value"), (result.nodes.single() as UiDocumentNode.Table).headers)
+        assertTrue(result.validate(budget, emptySet(), null).valid)
+        assertTrue(LocalUiDocumentBuilder.build("invalid", source, 0,
+            input.copy(rows = listOf(listOf("bad"))), budget, emptySet()).isFailure)
+    }
+
     @Test fun replyFormsOnlyPrepareInputAndOversizedDataIsRejectedWithoutTruncation() {
         val document = LocalUiDocumentBuilder.build("id", source, 0,
             UiLocalDocumentData.ReplyForm(""), budget, emptySet()).getOrThrow()

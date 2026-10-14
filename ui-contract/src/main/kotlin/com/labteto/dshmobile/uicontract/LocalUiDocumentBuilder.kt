@@ -4,9 +4,11 @@ package com.labteto.dshmobile.uicontract
 sealed interface UiLocalDocumentData {
     data class Status(val approval: UiApprovalSnapshot?) : UiLocalDocumentData
     data class ListItems(val items: List<String>) : UiLocalDocumentData
+    /** Receives Owner-issued typed data; never guess a table from untrusted free text. */
+    data class TableData(val title: String, val headers: List<String>, val rows: List<List<String>>) : UiLocalDocumentData
     data class ReplyForm(val initial: String) : UiLocalDocumentData
 }
-enum class UiLocalDocumentTemplate { STATUS, MESSAGE, REPLY_FORM }
+enum class UiLocalDocumentTemplate { STATUS, MESSAGE, REPLY_FORM, FACTS_TABLE }
 data class GenerateLocalUiDocumentCommand(val identity: UiSessionIdentity, val workMode: Boolean,
     val messageId: String, val template: UiLocalDocumentTemplate)
 
@@ -40,6 +42,14 @@ object LocalUiDocumentBuilder {
                 title = "已有内容"
                 fallback = data.items.joinToString("\n")
                 nodes = data.items.mapIndexed { index, value -> UiDocumentNode.Text("item_$index", value) }
+            }
+            is UiLocalDocumentData.TableData -> {
+                title = data.title
+                fallback = buildString {
+                    append(data.headers.joinToString(" | "))
+                    data.rows.forEach { row -> append('\n'); append(row.joinToString(" | ")) }
+                }
+                nodes = listOf(UiDocumentNode.Table("typed_table", data.headers, data.rows))
             }
             is UiLocalDocumentData.ReplyForm -> {
                 title = "回复草稿"
