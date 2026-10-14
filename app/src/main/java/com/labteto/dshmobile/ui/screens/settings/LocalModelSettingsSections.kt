@@ -465,6 +465,15 @@ internal fun LocalModelSettingsCard(
                                 color = colors.textTertiary,
                             )
                         }
+                        if (preset.provider == "Kimi Code" && preset.model == "k3") {
+                            // Subscription tier determines whether K3 may use 1M instead of the 256K default.
+                            // Exposing the override only for K3 avoids implying other models are upgradeable.
+                            LocalModelContextWindowField(contextWindowTokens) {
+                                contextWindowTokens = it
+                                editorGeneration++
+                                testStatus = null
+                            }
+                        }
                         ModelCapabilityTags(LocalModelPresets.clientCapabilitiesFor(preset.model, preset.baseUrl))
                         if (preset.capabilities.any { it == LocalModelCapability.VIDEO || it == LocalModelCapability.AUDIO }) {
                             Text(stringResource(R.string.local_model_media_not_connected),
