@@ -3,6 +3,9 @@ package com.labteto.dshmobile.local.model
 import com.labteto.dshmobile.local.DeepSeekClient
 import com.labteto.dshmobile.local.documentedContextWindowTokens
 import com.labteto.dshmobile.local.operationalInputLimitTokens
+import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
+import java.io.File
+import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import okhttp3.*
@@ -54,6 +57,8 @@ class LocalKimiCompatibilityTest {
         assertTrue(LocalKimiPolicy.isOfficial(cn + "/"))
         assertEquals("Kimi Code 订阅", LocalModelProfile("k", "k3", cn).sourceLabel())
         assertEquals("API Key", LocalModelProfile("other", "k3", "https://proxy.example/v1").sourceLabel())
+        assertFalse(LocalModelPresets.runtimeCapabilitiesFor("k3", cn).temperature)
+        assertNull(LocalModelPresets.samplingTemperatureFor("k3", cn, 0.8))
     }
 
     @Test fun reasoningControlsAndContextDoNotInventEntitlements() {
@@ -100,10 +105,11 @@ class LocalKimiCompatibilityTest {
         for (id in listOf("k3", "k3-256k", "kimi-for-coding")) {
             for (effort in listOf("low", "high", "max")) {
                 client.complete("member-key", cn, id, user, JsonArray(emptyList()),
-                    reasoningEffort = effort)
+                    temperature = 0.9, reasoningEffort = effort)
                 assertEquals(id, requests.last()["model"]?.jsonPrimitive?.content)
                 assertEquals(effort, requests.last()["reasoning_effort"]?.jsonPrimitive?.content)
                 assertFalse(requests.last().containsKey("thinking"))
+                assertFalse(requests.last().containsKey("temperature"))
             }
         }
         client.complete("member-key", cn, "kimi-for-coding-highspeed",
@@ -126,6 +132,66 @@ class LocalKimiCompatibilityTest {
         assertFalse(different.containsKey("reasoning_content"))
     }
 
+    @Test fun nativeUserImageSurvivesCanonicalTransportIntoKimiSubscriptionPayload() = runBlocking {
+        val root = Files.createTempDirectory("kimi-vision-regression-").toFile()
+        try {
+            val imageFile = File(root, "photo.png").apply {
+                writeBytes(byteArrayOf(
+                    0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+                    0, 1, 2, 3, 4, 5,
+                ))
+            }
+            val durable = buildLocalUserModelMessage(
+                "读取图片上的信息",
+                listOf(LocalImportedAttachment(
+                    name = "photo.png",
+                    relativePath = "photo.png",
+                    mediaType = "image/png",
+                    bytes = imageFile.length(),
+                )),
+            )
+            assertTrue(durable.toString().contains(LOCAL_IMAGE_REF))
+            assertFalse(durable.toString().contains("base64"))
+            val materialized = prepareLocalMultimodalMessages(
+                listOf(durable), root, LocalImageInputMode.NATIVE,
+            )
+            val routed = LocalCanonicalModelCodec.toLegacyMessages(
+                LocalCanonicalModelCodec.messages(materialized),
+                LocalModelAdapterIds.OPENAI_CHAT, "kimi-image-test",
+            )
+            var requestBody: JsonObject? = null
+            val http = OkHttpClient.Builder().addInterceptor { chain ->
+                requestBody = json.parseToJsonElement(Buffer().also {
+                    chain.request().body!!.writeTo(it)
+                }.readUtf8()).jsonObject
+                Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                    .code(200).message("OK")
+                    .body(
+                        """{"choices":[{"message":{"role":"assistant","content":"图片已接收"},"finish_reason":"stop"}]}"""
+                            .toResponseBody("application/json".toMediaType())
+                    ).build()
+            }.build()
+            val reply = DeepSeekClient(http, json).complete(
+                "member-key", cn, "k3", routed, JsonArray(emptyList()),
+                temperature = 0.75, reasoningEffort = "high",
+            )
+            val payload = requireNotNull(requestBody)
+            assertEquals("图片已接收", reply.content)
+            assertFalse(payload.containsKey("temperature"))
+            assertEquals("k3", payload["model"]!!.jsonPrimitive.content)
+            val parts = payload["messages"]!!.jsonArray.single().jsonObject["content"]!!.jsonArray
+            assertTrue(parts.any { it.jsonObject["type"]?.jsonPrimitive?.content == "text" })
+            val image = parts.single { it.jsonObject["type"]?.jsonPrimitive?.content == "image_url" }.jsonObject
+            assertTrue(
+                image["image_url"]!!.jsonObject["url"]!!.jsonPrimitive.content
+                    .startsWith("data:image/png;base64,"),
+            )
+            assertFalse(payload.toString().contains(LOCAL_IMAGE_REF))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test fun streamingThinkingAndTokensUseExistingGateway() = runBlocking {
         val sse = listOf(
             """data: {"choices":[{"delta":{"reasoning_content":"分析"}}]}""",
@@ -145,8 +211,9 @@ class LocalKimiCompatibilityTest {
         val deltas = mutableListOf<LocalModelDelta>()
         val result = DeepSeekClient(http, json).completeStreaming(
             "member-key", cn, "kimi-for-coding", user, JsonArray(emptyList()),
-            reasoningEffort = "max", onDelta = { deltas += it })
+            temperature = 0.9, reasoningEffort = "max", onDelta = { deltas += it })
         assertEquals("max", payload?.get("reasoning_effort")?.jsonPrimitive?.content)
+        assertFalse(payload?.containsKey("temperature") ?: true)
         assertEquals("结论", result.content)
         assertEquals("分析", result.reasoning)
         assertEquals("分析", deltas.joinToString("") { it.reasoning })
