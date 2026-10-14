@@ -165,5 +165,14 @@
   "figma": {
     "editableSync": "blocked",
     "reason": "Starter MCP quota exceeded; no canvas write verified"
+  },
+  "iconInventory": {
+    "sourceTotal": 26,
+    "activeCount": 24,
+    "retired": [
+      "Projects",
+      "RunCenter"
+    ],
+    "policy": "Retain legacy Kotlin path declarations but exclude the two retired entry icons from active design packaging."
   }
 }
