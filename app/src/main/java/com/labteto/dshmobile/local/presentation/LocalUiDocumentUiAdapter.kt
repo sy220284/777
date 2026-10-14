@@ -164,8 +164,17 @@ internal class LocalUiDocumentUiAdapter(
         return synchronized(state.foregroundRunHandle.lock) {
             if (conversations.identitySnapshot() != identity) return UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
             val workMode = state.state.value.usageMode == LocalUsageMode.WORK
-            val record = snapshots.value.documents.firstOrNull { it.document.documentId == request.documentId }?.document
-                ?: return UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+            // Rendering is asynchronous. Admission must read the current Session definition,
+            // including message removal and same-card revision replacement.
+            val current = state.state.value
+            val authoritative = try {
+                store.read(identity.sessionId, current.messages.map { it.id }.toSet(), generation.budget, knownScenes)
+                    .firstOrNull { it.document.documentId == request.documentId }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { return UiDocumentReceipt.Failed(failure.message) }
+                ?: return UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+            if (authoritative.recoveryNotice != null) return UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+            val record = authoritative.document
             if (record.revision != request.revision || record.source != request.source || !sourceMatches(record.source, identity, workMode))
                 return UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
             val defaults = record.initialFields()

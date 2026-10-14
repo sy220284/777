@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.uipack.next
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -439,6 +442,8 @@ object NextConversationUiPack : ConversationUiPack {
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (!workMode && identity != null && groups != null) {
                         NextChatGroupManager(groups, identity, ::show)
                     }
@@ -475,6 +480,7 @@ object NextConversationUiPack : ConversationUiPack {
                         TextButton(onClick = { loadFiles(true) }, enabled = identity != null && !fileLoading) { Text(stringResource(R.string.next_conversation_files)) }
                     }
                     TextButton(onClick = onClose) { Text(stringResource(R.string.next_close)) }
+                    }
                     Text(stringResource(when (phase) {
                         UiExecutionPhase.IDLE -> R.string.next_idle
                         UiExecutionPhase.RUNNING -> R.string.next_running
@@ -484,6 +490,8 @@ object NextConversationUiPack : ConversationUiPack {
                         identity?.let { target -> show(if (workMode) work.submit(WorkConversationUiCommand.Stop(target))
                             else chat.submit(ChatUiCommand.Stop(target))) }
                     }, enabled = identity != null) { Text(stringResource(R.string.next_stop)) }
+                    if (policy != null) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (policy != null && policySnapshot?.approvalMode == com.labteto.dshmobile.local.interaction.LocalApprovalMode.AUTO) {
                         TextButton(onClick = { show(policy.submit(com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.SetApprovalMode(identity,
                             com.labteto.dshmobile.local.interaction.LocalApprovalMode.MANUAL))) }) { Text(stringResource(R.string.next_disable_auto)) }
@@ -500,6 +508,7 @@ object NextConversationUiPack : ConversationUiPack {
                         if (policySnapshot.deviceApprovalLease) TextButton(onClick = {
                             identity?.let { show(policy.submit(com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.RevokeDeviceTurn(it))) }
                         }) { Text(stringResource(R.string.next_revoke_device)) }
+                    }
                     }
                     if (queued > 0) Text(stringResource(R.string.next_queued, queued))
                     if (status == UiSceneStatus.LOADING) Text(stringResource(R.string.next_loading))
@@ -611,13 +620,19 @@ object NextConversationUiPack : ConversationUiPack {
                     if (attachments != null) TextButton(onClick = {
                         pickerIdentity = identity; importing = true; pickAttachment()
                     }, enabled = identity != null && !importing) { Text(stringResource(R.string.next_attach)) }
-                    selectedAttachments.forEach { attachment ->
-                        Text("${attachment.name} (${attachment.bytes} B)")
+                    if (selectedAttachments.isNotEmpty()) androidx.compose.foundation.lazy.LazyRow(Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(selectedAttachments, key = { it.relativePath }) { attachment ->
+                            Column {
+                        Text("${attachment.name} (${attachment.bytes} B)", maxLines = 2,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         if (files != null) TextButton(onClick = { previewFile(attachment.relativePath, standalone = true) }, enabled = !fileLoading) {
                             Text(stringResource(R.string.next_attachment_preview))
                         }
                         TextButton(onClick = { identity?.let { drafts.removeAttachment(it.sessionId, attachment.relativePath) } }) {
                             Text(stringResource(R.string.next_remove_attachment))
+                        }
+                    }
                         }
                     }
                     OutlinedTextField(value = draft, onValueChange = { text -> identity?.let { drafts.updateDraft(it.sessionId, text) } }, modifier = Modifier.fillMaxWidth(),
