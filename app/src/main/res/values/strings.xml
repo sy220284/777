@@ -891,6 +891,7 @@
     <string name="local_question_title">Harness 需要你的决定</string>
     <string name="local_question_custom_answer">自定义回答</string>
     <string name="local_question_submit">提交回答</string>
+    <string name="local_question_submit_failed">提交未成功，选择已保留，请重试</string>
 
     <string name="local_usage_chat">聊天</string>
     <string name="local_usage_work">工作</string>
@@ -1072,16 +1073,6 @@
     <string name="persona_gallery_archive_deleted">归档对白已删除</string>
 
     <string name="local_run_center">任务进度</string>
-    <string name="local_workflow_stage">当前阶段：%1$s</string>
-    <string name="local_workflow_executing">执行中</string>
-    <string name="local_workflow_reassigning">重新指派</string>
-    <string name="local_workflow_verifying">验收中</string>
-    <string name="local_workflow_completed">已完成</string>
-    <string name="local_workflow_stalled">受阻</string>
-    <string name="local_workflow_processed">已处理 %1$d/%2$d</string>
-    <string name="local_workflow_blocked">受阻原因：%1$s</string>
-    <string name="local_workflow_user_action">请核对结果，再决定如何继续。</string>
-    <string name="local_workflow_waiting_user">等待你审批或回答。</string>
     <string name="local_work_history_title">最近任务</string>
     <string name="local_run_current_goal">当前目标</string>
     <string name="local_run_plan">计划</string>
@@ -2100,24 +2091,7 @@
     <string name="media_studio_capability_transcribe">录音转写</string>
     <string name="media_studio_kind_speech">语音</string>
     <string name="media_studio_kind_image">图片</string>
-    <string name="fluid_work_goal">目标</string>
-    <string name="fluid_work_plan">计划</string>
-    <string name="fluid_work_decision">决策点</string>
-    <string name="fluid_work_execution">执行中</string>
-    <string name="fluid_work_outputs">产出</string>
     <string name="fluid_item_count">%1$d 项</string>
-    <string name="fluid_tool_output">工具输出</string>
-    <string name="fluid_goal_empty">目标尚未建立。提交任务后会显示真实目标。</string>
-    <string name="fluid_plan_empty">暂无计划</string>
-    <string name="fluid_decision_empty">当前没有等待你的决策</string>
-    <string name="fluid_outputs_empty">暂无已记录产出</string>
-    <string name="fluid_outputs_failed">产出加载失败，请重试</string>
-    <string name="fluid_output_missing">文件当前不可用</string>
-    <string name="fluid_approval_modal_hint">请在审批对话框中确认操作范围</string>
-    <string name="fluid_back_execution">返回执行</string>
-    <string name="fluid_decision_checkpoint">决策检查点</string>
-    <string name="fluid_decision_continue">确认选择并继续</string>
-    <string name="fluid_decision_failed">提交未成功，选择已保留，请重试</string>
     <string name="fluid_persona_relationship">关系</string>
     <string name="fluid_persona_events">事件</string>
     <string name="fluid_persona_memories">记忆</string>

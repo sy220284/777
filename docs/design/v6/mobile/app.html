@@ -1061,75 +1061,24 @@ function S38Media(){
  </div>`;
 }
 
-// 02v2 工作执行
+// 02v2 工作执行：工作过程和成果直接留在会话中，不再提供五段分页。
 function S02v2Work(){
- const phase=state.wphase||2; // 0-4
  return `<div class="rowflex">
   <div class="card flex1">
-   <div class="ct">${I.task}迁移鉴权模块</div>
-   <div style="display:flex;gap:7px;margin-bottom:14px">
-    ${WORK_PHASES.map((p,i)=>`<div style="flex:1;cursor:pointer;padding:7px 9px;border-radius:9px;background:${i===phase?'rgba(232,168,124,.16)':i<phase?'var(--mintX)':'rgba(255,255,255,.5)'};border:1px solid ${i===phase?'var(--acc)':i<phase?'var(--mint)':'var(--gline2)'}" onclick="state.wphase=${i};goto('02')">
-     <div style="font-size:11px;color:var(--ink3);font-family:var(--mono);letter-spacing:.1em">${i+1}</div>
-     <div style="font-size:12.5px;font-weight:${i===phase?600:400};color:${i===phase?'#8A5C2A':i<phase?'var(--okInk)':'var(--ink2)'}">${p.l}</div>
-     <div style="font-size:10.5px;color:var(--ink3);margin-top:2px">${p.n} 项</div>
-    </div>`).join('')}
-   </div>
-
-   <div style="font-size:11.5px;font-family:var(--mono);color:var(--ink3);letter-spacing:.1em;margin:11px 0 6px">${WORK_PHASES[phase].l.toUpperCase()} · ${WORK_PHASES[phase].n} 项</div>
-   ${WORK_PHASES[phase].ph.map((p,i)=>`<div class="row" style="padding:8px 0;font-size:13px">
-    <div style="width:20px;height:20px;border-radius:50%;background:${i<2?'var(--mint)':'var(--gline2)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff">
-     ${i<2?I.check:`<span style="font-size:10px;font-family:var(--mono)">${i+1}</span>`}
-    </div>
-    <div style="flex:1;color:${i<2?'var(--ink3)':'var(--ink)'}">${p}</div>
-    ${i===0?`<div class="mono" style="color:var(--ink3);font-size:10.5px">02:11</div>`:''}
-   </div>`).join('')}
-
-   ${phase===2?`<div class="note note-warn" style="margin-top:14px">${I.warn}<span><b>决策检查点</b> 工具发现器建议你选一条路径继续。这不是错误,只是需要你点头。</span></div>
-   <div class="card sm" style="background:rgba(255,255,255,.6);margin-top:11px">
-    <div style="font-size:13px;font-weight:500;margin-bottom:7px">鉴权方式选哪个?</div>
-    <div style="font-size:12px;color:var(--ink2);margin-bottom:11px">3 个候选都通过初步检查。差异在生产环境行为。</div>
-    ${DECISION_CHOICES.map(c=>`<div class="row sy-choice-row ${state.workDecision===c.k?'selected':''}" role="radio" aria-checked="${state.workDecision===c.k}" tabindex="0" style="padding:9px;border-bottom:1px solid var(--sy-line);cursor:pointer;border-radius:11px;background:${state.workDecision===c.k?'var(--accX)':'transparent'}" onclick="chooseWorkDecision('${c.k}')">
-     <div style="width:19px;height:19px;border-radius:50%;border:2px solid ${state.workDecision===c.k?'var(--accD)':'var(--gline2)'};margin-top:1px;background:${state.workDecision===c.k?'var(--acc)':'transparent'};box-shadow:${state.workDecision===c.k?'inset 0 0 0 4px var(--sy-l5)':'none'};flex-shrink:0"></div>
-     <div style="flex:1"><div style="font-size:13px;font-weight:500">${c.k}</div><div style="font-size:11.5px;color:var(--ink3)">${c.p} · ${c.s}</div></div>
-    </div>`).join('')}
-    <button type="button" class="btn pri" style="width:100%;margin-top:13px;justify-content:center" onclick="confirmWorkDecision()">${state.workDecision?'确认使用 '+state.workDecision:'选择后确认方案'}</button>
-   </div>`:''}
+   <div class="ct">${I.task}工作对话</div>
+   <div class="row"><span style="color:var(--ink3)">用户</span><span>把鉴权模块迁到新接口，先核查调用点。</span></div>
+   <div class="row"><span style="color:var(--ink3)">助手</span><span>正在检查调用位置和兼容风险，完成后在这里继续汇报。</span></div>
+   <div class="row"><span style="color:var(--ink3)">工具</span><span>已读取相关源文件。产出文件会作为会话卡片出现。</span></div>
   </div>
-
   <div class="card" style="width:280px;flex-shrink:0">
    <div class="ct">${I.file}工具输出 · 可恢复</div>
-   <div class="note note-mint" style="margin-bottom:11px;font-size:11.5px">输出按 callId 哈希存到私有 spill 区,原话可恢复</div>
-   <div class="row" style="padding:7px 0;border-bottom:1px solid rgba(120,104,80,.08)">
-    <div style="font-family:var(--mono);font-size:11px;color:var(--ink2)">callId</div>
-    <div class="mono" style="font-size:10.5px">a1b2c3d4</div>
-   </div>
-   <div class="row" style="padding:7px 0;border-bottom:1px solid rgba(120,104,80,.08)">
-    <div style="font-family:var(--mono);font-size:11px;color:var(--ink2)">工具</div>
-    <div style="font-size:12px">web.fetch</div>
-   </div>
-   <div class="row" style="padding:7px 0;border-bottom:1px solid rgba(120,104,80,.08)">
-    <div style="font-family:var(--mono);font-size:11px;color:var(--ink2)">大小</div>
-    <div class="mono" style="font-size:11px">412 B</div>
-   </div>
-   <details class="sy-tool-trace"><summary aria-label="展开或收起原始工具输出">查看原始输出 · 412 B</summary><div style="background:var(--sy-l5);border:1px solid var(--gline2);border-radius:9px;padding:9px 11px;font-family:var(--mono);font-size:11.5px;color:var(--ink2);line-height:1.6;max-height:140px;overflow-y:auto;margin-top:9px"><b style="color:var(--mint)">"data"</b>:[{<br>  <b style="color:var(--acc)">"id"</b>:<span style="color:var(--mint)">"gpt-5.2"</span>,<br>  <b style="color:var(--acc)">"object"</b>:<span style="color:var(--mint)">"model"</span>,<br>  ...<br>}]</div></details>
-   <div style="display:flex;gap:7px;margin-top:11px">
-    <div class="btn" style="flex:1;justify-content:center;font-size:11.5px" onclick="toast('已复制原话')">${I.file}复制原话</div>
-    <div class="btn" style="flex:1;justify-content:center;font-size:11.5px" onclick="toast('已复制 callId')">复制 ID</div>
-   </div>
+   <div class="note note-mint" style="margin-bottom:11px;font-size:11.5px">原始输出从对应工具记录打开，不依赖分区导航</div>
+   <details class="sy-tool-trace"><summary>查看本次工具输出</summary>
+    <div style="padding:9px 11px;font-size:12px;color:var(--ink2)">原始结果由运行时保留。</div>
+   </details>
   </div>
  </div>`;
 }
-
-function chooseWorkDecision(choice){
- state.workDecision=choice;
- goto('02');
-}
-function confirmWorkDecision(){
- if(!state.workDecision){toast('请先选择鉴权方案');return;}
- const name=state.workDecision;
- openDialog('确认执行方案','已选择 '+name+'。这是本地原型确认流程，不会更改真实鉴权模块。',function(){state.wphase=3;goto('02');toast('设计原型：已进入执行阶段');},{confirm:'确认方案'});
-}
-
 // 14v2 能力面板
 function S14v2Capability(){
  return `<div class="rowflex">
@@ -1317,19 +1266,6 @@ const MEDIA=[
  {p:'GEMINI',k:'IMAGE',m:'gemini-2.5-flash-image',l:'Gemini 2.5 Flash Image',host:'generativelanguage.googleapis.com'},
 ];
 
-const WORK_PHASES=[
- {k:'goals',l:'目标',n:1,ph:['把鉴权模块迁到新接口']},
- {k:'plan',l:'计划',n:4,ph:['找到所有调用点','生成分层方案','逐文件改 + 验','跑全量测试']},
- {k:'decisions',l:'决策点',n:2,ph:['选 mTLS 还是 JWT?','日志结构是 ndjson 还是 syslog?']},
- {k:'progress',l:'执行中',n:3,ph:['已 grep 14 处','已改 2 个文件','npm test 在跑']},
- {k:'artifacts',l:'产出',n:2,ph:['middleware.ts (重写)','auth.config.ts (新增)']},
-];
-
-const DECISION_CHOICES=[
- {k:'mTLS',p:'更安全,握手 ~80ms',s:'生产环境,多实例'},
- {k:'JWT',p:'无状态,扩展容易',s:'微服务,SLA 99.9%'},
- {k:'Paseto',p:'比 JWT 简单,默认抗 misuse',s:'新项目,Go/Rust 后端'},
-];
 
 const TOOL_OUTPUT_SAMPLE='{"tool":"web.fetch","callId":"a1b2c3d4","input":{"url":"https://api.openai.com/v1/models"},"output":{"data":[{"id":"gpt-5.2","object":"model","created":1749576000,"owned_by":"openai"}]}}';
 

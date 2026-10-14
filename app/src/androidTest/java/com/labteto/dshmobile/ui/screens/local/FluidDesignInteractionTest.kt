@@ -4,17 +4,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.LocalMediaKind
@@ -30,21 +25,20 @@ import org.junit.Test
 class FluidDesignInteractionTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun decisionNeedsExplicitSubmissionAndFailureKeepsAnswerForRetry() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val attempts = mutableListOf<String>()
+    @Test fun workQuestionRequiresConfirmationAndKeepsSelectionOnFailure() {
+        val received = mutableListOf<String>()
         compose.setContent { DshTheme {
-            FluidDecisionPanel("decision-1", "Choose a route", listOf("Route A", "Route B"),
-                onAnswer = { attempts += it; attempts.size > 1 }, onCancel = {})
+            QuestionDialog("Choose a route", listOf("Route A", "Route B"),
+                onAnswer = { received += it; received.size > 1 }, onDismiss = {},
+                requireConfirmation = true)
         } }
+        compose.onNodeWithText("Choose a route").assertIsDisplayed()
         compose.onNodeWithText("Route A").performClick()
-        compose.runOnIdle { assertEquals(emptyList<String>(), attempts) }
-        compose.onNodeWithTag("workDecisionCustom").performTextInput("Use the existing endpoint")
-        compose.onNodeWithTag("workDecisionContinue").performClick()
-        compose.onNodeWithText(context.getString(R.string.fluid_decision_failed)).assertIsDisplayed()
-        compose.onNodeWithTag("workDecisionCustom").assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("Use the existing endpoint")))
-        compose.onNodeWithTag("workDecisionContinue").performClick()
-        compose.runOnIdle { assertEquals(listOf("Use the existing endpoint", "Use the existing endpoint"), attempts) }
+        compose.runOnIdle { assertEquals(emptyList<String>(), received) }
+        compose.onNodeWithText("提交回答").performClick()
+        compose.onNodeWithText("提交未成功，选择已保留，请重试").assertIsDisplayed()
+        compose.onNodeWithText("提交回答").performClick()
+        compose.runOnIdle { assertEquals(listOf("Route A", "Route A"), received) }
     }
 
     @Test fun selectedProfileSectionDoesNotShowPreviousStoryMemoryAfterSwitch() {

@@ -114,7 +114,6 @@ class ReadmeScreenshotActivity : ComponentActivity() {
             "character-tuning",
             "usage",
             "quota",
-            "design-work-goal", "design-work-plan", "design-work-decision", "design-work-execution", "design-work-outputs",
             "design-persona-0", "design-persona-1", "design-persona-2", "design-persona-3", "design-gallery", "design-capability",
         )
     }
