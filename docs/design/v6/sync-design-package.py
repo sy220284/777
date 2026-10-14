@@ -83,7 +83,7 @@ if len(icon_labels) != expected_icons or len(set(icon_labels)) != expected_icons
     parser.error("Active SVG sprite must contain exactly 24 distinct named entry glyphs")
 if retired_names.intersection(icon_labels):
     parser.error("Retired entry icons re-entered current V6 SVG sheet")
-asset_match = re.search(r"window\\.V6_ASSET_DATA\\s*=\\s*(\\{[^;]+\\})\\s*;", html)
+asset_match = re.search(r'window\.V6_ASSET_DATA\s*=\s*(\{.*?\})\s*;', html, re.S)
 if not asset_match:
     parser.error("V6 standalone HTML missing embedded offline icon sources")
 icons = json.loads(asset_match.group(1))
