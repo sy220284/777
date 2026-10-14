@@ -44,6 +44,9 @@ internal fun LocalFeatureAnimatedHost(
         DsAnimations.predictiveBackMaxOffset.toPx()
     }
     val pushOffset = with(LocalDensity.current) { DsAnimations.pushOffset.roundToPx() }
+    val peerOffset = with(LocalDensity.current) {
+        com.shenyan.designsystem.foundation.SyMetric.navigationPeerOffset.roundToPx()
+    }
     val settledBackProgress = predictiveBackProgress.coerceIn(0f, 1f)
     val reduced = LocalSyReducedMotion.current
     val ease = com.shenyan.designsystem.foundation.SyMotion.ease
@@ -88,10 +91,10 @@ internal fun LocalFeatureAnimatedHost(
 
                 else -> {
                     (
-                        slideInHorizontally(peer) { pushOffset / 4 } +
+                        slideInHorizontally(peer) { peerOffset } +
                             fadeIn(fadeEnter)
                         ).togetherWith(
-                        slideOutHorizontally(peer) { -pushOffset / 4 } +
+                        slideOutHorizontally(peer) { -peerOffset } +
                             fadeOut(fadeExit),
                     )
                 }

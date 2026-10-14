@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.shenyan.designsystem.foundation.SyMotion
+import com.shenyan.designsystem.foundation.SyMetric
 
 /**
  * The app's motion vocabulary. Screens reach for these instead of inlining `tween(…)` so that
@@ -27,7 +28,7 @@ object DsAnimations {
     private val fluidEase = SyMotion.ease
     val modal: FiniteAnimationSpec<Float> = tween(SyMotion.dialogMs, easing = fluidEase)
     val progress: FiniteAnimationSpec<Float> = tween(SyMotion.progressMs, easing = fluidEase)
-    val pushOffset: Dp = 20.dp
+    val pushOffset: Dp = SyMetric.navigationPushOffset
     /** Quick and settled — direct manipulation should feel tactile without visible rebound. */
     val fastSpring = spring<Float>(
         dampingRatio = Spring.DampingRatioNoBouncy,

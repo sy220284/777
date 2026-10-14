@@ -118,6 +118,9 @@ val LocalSySceneBackdrop = staticCompositionLocalOf<SySceneBackdrop?> { null }
 /** 非业务状态量统一设计，用户自定义字体缩放交由 Compose sp / 系统处理。 */
 object SyMetric {
     val touch = 48.dp
+    // Navigation geometry is V6 pack-owned, shared by feature stack and peer swaps.
+    val navigationPushOffset = 20.dp
+    val navigationPeerOffset = 6.dp
     val gapXs = 2.dp
     val gapSm = 6.dp
     val gapMd = 10.dp

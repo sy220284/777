@@ -123,7 +123,7 @@ internal fun FluidSectionSwap(
     enableSharedBounds: Boolean = false,
     content: @Composable (Int) -> Unit,
 ) {
-    val offset = with(LocalDensity.current) { 60.dp.roundToPx() }
+    val offset = with(LocalDensity.current) { SyMetric.navigationPeerOffset.roundToPx() }
     val reduceMotion = LocalSyReducedMotion.current
     val host: @Composable (Modifier, SharedTransitionScope?) -> Unit = { surfaceModifier, sharedScope ->
         AnimatedContent(targetState = section, modifier = surfaceModifier, label = "fluidSectionSwap",
