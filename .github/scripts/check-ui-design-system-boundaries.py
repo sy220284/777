@@ -131,12 +131,12 @@ CANONICAL_MOTION_FILES = (
     "screens/local/FluidDesignNavigation.kt",
     "shenyan/SyResponsiveSheet.kt",
 )
-INLINE_MOTION_DURATION = re.compile(r"\\btween\\s*(?:<[^>]+>)?\\s*\\(\\s*[1-9][0-9]{1,3}\\b")
+INLINE_MOTION_DURATION = re.compile(r"\btween\s*(?:<[^>]+>)?\s*\(\s*[1-9][0-9]{1,3}\b")
 for relative in CANONICAL_MOTION_FILES:
     file = UI / relative
     source = mask_non_code(file.read_text(encoding="utf-8"))
     for match in INLINE_MOTION_DURATION.finditer(source):
-        line = source.count("\\n", 0, match.start()) + 1
+        line = source.count("\n", 0, match.start()) + 1
         violations.append(f"{relative}:{line}: inline animation duration; use SyMotion semantic token")
 
 # The app and overlays must not drift into separate wallpaper/glow drawing algorithms.
