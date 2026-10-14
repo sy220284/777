@@ -30,3 +30,12 @@
 ## 证据边界
 
 新增代码的测试覆盖是**测试源码**；除非有绑定当前 Git SHA 的成功回执，不声明编译、CI 或设备测试成功。发布说明应只将上表“本轮新增”标记为本轮贡献。
+
+
+## 本轮续做（新提交，不属于前述 `09822351`）
+
+- **`ea745fa6`：调试切片真实接线。** `LocalConversationSliceHost` 从直接 `NextConversationUiPack.Render` 改为经 `LocalConversationPackGate` → `UiPackRegistry` 审核后以动态注册 Pack 渲染。Host 独立定义必需场景，并从实际端口连接生成结构能力集合，不直接信任 Manifest 自报能力。拒绝准入时展示错误/返回按钮，阻止隐式切换会话或偷偷进入 V6。
+- **`6fee3ab8`：受校验依赖版本约束。** 将 `:ui-host` 的 emoji2 解析固定在已有 `verification-metadata.xml` 校验记录的 1.4.0；这是针对上游 CI 依赖检验阻断的修正尝试，不关闭校验。
+- **`d586ba39`：回归测试补充。** 端口完全不连接时必须拒绝 Pack，证明 Pack 的 Manifest 自报不能成为 Owner/Host 的能力事实来源。
+
+**仍未完成：** 生产全 App 注册/导航、V6 全页面独立迁出、Next 全覆盖，动态 UI 媒体/结构化工具适配，真模型与设备验收。以上新提交未有当前 SHA 的成功 CI 回执，不得认定“构建已通过”。在线 Figma 未更新。
