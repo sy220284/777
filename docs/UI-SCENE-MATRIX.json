@@ -171,8 +171,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "send": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.SendMessage) / WorkConversationUiPort.submit(WorkConversationUiCommand.SendMessage)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -183,8 +183,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "import_attachment": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "AttachmentUiPort.import(ImportUiAttachmentCommand)",
+          "receiptType": "UiAttachmentReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -205,8 +205,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "stop": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.Stop) / WorkConversationUiPort.submit(WorkConversationUiCommand.Stop)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -230,14 +230,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "edit": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.EditUserMessage) / WorkConversationUiPort.submit(WorkConversationUiCommand.EditUserMessage)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "regenerate": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.RegenerateReply) / WorkConversationUiPort.submit(WorkConversationUiCommand.RegenerateReply)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -248,8 +248,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "select_variant": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.SelectVariant)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -270,8 +270,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "edit_and_resend": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.EditUserMessage) / WorkConversationUiPort.submit(WorkConversationUiCommand.EditUserMessage)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -343,8 +343,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "import_attachment": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "AttachmentUiPort.import(ImportUiAttachmentCommand)",
+          "receiptType": "UiAttachmentReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -648,8 +648,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "answer_question": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.AnswerQuestion)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1005,32 +1005,32 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "create": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "AutomationUiPort.submit(AutomationUiCommand.Create)",
+          "receiptType": "AutomationUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "edit": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "AutomationUiPort.submit(AutomationUiCommand.Update)",
+          "receiptType": "AutomationUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "enable": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "AutomationUiPort.submit(AutomationUiCommand.Pause|Resume)",
+          "receiptType": "AutomationUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "run": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "AutomationUiPort.submit(AutomationUiCommand.RunNow)",
+          "receiptType": "AutomationUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "delete": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "AutomationUiPort.submit(AutomationUiCommand.Delete)",
+          "receiptType": "AutomationUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1051,8 +1051,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "save_task": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "AutomationUiPort.submit(AutomationUiCommand.Create|Update)",
+          "receiptType": "AutomationUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1205,14 +1205,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "create": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "MediaUiPort.submit(MediaUiCommand.Image|Speech|Transcribe|Video)",
+          "receiptType": "MediaUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "query": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "MediaUiPort.submit(MediaUiCommand.PollVideo)",
+          "receiptType": "MediaUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -2307,20 +2307,20 @@
       "acceptance": "协议/Schema 自动化校验；真实模型、恢复和双包业务旅程待验收",
       "actionProof": {
         "prepare_user_input": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiDocumentUiPort.submit(UiDocumentAction.SendUserInput)",
+          "receiptType": "UiDocumentReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "open_registered_scene": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiDocumentUiPort.submit(UiDocumentAction.OpenKnownScene)",
+          "receiptType": "UiDocumentReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "answer_current_approval": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiDocumentUiPort.submit(UiDocumentAction.AnswerApproval)",
+          "receiptType": "UiDocumentReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -2348,8 +2348,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "generate_document": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiDocumentUiPort.generate(GenerateUiDocumentCommand)",
+          "receiptType": "UiDocumentReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }

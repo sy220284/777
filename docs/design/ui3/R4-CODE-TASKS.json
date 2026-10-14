@@ -6,7 +6,7 @@
   "verificationPolicy": "用户要求延后测试、编译、设备和 CI 跟进；代码状态不代表验收通过",
   "sceneCount": 78,
   "actionCount": 173,
-  "sourceMappedActions": 44,
+  "sourceMappedActions": 65,
   "tasks": [
     {
       "id": "S-1-01",
