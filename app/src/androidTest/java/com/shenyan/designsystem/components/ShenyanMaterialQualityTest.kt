@@ -92,6 +92,37 @@ class ShenyanMaterialQualityTest {
         } finally { file.delete() }
     }
 
+    @Test fun replacingWallpaperPathReloadsImageAndRecalculatesRegionColour() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        fun colouredFile(name: String, colour: Int): File =
+            File(context.cacheDir, name).also { file ->
+                val bitmap = Bitmap.createBitmap(120, 240, Bitmap.Config.ARGB_8888)
+                bitmap.eraseColor(colour)
+                file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                bitmap.recycle()
+            }
+        val first = colouredFile("test-background-blue.png", android.graphics.Color.rgb(12, 35, 94))
+        val second = colouredFile("test-background-yellow.png", android.graphics.Color.rgb(245, 233, 103))
+        val path = androidx.compose.runtime.mutableStateOf(first.absolutePath)
+        val displayedLuminance = java.util.concurrent.atomic.AtomicReference<Float?>(null)
+        try {
+            compose.setContent {
+                DshTheme(preference = ThemePreference.LIGHT, backgroundPath = path.value) {
+                    val luminance = LocalAppBackgroundState.current.analysis?.luminance
+                    SideEffect { displayedLuminance.set(luminance) }
+                    SyMaterialFrame(modifier = Modifier.fillMaxWidth()) { Text("更换背景后保持正常显示") }
+                }
+            }
+            compose.waitUntil(5_000) { (displayedLuminance.get() ?: 1f) < .3f }
+            compose.runOnIdle { path.value = second.absolutePath }
+            compose.waitUntil(5_000) { (displayedLuminance.get() ?: 0f) > .7f }
+            compose.onNodeWithText("更换背景后保持正常显示").assertExists()
+        } finally {
+            first.delete()
+            second.delete()
+        }
+    }
+
     @Test fun matteKeepsAnOpaqueSemanticSurfaceOverTheSameWallpaper() {
         val file = wallpaper()
         val ready = AtomicBoolean()
