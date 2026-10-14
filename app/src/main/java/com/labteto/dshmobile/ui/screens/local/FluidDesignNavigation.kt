@@ -137,8 +137,8 @@ internal fun FluidSectionSwap(
                     fadeIn(tween(0)).togetherWith(fadeOut(tween(0)))
                 } else {
                     val direction = if (targetState > initialState) 1 else -1
-                    (slideInHorizontally(slideSpec) { direction * offset } + fadeIn(tween(SyMotion.duration(SyMotion.pagePeerMs, reduced, tempo))))
-                        .togetherWith(slideOutHorizontally(slideSpec) { -direction * offset } + fadeOut(tween(SyMotion.duration(SyMotion.pagePeerMs, reduced, tempo))))
+                    (slideInHorizontally(slideSpec) { direction * offset } + fadeIn(tween(SyMotion.duration(SyMotion.pagePeerMs, reduceMotion, tempo))))
+                        .togetherWith(slideOutHorizontally(slideSpec) { -direction * offset } + fadeOut(tween(SyMotion.duration(SyMotion.pagePeerMs, reduceMotion, tempo))))
                 }
             },
         ) { selectedSection ->
