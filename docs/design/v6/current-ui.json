@@ -1,0 +1,179 @@
+{
+  "schema": "777.v6.current-ui/1",
+  "baselineCommit": "3cdd12f3395876b2d495721336d5d378b562a03c",
+  "asOf": "2026-10-14",
+  "platform": "Android mobile",
+  "sourceOfTruth": "merged Compose on main",
+  "routes": [
+    {
+      "id": "HOME",
+      "owner": "SHELL",
+      "label": "聊天／工作",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "features": [
+        "CHAT",
+        "WORK"
+      ],
+      "entries": [
+        "顶部菜单",
+        "新会话",
+        "输入框",
+        "加号",
+        "模型／能力",
+        "运行中停止／排队",
+        "审批／提问弹窗"
+      ]
+    },
+    {
+      "id": "PERSONA_GALLERY",
+      "owner": "CHAT",
+      "label": "人物图集",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryOverviewV3.kt",
+      "entries": [
+        "人物选择",
+        "人物详情／编辑",
+        "返回会话"
+      ]
+    },
+    {
+      "id": "DIARY",
+      "owner": "CHAT",
+      "label": "人物日记",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryScreen.kt",
+      "entries": [
+        "日记列表",
+        "内容查看"
+      ]
+    },
+    {
+      "id": "WORKSPACE",
+      "owner": "WORK",
+      "label": "工作区文件",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt",
+      "entries": [
+        "文件列表",
+        "文件打开",
+        "成果消息"
+      ]
+    },
+    {
+      "id": "TASKS",
+      "owner": "AUTOMATION",
+      "label": "自动化任务",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt",
+      "entries": [
+        "任务列表",
+        "任务编辑",
+        "真实任务状态"
+      ]
+    },
+    {
+      "id": "TOOLS",
+      "owner": "TOOLS",
+      "label": "工具与技能",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
+      "entries": [
+        "能力中心",
+        "技能",
+        "插件",
+        "GitHub",
+        "外部连接"
+      ]
+    },
+    {
+      "id": "SETTINGS",
+      "owner": "SETTINGS",
+      "label": "设置",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "entries": [
+        "外观",
+        "模型",
+        "账户",
+        "消耗",
+        "记忆",
+        "权限",
+        "通知",
+        "高级诊断"
+      ]
+    }
+  ],
+  "settingsDestinations": [
+    "ROOT",
+    "SESSION",
+    "APPEARANCE",
+    "CHAT",
+    "MODELS",
+    "MODEL_PERFORMANCE",
+    "ACCOUNT",
+    "MODEL_USAGE",
+    "MINIMAX_QUOTA",
+    "PRICING",
+    "USAGE",
+    "USAGE_LOG",
+    "USAGE_DETAIL",
+    "MEMORY",
+    "MEMORY_SETTINGS",
+    "MEMORY_MANAGEMENT",
+    "PERMISSIONS",
+    "NOTIFICATIONS",
+    "ADVANCED",
+    "SESSION_STORAGE",
+    "DIAGNOSTICS"
+  ],
+  "drawerActions": [
+    "WORKSPACE",
+    "GROUP_CHAT",
+    "PERSONA_GALLERY",
+    "PERSONA_GALLERY_CONTINUE",
+    "DIARY",
+    "TASKS",
+    "TOOLS",
+    "MINIMAX_QUOTA",
+    "USAGE",
+    "IMMERSIVE_READER",
+    "SETTINGS"
+  ],
+  "retiredUI": [
+    "HOME_THREE_TAB_BAR",
+    "HOME_DUPLICATE_SEARCH",
+    "WORK_FIVE_STAGE_TABS",
+    "WORK_OUTPUT_STANDALONE_CARD",
+    "WORK_NEW_SESSION_HEADING",
+    "PROJECT_MANAGEMENT",
+    "RUN_CENTER_STANDALONE",
+    "BACKGROUND_ASSISTANT_ENTRY",
+    "UPDATE_STANDALONE_PAGE",
+    "CHAT_MANAGE_USAGE_BUTTON",
+    "CHAT_SUBSCRIPTION_STATUS",
+    "ACCOUNT_MODEL_COUNT_BADGE",
+    "GALLERY_DIGIT_BADGE",
+    "PLUS_SHEET_WHITE_BG",
+    "PLUS_NESTED_BIG_ICON_CARDS"
+  ],
+  "pendingPRs": [
+    {
+      "number": 705,
+      "scope": "UI3.0 independent packs and ports",
+      "merged": false
+    }
+  ],
+  "figma": {
+    "editableSync": "blocked",
+    "reason": "Starter MCP quota exceeded; no canvas write verified"
+  },
+  "iconInventory": {
+    "sourceTotal": 26,
+    "activeCount": 24,
+    "retired": [
+      "Projects",
+      "RunCenter"
+    ],
+    "policy": "Retain legacy Kotlin path declarations but exclude the two retired entry icons from active design packaging."
+  },
+  "mergedUIFixes": [
+    711
+  ],
+  "mergedRelevantPRs": [
+    711
+  ]
+}

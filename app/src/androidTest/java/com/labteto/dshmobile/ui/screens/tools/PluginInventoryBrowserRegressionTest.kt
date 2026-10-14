@@ -1,15 +1,23 @@
 package com.labteto.dshmobile.ui.screens.tools
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -204,6 +212,94 @@ class PluginInventoryBrowserRegressionTest {
             org.junit.Assert.assertTrue(prompt.contains("确认"))
             org.junit.Assert.assertTrue(prompt.contains(".dsh/skills/"))
         }
+    }
+
+
+    @Test
+    fun pluginCardsKeepCompactIconsAndReadableText() {
+        compose.setContent {
+            DshTheme {
+                // CI emulators use a 412dp viewport: exercise a real narrow
+                // 320dp page rather than only the roomy default viewport.
+                Box(Modifier.width(320.dp)) {
+                    PluginInventoryBrowser(
+                        localIds = listOf("android-automation"),
+                        onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                        onUseCapability = {},
+                    )
+                }
+            }
+        }
+        val icon = compose.onNodeWithTag("plugin-inventory-icon-local:android-automation", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val title = compose.onNodeWithTag("plugin-inventory-title-local:android-automation", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val card = compose.onNodeWithTag("plugin-inventory-card-local:android-automation")
+            .getUnclippedBoundsInRoot()
+        assertTrue("Icon material should not stretch across the row", (icon.right - icon.left) <= 48.dp)
+        assertTrue("Plugin title must have readable horizontal space", (title.right - title.left) >= 100.dp)
+        assertTrue("Plugin card should not become a tall empty slab", (card.bottom - card.top) < 220.dp)
+    }
+
+    @Test
+    fun skillCardsKeepDescriptionsBelowTheActionRow() {
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(),
+                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                        "research-check", "核查改动正确性并追踪异常、复盘及验证修复结果", true,
+                    )),
+                    skillsOnly = true,
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onUseCapability = {},
+                )
+            }
+        }
+        val title = compose.onNodeWithTag("plugin-inventory-title-skill:research-check", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val details = compose.onNodeWithTag("plugin-inventory-detail-skill:research-check", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val card = compose.onNodeWithTag("plugin-inventory-card-skill:research-check")
+            .getUnclippedBoundsInRoot()
+        assertTrue("Skill title should not be a one-character column", (title.right - title.left) >= 100.dp)
+        assertTrue("Description should use the whole card width", (details.right - details.left) > (title.right - title.left))
+        assertTrue("Skill card should remain compact", (card.bottom - card.top) < 180.dp)
+    }
+
+    @Test
+    fun searchingDescriptionsHasAUsefulEmptyState() {
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = listOf("android-automation"),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-search").performTextInput("自动执行")
+        compose.onNodeWithTag("plugin-inventory-card-local:android-automation").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-inventory-search").performTextInput("不存在的插件名称")
+        compose.onNodeWithText("没有找到匹配的技能或插件").assertIsDisplayed()
+    }
+
+    @Test
+    fun existingCardsRemainVisibleDuringSkillUpdates() {
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(),
+                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                        "research-check", "核查改动正确性", true,
+                    )),
+                    skillsOnly = true, loading = true,
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onUseCapability = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-skill:research-check").assertIsDisplayed()
+        compose.onNodeWithText("使用").assertIsNotEnabled()
     }
 
 }

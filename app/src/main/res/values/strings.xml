@@ -357,6 +357,7 @@
     <string name="tools_catalog_installed">已安装</string>
     <string name="tools_catalog_connections">服务扩展</string>
     <string name="tools_catalog_empty">当前列表中暂无可用的插件</string>
+    <string name="tools_catalog_no_matches">没有找到匹配的技能或插件</string>
     <string name="tools_catalog_details">查看</string>
     <string name="tools_catalog_return_chat">返回对话</string>
     <string name="settings_plugins">插件</string>

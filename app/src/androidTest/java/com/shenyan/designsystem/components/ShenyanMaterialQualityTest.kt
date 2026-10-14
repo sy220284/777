@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -164,4 +165,28 @@ class ShenyanMaterialQualityTest {
             assertEquals(expected.blue, fill.blue, .01f)
         } finally { file.delete() }
     }
+
+    @Test fun decorativeHighlightNeverExpandsCompactMaterialInRow() {
+        compose.setContent {
+            DshTheme(preference = ThemePreference.LIGHT) {
+                Row(Modifier.fillMaxWidth()) {
+                    SyMaterialSurface(
+                        modifier = Modifier.testTag("compact-material"),
+                        tier = SyMaterialTier.L1_SECTION,
+                    ) {
+                        Text("图", Modifier.padding(12.dp))
+                    }
+                    Text(
+                        "旁边的标题仍有完整横向空间",
+                        modifier = Modifier.weight(1f).testTag("sibling-title"),
+                    )
+                }
+            }
+        }
+        val compact = compose.onNodeWithTag("compact-material").getUnclippedBoundsInRoot()
+        val sibling = compose.onNodeWithTag("sibling-title").getUnclippedBoundsInRoot()
+        assertTrue("Decorative rim must not determine the material width", (compact.right - compact.left) < 80.dp)
+        assertTrue("Adjacent text must retain usable width", (sibling.right - sibling.left) > 160.dp)
+    }
+
 }
