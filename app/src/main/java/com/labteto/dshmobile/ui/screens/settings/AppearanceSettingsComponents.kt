@@ -56,6 +56,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
+import com.labteto.dshmobile.ui.theme.wallpaperDecodeSample
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -294,8 +295,9 @@ internal fun BackgroundRow(
                         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                         BitmapFactory.decodeFile(imagePath, bounds)
                         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
-                        var sample = 1
-                        while (bounds.outHeight / (sample * 2) >= 96) sample *= 2
+                        // Wide/panoramic images must be sampled by width as well as height.
+                        // The thumbnail is only 96 x 56 dp, not a full-size bitmap.
+                        val sample = wallpaperDecodeSample(bounds.outWidth, bounds.outHeight, 256)
                         val opts = BitmapFactory.Options().apply { inSampleSize = sample }
                         BitmapFactory.decodeFile(imagePath, opts)?.asImageBitmap()
                     }.getOrNull()
