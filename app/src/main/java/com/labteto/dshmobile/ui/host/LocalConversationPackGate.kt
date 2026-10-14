@@ -57,6 +57,8 @@ internal object LocalConversationPackGate {
         gallery: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort? = null,
         personas: com.labteto.dshmobile.uicontract.PersonaSelectionUiPort? = null,
         personaTransfer: com.labteto.dshmobile.uicontract.PersonaTransferUiPort? = null,
+        stories: com.labteto.dshmobile.uicontract.PersonaStoryUiPort? = null,
+        galleryDeletion: com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort? = null,
     ): Set<UiCapabilityId> = buildSet {
         if (chat != null && drafts != null) {
             listOf("chat.send_text", "chat.edit", "chat.regenerate",
@@ -79,6 +81,8 @@ internal object LocalConversationPackGate {
         if (gallery != null) add(UiCapabilityId("chat.gallery_archive"))
         if (personas != null) add(UiCapabilityId("chat.persona_selection"))
         if (personaTransfer != null) add(UiCapabilityId("chat.persona_transfer"))
+        if (stories != null) add(UiCapabilityId("chat.gallery_story"))
+        if (galleryDeletion != null) add(UiCapabilityId("chat.gallery_delete"))
     }
 
     fun admit(

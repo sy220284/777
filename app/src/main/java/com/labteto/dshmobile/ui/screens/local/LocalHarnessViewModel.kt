@@ -52,6 +52,8 @@ class LocalHarnessViewModel @Inject constructor(
     val personaGalleryUiPort: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort,
     val personaSelectionUiPort: com.labteto.dshmobile.uicontract.PersonaSelectionUiPort,
     val personaTransferUiPort: com.labteto.dshmobile.uicontract.PersonaTransferUiPort,
+    val personaStoryUiPort: com.labteto.dshmobile.uicontract.PersonaStoryUiPort,
+    val personaGalleryDeletionUiPort: com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort,
     private val uiPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val chatUi: LocalChatUiFacade,
     private val businessSessions: com.labteto.dshmobile.uicontract.SessionUiPort,
@@ -208,8 +210,7 @@ class LocalHarnessViewModel @Inject constructor(
         personaGalleryController.setGalleryPortrait(id, uri)
     suspend fun removeGalleryPortrait(id: String): Result<PersonaGalleryEntry> =
         personaGalleryController.removeGalleryPortrait(id)
-    suspend fun editGalleryStoryDetails(id: String, storyId: String, notes: String, storyStage: String): Result<Unit> =
-        personaGalleryController.editGalleryStoryDetails(id, storyId, notes, storyStage)
+    suspend fun refreshGalleryForUi() = personaGalleryController.refresh()
     suspend fun renameGalleryStory(id: String, storyId: String, title: String): Result<Unit> =
         personaGalleryController.renameGalleryStory(id, storyId, title)
     internal suspend fun exportGalleryPersona(
@@ -224,10 +225,6 @@ class LocalHarnessViewModel @Inject constructor(
         personaGalleryController.importGalleryPersona(bytes, fileName, mimeType)
     suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> =
         personaGalleryController.installPersonaPreset(id)
-    suspend fun deleteGalleryEntry(id: String): Result<Unit> =
-        personaGalleryController.deleteGalleryEntry(id)
-    suspend fun deleteGalleryStory(id: String, storyId: String): Result<Unit> =
-        personaGalleryController.deleteGalleryStory(id, storyId)
     suspend fun deleteGalleryHistoryMessage(
         id: String,
         storyId: String,

@@ -1,12 +1,12 @@
 {
   "schema": "777.ui-r4.code-tasks/1",
   "asOf": "2026-10-14",
-  "baseline": "028682a8",
+  "baseline": "3f2511de",
   "scope": "整个 R4，非单一功能",
   "verificationPolicy": "用户要求延后测试、编译、设备和 CI 跟进；代码状态不代表验收通过",
   "sceneCount": 78,
-  "actionCount": 172,
-  "sourceMappedActions": 37,
+  "actionCount": 173,
+  "sourceMappedActions": 41,
   "tasks": [
     {
       "id": "S-1-01",
@@ -45,8 +45,8 @@
       "task": "图库/故事/立绘/导入导出/删除完整 Owner 端口",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "Gallery Owner 读取、重命名和归档消息删除；人物选择/开始故事；Chat Owner 人物导入导出事务迁出 UI；V6/Next 真实接线，Next 经 Host 文档服务导入及 JSON/Markdown/Word 导出。",
-      "remaining": "图库保存、人物资料编辑、故事详情、完整删除联动、立绘仍待迁移。"
+      "implemented": "读取/重命名/归档消息删除、人物选择/开始故事、原人物导入导出事务及双包文档传输；本批故事详情/阶段编辑和人物/故事删除经实际 Chat Owner 端口，双包确认及部分同步回执。",
+      "remaining": "图库保存、人物完整资料编辑、立绘设置/移除及相关全量 UI 移包仍待迁移。"
     },
     {
       "id": "S1-03",
@@ -57,8 +57,10 @@
     {
       "id": "S1-03B",
       "task": "图库删除后的群聊/人物绑定联动迁出 UI",
-      "codeStatus": "CODE_PENDING",
-      "verification": "DEFERRED"
+      "codeStatus": "CODE_IMPLEMENTED_UNVERIFIED",
+      "verification": "DEFERRED",
+      "implemented": "人物删除由 Chat Owner 读取实际条目并沿用原删除日志，保护共享立绘；群聊成员/人物绑定清理迁出 UI，以捕获激活身份校验当前会话。V6/Next 真实接线。",
+      "remaining": "测试延后。同步忙碌/过期/失败明确 DEFERRED；没有承诺清理所有非前台会话，完整恢复仍属于 S4-07。"
     },
     {
       "id": "S1-04",
@@ -231,6 +233,7 @@
     "S1-05": "已有实际来源关联写入，未实现新的真实核验执行/结论 API；不得把关联当通过",
     "S1-06": "重命名、置顶、两包删除/Host 清理已接线；搜索/定位/全局导航仍缺",
     "S3-03": "基础组件及新的独立证据 Overlay 已在 V6 模块；完整页面树仍留 App",
-    "S4-07": "新增删除清理仅覆盖 Owner-confirmed IDs；完整版本迁移/崩溃恢复未完成"
+    "S4-07": "新增删除清理仅覆盖 Owner-confirmed IDs；完整版本迁移/崩溃恢复未完成",
+    "S1-02": "编辑/删除的图库提交与当前会话同步是分立事实，Saved/Deleted + DEFERRED 不应重放图库操作。同期恢复相同条目/故事时不解绑其新引用。"
   }
 }

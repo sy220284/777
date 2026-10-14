@@ -40,7 +40,8 @@ class ChatPersonaGalleryStore internal constructor(
         try {
             UiPersonaGalleryReadReceipt.Available(list().map { entry ->
                 UiPersonaGalleryEntry(entry.id, entry.persona.name, entry.stories.map { story ->
-                    UiPersonaGalleryStory(story.id, story.title, story.notes, story.historyTotalCount)
+                    UiPersonaGalleryStory(story.id, story.title, story.notes, story.historyTotalCount,
+                        story.chatContext.storyStage, story.chatContext.visibleStoryStages().toList())
                 })
             })
         } catch (cancelled: CancellationException) {
@@ -501,6 +502,24 @@ class ChatPersonaGalleryStore internal constructor(
         documentStore.write(updated)
         archiveDeletionJournal.drain(updated, history)
         return true
+    }
+
+    /** Capture the actual deleted entry under the original writer lock, never a stale UI list. */
+    @Synchronized
+    internal fun deleteEntryForUi(id: String): PersonaGalleryEntry? {
+        val entry = findEntry(id) ?: return null
+        return entry.takeIf { delete(id) }
+    }
+
+    @Synchronized
+    internal fun cleanupDeletedPortrait(path: String) {
+        if (path.isBlank()) return
+        val root = File(requireNotNull(file.parentFile), "persona-portraits").canonicalFile
+        val candidate = File(path).canonicalFile
+        if (readNormalized().entries.any { it.portraitPath.isNotBlank() && File(it.portraitPath).canonicalFile == candidate }) return
+        if (candidate.path.startsWith(root.path + File.separator) && candidate.exists()) {
+            check(candidate.delete()) { "人物已删除，旧立绘清理未完成" }
+        }
     }
 
     @Synchronized

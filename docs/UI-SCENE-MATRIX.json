@@ -776,7 +776,8 @@
         "start_story",
         "read_archive",
         "rename_story",
-        "delete_history_message"
+        "delete_history_message",
+        "edit_story_details"
       ],
       "recovery": "Gallery/story identities + revision",
       "v6": 6,
@@ -822,6 +823,12 @@
         "delete_history_message": {
           "ownerPort": "PersonaGalleryUiPort.submit(PersonaGalleryUiCommand.DeleteHistoryMessage)",
           "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_story_details": {
+          "ownerPort": "PersonaStoryUiPort.submit(PersonaStoryUiCommand.SaveDetails)",
+          "receiptType": "UiPersonaStoryReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -902,20 +909,20 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "delete_persona": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "PersonaGalleryDeletionUiPort.delete(DeletePersonaGalleryCommand)",
+          "receiptType": "UiPersonaGalleryDeletionReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "delete_story": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "PersonaStoryUiPort.submit(PersonaStoryUiCommand.Delete)",
+          "receiptType": "UiPersonaStoryReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "delete_history": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "PersonaGalleryUiPort.submit(PersonaGalleryUiCommand.DeleteHistoryMessage)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }

@@ -32,5 +32,7 @@ interface ConversationUiPack {
         gallery: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort? = null,
         personas: com.labteto.dshmobile.uicontract.PersonaSelectionUiPort? = null,
         personaTransfer: com.labteto.dshmobile.uicontract.PersonaTransferUiPort? = null,
+        stories: com.labteto.dshmobile.uicontract.PersonaStoryUiPort? = null,
+        galleryDeletion: com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort? = null,
     )
 }

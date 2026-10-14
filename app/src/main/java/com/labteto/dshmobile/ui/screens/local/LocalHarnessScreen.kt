@@ -470,6 +470,46 @@ fun LocalHarnessScreen(
         }
     }
     val capturedTeam = viewModel.workTeamUiPort.snapshot()
+    suspend fun submitStory(command: com.labteto.dshmobile.uicontract.PersonaStoryUiCommand): Result<Unit> = runSuspendResult {
+        val result = viewModel.personaStoryUiPort.submit(command)
+        var refreshFailed = false
+        try { viewModel.refreshGalleryForUi() }
+        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) { refreshFailed = true }
+        when (result) {
+            is com.labteto.dshmobile.uicontract.UiPersonaStoryReceipt.Saved -> {
+                if (refreshFailed || result.sessionSync == com.labteto.dshmobile.uicontract.UiStorySessionSync.DEFERRED) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                        android.widget.Toast.makeText(context, R.string.local_gallery_story_saved_sync_pending,
+                            android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            com.labteto.dshmobile.uicontract.UiPersonaStoryReceipt.Missing -> error(resources.getString(R.string.local_gallery_story_missing))
+            is com.labteto.dshmobile.uicontract.UiPersonaStoryReceipt.Failed -> error(result.message ?: resources.getString(R.string.local_gallery_story_update_failed))
+        }
+    }
+    suspend fun deleteGallery(id: String): Result<Unit> = runSuspendResult {
+        val result = viewModel.personaGalleryDeletionUiPort.delete(com.labteto.dshmobile.uicontract.DeletePersonaGalleryCommand(sendIdentity, id))
+        var refreshFailed = false
+        try { viewModel.refreshGalleryForUi() }
+        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) { refreshFailed = true }
+        when (result) {
+            is com.labteto.dshmobile.uicontract.UiPersonaGalleryDeletionReceipt.Deleted -> {
+                val warning = buildList {
+                    result.portraitCleanupWarning?.let { add(it) }
+                    if (refreshFailed || result.sessionSync == com.labteto.dshmobile.uicontract.UiStorySessionSync.DEFERRED)
+                        add(resources.getString(R.string.local_gallery_story_saved_sync_pending))
+                }.joinToString("\n")
+                if (warning.isNotBlank()) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                    android.widget.Toast.makeText(context, warning, android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+            com.labteto.dshmobile.uicontract.UiPersonaGalleryDeletionReceipt.Missing -> error(resources.getString(R.string.local_gallery_entry_missing))
+            is com.labteto.dshmobile.uicontract.UiPersonaGalleryDeletionReceipt.Failed -> error(result.message ?: resources.getString(R.string.local_gallery_story_update_failed))
+        }
+    }
     val shellActions = LocalShellFeatureUiActions(
         streamingState = viewModel.streamingState,
         selectModel = viewModel::selectModel,
@@ -521,12 +561,12 @@ fun LocalHarnessScreen(
         hasUnsavedCurrentPersona = viewModel::hasUnsavedCurrentPersona,
         currentGalleryHasUnsavedChanges = viewModel::currentGalleryHasUnsavedChanges,
         saveCurrentToGallery = viewModel::saveCurrentToGallery,
-        editGalleryStoryDetails = viewModel::editGalleryStoryDetails,
+        editGalleryStoryDetails = { id, story, notes, stage -> submitStory(com.labteto.dshmobile.uicontract.PersonaStoryUiCommand.SaveDetails(sendIdentity, id, story, notes, stage)) },
         renameGalleryStory = viewModel::renameGalleryStory,
         inspectGalleryPersona = viewModel::inspectGalleryPersona,
         applyGallerySuggestions = viewModel::applyGallerySuggestions,
-        deleteGalleryEntry = viewModel::deleteGalleryEntry,
-        deleteGalleryStory = viewModel::deleteGalleryStory,
+        deleteGalleryEntry = ::deleteGallery,
+        deleteGalleryStory = { id, story -> submitStory(com.labteto.dshmobile.uicontract.PersonaStoryUiCommand.Delete(sendIdentity, id, story)) },
         deleteGalleryHistoryMessage = viewModel::deleteGalleryHistoryMessage,
         exportGalleryPersona = viewModel::exportGalleryPersona,
         importGalleryPersona = viewModel::importGalleryPersona,

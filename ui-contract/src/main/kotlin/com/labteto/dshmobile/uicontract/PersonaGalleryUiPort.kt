@@ -6,6 +6,8 @@ data class UiPersonaGalleryStory(
     val title: String,
     val notes: String,
     val messageCount: Int,
+    val storyStage: String = "",
+    val availableStages: List<String> = emptyList(),
 )
 
 data class UiPersonaGalleryEntry(

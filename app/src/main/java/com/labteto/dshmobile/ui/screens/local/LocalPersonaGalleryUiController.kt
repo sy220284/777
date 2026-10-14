@@ -44,6 +44,7 @@ internal class LocalPersonaGalleryUiController(
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
     val gallery: StateFlow<List<PersonaGalleryEntry>> = _gallery.asStateFlow()
     val personaPresets: List<PersonaPreset> = PersonaPresetCatalog.presets
+    suspend fun refresh() { _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() } }
     suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = runSuspendResult {
         runtime.chat.configureChatPersona(profile).getOrThrow()
         _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
@@ -303,17 +304,6 @@ private fun deleteManagedPortrait(path: String, keepPath: String? = null) {
     }
 }
 
-suspend fun editGalleryStoryDetails(id: String, storyId: String, notes: String, storyStage: String): Result<Unit> = runCatching {
-    withContext(Dispatchers.IO) {
-        check(chatUi.updateStoryDetails(id, storyId, notes, storyStage)) { "图集故事已不存在" }
-        _gallery.value = chatUi.galleryEntries()
-    }
-    // The gallery owns persisted stage data. Update the active copy through Chat's
-    // session owner only when this very story is bound and the turn is idle.
-    runtime.chat.updateBoundStoryStage(id, storyId, storyStage)
-    Unit
-}
-
 suspend fun renameGalleryStory(id: String, storyId: String, title: String): Result<Unit> = runSuspendResult {
     requireGalleryCommit(galleryPort.submit(com.labteto.dshmobile.uicontract.PersonaGalleryUiCommand.RenameStory(id, storyId, title)))
     withContext(Dispatchers.IO) {
@@ -354,25 +344,6 @@ suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runC
         }
     }
     entry
-}
-
-suspend fun deleteGalleryEntry(id: String): Result<Unit> = runCatching {
-    val portraitPath = gallery.value.firstOrNull { it.id == id }?.portraitPath.orEmpty()
-    withContext(Dispatchers.IO) {
-        check(chatUi.deleteGallery(id)) { "图集条目已不存在" }
-        _gallery.value = chatUi.galleryEntries()
-    }
-    deleteManagedPortrait(portraitPath)
-    runtime.chat.removeGroupChatMemberByGalleryId(id)
-    runtime.chat.clearChatGalleryBinding(expectedGalleryId = id)
-}
-
-suspend fun deleteGalleryStory(id: String, storyId: String): Result<Unit> = runCatching {
-    withContext(Dispatchers.IO) {
-        check(chatUi.deleteStory(id, storyId)) { "图集故事已不存在" }
-        _gallery.value = chatUi.galleryEntries()
-    }
-    runtime.chat.clearChatGalleryBinding(expectedGalleryId = id, expectedStoryId = storyId, keepCharacter = true)
 }
 
 suspend fun deleteGalleryHistoryMessage(

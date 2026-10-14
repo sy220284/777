@@ -195,7 +195,8 @@ internal class LocalChatPersonaCoordinator internal constructor(
             publishCommitted(target)
             enqueueSnapshot(snapshot.sessionId)
             true
-        } catch (error: Exception) {
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (error: Exception) {
             publishError(snapshot.sessionId, error.message ?: "当前会话剧情阶段同步失败")
             false
         } finally {
@@ -207,19 +208,19 @@ internal class LocalChatPersonaCoordinator internal constructor(
         expectedGalleryId: String,
         expectedStoryId: String? = null,
         keepCharacter: Boolean = false,
-    ) {
+    ): Boolean {
         val snapshot = state.value
         if (
             snapshot.usageMode != LocalUsageMode.CHAT ||
             snapshot.chat.galleryId != expectedGalleryId
-        ) return
-        if (expectedStoryId != null && snapshot.chat.galleryStoryId != expectedStoryId) return
+        ) return false
+        if (expectedStoryId != null && snapshot.chat.galleryStoryId != expectedStoryId) return false
 
         val lease = LocalSessionRuntimeRegistry.tryAcquire(
             snapshot.sessionId,
             LocalSessionRuntimeKind.MAINTENANCE,
-        ) ?: return
-        try {
+        ) ?: return false
+        return try {
             val current = state.value
             if (
                 current.sessionId != snapshot.sessionId ||
@@ -228,7 +229,7 @@ internal class LocalChatPersonaCoordinator internal constructor(
                 current.kernel.running ||
                 current.chat.galleryId != expectedGalleryId ||
                 (expectedStoryId != null && current.chat.galleryStoryId != expectedStoryId)
-            ) return
+            ) return false
             val target = current.copy(
                 chat = current.chat.copy(
                     galleryId = if (keepCharacter) current.chat.galleryId else null,
@@ -242,8 +243,11 @@ internal class LocalChatPersonaCoordinator internal constructor(
             commitDomainState(target, "gallery-unbound")
             publishCommitted(target)
             enqueueSnapshot(snapshot.sessionId)
-        } catch (error: Throwable) {
+            true
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (error: Exception) {
             publishError(snapshot.sessionId, error.message ?: "人物图集解绑失败")
+            false
         } finally {
             lease.close()
         }

@@ -29,7 +29,65 @@ class LocalChatRuntime @Inject internal constructor(
     private val groupMembership: LocalGroupChatMembershipCoordinator,
     private val replySuggestions: LocalReplySuggestionCoordinator,
     private val gallery: ChatPersonaGalleryStore,
-) : PersonaSelectionUiPort {
+) : PersonaSelectionUiPort, PersonaStoryUiPort, PersonaGalleryDeletionUiPort {
+    override suspend fun delete(command: DeletePersonaGalleryCommand): UiPersonaGalleryDeletionReceipt =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val deleted = gallery.deleteEntryForUi(command.galleryId) ?: return@withContext UiPersonaGalleryDeletionReceipt.Missing
+                val portraitWarning = try { gallery.cleanupDeletedPortrait(deleted.portraitPath); null }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (failure: Exception) { failure.message ?: "旧立绘清理未完成" }
+                val sync = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+                    val current = runtimeStateStore.state.value
+                    if (command.identity == null || runtimeStateStore.sessionTransitioning ||
+                        runtimeStateStore.uiBindingIdentity(current) != command.identity) return@synchronized UiStorySessionSync.DEFERRED
+                    val groupBound = current.usageMode == LocalUsageMode.CHAT && current.chat.groupChat.members.any { it.galleryId == command.galleryId }
+                    val personaBound = current.usageMode == LocalUsageMode.CHAT && current.chat.galleryId == command.galleryId
+                    if (!groupBound && !personaBound) return@synchronized UiStorySessionSync.NOT_BOUND
+                    // Import may have restored the same archive while cleanup was pending.
+                    if (gallery.findEntry(command.galleryId) != null) return@synchronized UiStorySessionSync.DEFERRED
+                    val groupApplied = !groupBound || groupMembership.remove(command.galleryId)
+                    val personaApplied = !personaBound || personaCoordinator.clearGalleryBinding(command.galleryId)
+                    if (groupApplied && personaApplied) UiStorySessionSync.APPLIED else UiStorySessionSync.DEFERRED
+                }
+                UiPersonaGalleryDeletionReceipt.Deleted(sync, portraitWarning)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { UiPersonaGalleryDeletionReceipt.Failed(failure.message) }
+        }
+
+    override suspend fun submit(command: PersonaStoryUiCommand): UiPersonaStoryReceipt =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val changed = when (command) {
+                    is PersonaStoryUiCommand.SaveDetails -> gallery.updateStoryDetails(command.galleryId, command.storyId, command.notes, command.storyStage)
+                    is PersonaStoryUiCommand.Delete -> gallery.deleteStory(command.galleryId, command.storyId)
+                }
+                if (!changed) return@withContext UiPersonaStoryReceipt.Missing
+                val sync = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+                    val current = runtimeStateStore.state.value
+                    if (command.identity == null || runtimeStateStore.sessionTransitioning ||
+                        runtimeStateStore.uiBindingIdentity(current) != command.identity) return@synchronized UiStorySessionSync.DEFERRED
+                    if (current.usageMode != LocalUsageMode.CHAT || current.chat.galleryId != command.galleryId ||
+                        current.chat.galleryStoryId != command.storyId) return@synchronized UiStorySessionSync.NOT_BOUND
+                    val applied = when (command) {
+                        is PersonaStoryUiCommand.SaveDetails -> {
+                            val stage = gallery.findEntry(command.galleryId)?.stories?.firstOrNull { it.id == command.storyId }?.chatContext?.storyStage
+                                ?: return@synchronized UiStorySessionSync.DEFERRED
+                            personaCoordinator.updateBoundStoryStage(command.galleryId, command.storyId, stage)
+                        }
+                        is PersonaStoryUiCommand.Delete -> {
+                            if (gallery.findEntry(command.galleryId)?.stories?.any { it.id == command.storyId } == true)
+                                return@synchronized UiStorySessionSync.DEFERRED
+                            personaCoordinator.clearGalleryBinding(command.galleryId, command.storyId, keepCharacter = true)
+                        }
+                    }
+                    if (applied) UiStorySessionSync.APPLIED else UiStorySessionSync.DEFERRED
+                }
+                UiPersonaStoryReceipt.Saved(sync)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { UiPersonaStoryReceipt.Failed(failure.message) }
+        }
+
     override val snapshots = runtimeStateStore.state.map { snapshot() }.distinctUntilChanged()
 
     override fun snapshot(): UiPersonaSelectionSnapshot = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
@@ -70,13 +128,6 @@ class LocalChatRuntime @Inject internal constructor(
     internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = behaviorTuning.configure(profile)
     internal fun bindChatGallery(galleryId: String, galleryStoryId: String?) =
         personaCoordinator.bindGallery(galleryId, galleryStoryId)
-    internal fun updateBoundStoryStage(galleryId: String, storyId: String, stage: String): Boolean =
-        personaCoordinator.updateBoundStoryStage(galleryId, storyId, stage)
-    internal fun clearChatGalleryBinding(
-        expectedGalleryId: String,
-        expectedStoryId: String? = null,
-        keepCharacter: Boolean = false,
-    ) = personaCoordinator.clearGalleryBinding(expectedGalleryId, expectedStoryId, keepCharacter)
     internal suspend fun syncDefaultChatPersona(profile: PersonaProfile): PersonaProfile =
         personaCoordinator.syncDefault(profile)
     internal fun createGroupChatSession(entries: List<PersonaGalleryEntry>): Boolean {

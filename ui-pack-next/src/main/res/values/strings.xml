@@ -167,4 +167,15 @@
     <string name="next_gallery_export_format">导出 %1$s</string>
     <string name="next_gallery_export_target">导出人物：%1$s</string>
     <string name="next_gallery_select_export">点击列表中的人物名称选择</string>
+    <string name="next_gallery_story_saved_sync_pending">图库操作已保存；当前会话同步未完成，无需重复提交，请重新打开后确认。</string>
+    <string name="next_gallery_story_notes">故事备注</string>
+    <string name="next_gallery_story_stage">剧情阶段</string>
+    <string name="next_gallery_save_details">保存故事详情</string>
+    <string name="next_gallery_delete_story">删除故事</string>
+    <string name="next_gallery_delete_story_effect">删除此故事及其归档记录，保留人物档案。操作完成后可能需要重新打开会话同步绑定。</string>
+    <string name="next_gallery_confirm_delete_story">确认删除此故事</string>
+    <string name="next_gallery_cancel_delete_story">取消删除</string>
+    <string name="next_gallery_delete_character">删除人物</string>
+    <string name="next_gallery_delete_character_effect">删除此人物、所有故事和归档；清理由应用管理且未被其他人物引用的立绘。操作完成后可能需要重新打开会话同步成员与人物绑定。</string>
+    <string name="next_gallery_confirm_delete_character">确认删除此人物及故事</string>
 </resources>
