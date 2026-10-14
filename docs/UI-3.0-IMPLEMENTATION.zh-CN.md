@@ -118,3 +118,13 @@ Work 提问新增真实 waiter 签发的 nonce；模型 callId 复用不能复�
 ## Next 接续、默认审批与工具活动（待合并，未验证）
 
 继续选取现有端口已经支持、改动范围较小的三个入口：Next 从 `SessionUiPort` 读取原 Owner 接续摘要，允许用户确认/编辑后创建 `CONTINUATION` 会话，提交携带原激活身份和模式；默认审批恢复通过 `WorkPolicyUiPort` 明确确认后应用，不由文档改变权限；Work 面板从 `WorkReadUiPort` 显示真实工具阶段、错误及参数/结果摘要，明确区分完成、失败、取消和结果未知，不把工具完成推断为需求核验通过。Work 面板关闭后失效本次读取，迟到结果不能重新打开。业务 Owner 未新增或替换。本批仍按要求不测试、不编译、不跟进 CI；完整 UI 替换及其他未实现部分不标完成。
+
+## 2026-10-14 本轮接续实施：Host Pack 准入
+
+**本轮新增（与此前作者/提交区分）：** `09822351` 增加 `:ui-host` 的 `UiPackRegistry`，将已安装的 UI Pack 按不可重复的 ID 注册；请求不存在的包直接拒绝，存在但场景/契约/能力/窗口/无障碍/深色模式不兼容的包返回逐项诊断，不自动用 V6 偷偷填补。新增 `UiPackRegistryTest` 回归测试源码，覆盖缺失包、整包 Scene 缺失、受限会话切片和重复 ID；以及 `docs/design/ui3/UI-PACK-REGISTRY-AUDIT-20261014.zh-CN.md` 代码-设计对照。
+
+**此前已有（不是本轮实现）：** `:ui-contract`、`UiPackManifest.checkCompatibility`、Next 会话切片、V6 的 16 个基础组件文件拆分、各 Feature Port、本地 `UiDocument` Builder、Shared Session 逐卡恢复等。维持原台账归属。
+
+**仍未完成：** 此次是独立的**准入机制**，尚未接入生产全局 UI Pack 选择和 UI Host 场景路由；全量 V6 页面独立拆分、Next 全 App 覆盖、S2 双包真实动作验收、S4 扩展与 S5 设备回归均未宣告完成。在线 Figma 未修改（当前连接为 View，且没有指定画板 key/节点）。
+
+**最新已观察到的 CI 阻断（非新代码验证）：** 早于本轮提交的 `2d243b92` 工作流 `38528990824` 中静态门禁和 JVM 单测成功，但 Android 构建/设备链因 `:ui-host:debugRuntimeClasspath` 对 `androidx.emoji2:emoji2:1.2.0` 的 Gradle 依赖元数据校验失败而阻断。暂未核实官方 artifact 的 SHA-256，**不得为通过 CI 关闭依赖安全校验或填写猜测校验和**。最新提交尚无完整 CI/真机回执。
