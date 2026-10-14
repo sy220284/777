@@ -71,14 +71,17 @@ internal fun syResolveMaterialFill(
     var tinted = lerp(anchor, sample.copy(alpha = 1f),
         if (scene.regionColors.isNotEmpty()) .30f else .18f)
     val luminanceStep = if (colors.text.luminance() < .5f) .01f else -.01f
-    repeat(100) {
-        if (contrast(tinted) >= 4.5f) return@repeat
+    var contrastSteps = 0
+    while (contrastSteps < 100 && contrast(tinted) < 4.5f) {
         // Equal-channel correction protects contrast without discarding the wallpaper hue.
-        tinted = Color(
+        val next = Color(
             red = (tinted.red + luminanceStep).coerceIn(0f, 1f),
             green = (tinted.green + luminanceStep).coerceIn(0f, 1f),
             blue = (tinted.blue + luminanceStep).coerceIn(0f, 1f),
         )
+        if (next == tinted) break
+        tinted = next
+        contrastSteps++
     }
     if (tier == SyMaterialTier.L5_SOLID) return tinted
 
