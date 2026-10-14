@@ -20,7 +20,8 @@ class ShenyanMaterialColorTest {
         listOf(ShenyanPalettes.light, ShenyanPalettes.dark).forEach { palette ->
             backgrounds.forEach { background ->
                 SyMaterialTier.entries.forEach { tier ->
-                    val fill = syResolveMaterialFill(palette, tier, scene(background))
+                    // The explicitly clearer endpoint keeps strict foreground contrast.
+                    val fill = syResolveMaterialFill(palette, tier, scene(background, transparency = 0f))
                     val composed = fill.compositeOver(background)
                     listOf(palette.text, palette.textSecondary, palette.textTertiary,
                         palette.successInk, palette.warningInk, palette.dangerInk).forEach { ink ->
@@ -47,7 +48,7 @@ class ShenyanMaterialColorTest {
     }
 
     @Test fun mixedBrightAndDarkTextureProtectsInkAtBothSampledExtremes() {
-        val sample = scene(Color.Gray).copy(regionExtremes = List(3) { listOf(Color.White, Color.Black) })
+        val sample = scene(Color.Gray, transparency = 0f).copy(regionExtremes = List(3) { listOf(Color.White, Color.Black) })
         listOf(ShenyanPalettes.light, ShenyanPalettes.dark).forEach { palette ->
             val fill = syResolveMaterialFill(palette, SyMaterialTier.L3_CARD, sample)
             listOf(Color.White, Color.Black).forEach { background ->
@@ -65,12 +66,43 @@ class ShenyanMaterialColorTest {
         }
     }
 
+    @Test fun adaptiveContrastNeverCancelsWallpaperTransparencyPreference() {
+        listOf(ShenyanPalettes.light, ShenyanPalettes.dark).forEach { palette ->
+            backgrounds.forEach { background ->
+                listOf(SyMaterialTier.L1_SECTION, SyMaterialTier.L2_BAR,
+                    SyMaterialTier.L3_CARD, SyMaterialTier.L4_OVERLAY).forEach { tier ->
+                    val clearer = syResolveMaterialFill(palette, tier, scene(background, 0f))
+                    val balanced = syResolveMaterialFill(palette, tier, scene(background, .5f))
+                    val airier = syResolveMaterialFill(palette, tier, scene(background, 1f))
+                    val label = "theme=${palette.canvas} tier=$tier wallpaper=$background"
+                    assertTrue("$label clearer=$clearer balanced=$balanced",
+                        clearer.alpha > balanced.alpha)
+                    assertTrue("$label balanced=$balanced airier=$airier",
+                        balanced.alpha > airier.alpha)
+                    assertTrue("$label transparency range too small",
+                        clearer.alpha - airier.alpha >= .10f)
+                }
+            }
+        }
+    }
+
+    @Test fun airierGlassKeepsMoreOfTheWallpaperHueInsteadOfTurningIntoAChalkySlab() {
+        val clearer = syResolveMaterialFill(ShenyanPalettes.light, SyMaterialTier.L3_CARD,
+            scene(backgrounds[0], 0f))
+        val airier = syResolveMaterialFill(ShenyanPalettes.light, SyMaterialTier.L3_CARD,
+            scene(backgrounds[0], 1f))
+        // This saturated purple background contributes progressively more violet to the plate.
+        assertTrue(airier.blue - airier.green > clearer.blue - clearer.green)
+        assertTrue(airier.alpha < clearer.alpha)
+    }
+
     @Test fun transparencyPreferenceStillChangesTheSurfaceWhenAdaptiveContrastIsDisabled() {
         val palette = ShenyanPalettes.light
         val clearer = syResolveMaterialFill(palette, SyMaterialTier.L3_CARD, scene(backgrounds[0], 1f, false))
         val protective = syResolveMaterialFill(palette, SyMaterialTier.L3_CARD, scene(backgrounds[0], 0f, false))
         assertTrue(clearer.alpha < protective.alpha)
-        assertEquals(clearer.red, protective.red, .0001f)
+        assertTrue("With adaptive contrast off, airier glass must blend in more wallpaper hue",
+            clearer.blue - clearer.green > protective.blue - protective.green)
     }
 
     @Test fun fluidBackgroundDerivesAllFiveTiersFromTheSameCanvasAndGlow() {
