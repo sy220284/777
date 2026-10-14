@@ -268,8 +268,8 @@ for theme, selector in (("Light", ":root"), ("Dark", 'body[data-theme="dark"]'),
 
 # Ensure active HTML icons and editable SVG deliverables match the manifest.
 v6_svg = (v6_root / "sy-entry-icons.svg").read_text(encoding="utf-8")
-labels = re.findall(r'<text\\b[^>]*>([A-Za-z][A-Za-z0-9]+)</text>', v6_svg)
-icon_map_match = re.search(r'window\\.V6_ASSET_DATA\\s*=\\s*(\\{[^;]+\\})\\s*;', v6_html)
+labels = re.findall(r'<text\b[^>]*>([A-Za-z][A-Za-z0-9]+)</text>', v6_svg)
+icon_map_match = re.search(r'window\.V6_ASSET_DATA\s*=\s*(\{.*?\})\s*;', v6_html, re.S)
 active_count = v6_manifest.get("iconInventory", {}).get("activeCount", 24)
 retired_icons = set(v6_manifest.get("iconInventory", {}).get("retired", []))
 if len(labels) != active_count or len(set(labels)) != active_count:
