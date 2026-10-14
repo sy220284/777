@@ -26,7 +26,7 @@ class LocalModelProfilesTest {
         }
         assertEquals(null, LocalModelPresets.samplingTemperatureFor("gpt-5.6", "https://api.openai.com/v1", 0.85))
         assertEquals(10_000_000L, LocalModelPresets.maxNativeImageBytesFor("MiniMax-M3", "https://api.minimaxi.com/v1"))
-        assertTrue(LocalModelPresets.entries.any { it.model == "claude-sonnet-5-5" })
+        assertFalse(LocalModelPresets.entries.any { it.model == "claude-sonnet-5-5" })
         assertFalse(LocalModelPresets.entries.any { it.model == "claude-sonnet-5" })
     }
 
@@ -145,6 +145,7 @@ class LocalModelProfilesTest {
 
     @Test fun providerPresetsUseDomesticRoutesWithoutRegionSuffixes() {
         val providers = LocalModelPresets.entries.map { it.provider }
+        assertEquals(setOf("DeepSeek", "MiniMax", "Kimi Code"), providers.toSet())
         assertFalse(providers.any { it.contains("海外") || it.contains("国际") || it.contains("中国") })
 
         val routes = LocalModelPresets.entries.map { it.baseUrl }
@@ -162,11 +163,7 @@ class LocalModelProfilesTest {
                 .filter { it.provider == "Kimi Code" }
                 .all { it.baseUrl == "https://api.kimi.com/coding/v1" },
         )
-        assertTrue(
-            LocalModelPresets.entries
-                .filter { it.provider == "通义千问" }
-                .all { it.baseUrl == "https://dashscope.aliyuncs.com/compatible-mode/v1" },
-        )
+        assertFalse(LocalModelPresets.entries.any { it.provider == "通义千问" })
     }
 
     @Test fun currentProviderPresetsExposeRoutesAndDocumentedCapabilities() {
@@ -262,27 +259,11 @@ class LocalModelProfilesTest {
             setOf("k3", "k3-256k", "kimi-for-coding", "kimi-for-coding-highspeed"),
             models("Kimi Code"),
         )
-        assertEquals(
-            setOf("glm-5.3-flash", "glm-5.3", "glm-5.2", "glm-5-turbo"),
-            models("智谱 GLM"),
-        )
-        assertEquals(
-            setOf("gpt-5.6", "gpt-5.6-sol", "gpt-6-astra", "gpt-6.1-sol",
-                "gpt-6-sol", "gpt-6-luna"),
-            models("OpenAI"),
-        )
-        assertEquals(
-            setOf("gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash-lite"),
-            models("Google Gemini"),
-        )
-        assertEquals(
-            setOf("qwen3.8-omni-flash", "qwen3.8-max", "qwen3.8-flash", "qwen3.7-plus", "qwen-plus"),
-            models("通义千问"),
-        )
-        assertEquals(
-            setOf("claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1"),
-            models("Claude"),
-        )
+        assertEquals(emptySet<String>(), models("智谱 GLM"))
+        assertEquals(emptySet<String>(), models("OpenAI"))
+        assertEquals(emptySet<String>(), models("Google Gemini"))
+        assertEquals(emptySet<String>(), models("通义千问"))
+        assertEquals(emptySet<String>(), models("Claude"))
     }
 
     @Test fun everyPresetHasAUniqueValidRoute() {
