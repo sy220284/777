@@ -93,6 +93,14 @@ class FluidDesignInteractionTest {
                 streaming = true, onCreateMedia = { _, _ -> })
         } }
         compose.onNodeWithTag("messageCreate:source").assertDoesNotExist()
+
+        // 未提供真实创作回调时不展示空入口。
+        compose.setContent { DshTheme {
+            LocalMessageRow(message, chatMode = true, groupMode = false, canEdit = false,
+                canRegenerate = false, canSelectVariant = false, branchInfo = null,
+                onEdit = {}, onSelectVariant = { _, _ -> false }, onRegenerate = { false })
+        } }
+        compose.onNodeWithTag("messageCreate:source").assertDoesNotExist()
     }
 
 }
