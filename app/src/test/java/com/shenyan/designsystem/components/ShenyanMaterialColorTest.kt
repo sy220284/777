@@ -101,7 +101,8 @@ class ShenyanMaterialColorTest {
         val clearer = syResolveMaterialFill(palette, SyMaterialTier.L3_CARD, scene(backgrounds[0], 1f, false))
         val protective = syResolveMaterialFill(palette, SyMaterialTier.L3_CARD, scene(backgrounds[0], 0f, false))
         assertTrue(clearer.alpha < protective.alpha)
-        assertEquals(clearer.red, protective.red, .0001f)
+        assertTrue("With adaptive contrast off, airier glass must blend in more wallpaper hue",
+            clearer.blue - clearer.green > protective.blue - protective.green)
     }
 
     @Test fun missingSceneKeepsDesignedPaletteAndSolidFallbackIsStillTinted() {
