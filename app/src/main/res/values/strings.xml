@@ -2317,5 +2317,7 @@
     <string name="ui_document_local_message">本地内容卡</string>
     <string name="ui_document_local_form">本地回复表单</string>
     <string name="ui_document_ai_design">AI 辅助设计（额外请求）</string>
+    <string name="ui_pack_incompatible">当前界面包缺少必要场景或功能，未切换界面。原会话和业务数据保持不变。</string>
+    <string name="ui_pack_back_to_stable">返回原界面</string>
 </resources>
 
