@@ -61,7 +61,7 @@ suspend fun saveCurrentToGallery(
     forceNewStory: Boolean = false,
     expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?,
 ): Result<PersonaGalleryEntry> = runSuspendResult {
-    val identity = expected ?: error("会话尚未就绪")
+    val identity = expected ?: error(appContext.getString(R.string.ui_r4_gallery_session_not_ready))
     when (val result = savePort.save(com.labteto.dshmobile.uicontract.SavePersonaGalleryCommand(identity, notes, existingId, existingStoryId, forceNewStory))) {
         is com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt.Saved -> {
             if (result.sessionSync == com.labteto.dshmobile.uicontract.UiStorySessionSync.DEFERRED) {
@@ -70,10 +70,10 @@ suspend fun saveCurrentToGallery(
                 }
             }
             refresh()
-            gallery.value.firstOrNull { it.id == result.galleryId } ?: error("图库已保存，但条目已变化，请刷新确认")
+            gallery.value.firstOrNull { it.id == result.galleryId } ?: error(appContext.getString(R.string.ui_r4_gallery_saved_changed))
         }
-        com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt.Rejected -> error("请在原单人聊天空闲时保存；会话可能已变化")
-        is com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt.Failed -> error(result.message ?: "图库保存未完成，请刷新确认状态")
+        com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt.Rejected -> error(appContext.getString(R.string.ui_r4_gallery_save_idle_single))
+        is com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_save_uncertain))
     }
 }
 
@@ -131,8 +131,8 @@ fun selectGalleryPersonaForCurrentChat(id: String, expected: com.labteto.dshmobi
 
 suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGalleryEntry> = runCatching {
     val originalIdentity = selectionPort.snapshot().identity
-    check(!state.value.loading && !state.value.kernel.running) { "请在聊天空闲时新建人物" }
-    require(isMeaningfulGalleryPersona(profile)) { "请填写人物名称和至少一项人物设定" }
+    check(!state.value.loading && !state.value.kernel.running) { appContext.getString(R.string.ui_r4_gallery_create_idle) }
+    require(isMeaningfulGalleryPersona(profile)) { appContext.getString(R.string.ui_r4_gallery_create_incomplete) }
     val entry = withContext(Dispatchers.IO) {
         chatUi.saveGallery(
             persona = profile,
@@ -149,7 +149,7 @@ suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGallery
 }
 suspend fun autoFillNewPersona(description: String): Result<PersonaProfile> = runSuspendResult {
     val snapshot = state.value
-    check(!snapshot.loading && !snapshot.kernel.running && snapshot.modelState.configured) { "请先配置模型并等待当前回复结束" }
+    check(!snapshot.loading && !snapshot.kernel.running && snapshot.modelState.configured) { appContext.getString(R.string.ui_r4_gallery_model_not_ready) }
     chatUi.autoFillPersona(
         model = snapshot.modelState.model, baseUrl = snapshot.modelState.baseUrl,
         profileId = snapshot.modelState.modelSelection.activeProfileId,
@@ -165,13 +165,13 @@ suspend fun inspectGalleryPersona(
 ): Result<PersonaInspectionResult> {
     val snapshot = state.value
     if (snapshot.loading || snapshot.kernel.running || snapshot.usageMode != LocalUsageMode.CHAT) {
-        return Result.failure(IllegalStateException("请在聊天空闲时检查人物"))
+        return Result.failure(IllegalStateException(appContext.getString(R.string.ui_r4_gallery_inspect_busy)))
     }
     if (!snapshot.modelState.configured) {
-        return Result.failure(IllegalStateException("请先配置聊天模型"))
+        return Result.failure(IllegalStateException(appContext.getString(R.string.ui_r4_gallery_model_unset)))
     }
     val entry = gallery.value.firstOrNull { it.id == id }
-        ?: return Result.failure(IllegalStateException("图集条目已不存在"))
+        ?: return Result.failure(IllegalStateException(appContext.getString(R.string.ui_r4_gallery_entry_gone)))
     val story = entry.story(storyId)
     val archived = story?.history.orEmpty()
     val dialogue = if (
@@ -202,9 +202,9 @@ suspend fun applyGallerySuggestions(
     suggestions: List<PersonaAppendSuggestion>,
 ): Result<PersonaGalleryEntry> = runCatching {
     val updated = withContext(Dispatchers.IO) {
-        check(suggestions.isNotEmpty()) { "请先选择要追加的内容" }
+        check(suggestions.isNotEmpty()) { appContext.getString(R.string.ui_r4_gallery_suggestions_empty) }
         chatUi.applyGallerySuggestions(id, suggestions)
-            ?: error("图集条目已不存在")
+            ?: error(appContext.getString(R.string.ui_r4_gallery_entry_gone))
     }
     _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
     if (state.value.chat.galleryId == id) {
@@ -226,10 +226,10 @@ private suspend fun updatePortrait(command: com.labteto.dshmobile.uicontract.Per
                 android.widget.Toast.makeText(appContext, warning, android.widget.Toast.LENGTH_LONG).show()
             } }
             refresh()
-            gallery.value.firstOrNull { it.id == result.galleryId } ?: error("立绘已更新，但条目已变化，请刷新确认")
+            gallery.value.firstOrNull { it.id == result.galleryId } ?: error(appContext.getString(R.string.ui_r4_gallery_portrait_changed))
         }
-        com.labteto.dshmobile.uicontract.UiPersonaPortraitReceipt.Missing -> error("图库人物已不存在")
-        is com.labteto.dshmobile.uicontract.UiPersonaPortraitReceipt.Failed -> error(result.message ?: "立绘更新未完成，请刷新确认")
+        com.labteto.dshmobile.uicontract.UiPersonaPortraitReceipt.Missing -> error(appContext.getString(R.string.ui_r4_gallery_persona_gone))
+        is com.labteto.dshmobile.uicontract.UiPersonaPortraitReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_portrait_uncertain))
     }
 }
 
@@ -246,7 +246,7 @@ internal suspend fun exportGalleryPersona(
 ): Result<PersonaTransferDocument> = runSuspendResult {
     when (val result = transferPort.export(com.labteto.dshmobile.uicontract.ExportPersonaDocumentCommand(id, format))) {
         is com.labteto.dshmobile.uicontract.UiPersonaExportReceipt.Ready -> result.document
-        is com.labteto.dshmobile.uicontract.UiPersonaExportReceipt.Failed -> error(result.message ?: "人物导出失败")
+        is com.labteto.dshmobile.uicontract.UiPersonaExportReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_export_fail))
     }
 }
 
@@ -257,16 +257,16 @@ internal suspend fun importGalleryPersona(
 ): Result<PersonaGalleryEntry> = runSuspendResult {
     val result = transferPort.import(com.labteto.dshmobile.uicontract.ImportPersonaDocumentCommand(bytes, fileName, mimeType))
     when (result) {
-        is com.labteto.dshmobile.uicontract.UiPersonaImportReceipt.Failed -> error(result.message ?: "人物导入失败，请刷新确认状态")
+        is com.labteto.dshmobile.uicontract.UiPersonaImportReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_import_uncertain))
         is com.labteto.dshmobile.uicontract.UiPersonaImportReceipt.Imported -> {
             _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
-            gallery.value.firstOrNull { it.id == result.galleryId } ?: error("人物已导入，但条目已变化，请刷新图库")
+            gallery.value.firstOrNull { it.id == result.galleryId } ?: error(appContext.getString(R.string.ui_r4_gallery_import_changed))
         }
     }
 }
 
 suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runCatching {
-    val preset = PersonaPresetCatalog.find(id) ?: error("人物预置不存在")
+    val preset = PersonaPresetCatalog.find(id) ?: error(appContext.getString(R.string.ui_r4_gallery_preset_missing))
     val entry = withContext(Dispatchers.IO) {
         PersonaPresetArtworkInstaller(appContext, chatUi).install(preset).also {
             _gallery.value = runCatching { chatUi.galleryEntries() }.getOrDefault(_gallery.value)
@@ -290,7 +290,7 @@ private fun requireGalleryCommit(receipt: com.labteto.dshmobile.uicontract.UiCom
     when (receipt) {
         com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted -> Unit
         is com.labteto.dshmobile.uicontract.UiCommandReceipt.Failed -> error(receipt.message)
-        else -> error("图集故事或消息已不存在，或输入无效")
+        else -> error(appContext.getString(R.string.ui_r4_gallery_story_missing))
     }
 }
 

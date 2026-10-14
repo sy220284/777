@@ -2328,5 +2328,24 @@
     <string name="local_gallery_story_missing">图库故事已不存在，请刷新</string>
     <string name="local_gallery_story_update_failed">图库更新未完成，请刷新确认状态</string>
     <string name="local_gallery_entry_missing">图库人物已不存在，请刷新</string>
+    <string name="ui_r4_gallery_session_not_ready">会话尚未就绪</string>
+    <string name="ui_r4_gallery_saved_changed">图库已保存，但条目已变化，请刷新确认</string>
+    <string name="ui_r4_gallery_save_idle_single">请在原单人聊天空闲时保存；会话可能已变化</string>
+    <string name="ui_r4_gallery_save_uncertain">图库保存未完成，请刷新确认状态</string>
+    <string name="ui_r4_gallery_create_idle">请在聊天空闲时新建人物</string>
+    <string name="ui_r4_gallery_create_incomplete">请填写人物名称和至少一项人物设定</string>
+    <string name="ui_r4_gallery_model_not_ready">请先配置模型并等待当前回复结束</string>
+    <string name="ui_r4_gallery_inspect_busy">请在聊天空闲时检查人物</string>
+    <string name="ui_r4_gallery_model_unset">请先配置聊天模型</string>
+    <string name="ui_r4_gallery_entry_gone">图集条目已不存在</string>
+    <string name="ui_r4_gallery_suggestions_empty">请先选择要追加的内容</string>
+    <string name="ui_r4_gallery_portrait_changed">立绘已更新，但条目已变化，请刷新确认</string>
+    <string name="ui_r4_gallery_persona_gone">图库人物已不存在</string>
+    <string name="ui_r4_gallery_portrait_uncertain">立绘更新未完成，请刷新确认</string>
+    <string name="ui_r4_gallery_export_fail">人物导出失败</string>
+    <string name="ui_r4_gallery_import_uncertain">人物导入失败，请刷新确认状态</string>
+    <string name="ui_r4_gallery_import_changed">人物已导入，但条目已变化，请刷新图库</string>
+    <string name="ui_r4_gallery_preset_missing">人物预置不存在</string>
+    <string name="ui_r4_gallery_story_missing">图集故事或消息已不存在，或输入无效</string>
 </resources>
 
