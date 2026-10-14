@@ -246,59 +246,57 @@ internal fun LocalModelSettingsCard(
                 Row(Modifier.fillMaxWidth().padding(SyMetric.gapMd),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                    Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
-                            Text(profile.displayName ?: profile.model, style = DsType.std14Strong.withReadingWeight(), color = colors.text,
-                                modifier = Modifier.weight(1f, fill = false), maxLines = 1,
-                                overflow = TextOverflow.Ellipsis)
-                            if (local.modelSelection.isActive(profile)) {
-                                SyStatusPill(SyStatus.Done, stringResource(R.string.local_model_in_use))
-                            }
-                        }
-                        val duplicateApiRoute = apiProfiles.count {
-                            it.model == profile.model && it.baseUrl == profile.baseUrl
-                        } > 1
+                    val modelContract = LocalEffectiveModelContracts.forProfile(profile)
+                    val creatorKinds = modelContract.mediaOffers.map { it.kind }.toSet()
+                    val duplicated = apiProfiles.count {
+                        it.model == profile.model && it.baseUrl == profile.baseUrl
+                    } > 1
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
+                    ) {
                         Text(
-                            if (duplicateApiRoute) {
-                                "${profile.baseUrl} · ${profile.id.takeLast(6)}"
-                            } else {
-                                profile.baseUrl
-                            },
-                            style = DsType.caption11.withReadingWeight(),
-                            color = colors.textTertiary,
+                            (profile.displayName ?: profile.model) +
+                                if (duplicated) " · ${profile.id.takeLast(4)}" else "",
+                            style = DsType.std14Strong.withReadingWeight(),
+                            color = colors.text,
+                            modifier = Modifier.weight(1f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        val modelContract = LocalEffectiveModelContracts.forProfile(profile)
-                        ModelCapabilityTags(modelContract.clientModalities)
-                        val creatorKinds = modelContract.mediaOffers.map { it.kind }.distinct()
-                        val contextDescription = modelContract.documentedContextWindowTokens
-                            ?.let { stringResource(R.string.local_model_policy_known_context, it) }
-                            ?: stringResource(R.string.local_model_policy_unknown_context)
-                        Text(
-                            stringResource(
-                                R.string.local_model_policy_work_budget,
-                                contextDescription,
-                                modelContract.executionBudget.workRequestsPerSlice,
-                            ),
-                            style = DsType.caption11.withReadingWeight(),
-                            color = colors.textSecondary,
-                        )
-                        if (creatorKinds.isNotEmpty()) {
-                            val creativeLabels = mapOf(
-                                LocalMediaKind.IMAGE to stringResource(R.string.media_studio_capability_image),
-                                LocalMediaKind.VIDEO to stringResource(R.string.media_studio_capability_video),
-                                LocalMediaKind.SPEECH to stringResource(R.string.media_studio_capability_speech),
-                                LocalMediaKind.TRANSCRIBE to stringResource(R.string.media_studio_capability_transcribe),
+                        if (isSelectedProfile) {
+                            SyStatusPill(SyStatus.Done, stringResource(R.string.local_model_in_use))
+                        }
+                        // Small capability glyphs are intentionally AFTER the active-status pill.
+                        // Display only actual client transport/creation abilities, not provider ads.
+                        if (LocalModelCapability.IMAGE in modelContract.clientModalities ||
+                            LocalMediaKind.IMAGE in creatorKinds) {
+                            Icon(
+                                FeatherIcons.Image,
+                                contentDescription = if (LocalMediaKind.IMAGE in creatorKinds)
+                                    "图片理解或生成" else "图片理解",
+                                tint = colors.textSecondary,
+                                modifier = Modifier.size(15.dp),
                             )
-                            Text(
-                                stringResource(
-                                    R.string.media_studio_model_capabilities,
-                                    creatorKinds.joinToString(" · ") { kind -> creativeLabels.getValue(kind) },
-                                ),
-                                style = DsType.caption11.withReadingWeight(),
-                                color = colors.textSecondary,
+                        }
+                        if (LocalModelCapability.VIDEO in modelContract.clientModalities ||
+                            LocalMediaKind.VIDEO in creatorKinds) {
+                            Icon(
+                                FeatherIcons.Video,
+                                contentDescription = if (LocalMediaKind.VIDEO in creatorKinds)
+                                    "视频理解或生成" else "视频理解",
+                                tint = colors.textSecondary,
+                                modifier = Modifier.size(15.dp),
+                            )
+                        }
+                        if (LocalMediaKind.SPEECH in creatorKinds ||
+                            LocalMediaKind.TRANSCRIBE in creatorKinds) {
+                            Icon(
+                                FeatherIcons.Activity,
+                                contentDescription = "语音生成或转写",
+                                tint = colors.textSecondary,
+                                modifier = Modifier.size(15.dp),
                             )
                         }
                     }
