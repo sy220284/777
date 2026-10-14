@@ -27,7 +27,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
-import androidx.compose.material3.SheetDefaults
 import com.shenyan.designsystem.components.SyMaterialSurface
 import com.shenyan.designsystem.components.SySceneBackgroundSurface
 import com.shenyan.designsystem.components.SyMaterialTier
@@ -165,7 +164,7 @@ fun SyResponsiveSheet(
             shape = RoundedCornerShape(SyDimensions.cornerOverlay),
             containerColor = Color.Transparent,
             scrimColor = if (seamlessBackground) Color.Transparent else p.scrim,
-            tonalElevation = if (seamlessBackground) 0.dp else SheetDefaults.Elevation,
+            tonalElevation = 0.dp,
             dragHandle = null,
             contentWindowInsets = { WindowInsets.navigationBars },
         ) {
