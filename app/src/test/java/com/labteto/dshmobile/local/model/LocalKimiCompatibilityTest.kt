@@ -53,6 +53,14 @@ class LocalKimiCompatibilityTest {
         assertFalse(LocalKimiPolicy.isOfficial("https://api.kimi.com.evil.example/coding/v1"))
         assertFalse(LocalKimiPolicy.isOfficial("https://api.kimi.com/v1"))
         assertFalse(LocalKimiPolicy.isOfficial("https://api.kimi.com/coding/v1?key=foo"))
+        assertEquals("video/mp4", LocalKimiPolicy.videoMediaType("clip.mp4", "video/mp4"))
+        assertEquals("video/webm", LocalKimiPolicy.videoMediaType("clip.webm", "application/octet-stream"))
+        assertNull(LocalKimiPolicy.videoMediaType("clip.mp4", "video/webm"))
+        assertNull(LocalKimiPolicy.videoMediaType("clip.bin", "application/octet-stream"))
+        assertFalse(LocalKimiPolicy.videoInputSupported("k3-256k", cn))
+        assertTrue(LocalKimiPolicy.videoInputSupported("k3", cn))
+        assertTrue(LocalKimiPolicy.videoInputSupported("kimi-for-coding", cn))
+        assertFalse(LocalKimiPolicy.videoInputSupported("k3", "https://api.kimi.ai/coding/v1"))
         assertFalse(LocalKimiPolicy.isOfficial("https://api.kimi.ai/coding/v1"))
         assertNull(LocalModelPresets.find("k3", "https://api.kimi.ai/coding/v1"))
         assertTrue(LocalKimiPolicy.isOfficial(cn + "/"))
@@ -233,6 +241,10 @@ class LocalKimiCompatibilityTest {
                 assertTrue(actual!!.toString().contains("video_url"))
                 assertFalse(actual!!.toString().contains(LOCAL_FILE_REF))
                 assertFalse(durable.toString().contains("base64"))
+                val logged = redactModelImages(materialized)
+                assertFalse(logged.toString().contains("base64"))
+                assertTrue(logged.toString().contains("[video data omitted]"))
+                assertFalse(logged.toString().contains("AQIDBAU="))
             }
             val unsupported = runCatching {
                 prepareLocalMultimodalMessages(listOf(durable), root,
