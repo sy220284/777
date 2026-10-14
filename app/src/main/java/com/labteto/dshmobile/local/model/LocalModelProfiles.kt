@@ -616,7 +616,8 @@ object LocalModelPresets {
     /** Capabilities actually encoded by this client's current request/response transports. */
     fun clientCapabilitiesFor(model: String, baseUrl: String): Set<LocalModelCapability> =
         capabilitiesFor(model, baseUrl).filterTo(linkedSetOf()) {
-            it == LocalModelCapability.TEXT || it == LocalModelCapability.IMAGE
+            it == LocalModelCapability.TEXT || it == LocalModelCapability.IMAGE ||
+                (it == LocalModelCapability.VIDEO && LocalKimiPolicy.videoInputSupported(model, baseUrl))
         }
 
     fun maxNativeImageBytesFor(model: String, baseUrl: String): Long =
