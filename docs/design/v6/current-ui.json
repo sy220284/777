@@ -179,12 +179,18 @@
       "adaptive launcher icon",
       "portrait bitmap"
     ],
-    "auditScript": "docs/design/v6/audit-all-icons.py"
+    "auditScript": "docs/design/v6/audit-all-icons.py",
+    "currentEntryCount": 24,
+    "legacyRedrawnCount": 12,
+    "specialCasePolicy": "Notification butterfly, launcher, portrait, and transparent splash are separately validated identity/system assets"
   },
   "mergedUIFixes": [
     711
   ],
   "mergedRelevantPRs": [
     711
-  ]
+  ],
+  "designVersion": "V6.3",
+  "deliveryVersion": "6.3.0",
+  "designStatus": "candidate / PR #715 pending merge"
 }

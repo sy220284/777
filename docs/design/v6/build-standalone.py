@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rebuild the only V6 mobile/app.html design projection from checked-in editable sources."""
+"""Rebuild the only V6.3 mobile/app.html design projection from checked-in editable sources."""
 import argparse
 import base64
 import json
@@ -34,7 +34,7 @@ target = S / "app.html"
 if args.check:
     if not target.exists() or target.read_text(encoding="utf-8") != h:
         parser.error("V6 compiled offline page drifted from editable source; regenerate")
-    print("V6 standalone source parity passed")
+    print("V6.3 standalone source parity passed")
 else:
     target.write_text(h, encoding="utf-8")
     print("Generated", target, len(h), "characters")

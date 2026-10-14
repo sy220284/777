@@ -2,7 +2,7 @@
 """Package current Android V6 source of truth and validate actual editable icon inventory.
 
 Usage: python docs/design/v6/sync-design-package.py \
-  --source docs/design/v6 --output /tmp/shenyan-v6-current.zip
+  --source docs/design/v6 --output /tmp/shenyan-v6.3-design.zip
 
 This utility packages only tracked-design deliverables, not APKs, old previews, or fonts.
 The resulting ZIP is a reproducible design hand-off, NOT device/Figma acceptance.
@@ -60,7 +60,7 @@ if source.name == "mobile" and (source.parent / "current-ui.json").is_file():
     source = source.parent
 required = (
     "mobile/app.html", "mobile/index.html", "mobile/v6.css", "mobile/v6.js", "build-standalone.py", "current-ui.json",
-    "icon-gallery.html", "audit-all-icons.py", "V6.2-ICON-SYSTEM.zh-CN.md", "V6-CURRENT-IMPLEMENTATION.zh-CN.md",
+    "icon-gallery.html", "audit-all-icons.py", "V6.3-ICON-SYSTEM.zh-CN.md", "V6-CURRENT-IMPLEMENTATION.zh-CN.md",
     "README.zh-CN.md", "STATUS.zh-CN.md", "SY-ENTRY-ICONS.zh-CN.md",
     "sy-entry-icons.svg", "file-icons.json", "assets/file-icons-preview.svg",
 )
@@ -133,6 +133,6 @@ with zipfile.ZipFile(output) as z:
 print(json.dumps({
     "archive": str(output), "files": len(payload)+1, "activeEntryIcons": 24,
     "bytes": output.stat().st_size, "routes": routes,
-    "sourceOfTruth": manifest["sourceOfTruth"],
+    "sourceOfTruth": manifest["sourceOfTruth"], "designVersion": manifest["designVersion"],
     "warning": "HTML preview and ZIP are not Android device/Figma verification",
 }, ensure_ascii=False))
