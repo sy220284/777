@@ -26,7 +26,7 @@ def active_entry_icon_sheet(raw: bytes) -> bytes:
     root = ElementTree.fromstring(raw)
     top_level_tiles = root.findall(f"{SVG_NS}g")
     if len(top_level_tiles) == 24:
-        labels = [next((e.text for e in tile.findall(f"{SVG_NS}text") if e.text and e.text.isascii()), "") for tile in top_level_tiles]
+        labels = [e.text for e in root.iter(f"{SVG_NS}text") if e.text and re.fullmatch(r"[A-Za-z][A-Za-z0-9]+", e.text)]
         if len(set(labels)) != 24 or RETIRED.intersection(labels):
             raise ValueError("The checked-in active icon sheet contains duplicate or retired labels")
         return raw
