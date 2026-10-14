@@ -68,6 +68,7 @@ fun MarkdownText(
     modifier: Modifier = Modifier,
     allowCodeCopy: Boolean = true,
     bodyStyle: TextStyle = DsType.mdBody,
+    preserveSoftLineBreaks: Boolean = false,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val blocks = remember(text) { parseMarkdown(text) }
@@ -84,7 +85,7 @@ fun MarkdownText(
                     InlineMarkdown(block.text, style.copy(color = colors.text), Modifier.padding(top = 10.dp))
                 }
                 is MdBlock.Paragraph -> InlineMarkdown(
-                    block.lines.joinToString(" "),
+                    markdownParagraphDisplayText(block.lines, preserveSoftLineBreaks),
                     bodyStyle.copy(color = colors.text),
                     Modifier.fillMaxWidth(),
                 )
@@ -96,6 +97,10 @@ fun MarkdownText(
         }
     }
 }
+
+/** The chat surface respects authored dialogue line breaks; technical Markdown keeps CommonMark folding. */
+internal fun markdownParagraphDisplayText(lines: List<String>, preserveSoftLineBreaks: Boolean): String =
+    lines.joinToString(if (preserveSoftLineBreaks) "\n" else " ")
 
 // ---- Parser (deterministic, line-based) ------------------------------------
 

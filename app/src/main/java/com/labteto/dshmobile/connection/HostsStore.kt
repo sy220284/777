@@ -30,6 +30,9 @@ class HostsStore @Inject constructor(
         val TEXT_SCALE = floatPreferencesKey("text_scale")
         val TEXT_WEIGHT_ADJUSTMENT = intPreferencesKey("text_weight_adjustment")
         val WALLPAPER_SURFACE_TRANSPARENCY = floatPreferencesKey("wallpaper_surface_transparency")
+        val AMBIENT_GLOW = floatPreferencesKey("appearance_ambient_glow")
+        val COMPONENT_EMPHASIS = floatPreferencesKey("appearance_component_emphasis")
+        val MOTION_DURATION_SCALE = floatPreferencesKey("appearance_motion_duration_scale")
         val NOTIFY_LOCAL_JOBS = booleanPreferencesKey("notify_local_jobs")
         val NOTIFY_JOB_RESULTS = booleanPreferencesKey("notify_job_results")
         val NOTIFY_JOB_FAILURES = booleanPreferencesKey("notify_job_failures")
@@ -99,6 +102,9 @@ class HostsStore @Inject constructor(
             textWeightAdjustment = (prefs[Keys.TEXT_WEIGHT_ADJUSTMENT] ?: 0).coerceIn(0, 2),
             wallpaperSurfaceTransparency =
                 (prefs[Keys.WALLPAPER_SURFACE_TRANSPARENCY] ?: 0.5f).coerceIn(0f, 1f),
+            ambientGlow = (prefs[Keys.AMBIENT_GLOW] ?: .5f).coerceIn(0f, 1f),
+            componentEmphasis = (prefs[Keys.COMPONENT_EMPHASIS] ?: .5f).coerceIn(0f, 1f),
+            motionDurationScale = (prefs[Keys.MOTION_DURATION_SCALE] ?: 1f).coerceIn(.7f, 1.3f),
         )
 
     suspend fun setSetting(transform: (AppSettings) -> AppSettings) {
@@ -125,6 +131,9 @@ class HostsStore @Inject constructor(
             prefs[Keys.TEXT_WEIGHT_ADJUSTMENT] = next.textWeightAdjustment.coerceIn(0, 2)
             prefs[Keys.WALLPAPER_SURFACE_TRANSPARENCY] =
                 next.wallpaperSurfaceTransparency.coerceIn(0f, 1f)
+            prefs[Keys.AMBIENT_GLOW] = next.ambientGlow.coerceIn(0f, 1f)
+            prefs[Keys.COMPONENT_EMPHASIS] = next.componentEmphasis.coerceIn(0f, 1f)
+            prefs[Keys.MOTION_DURATION_SCALE] = next.motionDurationScale.coerceIn(.7f, 1.3f)
             committed = next
         }
         // Mirrored out to SharedPreferences as well: the scheme has to be readable before any

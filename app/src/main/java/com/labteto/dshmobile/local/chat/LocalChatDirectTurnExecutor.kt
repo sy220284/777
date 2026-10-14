@@ -218,6 +218,8 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     snapshot.modelState.model,
                     snapshot.modelState.baseUrl,
                 ),
+                model = snapshot.modelState.model,
+                baseUrl = snapshot.modelState.baseUrl,
             )
             val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
 

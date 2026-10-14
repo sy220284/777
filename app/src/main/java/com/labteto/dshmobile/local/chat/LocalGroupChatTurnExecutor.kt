@@ -225,6 +225,8 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 mode = groupImageMode,
                 budget = imageRequestBudget,
                 maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.modelState.model, snapshot.modelState.baseUrl),
+                model = snapshot.modelState.model,
+                baseUrl = snapshot.modelState.baseUrl,
             )
             val rawReply = completeWithRetry(
                 key = key,

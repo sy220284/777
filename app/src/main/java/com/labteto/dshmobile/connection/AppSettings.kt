@@ -47,4 +47,9 @@ data class AppSettings(
     val textWeightAdjustment: Int = 0,
     /** 0=clearer/more opaque, 1=more transparent; 0.5 preserves the previous visual baseline. */
     val wallpaperSurfaceTransparency: Float = 0.5f,
+    /** V6 advanced appearance; 0.5 retains the designed baseline. */
+    val ambientGlow: Float = 0.5f,
+    val componentEmphasis: Float = 0.5f,
+    /** Duration multiplier; lower is brisker. System reduced motion still wins. */
+    val motionDurationScale: Float = 1f,
 )

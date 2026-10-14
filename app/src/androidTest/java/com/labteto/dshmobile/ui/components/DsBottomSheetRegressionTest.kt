@@ -13,10 +13,12 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -77,6 +79,28 @@ class DsBottomSheetRegressionTest {
         compose.onNodeWithTag("bottomSheetScrollBody").assertExists()
         compose.onNodeWithText("保存更改").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, saved) }
+    }
+
+    @Test
+    fun seamlessAttachmentSheetKeepsActionClickableWithoutMaterialBackdrop() {
+        var selected = 0
+        compose.setContent {
+            DshTheme {
+                SyResponsiveSheet(
+                    title = null,
+                    onDismiss = {},
+                    showDragHandle = false,
+                    seamlessBackground = true,
+                ) {
+                    SySheetChoiceRow(title = "团队协作", onClick = { selected++ })
+                }
+            }
+        }
+        compose.onNodeWithTag("sySceneBackgroundSurface").assertIsDisplayed()
+        val panel = compose.onNodeWithTag("sySceneBackgroundSurface").getUnclippedBoundsInRoot()
+        assertTrue("Background painter must not expand the compact menu", (panel.bottom - panel.top).value < 280f)
+        compose.onNodeWithText("团队协作").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1, selected) }
     }
 
     @Test

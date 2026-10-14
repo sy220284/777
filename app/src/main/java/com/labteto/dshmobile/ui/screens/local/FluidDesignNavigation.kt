@@ -31,7 +31,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.shenyan.LocalSyReducedMotion
-import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.shenyan.designsystem.components.SyMaterialFrame
@@ -39,6 +38,8 @@ import com.shenyan.designsystem.components.SyMaterialTier
 import com.shenyan.designsystem.foundation.LocalSyColors
 import com.shenyan.designsystem.foundation.SyMetric
 import com.shenyan.designsystem.foundation.SyMotion
+import com.shenyan.designsystem.foundation.LocalSyMotionTempo
+import androidx.compose.ui.unit.IntOffset
 
 /** Shared navigation for real nested views (persona, media and files), not a Work stage meter. */
 @Composable
@@ -53,7 +54,7 @@ internal fun FluidSectionNavigation(
     val colors = LocalSyColors.current
     val pulse = rememberHapticPulse()
     val reduced = LocalSyReducedMotion.current
-    val duration = if (reduced) 0 else SyMotion.selectMs
+    val duration = SyMotion.duration(SyMotion.selectMs, reduced, LocalSyMotionTempo.current)
     SyMaterialFrame(
         modifier = modifier.fillMaxWidth(),
         tier = SyMaterialTier.L2_BAR,
@@ -105,19 +106,21 @@ internal fun FluidSectionSwap(
     modifier: Modifier = Modifier,
     content: @Composable (Int) -> Unit,
 ) {
-    val offset = with(LocalDensity.current) { 60.dp.roundToPx() }
+    val offset = with(LocalDensity.current) { SyMetric.navigationPeerOffset.roundToPx() }
     val reduceMotion = LocalSyReducedMotion.current
+    val tempo = LocalSyMotionTempo.current
+    val slideSpec = tween<IntOffset>(SyMotion.duration(SyMotion.pagePeerMs, reduceMotion, tempo), easing = SyMotion.ease)
     AnimatedContent(
         targetState = section,
         modifier = modifier,
         label = "fluidSectionSwap",
         transitionSpec = {
             if (reduceMotion) {
-                fadeIn(tween(80)).togetherWith(fadeOut(tween(80)))
+                fadeIn(tween(0)).togetherWith(fadeOut(tween(0)))
             } else {
                 val direction = if (targetState > initialState) 1 else -1
-                (slideInHorizontally(DsAnimations.featurePagePeer) { direction * offset } + fadeIn(tween(380)))
-                    .togetherWith(slideOutHorizontally(DsAnimations.featurePagePeer) { -direction * offset } + fadeOut(tween(140)))
+                (slideInHorizontally(slideSpec) { direction * offset } + fadeIn(tween(SyMotion.duration(SyMotion.pagePeerMs, reduceMotion, tempo))))
+                    .togetherWith(slideOutHorizontally(slideSpec) { -direction * offset } + fadeOut(tween(SyMotion.duration(SyMotion.pagePeerMs, reduceMotion, tempo))))
             }
         },
     ) { selectedSection ->

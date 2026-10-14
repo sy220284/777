@@ -54,6 +54,7 @@ import com.shenyan.designsystem.foundation.LocalSyColors
 import com.shenyan.designsystem.foundation.LocalSyReduceMotion
 import com.shenyan.designsystem.foundation.SyMetric
 import com.shenyan.designsystem.foundation.SyMotion
+import com.shenyan.designsystem.foundation.LocalSyMotionTempo
 
 /** Unlike an icon's 20dp glyph, its semantic/touch target is never less than 48dp. */
 @Composable
@@ -68,12 +69,13 @@ fun SyIconButton(
 ) {
     val p = LocalSyColors.current
     val motion = LocalSyReduceMotion.current
+    val tempo = LocalSyMotionTempo.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val hovered by interaction.collectIsHoveredAsState()
     val scale by animateFloatAsState(
-        if (pressed && enabled && !motion) .96f else 1f,
-        animationSpec = tween(if (motion) 0 else SyMotion.pressMs),
+        if (pressed && enabled && !motion) SyMotion.pressedScale else 1f,
+        animationSpec = tween(SyMotion.duration(SyMotion.pressMs, motion, tempo)),
         label = "syIconPress",
     )
     val resolved = when {
@@ -83,7 +85,7 @@ fun SyIconButton(
         else -> containerColor
     }
     val fill by animateColorAsState(
-        resolved, animationSpec = tween(if (motion) 0 else SyMotion.selectMs),
+        resolved, animationSpec = tween(SyMotion.duration(SyMotion.selectMs, motion, tempo)),
         label = "syIconSurface",
     )
     val foreground = if (selected) p.text else tint ?: p.textSecondary

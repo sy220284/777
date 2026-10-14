@@ -76,37 +76,28 @@ internal fun LocalAgentSwarmLaunchEntry(
     modifier: Modifier = Modifier,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    SyMaterialSurface(
+    androidx.compose.material3.Surface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        shape = DsShapes.block,
-        tier = SyMaterialTier.L3_CARD,
-        border = BorderStroke(
-            1.dp,
-            if (selected) colors.primary.copy(alpha = 0.32f) else colors.border,
-        ),
-        tonalElevation = 0.dp,
+        color = androidx.compose.ui.graphics.Color.Transparent,
+        shape = DsShapes.row,
     ) {
         Row(
-            modifier = Modifier
-                .heightIn(min = 64.dp)
-                .padding(
-                    horizontal = SyMetric.gapLg,
-                    vertical = SyMetric.gapMd,
-                ),
+            modifier = Modifier.heightIn(min = 48.dp)
+                .padding(horizontal = SyMetric.gapMd, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
         ) {
             Icon(
                 painter = painterResource(R.drawable.ic_ui_create_subagent),
                 contentDescription = null,
-                tint = if (selected) colors.primary else colors.text,
-                modifier = Modifier.size(24.dp),
+                tint = if (selected) colors.primary else colors.textSecondary,
+                modifier = Modifier.size(20.dp),
             )
             Text(
                 stringResource(R.string.local_team_title),
                 style = DsType.std14Strong.withReadingWeight(),
-                color = colors.text,
+                color = if (selected) colors.primary else colors.text,
                 modifier = Modifier.weight(1f),
             )
             if (selected) {
@@ -114,12 +105,14 @@ internal fun LocalAgentSwarmLaunchEntry(
                     painter = painterResource(R.drawable.ic_ui_check),
                     contentDescription = null,
                     tint = colors.primary,
+                    modifier = Modifier.size(18.dp),
                 )
             } else {
                 Icon(
                     imageVector = FeatherIcons.ChevronRight,
                     contentDescription = null,
                     tint = colors.textTertiary,
+                    modifier = Modifier.size(18.dp),
                 )
             }
         }

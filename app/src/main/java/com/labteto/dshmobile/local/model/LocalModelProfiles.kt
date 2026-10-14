@@ -94,7 +94,7 @@ internal fun modelProfileId(
 
 internal fun LocalModelProfile.sourceLabel(): String =
     when (authKind) {
-        LocalModelAuthKind.API_KEY -> "API Key"
+        LocalModelAuthKind.API_KEY -> if (LocalKimiPolicy.isOfficial(baseUrl)) "Kimi Code 订阅" else "API Key"
         LocalModelAuthKind.CHATGPT_PLAN -> "ChatGPT 套餐"
     }
 
@@ -232,6 +232,7 @@ data class LocalModelPreset(
  * detection decides whether image input is available.
  */
 object LocalModelPresets {
+    /** API offers exposed to the Add Model picker. ChatGPT Plan models have their own account catalog. */
     val entries = listOf(
         LocalModelPreset(
             provider = "DeepSeek",
@@ -301,6 +302,9 @@ object LocalModelPresets {
                 LocalModelCapability.VIDEO,
             ),
             imageInputSupported = true,
+            temperatureSupported = false,
+            // Plus/Moderato is limited to 256K; 1M is a Pro/Allegretto entitlement.
+            contextWindowTokens = 262_144,
         ),
         LocalModelPreset(
             provider = "Kimi Code",
@@ -311,6 +315,8 @@ object LocalModelPresets {
                 LocalModelCapability.IMAGE,
             ),
             imageInputSupported = true,
+            temperatureSupported = false,
+            contextWindowTokens = 262_144,
         ),
         LocalModelPreset(
             provider = "Kimi Code",
@@ -322,6 +328,8 @@ object LocalModelPresets {
                 LocalModelCapability.VIDEO,
             ),
             imageInputSupported = true,
+            temperatureSupported = false,
+            contextWindowTokens = 1_048_576,
         ),
         LocalModelPreset(
             provider = "Kimi Code",
@@ -333,7 +341,17 @@ object LocalModelPresets {
                 LocalModelCapability.VIDEO,
             ),
             imageInputSupported = true,
+            temperatureSupported = false,
+            contextWindowTokens = 262_144,
         ),
+    )
+
+    /**
+     * Read-only metadata for previously saved API routes and ChatGPT Plan runtime contracts.
+     * Never rendered as an API preset. Keeping this metadata avoids silently degrading existing
+     * user-created routes and the independent ChatGPT subscription transport.
+     */
+    private val compatibilityMetadata = listOf(
         LocalModelPreset(
             provider = "智谱 GLM",
             model = "glm-5.3-flash",
@@ -581,7 +599,12 @@ object LocalModelPresets {
                 return entries.first { it.model == "MiniMax-M2.7" }.copy(model = normalizedModel, baseUrl = normalizedBaseUrl)
             }
         }
-        return entries.firstOrNull { preset ->
+        if (LocalKimiPolicy.isOfficial(normalizedBaseUrl)) {
+            return entries.firstOrNull {
+                it.provider == "Kimi Code" && it.model.equals(normalizedModel, ignoreCase = true)
+            }?.copy(baseUrl = normalizedBaseUrl)
+        }
+        return (entries + compatibilityMetadata).firstOrNull { preset ->
             preset.model.equals(normalizedModel, ignoreCase = true) &&
                 normalizeModelBaseUrl(preset.baseUrl) == normalizedBaseUrl
         }
@@ -593,7 +616,8 @@ object LocalModelPresets {
     /** Capabilities actually encoded by this client's current request/response transports. */
     fun clientCapabilitiesFor(model: String, baseUrl: String): Set<LocalModelCapability> =
         capabilitiesFor(model, baseUrl).filterTo(linkedSetOf()) {
-            it == LocalModelCapability.TEXT || it == LocalModelCapability.IMAGE
+            it == LocalModelCapability.TEXT || it == LocalModelCapability.IMAGE ||
+                (it == LocalModelCapability.VIDEO && LocalKimiPolicy.videoInputSupported(model, baseUrl))
         }
 
     fun maxNativeImageBytesFor(model: String, baseUrl: String): Long =

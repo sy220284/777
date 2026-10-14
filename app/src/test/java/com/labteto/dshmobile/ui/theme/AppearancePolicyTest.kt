@@ -53,6 +53,23 @@ class AppearancePolicyTest {
     }
 
     @Test
+    fun sampledWallpaperDecodeRespectsBothPortraitAndWideSourceDimensions() {
+        assertEquals(1, wallpaperDecodeSample(1080, 2400))
+        assertEquals(2, wallpaperDecodeSample(6000, 4000))
+        assertEquals(4, wallpaperDecodeSample(12000, 2000))
+        assertEquals(32, wallpaperDecodeSample(6144, 2048, 256))
+        assertEquals(1, wallpaperDecodeSample(0, 2400))
+    }
+
+    @Test
+    fun wallpaperSurfaceRegionQueriesTrackTheirOwnVerticalBands() {
+        assertEquals(.15f, BackgroundRegion.TOP.sampleY(), .0001f)
+        assertEquals(.50f, BackgroundRegion.MIDDLE.sampleY(), .0001f)
+        assertEquals(.50f, BackgroundRegion.ALL.sampleY(), .0001f)
+        assertEquals(.88f, BackgroundRegion.BOTTOM.sampleY(), .0001f)
+    }
+
+    @Test
     fun wallpaperTransparencyPreferenceHasVisibleMonotonicRange() {
         val opaque = resolveWallpaperAlpha(
             adaptiveAlpha = 0.58f,

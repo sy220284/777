@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.screens.settings
 
 import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelSelectionState
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAccountSummary
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase
@@ -51,6 +52,26 @@ class SettingsModelProfileFiltersTest {
     fun apiModelSettingsNeverShowsPlanModelsEvenWhenNoApiModelExists() {
         assertEquals(listOf(api), listOf(planA, api, planB).apiModelSettingsProfiles())
         assertTrue(listOf(planA, planB).apiModelSettingsProfiles().isEmpty())
+    }
+
+    @Test
+    fun apiPresetMenuExcludesRetiredProvidersButKeepsPlanCatalog() {
+        val menuProviders = LocalModelPresets.entries.map { it.provider }.toSet()
+        assertEquals(setOf("DeepSeek", "MiniMax", "Kimi Code"), menuProviders)
+        assertTrue(LocalModelPresets.entries.none { it.baseUrl.startsWith("https://api.kimi.ai") })
+        assertTrue(LocalModelPresets.entries.none { it.baseUrl.startsWith("https://api.openai.com") })
+        assertTrue(LocalModelPresets.entries.any { it.model == "k3" &&
+            it.baseUrl == "https://api.kimi.com/coding/v1" })
+
+        // Removing an API picker preset must not remove or mask subscription account models.
+        val account = LocalModelSelectionState(
+            profiles = listOf(planA, api),
+            activeProfileId = planA.id,
+        )
+        val rows = chatGptAccountModelRows(state(), account)
+        assertEquals(listOf("same"), rows.map { it.slug })
+        assertTrue(rows.single().active)
+        assertEquals(listOf(api), account.profiles.apiModelSettingsProfiles())
     }
 
     @Test
