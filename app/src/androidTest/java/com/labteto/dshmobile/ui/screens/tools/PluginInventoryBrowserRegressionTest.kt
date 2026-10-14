@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.ui.screens.tools
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -212,11 +215,15 @@ class PluginInventoryBrowserRegressionTest {
     fun pluginCardsKeepCompactIconsAndReadableText() {
         compose.setContent {
             DshTheme {
-                PluginInventoryBrowser(
-                    localIds = listOf("android-automation"),
-                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
-                    onUseCapability = {},
-                )
+                // CI emulators use a 412dp viewport: exercise a real narrow
+                // 320dp page rather than only the roomy default viewport.
+                Box(Modifier.width(320.dp)) {
+                    PluginInventoryBrowser(
+                        localIds = listOf("android-automation"),
+                        onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                        onUseCapability = {},
+                    )
+                }
             }
         }
         val icon = compose.onNodeWithTag("plugin-inventory-icon-local:android-automation")
