@@ -83,7 +83,7 @@ class FluidDesignInteractionTest {
         compose.onNodeWithText("基于此消息生成视频").assertDoesNotExist()
     }
 
-    @Test fun assistantCreateButtonIsHiddenWhileStreamingOrMissingCallback() {
+    @Test fun assistantCreateButtonIsHiddenWhileStreaming() {
         val message = LocalHarnessMessage("source", "assistant", "Ongoing", createdAt = 1)
         compose.setContent { DshTheme {
             LocalMessageRow(message, chatMode = true, groupMode = false, canEdit = false,
@@ -92,8 +92,11 @@ class FluidDesignInteractionTest {
                 streaming = true, onCreateMedia = { _, _ -> })
         } }
         compose.onNodeWithTag("messageCreate:source").assertDoesNotExist()
+    }
 
-        // 未提供真实创作回调时不展示空入口。
+    @Test fun assistantCreateButtonIsHiddenWithoutCallback() {
+        // 每条 Compose 仪表测试只能设置一次根界面，独立验证无回调情况。
+        val message = LocalHarnessMessage("source", "assistant", "Ongoing", createdAt = 1)
         compose.setContent { DshTheme {
             LocalMessageRow(message, chatMode = true, groupMode = false, canEdit = false,
                 canRegenerate = false, canSelectVariant = false, branchInfo = null,
