@@ -1,47 +1,50 @@
 package com.labteto.dshmobile.local.model
 
 import kotlinx.serialization.json.JsonObjectBuilder
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.net.URI
 
 /**
- * Kimi API Platform and Kimi Code are distinct credential/endpoint families.
- * Only the documented official API route and known API model IDs opt in.
- * Proxies and the pre-existing coding subscription endpoint retain their own defaults.
+ * Kimi Code membership route. The pay-as-you-go Moonshot API is deliberately excluded:
+ * its API keys and billing are not interchangeable with Kimi Code subscription benefits.
  */
 internal object LocalKimiPolicy {
-    private const val API_BASE = "https://api.moonshot.cn/v1"
+    private val officialHosts = setOf("api.kimi.com", "api.kimi.ai")
+    private val controllable = setOf("k3", "k3-256k", "kimi-for-coding")
 
-    fun isOfficial(baseUrl: String): Boolean =
-        runCatching { normalizeModelBaseUrl(baseUrl).equals(API_BASE, ignoreCase = true) }
-            .getOrDefault(false)
+    fun isOfficial(baseUrl: String): Boolean = runCatching {
+        val uri = URI(normalizeModelBaseUrl(baseUrl))
+        uri.scheme.equals("https", ignoreCase = true) &&
+            uri.host?.lowercase() in officialHosts &&
+            uri.port == -1 && uri.path.trimEnd('/') == "/coding/v1" &&
+            uri.rawQuery == null
+    }.getOrDefault(false)
 
-    fun selection(model: String): LocalReasoningSelection? = when (model.trim().lowercase()) {
-        // K3 always thinks. "Fast" means low reasoning effort, not thinking disabled.
-        "kimi-k3" -> LocalReasoningSelection("high", "low", "low", "max")
-        // K2.6 alone permits turning thinking off; reasoning_effort is not its API.
-        "kimi-k2.6" -> LocalReasoningSelection("high", "none")
-        // K2.7 Code (including highspeed) always thinks and exposes no effort switch.
-        else -> null
-    }
+    fun selection(model: String): LocalReasoningSelection? =
+        if (model.trim().lowercase() in controllable) {
+            // Selecting Fast cannot silently switch K3 to a different non-thinking model.
+            LocalReasoningSelection("high", "low", "low", "max")
+        } else null // Highspeed's thinking stays on with no advertised effort control.
 
     fun writeThinking(builder: JsonObjectBuilder, model: String, effort: String?) {
-        if (effort == null) return
-        when (model.trim().lowercase()) {
-            "kimi-k3" -> {
-                require(effort in setOf("low", "high", "max")) {
-                    "Kimi K3 始终启用思考，只支持 low、high、max 推理强度"
-                }
-                builder.put("reasoning_effort", effort)
-            }
-            "kimi-k2.6" -> {
-                require(effort in setOf("none", "high")) {
-                    "Kimi K2.6 仅支持启用或关闭思考"
-                }
-                builder.put("thinking", buildJsonObject {
-                    put("type", if (effort == "none") "disabled" else "enabled")
-                })
-            }
+        if (effort == null || model.trim().lowercase() !in controllable) return
+        require(effort in setOf("low", "high", "max")) {
+            "Kimi Code 当前型号的思考强度仅支持 low、high、max"
         }
+        builder.put("reasoning_effort", effort)
+    }
+
+    /** k3's 1M context requires an eligible Pro/Allegretto subscription. */
+    fun contextWindow(
+        model: String?,
+        baseUrl: String?,
+        requested: Int?,
+        defaultWindow: Int?,
+    ): Int? {
+        val override = requested?.takeIf { it in 4_096..16_000_000 }
+        return if (model.equals("k3", true) && baseUrl != null && isOfficial(baseUrl)) {
+            // Allow an explicit context setting; never assume a Plus tier has 1M.
+            override ?: defaultWindow
+        } else defaultWindow ?: override
     }
 }
