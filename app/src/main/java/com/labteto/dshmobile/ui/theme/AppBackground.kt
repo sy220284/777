@@ -112,7 +112,9 @@ data class AppBackgroundState(
         val stats = analysis?.region(region)
         if (!hasImage) return base
         if (!adaptiveContrast || stats == null) {
-            return base.copy(alpha = adjustedSurfaceAlpha(base.alpha.coerceAtLeast(0.76f), 0.62f, 1f))
+            // Disabling adaptive contrast must not force a 76% opaque floor onto every
+            // legacy region surface; the user's transparency setting still applies.
+            return base.copy(alpha = adjustedSurfaceAlpha(base.alpha.coerceIn(minAlpha, maxAlpha), minAlpha, maxAlpha))
         }
 
         val complexity = (stats.contrast * 0.52f + stats.detail * 0.48f).coerceIn(0f, 1f)
