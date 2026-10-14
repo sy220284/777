@@ -22,32 +22,32 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "send": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.SendMessage)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "edit": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.EditUserMessage)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "resend": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.EditUserMessage)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "regenerate": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.RegenerateReply)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "select_variant": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.SelectVariant)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -70,20 +70,20 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "send": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.SendMessage)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "stop": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.Stop)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "answer_question": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.AnswerQuestion)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -512,14 +512,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "select_variant": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.SelectVariant)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "regenerate": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.RegenerateReply)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -541,14 +541,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "approve": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.AnswerApproval)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "deny": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.AnswerApproval)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -599,14 +599,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "answer_question": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.AnswerQuestion)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "cancel_question": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.AnswerQuestion)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -2554,5 +2554,5 @@
       "acceptance": "不计入当前场景覆盖"
     }
   ],
-  "actionProofStatus": "PENDING_ACTION_LEVEL_EVIDENCE"
+  "actionProofStatus": "PENDING_END_TO_END_VERIFICATION"
 }
