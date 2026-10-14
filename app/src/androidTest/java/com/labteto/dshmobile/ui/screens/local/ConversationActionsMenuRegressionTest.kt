@@ -9,10 +9,13 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -36,6 +39,10 @@ class ConversationActionsMenuRegressionTest {
         }
 
         compose.onNodeWithContentDescription("对话操作").performClick()
+        // This menu must share the + action backdrop instead of the old opaque glass card.
+        val popup = compose.onNodeWithTag("sySeamlessPopupScene").assertIsDisplayed()
+        val bounds = popup.getUnclippedBoundsInRoot()
+        assertTrue("Three actions should remain a compact anchored menu", (bounds.bottom - bounds.top).value < 280f)
         compose.onNodeWithText("重命名").assertIsDisplayed().performClick()
         compose.runOnIdle {
             assertEquals(1, renamed)
