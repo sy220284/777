@@ -116,4 +116,5 @@
     <string name="next_document_local_table">本地事实表格</string>
     <string name="next_document_table_empty">没有可显示的行</string>
     <string name="next_document_local_tool_events">本地工具事件表格</string>
+    <string name="next_group_members">当前群聊成员：%1$s</string>
 </resources>

@@ -429,6 +429,13 @@ object NextConversationUiPack : ConversationUiPack {
                     Text(stringResource(R.string.next_title), style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.semantics { heading() })
                     Text(stringResource(R.string.next_scope), style = MaterialTheme.typography.bodySmall)
+                    if (!workMode && chatSnapshot.group != null) {
+                        Text(
+                            stringResource(R.string.next_group_members,
+                                chatSnapshot.group?.memberNames?.joinToString("、").orEmpty()),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                     if (sessions != null && sessionSnapshot != null) {
                         TextButton(onClick = { sessionChooser = true }) { Text(stringResource(R.string.next_sessions)) }
                         TextButton(onClick = { show(sessions.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.SelectMode(com.labteto.dshmobile.local.LocalUsageMode.CHAT))) }) {

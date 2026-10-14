@@ -102,6 +102,21 @@ class LocalConversationUiPortTest {
         assertFalse(f.port.work.snapshot().send.available)
     }
 
+    @Test fun groupFactsComeFromChatOwnerAndDisappearInWorkMode() {
+        val f = Fixture(LocalUsageMode.CHAT)
+        val group = f.state.value.chat.groupChat.copy(
+            mode = com.labteto.dshmobile.local.chat.LocalChatMode.GROUP,
+            members = listOf(
+                com.labteto.dshmobile.local.chat.LocalGroupChatMember("gallery-a", "persona-a", "小夏"),
+                com.labteto.dshmobile.local.chat.LocalGroupChatMember("gallery-b", "persona-b", "小秋"),
+            ),
+        )
+        f.state.value = f.state.value.copy(chat = f.state.value.chat.copy(groupChat = group))
+        assertEquals(listOf("小夏", "小秋"), f.port.chat.snapshot().group?.memberNames)
+        f.state.value = f.state.value.copy(usageMode = LocalUsageMode.WORK)
+        assertNull(f.port.chat.snapshot().group)
+    }
+
     @Test fun inactiveModeDoesNotExposeActiveModeErrorOrLoading() {
         for (mode in LocalUsageMode.entries) {
             val f = Fixture(mode)

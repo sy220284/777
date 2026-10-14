@@ -62,6 +62,11 @@ class LocalConversationUiPortComposition @Inject internal constructor(
                 queuedInputCount = if (active) state.kernel.queuedInputCount else 0,
                 send = availability(state, active),
                 error = state.error.takeIf { active },
+                group = state.chat.groupChat.takeIf { active && it.enabled }?.let { group ->
+                    com.labteto.dshmobile.uicontract.UiChatGroupSummary(
+                        memberNames = group.members.map { it.displayName },
+                    )
+                },
             )
         }
         override fun submit(command: ChatUiCommand): UiCommandReceipt = synchronized(stateStore.foregroundRunHandle.lock) {

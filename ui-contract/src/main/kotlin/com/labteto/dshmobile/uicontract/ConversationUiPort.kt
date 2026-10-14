@@ -41,6 +41,9 @@ data class UiMessageBranch(val index: Int, val count: Int)
 data class UiMessageSnapshot(val id: String, val role: UiMessageRole, val text: String, val createdAt: Long,
     val editableText: String? = null, val branch: UiMessageBranch? = null, val proactive: Boolean = false)
 
+/** Chat-owned read-only group facts; there is no implicit group administration command. */
+data class UiChatGroupSummary(val memberNames: List<String>)
+
 data class ChatSceneSnapshot(
     val identity: UiSessionIdentity?,
     val status: UiSceneStatus,
@@ -49,6 +52,7 @@ data class ChatSceneSnapshot(
     val queuedInputCount: Int,
     val send: UiActionAvailability,
     val error: String?,
+    val group: UiChatGroupSummary? = null,
 )
 
 sealed interface ChatUiCommand {
