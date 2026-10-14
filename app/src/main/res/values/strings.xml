@@ -2081,6 +2081,7 @@
     <string name="media_studio_capability_transcribe">录音转写</string>
     <string name="media_studio_kind_speech">语音</string>
     <string name="media_studio_kind_image">图片</string>
+    <string name="fluid_item_count">%1$d 项</string>
     <string name="fluid_persona_relationship">关系</string>
     <string name="fluid_persona_events">事件</string>
     <string name="fluid_persona_memories">记忆</string>
