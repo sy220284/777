@@ -302,6 +302,7 @@ object LocalModelPresets {
                 LocalModelCapability.VIDEO,
             ),
             imageInputSupported = true,
+            temperatureSupported = false,
             // Plus/Moderato is limited to 256K; 1M is a Pro/Allegretto entitlement.
             contextWindowTokens = 262_144,
         ),
@@ -314,6 +315,7 @@ object LocalModelPresets {
                 LocalModelCapability.IMAGE,
             ),
             imageInputSupported = true,
+            temperatureSupported = false,
             contextWindowTokens = 262_144,
         ),
         LocalModelPreset(
@@ -326,6 +328,7 @@ object LocalModelPresets {
                 LocalModelCapability.VIDEO,
             ),
             imageInputSupported = true,
+            temperatureSupported = false,
             contextWindowTokens = 1_048_576,
         ),
         LocalModelPreset(
@@ -338,6 +341,7 @@ object LocalModelPresets {
                 LocalModelCapability.VIDEO,
             ),
             imageInputSupported = true,
+            temperatureSupported = false,
             contextWindowTokens = 262_144,
         ),
     )
