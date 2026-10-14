@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
  * The legacy FeatherIcons object name is retained for binary/source compatibility
  * with existing Compose callers; every path is a project-specific V6.3 redraw,
  * not a copy of the old mixed optical weights. Editable SVG counterparts:
- * docs/design/v6/assets/icons-actions/*.svg.
+ * docs/design/v6/assets/icons-actions/ (individual editable SVG files).
  */
 internal object FeatherIcons {
     val Gauge: ImageVector by lazy { actionGlyph("Gauge",
