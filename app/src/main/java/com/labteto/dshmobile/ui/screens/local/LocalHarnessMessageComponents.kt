@@ -90,7 +90,6 @@ import com.labteto.dshmobile.ui.shenyan.SyUserBubble
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -152,7 +151,6 @@ internal fun LocalMessageRow(
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val pulse = rememberHapticPulse()
-    val backgroundState = LocalAppBackgroundState.current
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     val copiedMessage = stringResource(R.string.chat_copy_success)
@@ -281,10 +279,12 @@ internal fun LocalMessageRow(
 
         else -> {
             var actionsOpen by remember(message.id) { mutableStateOf(false) }
-            val readingLayer = chatMode && (backgroundState.hasImage || backgroundState.fluidGlass)
+            val readingLayer = chatMode
+            val visibleContent = if (groupMode) groupMessageVisibleContent(message) else message.content
+            val copyableContent = if (chatMode) extractLocalCharacterThought(visibleContent, streaming).second else visibleContent
             val readingModifier = if (readingLayer) {
                 Modifier
-                    .fillMaxWidth(0.80f)
+                    .fillMaxWidth(0.91f)
                     .background(
                         com.shenyan.designsystem.components.syMaterialColor(SyMaterialTier.L3_CARD),
                         DsShapes.characterBubble,
@@ -294,14 +294,18 @@ internal fun LocalMessageRow(
                         color = colors.border,
                         shape = DsShapes.characterBubble,
                     )
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(horizontal = 16.dp, vertical = 13.dp)
             } else {
                 Modifier.fillMaxWidth()
             }
             Column(
-                readingModifier.testTag("messageActionSurface:${message.id}").combinedClickable(onClick = {}, onLongClick = { pulse(); actionsOpen = true }),
-                verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
+                Column(
+                    readingModifier.testTag("messageActionSurface:${message.id}").combinedClickable(onClick = {}, onLongClick = { pulse(); actionsOpen = true }),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                ) {
                 if (groupMode) {
                     message.speakerName?.takeIf(String::isNotBlank)?.let { speaker ->
                         Text(
@@ -311,8 +315,6 @@ internal fun LocalMessageRow(
                         )
                     }
                 }
-                val visibleContent = if (groupMode) groupMessageVisibleContent(message) else message.content
-                val copyableContent = if (chatMode) extractLocalCharacterThought(visibleContent, streaming).second else visibleContent
                 FluidMessageActionSheet(actionsOpen, { actionsOpen = false }, buildList {
                     if (copyableContent.isNotBlank()) add(SyMenuItem(
                         text = stringResource(R.string.common_copy), icon = FeatherIcons.Copy,
@@ -335,8 +337,9 @@ internal fun LocalMessageRow(
                     groupMode = groupMode,
                     chatMode = chatMode,
                 )
+                }
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag("messageActionToolbar:${message.id}"),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -464,6 +467,7 @@ private fun LocalAssistantMessageContent(
                         MarkdownText(
                             body,
                             bodyStyle = if (chatMode) DsType.chatBody else DsType.mdBody,
+                            preserveSoftLineBreaks = chatMode,
                         )
                     }
                 }
