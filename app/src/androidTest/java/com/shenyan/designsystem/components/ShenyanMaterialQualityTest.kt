@@ -7,6 +7,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -14,6 +15,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.ui.theme.ThemePreference
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
+import com.labteto.dshmobile.ui.theme.analyzeBackground
 import com.shenyan.designsystem.foundation.ShenyanPalettes
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
@@ -61,6 +63,26 @@ class ShenyanMaterialQualityTest {
             compose.onNodeWithText("disabled").assertIsNotEnabled().performClick()
             compose.runOnIdle { assertEquals("edited", value.value); assertEquals(1, clicks) }
         } finally { file.delete() }
+    }
+
+    @Test fun landscapeWallpaperSamplingExcludesColoursCroppedOffTheScreen() {
+        val bitmap = Bitmap.createBitmap(300, 100, Bitmap.Config.ARGB_8888)
+        try {
+            bitmap.eraseColor(android.graphics.Color.RED)
+            val canvas = android.graphics.Canvas(bitmap)
+            val paint = android.graphics.Paint().apply { color = android.graphics.Color.GREEN }
+            canvas.drawRect(100f, 0f, 200f, 100f, paint)
+            paint.color = android.graphics.Color.BLUE
+            canvas.drawRect(200f, 0f, 300f, 100f, paint)
+            val full = analyzeBackground(bitmap)
+            val visible = analyzeBackground(bitmap, IntSize(100, 200))
+            // Portrait centre-crop retains the green middle only, not the hidden red/blue sides.
+            assertTrue(visible.middle.averageColor.green > .9f)
+            assertTrue(visible.middle.averageColor.red < .1f)
+            assertTrue(full.middle.averageColor.green < .6f)
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     @Test fun changingTransparencyUpdatesRenderedGlassWithoutReplacingWallpaper() {
