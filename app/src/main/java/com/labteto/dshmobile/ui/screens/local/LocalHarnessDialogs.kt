@@ -423,11 +423,17 @@ internal fun ApprovalDialog(
 internal fun QuestionDialog(
     question: String,
     options: List<String>,
-    onAnswer: (String) -> Unit,
+    onAnswer: (String) -> Boolean,
     onDismiss: () -> Unit,
+    requireConfirmation: Boolean = false,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var answer by rememberSaveable(question) { mutableStateOf("") }
+    var selected by rememberSaveable(question) { mutableStateOf("") }
+    var failed by rememberSaveable(question) { mutableStateOf(false) }
+    fun submit(value: String) {
+        failed = !onAnswer(value)
+    }
     SyResponsiveSheet(
         title = stringResource(R.string.local_question_title),
         onDismiss = onDismiss,
@@ -437,21 +443,37 @@ internal fun QuestionDialog(
         options.forEach { option ->
             SySheetChoiceRow(
                 title = option,
-                onClick = { onAnswer(option) },
+                selected = requireConfirmation && selected == option,
+                onClick = {
+                    if (requireConfirmation) {
+                        selected = option
+                        answer = ""
+                        failed = false
+                    } else {
+                        submit(option)
+                    }
+                },
             )
         }
         SyTextField(
             value = answer,
-            onValueChange = { answer = it },
+            onValueChange = {
+                answer = it
+                selected = ""
+                failed = false
+            },
             modifier = Modifier.fillMaxWidth(),
             label = { Text(stringResource(R.string.local_question_custom_answer)) },
             maxLines = 4,
         )
+        if (failed) {
+            Text(stringResource(R.string.local_question_submit_failed), color = colors.dangerInk)
+        }
         SyButton(
             text = stringResource(R.string.local_question_submit),
-            onClick = { onAnswer(answer) },
+            onClick = { submit(answer.ifBlank { if (requireConfirmation) selected else "" }) },
             modifier = Modifier.fillMaxWidth(),
-            enabled = answer.isNotBlank(),
+            enabled = answer.isNotBlank() || (requireConfirmation && selected.isNotBlank()),
         )
         SyButton(
             text = stringResource(R.string.common_cancel),
@@ -461,7 +483,6 @@ internal fun QuestionDialog(
         )
     }
 }
-
 
 @Composable
 internal fun ChatPersonaDialog(

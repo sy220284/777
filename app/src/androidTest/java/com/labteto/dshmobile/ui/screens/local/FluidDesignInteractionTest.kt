@@ -25,15 +25,20 @@ import org.junit.Test
 class FluidDesignInteractionTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun workQuestionStillAllowsAnswersWithoutDashboardTabs() {
+    @Test fun workQuestionRequiresConfirmationAndKeepsSelectionOnFailure() {
         val received = mutableListOf<String>()
         compose.setContent { DshTheme {
             QuestionDialog("Choose a route", listOf("Route A", "Route B"),
-                onAnswer = { received += it }, onDismiss = {})
+                onAnswer = { received += it; received.size > 1 }, onDismiss = {},
+                requireConfirmation = true)
         } }
         compose.onNodeWithText("Choose a route").assertIsDisplayed()
         compose.onNodeWithText("Route A").performClick()
-        compose.runOnIdle { assertEquals(listOf("Route A"), received) }
+        compose.runOnIdle { assertEquals(emptyList<String>(), received) }
+        compose.onNodeWithText("提交回答").performClick()
+        compose.onNodeWithText("提交未成功，选择已保留，请重试").assertIsDisplayed()
+        compose.onNodeWithText("提交回答").performClick()
+        compose.runOnIdle { assertEquals(listOf("Route A", "Route A"), received) }
     }
 
     @Test fun selectedProfileSectionDoesNotShowPreviousStoryMemoryAfterSwitch() {
