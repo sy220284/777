@@ -73,6 +73,37 @@ class ShenyanMaterialColorTest {
         assertEquals(clearer.red, protective.red, .0001f)
     }
 
+    @Test fun fluidBackgroundDerivesAllFiveTiersFromTheSameCanvasAndGlow() {
+        val palette = ShenyanPalettes.light
+        val plain = SySceneBackdrop(IntOffset.Zero, IntSize(393, 852), palette.canvas)
+        val glow = plain.copy(glowColors = listOf(
+            palette.primary, palette.mint, palette.lilac.copy(alpha = .18f),
+        ))
+        val top = SyMaterialTier.entries.map { syResolveMaterialFill(palette, it, glow, .15f) }
+        val bottom = SyMaterialTier.entries.map { syResolveMaterialFill(palette, it, glow, .9f) }
+        SyMaterialTier.entries.forEachIndexed { index, tier ->
+            val base = syResolveMaterialFill(palette, tier, plain, .15f)
+            assertNotEquals("The glow must participate in $tier", base, top[index])
+            assertNotEquals("No tier should have a fixed white fill", Color.White, top[index])
+            assertNotEquals("Top and bottom background colours must differ", top[index], bottom[index])
+        }
+        assertTrue(top.zipWithNext().all { (a, b) -> a.alpha <= b.alpha })
+        assertEquals(1f, top.last().alpha)
+    }
+
+    @Test fun materialTokensMatchTheMainThemeHueEvenWithoutScene() {
+        val palette = ShenyanPalettes.light
+        assertEquals(palette.materialL5, syResolveMaterialFill(palette, SyMaterialTier.L5_SOLID, null))
+        val root = palette.canvas
+        SyMaterialTier.entries.forEach { tier ->
+            val fill = syResolveMaterialFill(palette, tier, null)
+            assertTrue("Material must stay warm rather than neutral white", fill.red >= fill.blue)
+            assertTrue("Material must not introduce a bright white base",
+                fill.copy(alpha = 1f) != Color.White)
+        }
+        assertTrue("Canvas colour is not a pure white surface", root != Color.White)
+    }
+
     @Test fun missingSceneKeepsDesignedPaletteAndSolidFallbackIsStillTinted() {
         assertEquals(ShenyanPalettes.light.materialL3,
             syResolveMaterialFill(ShenyanPalettes.light, SyMaterialTier.L3_CARD, null))
