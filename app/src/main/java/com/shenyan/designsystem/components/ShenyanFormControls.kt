@@ -148,6 +148,7 @@ fun SyRadioControl(
     )
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun SySliderControl(
     value: Float,
