@@ -67,7 +67,7 @@ internal class AutomationWorkerSettlementCoordinator(
                 )
                 deferredOneShot -> run.nextRunAtHint
                 current.recurringMinutes != null ->
-                    checkedAutomationFutureMillis(finished, current.recurringMinutes, "任务周期")
+                    checkedAutomationFutureMillis(finished, requireNotNull(current.recurringMinutes), "任务周期")
                 else -> current.nextRunAt
             }
             val nextStatus = when {

@@ -525,7 +525,7 @@ fun SettingsScreen(
                     }
                     SettingsDestination.CHAT -> {
                         val customFilters = localHarness.chatStyleGuardCustomPhrases
-                        val personaFilters = localHarness.chatPersona.bannedPhrases
+                        val personaFilters = localHarness.personaBannedPhrases
                             .map(String::trim)
                             .filter(String::isNotBlank)
                             .distinct()

@@ -26,6 +26,8 @@ import com.labteto.dshmobile.uicontract.UiDocumentSnapshot
 import com.labteto.dshmobile.uicontract.UiDocumentFormKey
 import com.labteto.dshmobile.uicontract.UiDocumentFormUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentNode
+import com.labteto.dshmobile.uicontract.UiDocumentBoundValue
+import com.labteto.dshmobile.uicontract.UiExecutionPhase
 import com.labteto.dshmobile.uicontract.UiDocumentActionRequest
 import com.labteto.dshmobile.uicontract.UiDocumentUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentReceipt
@@ -43,7 +45,8 @@ internal fun NextUiDocument(snapshot: UiDocumentSnapshot, identity: UiSessionIde
     var receipt by remember(document.documentId, document.revision) { mutableStateOf<UiDocumentReceipt?>(null) }
     Surface(Modifier.fillMaxWidth(), tonalElevation = 2.dp) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(document.title, Modifier.semantics { heading() })
+            if (snapshot.recoveryNotice != null) Text(stringResource(R.string.next_document_history_incomplete))
+        Text(document.title, Modifier.semantics { heading() })
             Text(stringResource(R.string.next_document_model_source, snapshot.provenance.model))
             if (!snapshot.provenance.usageReported) Text(stringResource(R.string.next_document_usage_unknown))
             document.nodes.forEach { node ->
@@ -75,6 +78,19 @@ private fun NextDocumentNode(node: UiDocumentNode, values: Map<String, String>, 
     active: Boolean, update: (String, String) -> Unit, submit: (String) -> Unit) {
     when (node) {
         is UiDocumentNode.Text -> Text(node.text)
+        is UiDocumentNode.BoundText -> {
+            val value = when (val bound = snapshot.bindings[node.binding]) {
+                is UiDocumentBoundValue.Text -> bound.value
+                is UiDocumentBoundValue.Count -> bound.value.toString()
+                is UiDocumentBoundValue.Phase -> stringResource(when (bound.value) {
+                    UiExecutionPhase.IDLE -> R.string.next_document_phase_idle
+                    UiExecutionPhase.RUNNING -> R.string.next_document_phase_running
+                    UiExecutionPhase.WAITING_FOR_USER -> R.string.next_document_phase_waiting
+                })
+                else -> stringResource(R.string.next_document_binding_unavailable)
+            }
+            Text(stringResource(R.string.next_document_binding_value, node.label, value))
+        }
         is UiDocumentNode.Column -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             node.children.forEach { NextDocumentNode(it, values, snapshot, active, update, submit) }
         }

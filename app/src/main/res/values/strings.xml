@@ -2315,5 +2315,11 @@
     <string name="ui_document_confirm_generate">确认并生成</string>
     <string name="ui_document_invalid_fields">请检查必填内容和选项：%1$s</string>
     <string name="ui_document_history_unavailable">历史交互界面读取不完整，原消息仍可阅读；请检查会话数据或重新生成界面。</string>
+    <string name="ui_document_phase_idle">空闲</string>
+    <string name="ui_document_phase_running">运行中</string>
+    <string name="ui_document_phase_waiting">等待用户</string>
+    <string name="ui_document_binding_unavailable">当前没有可用事实</string>
+    <string name="ui_document_binding_value">%1$s：%2$s</string>
+    <string name="ui_document_history_incomplete">历史交互界面不兼容或不完整，已显示可用文本，操作不可执行。</string>
 </resources>
 

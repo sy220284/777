@@ -3,19 +3,6 @@ package com.labteto.dshmobile.local.model
 import java.net.URI
 
 /** Generation is a provider API product, NOT an input modality of the selected chat model. */
-enum class LocalMediaKind { IMAGE, VIDEO, SPEECH, TRANSCRIBE }
-enum class LocalMediaProvider { MINIMAX, OPENAI, QWEN, GEMINI }
-
-data class LocalMediaOffer(
-    val profile: LocalModelProfile,
-    val provider: LocalMediaProvider,
-    val kind: LocalMediaKind,
-    val model: String,
-    val label: String,
-) {
-    val id: String get() = "${profile.id}:${provider.name}:${kind.name}:$model"
-}
-
 /**
  * Documented, wired media API routes. "Model has IMAGE input" is not enough to advertise creation.
  * Only explicitly implemented API/credential/host combinations enter this catalog.

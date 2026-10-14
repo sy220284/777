@@ -1,6 +1,7 @@
 plugins {
     id("java-library")
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 java {
@@ -11,5 +12,6 @@ kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarg
 
 dependencies {
     api(libs.kotlinx.coroutines.core)
+    api(libs.kotlinx.serialization.json)
     testImplementation(libs.junit)
 }

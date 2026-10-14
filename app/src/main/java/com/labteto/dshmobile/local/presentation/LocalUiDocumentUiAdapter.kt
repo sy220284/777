@@ -11,6 +11,9 @@ import com.labteto.dshmobile.uicontract.UiDocumentUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentsSceneSnapshot
 import com.labteto.dshmobile.uicontract.ConversationDraftUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentSnapshot
+import com.labteto.dshmobile.uicontract.UiDocumentBinding
+import com.labteto.dshmobile.uicontract.UiDocumentBoundValue
+import com.labteto.dshmobile.uicontract.UiExecutionPhase
 import com.labteto.dshmobile.uicontract.UiActionAvailability
 import com.labteto.dshmobile.uicontract.UiCommandRejection
 import com.labteto.dshmobile.uicontract.GenerateUiDocumentCommand
@@ -45,9 +48,16 @@ internal class LocalUiDocumentUiAdapter(
     private val navigationScenes: Set<UiSceneId>,
     private val navigate: (UiSceneId) -> Unit,
 ) : UiDocumentUiPort {
-    private data class Context(val identity: UiSessionIdentity?, val workMode: Boolean, val messages: Set<String>)
-    private val contexts = state.state.map { snapshot -> Context(state.uiBindingIdentity(snapshot),
-        snapshot.usageMode == LocalUsageMode.WORK, snapshot.messages.map { it.id }.toSet()) }.distinctUntilChanged()
+    private data class Context(val identity: UiSessionIdentity?, val workMode: Boolean, val messages: Set<String>,
+        val phase: UiExecutionPhase, val queued: Int, val approvalTool: String?, val error: String?)
+    private val contexts = state.state.map { snapshot ->
+        val workMode = snapshot.usageMode == LocalUsageMode.WORK
+        val chat = conversations.chat.snapshot()
+        val work = conversations.work.snapshot()
+        Context(state.uiBindingIdentity(snapshot), workMode, snapshot.messages.map { it.id }.toSet(),
+            if (workMode) work.phase else chat.phase, if (workMode) work.queuedInputCount else chat.queuedInputCount,
+            work.approval?.toolName.takeIf { workMode }, if (workMode) work.error else chat.error)
+    }.distinctUntilChanged()
     override val snapshots: StateFlow<UiDocumentsSceneSnapshot> = combine(contexts, store.revision, generation.generating) { context, _, busy ->
         try {
             val id = context.identity
@@ -63,7 +73,14 @@ internal class LocalUiDocumentUiAdapter(
                         else -> null
                     }
                     action.id to UiActionAvailability(reason == null, reason)
-                })
+                }, if (!current) emptyMap() else mapOf(
+                    UiDocumentBinding.EXECUTION_PHASE to UiDocumentBoundValue.Phase(context.phase),
+                    UiDocumentBinding.QUEUED_INPUT_COUNT to UiDocumentBoundValue.Count(context.queued),
+                    UiDocumentBinding.PENDING_APPROVAL_TOOL to (context.approvalTool?.let { UiDocumentBoundValue.Text(it) }
+                        ?: UiDocumentBoundValue.Unavailable),
+                    UiDocumentBinding.CURRENT_ERROR to (context.error?.let { UiDocumentBoundValue.Text(it) }
+                        ?: UiDocumentBoundValue.Unavailable),
+                ), record.recoveryNotice)
             }, id?.sessionId in busy, null)
         } catch (cancelled: CancellationException) {
             throw cancelled

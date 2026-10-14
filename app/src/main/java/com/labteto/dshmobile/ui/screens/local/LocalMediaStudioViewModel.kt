@@ -4,7 +4,11 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.local.model.LocalMediaOffer
-import com.labteto.dshmobile.local.presentation.LocalMediaCreationRuntime
+import com.labteto.dshmobile.uicontract.MediaUiPort
+import com.labteto.dshmobile.uicontract.MediaUiCommand
+import com.labteto.dshmobile.uicontract.MediaUiReceipt
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import java.io.File
 import com.labteto.dshmobile.local.model.LocalMediaVideoTask
 import com.labteto.dshmobile.local.model.LocalMediaResult
 import com.labteto.dshmobile.local.model.LocalMediaPage
@@ -19,27 +23,36 @@ import javax.inject.Inject
 /** One UI-facing operation boundary; archive and conversation reads are indexed, explicit pages. */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class LocalMediaStudioViewModel @Inject constructor(private val creation: LocalMediaCreationRuntime) : ViewModel() {
+class LocalMediaStudioViewModel @Inject constructor(private val creation: MediaUiPort) : ViewModel() {
     val storageError get() = creation.storageError
-    private val archiveLimit = MutableStateFlow(LocalMediaCreationRuntime.PAGE_SIZE)
+    private val archiveLimit = MutableStateFlow(creation.pageSize)
     val archive = archiveLimit.flatMapLatest { creation.observe(null, it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LocalMediaPage())
-    fun loadOlderArchive() { archiveLimit.value = Math.addExact(archiveLimit.value, LocalMediaCreationRuntime.PAGE_SIZE) }
+    fun loadOlderArchive() { archiveLimit.value = Math.addExact(archiveLimit.value, creation.pageSize) }
     fun sessionPage(sessionId: String, limit: Int): Flow<LocalMediaPage> = creation.observe(sessionId, limit)
-    suspend fun retryStorage() {
-        try { creation.retryStorage() }
-        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-        catch (_: Exception) { /* The store keeps its actionable recovery error visible. */ }
+    private suspend fun dispatch(command: MediaUiCommand): MediaUiReceipt = creation.submit(command).also {
+        if (it is MediaUiReceipt.Failed) throw IllegalStateException(it.message)
     }
-    suspend fun dismissCreationJob(id: String) = creation.dismissCreationJob(id)
-    suspend fun submitImage(route: LocalMediaOffer, prompt: String, ratio: String, sessionId: String) = creation.submitImage(route, prompt, ratio, sessionId)
-    suspend fun submitSpeech(route: LocalMediaOffer, text: String, voice: String, sessionId: String) = creation.submitSpeech(route, text, voice, sessionId)
-    suspend fun submitTranscribe(route: LocalMediaOffer, uri: Uri, sessionId: String) = creation.submitTranscribe(route, uri, sessionId)
-    fun resultFile(item: LocalMediaResult) = creation.resultFile(item)
-    fun videoFile(task: LocalMediaVideoTask) = creation.videoFile(task)
-    suspend fun removeResult(id: String) = creation.removeResult(id)
-    suspend fun retryVideoSave(id: String) = creation.retryVideoSave(id)
+    fun offers(profiles: List<LocalModelProfile>) = creation.offers(profiles)
+    fun canRefresh(task: LocalMediaVideoTask, offer: LocalMediaOffer) = creation.canRefresh(task, offer)
+    suspend fun retryStorage() {
+        try { dispatch(MediaUiCommand.RetryStorage) }
+        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) { /* The Owner keeps its actionable storage recovery error visible. */ }
+    }
+    suspend fun dismissCreationJob(id: String) = dispatch(MediaUiCommand.DismissJob(id))
+    suspend fun submitImage(route: LocalMediaOffer, prompt: String, ratio: String, sessionId: String) =
+        (dispatch(MediaUiCommand.Image(route, prompt, ratio, sessionId)) as MediaUiReceipt.CreationAdmitted).job
+    suspend fun submitSpeech(route: LocalMediaOffer, text: String, voice: String, sessionId: String) =
+        (dispatch(MediaUiCommand.Speech(route, text, voice, sessionId)) as MediaUiReceipt.CreationAdmitted).job
+    suspend fun submitTranscribe(route: LocalMediaOffer, uri: Uri, sessionId: String) =
+        (dispatch(MediaUiCommand.Transcribe(route, uri.toString(), sessionId)) as MediaUiReceipt.CreationAdmitted).job
+    fun resultFile(item: LocalMediaResult) = creation.asset(item.id)?.localPath?.let(::File)
+    fun videoFile(task: LocalMediaVideoTask) = creation.asset(task.id)?.localPath?.let(::File)
+    suspend fun removeResult(id: String) = dispatch(MediaUiCommand.RemoveResult(id))
+    suspend fun retryVideoSave(id: String) = dispatch(MediaUiCommand.RetryLocalVideoSave(id))
     suspend fun voices(route: LocalMediaOffer) = creation.voices(route)
-    suspend fun createVideo(route: LocalMediaOffer, prompt: String, sessionId: String? = null) = creation.createVideo(route, prompt, sessionId)
-    suspend fun refreshVideo(route: LocalMediaOffer, taskId: String) = creation.refreshVideo(route, taskId)
+    suspend fun createVideo(route: LocalMediaOffer, prompt: String, sessionId: String? = null) =
+        (dispatch(MediaUiCommand.Video(route, prompt, sessionId)) as MediaUiReceipt.VideoAdmitted).task
+    suspend fun refreshVideo(route: LocalMediaOffer, taskId: String) = dispatch(MediaUiCommand.PollVideo(route, taskId))
 }

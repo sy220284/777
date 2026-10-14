@@ -350,6 +350,7 @@ dependencies {
     implementation(project(":ui-contract"))
     implementation(project(":ui-host"))
     implementation(project(":ui-pack-next"))
+    implementation(project(":ui-pack-v6"))
     implementation(project(":harness-core"))
     implementation(project(":harness-runtime-android"))
     implementation(project(":harness-interop"))

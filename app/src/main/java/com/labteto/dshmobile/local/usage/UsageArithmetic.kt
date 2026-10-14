@@ -3,11 +3,6 @@ package com.labteto.dshmobile.local.usage
 import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.model.DeepSeekTokenUsage
 
-internal fun saturatingUsageAdd(left: Long, right: Long): Long {
-    val safeLeft = left.coerceAtLeast(0L)
-    val safeRight = right.coerceAtLeast(0L)
-    return if (safeLeft > Long.MAX_VALUE - safeRight) Long.MAX_VALUE else safeLeft + safeRight
-}
 
 internal fun nonNegativeUsageDifference(total: Long, part: Long): Long {
     val safeTotal = total.coerceAtLeast(0L)
@@ -74,13 +69,13 @@ internal fun TokenUsageRecord.boundedForStorage(): TokenUsageRecord = normalized
         taskLabel = context.taskLabel?.take(256),
         runKind = context.runKind?.take(64),
     ),
-    route = route?.copy(
-        profileId = route.profileId?.take(128),
-        provider = route.provider.take(80),
-        model = route.model.take(128),
-        baseUrl = route.baseUrl.take(512),
-        authKind = route.authKind.take(64),
-        protocol = route.protocol.take(64),
-        fingerprint = route.fingerprint.take(128),
-    ),
+    route = route?.let { value -> value.copy(
+        profileId = value.profileId?.take(128),
+        provider = value.provider.take(80),
+        model = value.model.take(128),
+        baseUrl = value.baseUrl.take(512),
+        authKind = value.authKind.take(64),
+        protocol = value.protocol.take(64),
+        fingerprint = value.fingerprint.take(128),
+    ) },
 )

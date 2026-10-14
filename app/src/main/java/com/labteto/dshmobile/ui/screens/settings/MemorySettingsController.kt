@@ -2,8 +2,10 @@ package com.labteto.dshmobile.ui.screens.settings
 
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryScope
-import com.labteto.dshmobile.local.presentation.LocalSettingsDataFacade
-import com.labteto.dshmobile.local.presentation.LocalSettingsRuntime
+import com.labteto.dshmobile.uicontract.MemoryUiPort
+import com.labteto.dshmobile.uicontract.MemoryUiCommand
+import com.labteto.dshmobile.uicontract.MemoryUiReceipt
+import com.labteto.dshmobile.uicontract.SettingsUiPort
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -11,8 +13,8 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /** Owns Settings-facing local-memory scope, list and mutation behavior. */
 internal class MemorySettingsController(
-    private val localHarness: LocalSettingsRuntime,
-    private val settingsData: LocalSettingsDataFacade,
+    private val localHarness: SettingsUiPort,
+    private val settingsData: MemoryUiPort,
 ) {
     private val _memories = MutableStateFlow<List<MemoryRecord>>(emptyList())
     private var selectedMessageSource: Pair<String, String>? = null
@@ -53,7 +55,11 @@ internal class MemorySettingsController(
             return
         }
         runCatching {
-            settingsData.updateMemory(current, content, pinned)
+            when (val receipt = settingsData.submit(MemoryUiCommand.Update(current, content, pinned))) {
+                is MemoryUiReceipt.Updated -> receipt.record
+                is MemoryUiReceipt.Failed -> throw IllegalStateException(receipt.message)
+                else -> error("Memory revision was not updated")
+            }
         }.onSuccess {
             refresh()
             onDone(null)
@@ -70,7 +76,12 @@ internal class MemorySettingsController(
             refresh()
             return
         }
-        runCatching { settingsData.forgetMemory(current) }
+        runCatching { when (val receipt = settingsData.submit(MemoryUiCommand.Forget(current))) {
+                MemoryUiReceipt.Forgotten -> true
+                MemoryUiReceipt.StaleOrMissing -> false
+                is MemoryUiReceipt.Failed -> throw IllegalStateException(receipt.message)
+                else -> false
+            } }
             .onSuccess { removed ->
                 refresh()
                 onDone(if (removed) null else "这条记忆已被停用或不存在")

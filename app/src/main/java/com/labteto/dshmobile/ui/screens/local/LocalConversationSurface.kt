@@ -1117,7 +1117,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         )
                         is LocalTranscriptItem.VideoTask -> LocalGeneratedVideoTaskRow(
                             task = transcriptItem.task,
-                            offers = com.labteto.dshmobile.local.model.LocalMediaCatalog.offers(state.modelProfiles),
+                            offers = mediaStudioViewModel.offers(state.modelProfiles),
                             viewModel = mediaStudioViewModel,
                         )
                         is LocalTranscriptItem.WorkArtifact -> LocalWorkArtifactMessageRow(

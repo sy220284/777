@@ -8,25 +8,6 @@ import kotlinx.serialization.Serializable
  * Completed receipts share their identifier with the actual media result.
  */
 @Serializable
-enum class LocalMediaCreationPhase { PREPARING, SUBMITTING, SAVING, OUTCOME_UNKNOWN, FAILED, SAVE_FAILED, SUCCEEDED }
-
-@Serializable
-data class LocalMediaCreationJob(
-    val id: String,
-    val sessionId: String,
-    val kind: String,
-    val provider: String,
-    val model: String,
-    val prompt: String?,
-    val createdAtMillis: Long,
-    val phase: LocalMediaCreationPhase = LocalMediaCreationPhase.SUBMITTING,
-    val error: String? = null,
-    val profileId: String? = null,
-    val routeFingerprint: String? = null,
-    val errorCode: String? = null,
-)
-
-@Serializable
 internal data class LocalMediaCreationJobList(
     val jobs: List<LocalMediaCreationJob> = emptyList(),
 )

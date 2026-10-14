@@ -100,7 +100,7 @@ internal class LocalUiDocumentGeneration @Inject constructor(
                     val value = Json.parseToJsonElement(raw).jsonObject.toMutableMap()
                     val previous = withContext(Dispatchers.IO) {
                         documents.read(sessionId, setOf(command.messageId), budget, knownScenes)
-                            .firstOrNull { it.document.source == source }?.document
+                            .firstOrNull { it.recoveryNotice == null && it.document.source == source }?.document
                     }
                     val documentId = previous?.documentId ?: UUID.randomUUID().toString()
                     val revision = previous?.revision?.let { Math.addExact(it, 1L) } ?: 0L
@@ -140,7 +140,9 @@ internal class LocalUiDocumentGeneration @Inject constructor(
         Produce one JSON object for a native editable UI. No tools, code, URLs, styling or execution facts.
         Required keys: schemaVersion=1, documentId, revision=0, title, nodes, actions, fallbackText.
         Nodes require id,type. Allowed types and required fields:
-        text(text); column(children); row(children); disclosure(title,children);
+        text(text); bound_text(label,binding); column(children); row(children); disclosure(title,children);
+        bound_text binding is one of EXECUTION_PHASE, QUEUED_INPUT_COUNT, PENDING_APPROVAL_TOOL, CURRENT_ERROR.
+        These display actual host facts, never authored percentages, success, verification or tool results.
         field(label,initial,required); textarea(label,initial,required);
         select(label,options,initial); switch(label,initial); button(label,actionId).
         Actions require id,type. Allowed actions:

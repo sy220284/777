@@ -50,8 +50,6 @@ import com.labteto.dshmobile.automation.AutomationRunReceipt
 import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.automation.AutomationStatus
 import com.labteto.dshmobile.automation.AutomationTask
-import com.labteto.dshmobile.local.presentation.LocalTaskRuntime
-import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.shenyan.designsystem.components.SyIconButton
 import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
@@ -417,7 +415,7 @@ private fun taskTiming(task: AutomationTask): String {
         task.status == AutomationStatus.WAITING_USER ->
             stringResource(R.string.tasks_waiting_user_timing)
         terminalOneShot && task.lastRunAt != null ->
-            stringResource(R.string.tasks_last_run, formatTime(task.lastRunAt))
+            stringResource(R.string.tasks_last_run, formatTime(requireNotNull(task.lastRunAt)))
         else ->
             stringResource(R.string.tasks_next_run, formatTime(task.nextRunAt))
     }

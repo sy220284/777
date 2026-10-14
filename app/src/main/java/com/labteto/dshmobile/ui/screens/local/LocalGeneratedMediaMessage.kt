@@ -227,7 +227,7 @@ internal fun LocalGeneratedVideoTaskRow(
     val savedVideo = remember(task) { viewModel.videoFile(task) }
     val localVideo = savedVideo?.takeIf(File::isFile)
     val offer = remember(task.offerId, task.routeFingerprint, offers) {
-        offers.firstOrNull { task.belongsTo(it) }
+        offers.firstOrNull { viewModel.canRefresh(task, it) }
     }
     var refreshing by remember(task.id) { mutableStateOf(false) }
     var showingPlayer by remember(task.id) { mutableStateOf(false) }

@@ -20,14 +20,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
 /** Bounded UI page; hasMore means older charged results remain available, not evicted. */
-data class LocalMediaPage(
-    val results: List<LocalMediaResult> = emptyList(),
-    val jobs: List<LocalMediaCreationJob> = emptyList(),
-    val videos: List<LocalMediaVideoTask> = emptyList(),
-    val hasMore: Boolean = false,
-    val unavailable: Boolean = false,
-)
-
 /** Media owns migration, atomic receipt/result state, indexed reads and recoverable deletion. */
 @Singleton
 class LocalMediaStore @Inject constructor(@ApplicationContext private val context: Context, private val json: Json) {
@@ -157,6 +149,10 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
     @Synchronized
     fun videosNeedingDelivery(): List<LocalMediaVideoTask> = operation {
         initialize(); database.pending().mapNotNull { it.video }.filter { it.phase == LocalMediaVideoPhase.SUCCEEDED && it.fileName == null }
+    }
+    @Synchronized
+    fun result(id: String): LocalMediaResult? = operation {
+        initialize(); database.get(id)?.takeUnless { it.deleted }?.result
     }
     fun file(name: String?): File? = managedFile(name)?.takeIf(File::isFile)
     private fun managedFile(name: String?): File? = name?.takeIf { it.matches(Regex("[A-Za-z0-9._-]{1,180}")) && it !in setOf(".", "..") }

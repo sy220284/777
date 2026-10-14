@@ -35,7 +35,7 @@ import com.shenyan.designsystem.foundation.LocalSyColors
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_RESOURCE
-import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
+import com.labteto.dshmobile.uicontract.UiSettingsSnapshot as LocalHarnessSettingsState
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_USAGE_URL

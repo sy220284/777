@@ -7,6 +7,7 @@ import com.labteto.dshmobile.uicontract.UiDocumentSource
 import com.labteto.dshmobile.uicontract.UiDocumentBudget
 import com.labteto.dshmobile.uicontract.UiSceneId
 import com.labteto.dshmobile.uicontract.UiDocumentNode
+import com.labteto.dshmobile.uicontract.UiDocumentBinding
 import com.labteto.dshmobile.uicontract.UiDocumentAction
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -56,6 +57,7 @@ internal object LocalUiDocumentCodec {
             val kind = value.string("type")
             val properties = when (kind) {
                 "text" -> mapOf("text" to text)
+                "bound_text" -> mapOf("label" to text, "binding" to text)
                 "column", "row" -> mapOf("children" to objects)
                 "disclosure" -> mapOf("title" to text, "children" to objects)
                 "field", "textarea" -> mapOf("label" to text, "initial" to text, "required" to boolean)
@@ -69,6 +71,7 @@ internal object LocalUiDocumentCodec {
             fun children() = value.array("children").map { node(it.jsonObject, depth + 1) }
             return when (kind) {
                 "text" -> UiDocumentNode.Text(id, value.string("text"))
+                "bound_text" -> UiDocumentNode.BoundText(id, value.string("label"), UiDocumentBinding.valueOf(value.string("binding")))
                 "column" -> UiDocumentNode.Column(id, children())
                 "row" -> UiDocumentNode.Row(id, children())
                 "disclosure" -> UiDocumentNode.Disclosure(id, value.string("title"), children())

@@ -7,6 +7,13 @@ import com.labteto.dshmobile.local.model.LocalMediaCreationJob
 import com.labteto.dshmobile.local.model.LocalMediaDeliveryPhase
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalMediaOffer
+import com.labteto.dshmobile.local.model.LocalMediaVoice
+import com.labteto.dshmobile.local.model.belongsTo
+import com.labteto.dshmobile.uicontract.MediaUiPort
+import com.labteto.dshmobile.uicontract.MediaUiCommand
+import com.labteto.dshmobile.uicontract.MediaUiReceipt
+import com.labteto.dshmobile.uicontract.UiMediaAsset
+import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalMediaPage
 import com.labteto.dshmobile.local.model.LocalMediaProvider
 import com.labteto.dshmobile.local.model.LocalMediaRequestAdmission
@@ -37,7 +44,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
-data class LocalMediaVoice(val id: String, val name: String)
 
 /** Sole operation owner. Media Store atomically commits receipt/result and owns indexed persistence. */
 @Singleton
@@ -45,13 +51,37 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     private val miniMax: MiniMaxNativeMediaClient,
     private val api: LocalMediaApiClient,
     private val store: LocalMediaStore,
-) {
+) : MediaUiPort {
     companion object { const val PAGE_SIZE = LocalMediaStore.PAGE_SIZE }
+    override val pageSize: Int get() = PAGE_SIZE
+    override fun offers(profiles: List<LocalModelProfile>) = LocalMediaCatalog.offers(profiles)
+    override fun canRefresh(task: LocalMediaVideoTask, offer: LocalMediaOffer) = task.belongsTo(offer)
+    override fun asset(id: String): UiMediaAsset? {
+        store.result(id)?.let { result -> return UiMediaAsset(result.id,
+            resultFile(result)?.absolutePath, result.remoteUrl, result.textOutput) }
+        store.video(id)?.let { task -> return UiMediaAsset(task.id,
+            videoFile(task)?.absolutePath, task.downloadUrl, null) }
+        return null
+    }
+    override suspend fun submit(command: MediaUiCommand): MediaUiReceipt = try {
+        when (command) {
+            is MediaUiCommand.Image -> MediaUiReceipt.CreationAdmitted(submitImage(command.offer, command.prompt, command.ratio, command.sessionId))
+            is MediaUiCommand.Speech -> MediaUiReceipt.CreationAdmitted(submitSpeech(command.offer, command.text, command.voice, command.sessionId))
+            is MediaUiCommand.Transcribe -> MediaUiReceipt.CreationAdmitted(submitTranscribe(command.offer, Uri.parse(command.contentUri), command.sessionId))
+            is MediaUiCommand.Video -> MediaUiReceipt.VideoAdmitted(createVideo(command.offer, command.prompt, command.sessionId))
+            is MediaUiCommand.PollVideo -> { refreshVideo(command.offer, command.taskId); MediaUiReceipt.Applied }
+            is MediaUiCommand.RetryLocalVideoSave -> { retryVideoSave(command.id); MediaUiReceipt.Applied }
+            is MediaUiCommand.RemoveResult -> { removeResult(command.id); MediaUiReceipt.Applied }
+            is MediaUiCommand.DismissJob -> { dismissCreationJob(command.id); MediaUiReceipt.Applied }
+            MediaUiCommand.RetryStorage -> { retryStorage(); MediaUiReceipt.Applied }
+        }
+    } catch (cancelled: CancellationException) { throw cancelled }
+    catch (failure: Exception) { MediaUiReceipt.Failed(failure.message) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO +
         CoroutineExceptionHandler { _, failure -> AppLog.failure("MediaCreation", "media_operation", failure) })
     private val downloads = mutableMapOf<String, Deferred<Unit>>()
-    val storageError: StateFlow<String?> get() = store.recoveryErrors
-    fun observe(sessionId: String?, limit: Int): Flow<LocalMediaPage> = store.observe(sessionId, limit)
+    override val storageError: StateFlow<String?> get() = store.recoveryErrors
+    override fun observe(sessionId: String?, limit: Int): Flow<LocalMediaPage> = store.observe(sessionId, limit)
     fun resultFile(item: LocalMediaResult): File? = store.file(item.fileName)
     fun videoFile(task: LocalMediaVideoTask): File? = store.file(task.fileName)
     suspend fun removeResult(id: String) {
@@ -74,7 +104,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         }
     }
 
-    suspend fun voices(offer: LocalMediaOffer): List<LocalMediaVoice> {
+    override suspend fun voices(offer: LocalMediaOffer): List<LocalMediaVoice> {
         validate(offer, LocalMediaKind.SPEECH)
         return when (offer.provider) {
             LocalMediaProvider.MINIMAX -> miniMax.systemVoices(offer.profile).map { LocalMediaVoice(it.id, it.name) }
@@ -223,4 +253,11 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     private fun validate(offer: LocalMediaOffer, kind: LocalMediaKind) {
         LocalMediaCatalog.requireValid(offer); require(offer.kind == kind)
     }
+}
+
+@dagger.Module
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+abstract class LocalMediaUiBindings {
+    @dagger.Binds @Singleton
+    abstract fun media(implementation: LocalMediaCreationRuntime): MediaUiPort
 }

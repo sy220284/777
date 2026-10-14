@@ -21,9 +21,17 @@ data class UiDocument(
     val fallbackText: String,
 )
 
+enum class UiDocumentBinding { EXECUTION_PHASE, QUEUED_INPUT_COUNT, PENDING_APPROVAL_TOOL, CURRENT_ERROR }
+sealed interface UiDocumentBoundValue {
+    data class Text(val value: String) : UiDocumentBoundValue
+    data class Count(val value: Int) : UiDocumentBoundValue
+    data class Phase(val value: UiExecutionPhase) : UiDocumentBoundValue
+    data object Unavailable : UiDocumentBoundValue
+}
 sealed interface UiDocumentNode {
     val id: String
     data class Text(override val id: String, val text: String) : UiDocumentNode
+    data class BoundText(override val id: String, val label: String, val binding: UiDocumentBinding) : UiDocumentNode
     data class Column(override val id: String, val children: List<UiDocumentNode>) : UiDocumentNode
     data class Row(override val id: String, val children: List<UiDocumentNode>) : UiDocumentNode
     data class Field(override val id: String, val label: String, val initial: String, val required: Boolean,
@@ -79,6 +87,7 @@ fun UiDocument.validate(
         if (node.id.isBlank() || nodesById.put(node.id, node) != null) problems += "node_identity"
         when (node) {
             is UiDocumentNode.Text -> textChars += node.text.length
+            is UiDocumentNode.BoundText -> textChars += node.label.length
             is UiDocumentNode.Column -> node.children.forEach { walk(it, depth + 1) }
             is UiDocumentNode.Row -> node.children.forEach { walk(it, depth + 1) }
             is UiDocumentNode.Disclosure -> { textChars += node.title.length; node.children.forEach { walk(it, depth + 1) } }

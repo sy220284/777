@@ -7,36 +7,10 @@ import kotlinx.serialization.Serializable
  * SUBMITTING means the external request may already have been accepted. If the process dies
  * before its returned ID is committed, never silently replay a possibly billable request.
  */
-@Serializable
-enum class LocalMediaDeliveryPhase { PENDING, SAVING, SAVED, FAILED }
-
-@Serializable
-enum class LocalMediaVideoPhase { SUBMITTING, OUTCOME_UNKNOWN, QUEUED, PROCESSING, SUCCEEDED, FAILED }
-
-@Serializable
-data class LocalMediaVideoTask(
-    val id: String,
-    val offerId: String,
-    val routeFingerprint: String,
-    val provider: String,
-    val model: String,
-    val profileId: String,
-    val startedAtMillis: Long,
-    val updatedAtMillis: Long,
-    val phase: LocalMediaVideoPhase,
-    val providerTaskId: String? = null,
-    val downloadUrl: String? = null,
-    val lastError: String? = null,
-    val sessionId: String? = null,
-    val description: String? = null,
-    val fileName: String? = null,
-    val deliveryPhase: LocalMediaDeliveryPhase = LocalMediaDeliveryPhase.PENDING,
-) {
-    /** A removed, replaced or re-keyed account must not be used to poll an old task. */
-    fun belongsTo(offer: LocalMediaOffer): Boolean =
+/** A removed, replaced or re-keyed account must not be used to poll an old task. */
+fun LocalMediaVideoTask.belongsTo(offer: LocalMediaOffer): Boolean =
         offerId == offer.id && routeFingerprint == offer.profile.routeFingerprint() &&
             provider == offer.provider.name && model == offer.model
-}
 
 @Serializable
 internal data class LocalMediaVideoTaskList(val tasks: List<LocalMediaVideoTask> = emptyList())

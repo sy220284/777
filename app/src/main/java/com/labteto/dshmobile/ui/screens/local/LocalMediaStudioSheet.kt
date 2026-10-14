@@ -37,13 +37,12 @@ import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.local.model.LocalMediaCatalog
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalMediaOffer
 import com.labteto.dshmobile.local.model.LocalMediaProvider
 import com.labteto.dshmobile.local.model.LocalMediaVideoPhase
 import com.labteto.dshmobile.local.model.LocalModelProfile
-import com.labteto.dshmobile.local.presentation.LocalMediaVoice
+import com.labteto.dshmobile.local.model.LocalMediaVoice
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -70,7 +69,7 @@ internal fun LocalMediaStudioSheetContent(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val models = remember(profiles) { LocalMediaCatalog.offers(profiles) }
+    val models = remember(profiles) { viewModel.offers(profiles) }
     val archive by viewModel.archive.collectAsState()
     val videoTasks = archive.videos
     val generatedResults = archive.results
@@ -219,7 +218,7 @@ internal fun LocalMediaStudioSheetContent(
                             viewedVideoTaskId = task.id
                             onDelivered()
                         } })
-                    val taskRecords = videoTasks.filter { it.belongsTo(selected) }.asReversed()
+                    val taskRecords = videoTasks.filter { viewModel.canRefresh(it, selected) }.asReversed()
                     val currentTask = taskRecords.firstOrNull { it.id == viewedVideoTaskId }
                         ?: taskRecords.firstOrNull()
                     if (taskRecords.size > 1) {
@@ -364,7 +363,7 @@ internal fun LocalMediaStudioSheetContent(
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                 ) {
                     items(videoTasks.asReversed(), key = { it.id }) { task ->
-                        val matchingOffer = models.firstOrNull { task.belongsTo(it) }
+                        val matchingOffer = models.firstOrNull { viewModel.canRefresh(task, it) }
                         Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                             Text(
                                 stringResource(R.string.media_studio_history_item,
@@ -515,7 +514,7 @@ internal fun LocalMediaStudioSheetContent(
                                     SyButton(
                                         text = stringResource(R.string.media_studio_open_temporary_link),
                                         size = SyButtonSize.Small,
-                                        onClick = { openMediaUrl(context, asset.remoteUrl) { historyError = it } },
+                                        onClick = { openMediaUrl(context, requireNotNull(asset.remoteUrl)) { historyError = it } },
                                     )
                                 } else {
                                     Text(stringResource(R.string.media_studio_result_missing),

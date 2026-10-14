@@ -26,13 +26,6 @@ data class LocalHarnessMessage(
     val blocks: List<LocalMessageBlock> = emptyList(),
 )
 
-@Serializable
-enum class LocalConversationMode {
-    INDEPENDENT,
-    PROJECT,
-    CONTINUATION,
-}
-
 /** Persisted model history and its user-facing projection. */
 @Serializable
 data class LocalHarnessSession(

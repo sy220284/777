@@ -23,7 +23,7 @@ internal fun nextAutomationRunAfterUserActivity(
             task.nextRunAt,
             checkedAutomationFutureMillis(
                 userMessageAt,
-                task.recurringMinutes,
+                requireNotNull(task.recurringMinutes),
                 "任务周期",
             ),
         )

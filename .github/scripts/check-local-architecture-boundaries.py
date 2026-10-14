@@ -653,13 +653,17 @@ for required in (
 aggregate_models = strip_comments(read(
     "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessModels.kt"
 ))
-allowed_root_types = {"LocalHarnessState", "LocalUsageMode"}
+allowed_root_types = {"LocalHarnessState"}
 root_types = declared_top_level_types(aggregate_models)
 if root_types != allowed_root_types:
     die(
-        "root aggregate file may only declare LocalHarnessState/LocalUsageMode; found extra types: "
+        "root aggregate file may only declare LocalHarnessState; found extra types: "
         + ", ".join(sorted(root_types - allowed_root_types))
     )
+
+usage_api = strip_comments(read("ui-contract/src/main/kotlin/com/labteto/dshmobile/local/LocalUsageMode.kt"))
+if declared_top_level_types(usage_api) != {"LocalUsageMode"}:
+    die("the neutral usage mode API must declare exactly LocalUsageMode")
 
 aggregate_fields = data_class_fields(aggregate_models, "LocalHarnessState")
 domain_sources = (

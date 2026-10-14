@@ -23,18 +23,21 @@ class LocalSettingsDataFacade @Inject internal constructor(
     private val memoryManager: MemoryManager,
     private val chatMemoryProjection: LocalChatMemoryProjectionPort,
     private val pricing: DeepSeekPricingRepository,
-    private val usage: DeepSeekUsageTracker,
-) {
+) : com.labteto.dshmobile.uicontract.MemoryUiPort {
     internal val deepSeekPricing: StateFlow<DeepSeekPricingState> = pricing.state
-    internal val usageRevision: StateFlow<Long> = usage.analyticsRevision
     internal suspend fun refreshDeepSeekPricing() = pricing.refreshFromOfficial()
-    internal fun usageSnapshot(): TokenUsageAnalyticsSnapshot = usage.analyticsSnapshot()
-    internal fun usageGroupDetail(kind: TokenUsageGroupKind, key: String, modelFilter: String? = null): TokenUsageGroupDetail? =
-        usage.analyticsGroupDetail(kind, key, modelFilter = modelFilter)
-    internal fun usageRecord(requestId: String): TokenUsageRecord? = usage.analyticsRecord(requestId)
 
-    internal fun memories(scopes: Set<MemoryScope>, projectId: String?, lineageId: String?): List<MemoryRecord> =
+    override fun memories(scopes: Set<MemoryScope>, projectId: String?, lineageId: String?): List<MemoryRecord> =
         memoryStore.listActive(allowedScopes = scopes, projectId = projectId, lineageId = lineageId, limit = 100)
+    override fun submit(command: com.labteto.dshmobile.uicontract.MemoryUiCommand): com.labteto.dshmobile.uicontract.MemoryUiReceipt = try {
+        when (command) {
+            is com.labteto.dshmobile.uicontract.MemoryUiCommand.Update ->
+                com.labteto.dshmobile.uicontract.MemoryUiReceipt.Updated(updateMemory(command.expected, command.content, command.pinned))
+            is com.labteto.dshmobile.uicontract.MemoryUiCommand.Forget ->
+                if (forgetMemory(command.expected)) com.labteto.dshmobile.uicontract.MemoryUiReceipt.Forgotten
+                else com.labteto.dshmobile.uicontract.MemoryUiReceipt.StaleOrMissing
+        }
+    } catch (failure: Exception) { com.labteto.dshmobile.uicontract.MemoryUiReceipt.Failed(failure.message) }
     internal fun updateMemory(existing: MemoryRecord, content: String, pinned: Boolean): MemoryRecord {
         val updated = memoryManager.update(existing = existing, content = content, pinned = pinned)
         recoverDiaryAfterMemorySave("记忆已保存")
@@ -53,6 +56,13 @@ class LocalSettingsDataFacade @Inject internal constructor(
             throw IllegalStateException("$savedMessage，关联日记清理待恢复；重开或下次召回时会重试", error)
         }
     }
-    internal fun memoriesFromSourceMessage(sessionId: String, messageId: String): List<MemoryRecord> =
+    override fun memoriesFromSourceMessage(sessionId: String, messageId: String): List<MemoryRecord> =
         memoryStore.listActiveFromMessage(sessionId, messageId)
+}
+
+@dagger.Module
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+abstract class LocalMemoryUiBindings {
+    @dagger.Binds @Singleton
+    abstract fun memory(implementation: LocalSettingsDataFacade): com.labteto.dshmobile.uicontract.MemoryUiPort
 }

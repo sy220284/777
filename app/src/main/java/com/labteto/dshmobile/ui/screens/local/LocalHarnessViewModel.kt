@@ -47,7 +47,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val chatUi: LocalChatUiFacade,
     private val sessionUi: LocalSessionUiFacade,
     private val toolsUi: LocalToolsUiFacade,
-    private val usageUi: com.labteto.dshmobile.local.presentation.LocalUsageUiFacade,
+    private val usageUi: com.labteto.dshmobile.uicontract.UsageUiPort,
     private val approvalPreferences: LocalApprovalPreferences,
     private val networkSearchSettings: LocalNetworkSearchSettings,
     @ApplicationContext private val appContext: Context,

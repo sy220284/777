@@ -7,6 +7,8 @@ data class UiDocumentSnapshot(
     val document: UiDocument,
     val provenance: UiDocumentProvenance,
     val actions: Map<String, UiActionAvailability>,
+    val bindings: Map<UiDocumentBinding, UiDocumentBoundValue> = emptyMap(),
+    val recoveryNotice: String? = null,
 )
 data class UiDocumentsSceneSnapshot(
     val sessionId: String?,
