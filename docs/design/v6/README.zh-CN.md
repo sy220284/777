@@ -7,7 +7,7 @@
 - **[V6 现行实现反向设计规范](V6-CURRENT-IMPLEMENTATION.zh-CN.md)**：三主题的真实 ARGB、L1–L5 材质、区域透明度、尺寸、动效、触觉、7 条顶层路由、21 个设置二级页、工作/聊天/工具等交互与退役清单。
 - **[现行页面与退役入口机器清单](current-ui.json)**：`LocalFeatureCatalog` 和 `SettingsDestination` 的对应关系及未合并 UI PR，不得以旧 38 场景序号替代。
 - **[打开当前手机单列交互设计稿](mobile/app.html)**：本轮按主线重新组织，只允许当前仍有真实入口的页面/状态。它是离线交互投影，**不是 Android 真实截图，也不是 Figma 已同步证明**。
-- [可复用 SVG 入口图标](sy-entry-icons.svg)、[图标源文件映射](SY-ENTRY-ICONS.zh-CN.md)、[文件类 SVG](assets/file-icons-preview.svg)、[逐场景验收台账](STATUS.zh-CN.md)。图标素材是否仍用于现行入口须对照 `SyEntryIcons.kt` 和实际调用；存在素材不代表应恢复旧按钮。
+- [可复用 SVG 入口图标](sy-entry-icons.svg)、[图标源文件映射](SY-ENTRY-ICONS.zh-CN.md)、[文件类 SVG](assets/file-icons-preview.svg)、[逐场景验收台账](STATUS.zh-CN.md)。其中原代码保留 26 个原始 SVG 路径，**仅 24 个属于当前现行功能入口**；`Projects`、`RunCenter` 为历史退役入口，在新版交付素材中剔除，不以路径存在恢复 UI。详见图标规范。
 
 ## 以代码为准的视觉归属
 
