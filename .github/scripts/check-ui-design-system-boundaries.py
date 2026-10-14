@@ -309,11 +309,8 @@ try:
                 sheet = ElementTree.fromstring(exported.read("sy-entry-icons.svg"))
                 ns = "{http://www.w3.org/2000/svg}"
                 groups = sheet.findall(f"{ns}g")
-                names = [
-                    next((t.text for t in g.findall(f"{ns}text")
-                          if t.text and t.text.isascii()), "")
-                    for g in groups
-                ]
+                names = [t.text for t in sheet.iter(f"{ns}text")
+                         if t.text and re.fullmatch(r"[A-Za-z][A-Za-z0-9]+", t.text)]
                 if len(names) != active_count or len(set(names)) != active_count or retired_icons.intersection(names):
                     violations.append("V6 exported ZIP contains an incorrect/retired icon inventory")
 except (OSError, KeyError, ValueError, TimeoutError, zipfile.BadZipFile) as exc:
