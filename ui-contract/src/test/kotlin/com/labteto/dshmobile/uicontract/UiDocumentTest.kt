@@ -47,4 +47,30 @@ class UiDocumentTest {
         assertFalse(UiDocumentPatch("document", 1, updated).matches(current))
         assertFalse(UiDocumentPatch("document", 0, updated.copy(source = source.copy(messageId = "other"))).matches(current))
     }
+
+    @Test fun submittedValuesCannotBypassRequiredFieldsOrInventSelections() {
+        val send = UiDocumentAction.SendUserInput("send", "Request", listOf("required", "choice", "enabled"))
+        val form = document(listOf(
+            UiDocumentNode.Disclosure("details", "Details", listOf(
+                UiDocumentNode.Field("required", "Name", "", true, false),
+                UiDocumentNode.Select("choice", "Choice", listOf("one", "two"), "one"),
+                UiDocumentNode.Switch("enabled", "Enabled", false),
+            )),
+        ), listOf(send))
+        assertTrue(form.invalidInputFields(send, form.initialFields()) == setOf("required"))
+        val valid = form.initialFields() + ("required" to "中文姓名")
+        assertTrue(form.invalidInputFields(send, valid).isEmpty())
+        assertTrue(form.invalidInputFields(send, valid + mapOf("choice" to "invented", "enabled" to "yes")) ==
+            setOf("choice", "enabled"))
+    }
+
+    @Test fun actionsOnlyRequireTheirOwnInputsAndCannotReferenceMissingControls() {
+        val form = document(listOf(
+            UiDocumentNode.Field("optional", "Optional", "", false, true),
+            UiDocumentNode.Field("required", "Required elsewhere", "", true, false),
+        ), emptyList())
+        val send = UiDocumentAction.SendUserInput("send", "Request", listOf("optional"))
+        assertTrue(form.invalidInputFields(send, form.initialFields()).isEmpty())
+        assertTrue(form.invalidInputFields(send.copy(fieldIds = listOf("missing")), emptyMap()) == setOf("missing"))
+    }
 }

@@ -43,4 +43,6 @@
     <string name="next_document_extra_request_consent">这会额外请求一次当前模型，可能消耗用量或额度。表单提交会先放入消息草稿供你确认。</string>
     <string name="next_document_confirm_generate">确认并生成</string>
     <string name="next_cancel">取消</string>
+    <string name="next_document_invalid_fields">请检查必填内容和选项：%1$s</string>
+    <string name="next_document_history_unavailable">历史交互界面读取不完整，原消息仍可阅读；请检查会话数据或重新生成界面。</string>
 </resources>

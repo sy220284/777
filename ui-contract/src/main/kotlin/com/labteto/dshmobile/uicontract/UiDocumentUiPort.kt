@@ -32,6 +32,7 @@ sealed interface UiDocumentReceipt {
     data object NavigationRequested : UiDocumentReceipt
     data class OwnerReceipt(val receipt: UiCommandReceipt) : UiDocumentReceipt
     data class Rejected(val reason: UiCommandRejection) : UiDocumentReceipt
+    data class InvalidFields(val fieldIds: Set<String>) : UiDocumentReceipt
     data class Fallback(val text: String, val reason: String) : UiDocumentReceipt
     data class Failed(val message: String?) : UiDocumentReceipt
 }

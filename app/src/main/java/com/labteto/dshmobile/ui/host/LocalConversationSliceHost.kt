@@ -26,7 +26,7 @@ internal fun LocalConversationSliceHost(
     }
     BackHandler(onBack = onClose)
     NextConversationUiPack.Render(
-        documents = viewModel.uiDocumentUiPort,
+        documents = viewModel.nextUiDocumentUiPort,
         forms = viewModel.uiDocumentFormPort,
         reading = viewModel.conversationReadingUiPort,
         drafts = viewModel.conversationDraftUiPort,

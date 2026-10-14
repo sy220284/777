@@ -66,8 +66,7 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
                 anchor["workMode"]?.jsonPrimitive?.boolean ?: false)
             if (source.sessionId != sessionId) return@mapNotNull null
             val decoded = LocalUiDocumentCodec.decode(value.getValue("definition").toString(), source,
-                budget, knownScenes, value["admittedApprovalId"]?.jsonPrimitive?.content).getOrNull()
-                ?: return@mapNotNull null
+                budget, knownScenes, value["admittedApprovalId"]?.jsonPrimitive?.content).getOrThrow()
             val provenance = value.getValue("provenance").jsonObject
             LocalUiDocumentRecord(decoded, UiDocumentProvenance(provenance["requestId"]?.jsonPrimitive?.content,
                 provenance.getValue("model").jsonPrimitive.content, provenance.getValue("usageReported").jsonPrimitive.boolean))

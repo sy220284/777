@@ -40,7 +40,7 @@ internal fun NextUiDocument(snapshot: UiDocumentSnapshot, identity: UiSessionIde
     val key = UiDocumentFormKey(document.source.sessionId, document.documentId)
     val defaults = remember(document) { document.initialFields() }
     val values = defaults + allValues[key].orEmpty()
-    var receipt by remember(document.documentId) { mutableStateOf<UiDocumentReceipt?>(null) }
+    var receipt by remember(document.documentId, document.revision) { mutableStateOf<UiDocumentReceipt?>(null) }
     Surface(Modifier.fillMaxWidth(), tonalElevation = 2.dp) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(document.title, Modifier.semantics { heading() })
@@ -54,12 +54,18 @@ internal fun NextUiDocument(snapshot: UiDocumentSnapshot, identity: UiSessionIde
                             document.source, action, values))
                     } })
             }
-            receipt?.let { result -> Text(stringResource(when (result) {
-                UiDocumentReceipt.DraftPrepared -> R.string.next_document_draft_prepared
-                UiDocumentReceipt.NavigationRequested -> R.string.next_document_navigated
-                is UiDocumentReceipt.OwnerReceipt -> R.string.next_document_owner_receipt
-                else -> R.string.next_document_unavailable
-            })) }
+            receipt?.let { result ->
+                if (result is UiDocumentReceipt.InvalidFields) {
+                    Text(stringResource(R.string.next_document_invalid_fields, result.fieldIds.joinToString()))
+                } else {
+                    Text(stringResource(when (result) {
+                        UiDocumentReceipt.DraftPrepared -> R.string.next_document_draft_prepared
+                        UiDocumentReceipt.NavigationRequested -> R.string.next_document_navigated
+                        is UiDocumentReceipt.OwnerReceipt -> R.string.next_document_owner_receipt
+                        else -> R.string.next_document_unavailable
+                    }))
+                }
+            }
         }
     }
 }

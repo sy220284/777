@@ -23,6 +23,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -47,7 +53,8 @@ internal class LocalUiDocumentGeneration @Inject constructor(
     private val mutableGenerating = MutableStateFlow<Set<String>>(emptySet())
     val generating = mutableGenerating.asStateFlow()
 
-    suspend fun generate(command: GenerateUiDocumentCommand, knownScenes: Set<UiSceneId>): UiDocumentReceipt {
+    suspend fun generate(command: GenerateUiDocumentCommand, knownScenes: Set<UiSceneId>,
+        generationScenes: Set<UiSceneId> = knownScenes): UiDocumentReceipt {
         if (!command.acknowledgedAdditionalModelRequest) return UiDocumentReceipt.AdditionalRequestConsentRequired
         if (command.prompt.isBlank()) return UiDocumentReceipt.Rejected(UiCommandRejection.EMPTY_INPUT)
         val captured = synchronized(state.foregroundRunHandle.lock) {
@@ -63,44 +70,55 @@ internal class LocalUiDocumentGeneration @Inject constructor(
         val sessionId = command.identity.sessionId
         mutableGenerating.update { it + sessionId }
         try {
-            if (!isCurrent(command)) return UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
-            val profile = gateway.profileForRoute(command.identity.profileId, captured.modelState.model, captured.modelState.baseUrl)
-            val source = UiDocumentSource(sessionId, command.messageId, command.identity.contextGeneration,
-                command.identity.profileId, command.identity.projectId, command.workMode)
-            val reply = state.withNamedModelRequestResource("ui-document-generation") {
-                gateway.complete(profile.model, profile.baseUrl, listOf(
-                    buildJsonObject { put("role", "system"); put("content", instruction(knownScenes)) },
-                    buildJsonObject { put("role", "user"); put("content", command.prompt) },
-                ), JsonArray(emptyList()), profile = profile)
+            return coroutineScope {
+                val requestJob = currentCoroutineContext().job
+                val invalidation = launch(start = CoroutineStart.UNDISPATCHED) {
+                    state.state.first { !isCurrent(command) }
+                    requestJob.cancel(CancellationException("UI document source changed"))
+                }
+                try {
+                    if (!isCurrent(command)) return@coroutineScope UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                    val profile = gateway.profileForRoute(command.identity.profileId, captured.modelState.model, captured.modelState.baseUrl)
+                    val source = UiDocumentSource(sessionId, command.messageId, command.identity.contextGeneration,
+                        command.identity.profileId, command.identity.projectId, command.workMode)
+                    val reply = state.withNamedModelRequestResource("ui-document-generation") {
+                        gateway.complete(profile.model, profile.baseUrl, listOf(
+                            buildJsonObject { put("role", "system"); put("content", instruction(generationScenes)) },
+                            buildJsonObject { put("role", "user"); put("content", command.prompt) },
+                        ), JsonArray(emptyList()), profile = profile)
+                    }
+                    withContext(NonCancellable + Dispatchers.IO) {
+                        usage.record(profile.model, reply.usage, requestId = reply.requestId,
+                            context = TokenUsageContext(mode = captured.usageMode, sessionId = sessionId,
+                                action = TokenUsageAction.UI_STRUCTURE_GENERATION),
+                            promptBreakdown = reply.promptBreakdown, route = reply.routeIdentity)
+                    }
+                    if (!isCurrent(command)) return@coroutineScope UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                    val raw = reply.content.orEmpty()
+                    val parsed = LocalUiDocumentCodec.decode(raw, source, budget, generationScenes, null)
+                    if (parsed.isFailure) return@coroutineScope UiDocumentReceipt.Fallback(raw, "ui_document_unavailable")
+                    val value = Json.parseToJsonElement(raw).jsonObject.toMutableMap()
+                    val previous = withContext(Dispatchers.IO) {
+                        documents.read(sessionId, setOf(command.messageId), budget, knownScenes)
+                            .firstOrNull { it.document.source == source }?.document
+                    }
+                    val documentId = previous?.documentId ?: UUID.randomUUID().toString()
+                    val revision = previous?.revision?.let { Math.addExact(it, 1L) } ?: 0L
+                    value["documentId"] = JsonPrimitive(documentId)
+                    value["revision"] = JsonPrimitive(revision)
+                    withContext(Dispatchers.IO) {
+                      synchronized(state.foregroundRunHandle.lock) {
+                        if (!isCurrent(command)) return@withContext false
+                        documents.publish(source, JsonObject(value), UiDocumentProvenance(
+                            reply.requestId.takeIf { it.isNotBlank() }, profile.model, reply.usage.reported), null)
+                        true
+                      }
+                    }.let { published -> if (!published) return@coroutineScope UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY) }
+                    return@coroutineScope UiDocumentReceipt.Published(documentId)
+                } finally {
+                    invalidation.cancel()
+                }
             }
-            withContext(NonCancellable + Dispatchers.IO) {
-                usage.record(profile.model, reply.usage, requestId = reply.requestId,
-                    context = TokenUsageContext(mode = captured.usageMode, sessionId = sessionId,
-                        action = TokenUsageAction.UI_STRUCTURE_GENERATION),
-                    promptBreakdown = reply.promptBreakdown, route = reply.routeIdentity)
-            }
-            if (!isCurrent(command)) return UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
-            val raw = reply.content.orEmpty()
-            val parsed = LocalUiDocumentCodec.decode(raw, source, budget, knownScenes, null)
-            if (parsed.isFailure) return UiDocumentReceipt.Fallback(raw, "ui_document_unavailable")
-            val value = Json.parseToJsonElement(raw).jsonObject.toMutableMap()
-            val previous = withContext(Dispatchers.IO) {
-                documents.read(sessionId, setOf(command.messageId), budget, knownScenes)
-                    .firstOrNull { it.document.source == source }?.document
-            }
-            val documentId = previous?.documentId ?: UUID.randomUUID().toString()
-            val revision = previous?.revision?.let { Math.addExact(it, 1L) } ?: 0L
-            value["documentId"] = JsonPrimitive(documentId)
-            value["revision"] = JsonPrimitive(revision)
-            withContext(Dispatchers.IO) {
-              synchronized(state.foregroundRunHandle.lock) {
-                if (!isCurrent(command)) return@withContext false
-                documents.publish(source, JsonObject(value), UiDocumentProvenance(
-                    reply.requestId.takeIf { it.isNotBlank() }, profile.model, reply.usage.reported), null)
-                true
-              }
-            }.let { published -> if (!published) return UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY) }
-            return UiDocumentReceipt.Published(documentId)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {

@@ -15,6 +15,8 @@ internal object LocalUiSceneCatalog {
         UiSceneRequirement(UiSceneId("conversation.header"), UiSceneKind.SLOT, "SHELL", hostProvided = false),
         UiSceneRequirement(UiSceneId("conversation.timeline"), UiSceneKind.SLOT, "SHELL", hostProvided = false),
         UiSceneRequirement(UiSceneId("conversation.composer"), UiSceneKind.SLOT, "SHELL", hostProvided = false),
+        UiSceneRequirement(UiSceneId("conversation.ui_document"), UiSceneKind.SLOT, "SHELL", hostProvided = false),
+        UiSceneRequirement(UiSceneId("conversation.ui_document_generate"), UiSceneKind.OVERLAY, "SHELL", hostProvided = false),
         UiSceneRequirement(UiSceneId("conversation.reply_status"), UiSceneKind.SLOT, "SHELL", hostProvided = false),
         UiSceneRequirement(UiSceneId("conversation.message_actions"), UiSceneKind.OVERLAY, "CHAT", hostProvided = false),
         UiSceneRequirement(UiSceneId("conversation.edit"), UiSceneKind.OVERLAY, "CHAT", hostProvided = false),

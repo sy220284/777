@@ -153,12 +153,17 @@ class LocalHarnessViewModel @Inject constructor(
     fun consumeUiSceneRequest(id: String) {
         if (uiSceneRequest.value == id) savedStateHandle["ui_scene_request"] = null
     }
+    private val documentNavigationScenes = com.labteto.dshmobile.ui.host.LocalUiSceneCatalog.requirements
+        .filter { it.kind == com.labteto.dshmobile.uicontract.UiSceneKind.PAGE &&
+            (it.id.value.startsWith("route.") || it.id.value.startsWith("settings.")) }.map { it.id }.toSet()
     val uiDocumentUiPort: com.labteto.dshmobile.uicontract.UiDocumentUiPort = documentsFactory.create(
-        viewModelScope, conversationDraftUiPort,
-        com.labteto.dshmobile.ui.host.LocalUiSceneCatalog.requirements
-            .filter { it.kind == com.labteto.dshmobile.uicontract.UiSceneKind.PAGE &&
-                (it.id.value.startsWith("route.") || it.id.value.startsWith("settings.")) }.map { it.id }.toSet(),
+        viewModelScope, conversationDraftUiPort, documentNavigationScenes,
     ) { scene -> savedStateHandle["ui_scene_request"] = scene.value }
+    // The independent conversation slice cannot navigate to unimplemented pages.
+    // It reads the same historical documents but explicitly disables those actions.
+    val nextUiDocumentUiPort: com.labteto.dshmobile.uicontract.UiDocumentUiPort = documentsFactory.create(
+        viewModelScope, conversationDraftUiPort, documentNavigationScenes, navigationScenes = emptySet(),
+    ) { _ -> error("No navigation scenes are registered for this slice") }
 
     private val conversationUiState = LocalConversationUiStateStore(appContext)
     val pinnedSessionIds = conversationUiState.pinnedSessionIds

@@ -41,7 +41,7 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
     val key = UiDocumentFormKey(document.source.sessionId, document.documentId)
     val defaults = remember(document) { document.initialFields() }
     val values = defaults + allValues[key].orEmpty()
-    var receipt by remember(document.documentId) { mutableStateOf<UiDocumentReceipt?>(null) }
+    var receipt by remember(document.documentId, document.revision) { mutableStateOf<UiDocumentReceipt?>(null) }
     SyGlassCard(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
         Text(document.title, Modifier.semantics { heading() })
         Text(stringResource(R.string.ui_document_model_source, snapshot.provenance.model))
@@ -54,12 +54,18 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
                         document.source, action, values))
                 } })
         }
-        receipt?.let { result -> Text(stringResource(when (result) {
-            UiDocumentReceipt.DraftPrepared -> R.string.ui_document_draft_prepared
-            UiDocumentReceipt.NavigationRequested -> R.string.ui_document_navigation_requested
-            is UiDocumentReceipt.OwnerReceipt -> R.string.ui_document_owner_receipt
-            else -> R.string.ui_document_unavailable
-        })) }
+        receipt?.let { result ->
+            if (result is UiDocumentReceipt.InvalidFields) {
+                Text(stringResource(R.string.ui_document_invalid_fields, result.fieldIds.joinToString()))
+            } else {
+                Text(stringResource(when (result) {
+                    UiDocumentReceipt.DraftPrepared -> R.string.ui_document_draft_prepared
+                    UiDocumentReceipt.NavigationRequested -> R.string.ui_document_navigation_requested
+                    is UiDocumentReceipt.OwnerReceipt -> R.string.ui_document_owner_receipt
+                    else -> R.string.ui_document_unavailable
+                }))
+            }
+        }
     }
 }
 

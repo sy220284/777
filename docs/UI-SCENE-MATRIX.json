@@ -1150,6 +1150,37 @@
       "v6": null,
       "implementation": "V6 现行入口；独立 Pack 待迁移",
       "acceptance": "待设备验收"
+    },
+    {
+      "id": "conversation.ui_document",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalDynamicDocument.kt",
+      "actions": [
+        "prepare_user_input",
+        "open_registered_scene",
+        "answer_current_approval"
+      ],
+      "recovery": "Shared Session ui.document.published sidecar + source message/context/profile/project identity; Host SavedStateHandle form values",
+      "v6": null,
+      "implementation": "V6 和 Next 原生渲染；Next 不支持页面导航并明确禁用该动作；Work 运行内发布和绑定事实尚未实现",
+      "acceptance": "协议/Schema 自动化校验；真实模型、恢复和双包业务旅程待验收"
+    },
+    {
+      "id": "conversation.ui_document_generate",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalUiDocumentGenerateButton.kt",
+      "actions": [
+        "acknowledge_additional_model_request",
+        "generate_document"
+      ],
+      "recovery": "One captured model route/request; actual provider usage; cancelled generation is not replayed",
+      "v6": null,
+      "implementation": "V6 和 Next 显式确认后调用共享模型生成 Owner；不新增工具权限、不隐式付费重试",
+      "acceptance": "编译/协议自动化验证；真实模型收费与取消旅程待验收"
     }
   ],
   "v6ReferenceCoverage": [

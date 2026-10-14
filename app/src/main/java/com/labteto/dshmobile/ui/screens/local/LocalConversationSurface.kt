@@ -781,6 +781,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     }
 
     Column(Modifier.fillMaxSize().background(rootSurfaceColor).safeDrawingPadding().imePadding()) {
+        if (documentSnapshot.error != null) Text(
+            stringResource(R.string.ui_document_history_unavailable),
+            style = DsType.std14.withReadingWeight(), color = colors.textSecondary,
+        )
         if (readingAnchorMissing) Text(
             stringResource(R.string.local_reading_anchor_unavailable),
             style = DsType.std14.withReadingWeight(), color = colors.textSecondary,

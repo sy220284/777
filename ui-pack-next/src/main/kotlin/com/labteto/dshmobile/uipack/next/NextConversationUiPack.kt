@@ -58,9 +58,11 @@ import com.labteto.dshmobile.uihost.ConversationUiPack
 object NextConversationUiPack : ConversationUiPack {
     override val manifest = UiPackManifest(
         id = "next-conversation-slice", version = 1, minContractVersion = 1, maxContractVersion = 1,
-        scenes = setOf("conversation.chat", "conversation.work", "conversation.composer", "work.approval")
+        scenes = setOf("conversation.chat", "conversation.work", "conversation.composer", "work.approval",
+            "conversation.timeline", "conversation.ui_document", "conversation.ui_document_generate")
             .map(::UiSceneId).toSet(),
-        requiredCapabilities = setOf("chat.send_text", "work.send_text", "work.answer_approval")
+        requiredCapabilities = setOf("chat.send_text", "work.send_text", "work.answer_approval",
+            "ui_document.generate", "ui_document.prepare_input")
             .map(::UiCapabilityId).toSet(),
         windowClasses = UiWindowClass.entries.toSet(),
         accessibility = UiAccessibility.entries.toSet(),
@@ -174,6 +176,7 @@ object NextConversationUiPack : ConversationUiPack {
                     if (queued > 0) Text(stringResource(R.string.next_queued, queued))
                     if (status == UiSceneStatus.LOADING) Text(stringResource(R.string.next_loading))
                     if (status == UiSceneStatus.EMPTY) Text(stringResource(R.string.next_empty))
+                    if (documentSnapshot?.error != null) Text(stringResource(R.string.next_document_history_unavailable))
                     if (readingAnchorMissing) Text(stringResource(R.string.next_reading_anchor_unavailable))
                     LazyColumn(Modifier.weight(1f), state = listState, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(messages, key = UiMessageSnapshot::id) { message ->
