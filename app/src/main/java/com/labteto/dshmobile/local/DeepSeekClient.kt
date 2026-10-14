@@ -84,7 +84,8 @@ class DeepSeekClient @Inject constructor(
             put("model", model)
             put("messages", JsonArray(messages))
             put("stream", false)
-            temperature?.let { put("temperature", it) }
+            // Official Kimi Code models use provider-fixed sampling parameters.
+            if (!LocalKimiPolicy.isOfficial(baseUrl)) temperature?.let { put("temperature", it) }
             val miniMax = LocalMiniMaxPolicy.isOfficial(baseUrl)
             if (miniMax) {
                 put("reasoning_split", true)
@@ -197,7 +198,8 @@ class DeepSeekClient @Inject constructor(
             put("model", model)
             put("messages", JsonArray(messages))
             put("stream", true)
-            temperature?.let { put("temperature", it) }
+            // Official Kimi Code models use provider-fixed sampling parameters.
+            if (!LocalKimiPolicy.isOfficial(baseUrl)) temperature?.let { put("temperature", it) }
             put("stream_options", buildJsonObject { put("include_usage", true) })
             val miniMax = LocalMiniMaxPolicy.isOfficial(baseUrl)
             if (miniMax) {
