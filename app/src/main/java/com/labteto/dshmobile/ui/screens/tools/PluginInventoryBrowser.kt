@@ -455,6 +455,7 @@ internal fun PluginInventoryBrowser(
                 SyButton(
                     text = stringResource(R.string.skills_edit),
                     variant = SyButtonVariant.Info,
+                    enabled = !loading,
                     onClick = {
                         onOpenSkillEditor(item.id.substringAfter(":"))
                         selectedRow = null
@@ -473,6 +474,7 @@ internal fun PluginInventoryBrowser(
                         color = colors.textSecondary,
                     )
                     SySwitchControl(
+                        enabled = !loading,
                         checked = item.modelInvocable,
                         onCheckedChange = {
                             onSetSkillModelInvocable(item.id.substringAfter(":"), it)
@@ -485,6 +487,7 @@ internal fun PluginInventoryBrowser(
                 SyButton(
                     text = stringResource(R.string.common_remove),
                     variant = SyButtonVariant.Info,
+                    enabled = !loading,
                     onClick = {
                         removeSkillName = item.id.substringAfter(":")
                         selectedRow = null
