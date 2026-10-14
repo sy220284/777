@@ -1,59 +1,82 @@
 #!/usr/bin/env python3
-"""Package exactly the current V6 PHONE design folder. Never inherit old editions."""
+"""Package current Android V6 source of truth. Never inherit historical 38-screen archives.
+
+Usage: python docs/design/v6/sync-design-package.py \
+  --source docs/design/v6 --output /tmp/shenyan-v6-current.zip
+
+This utility packages only tracked-design deliverables, not APKs, old previews, or fonts.
+The resulting ZIP is a reproducible design hand-off, NOT device/Figma acceptance.
+"""
 from __future__ import annotations
-import argparse, hashlib, json, re, zipfile
+
+import argparse
+import hashlib
+import json
+import re
+import zipfile
 from pathlib import Path
 from xml.etree import ElementTree
 
-parser = argparse.ArgumentParser(description="Only V6 phone artwork, source and current previews")
-parser.add_argument("--source", type=Path, required=True, help="Unpacked current V6 phone folder")
-parser.add_argument("--output", type=Path, required=True, help="New ZIP archive file")
+parser = argparse.ArgumentParser(description="Package current V6 mobile design and semantic sources")
+parser.add_argument("--source", type=Path, required=True, help="Repository docs/design/v6 directory")
+parser.add_argument("--output", type=Path, required=True, help="Destination ZIP archive")
 args = parser.parse_args()
 source, output = args.source.resolve(), args.output.resolve()
-if not source.is_dir() or not (source / "app.html").is_file():
-    parser.error("Expected current V6 mobile directory with app.html")
-html = (source / "app.html").read_text(encoding="utf-8")
-tokens = json.loads((source / "semantic-design-tokens.json").read_text(encoding="utf-8"))
-if "shenyan.mobile.design.v6" != tokens.get("schema"):
-    parser.error("Only normalized mobile V6 tokens are accepted")
-ids = re.findall(r"'([0-9]{2})':\{n:'", html)
-if sorted(ids) != [f"{n:02d}" for n in range(1, 39)]:
-    parser.error("The prototype must include exactly the same 38 screens")
-if "function toggleDesktopSidebar" in html or "sy-desktop-toggle" in html and 'type="button"' in html.split("sy-desktop-toggle",1)[-1][:90]:
-    parser.error("Desktop toolbar is forbidden in the canonical phone design")
-icons = sorted((source / "assets/v6/entry-icons").glob("*.svg"))
-editable = [p for p in icons if p.name != "entry-icons-preview.svg"]
-if len(editable) != 26:
-    parser.error("Expected exactly 26 separate entry icon SVGs")
-allowed_roots = {"app.html", "README.zh-CN.md", "SCREENS.zh-CN.md",
-                 "semantic-design-tokens.json", "INTEGRITY.json",
-                 "QA-RESULT.json", "assets", "android-v6", "preview", "source"}
-allfiles = sorted(p for p in source.rglob("*") if p.is_file() and p.name != "MANIFEST.sha256")
-if any(p.relative_to(source).parts[0] not in allowed_roots for p in allfiles):
-    parser.error("Found unapproved files: old editions or unexpected content")
-for path in allfiles:
-    name = path.relative_to(source).as_posix()
-    if re.search(r"(?:^|/)(?:compose-v[2-5]|history-v\d|_preview-v|supplements|references)(?:/|$)", name, re.I):
-        parser.error("Legacy assets are forbidden: " + name)
-    if path.suffix.lower() in {".apk", ".ttf", ".otf"}:
-        parser.error("APK/font binary not allowed in this design archive: " + name)
-    if path.suffix == ".svg" or path.suffix == ".xml":
-        ElementTree.parse(path)
-rows = [hashlib.sha256(p.read_bytes()).hexdigest()+"  "+p.relative_to(source).as_posix()
-        for p in allfiles]
-manifest = ("\n".join(rows)+"\n").encode()
+if source.name == "mobile" and (source.parent / "current-ui.json").is_file():
+    source = source.parent
+required = (
+    "mobile/app.html", "current-ui.json", "V6-CURRENT-IMPLEMENTATION.zh-CN.md",
+    "README.zh-CN.md", "STATUS.zh-CN.md", "SY-ENTRY-ICONS.zh-CN.md",
+    "sy-entry-icons.svg", "file-icons.json", "assets/file-icons-preview.svg",
+)
+if any(not (source / name).is_file() for name in required):
+    parser.error("Expected current checked-in docs/design/v6 with V6 spec, manifest and editable sources")
+manifest = json.loads((source / "current-ui.json").read_text(encoding="utf-8"))
+routes = [item["id"] for item in manifest["routes"]]
+html = (source / "mobile/app.html").read_text(encoding="utf-8")
+match = re.search(r"const\s+V6_ROUTES\s*=\s*(\[[^\]]+\])", html)
+if not match or json.loads(match.group(1)) != routes:
+    parser.error("V6 prototype routes differ from current-ui.json")
+if routes != ["HOME", "PERSONA_GALLERY", "DIARY", "WORKSPACE", "TASKS", "TOOLS", "SETTINGS"]:
+    parser.error("V6 route inventory changed; audit and update package contract before exporting")
+if any(s in html for s in ("S03Board", "S02v2Work", "mobile-screen-tabs", "38 场景")):
+    parser.error("Obsolete design screens/controls re-entered current prototype")
+
+allowed_files = [source / name for name in required]
+allowed_files += sorted(p for p in (source / "assets").rglob("*") if p.is_file())
+allowed_files = sorted(set(allowed_files), key=lambda p: p.relative_to(source).as_posix())
+if any(not p.is_relative_to(source) for p in allowed_files):
+    parser.error("Packaging path escapes design root")
+for item in allowed_files:
+    name = item.relative_to(source).as_posix()
+    if item.is_symlink():
+        parser.error("Symlinks are forbidden: " + name)
+    if re.search(r"(?:^|/)(?:compose-v[2-5]|history-v\d|_preview-v|references|supplements)(?:/|$)", name, re.I):
+        parser.error("Old edition design artifact is forbidden: " + name)
+    if item.suffix.lower() in {".apk", ".ttf", ".otf", ".zip"}:
+        parser.error("Binary or nested archive is forbidden: " + name)
+    if item.suffix.lower() in {".svg", ".xml"}:
+        ElementTree.parse(item)
+
+rows = [
+    hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.relative_to(source).as_posix()
+    for p in allowed_files
+]
 output.parent.mkdir(parents=True, exist_ok=True)
 with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED, compresslevel=8) as z:
-    for path in allfiles:
-        z.write(path, path.relative_to(source).as_posix())
-    z.writestr("MANIFEST.sha256", manifest)
+    for item in allowed_files:
+        z.write(item, item.relative_to(source).as_posix())
+    z.writestr("MANIFEST.sha256", "\n".join(rows) + "\n")
 with zipfile.ZipFile(output) as z:
     if z.testzip() is not None:
-        raise SystemExit("ZIP CRC verification failed")
-    for row in z.read("MANIFEST.sha256").decode().splitlines():
-        sha, name = row.split("  ", 1)
-        if hashlib.sha256(z.read(name)).hexdigest() != sha:
-            raise SystemExit("Hash mismatch: "+name)
-print(json.dumps({"archive":str(output),"files":len(allfiles)+1,
-                  "bytes":output.stat().st_size,"screenCount":38,
-                  "editableIcons":26},ensure_ascii=False))
+        raise SystemExit("ZIP CRC validation failed")
+    for line in z.read("MANIFEST.sha256").decode("utf-8").splitlines():
+        sha, filename = line.split("  ", 1)
+        if hashlib.sha256(z.read(filename)).hexdigest() != sha:
+            raise SystemExit("ZIP manifest checksum mismatch: " + filename)
+print(json.dumps({
+    "archive": str(output), "files": len(allowed_files)+1,
+    "bytes": output.stat().st_size, "routes": routes,
+    "sourceOfTruth": manifest["sourceOfTruth"],
+    "warning": "HTML preview and ZIP are not Android device/Figma verification",
+}, ensure_ascii=False))
