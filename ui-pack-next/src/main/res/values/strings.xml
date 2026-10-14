@@ -93,4 +93,11 @@
     <string name="next_work_history_expired">历史已重置，请重新打开。</string>
     <string name="next_artifact_unavailable">文件当前不可读取</string>
     <string name="next_artifact_changed">文件内容已发生变化</string>
+    <string name="next_conversation_files">会话文件</string>
+    <string name="next_file_artifacts">成果文件</string>
+    <string name="next_file_involved">涉及文件</string>
+    <string name="next_no_conversation_files">当前会话暂无文件记录</string>
+    <string name="next_attachment_preview">预览附件</string>
+    <string name="next_loading_files">正在读取文件…</string>
+    <string name="next_file_read_failed">文件读取失败，请重试。</string>
 </resources>

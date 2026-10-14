@@ -3582,7 +3582,7 @@
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationUiPack.kt",
-      "sha256": "9e76542f0a5379be"
+      "sha256": "800f3ed6763c44be"
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextDocumentGenerateButton.kt",
@@ -3658,54 +3658,15 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "3cf885b473a0",
+  "source_snapshot": "a69610a80bb6",
   "observed_delta": {
-    "baseline": "234410bc59f6",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalWorkPolicyUiPortComposition.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/session/LocalConversationFiles.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/tools/LocalFileUiValues.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/work/LocalRequirementEvidenceLink.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/FilesUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/WorkPolicyUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/WorkReadUiPort.kt"
-    ],
+    "baseline": "3cf885b473a0",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/interaction/LocalInteractionCoordinator.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsModels.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalRequirementEvidence.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkApprovalCoordinator.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalConversationSliceHost.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalShellUiContribution.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ConversationUiPort.kt",
-      "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/ConversationUiPack.kt",
       "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationUiPack.kt"
     ],
-    "moved_unchanged_files": [
-      {
-        "previous": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalArtifactUiItem.kt",
-        "current": "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/presentation/LocalArtifactUiItem.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolActivityUiItem.kt",
-        "current": "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/presentation/LocalToolActivityUiItem.kt",
-        "basis": "文件内容指纹完全相同"
-      },
-      {
-        "previous": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalWorkHistoryPageUi.kt",
-        "current": "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/presentation/LocalWorkHistoryPageUi.kt",
-        "basis": "文件内容指纹完全相同"
-      }
-    ],
+    "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
     "added_ui": [],

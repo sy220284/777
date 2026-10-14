@@ -207,15 +207,74 @@ object NextConversationUiPack : ConversationUiPack {
                 finally { workFactsLoading = false }
             }
         }
-        var fileChooser by remember { mutableStateOf(false) }
-        var fileRows by remember { mutableStateOf(emptyList<com.labteto.dshmobile.local.tools.LocalWorkspaceFile>()) }
-        var filePreview by remember { mutableStateOf<com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview?>(null) }
-        var fileLoading by remember { mutableStateOf(false) }
+        val importFailed = stringResource(R.string.next_attachment_failed)
+        val fileReadFailed = stringResource(R.string.next_file_read_failed)
+        var fileChooser by remember(identity) { mutableStateOf(false) }
+        var fileRows by remember(identity) { mutableStateOf(emptyList<com.labteto.dshmobile.local.tools.LocalWorkspaceFile>()) }
+        var conversationFileRows by remember(identity) { mutableStateOf<com.labteto.dshmobile.local.session.LocalConversationFiles?>(null) }
+        var filePreview by remember(identity) { mutableStateOf<com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview?>(null) }
+        var fileError by remember(identity) { mutableStateOf<String?>(null) }
+        var fileLoading by remember(identity) { mutableStateOf(false) }
+        var fileRequestGeneration by remember(identity) { mutableStateOf(0L) }
+        var fileTitle by remember(identity) { mutableStateOf(R.string.next_workspace_files) }
+        fun fileRequestCurrent(target: com.labteto.dshmobile.uicontract.UiSessionIdentity?, generation: Long): Boolean =
+            generation == fileRequestGeneration && (if (workMode) work.snapshot().identity else chat.snapshot().identity) == target
+        fun closeFiles() {
+            fileRequestGeneration++
+            fileChooser = false
+            fileLoading = false
+            filePreview = null
+            fileError = null
+        }
+        fun previewFile(path: String, standalone: Boolean = false) {
+            val owner = files ?: return
+            if (fileLoading) return
+            val target = identity
+            val generation = ++fileRequestGeneration
+            fileLoading = true
+            fileError = null
+            filePreview = null
+            if (standalone) {
+                fileTitle = R.string.next_attachment_preview
+                fileRows = emptyList()
+                conversationFileRows = null
+                fileChooser = true
+            }
+            importScope.launch {
+                try {
+                    val preview = owner.previewWorkspaceFile(path)
+                    if (fileRequestCurrent(target, generation)) filePreview = preview
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (failure: Exception) { if (fileRequestCurrent(target, generation)) fileError = failure.message ?: fileReadFailed }
+                finally { if (fileRequestCurrent(target, generation)) fileLoading = false }
+            }
+        }
+        fun loadFiles(conversation: Boolean) {
+            val owner = files ?: return
+            if (fileLoading || conversation && identity == null) return
+            val target = identity
+            val generation = ++fileRequestGeneration
+            fileLoading = true
+            importScope.launch {
+                try {
+                    val sessionFiles = if (conversation) owner.conversationFiles(requireNotNull(target).sessionId) else null
+                    val workspaceFiles = if (conversation) emptyList() else owner.workspaceFiles()
+                    if (!fileRequestCurrent(target, generation)) return@launch
+                    conversationFileRows = sessionFiles
+                    fileRows = workspaceFiles
+                    filePreview = null
+                    fileError = null
+                    fileTitle = if (conversation) R.string.next_conversation_files else R.string.next_workspace_files
+                    fileChooser = true
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (failure: Exception) { if (fileRequestCurrent(target, generation)) receipt = failure.message ?: fileReadFailed }
+                finally { if (fileRequestCurrent(target, generation)) fileLoading = false }
+            }
+        }
         val attachmentDrafts by drafts.attachments.collectAsStateWithLifecycle()
         val selectedAttachments = attachmentDrafts[identity?.sessionId].orEmpty()
         var pickerIdentity by remember { mutableStateOf<com.labteto.dshmobile.uicontract.UiSessionIdentity?>(null) }
         var importing by remember { mutableStateOf(false) }
-        val importFailed = stringResource(R.string.next_attachment_failed)
         val pickAttachment = com.labteto.dshmobile.uihost.rememberUiAttachmentPicker { uri ->
             val target = pickerIdentity
             val port = attachments
@@ -270,23 +329,33 @@ object NextConversationUiPack : ConversationUiPack {
                     Text(stringResource(R.string.next_load_older))
                 } }
             } }, confirmButton = { TextButton(onClick = { workFactsOpen = false }) { Text(stringResource(R.string.next_close)) } })
-        if (fileChooser && files != null) AlertDialog(onDismissRequest = { fileChooser = false; filePreview = null },
-            title = { Text(stringResource(R.string.next_workspace_files)) },
+        if (fileChooser && files != null) AlertDialog(onDismissRequest = { closeFiles() },
+            title = { Text(stringResource(fileTitle)) },
             text = { LazyColumn(Modifier.heightIn(max = 360.dp)) {
                 item { filePreview?.let { preview ->
                     Text(preview.file.path)
+                    Text("${preview.file.bytes} B")
                     Text(preview.text ?: stringResource(R.string.next_binary_file))
                     if (preview.truncated) Text(stringResource(R.string.next_partial_preview))
                 } }
-                items(fileRows, key = { it.path }) { file -> TextButton(onClick = {
-                    if (!fileLoading) { fileLoading = true; importScope.launch {
-                        try { filePreview = files.previewWorkspaceFile(file.path) }
-                        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-                        catch (failure: Exception) { receipt = failure.message }
-                        finally { fileLoading = false }
-                    } }
-                }, enabled = !fileLoading) { Text(file.path) } }
-            } }, confirmButton = { TextButton(onClick = { fileChooser = false; filePreview = null }) { Text(stringResource(R.string.next_close)) } })
+                val sessionFiles = conversationFileRows
+                if (sessionFiles != null) {
+                    if (sessionFiles.isEmpty) item { Text(stringResource(R.string.next_no_conversation_files)) }
+                    if (sessionFiles.artifacts.isNotEmpty()) item { Text(stringResource(R.string.next_file_artifacts)) }
+                    items(sessionFiles.artifacts, key = { "artifact:${it.path}" }) { file ->
+                        TextButton(onClick = { previewFile(file.path) }, enabled = !fileLoading) { Text(file.path) }
+                    }
+                    if (sessionFiles.involved.isNotEmpty()) item { Text(stringResource(R.string.next_file_involved)) }
+                    items(sessionFiles.involved, key = { "involved:${it.path}" }) { file ->
+                        TextButton(onClick = { previewFile(file.path) }, enabled = !fileLoading) { Text(file.path) }
+                    }
+                }
+                items(fileRows, key = { "workspace:${it.path}" }) { file ->
+                    TextButton(onClick = { previewFile(file.path) }, enabled = !fileLoading) { Text(file.path) }
+                }
+                fileError?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
+                if (fileLoading) item { Text(stringResource(R.string.next_loading_files)) }
+            } }, confirmButton = { TextButton(onClick = { closeFiles() }) { Text(stringResource(R.string.next_close)) } })
         if (policyConsent != null && policy != null) AlertDialog(onDismissRequest = { policyConsent = null },
             title = { Text(stringResource(R.string.next_policy_confirm)) },
             text = { Text(stringResource(if (policyConsent is com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.ApproveWithAutoMode)
@@ -337,14 +406,10 @@ object NextConversationUiPack : ConversationUiPack {
                     if (workMode && workReads != null) TextButton(onClick = { loadWorkFacts(false) }, enabled = identity != null && !workFactsLoading) {
                         Text(stringResource(R.string.next_work_facts))
                     }
-                    if (files != null) TextButton(onClick = {
-                        if (!fileLoading) { fileLoading = true; importScope.launch {
-                            try { fileRows = files.workspaceFiles(); fileChooser = true }
-                            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-                            catch (failure: Exception) { receipt = failure.message }
-                            finally { fileLoading = false }
-                        } }
-                    }, enabled = !fileLoading) { Text(stringResource(R.string.next_workspace_files)) }
+                    if (files != null) {
+                        TextButton(onClick = { loadFiles(false) }, enabled = !fileLoading) { Text(stringResource(R.string.next_workspace_files)) }
+                        TextButton(onClick = { loadFiles(true) }, enabled = identity != null && !fileLoading) { Text(stringResource(R.string.next_conversation_files)) }
+                    }
                     TextButton(onClick = onClose) { Text(stringResource(R.string.next_close)) }
                     Text(stringResource(when (phase) {
                         UiExecutionPhase.IDLE -> R.string.next_idle
@@ -480,6 +545,9 @@ object NextConversationUiPack : ConversationUiPack {
                     }, enabled = identity != null && !importing) { Text(stringResource(R.string.next_attach)) }
                     selectedAttachments.forEach { attachment ->
                         Text("${attachment.name} (${attachment.bytes} B)")
+                        if (files != null) TextButton(onClick = { previewFile(attachment.relativePath, standalone = true) }, enabled = !fileLoading) {
+                            Text(stringResource(R.string.next_attachment_preview))
+                        }
                         TextButton(onClick = { identity?.let { drafts.removeAttachment(it.sessionId, attachment.relativePath) } }) {
                             Text(stringResource(R.string.next_remove_attachment))
                         }
