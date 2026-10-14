@@ -140,3 +140,16 @@ Work 提问新增真实 waiter 签发的 nonce；模型 callId 复用不能复�
 - `6fee3ab8`：`ui-host` 的 Gradle 依赖约束选择仓库原有 `gradle/verification-metadata.xml` 已记录 SHA256 的 `androidx.emoji2:emoji2:1.4.0`，替代从传递依赖解析到的未登记 `1.2.0`；**未关闭验证、未编造散列、未改全局安全门禁**。
 
 **局限与验证状态：** 这是**Debug Next 会话切片**的真实准入接线，不是完整应用的包管理器、全局路由或可切换 V6/Next 全套场景。Owner 仍按原规则二次授权，Host 的“端口已接线”不意味着此刻具有执行权限。当前未收到绑定 `d586ba39` 的最新 CI/设备回执；依赖修复是根据原 CI 日志与仓库已验证版本完成的**有依据改动**，仍需重跑 Android CI。仍不声称 S2/S3/S5 验收通过。
+
+## 2026-10-14 本轮追加：S4 受限表格与 Work 工具事件（仅本轮贡献）
+
+**本轮新增代码（与此前工作分开计算）：**
+- [`cc0e6ddc`](https://github.com/sy220284/777/commit/cc0e6ddc08fae94ce813b9fcfead9e5df22cedf0)：同一批 14 文件原子提交，新增受节点/字数预算保护的只读 `UiDocumentNode.Table`、嵌套严格 Schema / Codec 编解码、V6/Next 各自原生渲染、`TableData` 类型化本地 Builder、两包零额外请求的 `FACTS_TABLE` 会话快照入口，并编写协议/Codec/Builder 测试源码。
+- [`c97f01b0`](https://github.com/sy220284/777/commit/c97f01b0fef6a95d5f92ce2877da347b713516c1)：新增 Work 模式 `WORK_TOOL_ACTIVITY` 本地表格入口，读取已有 `WorkReadUiPort` 的真实 EventLog 工具活动，最多最近八项，准确展示原阶段（含失败、结果未知、取消），不提供工具执行、收费重试或审批权限；Chat 模式拒绝。更新两个 Pack 的可用入口。
+- [`UI-DOCUMENT-TABLE-R4-20261014.zh-CN.md`](design/ui3/UI-DOCUMENT-TABLE-R4-20261014.zh-CN.md)：本轮代码-设计边界、来源、验收限制和贡献归属对照。
+
+**此前已有，不归本轮成果：** `:ui-contract`、原三个本地模板、AI 受控调用、真实用量 Owner、`UiDocumentSessionStore`、Work EventLog 活动投影、`WorkReadUiPort`、V6/Next 动态表单与其他 Feature Port。本轮只在已有可靠类型化数据与共享闭合协议之上加显示能力。
+
+**仍未完成（不得因新增表格而勾选）：** 任意工具 Schema/结构化模型数据自动推断、动态图表/媒体/证据与实时更新、Work 运行内自动发布、公开 patch 工作流/兼容迁移、S1 全量 Port 与旧回调清理、S2 真正端到端双包验证、S3 全 V6 页面拆包与 Next 全应用替换、S5 38 场景及设备/弱网/辅助技术验收。新表格仅是制作时快照，既非实时进度也不证明需求核验。
+
+**验证：** 对照源码和权威 `JsonSchemaValidator` 确认已有嵌套数组语义校验支持；新增回归测试**源码**已经提交，但目前没有绑定本轮最终 head 的成功 CI/Android 16/17 设备回执。不得写为验收通过，不推进 Draft 合并。
