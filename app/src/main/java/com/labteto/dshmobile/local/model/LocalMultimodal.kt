@@ -503,10 +503,14 @@ internal fun redactModelImages(messages: List<JsonObject>): List<JsonObject> =
             content.forEach { part ->
                 val obj = part as? JsonObject
                 val type = obj?.get("type")?.jsonPrimitive?.contentOrNull
-                if (type == "image_url") {
+                if (type == "image_url" || type == "video_url") {
+                    val key = if (type == "video_url") "video_url" else "image_url"
                     add(buildJsonObject {
-                        put("type", "image_url")
-                        put("image_url", buildJsonObject { put("url", "[image data omitted]") })
+                        put("type", type)
+                        put(key, buildJsonObject {
+                            put("url", if (type == "video_url")
+                                "[video data omitted]" else "[image data omitted]")
+                        })
                     })
                 } else {
                     add(part)
