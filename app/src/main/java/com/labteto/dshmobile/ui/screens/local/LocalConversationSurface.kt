@@ -1553,7 +1553,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             showDragHandle = false,
             floating = true,
             scrollable = true,
-            surfaceTier = SyMaterialTier.L1_SECTION,
+            seamlessBackground = true,
         ) {
             // Four compact icon-and-label actions in one horizontal row.
             Row(
