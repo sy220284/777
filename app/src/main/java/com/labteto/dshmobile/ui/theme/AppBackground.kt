@@ -374,7 +374,9 @@ private fun adaptiveGlobalVeil(state: AppBackgroundState, surfaceBase: Color): C
 
 @Composable
 private fun rememberBackground(path: String?): LoadedBackground? {
-    var loaded by remember(path) { mutableStateOf<LoadedBackground?>(null) }
+    // Keep the previous valid frame visible while decoding a newly selected picture. Reset
+    // immediately on explicit clear; never flash the empty fluid-glass screen between swaps.
+    var loaded by remember { mutableStateOf<LoadedBackground?>(null) }
     LaunchedEffect(path) {
         loaded = if (path == null) {
             null
@@ -398,7 +400,7 @@ private fun rememberBackground(path: String?): LoadedBackground? {
             }
         }
     }
-    return loaded
+    return if (path == null) null else loaded
 }
 
 private data class PixelSample(
