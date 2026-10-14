@@ -72,6 +72,23 @@ class NextConversationUiPackInteractionTest {
         compose.onNodeWithText("retain draft", substring = true).assertDoesNotExist()
     }
 
+    @Test fun NextShowsRealGroupContextButDoesNotInventGroupAdministrationControls() {
+        val chat = Chat()
+        val work = Work()
+        chat.snapshots.value = chat.snapshots.value.copy(
+            group = com.labteto.dshmobile.uicontract.UiChatGroupSummary(listOf("小夏", "小秋"))
+        )
+        compose.setContent {
+            NextConversationUiPack.Render(null, null, reading, drafts, chat, work,
+                workMode = false, onClose = {})
+        }
+        compose.onNodeWithText("当前群聊成员：小夏、小秋").assertIsDisplayed()
+        compose.runOnIdle {
+            chat.snapshots.value = chat.snapshots.value.copy(group = null)
+        }
+        compose.onNodeWithText("当前群聊成员：小夏、小秋").assertDoesNotExist()
+    }
+
     @Test fun approvalOnlySubmitsTheExistingPendingIdentityAndDisplaysOwnerRejection() {
         val chat = Chat()
         val work = Work()
