@@ -97,6 +97,7 @@ internal data class LocalWorkUiActionResult(
 )
 
 internal data class LocalWorkFeatureUiActions(
+    val evidence: com.labteto.dshmobile.uicontract.WorkEvidenceUiPort,
     val workState: StateFlow<LocalWorkUiState>,
     val workspaceFiles: suspend () -> List<LocalWorkspaceFile>,
     val conversationFiles: suspend (String) -> LocalConversationFiles,

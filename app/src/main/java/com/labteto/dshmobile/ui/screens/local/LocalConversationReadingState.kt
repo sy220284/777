@@ -31,6 +31,11 @@ internal class LocalConversationReadingState(
         })
     }
 
+    fun forgetSessions(ids: Set<String>) {
+        ids.forEach(anchors::remove)
+        onSave(anchors.flatMap { (id, value) -> listOf(id, value.messageId.orEmpty(), value.offsetPx.toString(), value.followingTail.toString()) })
+    }
+
     private fun trim() {
         while (anchors.size > MAX_LOCAL_SESSION_PRESENTATION_STATES) anchors.remove(anchors.keys.first())
     }

@@ -27,7 +27,6 @@ class LocalWorkRuntime @Inject internal constructor(
     private val approvals: LocalWorkApprovalCoordinator,
     private val planMode: LocalWorkPlanModeCoordinator,
     private val execution: LocalWorkExecutionPort,
-    private val agentUi: LocalWorkAgentUiPort,
 ) : com.labteto.dshmobile.uicontract.WorkReadUiPort {
     internal fun send(
         text: String,
@@ -80,37 +79,36 @@ class LocalWorkRuntime @Inject internal constructor(
         else com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi(emptyList(), null, true)
     }
 
-    /** Store an explicit user-chosen source for one requirement, never a synthetic pass. */
-    internal fun linkRequirementEvidenceForUi(
-        sessionId: String,
-        requirementIndex: Int,
-        artifact: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem,
-    ): Boolean {
+    /** Hash/lookup preparation performs no write and does not need the foreground binding lock. */
+    internal fun prepareRequirementEvidenceForUi(sessionId: String, requirementIndex: Int,
+        expectedRequirement: String, artifact: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem): LocalPreparedRequirementEvidence? {
         val snapshot = runtimeStateStore.state.value
-        if (sessionId != runtimeStateStore.currentSessionId ||
-            snapshot.sessionId != sessionId || snapshot.usageMode != LocalUsageMode.WORK
-        ) return false
-        val requirement = snapshot.work.todos.getOrNull(requirementIndex)?.content ?: return false
-        val sourceCallId = artifact.sourceCallId?.takeIf(String::isNotBlank) ?: return false
+        if (sessionId != runtimeStateStore.currentSessionId || snapshot.sessionId != sessionId ||
+            snapshot.usageMode != LocalUsageMode.WORK || snapshot.work.todos.getOrNull(requirementIndex)?.content != expectedRequirement) return null
+        val sourceCallId = artifact.sourceCallId?.takeIf(String::isNotBlank) ?: return null
         val log = eventLogs.get(sessionId)
         val generation = log.resetGeneration
         val origin = log.pageAfter(artifact.asOfSequence - 1, 1).singleOrNull()
-        val version = selectedRequirementEvidenceVersion(
-            File(sessionFiles.workspace.path), origin, artifact,
-        ) ?: return false
+        val version = selectedRequirementEvidenceVersion(File(sessionFiles.workspace.path), origin, artifact) ?: return null
+        if (log.isClosed || log.resetGeneration != generation) return null
+        return LocalPreparedRequirementEvidence(sessionId, requirementIndex, expectedRequirement, artifact,
+            sourceCallId, version, log.historyInstanceIdentity, generation)
+    }
+
+    /** Sole reference writer. Caller freezes binding; Work rechecks its own requirement/log facts. */
+    internal fun commitRequirementEvidenceForUi(prepared: LocalPreparedRequirementEvidence): Boolean {
         val current = runtimeStateStore.state.value
-        if (sessionId != runtimeStateStore.currentSessionId || current.sessionId != sessionId ||
-            current.usageMode != LocalUsageMode.WORK ||
-            current.work.todos.getOrNull(requirementIndex)?.content != requirement ||
-            log.isClosed || log.resetGeneration != generation
-        ) return false
+        if (prepared.sessionId != runtimeStateStore.currentSessionId || current.sessionId != prepared.sessionId ||
+            current.usageMode != LocalUsageMode.WORK || current.work.todos.getOrNull(prepared.requirementIndex)?.content != prepared.requirement) return false
+        val log = eventLogs.get(prepared.sessionId)
+        if (log.isClosed || log.historyInstanceIdentity != prepared.logIdentity || log.resetGeneration != prepared.generation) return false
         log.append("work/requirement-evidence", buildJsonObject {
-            put("requirement_index", requirementIndex)
-            put("requirement", requirement)
-            put("artifact_path", artifact.reference)
-            put("origin_sequence", artifact.asOfSequence)
-            put("source_call_id", sourceCallId)
-            put("sha256", version)
+            put("requirement_index", prepared.requirementIndex)
+            put("requirement", prepared.requirement)
+            put("artifact_path", prepared.artifact.reference)
+            put("origin_sequence", prepared.artifact.asOfSequence)
+            put("source_call_id", prepared.sourceCallId)
+            put("sha256", prepared.version)
             put("assertion", "user_selected_reference_only")
         })
         return true
@@ -175,14 +173,6 @@ class LocalWorkRuntime @Inject internal constructor(
         }
     }
 
-    internal fun backgroundJobOutputForUi(jobId: String): String =
-        runtimeStateStore.jobManager.output(jobId, runtimeStateStore.currentSessionId)
-    internal suspend fun sendTeamMemberMessageForUi(memberId: String, message: String): LocalWorkAgentUiResult =
-        agentUi.sendTeamMessage(memberId, message)
-    internal suspend fun stopTeamMemberForUi(memberId: String): LocalWorkAgentUiResult =
-        agentUi.stopTeamMember(memberId)
-    internal suspend fun stopTeamForUi(): LocalWorkAgentUiResult =
-        agentUi.stopTeam()
     internal fun pendingQuestionForUi(): com.labteto.dshmobile.local.interaction.LocalQuestion? {
         val binding = workRunRegistry.live(runtimeStateStore.currentSessionId)
         return binding?.interactions?.pendingQuestionForUi()
@@ -257,6 +247,10 @@ internal fun localWorkArtifactFileAvailable(root: File, relative: String): Boole
     val target = File(root, relative).canonicalFile.toPath()
     target != canonicalRoot && target.startsWith(canonicalRoot) && java.nio.file.Files.isRegularFile(target)
 }.getOrDefault(false)
+
+internal data class LocalPreparedRequirementEvidence(val sessionId: String, val requirementIndex: Int,
+    val requirement: String, val artifact: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem,
+    val sourceCallId: String, val version: String, val logIdentity: String, val generation: Long)
 
 @dagger.Module
 @dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)

@@ -28,7 +28,7 @@ internal object LocalConversationPackGate {
         "conversation.chat", "conversation.work", "conversation.timeline",
         "conversation.composer", "conversation.ui_document",
         "conversation.ui_document_generate", "work.approval", "work.question",
-        "chat.group_members",
+        "chat.group_members", "work.team", "work.requirement_evidence",
     )
     private val requiredSliceScenes = LocalUiSceneCatalog.requirements.filter {
         it.id.value in requiredSceneNames
@@ -51,6 +51,9 @@ internal object LocalConversationPackGate {
         attachments: AttachmentUiPort?,
         transcript: TranscriptUiPort?,
         groups: com.labteto.dshmobile.uicontract.ChatGroupUiPort? = null,
+        team: com.labteto.dshmobile.uicontract.WorkTeamUiPort? = null,
+        shell: com.labteto.dshmobile.uicontract.ConversationShellUiPort? = null,
+        evidence: com.labteto.dshmobile.uicontract.WorkEvidenceUiPort? = null,
     ): Set<UiCapabilityId> = buildSet {
         if (chat != null && drafts != null) {
             listOf("chat.send_text", "chat.edit", "chat.regenerate",
@@ -67,6 +70,9 @@ internal object LocalConversationPackGate {
         if (attachments != null) add(UiCapabilityId("attachment.import"))
         if (transcript != null) add(UiCapabilityId("session.transcript_read"))
         if (groups != null) add(UiCapabilityId("chat.group_members"))
+        if (team != null) add(UiCapabilityId("work.team_control"))
+        if (shell != null) add(UiCapabilityId("shell.session_preferences"))
+        if (evidence != null) add(UiCapabilityId("work.evidence_reference"))
     }
 
     fun admit(

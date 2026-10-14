@@ -106,20 +106,20 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "rename": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ConversationShellUiPort.submit(ConversationShellUiCommand.Rename)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "pin": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ConversationShellUiPort.submit(ConversationShellUiCommand.SetPinned)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "delete": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SessionUiPort.delete",
+          "receiptType": "UiSessionDeletionReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -665,7 +665,8 @@
         "start_team",
         "message_member",
         "stop_member",
-        "stop_team"
+        "stop_team",
+        "read_output"
       ],
       "recovery": "Team run/member identities + EventLog projection",
       "v6": 17,
@@ -673,26 +674,32 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "start_team": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.SendWithTeam)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "message_member": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "WorkTeamUiPort.submit(WorkTeamUiCommand.SendMessage)",
+          "receiptType": "UiWorkTeamResult",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "stop_member": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "WorkTeamUiPort.submit(WorkTeamUiCommand.StopMember)",
+          "receiptType": "UiWorkTeamResult",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "stop_team": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "WorkTeamUiPort.submit(WorkTeamUiCommand.StopTeam)",
+          "receiptType": "UiWorkTeamResult",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "read_output": {
+          "ownerPort": "WorkTeamUiPort.readOutput",
+          "receiptType": "UiWorkTeamResult",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -2315,6 +2322,35 @@
         "generate_document": {
           "ownerPort": null,
           "receiptType": null,
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "work.requirement_evidence",
+      "owner": "WORK",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6WorkEvidencePanel.kt",
+      "actions": [
+        "read_references",
+        "link_reference"
+      ],
+      "recovery": "Owner session identity + requirement text + origin event/log generation + file versions; selected reference is not verification",
+      "v6": null,
+      "implementation": "V6/Next 原生独立渲染器已接同一 Work Port，未验证",
+      "acceptance": "待设备验收",
+      "actionProof": {
+        "read_references": {
+          "ownerPort": "WorkEvidenceUiPort.read",
+          "receiptType": "UiWorkEvidenceReadReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "link_reference": {
+          "ownerPort": "WorkEvidenceUiPort.submit(LinkWorkEvidenceReferenceCommand)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }

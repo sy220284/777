@@ -1,0 +1,228 @@
+{
+  "schema": "777.ui-r4.code-tasks/1",
+  "asOf": "2026-10-14",
+  "baseline": "bd940747",
+  "scope": "整个 R4，非单一功能",
+  "verificationPolicy": "用户要求延后测试、编译、设备和 CI 跟进；代码状态不代表验收通过",
+  "sceneCount": 78,
+  "actionCount": 169,
+  "sourceMappedActions": 30,
+  "tasks": [
+    {
+      "id": "S-1-01",
+      "task": "实时 MCP 注册/选中/连接/授权观测",
+      "codeStatus": "CODE_PENDING",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S-1-02",
+      "task": "插件故障隔离与恢复",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S0-01",
+      "task": "全量动作 Port/准入/回执/恢复映射",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S0-02",
+      "task": "隐性入口、设计与现行场景对应",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S1-01",
+      "task": "人物选择/编辑/行为调节/模型补全端口",
+      "codeStatus": "CODE_PENDING",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S1-02",
+      "task": "图库/故事/立绘/导入导出/删除完整 Owner 端口",
+      "codeStatus": "CODE_PENDING",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S1-03",
+      "task": "群聊成员/模式/创建/公告/移除端口",
+      "codeStatus": "CODE_IMPLEMENTED_UNVERIFIED",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S1-03B",
+      "task": "图库删除后的群聊/人物绑定联动迁出 UI",
+      "codeStatus": "CODE_PENDING",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S1-04",
+      "task": "Work 团队启动/消息/停止/实际输出与执行身份",
+      "codeStatus": "CODE_IMPLEMENTED_UNVERIFIED",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S1-05",
+      "task": "Work 证据写入与核验契约",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S1-06",
+      "task": "Shell 重命名/置顶/删除/搜索/定位",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S1-07",
+      "task": "附件多类型预览、状态与恢复",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S1-08",
+      "task": "Host 权限/文件/分享/通知/焦点服务",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S1-09",
+      "task": "全量旧 UI 回调退场",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S1-10",
+      "task": "统一 Port 行为与失败/撤权/晚到业务验证",
+      "codeStatus": "VERIFICATION_DEFERRED",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S2-01",
+      "task": "双包真实发送/编辑/审批/恢复与独立替换证明",
+      "codeStatus": "VERIFICATION_DEFERRED",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S3-01",
+      "task": "全应用 UiPack Scene Renderer API",
+      "codeStatus": "CODE_PENDING",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S3-02",
+      "task": "7 路由/二级场景/深链/返回的通用 Host",
+      "codeStatus": "CODE_PENDING",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S3-03",
+      "task": "完整 V6 页面/导航/Composer/时间线/设置移包",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S3-04",
+      "task": "Next 全应用必要场景原生实现",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S3-05",
+      "task": "生产级包选择/注册/持久恢复",
+      "codeStatus": "CODE_PENDING",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S3-06",
+      "task": "Host/Shell 旧绑定退场",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S3-07",
+      "task": "禁用 V6 的反向构建和替换证明",
+      "codeStatus": "VERIFICATION_DEFERRED",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S3-08",
+      "task": "剩余视觉语义/资源/动效治理",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S3-09",
+      "task": "设计入口与 Scene/组件/Owner 映射",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S4-01",
+      "task": "可信工具 Schema 与结构化结果适配",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S4-02",
+      "task": "动态图片/音频/视频状态/预览/保存",
+      "codeStatus": "CODE_PENDING",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S4-03",
+      "task": "动态证据有效性/核验卡",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S4-04",
+      "task": "同文档真实事件/成果渐进更新",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S4-05",
+      "task": "原 Work Owner 运行内自动发布",
+      "codeStatus": "CODE_PENDING",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S4-06",
+      "task": "必要图表/数据选择/操作组合",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S4-07",
+      "task": "历史编辑/分页/删除/版本迁移与完整恢复",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S4-08",
+      "task": "敏感草稿/留存/节点/历史/重组预算",
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S4-09",
+      "task": "同文档双包恢复/提交/拒绝验证",
+      "codeStatus": "VERIFICATION_DEFERRED",
+      "verification": "DEFERRED"
+    },
+    {
+      "id": "S5-01",
+      "task": "最终 SHA CI 与 Android16/17 全场景/无障碍/弱网/收费矩阵",
+      "codeStatus": "VERIFICATION_DEFERRED",
+      "verification": "DEFERRED"
+    }
+  ],
+  "limitations": {
+    "S1-05": "已有实际来源关联写入，未实现新的真实核验执行/结论 API；不得把关联当通过",
+    "S1-06": "重命名、置顶、两包删除/Host 清理已接线；搜索/定位/全局导航仍缺",
+    "S3-03": "基础组件及新的独立证据 Overlay 已在 V6 模块；完整页面树仍留 App",
+    "S4-07": "新增删除清理仅覆盖 Owner-confirmed IDs；完整版本迁移/崩溃恢复未完成"
+  }
+}

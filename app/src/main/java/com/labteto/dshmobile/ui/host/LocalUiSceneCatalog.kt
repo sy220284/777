@@ -34,6 +34,7 @@ internal object LocalUiSceneCatalog {
         UiSceneRequirement(UiSceneId("work.steering_choice"), UiSceneKind.SLOT, "WORK", hostProvided = false),
         UiSceneRequirement(UiSceneId("work.question"), UiSceneKind.OVERLAY, "WORK", hostProvided = false),
         UiSceneRequirement(UiSceneId("work.plan_review"), UiSceneKind.SLOT, "WORK", hostProvided = false),
+        UiSceneRequirement(UiSceneId("work.requirement_evidence"), UiSceneKind.OVERLAY, "WORK", hostProvided = false),
         UiSceneRequirement(UiSceneId("work.team"), UiSceneKind.OVERLAY, "WORK", hostProvided = false),
         UiSceneRequirement(UiSceneId("work.capabilities"), UiSceneKind.OVERLAY, "TOOLS", hostProvided = false),
         UiSceneRequirement(UiSceneId("workspace.preview"), UiSceneKind.OVERLAY, "WORK", hostProvided = false),

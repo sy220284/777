@@ -469,15 +469,16 @@ fun LocalHarnessScreen(
                 android.widget.Toast.LENGTH_SHORT).show()
         }
     }
+    val capturedTeam = viewModel.workTeamUiPort.snapshot()
     val shellActions = LocalShellFeatureUiActions(
         streamingState = viewModel.streamingState,
         selectModel = viewModel::selectModel,
         send = { text, attachments -> viewModel.send(text, attachments, sendIdentity, sendMode) },
         sendWithTeam = { text, attachments -> viewModel.sendWithTeam(text, attachments, sendIdentity) },
-        teamMemberOutput = viewModel::teamMemberOutput,
-        sendTeamMemberMessage = viewModel::sendTeamMemberMessage,
-        stopTeamMember = viewModel::stopTeamMember,
-        stopTeam = viewModel::stopTeam,
+        teamMemberOutput = { job -> viewModel.teamMemberOutput(job, sendIdentity, capturedTeam.members.firstOrNull { it.jobId == job }?.id) },
+        sendTeamMemberMessage = { member, text -> viewModel.sendTeamMemberMessage(member, text, sendIdentity, capturedTeam.members.firstOrNull { it.id == member }?.jobId) },
+        stopTeamMember = { member -> viewModel.stopTeamMember(member, sendIdentity, capturedTeam.members.firstOrNull { it.id == member }?.jobId) },
+        stopTeam = { viewModel.stopTeam(sendIdentity, capturedTeam.members.map { it.jobId }.toSet()) },
         editAndResend = { messageId, text -> viewModel.editAndResendUserMessage(messageId, text, sendIdentity, sendMode) },
         selectMessageVariant = { messageId, index -> viewModel.selectChatMessageVariant(messageId, index, sendIdentity) },
         regenerate = { messageId -> viewModel.regenerateReply(messageId, sendIdentity, sendMode) },
@@ -535,6 +536,7 @@ fun LocalHarnessScreen(
         startFromGallery = viewModel::startFromGallery,
     )
     val workActions = LocalWorkFeatureUiActions(
+        evidence = viewModel.workEvidenceUiPort,
         workState = viewModel.workState,
         workspaceFiles = viewModel::workspaceFiles,
         conversationFiles = viewModel::conversationFiles,

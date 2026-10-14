@@ -286,7 +286,7 @@ internal class LocalWorkComposition @Inject constructor(
     )
 
     private val teamUiProjection by lazy { LocalWorkTeamUiProjection(agentTeams, workRunRegistry, runtimeStateStore) }
-    internal val agentUi: LocalWorkAgentUiPort by lazy {
+    internal val agentUi: LocalWorkAgentController by lazy {
         LocalWorkAgentController(runtimeStateStore, agentTeams, teamUiProjection)
     }
     private val teamLifecycle by lazy { LocalWorkTeamLifecycle(runtimeStateStore, agentTeams, persistentJobs, teamUiProjection, scope) }

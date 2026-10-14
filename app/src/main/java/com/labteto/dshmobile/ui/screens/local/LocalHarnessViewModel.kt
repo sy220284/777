@@ -43,13 +43,15 @@ class LocalHarnessViewModel @Inject constructor(
     private val documentsFactory: com.labteto.dshmobile.local.presentation.LocalUiDocumentUiPortFactory,
     private val savedStateHandle: androidx.lifecycle.SavedStateHandle,
     private val runtime: LocalUiRuntime,
+    val workEvidenceUiPort: com.labteto.dshmobile.uicontract.WorkEvidenceUiPort,
+    val workTeamUiPort: com.labteto.dshmobile.uicontract.WorkTeamUiPort,
     val workReadUiPort: com.labteto.dshmobile.uicontract.WorkReadUiPort,
     val filesUiPort: com.labteto.dshmobile.uicontract.FilesUiPort,
     val attachmentUiPort: com.labteto.dshmobile.uicontract.AttachmentUiPort,
     val chatGroupUiPort: com.labteto.dshmobile.uicontract.ChatGroupUiPort,
     private val uiPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val chatUi: LocalChatUiFacade,
-    val sessionUiPort: com.labteto.dshmobile.uicontract.SessionUiPort,
+    private val businessSessions: com.labteto.dshmobile.uicontract.SessionUiPort,
     val transcriptUiPort: com.labteto.dshmobile.uicontract.TranscriptUiPort,
     private val toolsUi: LocalToolsUiFacade,
     private val usageUi: com.labteto.dshmobile.uicontract.UsageUiPort,
@@ -142,15 +144,19 @@ class LocalHarnessViewModel @Inject constructor(
             }
         }
 
-    val conversationReadingUiPort: com.labteto.dshmobile.uicontract.ConversationReadingUiPort =
-        LocalConversationReadingState(savedStateHandle.get<List<String>>("conversation_reading").orEmpty()) {
+    private val readingState = LocalConversationReadingState(savedStateHandle.get<List<String>>("conversation_reading").orEmpty()) {
             savedStateHandle["conversation_reading"] = ArrayList(it)
         }
 
-    val uiDocumentFormPort: com.labteto.dshmobile.uicontract.UiDocumentFormUiPort =
-        com.labteto.dshmobile.ui.host.LocalUiDocumentFormState(
+    val conversationReadingUiPort: com.labteto.dshmobile.uicontract.ConversationReadingUiPort get() = readingState
+    private val formState = com.labteto.dshmobile.ui.host.LocalUiDocumentFormState(
             savedStateHandle.get<List<String>>("ui_document_forms").orEmpty(),
         ) { savedStateHandle["ui_document_forms"] = it }
+    val uiDocumentFormPort: com.labteto.dshmobile.uicontract.UiDocumentFormUiPort get() = formState
+    val sessionUiPort: com.labteto.dshmobile.uicontract.SessionUiPort by lazy {
+        com.labteto.dshmobile.ui.host.HostConversationSessionUiPort(businessSessions, conversationDraftUiPort,
+            conversationUiState, readingState, formState)
+    }
     val uiSceneRequest = savedStateHandle.getStateFlow<String?>("ui_scene_request", null)
     fun consumeUiSceneRequest(id: String) {
         if (uiSceneRequest.value == id) savedStateHandle["ui_scene_request"] = null
@@ -167,7 +173,7 @@ class LocalHarnessViewModel @Inject constructor(
         viewModelScope, conversationDraftUiPort, documentNavigationScenes, navigationScenes = emptySet(),
     ) { _ -> error("No navigation scenes are registered for this slice") }
 
-    private val conversationUiState = LocalConversationUiStateStore(appContext)
+    private val conversationUiState = LocalConversationUiStateStore(appContext, businessSessions)
     val pinnedSessionIds = conversationUiState.pinnedSessionIds
     val sessionTitleOverrides = conversationUiState.sessionTitleOverrides
     suspend fun saveCurrentToGallery(
@@ -328,16 +334,19 @@ class LocalHarnessViewModel @Inject constructor(
         }
         return receipt == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
     }
-    fun toggleSessionPinned(sessionId: String) = conversationUiState.toggleSessionPinned(sessionId)
-    fun renameSession(sessionId: String, title: String): Boolean = conversationUiState.renameSession(sessionId, title)
+    val conversationShellUiPort: com.labteto.dshmobile.uicontract.ConversationShellUiPort get() = conversationUiState
+    fun toggleSessionPinned(sessionId: String) {
+        conversationShellUiPort.submit(com.labteto.dshmobile.uicontract.ConversationShellUiCommand.SetPinned(sessionId,
+            sessionId !in conversationShellUiPort.pinnedSessionIds.value))
+    }
+    fun renameSession(sessionId: String, title: String): Boolean = conversationShellUiPort.submit(
+        com.labteto.dshmobile.uicontract.ConversationShellUiCommand.Rename(sessionId, title)) == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
     suspend fun deleteSessions(ids: Set<String>): Int {
         val receipt = sessionUiPort.delete(ids)
         val deleted = when (receipt) {
             is com.labteto.dshmobile.uicontract.UiSessionDeletionReceipt.Deleted -> receipt.sessionIds
             is com.labteto.dshmobile.uicontract.UiSessionDeletionReceipt.Failed -> error(receipt.message ?: "会话删除未完成，请重新读取列表")
         }
-        deleted.forEach { conversationDraftUiPort.updateDraft(it, ""); conversationDraftUiPort.clearAttachments(it) }
-        conversationUiState.forgetSessions(deleted)
         return deleted.size
     }
     suspend fun importAttachment(uri: Uri, identity: com.labteto.dshmobile.uicontract.UiSessionIdentity?): LocalImportedAttachment {
@@ -361,29 +370,26 @@ class LocalHarnessViewModel @Inject constructor(
     fun toolEvidenceForUi(sessionId: String, callId: String, sequence: Long) =
         workReadUiPort.toolEvidenceForUi(sessionId, callId, sequence)
     internal fun requirementEvidenceForUi(sessionId: String) = workReadUiPort.requirementEvidenceForUi(sessionId)
-    fun linkRequirementEvidenceForUi(
-        sessionId: String, index: Int,
-        artifact: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem,
-    ) = runtime.work.linkRequirementEvidenceForUi(sessionId, index, artifact)
     fun eventSequenceForUi(sessionId: String) = workReadUiPort.eventSequenceForUi(sessionId)
-    internal fun teamMemberOutput(jobId: String): String = runtime.work.backgroundJobOutputForUi(jobId)
-
-    internal suspend fun sendTeamMemberMessage(
-        memberId: String,
-        message: String,
-    ): LocalWorkUiActionResult {
-        val result = runtime.work.sendTeamMemberMessageForUi(memberId, message)
-        return LocalWorkUiActionResult(result.accepted, result.message)
+    internal fun teamMemberOutput(jobId: String, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?, memberId: String?): String {
+        if (expected == null || memberId == null) return "助手执行身份已改变"
+        return workTeamUiPort.readOutput(expected, memberId, jobId).message
     }
-
-    internal suspend fun stopTeamMember(memberId: String): LocalWorkUiActionResult {
-        val result = runtime.work.stopTeamMemberForUi(memberId)
-        return LocalWorkUiActionResult(result.accepted, result.message)
+    internal suspend fun sendTeamMemberMessage(memberId: String, message: String,
+        expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?, jobId: String?): LocalWorkUiActionResult {
+        if (expected == null || jobId == null) return LocalWorkUiActionResult(false, "助手执行身份已改变")
+        val result = workTeamUiPort.submit(com.labteto.dshmobile.uicontract.WorkTeamUiCommand.SendMessage(expected, memberId, jobId, message))
+        return LocalWorkUiActionResult(result.receipt == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted, result.message)
     }
-
-    internal suspend fun stopTeam(): LocalWorkUiActionResult {
-        val result = runtime.work.stopTeamForUi()
-        return LocalWorkUiActionResult(result.accepted, result.message)
+    internal suspend fun stopTeamMember(memberId: String, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?, jobId: String?): LocalWorkUiActionResult {
+        if (expected == null || jobId == null) return LocalWorkUiActionResult(false, "助手执行身份已改变")
+        val result = workTeamUiPort.submit(com.labteto.dshmobile.uicontract.WorkTeamUiCommand.StopMember(expected, memberId, jobId))
+        return LocalWorkUiActionResult(result.receipt == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted, result.message)
+    }
+    internal suspend fun stopTeam(expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?, jobs: Set<String>): LocalWorkUiActionResult {
+        if (expected == null) return LocalWorkUiActionResult(false, "会话已改变")
+        val result = workTeamUiPort.submit(com.labteto.dshmobile.uicontract.WorkTeamUiCommand.StopTeam(expected, jobs))
+        return LocalWorkUiActionResult(result.receipt == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted, result.message)
     }
     internal fun answerUiApproval(
         pendingId: String,

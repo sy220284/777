@@ -128,4 +128,23 @@
     <string name="next_group_announcement_save">保存公告</string>
     <string name="next_group_remove">移除成员</string>
     <string name="next_group_write_failed">操作未完成，请确认会话和运行状态后重试。</string>
+    <string name="next_team">工作团队</string>
+    <string name="next_team_message">发送成员消息</string>
+    <string name="next_team_stop_member">停止该成员</string>
+    <string name="next_team_stop_all">停止团队</string>
+    <string name="next_team_output">查看实际输出</string>
+    <string name="next_send_team">交给团队执行</string>
+    <string name="next_rename_session">重命名会话</string>
+    <string name="next_session_title">会话标题</string>
+    <string name="next_save_session_title">保存标题</string>
+    <string name="next_pin_session">置顶</string>
+    <string name="next_unpin_session">取消置顶</string>
+    <string name="next_evidence">需求与证据来源</string>
+    <string name="next_evidence_not_verified">需求状态由 Work 报告。关联来源不表示核验通过。</string>
+    <string name="next_evidence_linked">已关联来源，未改变核验结论。</string>
+    <string name="next_evidence_unavailable">来源不可用或需求已改变，请刷新后重试。</string>
+    <string name="next_evidence_source_current">当前文件与关联时版本一致</string>
+    <string name="next_evidence_refresh">刷新来源</string>
+    <string name="next_delete_session">删除会话</string>
+    <string name="next_delete_session_effect">删除所选会话及相关记录。操作完成后清理对应草稿、表单和阅读状态。</string>
 </resources>

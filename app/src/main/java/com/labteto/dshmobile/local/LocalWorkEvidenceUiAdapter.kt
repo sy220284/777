@@ -1,0 +1,65 @@
+package com.labteto.dshmobile.local
+
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.work.LocalWorkRuntime
+import com.labteto.dshmobile.uicontract.*
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/** Admission/projection adapter only. Work owns origin lookup, hashes and reference persistence. */
+@Singleton
+class LocalWorkEvidenceUiAdapter @Inject internal constructor(
+    private val state: LocalRuntimeStateStore,
+    private val work: LocalWorkRuntime,
+) : WorkEvidenceUiPort {
+    private fun current(identity: UiSessionIdentity): Boolean =
+        !state.sessionTransitioning && !state.state.value.loading &&
+            state.state.value.usageMode == LocalUsageMode.WORK && state.uiBindingIdentity(state.state.value) == identity
+
+    override suspend fun read(identity: UiSessionIdentity): UiWorkEvidenceReadReceipt = withContext(Dispatchers.IO) {
+        try {
+            val requirements = synchronized(state.foregroundRunHandle.lock) {
+                if (!current(identity)) return@withContext UiWorkEvidenceReadReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                state.state.value.work.todos.mapIndexed { index, todo -> UiWorkRequirement(index, todo.content, todo.status) }
+            }
+            val artifacts = work.artifactsForUi(identity.sessionId)
+            val references = work.requirementEvidenceForUi(identity.sessionId)
+            currentCoroutineContext().ensureActive()
+            synchronized(state.foregroundRunHandle.lock) {
+                if (!current(identity) || state.state.value.work.todos.mapIndexed { index, todo -> UiWorkRequirement(index, todo.content, todo.status) } != requirements)
+                    UiWorkEvidenceReadReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                else UiWorkEvidenceReadReceipt.Available(UiWorkEvidenceSnapshot(identity, requirements, artifacts, references))
+            }
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) { UiWorkEvidenceReadReceipt.Failed(failure.message) }
+    }
+    override suspend fun submit(command: LinkWorkEvidenceReferenceCommand): UiCommandReceipt = withContext(Dispatchers.IO) {
+        try {
+            synchronized(state.foregroundRunHandle.lock) {
+                if (!current(command.identity)) return@withContext UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+            }
+            val prepared = work.prepareRequirementEvidenceForUi(command.identity.sessionId, command.requirementIndex,
+                command.expectedRequirement, command.artifact) ?: return@withContext UiCommandReceipt.NotAdmitted
+            currentCoroutineContext().ensureActive()
+            synchronized(state.foregroundRunHandle.lock) {
+                if (!current(command.identity) || state.state.value.work.todos.getOrNull(command.requirementIndex)?.content != command.expectedRequirement)
+                    return@synchronized UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                if (work.commitRequirementEvidenceForUi(prepared))
+                    UiCommandReceipt.Accepted else UiCommandReceipt.NotAdmitted
+            }
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) { UiCommandReceipt.Failed(failure.message ?: "证据来源未关联") }
+    }
+}
+
+@dagger.Module
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+internal abstract class LocalWorkEvidenceUiBindings {
+    @dagger.Binds @Singleton
+    abstract fun evidence(implementation: LocalWorkEvidenceUiAdapter): WorkEvidenceUiPort
+}

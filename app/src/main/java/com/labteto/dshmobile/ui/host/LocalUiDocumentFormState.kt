@@ -50,6 +50,15 @@ internal class LocalUiDocumentFormState(
         fields.keys.filter { it.sessionId == key.sessionId && it.documentId == key.documentId &&
             it.revision != key.revision }.forEach { fields.remove(it) }
         fields[key] = fields[key].orEmpty() + (fieldId to value)
+        publish()
+    }
+
+    fun forgetSessions(ids: Set<String>) {
+        fields.keys.filter { it.sessionId in ids }.forEach(fields::remove)
+        publish()
+    }
+
+    private fun publish() {
         mutableValues.value = fields.toMap()
         save(ArrayList<String>().apply {
             add(FORMAT_V2)

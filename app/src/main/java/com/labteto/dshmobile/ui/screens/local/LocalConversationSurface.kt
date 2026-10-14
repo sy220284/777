@@ -866,6 +866,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         }
 
         LocalModeIntroBanner(modeIntro)
+        if (state.usageMode == LocalUsageMode.WORK && documentIdentity != null) {
+            workActions?.let { com.labteto.dshmobile.uipack.v6.V6WorkEvidencePanel(it.evidence, documentIdentity) }
+        }
 
         if (state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled) {
             GroupAnnouncementCard(

@@ -8,12 +8,14 @@ import kotlinx.coroutines.flow.asStateFlow
  * Owns local-only conversation presentation preferences so the screen ViewModel stays focused on
  * orchestration instead of persistence details.
  */
-internal class LocalConversationUiStateStore(context: Context) {
+internal class LocalConversationUiStateStore(context: Context,
+    private val sessions: com.labteto.dshmobile.uicontract.SessionUiPort,
+) : com.labteto.dshmobile.uicontract.ConversationShellUiPort {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val _pinnedSessionIds = MutableStateFlow(
         preferences.getStringSet(PINNED_SESSION_IDS, emptySet()).orEmpty().toSet(),
     )
-    val pinnedSessionIds = _pinnedSessionIds.asStateFlow()
+    override val pinnedSessionIds = _pinnedSessionIds.asStateFlow()
 
     private val _sessionTitleOverrides = MutableStateFlow(
         preferences.all.mapNotNull { (key, value) ->
@@ -22,17 +24,25 @@ internal class LocalConversationUiStateStore(context: Context) {
             key.removePrefix(SESSION_TITLE_PREFIX) to title
         }.toMap(),
     )
-    val sessionTitleOverrides = _sessionTitleOverrides.asStateFlow()
+    override val sessionTitleOverrides = _sessionTitleOverrides.asStateFlow()
 
-    fun toggleSessionPinned(sessionId: String) {
-        val updated = _pinnedSessionIds.value.toMutableSet().apply {
-            if (!add(sessionId)) remove(sessionId)
-        }.toSet()
-        _pinnedSessionIds.value = updated
-        preferences.edit().putStringSet(PINNED_SESSION_IDS, updated).apply()
+    @Synchronized
+    override fun submit(command: com.labteto.dshmobile.uicontract.ConversationShellUiCommand): com.labteto.dshmobile.uicontract.UiCommandReceipt {
+        if (sessions.snapshot().sessions.none { it.id == command.sessionId })
+            return com.labteto.dshmobile.uicontract.UiCommandReceipt.Rejected(com.labteto.dshmobile.uicontract.UiCommandRejection.STALE_IDENTITY)
+        return when (command) {
+            is com.labteto.dshmobile.uicontract.ConversationShellUiCommand.Rename -> if (renameSession(command.sessionId, command.title))
+                com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted else com.labteto.dshmobile.uicontract.UiCommandReceipt.Rejected(com.labteto.dshmobile.uicontract.UiCommandRejection.EMPTY_INPUT)
+            is com.labteto.dshmobile.uicontract.ConversationShellUiCommand.SetPinned -> {
+                val updated = if (command.pinned) _pinnedSessionIds.value + command.sessionId else _pinnedSessionIds.value - command.sessionId
+                preferences.edit().putStringSet(PINNED_SESSION_IDS, updated).apply()
+                _pinnedSessionIds.value = updated
+                com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
+            }
+        }
     }
 
-    fun renameSession(sessionId: String, title: String): Boolean {
+    private fun renameSession(sessionId: String, title: String): Boolean {
         val normalized = title.trim().take(80)
         if (normalized.isBlank()) return false
         _sessionTitleOverrides.value = _sessionTitleOverrides.value + (sessionId to normalized)
@@ -40,6 +50,7 @@ internal class LocalConversationUiStateStore(context: Context) {
         return true
     }
 
+    @Synchronized
     fun forgetSessions(ids: Set<String>) {
         if (ids.isEmpty()) return
 

@@ -67,13 +67,13 @@ object NextConversationUiPack : ConversationUiPack {
         id = "next-conversation-slice", version = 1, minContractVersion = 1, maxContractVersion = 1,
         scenes = setOf("conversation.chat", "conversation.work", "conversation.composer", "work.approval",
             "conversation.timeline", "conversation.edit", "work.question", "conversation.ui_document", "conversation.ui_document_generate",
-            "chat.group_members")
+            "chat.group_members", "work.team", "work.requirement_evidence")
             .map(::UiSceneId).toSet(),
         requiredCapabilities = setOf("chat.send_text", "work.send_text", "work.answer_approval",
             "ui_document.generate", "ui_document.generate_local", "ui_document.prepare_input", "attachment.import",
             "chat.edit", "chat.regenerate", "chat.select_variant", "chat.stop", "session.transcript_read",
             "work.edit", "work.regenerate", "work.stop", "work.answer_question",
-            "chat.group_members")
+            "chat.group_members", "work.team_control", "shell.session_preferences", "work.evidence_reference")
             .map(::UiCapabilityId).toSet(),
         windowClasses = UiWindowClass.entries.toSet(),
         accessibility = UiAccessibility.entries.toSet(),
@@ -96,10 +96,20 @@ object NextConversationUiPack : ConversationUiPack {
         policy: com.labteto.dshmobile.uicontract.WorkPolicyUiPort?,
         workReads: com.labteto.dshmobile.uicontract.WorkReadUiPort?,
         files: com.labteto.dshmobile.uicontract.FilesUiPort?,
+        evidence: com.labteto.dshmobile.uicontract.WorkEvidenceUiPort?,
+        shell: com.labteto.dshmobile.uicontract.ConversationShellUiPort?,
+        team: com.labteto.dshmobile.uicontract.WorkTeamUiPort?,
         groups: com.labteto.dshmobile.uicontract.ChatGroupUiPort?,
     ) {
         val policySnapshot = policy?.snapshots?.collectAsStateWithLifecycle(initialValue = policy.snapshot())?.value
         val sessionSnapshot = sessions?.snapshots?.collectAsStateWithLifecycle(initialValue = sessions.snapshot())?.value
+        val pinnedSessions = shell?.pinnedSessionIds?.collectAsStateWithLifecycle()?.value.orEmpty()
+        val titleOverrides = shell?.sessionTitleOverrides?.collectAsStateWithLifecycle()?.value.orEmpty()
+        var renamingSession by remember { mutableStateOf<String?>(null) }
+        var sessionTitle by remember { mutableStateOf("") }
+        var deletingSession by remember { mutableStateOf<String?>(null) }
+        var deleting by remember { mutableStateOf(false) }
+        var deletionError by remember { mutableStateOf<String?>(null) }
         var sessionChooser by remember { mutableStateOf(false) }
         val initialChat = remember(chat) { chat.snapshot() }
         val initialWork = remember(work) { work.snapshot() }
@@ -420,12 +430,58 @@ object NextConversationUiPack : ConversationUiPack {
                 if (result == UiCommandReceipt.Accepted || result == UiCommandReceipt.Queued) continuation = null
             }, enabled = continuationSummary.isNotBlank()) { Text(stringResource(R.string.next_create_continuation)) } },
             dismissButton = { TextButton(onClick = { continuation = null }) { Text(stringResource(R.string.next_cancel)) } })
+        if (renamingSession != null && shell != null) AlertDialog(onDismissRequest = { renamingSession = null },
+            title = { Text(stringResource(R.string.next_rename_session)) },
+            text = { OutlinedTextField(sessionTitle, { sessionTitle = it }, label = { Text(stringResource(R.string.next_session_title)) }) },
+            confirmButton = { TextButton(onClick = {
+                val target = renamingSession ?: return@TextButton
+                val result = shell.submit(com.labteto.dshmobile.uicontract.ConversationShellUiCommand.Rename(target, sessionTitle))
+                show(result)
+                if (result == UiCommandReceipt.Accepted) renamingSession = null
+            }, enabled = sessionTitle.isNotBlank()) { Text(stringResource(R.string.next_save_session_title)) } },
+            dismissButton = { TextButton(onClick = { renamingSession = null }) { Text(stringResource(R.string.next_cancel)) } })
+        if (deletingSession != null && sessions != null) AlertDialog(onDismissRequest = { if (!deleting) deletingSession = null },
+            title = { Text(stringResource(R.string.next_delete_session)) },
+            text = { Column {
+                Text(stringResource(R.string.next_delete_session_effect))
+                deletionError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            } },
+            confirmButton = { TextButton(onClick = {
+                val target = deletingSession ?: return@TextButton
+                deleting = true
+                deletionError = null
+                importScope.launch {
+                    try {
+                        when (val result = sessions.delete(setOf(target))) {
+                            is com.labteto.dshmobile.uicontract.UiSessionDeletionReceipt.Deleted -> {
+                                if (target in result.sessionIds) deletingSession = null
+                                else deletionError = rejected
+                            }
+                            is com.labteto.dshmobile.uicontract.UiSessionDeletionReceipt.Failed -> deletionError = result.message ?: unknown
+                        }
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                    catch (failure: Exception) { deletionError = failure.message ?: unknown }
+                    finally { deleting = false }
+                }
+            }, enabled = !deleting) { Text(stringResource(R.string.next_delete_session)) } },
+            dismissButton = { TextButton(onClick = { deletingSession = null }, enabled = !deleting) { Text(stringResource(R.string.next_cancel)) } })
         if (sessionChooser && sessions != null && sessionSnapshot != null) AlertDialog(onDismissRequest = { sessionChooser = false },
             title = { Text(stringResource(R.string.next_sessions)) },
             text = { LazyColumn(Modifier.heightIn(max = 360.dp)) {
                 items(sessionSnapshot.sessions, key = { it.id }) { session ->
                     TextButton(onClick = { show(sessions.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.Open(session.id))); sessionChooser = false }) {
-                        Text(session.title)
+                        Text(titleOverrides[session.id] ?: session.title)
+                    }
+                    TextButton(onClick = { deletingSession = session.id; deletionError = null; sessionChooser = false }) {
+                        Text(stringResource(R.string.next_delete_session))
+                    }
+                    if (shell != null) {
+                        TextButton(onClick = { show(shell.submit(com.labteto.dshmobile.uicontract.ConversationShellUiCommand.SetPinned(session.id, session.id !in pinnedSessions))) }) {
+                            Text(stringResource(if (session.id in pinnedSessions) R.string.next_unpin_session else R.string.next_pin_session))
+                        }
+                        TextButton(onClick = { renamingSession = session.id; sessionTitle = titleOverrides[session.id] ?: session.title; sessionChooser = false }) {
+                            Text(stringResource(R.string.next_rename_session))
+                        }
                     }
                 }
             } }, confirmButton = { TextButton(onClick = { sessionChooser = false }) { Text(stringResource(R.string.next_close)) } })
@@ -472,6 +528,8 @@ object NextConversationUiPack : ConversationUiPack {
                             Text(stringResource(R.string.next_continue_session))
                         }
                     }
+                    if (workMode && identity != null && evidence != null) NextWorkEvidencePanel(evidence, identity)
+                    if (workMode && identity != null && team != null) NextWorkTeamPanel(team, identity)
                     if (workMode && workReads != null) TextButton(onClick = { loadWorkFacts(false) }, enabled = identity != null && !workFactsLoading) {
                         Text(stringResource(R.string.next_work_facts))
                     }
@@ -637,6 +695,16 @@ object NextConversationUiPack : ConversationUiPack {
                     }
                     OutlinedTextField(value = draft, onValueChange = { text -> identity?.let { drafts.updateDraft(it.sessionId, text) } }, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.next_input)) }, maxLines = 5)
+                    if (workMode) TextButton(onClick = {
+                        val target = identity ?: return@TextButton
+                        val result = work.submit(WorkConversationUiCommand.SendWithTeam(target, draft, selectedAttachments))
+                        show(result)
+                        if (result == UiCommandReceipt.Accepted || result == UiCommandReceipt.Queued) {
+                            drafts.updateDraft(target.sessionId, ""); drafts.clearAttachments(target.sessionId)
+                        }
+                    }, enabled = identity != null && send.available && (draft.isNotBlank() || selectedAttachments.isNotEmpty())) {
+                        Text(stringResource(R.string.next_send_team))
+                    }
                     Button(enabled = send.available && (draft.isNotBlank() || selectedAttachments.isNotEmpty()) && identity != null, onClick = {
                         val target = identity ?: return@Button
                         val result = if (workMode) work.submit(WorkConversationUiCommand.SendMessage(target, draft, selectedAttachments))
