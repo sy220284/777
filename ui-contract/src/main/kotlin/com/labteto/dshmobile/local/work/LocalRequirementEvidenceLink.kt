@@ -12,4 +12,3 @@ data class LocalRequirementEvidenceLink(
     /** SHA-256 of the actual current file, null when unreadable or removed. */
     val versionNow: String? = null,
 )
-
