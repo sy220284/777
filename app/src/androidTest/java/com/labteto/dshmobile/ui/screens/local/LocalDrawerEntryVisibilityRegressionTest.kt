@@ -83,7 +83,6 @@ class LocalDrawerEntryVisibilityRegressionTest {
                     onWorkspaceFiles = { opened += "workspace" },
                     onTools = { opened += "tools" },
                     onUsage = { opened += "usage" },
-                    onImmersiveReader = { opened += "reader" },
                 )
             }
         }
@@ -92,12 +91,12 @@ class LocalDrawerEntryVisibilityRegressionTest {
             R.string.tasks_title to "tasks",
             R.string.tools_title to "tools",
             R.string.usage_calculation_title to "usage",
-            R.string.fluid_reader_title to "reader",
         ).forEach { (label, action) ->
             compose.onNodeWithText(context.getString(label)).performClick()
             compose.runOnIdle { assertEquals(action, opened.last()) }
         }
-        compose.runOnIdle { assertEquals(5, opened.size) }
+        compose.runOnIdle { assertEquals(4, opened.size) }
+        compose.onNodeWithText("沉浸阅读").assertDoesNotExist()
     }
 
     @Test
@@ -125,6 +124,7 @@ class LocalDrawerEntryVisibilityRegressionTest {
             compose.runOnIdle { assertEquals(action, opened.last()) }
         }
         compose.runOnIdle { assertEquals(4, opened.size) }
+        compose.onNodeWithText("沉浸阅读").assertDoesNotExist()
     }
 
     @Test

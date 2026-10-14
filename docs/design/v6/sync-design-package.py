@@ -2,7 +2,7 @@
 """Package current Android V6 source of truth and validate actual editable icon inventory.
 
 Usage: python docs/design/v6/sync-design-package.py \
-  --source docs/design/v6 --output /tmp/shenyan-v6-current.zip
+  --source docs/design/v6 --output /tmp/shenyan-v6.3-design.zip
 
 This utility packages only tracked-design deliverables, not APKs, old previews, or fonts.
 The resulting ZIP is a reproducible design hand-off, NOT device/Figma acceptance.
@@ -59,7 +59,8 @@ source, output = args.source.resolve(), args.output.resolve()
 if source.name == "mobile" and (source.parent / "current-ui.json").is_file():
     source = source.parent
 required = (
-    "mobile/app.html", "mobile/index.html", "mobile/v6.css", "mobile/v6.js", "build-standalone.py", "current-ui.json", "V6-CURRENT-IMPLEMENTATION.zh-CN.md",
+    "mobile/app.html", "mobile/index.html", "mobile/v6.css", "mobile/v6.js", "build-standalone.py", "current-ui.json",
+    "icon-gallery.html", "audit-all-icons.py", "V6.3-ICON-SYSTEM.zh-CN.md", "V6.3-DELIVERY.zh-CN.md", "V6-CURRENT-IMPLEMENTATION.zh-CN.md",
     "README.zh-CN.md", "STATUS.zh-CN.md", "SY-ENTRY-ICONS.zh-CN.md",
     "sy-entry-icons.svg", "file-icons.json", "assets/file-icons-preview.svg",
 )
@@ -81,7 +82,7 @@ if any(s in html for s in ("S03Board", "S02v2Work", "mobile-screen-tabs", "38 åœ
 entry_svg = source / "sy-entry-icons.svg"
 root = ElementTree.parse(entry_svg).getroot()
 ns = "{http://www.w3.org/2000/svg}"
-icon_labels = [node.text for node in root.findall(ns + "text") if node.text and re.fullmatch(r"[A-Za-z][A-Za-z0-9]+", node.text)]
+icon_labels = [node.text for node in root.iter(ns + "text") if node.text and re.fullmatch(r"[A-Za-z][A-Za-z0-9]+", node.text)]
 expected_icons = int(manifest["iconInventory"]["activeCount"])
 retired_names = set(manifest["iconInventory"]["retired"])
 if len(icon_labels) != expected_icons or len(set(icon_labels)) != expected_icons:
@@ -132,6 +133,6 @@ with zipfile.ZipFile(output) as z:
 print(json.dumps({
     "archive": str(output), "files": len(payload)+1, "activeEntryIcons": 24,
     "bytes": output.stat().st_size, "routes": routes,
-    "sourceOfTruth": manifest["sourceOfTruth"],
+    "sourceOfTruth": manifest["sourceOfTruth"], "designVersion": manifest["designVersion"],
     "warning": "HTML preview and ZIP are not Android device/Figma verification",
 }, ensure_ascii=False))

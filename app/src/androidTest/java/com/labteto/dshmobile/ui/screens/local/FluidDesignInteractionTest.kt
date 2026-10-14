@@ -60,8 +60,7 @@ class FluidDesignInteractionTest {
         compose.onNodeWithTag("profileTestSection:0").performClick()
         compose.onNodeWithTag("profileTestSection:0").assertIsSelected()
     }
-    @Test fun messageMediaActionCarriesTextAndDismissesWithoutRegenerating() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
+    @Test fun assistantCreateButtonCarriesSourceTextWithoutRegenerating() {
         val requests = mutableListOf<Pair<String, LocalMediaKind>>()
         var regenerationCount = 0
         val message = LocalHarnessMessage("source", "assistant", "Describe a rainy street", createdAt = 1)
@@ -72,14 +71,38 @@ class FluidDesignInteractionTest {
                 onRegenerate = { regenerationCount++; true },
                 onCreateMedia = { source, kind -> requests += source.content to kind })
         } }
-        compose.onNodeWithTag("messageActionSurface:source").performSemanticsAction(SemanticsActions.OnLongClick) { it() }
-        compose.runOnIdle { assertEquals(emptyList<Pair<String, LocalMediaKind>>(), requests) }
-        compose.onNodeWithText(context.getString(R.string.fluid_message_media_video)).performClick()
-        compose.onNodeWithText(context.getString(R.string.fluid_message_actions)).assertDoesNotExist()
+        compose.onNodeWithTag("messageCreate:source").assertIsDisplayed().performClick()
         compose.runOnIdle {
-            assertEquals(listOf("Describe a rainy street" to LocalMediaKind.VIDEO), requests)
+            assertEquals(listOf("Describe a rainy street" to LocalMediaKind.IMAGE), requests)
             assertEquals(0, regenerationCount)
         }
+        // 长按只提供消息管理，不再与「创作」按钮形成重复入口。
+        compose.onNodeWithTag("messageActionSurface:source")
+            .performSemanticsAction(SemanticsActions.OnLongClick) { it() }
+        compose.onNodeWithText("消息操作").assertIsDisplayed()
+        compose.onNodeWithText("基于此消息生成视频").assertDoesNotExist()
+    }
+
+    @Test fun assistantCreateButtonIsHiddenWhileStreaming() {
+        val message = LocalHarnessMessage("source", "assistant", "Ongoing", createdAt = 1)
+        compose.setContent { DshTheme {
+            LocalMessageRow(message, chatMode = true, groupMode = false, canEdit = false,
+                canRegenerate = false, canSelectVariant = false, branchInfo = null,
+                onEdit = {}, onSelectVariant = { _, _ -> false }, onRegenerate = { false },
+                streaming = true, onCreateMedia = { _, _ -> })
+        } }
+        compose.onNodeWithTag("messageCreate:source").assertDoesNotExist()
+    }
+
+    @Test fun assistantCreateButtonIsHiddenWithoutCallback() {
+        // 每条 Compose 仪表测试只能设置一次根界面，独立验证无回调情况。
+        val message = LocalHarnessMessage("source", "assistant", "Ongoing", createdAt = 1)
+        compose.setContent { DshTheme {
+            LocalMessageRow(message, chatMode = true, groupMode = false, canEdit = false,
+                canRegenerate = false, canSelectVariant = false, branchInfo = null,
+                onEdit = {}, onSelectVariant = { _, _ -> false }, onRegenerate = { false })
+        } }
+        compose.onNodeWithTag("messageCreate:source").assertDoesNotExist()
     }
 
 }

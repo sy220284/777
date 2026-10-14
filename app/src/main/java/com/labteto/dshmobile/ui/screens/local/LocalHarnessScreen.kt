@@ -641,13 +641,6 @@ fun LocalHarnessScreen(
                 requestedFilePath = null
                 pushFeature(LocalFeaturePage.WORKSPACE)
             },
-            onOpenFromDrawer = ::openFeatureFromDrawer,
-            onCloseDrawer = { scope.launch { drawerState.close() } },
-            onReturnFromDrawerReader = {
-                drawerFeatureOriginStack?.let { featureStack = it }
-                drawerFeatureOriginStack = null
-                if (!syWideViewport) scope.launch { drawerState.open() }
-            },
             onUseWorkCapability = ::useWorkCapability,
             onLocateMemoryForMessage = { messageId ->
                 memorySourceSessionId = shell.sessionId
@@ -964,7 +957,6 @@ fun LocalHarnessScreen(
                 onTools = { openDrawerEntry(LocalFeatureDrawerEntry.TOOLS) },
                 onSettings = { openDrawerEntry(LocalFeatureDrawerEntry.SETTINGS) },
                 onUsage = { openDrawerEntry(LocalFeatureDrawerEntry.USAGE) },
-                onImmersiveReader = { openDrawerEntry(LocalFeatureDrawerEntry.IMMERSIVE_READER) },
                 onMiniMaxQuota = if (activeModelProfile?.canQueryMiniMaxQuota() == true) {
                     { openDrawerEntry(LocalFeatureDrawerEntry.MINIMAX_QUOTA) }
                 } else null,

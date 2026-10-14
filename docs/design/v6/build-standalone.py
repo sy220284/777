@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rebuild the only V6 mobile/app.html design projection from checked-in editable sources."""
+"""Rebuild the only V6.3 mobile/app.html design projection from checked-in editable sources."""
 import argparse
 import base64
 import json
@@ -18,10 +18,13 @@ def svg(path):
 icons = {p.stem: svg(p) for p in sorted((R / "assets/icons").glob("*.svg"))}
 if len(icons) != tokens["iconInventory"]["activeCount"]:
     parser.error("Unexpected active icon count")
+legacy = {p.stem: svg(p) for p in sorted((R / "assets/icons-legacy-redrawn").glob("*.svg"))}
+if len(legacy) != 12: parser.error("Expected 12 redrawn legacy and utility icons")
 people = {i: svg(R / "assets/portraits" / f"persona-{i+1}.svg") for i in range(4)}
 archive = svg(R / "assets/file-icons/archive-light.svg")
 boot = ('<script>\nconst V6_ROUTES=' + json.dumps([x["id"] for x in tokens["routes"]], ensure_ascii=False) +
     ';\nwindow.V6_ASSET_DATA=' + json.dumps(icons, ensure_ascii=False) +
+    ';\nwindow.V6_UTILITY_DATA=' + json.dumps(legacy, ensure_ascii=False) +
     ';\nwindow.V6_PORTRAIT_DATA=' + json.dumps(people, ensure_ascii=False) +
     ';\nwindow.V6_FILE_ICON_DATA=' + json.dumps(archive) + ';\n</script>')
 h = h.replace('<html lang="zh-CN">', '<html lang="zh-CN" data-v6-authoritative="compose-3cdd12f">')
@@ -31,7 +34,7 @@ target = S / "app.html"
 if args.check:
     if not target.exists() or target.read_text(encoding="utf-8") != h:
         parser.error("V6 compiled offline page drifted from editable source; regenerate")
-    print("V6 standalone source parity passed")
+    print("V6.3 standalone source parity passed")
 else:
     target.write_text(h, encoding="utf-8")
     print("Generated", target, len(h), "characters")

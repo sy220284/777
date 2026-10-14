@@ -12,3 +12,13 @@ body[data-theme="dark"] .ico-plate img,body[data-theme="matte"] .ico-plate img{f
 
 /* Detail states follow real SettingsDestination structure; values remain unavailable until native data exists. */
 .quota-track{height:8px;border:1px solid var(--border);background:var(--l1);border-radius:9px;overflow:hidden;margin:8px 0 15px}.quota-track>div{height:100%;background:var(--mint)}.pricing-row{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--border);min-height:42px;font-size:12px;color:var(--muted)}.pricing-row:last-child{border:0}.pricing-row strong{color:var(--ink);font-size:12px;flex-shrink:0}.empty-state{text-align:center;padding:18px 5px 13px}.empty-state strong{font-size:12px;color:var(--ink)}.empty-state p{font-size:11px}.segmented{max-width:100%;overflow-x:auto}.segmented button{white-space:nowrap}
+
+/* V6.2 touch targets and optical icon sizing: 24x24 art never defines the hit area. */
+.bubble-tools button,.segmented button,.skill-footer .action,.composer-actions button,.compose-stop,.compose-send,.drawer-mode button,.pricing-row button{min-height:48px}
+.actions-scroll button:first-child{min-width:48px}
+.ico-plate img,.drawer-list .ico-plate img{width:24px;height:24px}
+.ico-plate.sm img{width:21px;height:21px}
+.sheet-grid .utility-glyph{width:24px;height:24px;object-fit:contain}
+body[data-theme="dark"] .utility-glyph,body[data-theme="matte"] .utility-glyph{filter:invert(.89)}
+.phone[data-modal="true"] .topbar,.phone[data-modal="true"] #page,.phone[data-modal="true"] #bottom-dock{pointer-events:none}
+.bottom-sheet:focus-visible{outline:2px solid var(--primary);outline-offset:-3px}

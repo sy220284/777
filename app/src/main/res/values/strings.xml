@@ -644,8 +644,9 @@
     <string name="settings_page_permissions">连接与权限</string>
     <string name="settings_page_notifications">通知</string>
     <string name="settings_page_advanced">高级</string>
-    <string name="settings_group_common">常用</string>
-    <string name="settings_group_models_experience">模型与体验</string>
+    <string name="settings_group_appearance_experience">外观与体验</string>
+    <string name="settings_group_models_account">模型与账户</string>
+    <string name="settings_group_memory_data">记忆与数据</string>
     <string name="settings_group_system_maintenance">系统与维护</string>
     <string name="settings_permissions_check_failed">检查失败</string>
     <string name="settings_permissions_ready">已就绪</string>
@@ -2123,8 +2124,6 @@
     <string name="fluid_capability_none">尚未发现可显示的工具</string>
     <string name="fluid_copy_tool_id">复制 ID</string>
     <string name="fluid_copy_tool_output">复制原话</string>
-    <string name="fluid_reader_title">沉浸阅读</string>
-    <string name="fluid_reader_empty">暂无可阅读的回复</string>
     <string name="fluid_model_composition">模型累计 Token 构成</string>
     <string name="fluid_settings_session_storage">会话与存储</string>
     <!-- 统一聊天成果卡片：按钮、状态、错误与可访问描述 -->
@@ -2184,6 +2183,7 @@
     <string name="media_chat_creation_safe_retry">为避免重复计费，应用不会自动重新提交此请求。</string>
     <string name="media_chat_preview_unavailable">预览暂时不可用，可打开原图查看</string>
     <string name="fluid_message_actions">消息操作</string>
+    <string name="fluid_message_create">创作</string>
     <string name="fluid_message_media_image">基于此消息生成图像</string>
     <string name="fluid_message_media_video">基于此消息生成视频</string>
     <string name="fluid_message_media_speech">基于此消息合成语音</string>
