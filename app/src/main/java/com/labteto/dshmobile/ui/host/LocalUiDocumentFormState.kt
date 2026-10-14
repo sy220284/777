@@ -43,6 +43,9 @@ internal class LocalUiDocumentFormState(
 
     override fun update(key: UiDocumentFormKey, fieldId: String, value: String) {
         if (fieldId.isBlank()) return
+        // A delayed edit from an older renderer cannot erase the newer revision's draft.
+        if (fields.keys.any { it.sessionId == key.sessionId && it.documentId == key.documentId &&
+                it.revision > key.revision }) return
         // A replacement revision invalidates drafts for the prior definition only.
         fields.keys.filter { it.sessionId == key.sessionId && it.documentId == key.documentId &&
             it.revision != key.revision }.forEach { fields.remove(it) }

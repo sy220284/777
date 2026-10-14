@@ -240,7 +240,8 @@ fun LocalHarnessScreen(
     }
     var toolsStartAtPlugins by rememberSaveable { mutableStateOf(false) }
     var toolsStartAtSkills by rememberSaveable { mutableStateOf(false) }
-    var showGroupSetup by rememberSaveable { mutableStateOf(false) }
+    val groupModalIdentity = viewModel.chatUiPort.snapshot().identity
+    var showGroupSetup by remember(groupModalIdentity) { mutableStateOf(false) }
     var showPersonaGallerySavePrompt by rememberSaveable { mutableStateOf(false) }
     var showNewPersona by rememberSaveable { mutableStateOf(false) }
     var modeIntro by remember { mutableStateOf<LocalUsageMode?>(null) }
@@ -460,6 +461,14 @@ fun LocalHarnessScreen(
                     ?: resources.getString(R.string.local_ui_context_changed), android.widget.Toast.LENGTH_SHORT).show()
         }
     }
+    fun submitGroupMode(identity: com.labteto.dshmobile.uicontract.UiSessionIdentity, enabled: Boolean) {
+        when (val result = viewModel.chatGroupUiPort.submit(com.labteto.dshmobile.uicontract.ChatGroupUiCommand.SetGroupMode(identity, enabled))) {
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted, com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued -> Unit
+            else -> android.widget.Toast.makeText(context,
+                (result as? com.labteto.dshmobile.uicontract.UiCommandReceipt.Failed)?.message ?: resources.getString(R.string.local_ui_context_changed),
+                android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
     val shellActions = LocalShellFeatureUiActions(
         streamingState = viewModel.streamingState,
         selectModel = viewModel::selectModel,
@@ -476,7 +485,7 @@ fun LocalHarnessScreen(
         loadOlderTranscript = viewModel::loadOlderTranscript,
         importAttachment = { uri -> viewModel.importAttachment(uri, sendIdentity) },
         stop = { viewModel.stop(sendIdentity, sendMode) },
-        exitGroupChat = viewModel::leaveGroupChatMode,
+        exitGroupChat = { sendIdentity?.let { submitGroupMode(it, false) } },
         toggleSessionPinned = viewModel::toggleSessionPinned,
         renameSession = viewModel::renameSession,
         deleteSessions = ::deleteSessionsAndNavigate,
@@ -1128,7 +1137,7 @@ fun LocalHarnessScreen(
             currentIds = emptyList(),
             enabled = !shell.loading && !shell.running,
             onSave = { ids ->
-                val created = viewModel.createGroupChatSession(ids)
+                val created = viewModel.createGroupChatSession(ids, groupModalIdentity)
                 if (created) {
                     showGroupSetup = false
                     conversationOpenedFromDrawer = groupSetupOpenedFromDrawer

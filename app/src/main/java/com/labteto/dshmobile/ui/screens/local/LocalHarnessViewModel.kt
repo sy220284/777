@@ -264,16 +264,12 @@ class LocalHarnessViewModel @Inject constructor(
     }
     internal suspend fun deactivateDiaryEntry(subjectKey: String, id: String, revision: Long): Boolean =
         withContext(Dispatchers.IO) { runtime.chat.deactivateDiaryEntry(subjectKey, id, revision) }
-    fun createGroupChatSession(ids: List<String>): Boolean {
-        val distinctIds = ids.distinct()
-        val entriesById = gallery.value.associateBy(PersonaGalleryEntry::id)
-        val entries = distinctIds.mapNotNull(entriesById::get)
-        if (entries.size != distinctIds.size) return false
-        return runtime.chat.createGroupChatSession(entries)
+    fun createGroupChatSession(ids: List<String>, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Boolean {
+        val identity = expected ?: return false
+        return chatGroupUiPort.submit(com.labteto.dshmobile.uicontract.ChatGroupUiCommand.CreateGroupSession(identity, ids)) ==
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
     }
     fun createSingleChatSession() = runtime.chat.createSingleChatSession()
-    fun openGroupChatMode() = runtime.chat.switchChatMode(com.labteto.dshmobile.local.chat.LocalChatMode.GROUP)
-    fun leaveGroupChatMode() = runtime.chat.switchChatMode(com.labteto.dshmobile.local.chat.LocalChatMode.SINGLE)
     fun configureGroupChatMembers(ids: List<String>, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Boolean {
         // V6 and Next now submit the same closed intent to the original Chat Owner.
         val identity = expected ?: return false

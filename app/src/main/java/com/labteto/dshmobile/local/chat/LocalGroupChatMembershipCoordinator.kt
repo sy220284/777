@@ -30,8 +30,8 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    internal fun configure(entries: List<PersonaGalleryEntry>): Boolean {
-        val snapshot = chatState.value
+    internal fun configure(entries: List<PersonaGalleryEntry>, handle: com.labteto.dshmobile.local.runtime.LocalAgentRunHandle): Boolean {
+        val (snapshot, activation) = synchronized(handle.lock) { chatState.value to handle.activationId }
         if (!snapshot.canEditGroupMembers()) return false
         val selected = entries.distinctBy(PersonaGalleryEntry::id).take(MAX_GROUP_CHAT_MEMBERS)
         if (selected.size !in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS) return false
@@ -45,7 +45,7 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
             var previousPersonas: Map<String, PersonaProfile?> = emptyMap()
             try {
                 val current = chatState.value
-                if (!current.matchesGroupMemberEdit(snapshot)) return@launch
+                if (handle.activationId != activation || !current.matchesGroupMemberEdit(snapshot)) return@launch
 
                 previousPersonas = selected.associate { entry ->
                     entry.id to personaStore.find(entry.id)
@@ -56,7 +56,7 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
                     chatPersonaStore = personaStore,
                 )
                 val afterResolve = chatState.value
-                if (!afterResolve.matchesGroupMemberEdit(snapshot)) {
+                if (handle.activationId != activation || !afterResolve.matchesGroupMemberEdit(snapshot)) {
                     rollbackPersonas(previousPersonas, null)
                     return@launch
                 }
@@ -69,30 +69,42 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
                     ),
                     error = null,
                 )
-                val eventLog = sessionStorage.eventLogs.get(snapshot.sessionId)
-                appendChatDomainStateCommit(eventLog, target, "group-members-updated")
-                committed = true
-                publishCommitted(target)
-                sessionStorage.enqueueCurrentSnapshot(snapshot.sessionId)
-                recordDerivedGroupState(
-                    snapshot.sessionId,
-                    eventLog,
-                    "group/members-updated",
-                    buildJsonObject {
-                        put("count", members.size)
-                        put("gallery_ids", JsonArray(members.map { JsonPrimitive(it.galleryId) }))
-                    },
-                )
+                val applied = synchronized(handle.lock) {
+                    if (handle.activationId != activation || !chatState.value.matchesGroupMemberEdit(snapshot)) false
+                    else {
+                    val eventLog = sessionStorage.eventLogs.get(snapshot.sessionId)
+                    appendChatDomainStateCommit(eventLog, target, "group-members-updated")
+                    committed = true
+                    publishCommitted(target)
+                    sessionStorage.enqueueCurrentSnapshot(snapshot.sessionId)
+                    recordDerivedGroupState(
+                        snapshot.sessionId,
+                        eventLog,
+                        "group/members-updated",
+                        buildJsonObject {
+                            put("count", members.size)
+                            put("gallery_ids", JsonArray(members.map { JsonPrimitive(it.galleryId) }))
+                        },
+                    )
+                        true
+                    }
+                }
+                if (!applied) rollbackPersonas(previousPersonas, null)
             } catch (cancelled: CancellationException) {
                 if (!committed) rollbackPersonas(previousPersonas, cancelled)
                 throw cancelled
             } catch (error: Throwable) {
                 if (!committed) rollbackPersonas(previousPersonas, error)
-                publishError(
-                    snapshot.sessionId,
-                    error.message?.takeIf(String::isNotBlank)
-                        ?: "群聊成员更新失败：${error::class.java.simpleName}",
-                )
+                com.labteto.dshmobile.observability.AppLog.failure("GroupMembership", "configure", error)
+                synchronized(handle.lock) {
+                    if (handle.activationId == activation) {
+                        publishError(
+                            snapshot.sessionId,
+                            error.message?.takeIf(String::isNotBlank)
+                                ?: "群聊成员更新失败：${error::class.java.simpleName}",
+                        )
+                    }
+                }
             } finally {
                 lease.close()
             }

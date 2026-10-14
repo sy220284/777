@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "baseline": "3a69089d",
+  "baseline": "8d4855ff",
   "scope": "S0 源码场景审计；不是独立 UI Pack 覆盖或设备验收证明",
   "scenes": [
     {
@@ -1233,8 +1233,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "create_group": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ChatGroupUiPort.submit(ChatGroupUiCommand.CreateGroupSession)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }

@@ -85,7 +85,7 @@ class LocalChatRuntime @Inject internal constructor(
     internal fun switchChatMode(mode: LocalChatMode) =
         sessionRuntime.switchDomainMode(LocalChatSessionModeCommand(mode))
     internal fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean =
-        groupMembership.configure(entries)
+        groupMembership.configure(entries, runtimeStateStore.foregroundRunHandle)
     internal suspend fun setGroupChatAnnouncement(text: String): Result<Unit> {
         val sessionId = runtimeStateStore.currentSessionId
         return saveGroupChatAnnouncement(

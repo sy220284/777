@@ -33,24 +33,34 @@ internal fun NextChatGroupManager(
     onReceipt: (UiCommandReceipt) -> Unit,
 ) {
     val snapshot by groups.snapshots.collectAsStateWithLifecycle(initialValue = groups.snapshot())
-    if (snapshot.identity != identity || !snapshot.active) return
+    if (snapshot.identity != identity) return
 
     var open by remember(identity) { mutableStateOf(false) }
+    var creating by remember(identity) { mutableStateOf(false) }
     var selected by remember(identity) { mutableStateOf(emptySet<String>()) }
     TextButton(onClick = {
         val current = groups.snapshot()
         if (current.identity == identity && current.active) {
+            creating = false
             selected = current.memberIds
             open = true
         }
-    }) { Text(stringResource(R.string.next_group_manage)) }
+    }, enabled = snapshot.active && !snapshot.busy) { Text(stringResource(R.string.next_group_manage)) }
+    TextButton(onClick = {
+        creating = true
+        selected = emptySet()
+        open = true
+    }, enabled = !snapshot.busy) { Text(stringResource(R.string.next_group_create)) }
+    TextButton(onClick = {
+        onReceipt(groups.submit(ChatGroupUiCommand.SetGroupMode(identity, !snapshot.active)))
+    }, enabled = !snapshot.busy) { Text(stringResource(if (snapshot.active) R.string.next_group_exit else R.string.next_group_enter)) }
 
     if (open) {
         val current = snapshot
-        if (current.identity == identity && current.active) {
+        if (current.identity == identity && (creating || current.active)) {
         AlertDialog(
             onDismissRequest = { open = false },
-            title = { Text(stringResource(R.string.next_group_members_dialog)) },
+            title = { Text(stringResource(if (creating) R.string.next_group_create else R.string.next_group_members_dialog)) },
             text = {
                 LazyColumn(Modifier.heightIn(max = 320.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     items(current.available, key = { it.galleryId }) { member ->
@@ -69,9 +79,11 @@ internal fun NextChatGroupManager(
             },
             confirmButton = {
                 TextButton(
-                    enabled = selected.size in 2..6,
+                    enabled = !current.busy && selected.size in current.minimumMembers..current.maximumMembers,
                     onClick = {
-                        val result = groups.submit(ChatGroupUiCommand.ConfigureMembers(identity, selected.toList()))
+                        val command = if (creating) ChatGroupUiCommand.CreateGroupSession(identity, selected.toList())
+                            else ChatGroupUiCommand.ConfigureMembers(identity, selected.toList())
+                        val result = groups.submit(command)
                         onReceipt(result)
                         if (result == UiCommandReceipt.Accepted || result == UiCommandReceipt.Queued) open = false
                     },

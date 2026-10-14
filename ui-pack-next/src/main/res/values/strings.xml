@@ -120,4 +120,7 @@
     <string name="next_group_manage">管理群聊成员</string>
     <string name="next_group_members_dialog">选择群聊成员</string>
     <string name="next_group_save">保存成员</string>
+    <string name="next_group_create">新建群聊会话</string>
+    <string name="next_group_enter">进入群聊模式</string>
+    <string name="next_group_exit">退出群聊模式</string>
 </resources>
