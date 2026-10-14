@@ -94,7 +94,7 @@ internal fun modelProfileId(
 
 internal fun LocalModelProfile.sourceLabel(): String =
     when (authKind) {
-        LocalModelAuthKind.API_KEY -> "API Key"
+        LocalModelAuthKind.API_KEY -> if (LocalKimiPolicy.isOfficial(baseUrl)) "Kimi Code 订阅" else "API Key"
         LocalModelAuthKind.CHATGPT_PLAN -> "ChatGPT 套餐"
     }
 
@@ -292,62 +292,6 @@ object LocalModelPresets {
             contextWindowTokens = 204_800,
         ),
         LocalModelPreset(
-            provider = "Kimi",
-            model = "kimi-k3",
-            baseUrl = "https://api.moonshot.cn/v1",
-            capabilities = setOf(
-                LocalModelCapability.TEXT,
-                LocalModelCapability.IMAGE,
-                LocalModelCapability.VIDEO,
-            ),
-            imageInputSupported = true,
-            modelsEndpoint = "https://api.moonshot.cn/v1/models",
-            temperatureSupported = false,
-            contextWindowTokens = 1_000_000,
-        ),
-        LocalModelPreset(
-            provider = "Kimi",
-            model = "kimi-k2.7-code",
-            baseUrl = "https://api.moonshot.cn/v1",
-            capabilities = setOf(
-                LocalModelCapability.TEXT,
-                LocalModelCapability.IMAGE,
-                LocalModelCapability.VIDEO,
-            ),
-            imageInputSupported = true,
-            modelsEndpoint = "https://api.moonshot.cn/v1/models",
-            temperatureSupported = false,
-            contextWindowTokens = 256_000,
-        ),
-        LocalModelPreset(
-            provider = "Kimi",
-            model = "kimi-k2.7-code-highspeed",
-            baseUrl = "https://api.moonshot.cn/v1",
-            capabilities = setOf(
-                LocalModelCapability.TEXT,
-                LocalModelCapability.IMAGE,
-                LocalModelCapability.VIDEO,
-            ),
-            imageInputSupported = true,
-            modelsEndpoint = "https://api.moonshot.cn/v1/models",
-            temperatureSupported = false,
-            contextWindowTokens = 256_000,
-        ),
-        LocalModelPreset(
-            provider = "Kimi",
-            model = "kimi-k2.6",
-            baseUrl = "https://api.moonshot.cn/v1",
-            capabilities = setOf(
-                LocalModelCapability.TEXT,
-                LocalModelCapability.IMAGE,
-                LocalModelCapability.VIDEO,
-            ),
-            imageInputSupported = true,
-            modelsEndpoint = "https://api.moonshot.cn/v1/models",
-            temperatureSupported = false,
-            contextWindowTokens = 256_000,
-        ),
-        LocalModelPreset(
             provider = "Kimi Code",
             model = "k3",
             baseUrl = "https://api.kimi.com/coding/v1",
@@ -357,6 +301,8 @@ object LocalModelPresets {
                 LocalModelCapability.VIDEO,
             ),
             imageInputSupported = true,
+            // Plus/Moderato is limited to 256K; 1M is a Pro/Allegretto entitlement.
+            contextWindowTokens = 262_144,
         ),
         LocalModelPreset(
             provider = "Kimi Code",
@@ -367,6 +313,7 @@ object LocalModelPresets {
                 LocalModelCapability.IMAGE,
             ),
             imageInputSupported = true,
+            contextWindowTokens = 262_144,
         ),
         LocalModelPreset(
             provider = "Kimi Code",
@@ -378,6 +325,7 @@ object LocalModelPresets {
                 LocalModelCapability.VIDEO,
             ),
             imageInputSupported = true,
+            contextWindowTokens = 1_048_576,
         ),
         LocalModelPreset(
             provider = "Kimi Code",
@@ -389,6 +337,7 @@ object LocalModelPresets {
                 LocalModelCapability.VIDEO,
             ),
             imageInputSupported = true,
+            contextWindowTokens = 262_144,
         ),
         LocalModelPreset(
             provider = "智谱 GLM",
@@ -636,6 +585,11 @@ object LocalModelPresets {
             if (normalizedModel.lowercase() in setOf("minimax-m2", "minimax-m2.1", "minimax-m2.1-highspeed", "minimax-m2.5", "minimax-m2.5-highspeed")) {
                 return entries.first { it.model == "MiniMax-M2.7" }.copy(model = normalizedModel, baseUrl = normalizedBaseUrl)
             }
+        }
+        if (LocalKimiPolicy.isOfficial(normalizedBaseUrl)) {
+            return entries.firstOrNull {
+                it.provider == "Kimi Code" && it.model.equals(normalizedModel, ignoreCase = true)
+            }?.copy(baseUrl = normalizedBaseUrl)
         }
         return entries.firstOrNull { preset ->
             preset.model.equals(normalizedModel, ignoreCase = true) &&
