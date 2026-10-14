@@ -4,9 +4,11 @@
 
 ## 用户如何配置
 
+777 的“添加模型”预置 API 菜单仅保留 DeepSeek、MiniMax、Kimi Code（国内）。Claude、通义千问、Gemini、GLM、OpenAI API 已从预置菜单移除；ChatGPT 订阅套餐的 OAuth 账户与动态模型目录保持独立且不受影响。既有用户配置及密钥保留，用户仍可自行管理自定义 API 路由，不执行数据删除。
+
 1. 在 [Kimi Code 控制台](https://www.kimi.com/code) 创建**订阅专用 API Key**，该 Key 与开放平台 Key 不通用；会员资格和可用模型以账号权益为准。
 2. 777 设置 → 模型配置 → 选择提供商「Kimi Code」，从预置中选择模型 ID 并保存订阅 Key，协议为「Chat Completions」。
-3. 国内入口 `https://api.kimi.com/coding/v1`；海外入口 `https://api.kimi.ai/coding/v1`。客户端完整请求 `/coding/v1/chat/completions`，两者共用同一底座，地区及账户是否可用由 Kimi 服务端决定。
+3. 仅保留国内订阅入口 `https://api.kimi.com/coding/v1`；完整请求为 `/coding/v1/chat/completions`。海外 `https://api.kimi.ai/coding/v1` 不再属于内置支持的官方订阅路由。
 4. **不要**填 `https://api.moonshot.cn/v1`、`https://api.moonshot.ai/v1` 或开放平台 API Key；本次没有新增这些按量计费路由或模型。
 
 ## 订阅模型与限制
@@ -32,7 +34,7 @@
 
 ## 验证边界
 
-`LocalKimiCompatibilityTest` 验证官方国内/海外路由、4 个订阅 Model ID、套餐默认上下文及用户明确升级窗口、Fast/Deep 推理参数、非流式与 SSE 思考内容、Token usage 和同路由回放隔离；静态/单测通过不等于账户实际登录成功。暂未拿到用户订阅 Key，真实多轮工具调用、会员配额消耗以及移动设备网络条件还需真实账号验收。
+`LocalKimiCompatibilityTest` 验证官方国内路由、拒绝海外官方识别、4 个订阅 Model ID、套餐默认上下文及用户明确升级窗口、Fast/Deep 推理参数、非流式与 SSE 思考内容、Token usage 和同路由回放隔离；静态/单测通过不等于账户实际登录成功。暂未拿到用户订阅 Key，真实多轮工具调用、会员配额消耗以及移动设备网络条件还需真实账号验收。
 
 Kimi Code 的官方定位是**智能编程及第三方开发工具**，不同于开放平台面向产品集成的 API。客户端使用须遵循 Kimi 的服务条款和订阅权益范围，尤其不要冒充官方产品的客户端标识。
 
