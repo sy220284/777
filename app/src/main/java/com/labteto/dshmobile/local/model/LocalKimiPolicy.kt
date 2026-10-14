@@ -44,7 +44,7 @@ internal object LocalKimiPolicy {
         val override = requested?.takeIf { it in 4_096..16_000_000 }
         return if (model.equals("k3", true) && baseUrl != null && isOfficial(baseUrl)) {
             // Allow an explicit context setting; never assume a Plus tier has 1M.
-            override ?: defaultWindow
+            override?.takeIf { it <= 1_048_576 } ?: defaultWindow
         } else defaultWindow ?: override
     }
 }
