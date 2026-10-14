@@ -11,7 +11,6 @@ import re
 import json
 import sys
 import subprocess
-import subprocess
 import tempfile
 import zipfile
 from xml.etree import ElementTree
@@ -233,7 +232,7 @@ if "Figma" not in v6_spec or "#711" not in v6_spec:
     violations.append("V6 spec omitted Figma or pending PR #711 state")
 
 # Exact Compose -> HTML token parity; labels alone are not enough to prevent reintroducing old white glass.
-v6_foundation = (ROOT / "app/src/main/java/com/shenyan/designsystem/foundation/ShenyanFoundation.kt").read_text(encoding="utf-8")
+v6_foundation = (ROOT / "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/foundation/ShenyanFoundation.kt").read_text(encoding="utf-8")
 v6_preview = (v6_root / "assets/file-icons-preview.svg").read_text(encoding="utf-8")
 def read_primitive_style(css, selector, name):
     m = re.search(re.escape(selector) + r"\s*\{([^}]+)\}", css)
