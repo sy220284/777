@@ -18,7 +18,11 @@ import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 @Composable
 internal fun FluidMessageActionSheet(expanded: Boolean, onDismiss: () -> Unit, items: List<SyMenuItem>) {
     if (!expanded || items.isEmpty()) return
-    SyResponsiveSheet(title = stringResource(R.string.fluid_message_actions), onDismiss = onDismiss) {
+    SyResponsiveSheet(
+        title = stringResource(R.string.fluid_message_actions),
+        onDismiss = onDismiss,
+        seamlessBackground = true,
+    ) {
         items.forEach { item ->
             SyButton(text = item.text, icon = item.icon, modifier = Modifier.fillMaxWidth(),
                 variant = if (item.danger) SyButtonVariant.Danger else SyButtonVariant.Ghost,

@@ -94,6 +94,7 @@ internal fun NewSessionModeDialog(
     SyResponsiveSheet(
         title = stringResource(R.string.local_new_session_dialog_title),
         onDismiss = onDismiss,
+        seamlessBackground = true,
     ) {
         SySheetChoiceRow(
             modifier = Modifier.heightIn(min = 72.dp),
@@ -123,6 +124,7 @@ internal fun GroupNewSessionDialog(
     SyResponsiveSheet(
         title = stringResource(R.string.local_group_new_session_title),
         onDismiss = onDismiss,
+        seamlessBackground = true,
     ) {
         SySheetChoiceRow(
             title = stringResource(R.string.local_group_new_group),
@@ -440,6 +442,7 @@ internal fun QuestionDialog(
         title = stringResource(R.string.local_question_title),
         onDismiss = onDismiss,
         scrollable = true,
+        seamlessBackground = !requireConfirmation,
     ) {
         Text(question, style = DsType.base16Strong.withReadingWeight(), color = colors.text)
         options.forEach { option ->

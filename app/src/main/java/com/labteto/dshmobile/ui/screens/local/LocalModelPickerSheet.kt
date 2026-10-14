@@ -43,6 +43,7 @@ internal fun LocalModelPickerSheet(
     SyResponsiveSheet(
         title = stringResource(R.string.models_title),
         onDismiss = onDismiss,
+        seamlessBackground = true,
         scrollable = true,
         footer = {
         SyButton(
@@ -86,9 +87,8 @@ internal fun LocalModelPickerSheet(
                         .fillMaxWidth()
                         .heightIn(min = 60.dp)
                         .clip(DsShapes.row)
-                        .background(if (selected) com.shenyan.designsystem.components.syMaterialColor(
-                            com.shenyan.designsystem.components.SyMaterialTier.L3_CARD,
-                        ) else androidx.compose.ui.graphics.Color.Transparent)
+                        .background(if (selected) colors.selected.copy(alpha = .35f)
+                            else androidx.compose.ui.graphics.Color.Transparent)
                         .clickable {
                             onSelect(profile.id)
                             onDismiss()

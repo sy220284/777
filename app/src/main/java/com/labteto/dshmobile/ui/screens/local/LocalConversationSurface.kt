@@ -1478,6 +1478,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         SyResponsiveSheet(
             title = stringResource(R.string.local_reply_suggestions_title),
             onDismiss = { showReplySuggestions = false },
+            seamlessBackground = true,
         ) {
             Text(
                 stringResource(R.string.local_reply_suggestions_hint),
@@ -1493,8 +1494,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !state.running,
                     shape = DsShapes.row,
-                    tier = SyMaterialTier.L3_CARD,
-                    border = BorderStroke(1.dp, colors.border),
+                    tier = SyMaterialTier.L1_SECTION,
                 ) {
                     Column(
                         Modifier.heightIn(min = SyMetric.touch)
