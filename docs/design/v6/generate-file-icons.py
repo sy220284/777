@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export the same V5 vector paths to Android XML and editable SVG assets."""
+"""Generate all V6.3 file glyphs (10 types × 2 themes) from one editable spec."""
 from pathlib import Path
 import json
 from xml.sax.saxutils import escape
@@ -27,4 +27,4 @@ for kind, glyph in spec['glyphs'].items():
         xml.append('</vector>'); svg.append('</svg>')
         (drawables / f'{name}.xml').write_text('\n'.join(xml) + '\n')
         (exports / f'{name}.svg').write_text('\n'.join(svg) + '\n')
-print('Exported 6 Android vectors and 6 matching SVG originals')
+print(f'Exported {len(spec["glyphs"]) * len(spec["themes"])} Android vectors and SVG counterparts')
