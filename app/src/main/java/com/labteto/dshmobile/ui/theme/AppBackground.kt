@@ -206,6 +206,16 @@ internal fun BackgroundRegion.sampleY(): Float = when (this) {
     BackgroundRegion.BOTTOM -> .88f
 }
 
+/** Bound decoded wallpaper size; keep high-resolution display but avoid huge full-size bitmaps. */
+internal fun wallpaperDecodeSample(width: Int, height: Int, maximumDimension: Int = 3072): Int {
+    if (width <= 0 || height <= 0 || maximumDimension <= 0) return 1
+    var sample = 1
+    while (maxOf(width, height) / sample > maximumDimension && sample <= Int.MAX_VALUE / 2) {
+        sample *= 2
+    }
+    return sample
+}
+
 /** The image painted behind the whole app shell, or null for the plain theme colour. */
 val LocalAppBackground = staticCompositionLocalOf<ImageBitmap?> { null }
 
@@ -357,7 +367,13 @@ private fun rememberBackground(path: String?): LoadedBackground? {
         } else {
             withContext(Dispatchers.IO) {
                 runCatching {
-                    BitmapFactory.decodeFile(path)?.let { bitmap ->
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeFile(path, bounds)
+                    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
+                    val options = BitmapFactory.Options().apply {
+                        inSampleSize = wallpaperDecodeSample(bounds.outWidth, bounds.outHeight)
+                    }
+                    BitmapFactory.decodeFile(path, options)?.let { bitmap ->
                         LoadedBackground(
                             image = bitmap.asImageBitmap(),
                             analysis = analyzeBackground(bitmap),
