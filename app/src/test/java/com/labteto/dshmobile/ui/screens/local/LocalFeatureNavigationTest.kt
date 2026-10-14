@@ -141,7 +141,7 @@ class LocalFeatureNavigationTest {
     @Test
     fun drawerSelectionsPreserveThePageThatOpenedTheDrawerAsReturnOrigin() {
         var stack = localFeatureHome()
-        stack = localFeaturePush(stack, LocalFeaturePage.PROJECT)
+        stack = localFeaturePush(stack, LocalFeaturePage.TASKS)
         stack = localFeaturePush(stack, LocalFeaturePage.WORKSPACE)
         val expectedOrigin = stack
 
@@ -278,7 +278,7 @@ class LocalFeatureNavigationTest {
 
     @Test
     fun drawerExitRestoresItsOriginalUnderlyingFeature() {
-        val origin = localFeaturePush(localFeatureHome(), LocalFeaturePage.PROJECT)
+        val origin = localFeaturePush(localFeatureHome(), LocalFeaturePage.WORKSPACE)
         val opened = localFeatureOpenFromDrawer(origin, null, LocalFeaturePage.TOOLS)
         val backed = localFeatureBack(opened.stack, opened.originStack)
         assertTrue(backed.reopenDrawer)
@@ -311,7 +311,7 @@ class LocalFeatureNavigationTest {
     fun collapsedRailLabelsAndTargetsMatchExpandedDrawerModes() {
         assertEquals(LocalFeatureDrawerEntry.PERSONA_GALLERY,
             localCollapsedRailPrimaryEntry(LocalUsageMode.CHAT))
-        assertEquals(LocalFeatureDrawerEntry.PROJECT,
+        assertEquals(LocalFeatureDrawerEntry.WORKSPACE,
             localCollapsedRailPrimaryEntry(LocalUsageMode.WORK))
         assertEquals(com.labteto.dshmobile.R.string.tasks_chat_title,
             localCollapsedRailTaskTitle(LocalUsageMode.CHAT))
@@ -417,13 +417,13 @@ class LocalFeatureNavigationTest {
     fun deepNavigationPreservesEveryParentInsteadOfDiscardingHistory() {
         var stack = localFeatureHome()
         repeat(20) { index ->
-            val page = if (index % 2 == 0) LocalFeaturePage.WORKSPACE else LocalFeaturePage.PROJECT
+            val page = if (index % 2 == 0) LocalFeaturePage.WORKSPACE else LocalFeaturePage.TOOLS
             stack = localFeaturePush(stack, page)
         }
 
         assertEquals(21, stack.size)
         assertEquals(LocalFeaturePage.HOME.name, stack.first())
-        assertEquals(LocalFeaturePage.PROJECT, localFeatureCurrent(stack))
+        assertEquals(LocalFeaturePage.TOOLS, localFeatureCurrent(stack))
         repeat(20) { stack = localFeaturePop(stack) }
         assertEquals(localFeatureHome(), stack)
     }

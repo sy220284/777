@@ -1,6 +1,6 @@
 # 777《神言神语》全功能架构树
 
-代码核对基准：本次全量扫描的源码内容指纹 `c7068eee3f63`。扫描后确认的功能变更写入功能树；证据不足的候选变化保留待核实，不能视为已交付。
+代码核对基准：本次全量扫描的源码内容指纹 `c4aa6a1797dd`。扫描后确认的功能变更写入功能树；证据不足的候选变化保留待核实，不能视为已交付。
 
 说明：本图展示已登记的产品功能及归属。历史功能仍需按真实调用链逐项验收；源码符号、路由和测试存在仅构成局部证据，不证明全部功能可用。参考 [功能审计](FUNCTION-AUDIT.zh-CN.md)、[代码证据台账](FEATURE-CODE-EVIDENCE.zh-CN.md)、[自动复核结果](FEATURE-REVIEW.auto.json) 与[交互式树状图](FEATURE-TREE.zh-CN.html)。
 
@@ -211,19 +211,6 @@
 │  │     ├─ 自动工作任务执行入口
 │  │     ├─ 后台任务触发和恢复
 │  │     └─ 工作任务与计划、审批的联系
-│  ├─ 项目功能
-│  │  ├─ 项目档案
-│  │  │  ├─ 项目新建、列表与切换
-│  │  │  ├─ 项目名称与项目身份管理
-│  │  │  └─ 项目删除及关联引用保护（存在引用时阻止删除）
-│  │  ├─ 项目指令
-│  │  │  ├─ 项目长期规则和上下文
-│  │  │  ├─ 项目规则应用到工作／子代理／聊天
-│  │  │  └─ 规则文件不可读时拒绝执行
-│  │  └─ 项目关联
-│  │     ├─ 会话与项目绑定
-│  │     ├─ 项目范围的记忆与资料关联
-│  │     └─ 项目身份与工作目录分离
 │  ├─ 自动化功能
 │  │  ├─ 自动任务目录
 │  │  │  ├─ 新建、查看、编辑和删除
@@ -565,8 +552,7 @@
 
 - **应用外壳与统一交互**：`app/src/main/java/com/labteto/dshmobile/ui/screens/local/`、`app/src/main/java/com/labteto/dshmobile/ui/components/`、`app/src/main/java/com/labteto/dshmobile/ui/sidebar/`
 - **聊天功能**：`app/src/main/java/com/labteto/dshmobile/local/chat/`、`app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryOverviewV3.kt`、`app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryScreen.kt`
-- **工作与智能体功能**：`app/src/main/java/com/labteto/dshmobile/local/work/`、`app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt`、`app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalRunCenterScreen.kt`
-- **项目功能**：`app/src/main/java/com/labteto/dshmobile/local/project/`、`app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiContribution.kt`
+- **工作与智能体功能**：`app/src/main/java/com/labteto/dshmobile/local/work/`、`app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt`
 - **自动化功能**：`app/src/main/java/com/labteto/dshmobile/automation/`、`app/src/main/java/com/labteto/dshmobile/local/automation/`、`app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/`
 - **工具与扩展功能**：`app/src/main/java/com/labteto/dshmobile/local/tools/`、`harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/`、`app/src/main/java/com/labteto/dshmobile/ui/screens/tools/`
 - **设置与个人配置**：`app/src/main/java/com/labteto/dshmobile/ui/screens/settings/`、`app/src/main/java/com/labteto/dshmobile/local/model/`、`app/src/main/java/com/labteto/dshmobile/local/usage/`

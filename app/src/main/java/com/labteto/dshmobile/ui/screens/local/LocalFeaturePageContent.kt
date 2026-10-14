@@ -9,7 +9,6 @@ import com.labteto.dshmobile.local.feature.LocalFeatureModuleId
 
 internal enum class LocalFeatureDrawerEntry {
     WORKSPACE,
-    PROJECT,
     GROUP_CHAT,
     PERSONA_GALLERY,
     PERSONA_GALLERY_CONTINUE,

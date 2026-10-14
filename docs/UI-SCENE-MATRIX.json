@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "baseline": "f2aeac62",
+  "baseline": "d69f6513",
   "scope": "S0 源码场景审计；不是独立 UI Pack 覆盖或设备验收证明",
   "scenes": [
     {
@@ -1092,21 +1092,6 @@
       "acceptance": "待设备验收"
     },
     {
-      "id": "route.project",
-      "owner": "CATALOG",
-      "route": "PROJECT",
-      "kind": "PAGE",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
-      "actions": [
-        "navigate",
-        "back"
-      ],
-      "recovery": "LocalFeatureCatalog + contribution restore policy",
-      "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收"
-    },
-    {
       "id": "route.tasks",
       "owner": "CATALOG",
       "route": "TASKS",
@@ -1419,6 +1404,21 @@
       "recovery": "LocalFeatureCatalog + contribution restore policy",
       "v6": null,
       "implementation": "主线 #698 已退役；仅作历史索引",
+      "acceptance": "不计入当前场景覆盖"
+    },
+    {
+      "id": "route.project",
+      "owner": "CATALOG",
+      "route": "PROJECT",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "主线 #702 已退役；仅作历史索引",
       "acceptance": "不计入当前场景覆盖"
     }
   ]

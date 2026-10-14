@@ -19,7 +19,6 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.agent.localAgentRunPolicy
 import com.labteto.dshmobile.local.context.ContextComposer
-import com.labteto.dshmobile.local.project.ProjectContextPort
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalImageCapability
 import com.labteto.dshmobile.local.model.LocalModelGateway
@@ -89,7 +88,6 @@ internal class LocalWorkAgentTurnExecutor(
     private val modelRequests: LocalModelRequestCoordinator,
     private val usageTracker: DeepSeekUsageTracker,
     private val contextComposer: ContextComposer,
-    private val projectContext: ProjectContextPort,
     private val workRunRegistry: LocalWorkRunRegistry,
     private val workMemoryRuntime: LocalWorkMemoryRuntime,
     private val workModelHistoryRuntime: LocalWorkModelHistoryRuntime,
@@ -289,7 +287,6 @@ internal class LocalWorkAgentTurnExecutor(
                             input = input,
                             snapshot = snapshot,
                             workspacePath = workspacePath,
-                            projectInstructions = projectContext.instructionsFor(snapshot.projectId),
                             skillGuidance = resolveLocalWorkSkillGuidance(sessionStorage.files.workspace, input),
                         )
                         workMemoryRuntime.captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
@@ -308,7 +305,6 @@ internal class LocalWorkAgentTurnExecutor(
                             input = effectiveInput,
                             snapshot = snapshot,
                             workspacePath = workspacePath,
-                            projectInstructions = projectContext.instructionsFor(snapshot.projectId),
                             skillGuidance = resolveLocalWorkSkillGuidance(
                                 sessionStorage.files.workspace, effectiveInput,
                             ),

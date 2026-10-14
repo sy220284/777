@@ -11,7 +11,6 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.LocalToolApprovalRuntime
 import com.labteto.dshmobile.local.LocalToolCompositionRoot
 import com.labteto.dshmobile.local.context.ContextComposer
-import com.labteto.dshmobile.local.project.ProjectContextPort
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.memory.MemoryManager
@@ -57,7 +56,6 @@ internal class LocalWorkComposition @Inject constructor(
     modelRequests: LocalModelRequestCoordinator,
     usageTracker: DeepSeekUsageTracker,
     contextComposer: ContextComposer,
-    projectContext: ProjectContextPort,
     private val workRunRegistry: LocalWorkRunRegistry,
     workMemoryRuntime: LocalWorkMemoryRuntime,
     workModelHistoryRuntime: LocalWorkModelHistoryRuntime,
@@ -101,7 +99,6 @@ internal class LocalWorkComposition @Inject constructor(
             memoryClassMb = runtimeStateStore.memoryClassMb,
             agentRunCoordinator = sessionStorage.agentRunCoordinator,
             contextComposer = contextComposer,
-            projectContext = projectContext,
             memoryStore = memoryStore,
             memoryManager = memoryManager,
             eventLogFor = sessionStorage.eventLogs::get,
@@ -273,7 +270,6 @@ internal class LocalWorkComposition @Inject constructor(
         modelRequests = modelRequests,
         usageTracker = usageTracker,
         contextComposer = contextComposer,
-        projectContext = projectContext,
         workRunRegistry = workRunRegistry,
         workMemoryRuntime = workMemoryRuntime,
         workModelHistoryRuntime = workModelHistoryRuntime,

@@ -30,9 +30,11 @@ internal fun FluidMessageActionSheet(expanded: Boolean, onDismiss: () -> Unit, i
 @Composable
 internal fun fluidMessageMediaItems(message: LocalHarnessMessage,
     onCreate: (LocalHarnessMessage, LocalMediaKind) -> Unit): List<SyMenuItem> =
-    listOf(LocalMediaKind.IMAGE to R.string.fluid_message_media_image,
-        LocalMediaKind.VIDEO to R.string.fluid_message_media_video,
-        LocalMediaKind.SPEECH to R.string.fluid_message_media_speech).map { (kind, label) ->
-        SyMenuItem(text = stringResource(label), icon = FeatherIcons.Plus,
+    listOf(
+        Triple(LocalMediaKind.IMAGE, R.string.fluid_message_media_image, FeatherIcons.Image),
+        Triple(LocalMediaKind.VIDEO, R.string.fluid_message_media_video, FeatherIcons.Video),
+        Triple(LocalMediaKind.SPEECH, R.string.fluid_message_media_speech, FeatherIcons.Activity),
+    ).map { (kind, label, glyph) ->
+        SyMenuItem(text = stringResource(label), icon = glyph,
             onClick = { onCreate(message, kind) })
     }

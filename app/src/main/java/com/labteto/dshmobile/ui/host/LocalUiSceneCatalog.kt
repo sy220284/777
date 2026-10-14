@@ -84,7 +84,6 @@ internal object LocalUiSceneCatalog {
         UiSceneRequirement(UiSceneId("route.persona_gallery"), UiSceneKind.PAGE, LocalFeatureCatalog.ownerOf(LocalFeatureRoute.PERSONA_GALLERY).name, hostProvided = false),
         UiSceneRequirement(UiSceneId("route.diary"), UiSceneKind.PAGE, LocalFeatureCatalog.ownerOf(LocalFeatureRoute.DIARY).name, hostProvided = false),
         UiSceneRequirement(UiSceneId("route.workspace"), UiSceneKind.PAGE, LocalFeatureCatalog.ownerOf(LocalFeatureRoute.WORKSPACE).name, hostProvided = false),
-        UiSceneRequirement(UiSceneId("route.project"), UiSceneKind.PAGE, LocalFeatureCatalog.ownerOf(LocalFeatureRoute.PROJECT).name, hostProvided = false),
         UiSceneRequirement(UiSceneId("route.tasks"), UiSceneKind.PAGE, LocalFeatureCatalog.ownerOf(LocalFeatureRoute.TASKS).name, hostProvided = false),
         UiSceneRequirement(UiSceneId("route.tools"), UiSceneKind.PAGE, LocalFeatureCatalog.ownerOf(LocalFeatureRoute.TOOLS).name, hostProvided = false),
         UiSceneRequirement(UiSceneId("route.settings"), UiSceneKind.PAGE, LocalFeatureCatalog.ownerOf(LocalFeatureRoute.SETTINGS).name, hostProvided = false),

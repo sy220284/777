@@ -33,14 +33,13 @@ class LocalDrawerEntryVisibilityRegressionTest {
                     onOpenDiary = {},
                     onTasks = {},
                     onWorkspaceFiles = {},
-                    onProjects = {},
                     onTools = { openToolsCount++ },
                 )
             }
         }
 
         compose.onNodeWithText(context.getString(R.string.app_extended_capabilities)).assertDoesNotExist()
-        compose.onNodeWithText(context.getString(R.string.local_project_management_title)).assertExists()
+        compose.onNodeWithText("工作项目").assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.local_run_center)).assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.chatlist_workspace_files)).assertExists()
         compose.onNodeWithText(context.getString(R.string.local_drawer_projects_plain_hint)).assertDoesNotExist()
@@ -60,13 +59,12 @@ class LocalDrawerEntryVisibilityRegressionTest {
                     onOpenDiary = {},
                     onTasks = {},
                     onWorkspaceFiles = {},
-                    onProjects = {},
                     onTools = {},
                 )
             }
         }
 
-        compose.onNodeWithText(context.getString(R.string.local_project_management_title)).assertDoesNotExist()
+        compose.onNodeWithText("工作项目").assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.persona_gallery_title)).assertExists()
         compose.onNodeWithText(context.getString(R.string.local_group_chat_title)).assertExists()
         compose.onNodeWithText(context.getString(R.string.tasks_chat_title)).assertExists()
@@ -83,7 +81,6 @@ class LocalDrawerEntryVisibilityRegressionTest {
                     onOpenGroupChat = {}, onOpenPersonaGallery = {}, onOpenDiary = {},
                     onTasks = { opened += "tasks" },
                     onWorkspaceFiles = { opened += "workspace" },
-                    onProjects = { opened += "projects" },
                     onTools = { opened += "tools" },
                     onUsage = { opened += "usage" },
                     onImmersiveReader = { opened += "reader" },
@@ -91,7 +88,6 @@ class LocalDrawerEntryVisibilityRegressionTest {
             }
         }
         listOf(
-            R.string.local_project_management_title to "projects",
             R.string.chatlist_workspace_files to "workspace",
             R.string.tasks_title to "tasks",
             R.string.tools_title to "tools",
@@ -101,7 +97,7 @@ class LocalDrawerEntryVisibilityRegressionTest {
             compose.onNodeWithText(context.getString(label)).performClick()
             compose.runOnIdle { assertEquals(action, opened.last()) }
         }
-        compose.runOnIdle { assertEquals(6, opened.size) }
+        compose.runOnIdle { assertEquals(5, opened.size) }
     }
 
     @Test
@@ -115,7 +111,7 @@ class LocalDrawerEntryVisibilityRegressionTest {
                     onOpenPersonaGallery = { opened += "gallery" },
                     onOpenDiary = { opened += "diary" },
                     onTasks = { opened += "chat_tasks" },
-                    onWorkspaceFiles = {}, onProjects = {}, onTools = {},
+                    onWorkspaceFiles = {}, onTools = {},
                 )
             }
         }
@@ -141,7 +137,7 @@ class LocalDrawerEntryVisibilityRegressionTest {
                 DrawerQuickActions(
                     usageMode = mode.value,
                     onOpenGroupChat = {}, onOpenPersonaGallery = {}, onOpenDiary = {},
-                    onTasks = {}, onWorkspaceFiles = {}, onProjects = {}, onTools = {}, onMiniMaxQuota = if (available.value) { { opens++ } } else null,
+                    onTasks = {}, onWorkspaceFiles = {}, onTools = {}, onMiniMaxQuota = if (available.value) { { opens++ } } else null,
                 )
             }
         }

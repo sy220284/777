@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "snapshot": "c7068eee3f63",
+  "snapshot": "c4aa6a1797dd",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
-  "code_files_scanned": 1533,
-  "production_sources_scanned": 867,
-  "feature_nodes": 543,
-  "functional_leaves": 446,
-  "existing_executable_test_mappings": 128,
+  "code_files_scanned": 1523,
+  "production_sources_scanned": 862,
+  "feature_nodes": 530,
+  "functional_leaves": 437,
+  "existing_executable_test_mappings": 122,
   "leaf_evidence": [
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 本机聊天／工作模式切换",
@@ -3254,159 +3254,6 @@
       "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目新建、列表与切换",
-      "verification": "真实测试映射（仅局部）",
-      "test_reference_count": 1,
-      "historical_grade": "测试方法已核",
-      "existing_production_sources": [],
-      "missing_production_sources": [],
-      "named_symbols": [],
-      "explicit_source_anchor": false,
-      "explicit_static_scope": null,
-      "explicit_test_candidates": [],
-      "workflow_evidence": []
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目名称与项目身份管理",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
-      "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
-        "app/src/main/java/com/labteto/dshmobile/local/project/LocalProjectFeatureRuntime.kt"
-      ],
-      "missing_production_sources": [],
-      "named_symbols": [
-        {
-          "symbol": "rename",
-          "declaration_found": true
-        }
-      ],
-      "explicit_source_anchor": false,
-      "explicit_static_scope": null,
-      "explicit_test_candidates": [],
-      "workflow_evidence": [],
-      "identity_id": "existing.0092",
-      "identity_status": "静态声明已核，尚未授权自动改树"
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目删除及关联引用保护（存在引用时阻止删除）",
-      "verification": "真实测试映射（仅局部）",
-      "test_reference_count": 5,
-      "historical_grade": "测试方法已核",
-      "existing_production_sources": [],
-      "missing_production_sources": [],
-      "named_symbols": [],
-      "explicit_source_anchor": false,
-      "explicit_static_scope": null,
-      "explicit_test_candidates": [],
-      "workflow_evidence": []
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目指令 / 项目长期规则和上下文",
-      "verification": "真实测试映射（仅局部）",
-      "test_reference_count": 1,
-      "historical_grade": "测试方法已核",
-      "existing_production_sources": [],
-      "missing_production_sources": [],
-      "named_symbols": [],
-      "explicit_source_anchor": false,
-      "explicit_static_scope": null,
-      "explicit_test_candidates": [],
-      "workflow_evidence": []
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目指令 / 项目规则应用到工作／子代理／聊天",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
-      "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
-        "app/src/main/java/com/labteto/dshmobile/local/project/LocalProjectFeatureRuntime.kt"
-      ],
-      "missing_production_sources": [],
-      "named_symbols": [
-        {
-          "symbol": "instructionsFor",
-          "declaration_found": true
-        }
-      ],
-      "explicit_source_anchor": false,
-      "explicit_static_scope": null,
-      "explicit_test_candidates": [],
-      "workflow_evidence": [],
-      "identity_id": "existing.0095",
-      "identity_status": "静态声明已核，尚未授权自动改树"
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目指令 / 规则文件不可读时拒绝执行",
-      "verification": "真实测试映射（仅局部）",
-      "test_reference_count": 1,
-      "historical_grade": "测试方法已核",
-      "existing_production_sources": [],
-      "missing_production_sources": [],
-      "named_symbols": [],
-      "explicit_source_anchor": false,
-      "explicit_static_scope": null,
-      "explicit_test_candidates": [],
-      "workflow_evidence": []
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 会话与项目绑定",
-      "verification": "真实测试映射（仅局部）",
-      "test_reference_count": 1,
-      "historical_grade": "测试方法已核",
-      "existing_production_sources": [],
-      "missing_production_sources": [],
-      "named_symbols": [],
-      "explicit_source_anchor": false,
-      "explicit_static_scope": null,
-      "explicit_test_candidates": [],
-      "workflow_evidence": []
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 项目范围的记忆与资料关联",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
-      "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
-        "app/src/main/java/com/labteto/dshmobile/local/project/LocalProjectFeatureRuntime.kt"
-      ],
-      "missing_production_sources": [],
-      "named_symbols": [
-        {
-          "symbol": "activeProjectId",
-          "declaration_found": true
-        }
-      ],
-      "explicit_source_anchor": false,
-      "explicit_static_scope": null,
-      "explicit_test_candidates": [],
-      "workflow_evidence": [],
-      "identity_id": "existing.0093",
-      "identity_status": "静态声明已核，尚未授权自动改树"
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 项目身份与工作目录分离",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
-      "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
-        "app/src/main/java/com/labteto/dshmobile/local/project/LocalProjectFeatureRuntime.kt"
-      ],
-      "missing_production_sources": [],
-      "named_symbols": [
-        {
-          "symbol": "LocalProjectFeatureRuntime",
-          "declaration_found": true
-        }
-      ],
-      "explicit_source_anchor": false,
-      "explicit_static_scope": null,
-      "explicit_test_candidates": [],
-      "workflow_evidence": [],
-      "identity_id": "existing.0094",
-      "identity_status": "静态声明已核，尚未授权自动改树"
-    },
-    {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 新建、查看、编辑和删除",
       "verification": "具名源码声明存在（静态，待调用链复核）",
       "test_reference_count": 0,
@@ -5929,8 +5776,8 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 会话创建、读写、删除和归档",
-      "verification": "真实测试映射（仅局部）",
-      "test_reference_count": 1,
+      "verification": "没有可确认的现行入口证据",
+      "test_reference_count": 0,
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -5938,7 +5785,15 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": []
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "shared_session_persistence",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 2,
+        "test_methods_confirmed": 2,
+        "explanation": "主线退役项目功能后，旧聚合测试不再作为此叶节点的唯一证据。实际共享会话仓库、持久化和删除写入口仍存在；改为溯源真实仓库与其耐久性/删除回归测试，不据此宣称动态文档完整恢复旅程通过。"
+      }
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 会话归属、运行租约与唯一写入者",
@@ -8329,9 +8184,9 @@
     }
   ],
   "evidence_grade_summary": {
-    "真实测试映射（仅局部）": 128,
-    "具名源码声明存在（静态，待调用链复核）": 204,
-    "没有可确认的现行入口证据": 20,
+    "真实测试映射（仅局部）": 122,
+    "具名源码声明存在（静态，待调用链复核）": 200,
+    "没有可确认的现行入口证据": 21,
     "历史生产文件仍存在（待入口复核）": 71,
     "具名源码及仪表测试声明存在（静态，未执行）": 6,
     "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）": 14,
@@ -8347,6 +8202,42 @@
       "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryCheckpoint.kt",
       "entry": "latestFrom",
       "owner": "WORK",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "稳定身份关联的功能路径已不在现行树；可能改名或退役"
+    },
+    {
+      "id": "existing.0092",
+      "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目名称与项目身份管理",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/project/LocalProjectFeatureRuntime.kt",
+      "entry": "rename",
+      "owner": "PROJECT",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "稳定身份关联的功能路径已不在现行树；可能改名或退役"
+    },
+    {
+      "id": "existing.0093",
+      "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 项目范围的记忆与资料关联",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/project/LocalProjectFeatureRuntime.kt",
+      "entry": "activeProjectId",
+      "owner": "PROJECT",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "稳定身份关联的功能路径已不在现行树；可能改名或退役"
+    },
+    {
+      "id": "existing.0094",
+      "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 项目身份与工作目录分离",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/project/LocalProjectFeatureRuntime.kt",
+      "entry": "LocalProjectFeatureRuntime",
+      "owner": "PROJECT",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "稳定身份关联的功能路径已不在现行树；可能改名或退役"
+    },
+    {
+      "id": "existing.0095",
+      "path": "第一层｜产品功能与界面 / 项目功能 / 项目指令 / 项目规则应用到工作／子代理／聊天",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/project/LocalProjectFeatureRuntime.kt",
+      "entry": "instructionsFor",
+      "owner": "PROJECT",
       "verification": "静态源码声明，未授权自动变更",
       "problem": "稳定身份关联的功能路径已不在现行树；可能改名或退役"
     }
@@ -9015,6 +8906,27 @@
       }
     },
     {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 会话创建、读写、删除和归档",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "共享会话身份与恢复",
+      "inspect": "harness-core/src/main/session、app/local/session",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "shared_session_persistence",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 2,
+        "test_methods_confirmed": 2,
+        "explanation": "主线退役项目功能后，旧聚合测试不再作为此叶节点的唯一证据。实际共享会话仓库、持久化和删除写入口仍存在；改为溯源真实仓库与其耐久性/删除回归测试，不据此宣称动态文档完整恢复旅程通过。"
+      }
+    },
+    {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 工具输出格式和结构化验证",
       "issue": "缺少可确认的现行源码入口",
       "domain": "共享工具或其他能力",
@@ -9213,22 +9125,63 @@
       }
     }
   ],
-  "followup_investigated_descriptions": 20,
-  "followup_production_or_compatibility": 13,
+  "followup_investigated_descriptions": 21,
+  "followup_production_or_compatibility": 14,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "b6c27a8b4993",
+    "baseline": "c7068eee3f63",
     "added_production_files": [],
-    "removed_production_files": [],
+    "removed_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalProjectUiFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/project/LocalProjectFeatureRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/project/ProjectContextPort.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiContribution.kt",
+      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ProjectUiPort.kt"
+    ],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalDynamicDocument.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextUiDocument.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/LocalSessionComposition.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatAutomationExecutionCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTurnCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/context/ContextComposer.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalog.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunnerFactory.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAutomationExecutionCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkComposition.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnPromptContext.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/components/FeatherIcons.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalog.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryScreen.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/ChatGptPlanUsageUi.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/FluidMessageActionSheet.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/GroupChatMemberPicker.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDialogs.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawerComponents.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/shenyan/SyOverlays.kt",
+      "app/src/main/java/com/shenyan/designsystem/components/ShenyanCompound.kt",
+      "app/src/main/java/com/shenyan/designsystem/components/ShenyanFeedback.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
-    "removed_routes": [],
+    "removed_routes": [
+      "PROJECT"
+    ],
     "added_ui": [],
-    "removed_ui": []
+    "removed_ui": [
+      {
+        "symbol": "LocalProjectScreen",
+        "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiContribution.kt"
+      }
+    ]
   },
   "source_verified_registrations": 6,
   "explicit_retirements": 0,

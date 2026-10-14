@@ -23,7 +23,6 @@ import com.labteto.dshmobile.local.presentation.LocalChatUiFacade
 import com.labteto.dshmobile.local.presentation.LocalSessionUiFacade
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
 import com.labteto.dshmobile.local.presentation.LocalToolsUiFacade
-import com.labteto.dshmobile.local.presentation.LocalProjectUiFacade
 import com.labteto.dshmobile.local.presentation.projectChatSurfaceState
 import com.labteto.dshmobile.local.presentation.projectShellState
 import com.labteto.dshmobile.local.presentation.projectWorkState
@@ -47,7 +46,6 @@ class LocalHarnessViewModel @Inject constructor(
     private val uiPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val chatUi: LocalChatUiFacade,
     private val sessionUi: LocalSessionUiFacade,
-    private val projects: LocalProjectUiFacade,
     private val toolsUi: LocalToolsUiFacade,
     private val usageUi: com.labteto.dshmobile.local.presentation.LocalUsageUiFacade,
     private val approvalPreferences: LocalApprovalPreferences,
@@ -111,11 +109,6 @@ class LocalHarnessViewModel @Inject constructor(
     internal fun turnUsageSummaries(sessionId: String) = usageUi.turnSummaries(sessionId)
     internal fun turnUsage(sessionId: String, turnId: String) = usageUi.turnDetail(sessionId, turnId)
     internal fun requestUsage(requestId: String) = usageUi.requestDetail(requestId)
-    val projectUiPort: com.labteto.dshmobile.uicontract.ProjectUiPort get() = projects
-    internal val projectRecoveryNotice = projects.recoveryNotice
-    internal fun createProjectWorkSession() = runtime.session.createSession(
-        LocalConversationMode.PROJECT, LocalUsageMode.WORK,
-    )
     private val personaGalleryController = LocalPersonaGalleryUiController(
         runtime = runtime,
         chatUi = chatUi,

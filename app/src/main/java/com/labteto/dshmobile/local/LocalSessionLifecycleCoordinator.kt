@@ -93,7 +93,6 @@ internal class LocalSessionLifecycleCoordinator(
     private val startNextQueuedTurnIfIdle: () -> Job?,
     private val sessionSummaries: () -> List<LocalSessionSummary>,
     private val beforeEventLogsDeleted: (Set<String>) -> Unit = {},
-    private val activeProjectId: () -> String,
 ) {
     // Mode and history taps share the same latest destination while a session is restored.
     private val navigationLock = Any()
@@ -176,7 +175,7 @@ internal class LocalSessionLifecycleCoordinator(
                     }
                     val projectId = when (mode) {
                         LocalConversationMode.INDEPENDENT -> null
-                        LocalConversationMode.PROJECT -> activeProjectId()
+                        LocalConversationMode.PROJECT -> null // 兼容历史模式，不再创建项目归属。
                         LocalConversationMode.CONTINUATION -> sourceState.projectId
                     }
                     val chatPlan = chatSessionLifecycle.prepareCreate(

@@ -1,26 +1,26 @@
 # UI 3.0-R4 实施台账
 
-执行依据：[R4 完整方案](design/ui3/PLAN-R4.zh-CN.md)。权威规范：[UI 3.0](design/UI-3.0.zh-CN.md)。当前分支 `feat/ui-r4-pluggable` 基于主线 `f2aeac62`，尚未合并。此台账记录实际实现，不能将方案描述、渲染夹具或 CI 通过当作全方案完成。
+执行依据：[R4 完整方案](design/ui3/PLAN-R4.zh-CN.md)。权威规范：[UI 3.0](design/UI-3.0.zh-CN.md)。当前分支 `feat/ui-r4-pluggable` 已组合主线 `d69f6513`，尚未合并。此台账记录实际实现，不能将方案描述、渲染夹具或 CI 通过当作全方案完成。
 
 ## 阶段状态
 
 | 阶段 | 当前实现 | 尚未完成 |
 |---|---|---|
 | S-1 | MCP 未检测健康使用中立标识；Chat/群聊显示真实共享队列；Work 审批使用 Owner 签发的实际等待身份 | 实时 MCP 选中/连接/授权观测与插件故障隔离完整旅程；可读性和辅助技术复现 |
-| S0 | 78 项现行 Scene、8 条顶级路由、21 个设置页面与行内更新；3 项退役场景保留历史索引；22 项旧问题有阶段去向 | 全部隐性入口的真实旅程核对，逐动作能力/回执/恢复矩阵完善 |
-| S1 | `:ui-contract` 中立协议；Chat/Work 文本发送和审批；Project 强类型命令直接驱动页面；Tools 中立管理端口；Host 草稿、阅读锚点和动态表单共享状态；模型不可变公开值抽离 | 附件、编辑、分支、媒体、Automation、Settings、Usage 等全量契约迁移；生产旧回调全面退出 |
+| S0 | 77 项现行 Scene、7 条顶级路由、21 个设置页面与行内更新；4 项退役场景保留历史索引；22 项旧问题有阶段去向 | 全部隐性入口的真实旅程核对，逐动作能力/回执/恢复矩阵完善 |
+| S1 | `:ui-contract` 中立协议；Chat/Work 文本发送和审批；Tools 中立管理端口；Host 草稿、阅读锚点和动态表单共享状态；模型不可变公开值抽离 | 附件、编辑、分支、媒体、Automation、Settings、Usage 等全量契约迁移；生产旧回调全面退出 |
 | S2 | `:ui-pack-next` 独立 Material 会话包与 V6 共用真实发送/审批 Port；三项显式渲染夹具测试 | 当前 Codex 与 App 的真实发送/审批/恢复旅程，不能标记 S2 已验收 |
-| S3 | Project 页面退出旧业务回调；会话草稿/阅读位置归 Host；Next 独立编译 | 全部 V6 页面抽离至独立 Pack、完整 Host 导航/注册切换、同触点视觉修复；本阶段未完成 |
+| S3 | 会话草稿/阅读位置归 Host；Next 独立编译 | 全部 V6 页面抽离至独立 Pack、完整 Host 导航/注册切换、同触点视觉修复；本阶段未完成 |
 | S4 | 受限 UiDocument 协议、既有 Schema 引擎验证、显式模型生成、真实用量分类、Shared Session Sidecar、双包原生表单/按钮、文本回退 | Work 运行内发布、真实进度/证据/媒体绑定、更新与版本迁移完整闭环、历史检索性能与表单留存预算 |
 | S5 | 既有完整 CI 的静态/JVM/构建/Android 16/17 门禁及截图继续保留 | 整包禁用 V6 后的全场景证明、38 场景、三主题、TalkBack/200% 字体/IME/弱网/收费未知、新包脚手架与 Token 导入 |
 
-**全方案尚未实现完毕。** V6 仍在 App 中，没有独立 `:ui-pack-v6`；Next 是显式会话切片，缺失页面不会隐藏调用 V6。主线 #698 已退役运行中心、运行历史及后台助手入口，#697 已移除独立更新页，本分支不恢复这些功能。
+**全方案尚未实现完毕。** V6 仍在 App 中，没有独立 `:ui-pack-v6`；Next 是显式会话切片，缺失页面不会隐藏调用 V6。主线 #698 已退役运行中心、运行历史及后台助手入口，#697 已移除独立更新页，#702 已移除工作项目功能；本分支撤回对应 Project Port/页面迁移和夹具，不恢复这些功能。主线窄屏布局和额度入口移除变更已合入。
 
 ## 所有权与动作边界
 
 业务 Owner、Shared Session、资源调度、收费记录及审批策略保持原所有权。消息快照来自现有有界正文；队列来自 Shared Runtime；审批来自 Work 的真实 interaction waiter。Owner 每次等待签发新 nonce，模型工具调用 ID 不作为审批权限。前台激活身份随 rebind 改变，旧画面意图不能重定向到当前会话。
 
-`Accepted` 是实际接纳，`Queued` 是实际排队，均不代表完成或核验。拒绝发送保留草稿。Project 创建、选择、重命名、删除、规则保存与目录恢复提交中立强类型命令，原 Owner 仍执行引用检查和写入；测试回调仅在显式渲染夹具中存在。Tools 管理元数据不构成工具执行授权，未知健康状态不显示在线。
+`Accepted` 是实际接纳，`Queued` 是实际排队，均不代表完成或核验。拒绝发送保留草稿。Tools 管理元数据不构成工具执行授权，未知健康状态不显示在线。
 
 Host 草稿与阅读锚点沿用原 12 会话 LRU，V6/Next 共用单一 UI 状态 Owner；SavedStateHandle 支持系统保存状态恢复，不等于强停/崩溃后的业务恢复。阅读锚点使用稳定消息 ID；缺失正文显示明确提示。
 
@@ -58,7 +58,7 @@ adb shell am start -n com.sy220284.dshmobile.debug/com.labteto.dshmobile.MainAct
 ## 验证回执
 
 - `3beb5012`：完整 CI [Run 38485866962](https://github.com/sy220284/777/actions/runs/38485866962) 所有任务通过，包括静态/架构/官方夹具、全部 JVM 单测、ARM64 lint/optimized APK、x86 Debug/测试/optimized APK、Android 16/17 仪器化和 merge gate。该回执不覆盖后续源码改动。
-- 后续动态表单、取消和导航修正：`:ui-contract:test`、`:ui-host:compileDebugKotlin`、`:ui-pack-next:compileDebugKotlin` 本地通过；Schema 越权/来源/大小回归测试已新增，最终 App/设备 CI 需绑定最终 head。
+- 合入 `d69f6513` 后旧回执不代表当前组合通过。后续动态表单、取消和导航修正：`:ui-contract:test`、`:ui-host:compileDebugKotlin`、`:ui-pack-next:compileDebugKotlin` 本地通过；Schema 越权/来源/大小回归测试已新增，最终 App/设备 CI 需绑定最终 head。
 - Next Android 交互测试为明确的端口渲染夹具，覆盖拒绝保留草稿、审批身份和跨包草稿复用，不替代真实模型/工具业务验收。
 - 用户指定当前 Codex 为测试模型；临时桥 SSE 探测成功只证明桥可响应，未完成 App/S2 验收。按最新指示停止额外环境排障和实时模型联调，未执行项目单独披露。
 

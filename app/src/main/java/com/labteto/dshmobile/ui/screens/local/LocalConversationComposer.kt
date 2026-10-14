@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,7 +51,6 @@ import com.labteto.dshmobile.ui.shenyan.SyComposerAction
 import com.labteto.dshmobile.ui.shenyan.SyComposerField
 import com.labteto.dshmobile.ui.shenyan.SyConversationComposer
 import com.shenyan.designsystem.components.SyIconButton
-import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -287,22 +287,19 @@ internal fun LocalConversationComposer(
         // the IME is already animating the whole surface.
         animateSize = false,
     ) {
-        ChatGptPlanUsageBar(activeModelProfile)
         if (state.usageMode == LocalUsageMode.WORK && teamDispatchSelected) {
+            // A compact icon-only indicator keeps team dispatch reversible without
+            // repeating its name or squeezing the adjacent text into vertical glyphs.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                horizontalArrangement = Arrangement.End,
             ) {
-                SyPill(
-                    text = stringResource(R.string.local_team_title),
-                    selected = true,
-                )
-                Text(
-                    stringResource(R.string.local_team_selected_hint),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.textSecondary,
-                    modifier = Modifier.weight(1f),
+                Icon(
+                    painter = painterResource(R.drawable.ic_ui_create_subagent),
+                    contentDescription = stringResource(R.string.local_team_selected_hint),
+                    tint = colors.primary,
+                    modifier = Modifier.size(20.dp),
                 )
                 SyIconButton(
                     icon = FeatherIcons.X,

@@ -430,6 +430,33 @@
         }
       ],
       "conclusion": "真实文件版本哈希和变化检测仍有代码与测试；旧独立证据展示已退役，不能把后台版本能力当作当前 UI 变化提示已通过。"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 会话创建、读写、删除和归档",
+      "kind": "shared_session_persistence",
+      "independent": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt",
+          "symbol": "LocalSessionRepository"
+        },
+        {
+          "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt",
+          "symbol": "DurableSessionCatalog"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/LocalSessionRepositoryTest.kt",
+          "method": "explicitWriteIsDurableBeforeReturnAndSupersedesQueuedSnapshot"
+        },
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/LocalSessionRepositoryTest.kt",
+          "method": "deletionCannotBeUndoneByQueuedSnapshots"
+        }
+      ],
+      "conclusion": "主线退役项目功能后，旧聚合测试不再作为此叶节点的唯一证据。实际共享会话仓库、持久化和删除写入口仍存在；改为溯源真实仓库与其耐久性/删除回归测试，不据此宣称动态文档完整恢复旅程通过。"
     }
   ]
 }
