@@ -194,6 +194,7 @@ fun SySceneBackgroundSurface(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(SyMetric.radiusSheet),
     fallbackColor: Color? = null,
+    tag: String = "sySceneBackgroundSurface",
     content: @Composable () -> Unit,
 ) {
     val scene = LocalSySceneBackdrop.current
@@ -202,7 +203,7 @@ fun SySceneBackgroundSurface(
     val windowOnScreen = remember { IntArray(2) }
     var origin by remember { mutableStateOf(IntOffset.Zero) }
     Box(
-        modifier.clip(shape).testTag("sySceneBackgroundSurface").onGloballyPositioned { coordinates ->
+        modifier.clip(shape).testTag(tag).onGloballyPositioned { coordinates ->
             view.rootView.getLocationOnScreen(windowOnScreen)
             val point = coordinates.positionInWindow()
             val next = IntOffset(point.x.roundToInt() + windowOnScreen[0],

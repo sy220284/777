@@ -308,6 +308,7 @@ fun AppBackgroundHost(
                     modifier = Modifier.fillMaxSize(),
                     shape = androidx.compose.foundation.shape.RectangleShape,
                     fallbackColor = surfaceBase,
+                    tag = "appRootSceneBackground",
                 ) {}
             }
             content()
