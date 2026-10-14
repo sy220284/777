@@ -426,11 +426,12 @@ internal fun QuestionDialog(
     onAnswer: (String) -> Boolean,
     onDismiss: () -> Unit,
     requireConfirmation: Boolean = false,
+    questionId: String = question,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    var answer by rememberSaveable(question) { mutableStateOf("") }
-    var selected by rememberSaveable(question) { mutableStateOf("") }
-    var failed by rememberSaveable(question) { mutableStateOf(false) }
+    var answer by rememberSaveable(questionId) { mutableStateOf("") }
+    var selected by rememberSaveable(questionId) { mutableStateOf("") }
+    var failed by rememberSaveable(questionId) { mutableStateOf(false) }
     fun submit(value: String) {
         failed = !onAnswer(value)
     }

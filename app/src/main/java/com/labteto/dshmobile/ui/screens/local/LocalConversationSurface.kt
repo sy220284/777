@@ -1379,6 +1379,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             onDismiss = { onCancelQuestion(question.callId) },
             // The removed Work decision panel required explicit confirmation; keep that contract.
             requireConfirmation = workActions != null,
+            questionId = question.callId,
         )
     }
     if (
