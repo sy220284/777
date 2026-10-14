@@ -59,7 +59,8 @@ source, output = args.source.resolve(), args.output.resolve()
 if source.name == "mobile" and (source.parent / "current-ui.json").is_file():
     source = source.parent
 required = (
-    "mobile/app.html", "mobile/index.html", "mobile/v6.css", "mobile/v6.js", "build-standalone.py", "current-ui.json", "V6-CURRENT-IMPLEMENTATION.zh-CN.md",
+    "mobile/app.html", "mobile/index.html", "mobile/v6.css", "mobile/v6.js", "build-standalone.py", "current-ui.json",
+    "icon-gallery.html", "audit-all-icons.py", "V6.2-ICON-SYSTEM.zh-CN.md", "V6-CURRENT-IMPLEMENTATION.zh-CN.md",
     "README.zh-CN.md", "STATUS.zh-CN.md", "SY-ENTRY-ICONS.zh-CN.md",
     "sy-entry-icons.svg", "file-icons.json", "assets/file-icons-preview.svg",
 )
