@@ -266,6 +266,26 @@ for theme, selector in (("Light", ":root"), ("Dark", 'body[data-theme="dark"]'),
         if name.startswith("materialL") and value not in v6_preview:
             violations.append(f"V6 material SVG preview outdated: {theme} {name} 0x{value}")
 
+# Ensure active HTML icons and editable SVG deliverables match the manifest.
+v6_svg = (v6_root / "sy-entry-icons.svg").read_text(encoding="utf-8")
+labels = re.findall(r'<text\\b[^>]*>([A-Za-z][A-Za-z0-9]+)</text>', v6_svg)
+icon_map_match = re.search(r'window\\.V6_ASSET_DATA\\s*=\\s*(\\{[^;]+\\})\\s*;', v6_html)
+active_count = v6_manifest.get("iconInventory", {}).get("activeCount", 24)
+retired_icons = set(v6_manifest.get("iconInventory", {}).get("retired", []))
+if len(labels) != active_count or len(set(labels)) != active_count:
+    violations.append("V6 SVG sheet must have 24 distinct active icon glyphs")
+if retired_icons.intersection(labels):
+    violations.append("V6 SVG sheet still includes a retired entry icon")
+if not icon_map_match:
+    violations.append("V6 offline HTML missing embedded icon assets")
+else:
+    try:
+        offline_names = set(json.loads(icon_map_match.group(1)))
+        if offline_names != set(labels):
+            violations.append("V6 offline HTML icon inventory differs from current editable SVG")
+    except json.JSONDecodeError:
+        violations.append("V6 offline HTML icon map invalid")
+
 # Also validate local source links in the actual V6 authority.
 for link in re.findall(r"\]\(([^)]+)\)", v6_spec):
     url = link.split("#")[0].split("?")[0].strip()
