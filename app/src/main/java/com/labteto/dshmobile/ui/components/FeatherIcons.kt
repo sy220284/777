@@ -280,11 +280,11 @@ private fun actionGlyph(name: String, vararg strokes: String): ImageVector =
         name = "Feather.$name", defaultWidth = 24.dp, defaultHeight = 24.dp,
         viewportWidth = 24f, viewportHeight = 24f,
     ).apply {
-        strokes.forEach { pathString ->
-            addPath(
-                pathData = PathParser().parsePathString(pathString).toNodes(),
-                stroke = SolidColor(Color.Black), strokeLineWidth = 1.75f,
-                strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round,
-            )
-        }
+        // The legacy Compose API and tests expect a single VectorPath per glyph.
+        // Multiple moveto subpaths share this one VectorPath without altering geometry.
+        addPath(
+            pathData = strokes.flatMap { PathParser().parsePathString(it).toNodes() },
+            stroke = SolidColor(Color.Black), strokeLineWidth = 1.75f,
+            strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round,
+        )
     }.build()
