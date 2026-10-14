@@ -27,5 +27,8 @@ dependencies {
             implementation("androidx.lifecycle:$artifact:${libs.versions.lifecycle.get()}")
         }
         implementation("androidx.tracing:tracing:1.2.0")
+        // Resolve the already checksummed version in gradle/verification-metadata.xml;
+        // the earlier transitive 1.2.0 module has no verified metadata entry.
+        implementation("androidx.emoji2:emoji2:1.4.0")
     }
 }
