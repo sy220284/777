@@ -226,6 +226,46 @@ for marker in ("S03Board", "S02v2Work", "mobile-screen-tabs", "38 场景", "目�
         violations.append(f"V6 prototype reintroduced obsolete reference: {marker}")
 if "Figma" not in v6_spec or "#711" not in v6_spec:
     violations.append("V6 spec omitted Figma or pending PR #711 state")
+
+# Exact Compose -> HTML token parity; labels alone are not enough to prevent reintroducing old white glass.
+v6_foundation = (ROOT / "app/src/main/java/com/shenyan/designsystem/foundation/ShenyanFoundation.kt").read_text(encoding="utf-8")
+v6_preview = (v6_root / "assets/file-icons-preview.svg").read_text(encoding="utf-8")
+def read_primitive_style(css, selector, name):
+    m = re.search(re.escape(selector) + r"\s*\{([^}]+)\}", css)
+    if not m:
+        return None
+    val = re.search(r"--" + re.escape(name) + r"\s*:\s*([^;]+)\s*;", m.group(1))
+    return val.group(1).strip() if val else None
+for theme, selector in (("Light", ":root"), ("Dark", 'body[data-theme="dark"]'), ("Matte", 'body[data-theme="matte"]')):
+    palette = re.search(r"private val " + theme + r" = SyColors\((.*?)\n\)", v6_foundation, re.S)
+    if not palette:
+        violations.append(f"V6 palette missing from Compose: {theme}")
+        continue
+    def native_argb(name):
+        m = re.search(r"\b" + name + r"\s*=\s*Color\(0x([0-9A-Fa-f]{8})\)", palette.group(1))
+        return m.group(1).upper() if m else None
+    for name, css_key in (("canvas", "canvas"), ("materialL1","l1"), ("materialL2","l2"), ("materialL3","l3"), ("materialL4","l4"), ("materialL5","l5")):
+        value = native_argb(name)
+        css_value = read_primitive_style(v6_html, selector, css_key)
+        if not value or not css_value:
+            violations.append(f"V6 {theme} {name}: source token missing")
+            continue
+        expected_rgb = "#" + value[2:]
+        alpha = int(value[:2], 16)/255
+        if css_value.upper() == expected_rgb and alpha == 1:
+            pass
+        else:
+            rgba = re.fullmatch(r"rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([0-9.]+)\s*\)", css_value)
+            if not rgba:
+                violations.append(f"V6 {theme} {name}: invalid CSS token -> {css_value}")
+                continue
+            vals = tuple(int(x) for x in rgba.groups()[:3])
+            expected_vals = tuple(int(value[i:i+2],16) for i in (2,4,6))
+            if vals != expected_vals or abs(float(rgba.group(4))-alpha) > .003:
+                violations.append(f"V6 {theme} {name}: CSS drifted from Compose 0x{value}")
+        if name.startswith("materialL") and value not in v6_preview:
+            violations.append(f"V6 material SVG preview outdated: {theme} {name} 0x{value}")
+
 # Also validate local source links in the actual V6 authority.
 for link in re.findall(r"\]\(([^)]+)\)", v6_spec):
     url = link.split("#")[0].split("?")[0].strip()
