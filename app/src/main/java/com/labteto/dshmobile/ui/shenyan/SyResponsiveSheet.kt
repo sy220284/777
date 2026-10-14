@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.SheetDefaults
 import com.shenyan.designsystem.components.SyMaterialSurface
 import com.shenyan.designsystem.components.SyMaterialTier
 import androidx.compose.ui.graphics.Color
@@ -61,6 +62,7 @@ fun SyResponsiveSheet(
     showDragHandle: Boolean = true,
     floating: Boolean = false,
     surfaceTier: SyMaterialTier = SyMaterialTier.L4_OVERLAY,
+    seamlessBackground: Boolean = false,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -138,12 +140,19 @@ fun SyResponsiveSheet(
                         easing = CubicBezierEasing(.22f, 1f, .36f, 1f)
                     )) { fullWidth -> fullWidth },
                 ) {
-                    SyMaterialSurface(
-                        modifier = modifier.width(420.dp).fillMaxHeight()
-                            .padding(if (floating) 18.dp else 10.dp),
-                        shape = RoundedCornerShape(SyDimensions.cornerOverlay),
-                        tier = surfaceTier,
-                    ) { SheetBody() }
+                    val panelModifier = modifier.width(420.dp).fillMaxHeight()
+                        .padding(if (floating) 18.dp else 10.dp)
+                    if (seamlessBackground) {
+                        // The attachment menu lives directly over the current app background.
+                        // A lower material tier still paints a solid sheet and cannot remove it.
+                        Box(panelModifier) { SheetBody() }
+                    } else {
+                        SyMaterialSurface(
+                            modifier = panelModifier,
+                            shape = RoundedCornerShape(SyDimensions.cornerOverlay),
+                            tier = surfaceTier,
+                        ) { SheetBody() }
+                    }
                 }
             }
         }
@@ -154,12 +163,17 @@ fun SyResponsiveSheet(
             modifier = if (floating) modifier.padding(horizontal = 6.dp) else modifier,
             shape = RoundedCornerShape(SyDimensions.cornerOverlay),
             containerColor = Color.Transparent,
-            scrimColor = p.scrim,
+            scrimColor = if (seamlessBackground) Color.Transparent else p.scrim,
+            tonalElevation = if (seamlessBackground) 0.dp else SheetDefaults.Elevation,
             dragHandle = null,
             contentWindowInsets = { WindowInsets.navigationBars },
         ) {
-            SyMaterialSurface(tier = surfaceTier,
-                shape = RoundedCornerShape(SyDimensions.cornerOverlay)) { SheetBody() }
+            if (seamlessBackground) {
+                SheetBody()
+            } else {
+                SyMaterialSurface(tier = surfaceTier,
+                    shape = RoundedCornerShape(SyDimensions.cornerOverlay)) { SheetBody() }
+            }
         }
     }
 }
