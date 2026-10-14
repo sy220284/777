@@ -2179,6 +2179,7 @@
     <string name="media_chat_creation_safe_retry">为避免重复计费，应用不会自动重新提交此请求。</string>
     <string name="media_chat_preview_unavailable">预览暂时不可用，可打开原图查看</string>
     <string name="fluid_message_actions">消息操作</string>
+    <string name="fluid_message_create">创作</string>
     <string name="fluid_message_media_image">基于此消息生成图像</string>
     <string name="fluid_message_media_video">基于此消息生成视频</string>
     <string name="fluid_message_media_speech">基于此消息合成语音</string>

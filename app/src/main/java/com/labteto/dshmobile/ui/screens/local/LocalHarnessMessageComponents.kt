@@ -25,6 +25,8 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -83,6 +85,9 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ThinkingRow
@@ -129,7 +134,7 @@ internal fun localJobStatusLabel(status: String): String = when (status) {
 }
 
 @Composable
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 internal fun LocalMessageRow(
     message: LocalHarnessMessage,
     chatMode: Boolean,
@@ -326,9 +331,6 @@ internal fun LocalMessageRow(
                         text = stringResource(R.string.local_regenerate_reply), icon = FeatherIcons.Retry,
                         onClick = { if (!onRegenerate(message.id))
                             Toast.makeText(context, regenerateFailedMessage, Toast.LENGTH_SHORT).show() }))
-                    onCreateMedia?.takeIf { !streaming && copyableContent.isNotBlank() }?.let { create ->
-                        addAll(fluidMessageMediaItems(message.copy(content = copyableContent), create))
-                    }
                 })
                 LocalAssistantMessageContent(
                     message = message,
@@ -338,18 +340,21 @@ internal fun LocalMessageRow(
                     chatMode = chatMode,
                 )
                 }
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth().testTag("messageActionToolbar:${message.id}"),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     if (chatMode) {
-                        MessageVariantControls(
-                            messageId = message.id,
-                            branchInfo = branchInfo,
-                            enabled = canSelectVariant && !selectingVariant,
-                            onSelectVariant = selectVariantWithFeedback,
-                        )
+                        // 分支切换作为一个整体换行，窄屏不拆散左右箭头与页码。
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            MessageVariantControls(
+                                messageId = message.id,
+                                branchInfo = branchInfo,
+                                enabled = canSelectVariant && !selectingVariant,
+                                onSelectVariant = selectVariantWithFeedback,
+                            )
+                        }
                     }
                     if (copyableContent.isNotBlank()) {
                         CompactMessageAction(
@@ -378,6 +383,17 @@ internal fun LocalMessageRow(
                             }
                         },
                     )
+                    // 创作是独立的明确入口；正文长按继续保留原生选词能力。
+                    onCreateMedia?.takeIf { !streaming && copyableContent.isNotBlank() }?.let { create ->
+                        SyButton(
+                            text = stringResource(R.string.fluid_message_create),
+                            icon = FeatherIcons.Sparkles,
+                            onClick = { create(message.copy(content = copyableContent), LocalMediaKind.IMAGE) },
+                            modifier = Modifier.testTag("messageCreate:${message.id}"),
+                            variant = SyButtonVariant.Ghost,
+                            size = SyButtonSize.Small,
+                        )
+                    }
                 }
             }
         }
