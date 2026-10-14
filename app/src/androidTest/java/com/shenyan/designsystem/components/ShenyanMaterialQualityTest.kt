@@ -185,8 +185,8 @@ class ShenyanMaterialQualityTest {
         }
         val compact = compose.onNodeWithTag("compact-material").getUnclippedBoundsInRoot()
         val sibling = compose.onNodeWithTag("sibling-title").getUnclippedBoundsInRoot()
-        assertTrue("Decorative rim must not determine the material width", compact.width < 80.dp)
-        assertTrue("Adjacent text must retain usable width", sibling.width > 160.dp)
+        assertTrue("Decorative rim must not determine the material width", (compact.right - compact.left) < 80.dp)
+        assertTrue("Adjacent text must retain usable width", (sibling.right - sibling.left) > 160.dp)
     }
 
 }
