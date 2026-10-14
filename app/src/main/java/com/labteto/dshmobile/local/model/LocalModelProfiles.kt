@@ -232,6 +232,7 @@ data class LocalModelPreset(
  * detection decides whether image input is available.
  */
 object LocalModelPresets {
+    /** API offers exposed to the Add Model picker. ChatGPT Plan models have their own account catalog. */
     val entries = listOf(
         LocalModelPreset(
             provider = "DeepSeek",
@@ -339,6 +340,14 @@ object LocalModelPresets {
             imageInputSupported = true,
             contextWindowTokens = 262_144,
         ),
+    )
+
+    /**
+     * Read-only metadata for previously saved API routes and ChatGPT Plan runtime contracts.
+     * Never rendered as an API preset. Keeping this metadata avoids silently degrading existing
+     * user-created routes and the independent ChatGPT subscription transport.
+     */
+    private val compatibilityMetadata = listOf(
         LocalModelPreset(
             provider = "智谱 GLM",
             model = "glm-5.3-flash",
@@ -591,7 +600,7 @@ object LocalModelPresets {
                 it.provider == "Kimi Code" && it.model.equals(normalizedModel, ignoreCase = true)
             }?.copy(baseUrl = normalizedBaseUrl)
         }
-        return entries.firstOrNull { preset ->
+        return (entries + compatibilityMetadata).firstOrNull { preset ->
             preset.model.equals(normalizedModel, ignoreCase = true) &&
                 normalizeModelBaseUrl(preset.baseUrl) == normalizedBaseUrl
         }
