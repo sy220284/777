@@ -15,9 +15,9 @@ fold = 'M29,1V6C29,7.7 30.3,9 32,9H37'
 for kind, glyph in spec['glyphs'].items():
     for theme, colors in spec['themes'].items():
         name = f'ic_ui_file{kind}_{theme}'
-        paths = [(paper, colors['paper'], colors['edge'], 1.4),
-                 (fold, 'none', colors['edge'], 1.4),
-                 (glyph, 'none', colors[kind], 2)]
+        paths = [(paper, colors['paper'], colors['edge'], 1.75),
+                 (fold, 'none', colors['edge'], 1.75),
+                 (glyph, 'none', colors[kind], 1.75)]
         xml = ['<vector xmlns:android="http://schemas.android.com/apk/res/android"',
                '    android:width="40dp" android:height="40dp" android:viewportWidth="40" android:viewportHeight="40">']
         svg = ['<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">', f'<title>{escape(spec["labels"][kind])} · {theme}</title>']
