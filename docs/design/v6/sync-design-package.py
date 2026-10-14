@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package current Android V6 source of truth. Never inherit historical 38-screen archives.
+"""Package current Android V6 source of truth and validate actual editable icon inventory.
 
 Usage: python docs/design/v6/sync-design-package.py \
   --source docs/design/v6 --output /tmp/shenyan-v6-current.zip
@@ -70,6 +70,27 @@ if routes != ["HOME", "PERSONA_GALLERY", "DIARY", "WORKSPACE", "TASKS", "TOOLS",
     parser.error("V6 route inventory changed; audit and update package contract before exporting")
 if any(s in html for s in ("S03Board", "S02v2Work", "mobile-screen-tabs", "38 场景")):
     parser.error("Obsolete design screens/controls re-entered current prototype")
+
+
+# Review the actual generated icon assets, not the advertised count in a Markdown file.
+entry_svg = source / "sy-entry-icons.svg"
+root = ElementTree.parse(entry_svg).getroot()
+ns = "{http://www.w3.org/2000/svg}"
+icon_labels = [node.text for node in root.findall(ns + "text") if node.text and re.fullmatch(r"[A-Za-z][A-Za-z0-9]+", node.text)]
+expected_icons = int(manifest["iconInventory"]["activeCount"])
+retired_names = set(manifest["iconInventory"]["retired"])
+if len(icon_labels) != expected_icons or len(set(icon_labels)) != expected_icons:
+    parser.error("Active SVG sprite must contain exactly 24 distinct named entry glyphs")
+if retired_names.intersection(icon_labels):
+    parser.error("Retired entry icons re-entered current V6 SVG sheet")
+asset_match = re.search(r"window\\.V6_ASSET_DATA\\s*=\\s*(\\{[^;]+\\})\\s*;", html)
+if not asset_match:
+    parser.error("V6 standalone HTML missing embedded offline icon sources")
+icons = json.loads(asset_match.group(1))
+if set(icon_labels) != set(icons):
+    parser.error("Standalone HTML and editable SVG sheet have different active icon sets")
+if 'data-v6-authoritative="compose-' not in html:
+    parser.error("Offline design lost Compose source marker")
 
 allowed_files = [source / name for name in required]
 allowed_files += sorted(p for p in (source / "assets").rglob("*") if p.is_file())
