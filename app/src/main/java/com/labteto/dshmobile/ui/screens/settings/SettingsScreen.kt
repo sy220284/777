@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -1059,7 +1060,7 @@ internal fun SettingsSeamlessGroup(
     content: @Composable () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag("settingsSeamlessGroup"),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
     ) {
         SettingsGroupTitle(title)
@@ -1074,24 +1075,9 @@ internal fun SettingsSeamlessGroup(
 }
 
 @Composable
-internal fun SettingsCard(
-    title: String,
-    content: @Composable () -> Unit,
-) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-        SettingsGroupTitle(title)
-        // The settings groups sample the same V6 wallpaper / light field as the page.
-        // Keep content crisp; only the material backing layer is blurred.
-        SyMaterialFrame(
-            modifier = Modifier.fillMaxWidth(),
-            tier = SyMaterialTier.L3_CARD,
-            horizontalPadding = SyMetric.gapLg,
-            verticalPadding = SyMetric.gapLg,
-            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-        ) {
-            content()
-        }
-    }
+internal fun SettingsCard(title: String, content: @Composable () -> Unit) {
+    // Lightweight settings share the same canvas. Explicit data/approval cards keep their own material.
+    SettingsSeamlessGroup(title, content)
 }
 
 /** 更新检查是设置页内的即时操作，不占用独立导航层级。 */

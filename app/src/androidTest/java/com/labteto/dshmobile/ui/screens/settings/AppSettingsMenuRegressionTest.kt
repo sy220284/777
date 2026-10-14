@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DshTheme
@@ -51,10 +52,22 @@ class AppSettingsMenuRegressionTest {
             }
         }
 
+        compose.onNodeWithTag("settingsOpenSection").assertExists()
         compose.onNodeWithText("外观与阅读").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, selected.intValue) }
         compose.onNodeWithText("个性化与记忆").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(2, selected.intValue) }
+    }
+
+    @Test
+    fun notificationPreferencesUseSeamlessGrouping() {
+        compose.setContent {
+            DshTheme {
+                SettingsCard("通知") { Text("任务提醒") }
+            }
+        }
+        compose.onNodeWithTag("settingsSeamlessGroup").assertExists()
+        compose.onNodeWithText("任务提醒").assertIsDisplayed()
     }
 
     @Test

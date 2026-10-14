@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.test.platform.app.InstrumentationRegistry
@@ -232,6 +233,7 @@ class LocalFeatureEntryDescriptionsRegressionTest {
                 )
             }
         }
+        compose.onNodeWithTag("sySeamlessContextScene").assertIsDisplayed()
         labels.forEach { label -> compose.onNodeWithText(label).assertIsDisplayed() }
         compose.onNodeWithText(labels.last()).performClick()
         compose.runOnIdle { assertEquals(labels.last(), clicked) }

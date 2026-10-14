@@ -203,7 +203,7 @@ fun SyPopupMenu(
     modifier: Modifier = Modifier,
     focusable: Boolean = true,
     containerColor: Color? = null,
-    seamlessBackground: Boolean = false,
+    seamlessBackground: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val p = LocalSyColors.current
@@ -238,7 +238,7 @@ fun SyPopupMenu(
         content = {
             if (seamlessBackground) {
                 SySceneBackgroundSurface(
-                    modifier = Modifier.widthIn(min = 232.dp),
+                    modifier = Modifier,
                     shape = RoundedCornerShape(SyMetric.radiusControl),
                     tag = "sySeamlessPopupScene",
                 ) {
@@ -257,7 +257,7 @@ fun SyPopupMenu(
     items: List<SyMenuItem>,
     focusable: Boolean = true,
     containerColor: Color? = null,
-    seamlessBackground: Boolean = false,
+    seamlessBackground: Boolean = true,
 ) {
     val p = LocalSyColors.current
     SyPopupMenu(expanded, onDismiss,
@@ -316,12 +316,10 @@ fun SyContextActionMenu(
         properties = PopupProperties(
             focusable = true, dismissOnBackPress = true,
             dismissOnClickOutside = true, clippingEnabled = true)) {
-        SyMaterialSurface(
+        SySceneBackgroundSurface(
             modifier = Modifier.widthIn(max = maxMenuWidth),
-            tier = SyMaterialTier.L4_OVERLAY,
             shape = RoundedCornerShape(SyMetric.radiusControl),
-            border = BorderStroke(1.dp, p.border),
-            shadowElevation = 12.dp,
+            tag = "sySeamlessContextScene",
         ) {
             // Wrap actions rather than allowing the popup to run off the display.
             FlowRow(

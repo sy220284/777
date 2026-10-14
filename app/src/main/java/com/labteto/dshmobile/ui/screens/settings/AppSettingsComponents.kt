@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.shenyan.designsystem.components.SyIconBox
 import com.shenyan.designsystem.components.SyMaterialFrame
@@ -42,16 +43,13 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
  */
 @Composable
 internal fun AppSettingsSection(compact: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
-    SyMaterialFrame(
-        modifier = Modifier.fillMaxWidth(),
-        tier = SyMaterialTier.L3_CARD,
-        shape = if (compact) DsShapes.settingsGroup else DsShapes.block,
-        horizontalPadding = 0.dp,
-        verticalPadding = SyMetric.gapXs,
+    Column(
+        modifier = Modifier.fillMaxWidth()
+            .testTag("settingsOpenSection")
+            .padding(vertical = if (compact) SyMetric.gapXs else SyMetric.gapSm),
         verticalArrangement = Arrangement.Top,
-    ) {
-        content()
-    }
+        content = content,
+    )
 }
 
 @Composable

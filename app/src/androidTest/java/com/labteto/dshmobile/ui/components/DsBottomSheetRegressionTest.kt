@@ -128,6 +128,25 @@ class DsBottomSheetRegressionTest {
     }
 
     @Test
+    fun defaultPopupMenuUsesContinuousBackground() {
+        var clicked = 0
+        compose.setContent {
+            DshTheme {
+                Box {
+                    SyPopupMenu(
+                        expanded = true,
+                        onDismiss = {},
+                        items = listOf(SyMenuItem("编辑任务", onClick = { clicked++ })),
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("sySeamlessPopupScene").assertIsDisplayed()
+        compose.onNodeWithText("编辑任务").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1, clicked) }
+    }
+
+    @Test
     fun seamlessPersonaPickerKeepsHeaderAndContentsVisible() {
         compose.setContent {
             DshTheme {
