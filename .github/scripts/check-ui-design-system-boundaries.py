@@ -11,6 +11,7 @@ import re
 import json
 import sys
 import subprocess
+import subprocess
 import tempfile
 import zipfile
 from xml.etree import ElementTree
@@ -315,6 +316,17 @@ try:
                     violations.append("V6 exported ZIP contains an incorrect/retired icon inventory")
 except (OSError, KeyError, ValueError, TimeoutError, zipfile.BadZipFile) as exc:
     violations.append(f"V6 ZIP exporter validation failed: {exc}")
+
+# Check the standalone mobile HTML is reproducible from the committed editable source and 24 SVG assets.
+try:
+    generated = subprocess.run(
+        [sys.executable, str(v6_root / "build-standalone.py"), "--check"],
+        capture_output=True, text=True, timeout=20, check=False,
+    )
+    if generated.returncode != 0:
+        violations.append("V6 offline preview drifted from editable source: " + (generated.stderr.strip() or generated.stdout.strip())[:360])
+except (OSError, subprocess.TimeoutExpired) as exc:
+    violations.append("V6 offline generator check failed: " + str(exc))
 
 # Also validate local source links in the actual V6 authority.
 for link in re.findall(r"\]\(([^)]+)\)", v6_spec):
