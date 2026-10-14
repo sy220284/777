@@ -148,6 +148,7 @@ fun SyRadioControl(
     )
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun SySliderControl(
     value: Float,
@@ -159,6 +160,18 @@ fun SySliderControl(
     onValueChangeFinished: (() -> Unit)? = null,
 ) {
     val p = LocalSyColors.current
+    val controlColors = SliderDefaults.colors(
+        thumbColor = p.primary,
+        activeTrackColor = p.primary,
+        inactiveTrackColor = p.textSecondary.copy(alpha = .20f),
+        activeTickColor = Color.Transparent,
+        inactiveTickColor = Color.Transparent,
+        disabledThumbColor = p.textTertiary,
+        disabledActiveTrackColor = p.primary.copy(alpha = .32f),
+        disabledInactiveTrackColor = p.textSecondary.copy(alpha = .12f),
+        disabledActiveTickColor = Color.Transparent,
+        disabledInactiveTickColor = Color.Transparent,
+    )
     Slider(
         value = value,
         onValueChange = onValueChange,
@@ -167,17 +180,18 @@ fun SySliderControl(
         valueRange = valueRange,
         steps = steps,
         onValueChangeFinished = onValueChangeFinished,
-        colors = SliderDefaults.colors(
-            thumbColor = p.primary, activeTrackColor = p.primary,
-            inactiveTrackColor = syMaterialColor(SyMaterialTier.L2_BAR),
-            activeTickColor = Color.Transparent,
-            inactiveTickColor = Color.Transparent,
-            disabledThumbColor = p.textTertiary,
-            disabledActiveTrackColor = p.primary.copy(alpha = .32f),
-            disabledInactiveTrackColor = syMaterialColor(SyMaterialTier.L2_BAR).copy(alpha = .6f),
-            disabledActiveTickColor = Color.Transparent,
-            disabledInactiveTickColor = Color.Transparent,
-        ),
+        colors = controlColors,
+        track = { sliderState ->
+            SliderDefaults.Track(
+                sliderState = sliderState,
+                enabled = enabled,
+                colors = controlColors,
+                drawStopIndicator = null,
+                drawTick = { _, _ -> },
+                thumbTrackGapSize = 0.dp,
+                trackInsideCornerSize = 0.dp,
+            )
+        },
     )
 }
 

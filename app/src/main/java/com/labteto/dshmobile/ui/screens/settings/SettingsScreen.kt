@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -78,8 +79,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.shenyan.SyToastHost
-import com.labteto.dshmobile.ui.shenyan.SyMaterialFrame
-import com.labteto.dshmobile.ui.shenyan.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.shenyan.SyHierarchyPage
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -88,7 +87,6 @@ import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.shenyan.SyUserBubble
 import com.labteto.dshmobile.ui.shenyan.rememberSyToast
 import com.labteto.dshmobile.ui.theme.AccentPalettes
-import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -482,17 +480,17 @@ fun SettingsScreen(
 
                     SettingsDestination.APPEARANCE -> {
                         // Keep common appearance compact; advanced appearance expands in place.
-                        SettingsCard(stringResource(R.string.settings_appearance)) {
+                        SettingsSeamlessGroup(stringResource(R.string.settings_appearance)) {
                             AppearanceRow(settings) { mode ->
                                 viewModel.set { it.copy(themePreference = mode) }
                             }
                         }
-                        SettingsCard(stringResource(R.string.settings_accent_theme)) {
+                        SettingsSeamlessGroup(stringResource(R.string.settings_accent_theme)) {
                             AccentThemeRow(settings) { key ->
                                 viewModel.set { it.copy(accentTheme = key) }
                             }
                         }
-                        SettingsCard(stringResource(R.string.settings_reading_preferences)) {
+                        SettingsSeamlessGroup(stringResource(R.string.settings_reading_preferences)) {
                             ReadingPreferencesRow(
                                 settings,
                                 onTextScaleChange = { value ->
@@ -509,7 +507,7 @@ fun SettingsScreen(
                             )
                             AppearanceReadingPreview()
                         }
-                        SettingsCard(stringResource(R.string.settings_background_image)) {
+                        SettingsSeamlessGroup(stringResource(R.string.settings_background_image)) {
                             BackgroundRow(
                                 settings.backgroundImagePath,
                                 onPick = { uri -> viewModel.setBackgroundImage(uri) { message -> toast.second(message) } },
@@ -517,7 +515,7 @@ fun SettingsScreen(
                             )
                         }
                         var advancedExpanded by rememberSaveable { mutableStateOf(false) }
-                        SettingsCard(stringResource(R.string.settings_advanced_appearance)) {
+                        SettingsSeamlessGroup(stringResource(R.string.settings_advanced_appearance)) {
                             ToggleRow(
                                 stringResource(R.string.settings_advanced_expand),
                                 advancedExpanded,
@@ -1050,25 +1048,34 @@ private fun ChatFilterPhraseRow(
     }
 }
 
+/** The + menu's continuous scene is already behind this page.
+ * These two visual settings pages use open sections, not nested L3 glass cards.
+ * Other settings retain SettingsCard's existing material and behavior.
+ */
 @Composable
-internal fun SettingsCard(
+internal fun SettingsSeamlessGroup(
     title: String,
     content: @Composable () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("settingsSeamlessGroup"),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+    ) {
         SettingsGroupTitle(title)
-        // The settings groups sample the same V6 wallpaper / light field as the page.
-        // Keep content crisp; only the material backing layer is blurred.
-        SyMaterialFrame(
-            modifier = Modifier.fillMaxWidth(),
-            tier = SyMaterialTier.L3_CARD,
-            horizontalPadding = SyMetric.gapLg,
-            verticalPadding = SyMetric.gapLg,
-            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+        Column(
+            modifier = Modifier.fillMaxWidth()
+                .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapXs),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
         ) {
             content()
         }
     }
+}
+
+@Composable
+internal fun SettingsCard(title: String, content: @Composable () -> Unit) {
+    // Lightweight settings share the same canvas. Explicit data/approval cards keep their own material.
+    SettingsSeamlessGroup(title, content)
 }
 
 /** 更新检查是设置页内的即时操作，不占用独立导航层级。 */

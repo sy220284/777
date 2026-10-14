@@ -47,7 +47,7 @@ internal fun ModelPerformanceSettingsPage() {
     val limits by LocalModelPerformanceControls.state.collectAsState()
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
 
-    SettingsCard(stringResource(R.string.settings_model_performance_reasoning)) {
+    SettingsSeamlessGroup(stringResource(R.string.settings_model_performance_reasoning)) {
         Text(
             stringResource(R.string.settings_model_performance_reasoning_hint),
             style = DsType.small13.withReadingWeight(),
@@ -66,7 +66,7 @@ internal fun ModelPerformanceSettingsPage() {
                 Modifier.fillMaxWidth()
                     .heightIn(min = 48.dp)
                     .clip(DsShapes.row)
-                    .background(if (limits.reasoningCeiling == ceiling) colors.selected
+                    .background(if (limits.reasoningCeiling == ceiling) colors.selected.copy(alpha = 0.45f)
                         else androidx.compose.ui.graphics.Color.Transparent)
                     .selectable(selected = limits.reasoningCeiling == ceiling, role = Role.RadioButton,
                         onClick = { LocalModelPerformanceControls.setReasoningCeiling(ceiling) })
@@ -87,7 +87,7 @@ internal fun ModelPerformanceSettingsPage() {
         )
     }
 
-    SettingsCard(stringResource(R.string.settings_model_performance_temperature)) {
+    SettingsSeamlessGroup(stringResource(R.string.settings_model_performance_temperature)) {
         Text(
             stringResource(R.string.settings_model_performance_temperature_hint),
             style = DsType.small13.withReadingWeight(), color = colors.textSecondary,

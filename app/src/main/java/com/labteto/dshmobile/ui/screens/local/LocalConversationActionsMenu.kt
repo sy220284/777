@@ -37,6 +37,8 @@ internal fun ConversationActionsMenu(
         SyPopupMenu(
             expanded = expanded,
             onDismiss = { expanded = false },
+            // Match the attachment + menu: paint the aligned chat scene, not an opaque L4 plate.
+            seamlessBackground = true,
             items = listOf(
                 SyMenuItem(
                     text = stringResource(R.string.common_rename),

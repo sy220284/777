@@ -440,6 +440,7 @@ internal fun PersonaGalleryScreen(
         SyResponsiveSheet(
             title = stringResource(R.string.persona_gallery_export_format_title),
             onDismiss = { showExportFormatDialog = false },
+            seamlessBackground = true,
         ) {
             Text(
                 stringResource(R.string.persona_gallery_export_format_hint),
@@ -482,6 +483,7 @@ internal fun PersonaGalleryScreen(
             title = stringResource(R.string.persona_gallery_more_actions),
             subtitle = selected.persona.name,
             onDismiss = ::dismissMoreActions,
+            seamlessBackground = true,
             dismissEnabled = !busy && !inspecting,
             scrollable = true,
             footer = {
@@ -743,6 +745,7 @@ internal fun PersonaGalleryScreen(
         SyResponsiveSheet(
             title = stringResource(R.string.persona_gallery_portrait_actions_title),
             onDismiss = { showPortraitActions = false },
+            seamlessBackground = true,
             dismissEnabled = !busy,
         ) {
             SySheetChoiceRow(
