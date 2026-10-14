@@ -10,6 +10,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,7 +32,7 @@ internal fun NextChatGroupManager(
     identity: UiSessionIdentity,
     onReceipt: (UiCommandReceipt) -> Unit,
 ) {
-    val snapshot = groups.snapshot()
+    val snapshot by groups.snapshots.collectAsStateWithLifecycle(initialValue = groups.snapshot())
     if (snapshot.identity != identity || !snapshot.active) return
 
     var open by remember(identity) { mutableStateOf(false) }
@@ -45,7 +46,7 @@ internal fun NextChatGroupManager(
     }) { Text(stringResource(R.string.next_group_manage)) }
 
     if (open) {
-        val current = groups.snapshot()
+        val current = snapshot
         if (current.identity == identity && current.active) {
         AlertDialog(
             onDismissRequest = { open = false },
@@ -72,7 +73,7 @@ internal fun NextChatGroupManager(
                     onClick = {
                         val result = groups.submit(ChatGroupUiCommand.ConfigureMembers(identity, selected.toList()))
                         onReceipt(result)
-                        if (result == UiCommandReceipt.Accepted) open = false
+                        if (result == UiCommandReceipt.Accepted || result == UiCommandReceipt.Queued) open = false
                     },
                 ) { Text(stringResource(R.string.next_group_save)) }
             },

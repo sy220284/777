@@ -472,8 +472,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val loadedSearchState = rememberV6LoadedConversationSearchState(state.sessionId)
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
     var showCharacterTuning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
-    var showGroupMemberPicker by rememberSaveable { mutableStateOf(false) }
-    var showGroupAnnouncement by rememberSaveable { mutableStateOf(false) }
+    var showGroupMemberPicker by remember(documentIdentity) { mutableStateOf(false) }
+    var showGroupAnnouncement by remember(documentIdentity) { mutableStateOf(false) }
     var showPersonaEditor by rememberSaveable { mutableStateOf(false) }
     var personaEditorDraft by remember { mutableStateOf<PersonaProfile?>(null) }
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }

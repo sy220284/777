@@ -481,7 +481,7 @@ fun LocalHarnessScreen(
         renameSession = viewModel::renameSession,
         deleteSessions = ::deleteSessionsAndNavigate,
         configureChatPersona = viewModel::configureChatPersona,
-        configureGroupMembers = viewModel::configureGroupChatMembers,
+        configureGroupMembers = { ids -> viewModel.configureGroupChatMembers(ids, sendIdentity) },
         selectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
         autoFillChatPersona = viewModel::autoFillChatPersona,
         saveGroupAnnouncement = viewModel::setGroupChatAnnouncement,

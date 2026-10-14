@@ -22,6 +22,8 @@ sealed interface ChatGroupUiCommand {
 }
 
 interface ChatGroupUiPort {
+    val snapshots: kotlinx.coroutines.flow.Flow<UiChatGroupManagementSnapshot>
+        get() = kotlinx.coroutines.flow.flowOf(snapshot())
     fun snapshot(): UiChatGroupManagementSnapshot
     fun submit(command: ChatGroupUiCommand): UiCommandReceipt
 }

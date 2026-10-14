@@ -9,6 +9,9 @@ import com.labteto.dshmobile.uicontract.UiChatGroupChoice
 import com.labteto.dshmobile.uicontract.UiChatGroupManagementSnapshot
 import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.UiCommandRejection
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -23,6 +26,8 @@ class LocalChatGroupUiAdapter @Inject internal constructor(
     private val chat: LocalChatRuntime,
     private val gallery: LocalChatUiFacade,
 ) : ChatGroupUiPort {
+    override val snapshots = store.state.map { snapshot() }.distinctUntilChanged()
+
     override fun snapshot(): UiChatGroupManagementSnapshot {
         val state = synchronized(store.foregroundRunHandle.lock) {
             val current = store.state.value
@@ -45,7 +50,7 @@ class LocalChatGroupUiAdapter @Inject internal constructor(
         )
     }
 
-    override fun submit(command: ChatGroupUiCommand): UiCommandReceipt =
+    override fun submit(command: ChatGroupUiCommand): UiCommandReceipt = try {
         synchronized(store.foregroundRunHandle.lock) {
             val current = store.state.value
             if (store.sessionTransitioning) return@synchronized UiCommandReceipt.Rejected(
@@ -64,11 +69,13 @@ class LocalChatGroupUiAdapter @Inject internal constructor(
                     if (selected.any { it !in available }) return@synchronized UiCommandReceipt.Rejected(
                         UiCommandRejection.UNSUPPORTED)
                     val entries = selected.map { available.getValue(it) }
-                    if (chat.configureGroupChatMembers(entries)) UiCommandReceipt.Accepted
+                    if (chat.configureGroupChatMembers(entries)) UiCommandReceipt.Queued
                     else UiCommandReceipt.NotAdmitted
                 }
             }
         }
+    } catch (cancelled: CancellationException) { throw cancelled }
+    catch (failure: Exception) { UiCommandReceipt.Failed(failure.message ?: "群聊操作未完成") }
 }
 
 @dagger.Module
