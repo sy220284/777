@@ -181,6 +181,7 @@ class LocalFeatureEntryDescriptionsRegressionTest {
                         modifier = Modifier.weight(1f),
                         onClick = { lastAction = "media" },
                     )
+                }
             }
         }
         listOf("拍照", "图片", "文件", "多模态创作").forEach {
