@@ -84,9 +84,7 @@ class DeepSeekClient @Inject constructor(
             put("model", model)
             put("messages", JsonArray(messages))
             put("stream", false)
-            // Official Kimi API models reject non-default sampling temperatures.
-            temperature?.takeUnless { LocalKimiPolicy.isOfficial(baseUrl) }
-                ?.let { put("temperature", it) }
+            temperature?.let { put("temperature", it) }
             val miniMax = LocalMiniMaxPolicy.isOfficial(baseUrl)
             if (miniMax) {
                 put("reasoning_split", true)
@@ -199,9 +197,7 @@ class DeepSeekClient @Inject constructor(
             put("model", model)
             put("messages", JsonArray(messages))
             put("stream", true)
-            // Official Kimi API models reject non-default sampling temperatures.
-            temperature?.takeUnless { LocalKimiPolicy.isOfficial(baseUrl) }
-                ?.let { put("temperature", it) }
+            temperature?.let { put("temperature", it) }
             put("stream_options", buildJsonObject { put("include_usage", true) })
             val miniMax = LocalMiniMaxPolicy.isOfficial(baseUrl)
             if (miniMax) {
