@@ -174,7 +174,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalChatGroupUiAdapter.kt",
-      "sha256": "5546b36137707265"
+      "sha256": "3787712ca091b0ac"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalContextBudget.kt",
@@ -638,7 +638,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/GroupAnnouncementSaveCoordinator.kt",
-      "sha256": "6b995d506ab8bebb"
+      "sha256": "1685c4ce13393a21"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/GroupReplyDeliveryLedger.kt",
@@ -770,7 +770,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt",
-      "sha256": "3227cdc6cbed9b05"
+      "sha256": "0547c0eea6d13d4c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatSendCoordinator.kt",
@@ -850,7 +850,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatMembershipCoordinator.kt",
-      "sha256": "235201e677e46822"
+      "sha256": "e1bd544b832543b9"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatSessionPolicy.kt",
@@ -2698,7 +2698,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "sha256": "f55fff127ea0b780"
+      "sha256": "d2af30bc156717c0"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStreamingComponents.kt",
@@ -2706,7 +2706,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "sha256": "c930dcd008394eb3"
+      "sha256": "f335bf3291292af3"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModelDefaults.kt",
@@ -3502,7 +3502,7 @@
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ChatGroupUiPort.kt",
-      "sha256": "31995b0488488b84"
+      "sha256": "bbca1bf82c0468c7"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ConversationDraftUiPort.kt",
@@ -3598,7 +3598,7 @@
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextChatGroupManager.kt",
-      "sha256": "47c85afede5564a8"
+      "sha256": "4df442a634114cb0"
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationUiPack.kt",
@@ -3678,14 +3678,20 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "a6e1aa2f3ac8",
+  "source_snapshot": "371fc60aa706",
   "observed_delta": {
-    "baseline": "77db5c6889e1",
+    "baseline": "a6e1aa2f3ac8",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiDocumentUiAdapter.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationUiPack.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/LocalChatGroupUiAdapter.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/GroupAnnouncementSaveCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatMembershipCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
+      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ChatGroupUiPort.kt",
+      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextChatGroupManager.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

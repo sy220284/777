@@ -279,7 +279,14 @@ class LocalHarnessViewModel @Inject constructor(
         return receipt == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted ||
             receipt == com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued
     }
-    suspend fun setGroupChatAnnouncement(text: String): Result<Unit> = runtime.chat.setGroupChatAnnouncement(text)
+    suspend fun setGroupChatAnnouncement(text: String, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Result<Unit> = withContext(Dispatchers.IO) {
+        val identity = expected ?: return@withContext Result.failure(IllegalStateException("会话已改变，请重新打开群公告"))
+        when (val receipt = chatGroupUiPort.submit(com.labteto.dshmobile.uicontract.ChatGroupUiCommand.SaveAnnouncement(identity, text))) {
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted -> Result.success(Unit)
+            is com.labteto.dshmobile.uicontract.UiCommandReceipt.Failed -> Result.failure(IllegalStateException(receipt.message))
+            else -> Result.failure(IllegalStateException("群公告未保存，请确认会话和运行状态后重试"))
+        }
+    }
 
     suspend fun editAndResendUserMessage(messageId: String, text: String, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?, mode: LocalUsageMode): LocalChatUserEditResult {
         val identity = expected ?: return LocalChatUserEditResult.UNAVAILABLE

@@ -10,13 +10,18 @@ data class UiChatGroupManagementSnapshot(
     val active: Boolean,
     val memberIds: Set<String>,
     val available: List<UiChatGroupChoice>,
+    val announcement: String = "",
     val busy: Boolean = false,
     val minimumMembers: Int = 2,
     val maximumMembers: Int = 6,
+    val maximumAnnouncementChars: Int = 2_000,
 )
 
 sealed interface ChatGroupUiCommand {
     val identity: UiSessionIdentity
+
+    data class SaveAnnouncement(override val identity: UiSessionIdentity, val text: String) : ChatGroupUiCommand
+    data class RemoveMember(override val identity: UiSessionIdentity, val galleryId: String) : ChatGroupUiCommand
 
     data class SetGroupMode(override val identity: UiSessionIdentity, val enabled: Boolean) : ChatGroupUiCommand
     data class CreateGroupSession(override val identity: UiSessionIdentity, val galleryIds: List<String>) : ChatGroupUiCommand

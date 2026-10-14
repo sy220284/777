@@ -112,20 +112,21 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
         return true
     }
 
-    internal fun remove(galleryId: String) {
+    internal fun remove(galleryId: String): Boolean {
         val snapshot = chatState.value
         if (
             !snapshot.canEditGroupMembers() ||
             snapshot.chat.groupChat.members.none { it.galleryId == galleryId }
-        ) return
+        ) return false
 
         val lease = LocalSessionRuntimeRegistry.tryAcquire(
             snapshot.sessionId,
             LocalSessionRuntimeKind.MAINTENANCE,
-        ) ?: return
+        ) ?: return false
+        var committed = false
         try {
             val current = chatState.value
-            if (!current.matchesGroupMemberEdit(snapshot)) return
+            if (!current.matchesGroupMemberEdit(snapshot)) return false
             val members = current.chat.groupChat.members.filterNot { it.galleryId == galleryId }
             val target = current.copy(
                 chat = current.chat.copy(
@@ -136,6 +137,7 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
             )
             val eventLog = sessionStorage.eventLogs.get(snapshot.sessionId)
             appendChatDomainStateCommit(eventLog, target, "group-member-deleted")
+            committed = true
             publishCommitted(target)
             sessionStorage.enqueueCurrentSnapshot(snapshot.sessionId)
             recordDerivedGroupState(
@@ -148,7 +150,8 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
                     put("count", members.size)
                 },
             )
-        } catch (error: Throwable) {
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (error: Exception) {
             publishError(
                 snapshot.sessionId,
                 error.message?.takeIf(String::isNotBlank)
@@ -157,6 +160,7 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
         } finally {
             lease.close()
         }
+        return committed
     }
 
     private fun publishCommitted(target: LocalChatProjectionState) {

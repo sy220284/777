@@ -86,19 +86,22 @@ class LocalChatRuntime @Inject internal constructor(
         sessionRuntime.switchDomainMode(LocalChatSessionModeCommand(mode))
     internal fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean =
         groupMembership.configure(entries, runtimeStateStore.foregroundRunHandle)
-    internal suspend fun setGroupChatAnnouncement(text: String): Result<Unit> {
+    /** UI admission holds the Shared foreground lock; the durable fact precedes its cache. */
+    internal fun commitGroupAnnouncementFromUi(text: String): Result<Unit> {
         val sessionId = runtimeStateStore.currentSessionId
-        return saveGroupChatAnnouncement(
-            state = chatState,
-            text = text,
-            sessionId = sessionId,
-            commitDomainState = { target ->
-                appendChatDomainStateCommit(
-                    sessionStorage.eventLogs.get(sessionId), target, "group-announcement-updated",
-                )
-            },
-            persistNow = sessionStorage::writeCurrentSnapshotNow,
-        )
+        val result = commitGroupChatAnnouncement(chatState, text, sessionId) { target ->
+            appendChatDomainStateCommit(sessionStorage.eventLogs.get(sessionId), target, "group-announcement-updated")
+        }
+        if (result.isFailure) return Result.failure(requireNotNull(result.exceptionOrNull()))
+        if (result.getOrThrow()) {
+            try { sessionStorage.enqueueCurrentSnapshot(sessionId) }
+            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                chatState.update { current -> if (current.sessionId == sessionId)
+                    current.copy(error = "群公告已保存，快照更新失败：${failure.message}") else current }
+            }
+        }
+        return Result.success(Unit)
     }
     internal fun removeGroupChatMemberByGalleryId(galleryId: String) =
         groupMembership.remove(galleryId)

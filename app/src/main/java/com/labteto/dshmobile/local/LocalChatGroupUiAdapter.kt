@@ -37,9 +37,11 @@ class LocalChatGroupUiAdapter @Inject internal constructor(
             active = usable && group.enabled,
             memberIds = if (usable && group.enabled) group.members.map { it.galleryId }.toSet() else emptySet(),
             available = if (usable) gallery.galleryEntries().map { UiChatGroupChoice(it.id, it.persona.name) } else emptyList(),
+            announcement = if (usable && group.enabled) group.announcement else "",
             busy = !usable || current.kernel.running,
             minimumMembers = com.labteto.dshmobile.local.chat.MIN_GROUP_CHAT_MEMBERS,
             maximumMembers = com.labteto.dshmobile.local.chat.MAX_GROUP_CHAT_MEMBERS,
+            maximumAnnouncementChars = com.labteto.dshmobile.local.chat.MAX_GROUP_CHAT_ANNOUNCEMENT_CHARS,
         )
     }
 
@@ -52,6 +54,15 @@ class LocalChatGroupUiAdapter @Inject internal constructor(
                 store.uiBindingIdentity(current) != command.identity
             ) return@synchronized UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
             when (command) {
+                is ChatGroupUiCommand.SaveAnnouncement -> {
+                    val result = chat.commitGroupAnnouncementFromUi(command.text)
+                    if (result.isSuccess) UiCommandReceipt.Accepted
+                    else UiCommandReceipt.Failed(result.exceptionOrNull()?.message ?: "群公告保存未完成")
+                }
+                is ChatGroupUiCommand.RemoveMember -> {
+                    if (chat.removeGroupChatMemberByGalleryId(command.galleryId)) UiCommandReceipt.Accepted
+                    else UiCommandReceipt.NotAdmitted
+                }
                 is ChatGroupUiCommand.SetGroupMode -> {
                     if (current.kernel.running) return@synchronized UiCommandReceipt.NotAdmitted
                     chat.switchChatMode(if (command.enabled) com.labteto.dshmobile.local.chat.LocalChatMode.GROUP

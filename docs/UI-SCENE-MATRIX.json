@@ -430,7 +430,10 @@
       "kind": "OVERLAY",
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/GroupChatMemberPicker.kt",
       "actions": [
-        "configure_members"
+        "configure_members",
+        "remove_member",
+        "enter_group_mode",
+        "leave_group_mode"
       ],
       "recovery": "Member gallery IDs + current session",
       "v6": 10,
@@ -439,6 +442,24 @@
       "actionProof": {
         "configure_members": {
           "ownerPort": "ChatGroupUiPort.submit(ChatGroupUiCommand.ConfigureMembers)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "remove_member": {
+          "ownerPort": "ChatGroupUiPort.submit(ChatGroupUiCommand.RemoveMember)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "enter_group_mode": {
+          "ownerPort": "ChatGroupUiPort.submit(ChatGroupUiCommand.SetGroupMode)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "leave_group_mode": {
+          "ownerPort": "ChatGroupUiPort.submit(ChatGroupUiCommand.SetGroupMode)",
           "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
@@ -460,8 +481,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "save_announcement": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ChatGroupUiPort.submit(ChatGroupUiCommand.SaveAnnouncement)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }

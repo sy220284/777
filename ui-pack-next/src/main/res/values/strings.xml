@@ -123,4 +123,9 @@
     <string name="next_group_create">新建群聊会话</string>
     <string name="next_group_enter">进入群聊模式</string>
     <string name="next_group_exit">退出群聊模式</string>
+    <string name="next_group_announcement">群公告</string>
+    <string name="next_group_announcement_content">公告内容（最多 %1$d 字符）</string>
+    <string name="next_group_announcement_save">保存公告</string>
+    <string name="next_group_remove">移除成员</string>
+    <string name="next_group_write_failed">操作未完成，请确认会话和运行状态后重试。</string>
 </resources>

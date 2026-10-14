@@ -493,7 +493,7 @@ fun LocalHarnessScreen(
         configureGroupMembers = { ids -> viewModel.configureGroupChatMembers(ids, sendIdentity) },
         selectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
         autoFillChatPersona = viewModel::autoFillChatPersona,
-        saveGroupAnnouncement = viewModel::setGroupChatAnnouncement,
+        saveGroupAnnouncement = { text -> viewModel.setGroupChatAnnouncement(text, sendIdentity) },
         undoPersonaCorrection = viewModel::undoChatPersonaCorrection,
         setPlanMode = { enabled -> sendIdentity?.let { submitPolicy(com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.SetPlanMode(it, enabled)) } },
         approve = { pendingId -> answerApprovalFromFrame(pendingId, true) },
