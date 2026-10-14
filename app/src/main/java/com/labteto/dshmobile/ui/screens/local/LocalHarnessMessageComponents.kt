@@ -150,7 +150,6 @@ internal fun LocalMessageRow(
     streaming: Boolean = false,
     skillDisplayNames: Map<String, String> = emptyMap(),
     onLocateSourceMemory: ((LocalHarnessMessage) -> Unit)? = null,
-    onReadMessage: ((LocalHarnessMessage) -> Unit)? = null,
     onCreateMedia: ((LocalHarnessMessage, LocalMediaKind) -> Unit)? = null,
     onConvertToWork: ((LocalHarnessMessage) -> Unit)? = null,
 ) {
@@ -324,9 +323,6 @@ internal fun LocalMessageRow(
                     if (copyableContent.isNotBlank()) add(SyMenuItem(
                         text = stringResource(R.string.common_copy), icon = FeatherIcons.Copy,
                         onClick = { clipboard.setText(AnnotatedString(copyableContent)); copied = true }))
-                    onReadMessage?.let { read -> add(SyMenuItem(
-                        text = stringResource(R.string.fluid_reader_title), icon = FeatherIcons.BookOpen,
-                        onClick = { read(message) })) }
                     if (canRegenerate) add(SyMenuItem(
                         text = stringResource(R.string.local_regenerate_reply), icon = FeatherIcons.Retry,
                         onClick = { if (!onRegenerate(message.id))
@@ -368,11 +364,6 @@ internal fun LocalMessageRow(
                             },
                         )
                     }
-                    onReadMessage?.let { read -> CompactMessageAction(
-                        icon = FeatherIcons.BookOpen, iconSize = 22.dp,
-                        contentDescription = stringResource(R.string.fluid_reader_title),
-                        onClick = { read(message) },
-                    ) }
                     if (canRegenerate) CompactMessageAction(
                         icon = FeatherIcons.Retry,
                         iconSize = 22.dp,

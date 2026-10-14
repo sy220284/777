@@ -140,7 +140,6 @@ internal fun DrawerQuickActions(
     onTools: () -> Unit,
     onMiniMaxQuota: (() -> Unit)? = null,
     onUsage: (() -> Unit)? = null,
-    onImmersiveReader: (() -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -149,9 +148,6 @@ internal fun DrawerQuickActions(
             onUsage?.let { openUsage ->
                 DrawerQuickAction(icon = SyEntryIcons.Usage,
                     title = stringResource(R.string.usage_calculation_title), onClick = openUsage)
-            }
-            onImmersiveReader?.let { read ->
-                DrawerQuickAction(SyEntryIcons.Reader, stringResource(R.string.fluid_reader_title), read)
             }
             if (usageMode == LocalUsageMode.CHAT) {
                 DrawerQuickAction(

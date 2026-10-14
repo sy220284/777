@@ -134,8 +134,6 @@ internal class LocalConversationSurfaceArgs(
     val state: LocalConversationSurfaceState,
     val workActions: LocalWorkFeatureUiActions?,
     val onOpenWorkArtifact: (String) -> Unit,
-    val readRequest: Long,
-    val onReaderDismissed: () -> Unit,
     val activeModelProfile: LocalModelProfile?,
     val sendFeedback: LocalSendFeedbackState,
     val streamingState: StateFlow<LocalHarnessStreamingState>,
@@ -198,8 +196,6 @@ internal fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
     workActions: LocalWorkFeatureUiActions? = null,
     onOpenWorkArtifact: (String) -> Unit = {},
-    readRequest: Long = 0L,
-    onReaderDismissed: () -> Unit = {},
     activeModelProfile: LocalModelProfile?,
     sendFeedback: LocalSendFeedbackState,
     streamingState: StateFlow<LocalHarnessStreamingState>,
@@ -260,8 +256,6 @@ internal fun LocalConversationSurface(
         state = state,
         workActions = workActions,
         onOpenWorkArtifact = onOpenWorkArtifact,
-        readRequest = readRequest,
-        onReaderDismissed = onReaderDismissed,
         activeModelProfile = activeModelProfile,
         sendFeedback = sendFeedback,
         streamingState = streamingState,
@@ -326,8 +320,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val state = args.state
     val workActions = args.workActions
     val onOpenWorkArtifact = args.onOpenWorkArtifact
-    val readRequest = args.readRequest
-    val onReaderDismissed = args.onReaderDismissed
     val activeModelProfile = args.activeModelProfile
     val sendFeedback = args.sendFeedback
     val streamingState = args.streamingState
@@ -392,16 +384,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         loadTurn = loadTurnUsage,
         loadRequest = loadUsageRequest,
     )
-    var readerOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
-    var readerMessageId by rememberSaveable(state.sessionId) { mutableStateOf<String?>(null) }
-    var consumedReadRequest by rememberSaveable { androidx.compose.runtime.mutableLongStateOf(0L) }
-    LaunchedEffect(readRequest) {
-        if (readRequest > consumedReadRequest) {
-            consumedReadRequest = readRequest
-            readerOpen = true
-            readerMessageId = state.messages.lastOrNull { it.role == "assistant" }?.id
-        }
-    }
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val rootSurfaceColor = colors.rootSurface()
     // Custom wallpapers remain visible behind the chat toolbar; work mode still gets its
@@ -1020,7 +1002,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                     null
                                 },
                                 onEdit = { message -> editingUserMessage = message },
-                                onReadMessage = { message -> readerOpen = true; readerMessageId = message.id },
                                 onCreateMedia = { message, kind ->
                                     mediaInitialPrompt = message.content
                                     mediaInitialKind = kind.name
@@ -1343,19 +1324,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         visible = state.usageMode == LocalUsageMode.CHAT,
         onSearchAll = onOpenGlobalSearch,
     )
-    if (readerOpen) {
-        val message = (transcriptHistory.olderMessages + state.messages).firstOrNull { it.id == readerMessageId }
-        FluidMessageReader(
-            title = message?.speakerName ?: sessionTitle,
-            content = message?.content?.let(::visibleAssistantText).orEmpty(),
-            onDismiss = {
-                readerOpen = false
-                readerMessageId = null
-                onReaderDismissed()
-            },
-        )
-    }
-
     state.pendingApproval
         ?.takeIf { state.usageMode == LocalUsageMode.WORK }
         ?.let { approval ->
