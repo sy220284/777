@@ -275,10 +275,11 @@ class LocalHarnessViewModel @Inject constructor(
     fun openGroupChatMode() = runtime.chat.switchChatMode(com.labteto.dshmobile.local.chat.LocalChatMode.GROUP)
     fun leaveGroupChatMode() = runtime.chat.switchChatMode(com.labteto.dshmobile.local.chat.LocalChatMode.SINGLE)
     fun configureGroupChatMembers(ids: List<String>): Boolean {
-        val entriesById = gallery.value.associateBy(PersonaGalleryEntry::id)
-        val entries = ids.distinct().mapNotNull(entriesById::get)
-        if (entries.size != ids.distinct().size) return false
-        return runtime.chat.configureGroupChatMembers(entries)
+        // V6 and Next now submit the same closed intent to the original Chat Owner.
+        val identity = chatGroupUiPort.snapshot().identity ?: return false
+        return chatGroupUiPort.submit(
+            com.labteto.dshmobile.uicontract.ChatGroupUiCommand.ConfigureMembers(identity, ids)
+        ) == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
     }
     suspend fun setGroupChatAnnouncement(text: String): Result<Unit> = runtime.chat.setGroupChatAnnouncement(text)
 
