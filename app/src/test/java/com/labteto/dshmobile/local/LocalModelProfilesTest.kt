@@ -20,9 +20,17 @@ import org.junit.Test
 class LocalModelProfilesTest {
     @Test fun clientCapabilityTagsOnlyAdvertiseImplementedInputs() {
         LocalModelPresets.entries.forEach { preset ->
-            assertFalse(LocalModelPresets.clientCapabilitiesFor(preset.model, preset.baseUrl).any {
-                it == LocalModelCapability.VIDEO || it == LocalModelCapability.AUDIO || it == LocalModelCapability.MUSIC
-            })
+            val wired = LocalModelPresets.clientCapabilitiesFor(preset.model, preset.baseUrl)
+            assertFalse(LocalModelCapability.AUDIO in wired || LocalModelCapability.MUSIC in wired)
+            // Video input is wired for Kimi Code (excluding K3-256K), not a general
+            // promise that every provider or the creative-media API can accept video.
+            assertEquals(
+                preset.provider == "Kimi Code" && preset.model != "k3-256k",
+                LocalModelCapability.VIDEO in wired,
+            )
+            if (preset.provider == "Kimi Code") {
+                assertTrue(LocalModelCapability.IMAGE in wired)
+            }
         }
         assertEquals(null, LocalModelPresets.samplingTemperatureFor("gpt-5.6", "https://api.openai.com/v1", 0.85))
         assertEquals(10_000_000L, LocalModelPresets.maxNativeImageBytesFor("MiniMax-M3", "https://api.minimaxi.com/v1"))
