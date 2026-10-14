@@ -306,7 +306,7 @@ fun AppBackgroundHost(
             if (loaded != null || fluidGlass) {
                 com.shenyan.designsystem.components.SySceneBackgroundSurface(
                     modifier = Modifier.fillMaxSize(),
-                    shape = androidx.compose.foundation.shape.RectangleShape,
+                    shape = androidx.compose.ui.graphics.RectangleShape,
                     fallbackColor = surfaceBase,
                     tag = "appRootSceneBackground",
                 ) {}
