@@ -31,9 +31,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.shenyan.designsystem.components.SyIconBox
-import com.shenyan.designsystem.components.SyMaterialFrame
-import com.shenyan.designsystem.components.SyMaterialTier
-import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
