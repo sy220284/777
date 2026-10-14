@@ -66,22 +66,18 @@ internal fun AppearanceReadingPreview() {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SyMaterialFrame(
         modifier = Modifier.fillMaxWidth(),
-        tier = SyMaterialTier.L3_CARD,
-        horizontalPadding = SyMetric.gapLg,
-        verticalPadding = SyMetric.gapLg,
-        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+        tier = SyMaterialTier.L2_BAR,
+        horizontalPadding = SyMetric.gapMd,
+        verticalPadding = SyMetric.gapSm,
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
     ) {
         Text(
             stringResource(R.string.settings_appearance_preview_assistant),
-            style = DsType.chatBody.withReadingWeight(),
+            style = DsType.small13.withReadingWeight(),
+            maxLines = 1,
             color = colors.text,
         )
         SyUserBubble(stringResource(R.string.settings_appearance_preview_user))
-        Text(
-            stringResource(R.string.settings_appearance_preview_hint),
-            style = DsType.small13.withReadingWeight(),
-            color = colors.textSecondary,
-        )
     }
 }
 
@@ -90,7 +86,6 @@ internal fun ReadingPreferencesRow(
     settings: AppSettings,
     onTextScaleChange: (Float) -> Unit,
     onTextWeightChange: (Int) -> Unit,
-    onTransparencyChange: (Float) -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Text(
@@ -137,31 +132,77 @@ internal fun ReadingPreferencesRow(
         modifier = Modifier.fillMaxWidth(),
     )
 
-    Text(
-        stringResource(R.string.settings_component_transparency),
-        style = DsType.std14Strong.withReadingWeight(),
-        color = colors.text,
+
+}
+
+@Composable
+internal fun AppearanceAdvancedControls(
+    settings: AppSettings,
+    onAmbientChange: (Float) -> Unit,
+    onTransparencyChange: (Float) -> Unit,
+    onMotionChange: (Float) -> Unit,
+    onEmphasisChange: (Float) -> Unit,
+    onAdaptiveContrastChange: (Boolean) -> Unit,
+    onReset: () -> Unit,
+) {
+    val colors = LocalSyColors.current
+    Text(stringResource(R.string.settings_advanced_color_background),
+        style = DsType.std14Strong.withReadingWeight(), color = colors.text)
+    AppearanceAdvancedSlider(
+        stringResource(R.string.settings_advanced_ambient), settings.ambientGlow, 0f..1f, onAmbientChange,
     )
+    ToggleRow(
+        stringResource(R.string.settings_background_adaptive_contrast),
+        settings.backgroundAdaptiveContrast,
+    ) { onAdaptiveContrastChange(!settings.backgroundAdaptiveContrast) }
+
+    Spacer(Modifier.height(SyMetric.gapSm))
+    Text(stringResource(R.string.settings_advanced_material),
+        style = DsType.std14Strong.withReadingWeight(), color = colors.text)
+    AppearanceAdvancedSlider(
+        stringResource(R.string.settings_component_transparency),
+        settings.wallpaperSurfaceTransparency, 0f..1f, onTransparencyChange,
+    )
+
+    Spacer(Modifier.height(SyMetric.gapSm))
+    Text(stringResource(R.string.settings_advanced_motion),
+        style = DsType.std14Strong.withReadingWeight(), color = colors.text)
+    AppearanceAdvancedSlider(
+        stringResource(R.string.settings_advanced_motion_tempo),
+        settings.motionDurationScale, .7f..1.3f, onMotionChange,
+    )
+
+    Spacer(Modifier.height(SyMetric.gapSm))
+    Text(stringResource(R.string.settings_advanced_components),
+        style = DsType.std14Strong.withReadingWeight(), color = colors.text)
+    AppearanceAdvancedSlider(
+        stringResource(R.string.settings_advanced_emphasis), settings.componentEmphasis, 0f..1f,
+        onEmphasisChange,
+    )
+    AppearanceChip(stringResource(R.string.settings_advanced_reset), false, onReset)
+}
+
+@Composable
+private fun AppearanceAdvancedSlider(
+    label: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    onChange: (Float) -> Unit,
+) {
+    val colors = LocalSyColors.current
     Row(
         modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
-        Text(stringResource(R.string.settings_surface_clearer), style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
-        SySlider(
-            value = settings.wallpaperSurfaceTransparency,
-            onValueChange = onTransparencyChange,
-            valueRange = 0f..1f,
-            steps = 9,
-            hapticSegments = 10,
-            modifier = Modifier.weight(1f),
-        )
-        Text(stringResource(R.string.settings_surface_airier), style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+        Text(label, style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+        Text("${(value * 100).toInt()}%",
+            style = DsType.small13Strong.withReadingWeight(), color = colors.text)
     }
-    Text(
-        stringResource(R.string.settings_component_transparency_hint),
-        style = DsType.small13.withReadingWeight(),
-        color = colors.textSecondary,
+    SySlider(
+        value = value, onValueChange = onChange,
+        valueRange = range, steps = 5, hapticSegments = 6,
+        modifier = Modifier.fillMaxWidth(),
     )
 }
 
@@ -277,8 +318,6 @@ private fun AppearanceChip(label: String, selected: Boolean, onClick: () -> Unit
 @Composable
 internal fun BackgroundRow(
     path: String?,
-    adaptiveContrast: Boolean,
-    onAdaptiveContrastChange: (Boolean) -> Unit,
     onPick: (Uri) -> Unit,
     onClear: () -> Unit,
 ) {
@@ -336,13 +375,6 @@ internal fun BackgroundRow(
                     onClear()
                 }
             }
-        }
-        if (path != null) {
-            Spacer(Modifier.height(SyMetric.gapMd))
-            ToggleRow(
-                stringResource(R.string.settings_background_adaptive_contrast),
-                adaptiveContrast,
-            ) { onAdaptiveContrastChange(!adaptiveContrast) }
         }
     }
 }

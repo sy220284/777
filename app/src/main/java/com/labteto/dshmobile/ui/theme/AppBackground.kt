@@ -242,6 +242,7 @@ fun AppBackgroundHost(
     surfaceTransparency: Float = 0.5f,
     modifier: Modifier = Modifier,
     fluidGlass: Boolean = true,
+    ambientGlow: Float = .5f,
     ambientPalette: com.shenyan.designsystem.foundation.SyColors = com.shenyan.designsystem.foundation.ShenyanPalettes.light,
     content: @Composable () -> Unit,
 ) {
@@ -287,6 +288,7 @@ fun AppBackgroundHost(
         regionExtremes = visibleAnalysis?.let { analysis -> listOf(analysis.top, analysis.middle, analysis.bottom)
             .map { listOf(it.darkestColor, it.brightestColor) } } ?: emptyList(),
         surfaceTransparency = state.surfaceTransparency,
+        ambientGlow = ambientGlow.coerceIn(0f, 1f),
         adaptiveContrast = adaptiveEnabled,
     ) else null
     Box(modifier.fillMaxSize().background(surfaceBase).onGloballyPositioned { coordinates ->

@@ -244,7 +244,8 @@ private fun SyPaintAlignedScene(
             scene.veil?.let { drawRect(it) }
         } else if (scene.glowColors.size >= 3) {
             val extent = max(viewport.width, viewport.height).toFloat()
-            val opacity = if (scene.dark) 0.10f else 0.38f
+            val baselineOpacity = if (scene.dark) 0.10f else 0.38f
+            val opacity = baselineOpacity * (scene.ambientGlow.coerceIn(0f, 1f) * 2f)
             val centers = listOf(.06f to .08f, .98f to .36f, .24f to .92f)
             val radii = listOf(.72f, .65f, .55f)
             scene.glowColors.take(3).forEachIndexed { index, color ->

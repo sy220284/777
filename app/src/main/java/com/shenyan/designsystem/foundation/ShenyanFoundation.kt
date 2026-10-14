@@ -109,6 +109,7 @@ data class SySceneBackdrop(
     val regionColors: List<Color> = emptyList(),
     val regionExtremes: List<List<Color>> = emptyList(),
     val surfaceTransparency: Float = .5f,
+    val ambientGlow: Float = .5f,
     val adaptiveContrast: Boolean = true,
 )
 

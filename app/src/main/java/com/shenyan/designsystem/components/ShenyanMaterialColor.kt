@@ -52,7 +52,8 @@ internal fun syResolveMaterialFill(
         scene.glowColors.size >= 3 -> {
             // FluidGlassBackdrop's matching top/middle/bottom light fields.
             lerp(scene.canvas, scene.glowColors[index].copy(alpha = 1f),
-                if (scene.dark) .055f else if (index == 2) .045f else .14f)
+                (if (scene.dark) .055f else if (index == 2) .045f else .14f) *
+                    (scene.ambientGlow.coerceIn(0f, 1f) * 2f).coerceIn(0f, 2f))
         }
         else -> scene.canvas
     }
