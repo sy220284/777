@@ -34,6 +34,10 @@ internal object LocalReasoningRequestPolicy {
         if (profile.authKind == LocalModelAuthKind.API_KEY && LocalMiniMaxPolicy.isOfficial(profile.baseUrl) &&
             profile.protocol in setOf(LocalModelProtocol.CHAT_COMPLETIONS, LocalModelProtocol.ANTHROPIC_MESSAGES)
         ) return LocalMiniMaxPolicy.selection(model)
+        if (profile.authKind == LocalModelAuthKind.API_KEY &&
+            profile.protocol == LocalModelProtocol.CHAT_COMPLETIONS &&
+            LocalKimiPolicy.isOfficial(profile.baseUrl)
+        ) return LocalKimiPolicy.selection(model)
         if (host != "api.openai.com") return null
         if (profile.protocol !in setOf(
             LocalModelProtocol.CHAT_COMPLETIONS,
