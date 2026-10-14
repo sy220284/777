@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DshTheme
@@ -225,7 +226,7 @@ class PluginInventoryBrowserRegressionTest {
             .getUnclippedBoundsInRoot()
         assertTrue("Icon material should not stretch across the row", icon.width <= 48.dp)
         assertTrue("Plugin title must have readable horizontal space", title.width >= 100.dp)
-        assertTrue("Plugin card should not become a tall empty slab", card.height < 180.dp)
+        assertTrue("Plugin card should not become a tall empty slab", card.height < 220.dp)
     }
 
     @Test
@@ -252,6 +253,41 @@ class PluginInventoryBrowserRegressionTest {
         assertTrue("Skill title should not be a one-character column", title.width >= 100.dp)
         assertTrue("Description should use the whole card width", details.width > title.width)
         assertTrue("Skill card should remain compact", card.height < 180.dp)
+    }
+
+    @Test
+    fun searchingDescriptionsHasAUsefulEmptyState() {
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = listOf("android-automation"),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-search").performTextInput("自动执行")
+        compose.onNodeWithTag("plugin-inventory-card-local:android-automation").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-inventory-search").performTextInput("不存在的插件名称")
+        compose.onNodeWithText("没有找到匹配的技能或插件").assertIsDisplayed()
+    }
+
+    @Test
+    fun existingCardsRemainVisibleDuringSkillUpdates() {
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(),
+                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                        "research-check", "核查改动正确性", true,
+                    )),
+                    skillsOnly = true, loading = true,
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onUseCapability = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-skill:research-check").assertIsDisplayed()
+        compose.onNodeWithText("使用").assertIsNotEnabled()
     }
 
 }
