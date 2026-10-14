@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
+import com.labteto.dshmobile.local.runtime.LocalAgentRunHandle
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -48,60 +49,79 @@ internal class LocalChatPersonaCoordinator internal constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    internal fun select(profile: PersonaProfile, galleryId: String? = null) {
+    internal fun canSelectForCurrentChat(): Boolean = state.value.canEditPersona(requireEmptyDialogue = true)
+
+    internal fun select(profile: PersonaProfile, galleryId: String? = null, handle: LocalAgentRunHandle? = null): Boolean {
         val snapshot = state.value
-        if (!snapshot.canEditPersona(requireEmptyDialogue = true)) return
+        val activation = handle?.activationId
+        if (!snapshot.canEditPersona(requireEmptyDialogue = true)) return false
         scope.launch {
             try {
-                selectNow(snapshot, profile, galleryId)
+                selectNow(snapshot, profile, galleryId, handle, activation)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                publishError(snapshot.sessionId, error.message ?: "角色切换失败")
+                fun report() {
+                    if (handle == null || handle.activationId == activation)
+                        publishError(snapshot.sessionId, error.message ?: "角色切换失败")
+                }
+                if (handle == null) report() else synchronized(handle.lock) { report() }
             }
         }
+        return true
     }
 
     internal suspend fun selectNow(
         snapshot: LocalChatProjectionState,
         profile: PersonaProfile,
         galleryId: String? = null,
+        handle: LocalAgentRunHandle? = null,
+        activation: String? = handle?.activationId,
     ): Boolean {
         val lease = LocalSessionRuntimeRegistry.tryAcquire(
             snapshot.sessionId,
             LocalSessionRuntimeKind.MAINTENANCE,
         ) ?: return false
         return try {
-            if (!state.value.matchesPersonaEdit(snapshot, requireEmptyDialogue = true)) return false
+            fun belongs(): Boolean = (handle == null || handle.activationId == activation) &&
+                state.value.matchesPersonaEdit(snapshot, requireEmptyDialogue = true)
+            if (!belongs()) return false
             val personaId = profile.id.takeUnless { it == PersonaProfile.DEFAULT_PERSONA_ID }
                 ?: "persona-${UUID.randomUUID()}"
             val previous = loadPersona(personaId)
             var committed = false
             try {
                 val saved = savePersona(profile.copy(id = personaId))
-                val current = state.value
-                if (!current.matchesPersonaEdit(snapshot, requireEmptyDialogue = true)) {
+                fun commit(): Boolean {
+                    if (!belongs()) return false
+                    val current = state.value
+                    val target = current.copy(
+                        chat = current.chat.copy(
+                            personaId = saved.id,
+                            galleryId = galleryId,
+                            galleryStoryId = null,
+                            gallerySaveSuppressedThrough = 0L,
+                            chatPersona = saved,
+                            chatState = ChatCharacterState(behaviorTuning = saved.behaviorTuning),
+                            replySuggestions = emptyList(),
+                            chatBranches = LocalChatBranchState(),
+                        ),
+                        handoffSummary = null,
+                        error = null,
+                    )
+                    commitDomainState(target, "persona-selected")
+                    committed = true
+                    publishCommitted(target)
+                    enqueueSnapshot(snapshot.sessionId)
+                    return true
+                }
+                // IO stays outside the foreground lock. Admission and the durable commit share
+                // the actual Session rebind lock, including leave-and-return activation changes.
+                val applied = if (handle == null) commit() else synchronized(handle.lock) { commit() }
+                if (!applied) {
                     rollbackPersona(personaId, previous, null)
                     return false
                 }
-                val target = current.copy(
-                    chat = current.chat.copy(
-                        personaId = saved.id,
-                        galleryId = galleryId,
-                        galleryStoryId = null,
-                        gallerySaveSuppressedThrough = 0L,
-                        chatPersona = saved,
-                        chatState = ChatCharacterState(behaviorTuning = saved.behaviorTuning),
-                        replySuggestions = emptyList(),
-                        chatBranches = LocalChatBranchState(),
-                    ),
-                    handoffSummary = null,
-                    error = null,
-                )
-                commitDomainState(target, "persona-selected")
-                committed = true
-                publishCommitted(target)
-                enqueueSnapshot(snapshot.sessionId)
                 true
             } catch (error: Throwable) {
                 if (!committed) rollbackPersona(personaId, previous, error)

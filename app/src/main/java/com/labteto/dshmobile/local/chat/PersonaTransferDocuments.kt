@@ -12,23 +12,7 @@ import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 
-internal const val PERSONA_WORD_MIME =
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 internal const val MAX_PERSONA_TRANSFER_BYTES = 16 * 1024 * 1024
-
-enum class PersonaTransferFormat(
-    val extension: String,
-    val mimeType: String,
-) {
-    JSON("json", "application/json"),
-    MARKDOWN("md", "text/markdown"),
-    WORD("docx", PERSONA_WORD_MIME),
-}
-
-data class PersonaTransferDocument(
-    val format: PersonaTransferFormat,
-    val bytes: ByteArray,
-)
 
 @Serializable
 internal data class PersonaTransferMemorySummary(

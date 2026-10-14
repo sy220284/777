@@ -46,6 +46,6 @@ PR #705 尚为 Draft，当前分支相对于 main 有未同步提交，GitHub �
 ## 第二批 S1 / S2 可执行群聊接口（新增于 `36a07cfd`）
 
 - 从已有 Chat Owner 读取群聊成员和图库合法 ID，经中立 `ChatGroupUiPort` 将选择动作回交 Owner；Next 独立绘制成员管理，并由 Host 校验 Port 的真实连接身份。没有另建成员写入者。
-- S0 现已**33/172** 个动作写入源码 Command 映射，**139/172** 个仍需补 Owner/Receipt 路径；全部动作的正式 E2E 证据仍为待办。
+- S0 现已**37/172** 个动作写入源码 Command 映射，**135/172** 个仍需补 Owner/Receipt 路径；全部动作的正式 E2E 证据仍为待办。
 - 新增 Compose UI 测试与 Host 能力拒绝测试**源码**，最新编译/设备结果尚需独立回执。
 - 此批是 Group Members 的完整纵向切片，不代表群聊公告、角色世界书、图库和全 App UI 包切换都已完成。参见 [独立专项](R4-GROUP-PORT-20261014.zh-CN.md)。

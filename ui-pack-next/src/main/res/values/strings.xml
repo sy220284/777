@@ -156,4 +156,15 @@
     <string name="next_gallery_close">关闭</string>
     <string name="next_gallery_refresh">刷新</string>
     <string name="next_document_local_tool_result">本地整理工具结果</string>
+    <string name="next_gallery_selection_queued">人物切换已提交，请等待 Chat 更新实际状态</string>
+    <string name="next_gallery_use_character">用于当前空白聊天</string>
+    <string name="next_gallery_new_story">开始新故事</string>
+    <string name="next_gallery_continue_story">从此故事开始会话</string>
+    <string name="next_gallery_transfer_failed">人物传输未完成，请刷新后确认状态</string>
+    <string name="next_gallery_imported">人物文档已导入</string>
+    <string name="next_gallery_export_saved">人物文档已写入所选位置</string>
+    <string name="next_gallery_import">导入人物文档</string>
+    <string name="next_gallery_export_format">导出 %1$s</string>
+    <string name="next_gallery_export_target">导出人物：%1$s</string>
+    <string name="next_gallery_select_export">点击列表中的人物名称选择</string>
 </resources>

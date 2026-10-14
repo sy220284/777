@@ -365,8 +365,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "select_persona": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "PersonaSelectionUiPort.submit(PersonaSelectionUiCommand.SelectForCurrentChat)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -790,20 +790,20 @@
           "status": "PENDING_EVIDENCE"
         },
         "import": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "PersonaTransferUiPort.import(ImportPersonaDocumentCommand)",
+          "receiptType": "UiPersonaImportReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "export": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "PersonaTransferUiPort.export(ExportPersonaDocumentCommand)",
+          "receiptType": "UiPersonaExportReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "start_story": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "PersonaSelectionUiPort.submit(PersonaSelectionUiCommand.StartStory)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },

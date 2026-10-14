@@ -1,8 +1,8 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1592,
-  "production_source_count": 914,
+  "repository_code_file_count": 1597,
+  "production_source_count": 919,
   "test_code_file_count": 516,
   "workflow_files": [
     ".github/workflows/capture-readme-ui.yml",
@@ -190,7 +190,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt",
-      "sha256": "660f44f540b5e7ec"
+      "sha256": "d5639ae605c990a8"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureHistorySummaries.kt",
@@ -742,7 +742,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatPersonaCoordinator.kt",
-      "sha256": "4533a0673f5811e2"
+      "sha256": "eea1235570b85df4"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatPersonaCorrectionCoordinator.kt",
@@ -774,7 +774,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt",
-      "sha256": "0547c0eea6d13d4c"
+      "sha256": "0750cd92df81965e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatSendCoordinator.kt",
@@ -877,6 +877,10 @@
       "sha256": "8db7d6049494040a"
     },
     {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalPersonaTransferOwner.kt",
+      "sha256": "f34ab53a676578a3"
+    },
+    {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalReplySuggestionCommit.kt",
       "sha256": "949c432702888605"
     },
@@ -958,7 +962,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaTransferDocuments.kt",
-      "sha256": "207083d7209495c0"
+      "sha256": "83ac15b7312471f8"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/RelationshipDynamics.kt",
@@ -1510,7 +1514,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalChatUiFacade.kt",
-      "sha256": "da73e68fd24efcd2"
+      "sha256": "52d8362a2bba743a"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalChatUiPolicies.kt",
@@ -2514,11 +2518,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalConversationPackGate.kt",
-      "sha256": "6171fd63a36b58cc"
+      "sha256": "fe52635894ccfbee"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalConversationSliceHost.kt",
-      "sha256": "f5d6e6315d78a696"
+      "sha256": "afaf461d2def67e1"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiDocumentFormState.kt",
@@ -2702,7 +2706,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "sha256": "5cd1ac6d7beb1cf7"
+      "sha256": "30a621fa4c701a59"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStreamingComponents.kt",
@@ -2710,7 +2714,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "sha256": "3f4b1995e89aa1ef"
+      "sha256": "b6dff0dab92da3fe"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModelDefaults.kt",
@@ -2734,11 +2738,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaGalleryUiController.kt",
-      "sha256": "98a0320ef63a88d6"
-    },
-    {
-      "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaTransferCoordinator.kt",
-      "sha256": "2a13e9541a00a758"
+      "sha256": "adef9cf66997a290"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPlanReviewCard.kt",
@@ -3409,6 +3409,10 @@
       "sha256": "0c627f6b597e02a9"
     },
     {
+      "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/chat/PersonaTransferValues.kt",
+      "sha256": "ae2eee7126b9a041"
+    },
+    {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/interaction/LocalApprovalMode.kt",
       "sha256": "9d26d747b40219fe"
     },
@@ -3549,6 +3553,14 @@
       "sha256": "21bd47ca6be3a325"
     },
     {
+      "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/PersonaSelectionUiPort.kt",
+      "sha256": "f43bbed0a2d69bf1"
+    },
+    {
+      "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/PersonaTransferUiPort.kt",
+      "sha256": "9cb643dc4e632384"
+    },
+    {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/SessionUiPort.kt",
       "sha256": "360863ed8a4428a9"
     },
@@ -3610,11 +3622,15 @@
     },
     {
       "path": "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/ConversationUiPack.kt",
-      "sha256": "078c6149b7cca49a"
+      "sha256": "27da46ca2b8957ba"
     },
     {
       "path": "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiAttachmentPicker.kt",
       "sha256": "92341ec25b199667"
+    },
+    {
+      "path": "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiDocumentTransfer.kt",
+      "sha256": "e415335e8e8e809d"
     },
     {
       "path": "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiPackRegistry.kt",
@@ -3626,7 +3642,7 @@
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationUiPack.kt",
-      "sha256": "8af4b36d6531d22f"
+      "sha256": "91db4cdd75bb8f15"
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextDocumentGenerateButton.kt",
@@ -3634,7 +3650,11 @@
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextPersonaGalleryPanel.kt",
-      "sha256": "a06e2498268096fc"
+      "sha256": "bfb071bba7b79730"
+    },
+    {
+      "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextPersonaTransferActions.kt",
+      "sha256": "a49b9a34050de621"
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextUiDocument.kt",
@@ -3718,29 +3738,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "4e108a25e618",
+  "source_snapshot": "b4d4dbd93570",
   "observed_delta": {
-    "baseline": "9740141137f9",
-    "added_production_files": [
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/LocalStructuredUiDataAdapter.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/PersonaGalleryUiPort.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextPersonaGalleryPanel.kt"
-    ],
+    "baseline": "1cd29c73d9d8",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaGalleryStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalChatUiFacade.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiDocumentUiAdapter.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalConversationPackGate.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalConversationSliceHost.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaGalleryUiController.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalUiDocumentGenerateButton.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilder.kt",
-      "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/ConversationUiPack.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationUiPack.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextDocumentGenerateButton.kt"
+      "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiDocumentTransfer.kt",
+      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextPersonaTransferActions.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

@@ -50,6 +50,8 @@ class LocalHarnessViewModel @Inject constructor(
     val attachmentUiPort: com.labteto.dshmobile.uicontract.AttachmentUiPort,
     val chatGroupUiPort: com.labteto.dshmobile.uicontract.ChatGroupUiPort,
     val personaGalleryUiPort: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort,
+    val personaSelectionUiPort: com.labteto.dshmobile.uicontract.PersonaSelectionUiPort,
+    val personaTransferUiPort: com.labteto.dshmobile.uicontract.PersonaTransferUiPort,
     private val uiPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val chatUi: LocalChatUiFacade,
     private val businessSessions: com.labteto.dshmobile.uicontract.SessionUiPort,
@@ -121,6 +123,8 @@ class LocalHarnessViewModel @Inject constructor(
         runtime = runtime,
         chatUi = chatUi,
         galleryPort = personaGalleryUiPort,
+        selectionPort = personaSelectionUiPort,
+        transferPort = personaTransferUiPort,
         appContext = appContext,
         scope = viewModelScope,
     )
@@ -188,8 +192,8 @@ class LocalHarnessViewModel @Inject constructor(
     fun hasUnsavedCurrentPersona(): Boolean = personaGalleryController.hasUnsavedCurrentPersona()
     fun currentGalleryNeedsUpdate(): Boolean = personaGalleryController.currentGalleryNeedsUpdate()
     fun currentGalleryHasUnsavedChanges(): Boolean = personaGalleryController.currentGalleryHasUnsavedChanges()
-    fun selectGalleryPersonaForCurrentChat(id: String): Boolean =
-        personaGalleryController.selectGalleryPersonaForCurrentChat(id)
+    fun selectGalleryPersonaForCurrentChat(id: String, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Boolean =
+        personaGalleryController.selectGalleryPersonaForCurrentChat(id, expected)
     suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGalleryEntry> =
         personaGalleryController.createGalleryPersona(profile)
     suspend fun autoFillNewPersona(description: String): Result<PersonaProfile> =
@@ -229,8 +233,8 @@ class LocalHarnessViewModel @Inject constructor(
         storyId: String,
         messageKey: String,
     ): Result<Unit> = personaGalleryController.deleteGalleryHistoryMessage(id, storyId, messageKey)
-    fun startFromGallery(id: String, storyId: String?, freshStory: Boolean): Boolean =
-        personaGalleryController.startFromGallery(id, storyId, freshStory)
+    fun startFromGallery(id: String, storyId: String?, freshStory: Boolean, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Boolean =
+        personaGalleryController.startFromGallery(id, storyId, freshStory, expected)
 
     internal suspend fun prepareTranscriptHistory(
         sessionId: String,

@@ -30,5 +30,7 @@ interface ConversationUiPack {
         team: com.labteto.dshmobile.uicontract.WorkTeamUiPort? = null,
         groups: com.labteto.dshmobile.uicontract.ChatGroupUiPort? = null,
         gallery: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort? = null,
+        personas: com.labteto.dshmobile.uicontract.PersonaSelectionUiPort? = null,
+        personaTransfer: com.labteto.dshmobile.uicontract.PersonaTransferUiPort? = null,
     )
 }

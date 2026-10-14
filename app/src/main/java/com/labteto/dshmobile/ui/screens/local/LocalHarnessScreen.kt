@@ -492,7 +492,7 @@ fun LocalHarnessScreen(
         deleteSessions = ::deleteSessionsAndNavigate,
         configureChatPersona = viewModel::configureChatPersona,
         configureGroupMembers = { ids -> viewModel.configureGroupChatMembers(ids, sendIdentity) },
-        selectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
+        selectGalleryPersona = { id -> viewModel.selectGalleryPersonaForCurrentChat(id, sendIdentity) },
         autoFillChatPersona = viewModel::autoFillChatPersona,
         saveGroupAnnouncement = { text -> viewModel.setGroupChatAnnouncement(text, sendIdentity) },
         undoPersonaCorrection = viewModel::undoChatPersonaCorrection,
@@ -533,7 +533,7 @@ fun LocalHarnessScreen(
         installPersonaPreset = viewModel::installPersonaPreset,
         setGalleryPortrait = viewModel::setGalleryPortrait,
         removeGalleryPortrait = viewModel::removeGalleryPortrait,
-        startFromGallery = viewModel::startFromGallery,
+        startFromGallery = { id, story, fresh -> viewModel.startFromGallery(id, story, fresh, sendIdentity) },
     )
     val workActions = LocalWorkFeatureUiActions(
         evidence = viewModel.workEvidenceUiPort,

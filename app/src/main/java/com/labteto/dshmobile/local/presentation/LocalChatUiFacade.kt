@@ -3,18 +3,14 @@ package com.labteto.dshmobile.local.presentation
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.visibleStoryStages
-import com.labteto.dshmobile.local.chat.ChatDiaryEntry
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
 import com.labteto.dshmobile.local.chat.PersonaAutoFillService
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
-import com.labteto.dshmobile.local.chat.PersonaGalleryPreparedImport
 import com.labteto.dshmobile.local.chat.PersonaGallerySaveOutcome
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
 import com.labteto.dshmobile.local.chat.PersonaInspectionService
 import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.local.chat.PersonaTransferDocument
-import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -50,13 +46,6 @@ class LocalChatUiFacade @Inject constructor(
         gallery.updateStoryDetails(id, storyId, notes, storyStage)
     internal fun deleteGallery(id: String) = gallery.delete(id)
     internal fun deleteStory(id: String, storyId: String) = gallery.deleteStory(id, storyId)
-
-    internal fun exportPersonaDocument(id: String, format: PersonaTransferFormat, diaryEntries: List<ChatDiaryEntry>): PersonaTransferDocument =
-        gallery.exportPersonaDocument(id, format, diaryEntries)
-    internal fun preparePersonaDocumentImport(bytes: ByteArray, fileName: String?, mimeType: String?): PersonaGalleryPreparedImport =
-        gallery.preparePersonaDocumentImport(bytes, fileName, mimeType)
-    internal fun commitPersonaDocumentImport(prepared: PersonaGalleryPreparedImport): PersonaGalleryEntry =
-        gallery.commitPersonaDocumentImport(prepared)
 
     internal suspend fun autoFillPersona(
         model: String,

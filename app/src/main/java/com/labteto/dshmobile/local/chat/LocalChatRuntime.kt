@@ -8,6 +8,12 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.uiBindingIdentity
+import com.labteto.dshmobile.uicontract.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 /** Chat/persona capability boundary for the local UI. */
 @Singleton
 class LocalChatRuntime @Inject internal constructor(
@@ -22,10 +28,46 @@ class LocalChatRuntime @Inject internal constructor(
     private val personaCoordinator: LocalChatPersonaCoordinator,
     private val groupMembership: LocalGroupChatMembershipCoordinator,
     private val replySuggestions: LocalReplySuggestionCoordinator,
-) {
+    private val gallery: ChatPersonaGalleryStore,
+) : PersonaSelectionUiPort {
+    override val snapshots = runtimeStateStore.state.map { snapshot() }.distinctUntilChanged()
+
+    override fun snapshot(): UiPersonaSelectionSnapshot = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+        val current = runtimeStateStore.state.value
+        val ready = current.usageMode == LocalUsageMode.CHAT && !current.loading &&
+            !current.kernel.running && !runtimeStateStore.sessionTransitioning
+        UiPersonaSelectionSnapshot(runtimeStateStore.uiBindingIdentity(current),
+            ready && personaCoordinator.canSelectForCurrentChat(), ready,
+            when {
+                !ready -> "请在聊天空闲且会话加载完成后操作"
+                current.chat.groupChat.enabled -> "当前是群聊；可以开始新的单人故事"
+                current.transcriptIndex.hasDialogue -> "已有对话不能替换人物；可以开始新的故事"
+                else -> null
+            })
+    }
+
+    override fun submit(command: PersonaSelectionUiCommand): UiCommandReceipt = try {
+        synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+            val current = runtimeStateStore.state.value
+            if (runtimeStateStore.sessionTransitioning) return@synchronized UiCommandReceipt.Rejected(UiCommandRejection.SESSION_TRANSITION)
+            if (runtimeStateStore.uiBindingIdentity(current) != command.identity || current.loading ||
+                current.usageMode != LocalUsageMode.CHAT) return@synchronized UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+            if (current.kernel.running) return@synchronized UiCommandReceipt.NotAdmitted
+            val entry = gallery.findEntry(command.galleryId) ?: return@synchronized UiCommandReceipt.NotAdmitted
+            when (command) {
+                is PersonaSelectionUiCommand.SelectForCurrentChat ->
+                    if (personaCoordinator.select(entry.persona, entry.id, runtimeStateStore.foregroundRunHandle)) UiCommandReceipt.Queued
+                    else UiCommandReceipt.NotAdmitted
+                is PersonaSelectionUiCommand.StartStory -> {
+                    if (command.storyId != null && entry.stories.none { it.id == command.storyId }) return@synchronized UiCommandReceipt.NotAdmitted
+                    if (startSessionFromGallery(entry, command.storyId, command.freshStory)) UiCommandReceipt.Accepted else UiCommandReceipt.NotAdmitted
+                }
+            }
+        }
+    } catch (cancelled: CancellationException) { throw cancelled }
+    catch (failure: Exception) { UiCommandReceipt.Failed(failure.message ?: "人物操作未完成，请刷新确认状态") }
+
     internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = behaviorTuning.configure(profile)
-    internal fun selectChatPersona(profile: PersonaProfile, galleryId: String? = null) =
-        personaCoordinator.select(profile, galleryId)
     internal fun bindChatGallery(galleryId: String, galleryStoryId: String?) =
         personaCoordinator.bindGallery(galleryId, galleryStoryId)
     internal fun updateBoundStoryStage(galleryId: String, storyId: String, stage: String): Boolean =

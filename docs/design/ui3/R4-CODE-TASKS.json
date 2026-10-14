@@ -1,12 +1,12 @@
 {
   "schema": "777.ui-r4.code-tasks/1",
   "asOf": "2026-10-14",
-  "baseline": "18821533",
+  "baseline": "028682a8",
   "scope": "整个 R4，非单一功能",
   "verificationPolicy": "用户要求延后测试、编译、设备和 CI 跟进；代码状态不代表验收通过",
   "sceneCount": 78,
   "actionCount": 172,
-  "sourceMappedActions": 33,
+  "sourceMappedActions": 37,
   "tasks": [
     {
       "id": "S-1-01",
@@ -35,16 +35,18 @@
     {
       "id": "S1-01",
       "task": "人物选择/编辑/行为调节/模型补全端口",
-      "codeStatus": "CODE_PENDING",
-      "verification": "DEFERRED"
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED",
+      "implemented": "人物选择与开始故事由 Chat Owner 的 PersonaSelectionUiPort 承接；V6/Next 均传捕获身份；实际异步人物提交检查原激活身份。",
+      "remaining": "完整人物资料编辑、行为调节和模型补全仍待迁移。"
     },
     {
       "id": "S1-02",
       "task": "图库/故事/立绘/导入导出/删除完整 Owner 端口",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "Gallery Owner 直接实现读取、故事重命名、归档消息删除；V6 旧调用替换，Next 原生只读列表与标题编辑。",
-      "remaining": "保存、人物选择/编辑、故事详情、开始故事、完整删除联动、立绘、导入导出仍待迁移。"
+      "implemented": "Gallery Owner 读取、重命名和归档消息删除；人物选择/开始故事；Chat Owner 人物导入导出事务迁出 UI；V6/Next 真实接线，Next 经 Host 文档服务导入及 JSON/Markdown/Word 导出。",
+      "remaining": "图库保存、人物资料编辑、故事详情、完整删除联动、立绘仍待迁移。"
     },
     {
       "id": "S1-03",
@@ -86,7 +88,9 @@
       "id": "S1-08",
       "task": "Host 权限/文件/分享/通知/焦点服务",
       "codeStatus": "CODE_PARTIAL",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "implemented": "附件 OpenDocument；新增通用 Host 文档选择、受 Owner 大小限制的字节读取及 CreateDocument 写入，Next 人物传输生产接线。",
+      "remaining": "全应用系统权限/分享/通知/焦点生命周期与完整恢复仍未实现。"
     },
     {
       "id": "S1-09",
