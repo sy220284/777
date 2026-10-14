@@ -281,10 +281,10 @@ internal fun LocalMessageRow(
 
         else -> {
             var actionsOpen by remember(message.id) { mutableStateOf(false) }
-            val readingLayer = chatMode && (backgroundState.hasImage || backgroundState.fluidGlass)
+            val readingLayer = chatMode
             val readingModifier = if (readingLayer) {
                 Modifier
-                    .fillMaxWidth(0.80f)
+                    .fillMaxWidth(0.91f)
                     .background(
                         com.shenyan.designsystem.components.syMaterialColor(SyMaterialTier.L3_CARD),
                         DsShapes.characterBubble,
@@ -294,14 +294,18 @@ internal fun LocalMessageRow(
                         color = colors.border,
                         shape = DsShapes.characterBubble,
                     )
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(horizontal = 16.dp, vertical = 13.dp)
             } else {
                 Modifier.fillMaxWidth()
             }
             Column(
-                readingModifier.testTag("messageActionSurface:${message.id}").combinedClickable(onClick = {}, onLongClick = { pulse(); actionsOpen = true }),
-                verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
+                Column(
+                    readingModifier.testTag("messageActionSurface:${message.id}").combinedClickable(onClick = {}, onLongClick = { pulse(); actionsOpen = true }),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                ) {
                 if (groupMode) {
                     message.speakerName?.takeIf(String::isNotBlank)?.let { speaker ->
                         Text(
@@ -335,8 +339,9 @@ internal fun LocalMessageRow(
                     groupMode = groupMode,
                     chatMode = chatMode,
                 )
+                }
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag("messageActionToolbar:${message.id}"),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -464,6 +469,7 @@ private fun LocalAssistantMessageContent(
                         MarkdownText(
                             body,
                             bodyStyle = if (chatMode) DsType.chatBody else DsType.mdBody,
+                            preserveSoftLineBreaks = chatMode,
                         )
                     }
                 }
