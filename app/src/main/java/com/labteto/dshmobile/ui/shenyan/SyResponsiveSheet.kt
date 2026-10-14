@@ -60,6 +60,7 @@ fun SyResponsiveSheet(
     dismissEnabled: Boolean = true,
     showDragHandle: Boolean = true,
     floating: Boolean = false,
+    surfaceTier: SyMaterialTier = SyMaterialTier.L4_OVERLAY,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -141,7 +142,7 @@ fun SyResponsiveSheet(
                         modifier = modifier.width(420.dp).fillMaxHeight()
                             .padding(if (floating) 18.dp else 10.dp),
                         shape = RoundedCornerShape(SyDimensions.cornerOverlay),
-                        tier = SyMaterialTier.L4_OVERLAY,
+                        tier = surfaceTier,
                     ) { SheetBody() }
                 }
             }
@@ -157,7 +158,7 @@ fun SyResponsiveSheet(
             dragHandle = null,
             contentWindowInsets = { WindowInsets.navigationBars },
         ) {
-            SyMaterialSurface(tier = SyMaterialTier.L4_OVERLAY,
+            SyMaterialSurface(tier = surfaceTier,
                 shape = RoundedCornerShape(SyDimensions.cornerOverlay)) { SheetBody() }
         }
     }
