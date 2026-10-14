@@ -100,4 +100,17 @@
     <string name="next_attachment_preview">预览附件</string>
     <string name="next_loading_files">正在读取文件…</string>
     <string name="next_file_read_failed">文件读取失败，请重试。</string>
+    <string name="next_continue_session">接续当前会话</string>
+    <string name="next_handoff_summary">接续摘要</string>
+    <string name="next_create_continuation">创建接续会话</string>
+    <string name="next_default_policy">恢复默认审批策略</string>
+    <string name="next_default_policy_effect">恢复默认策略：可安全自动批准的请求由系统处理，其余请求仍需确认。</string>
+    <string name="next_tool_activities">实际工具活动</string>
+    <string name="next_tool_declared">已声明</string>
+    <string name="next_tool_running">执行中</string>
+    <string name="next_tool_completed">执行已完成</string>
+    <string name="next_tool_failed">执行失败</string>
+    <string name="next_tool_unknown">执行结果未知</string>
+    <string name="next_tool_cancelled">执行已取消</string>
+    <string name="next_apply_policy">应用策略</string>
 </resources>

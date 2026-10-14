@@ -3582,7 +3582,7 @@
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationUiPack.kt",
-      "sha256": "800f3ed6763c44be"
+      "sha256": "b6dbce0026eba5c2"
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextDocumentGenerateButton.kt",
@@ -3658,9 +3658,9 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "a69610a80bb6",
+  "source_snapshot": "fa2a25725e0b",
   "observed_delta": {
-    "baseline": "3cf885b473a0",
+    "baseline": "a69610a80bb6",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
