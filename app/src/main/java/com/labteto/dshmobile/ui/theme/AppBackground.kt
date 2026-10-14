@@ -199,6 +199,13 @@ internal fun resolveWallpaperAlpha(
     return (adaptiveAlpha + adjustment).coerceIn(lower, upper)
 }
 
+/** Use the same three vertical sample bands as the on-screen glass renderer. */
+internal fun BackgroundRegion.sampleY(): Float = when (this) {
+    BackgroundRegion.TOP -> .15f
+    BackgroundRegion.MIDDLE, BackgroundRegion.ALL -> .50f
+    BackgroundRegion.BOTTOM -> .88f
+}
+
 /** The image painted behind the whole app shell, or null for the plain theme colour. */
 val LocalAppBackground = staticCompositionLocalOf<ImageBitmap?> { null }
 
@@ -482,12 +489,13 @@ fun DsColors.wallpaperSurface(
     val tier = when (level) {
         WallpaperSurfaceLevel.INPUT -> com.shenyan.designsystem.components.SyMaterialTier.L1_SECTION
         WallpaperSurfaceLevel.CHROME -> com.shenyan.designsystem.components.SyMaterialTier.L2_BAR
-        WallpaperSurfaceLevel.FLOATING, WallpaperSurfaceLevel.SHEET, WallpaperSurfaceLevel.DRAWER,
+        WallpaperSurfaceLevel.DRAWER -> com.shenyan.designsystem.components.SyMaterialTier.L2_BAR
+        WallpaperSurfaceLevel.FLOATING, WallpaperSurfaceLevel.SHEET,
         WallpaperSurfaceLevel.DIALOG, WallpaperSurfaceLevel.MENU -> com.shenyan.designsystem.components.SyMaterialTier.L4_OVERLAY
         else -> com.shenyan.designsystem.components.SyMaterialTier.L3_CARD
     }
     val neutral = base in listOf(bgBase, bgLayer1, bgLayer2, bgLayer3, bgModulePlatform, sidebar)
-    return if (neutral) com.shenyan.designsystem.components.syMaterialColor(tier)
+    return if (neutral) com.shenyan.designsystem.components.syMaterialColor(tier, region.sampleY())
     else LocalAppBackgroundState.current.wallpaperSurface(base, level, region)
 }
 
@@ -519,11 +527,12 @@ fun com.shenyan.designsystem.foundation.SyColors.wallpaperSurface(
     val tier = when (level) {
         WallpaperSurfaceLevel.INPUT -> com.shenyan.designsystem.components.SyMaterialTier.L1_SECTION
         WallpaperSurfaceLevel.CHROME -> com.shenyan.designsystem.components.SyMaterialTier.L2_BAR
-        WallpaperSurfaceLevel.FLOATING, WallpaperSurfaceLevel.SHEET, WallpaperSurfaceLevel.DRAWER,
+        WallpaperSurfaceLevel.DRAWER -> com.shenyan.designsystem.components.SyMaterialTier.L2_BAR
+        WallpaperSurfaceLevel.FLOATING, WallpaperSurfaceLevel.SHEET,
         WallpaperSurfaceLevel.DIALOG, WallpaperSurfaceLevel.MENU -> com.shenyan.designsystem.components.SyMaterialTier.L4_OVERLAY
         else -> com.shenyan.designsystem.components.SyMaterialTier.L3_CARD
     }
     val neutral = base in listOf(canvas, materialL1, materialL2, materialL3, materialL4, surface, surfaceRaised)
-    return if (neutral) com.shenyan.designsystem.components.syMaterialColor(tier)
+    return if (neutral) com.shenyan.designsystem.components.syMaterialColor(tier, region.sampleY())
         else LocalAppBackgroundState.current.wallpaperSurface(base, level, region)
 }
