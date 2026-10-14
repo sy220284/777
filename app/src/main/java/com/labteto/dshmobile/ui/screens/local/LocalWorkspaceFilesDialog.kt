@@ -738,7 +738,8 @@ private fun LocalFilePreviewBody(preview: LocalWorkspaceFilePreview) {
             style = DsType.caption11.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         )
-        if (preview.text == null) {
+        val previewText = preview.text
+        if (previewText == null) {
             Text(
                 stringResource(R.string.local_files_binary_hint),
                 modifier = Modifier.padding(vertical = SyMetric.gapLg),
@@ -754,7 +755,7 @@ private fun LocalFilePreviewBody(preview: LocalWorkspaceFilePreview) {
             }
             SelectionContainer {
                 Text(
-                    preview.text,
+                    previewText,
                     modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                     style = DsType.mdCode,
                 )
