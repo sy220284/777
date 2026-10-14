@@ -117,4 +117,7 @@
     <string name="next_document_table_empty">没有可显示的行</string>
     <string name="next_document_local_tool_events">本地工具事件表格</string>
     <string name="next_group_members">当前群聊成员：%1$s</string>
+    <string name="next_group_manage">管理群聊成员</string>
+    <string name="next_group_members_dialog">选择群聊成员</string>
+    <string name="next_group_save">保存成员</string>
 </resources>

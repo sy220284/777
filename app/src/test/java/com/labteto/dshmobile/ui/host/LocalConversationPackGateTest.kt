@@ -47,6 +47,19 @@ class LocalConversationPackGateTest {
         ) is UiPackAdmission.UnknownPack)
     }
 
+    @Test fun groupManagementRequiresAConnectedOwnerPort() {
+        val actual = LocalConversationPackGate.capabilities(
+            chat = null, work = null, drafts = null, documents = null,
+            forms = null, attachments = null, transcript = null, groups = null,
+        )
+        assertTrue(UiCapabilityId("chat.group_members") !in actual)
+        assertTrue(LocalConversationPackGate.admit(
+            NextConversationUiPack.manifest.id,
+            allConnected - UiCapabilityId("chat.group_members"),
+            UiWindowClass.COMPACT, false,
+        ) is UiPackAdmission.Rejected)
+    }
+
     @Test fun missingWorkApprovalCapabilityRejectsSlice() {
         val result = LocalConversationPackGate.admit(
             NextConversationUiPack.manifest.id,

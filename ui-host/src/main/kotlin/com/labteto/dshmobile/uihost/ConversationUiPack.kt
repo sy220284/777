@@ -25,5 +25,6 @@ interface ConversationUiPack {
         policy: com.labteto.dshmobile.uicontract.WorkPolicyUiPort? = null,
         workReads: com.labteto.dshmobile.uicontract.WorkReadUiPort? = null,
         files: com.labteto.dshmobile.uicontract.FilesUiPort? = null,
+        groups: com.labteto.dshmobile.uicontract.ChatGroupUiPort? = null,
     )
 }

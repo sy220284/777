@@ -89,6 +89,38 @@ class NextConversationUiPackInteractionTest {
         compose.onNodeWithText("当前群聊成员：小夏、小秋").assertDoesNotExist()
     }
 
+    @Test fun groupMemberEditorSubmitsOnlyTheCapturedOwnerIdentity() {
+        val chat = Chat()
+        val work = Work()
+        chat.snapshots.value = chat.snapshots.value.copy(
+            group = com.labteto.dshmobile.uicontract.UiChatGroupSummary(listOf("小夏", "小秋")))
+        val recorded = mutableListOf<com.labteto.dshmobile.uicontract.ChatGroupUiCommand>()
+        val management = object : com.labteto.dshmobile.uicontract.ChatGroupUiPort {
+            override fun snapshot() = com.labteto.dshmobile.uicontract.UiChatGroupManagementSnapshot(
+                identity, active = true, memberIds = setOf("a", "b"),
+                available = listOf(
+                    com.labteto.dshmobile.uicontract.UiChatGroupChoice("a", "小夏"),
+                    com.labteto.dshmobile.uicontract.UiChatGroupChoice("b", "小秋"),
+                ),
+            )
+            override fun submit(command: com.labteto.dshmobile.uicontract.ChatGroupUiCommand): UiCommandReceipt {
+                recorded += command
+                return UiCommandReceipt.Accepted
+            }
+        }
+        compose.setContent {
+            NextConversationUiPack.Render(null, null, reading, drafts, chat, work,
+                workMode = false, onClose = {}, groups = management)
+        }
+        compose.onNodeWithText("管理群聊成员").performClick()
+        compose.onNodeWithText("选择群聊成员").assertIsDisplayed()
+        compose.onNodeWithText("保存成员").performClick()
+        compose.runOnIdle {
+            assertEquals(listOf(com.labteto.dshmobile.uicontract.ChatGroupUiCommand.ConfigureMembers(
+                identity, listOf("a", "b"))), recorded)
+        }
+    }
+
     @Test fun approvalOnlySubmitsTheExistingPendingIdentityAndDisplaysOwnerRejection() {
         val chat = Chat()
         val work = Work()

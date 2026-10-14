@@ -63,12 +63,14 @@ object NextConversationUiPack : ConversationUiPack {
     override val manifest = UiPackManifest(
         id = "next-conversation-slice", version = 1, minContractVersion = 1, maxContractVersion = 1,
         scenes = setOf("conversation.chat", "conversation.work", "conversation.composer", "work.approval",
-            "conversation.timeline", "conversation.edit", "work.question", "conversation.ui_document", "conversation.ui_document_generate")
+            "conversation.timeline", "conversation.edit", "work.question", "conversation.ui_document", "conversation.ui_document_generate",
+            "chat.group_members")
             .map(::UiSceneId).toSet(),
         requiredCapabilities = setOf("chat.send_text", "work.send_text", "work.answer_approval",
             "ui_document.generate", "ui_document.generate_local", "ui_document.prepare_input", "attachment.import",
             "chat.edit", "chat.regenerate", "chat.select_variant", "chat.stop", "session.transcript_read",
-            "work.edit", "work.regenerate", "work.stop", "work.answer_question")
+            "work.edit", "work.regenerate", "work.stop", "work.answer_question",
+            "chat.group_members")
             .map(::UiCapabilityId).toSet(),
         windowClasses = UiWindowClass.entries.toSet(),
         accessibility = UiAccessibility.entries.toSet(),
@@ -91,6 +93,7 @@ object NextConversationUiPack : ConversationUiPack {
         policy: com.labteto.dshmobile.uicontract.WorkPolicyUiPort?,
         workReads: com.labteto.dshmobile.uicontract.WorkReadUiPort?,
         files: com.labteto.dshmobile.uicontract.FilesUiPort?,
+        groups: com.labteto.dshmobile.uicontract.ChatGroupUiPort?,
     ) {
         val policySnapshot = policy?.snapshots?.collectAsStateWithLifecycle(initialValue = policy.snapshot())?.value
         val sessionSnapshot = sessions?.snapshots?.collectAsStateWithLifecycle(initialValue = sessions.snapshot())?.value
@@ -435,6 +438,9 @@ object NextConversationUiPack : ConversationUiPack {
                                 chatSnapshot.group?.memberNames?.joinToString("、").orEmpty()),
                             style = MaterialTheme.typography.bodyMedium,
                         )
+                    }
+                    if (!workMode && identity != null && groups != null) {
+                        NextChatGroupManager(groups, identity, ::show)
                     }
                     if (sessions != null && sessionSnapshot != null) {
                         TextButton(onClick = { sessionChooser = true }) { Text(stringResource(R.string.next_sessions)) }

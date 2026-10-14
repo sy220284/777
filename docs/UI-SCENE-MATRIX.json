@@ -438,8 +438,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "configure_members": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ChatGroupUiPort.submit(ChatGroupUiCommand.ConfigureMembers)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }

@@ -28,6 +28,7 @@ internal object LocalConversationPackGate {
         "conversation.chat", "conversation.work", "conversation.timeline",
         "conversation.composer", "conversation.ui_document",
         "conversation.ui_document_generate", "work.approval", "work.question",
+        "chat.group_members",
     )
     private val requiredSliceScenes = LocalUiSceneCatalog.requirements.filter {
         it.id.value in requiredSceneNames
@@ -49,6 +50,7 @@ internal object LocalConversationPackGate {
         forms: UiDocumentFormUiPort?,
         attachments: AttachmentUiPort?,
         transcript: TranscriptUiPort?,
+        groups: com.labteto.dshmobile.uicontract.ChatGroupUiPort? = null,
     ): Set<UiCapabilityId> = buildSet {
         if (chat != null && drafts != null) {
             listOf("chat.send_text", "chat.edit", "chat.regenerate",
@@ -64,6 +66,7 @@ internal object LocalConversationPackGate {
         }
         if (attachments != null) add(UiCapabilityId("attachment.import"))
         if (transcript != null) add(UiCapabilityId("session.transcript_read"))
+        if (groups != null) add(UiCapabilityId("chat.group_members"))
     }
 
     fun admit(

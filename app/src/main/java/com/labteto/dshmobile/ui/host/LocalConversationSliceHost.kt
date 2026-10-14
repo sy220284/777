@@ -52,6 +52,7 @@ internal fun LocalConversationSliceHost(
             forms = viewModel.uiDocumentFormPort,
             attachments = viewModel.attachmentUiPort,
             transcript = viewModel.transcriptUiPort,
+            groups = viewModel.chatGroupUiPort,
         ),
         windowClass = windowClass,
         dark = isSystemInDarkTheme(),
@@ -78,6 +79,7 @@ internal fun LocalConversationSliceHost(
             policy = viewModel.workPolicyUiPort,
             workReads = viewModel.workReadUiPort,
             files = viewModel.filesUiPort,
+            groups = viewModel.chatGroupUiPort,
         )
         is UiPackAdmission.Rejected, is UiPackAdmission.UnknownPack -> MaterialTheme {
             Surface(modifier = Modifier.fillMaxSize()) {
