@@ -9,13 +9,13 @@ import java.net.URI
  * its API keys and billing are not interchangeable with Kimi Code subscription benefits.
  */
 internal object LocalKimiPolicy {
-    private val officialHosts = setOf("api.kimi.com", "api.kimi.ai")
+    private const val officialHost = "api.kimi.com"
     private val controllable = setOf("k3", "k3-256k", "kimi-for-coding")
 
     fun isOfficial(baseUrl: String): Boolean = runCatching {
         val uri = URI(normalizeModelBaseUrl(baseUrl))
         uri.scheme.equals("https", ignoreCase = true) &&
-            uri.host?.lowercase() in officialHosts &&
+            uri.host.equals(officialHost, ignoreCase = true) &&
             uri.port == -1 && uri.path.trimEnd('/') == "/coding/v1" &&
             uri.rawQuery == null
     }.getOrDefault(false)
