@@ -207,7 +207,8 @@ internal fun PluginInventoryBrowser(
             SySearchField(
                 value = query,
                 onValueChange = { query = it },
-                modifier = Modifier.padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
+                modifier = Modifier.padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg)
+                    .testTag("plugin-inventory-search"),
                 placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search else R.string.tools_catalog_search),
             )
             if (skillsOnly) {
@@ -250,7 +251,7 @@ internal fun PluginInventoryBrowser(
                         stringResource(R.string.skills_import_hint),
                         style = DsType.small13.withReadingWeight(),
                         color = colors.textTertiary,
-                                            )
+                    )
                 }
             }
             if (!skillsOnly) LazyRow(
@@ -371,7 +372,6 @@ internal fun PluginInventoryBrowser(
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                     )
-
                                 }
                                 Text(
                                     item.detail,
