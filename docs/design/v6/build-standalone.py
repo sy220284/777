@@ -24,7 +24,7 @@ boot = ('<script>\nconst V6_ROUTES=' + json.dumps([x["id"] for x in tokens["rout
     ';\nwindow.V6_ASSET_DATA=' + json.dumps(icons, ensure_ascii=False) +
     ';\nwindow.V6_PORTRAIT_DATA=' + json.dumps(people, ensure_ascii=False) +
     ';\nwindow.V6_FILE_ICON_DATA=' + json.dumps(archive) + ';\n</script>')
-h = h.replace('<html lang="zh-CN">', '<html lang="zh-CN" data-v6-authoritative="compose-3a69089d">')
+h = h.replace('<html lang="zh-CN">', '<html lang="zh-CN" data-v6-authoritative="compose-3cdd12f">')
 h = h.replace('<link rel="stylesheet" href="v6.css">', "<style>" + css + "</style>")
 h = h.replace('<script src="v6.js"></script>', boot + "<script>" + js + "</script>")
 target = S / "app.html"

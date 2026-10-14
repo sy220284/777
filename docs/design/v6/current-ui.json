@@ -172,5 +172,8 @@
   },
   "mergedUIFixes": [
     711
+  ],
+  "mergedRelevantPRs": [
+    711
   ]
 }
