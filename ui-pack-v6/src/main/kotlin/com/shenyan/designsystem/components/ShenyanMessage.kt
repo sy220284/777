@@ -24,10 +24,10 @@ fun SyUserBubble(text: String, modifier: Modifier = Modifier,
     val p = LocalSyColors.current
     val shape = RoundedCornerShape(SyMetric.radiusCard)
     BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-        SyMaterialSurface(modifier = Modifier.widthIn(max = minOf(525.dp, maxWidth * .82f)),
+        SyMaterialSurface(modifier = Modifier.widthIn(max = minOf(460.dp, maxWidth * .86f)),
             shape = shape, tier = SyMaterialTier.L3_CARD, tint = background,
             border = androidx.compose.foundation.BorderStroke(1.dp, border), shadowElevation = 0.dp) {
-            Text(text, style = textStyle, color = p.text, modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
+            Text(text, style = textStyle, color = p.text, modifier = Modifier.padding(horizontal = 15.dp, vertical = 11.dp))
         }
     }
 }

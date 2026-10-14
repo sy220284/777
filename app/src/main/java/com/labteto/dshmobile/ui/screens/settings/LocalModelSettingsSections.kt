@@ -105,6 +105,7 @@ internal fun LocalModelSettingsCard(
     val catalogFailureFormat = stringResource(R.string.local_model_catalog_failure)
     val catalogUnavailable = stringResource(R.string.local_model_catalog_unavailable)
     val catalogTestFailureFormat = stringResource(R.string.local_model_catalog_test_failure)
+    val kimiK3ContextInvalid = stringResource(R.string.local_model_kimi_k3_context_invalid)
     val scope = rememberCoroutineScope()
     val apiProfiles = local.modelProfiles.apiModelSettingsProfiles()
     var showEditor by remember { mutableStateOf(false) }
@@ -245,59 +246,57 @@ internal fun LocalModelSettingsCard(
                 Row(Modifier.fillMaxWidth().padding(SyMetric.gapMd),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                    Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
-                            Text(profile.displayName ?: profile.model, style = DsType.std14Strong.withReadingWeight(), color = colors.text,
-                                modifier = Modifier.weight(1f, fill = false), maxLines = 1,
-                                overflow = TextOverflow.Ellipsis)
-                            if (local.modelSelection.isActive(profile)) {
-                                SyStatusPill(SyStatus.Done, stringResource(R.string.local_model_in_use))
-                            }
-                        }
-                        val duplicateApiRoute = apiProfiles.count {
-                            it.model == profile.model && it.baseUrl == profile.baseUrl
-                        } > 1
+                    val modelContract = LocalEffectiveModelContracts.forProfile(profile)
+                    val creatorKinds = modelContract.mediaOffers.map { it.kind }.toSet()
+                    val duplicated = apiProfiles.count {
+                        it.model == profile.model && it.baseUrl == profile.baseUrl
+                    } > 1
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
+                    ) {
                         Text(
-                            if (duplicateApiRoute) {
-                                "${profile.baseUrl} · ${profile.id.takeLast(6)}"
-                            } else {
-                                profile.baseUrl
-                            },
-                            style = DsType.caption11.withReadingWeight(),
-                            color = colors.textTertiary,
+                            (profile.displayName ?: profile.model) +
+                                if (duplicated) " · ${profile.id.takeLast(4)}" else "",
+                            style = DsType.std14Strong.withReadingWeight(),
+                            color = colors.text,
+                            modifier = Modifier.weight(1f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        val modelContract = LocalEffectiveModelContracts.forProfile(profile)
-                        ModelCapabilityTags(modelContract.clientModalities)
-                        val creatorKinds = modelContract.mediaOffers.map { it.kind }.distinct()
-                        val contextDescription = modelContract.documentedContextWindowTokens
-                            ?.let { stringResource(R.string.local_model_policy_known_context, it) }
-                            ?: stringResource(R.string.local_model_policy_unknown_context)
-                        Text(
-                            stringResource(
-                                R.string.local_model_policy_work_budget,
-                                contextDescription,
-                                modelContract.executionBudget.workRequestsPerSlice,
-                            ),
-                            style = DsType.caption11.withReadingWeight(),
-                            color = colors.textSecondary,
-                        )
-                        if (creatorKinds.isNotEmpty()) {
-                            val creativeLabels = mapOf(
-                                LocalMediaKind.IMAGE to stringResource(R.string.media_studio_capability_image),
-                                LocalMediaKind.VIDEO to stringResource(R.string.media_studio_capability_video),
-                                LocalMediaKind.SPEECH to stringResource(R.string.media_studio_capability_speech),
-                                LocalMediaKind.TRANSCRIBE to stringResource(R.string.media_studio_capability_transcribe),
+                        if (isSelectedProfile) {
+                            SyStatusPill(SyStatus.Done, stringResource(R.string.local_model_in_use))
+                        }
+                        // Small capability glyphs are intentionally AFTER the active-status pill.
+                        // Display only actual client transport/creation abilities, not provider ads.
+                        if (LocalModelCapability.IMAGE in modelContract.clientModalities ||
+                            LocalMediaKind.IMAGE in creatorKinds) {
+                            Icon(
+                                FeatherIcons.Image,
+                                contentDescription = if (LocalMediaKind.IMAGE in creatorKinds)
+                                    stringResource(R.string.local_model_capability_image_or_generate) else stringResource(R.string.local_model_capability_image_understand),
+                                tint = colors.textSecondary,
+                                modifier = Modifier.size(15.dp),
                             )
-                            Text(
-                                stringResource(
-                                    R.string.media_studio_model_capabilities,
-                                    creatorKinds.joinToString(" · ") { kind -> creativeLabels.getValue(kind) },
-                                ),
-                                style = DsType.caption11.withReadingWeight(),
-                                color = colors.textSecondary,
+                        }
+                        if (LocalModelCapability.VIDEO in modelContract.clientModalities ||
+                            LocalMediaKind.VIDEO in creatorKinds) {
+                            Icon(
+                                FeatherIcons.Video,
+                                contentDescription = if (LocalMediaKind.VIDEO in creatorKinds)
+                                    stringResource(R.string.local_model_capability_video_or_generate) else stringResource(R.string.local_model_capability_video_understand),
+                                tint = colors.textSecondary,
+                                modifier = Modifier.size(15.dp),
+                            )
+                        }
+                        if (LocalMediaKind.SPEECH in creatorKinds ||
+                            LocalMediaKind.TRANSCRIBE in creatorKinds) {
+                            Icon(
+                                FeatherIcons.Activity,
+                                contentDescription = stringResource(R.string.local_model_capability_speech_services),
+                                tint = colors.textSecondary,
+                                modifier = Modifier.size(15.dp),
                             )
                         }
                     }
@@ -363,6 +362,11 @@ internal fun LocalModelSettingsCard(
                 SyButton(stringResource(R.string.advanced_save_model_settings), onClick = {
                     if (!savedRoute && apiKey.isBlank() && credentialSourceProfileId == null) {
                         testStatus = "请填写该模型的密钥"
+                    } else if (selectedPreset?.provider == "Kimi Code" && selectedPreset.model == "k3" &&
+                        contextWindowTokens.isNotBlank() &&
+                        (contextWindowTokens.toIntOrNull() ?: -1) !in 4_096..1_048_576
+                    ) {
+                        testStatus = kimiK3ContextInvalid
                     } else {
                         saving = true
                         val savedGeneration = editorGeneration
@@ -463,6 +467,17 @@ internal fun LocalModelSettingsCard(
                                 style = DsType.caption11.withReadingWeight(),
                                 color = colors.textTertiary,
                             )
+                        }
+                        if (preset.provider == "Kimi Code" && preset.model == "k3") {
+                            // Subscription tier determines whether K3 may use 1M instead of the 256K default.
+                            // Exposing the override only for K3 avoids implying other models are upgradeable.
+                            LocalModelContextWindowField(contextWindowTokens) {
+                                contextWindowTokens = it
+                                editorGeneration++
+                                testStatus = null
+                            }
+                            Text("K3 默认 256K；仅已开通 Pro/Allegretto 及以上会员时填写 1048576。",
+                                style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
                         }
                         ModelCapabilityTags(LocalModelPresets.clientCapabilitiesFor(preset.model, preset.baseUrl))
                         if (preset.capabilities.any { it == LocalModelCapability.VIDEO || it == LocalModelCapability.AUDIO }) {

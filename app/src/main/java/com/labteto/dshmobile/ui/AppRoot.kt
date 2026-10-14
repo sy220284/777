@@ -51,6 +51,9 @@ fun AppRoot(
         textScale = settings.textScale,
         textWeightAdjustment = settings.textWeightAdjustment,
         wallpaperSurfaceTransparency = settings.wallpaperSurfaceTransparency,
+        ambientGlow = settings.ambientGlow,
+        componentEmphasis = settings.componentEmphasis,
+        motionDurationScale = settings.motionDurationScale,
     ) {
         LocalHarnessScreen(
             requestedSessionId = requestedLocalSessionId,

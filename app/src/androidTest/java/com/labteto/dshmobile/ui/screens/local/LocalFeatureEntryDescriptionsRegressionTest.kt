@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -155,41 +156,40 @@ class LocalFeatureEntryDescriptionsRegressionTest {
         var lastAction = ""
         compose.setContent {
             DshTheme {
-                Column(Modifier.width(320.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        SyQuickActionTile(
-                            icon = FeatherIcons.Camera,
-                            label = "拍照",
-                            modifier = Modifier.weight(1f),
-                            onClick = { lastAction = "camera" },
-                        )
-                        SyQuickActionTile(
-                            icon = FeatherIcons.Image,
-                            label = "图片",
-                            modifier = Modifier.weight(1f),
-                            onClick = { lastAction = "image" },
-                        )
-                    }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        SyQuickActionTile(
-                            icon = FeatherIcons.Folder,
-                            label = "文件",
-                            modifier = Modifier.weight(1f),
-                            onClick = { lastAction = "file" },
-                        )
-                        SyQuickActionTile(
-                            icon = FeatherIcons.Sparkles,
-                            label = "多模态创作",
-                            modifier = Modifier.weight(1f),
-                            onClick = { lastAction = "media" },
-                        )
-                    }
+                Row(Modifier.width(320.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SyQuickActionTile(
+                        icon = FeatherIcons.Camera,
+                        label = "拍照",
+                        modifier = Modifier.weight(1f),
+                        onClick = { lastAction = "camera" },
+                    )
+                    SyQuickActionTile(
+                        icon = FeatherIcons.Image,
+                        label = "图片",
+                        modifier = Modifier.weight(1f),
+                        onClick = { lastAction = "image" },
+                    )
+                    SyQuickActionTile(
+                        icon = FeatherIcons.Folder,
+                        label = "文件",
+                        modifier = Modifier.weight(1f),
+                        onClick = { lastAction = "file" },
+                    )
+                    SyQuickActionTile(
+                        icon = FeatherIcons.Sparkles,
+                        label = "多模态创作",
+                        modifier = Modifier.weight(1f),
+                        onClick = { lastAction = "media" },
+                    )
                 }
             }
         }
         listOf("拍照", "图片", "文件", "多模态创作").forEach {
             compose.onNodeWithText(it).assertIsDisplayed()
         }
+        val positions = listOf("拍照", "图片", "文件", "多模态创作")
+            .map { compose.onNodeWithText(it).getUnclippedBoundsInRoot() }
+        assertEquals(positions.first().top.value, positions.last().top.value, 3f)
         compose.onNodeWithText("多模态创作").performClick()
         compose.runOnIdle { assertEquals("media", lastAction) }
     }

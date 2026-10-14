@@ -84,6 +84,12 @@ internal object LocalEffectiveModelContracts {
             it.model == model && normalizeModelBaseUrl(it.baseUrl) == normalizeModelBaseUrl(baseUrl)
         }
         val runtime = LocalModelPresets.runtimeCapabilitiesFor(model, baseUrl, protocol, authKind)
+            .let { base ->
+                if (exactProfile == null) base
+                else base.copy(contextWindowTokens = documentedContextWindowTokens(
+                    model, baseUrl, exactProfile.contextWindowTokensOverride,
+                ))
+            }
         val documented = LocalModelPresets.capabilitiesFor(model, baseUrl)
         val client = LocalModelPresets.clientCapabilitiesFor(model, baseUrl)
         val reasoningProfile = exactProfile ?: LocalModelProfile(

@@ -349,14 +349,12 @@ internal fun LocalModeDrawer(
                                 keyboardController?.hide()
                             }
                         },
-                        containerColor = sy.l3.compositeOver(sy.canvas),
                         tint = sy.text,
                     )
                     SyIconButton(
                         icon = SyEntryIcons.NewSession,
                         contentDescription = stringResource(R.string.chatlist_new_session),
                         onClick = onNewSession,
-                        containerColor = sy.l3.compositeOver(sy.canvas),
                         tint = sy.text,
                     )
 

@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import com.labteto.dshmobile.R
@@ -31,6 +32,7 @@ import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_FILE
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +43,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 @HiltViewModel
@@ -56,6 +60,7 @@ class SettingsViewModel @Inject constructor(
     private val appContext = context.applicationContext
     private val deviceCapabilitiesController = DeviceCapabilitiesController(appContext)
     private val memorySettingsController = MemorySettingsController(localHarness, memoryUi)
+    private val backgroundChangeMutex = Mutex()
 
     private val _state = MutableStateFlow(AppSettings())
     val state: StateFlow<AppSettings> = _state.asStateFlow()
@@ -137,8 +142,12 @@ class SettingsViewModel @Inject constructor(
     fun setBackgroundImage(uri: Uri, onError: (String) -> Unit = {}) {
         viewModelScope.launch {
             try {
-                val stored = importBackgroundImage(uri)
-                hostsStore.setSetting { it.copy(backgroundImagePath = stored) }
+                // Never replace the image at an unchanged path: Compose caches by path.
+                backgroundChangeMutex.withLock {
+                    val stored = importBackgroundImage(uri)
+                    hostsStore.setSetting { it.copy(backgroundImagePath = stored) }
+                    removeInactiveBackgroundFiles(stored)
+                }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -148,26 +157,49 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Drop the background image. The copied file stays until the next import overwrites it. */
+    /** Clear the persisted reference before removing the managed file. */
     fun clearBackgroundImage() {
         viewModelScope.launch {
-            hostsStore.setSetting { it.copy(backgroundImagePath = null) }
+            backgroundChangeMutex.withLock {
+                hostsStore.setSetting { it.copy(backgroundImagePath = null) }
+                removeInactiveBackgroundFiles(null)
+            }
         }
     }
 
     private suspend fun importBackgroundImage(uri: Uri): String = withContext(Dispatchers.IO) {
         val directory = File(appContext.filesDir, APP_BACKGROUND_DIR).apply { mkdirs() }
-        val target = File(directory, APP_BACKGROUND_FILE)
+        // Each import gets a new identity, triggering both settings and wallpaper analysis.
+        val target = File(directory, "${APP_BACKGROUND_FILE}-${UUID.randomUUID()}.image")
         val staging = File.createTempFile("background-", ".part", directory)
         try {
             val source = appContext.contentResolver.openInputStream(uri)
                 ?: error("Cannot open the picked image")
             source.use { input -> staging.outputStream().use { output -> input.copyTo(output) } }
-            check(staging.renameTo(target)) { "Cannot replace the background image" }
+            // Validate the staged bytes before persisting a reference or deleting the last
+            // usable wallpaper. An image/* provider is allowed to return undecodable data.
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(staging.absolutePath, bounds)
+            check(bounds.outWidth > 0 && bounds.outHeight > 0) { "Invalid background image" }
+            check(staging.renameTo(target)) { "Cannot commit the background image" }
         } finally {
             staging.delete()
         }
         target.absolutePath
+    }
+
+    private suspend fun removeInactiveBackgroundFiles(activePath: String?) = withContext(Dispatchers.IO) {
+        val directory = File(appContext.filesDir, APP_BACKGROUND_DIR)
+        directory.listFiles()?.forEach { file ->
+            if (file.isFile && file.absolutePath != activePath &&
+                (file.name == APP_BACKGROUND_FILE || file.name.startsWith("${APP_BACKGROUND_FILE}-"))
+            ) {
+                if (!file.delete()) {
+                    AppLog.failure("Settings", "background_cleanup",
+                        IllegalStateException("Cannot delete old background"))
+                }
+            }
+        }
     }
 
     /** Reload every capability-backed Settings section without requiring an app restart. */

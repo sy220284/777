@@ -7,7 +7,7 @@ activity="com.labteto.dshmobile.ui.screens.local.ReadmeScreenshotActivity"
 output_dir=".ci/fluid-ui"
 mkdir -p "$output_dir"
 for appearance in light dark matte; do
-  for screen in navigation chat work usage quota design-work-goal design-work-plan design-work-decision design-work-execution design-work-outputs design-persona-0 design-persona-1 design-persona-2 design-persona-3 design-gallery design-capability; do
+  for screen in navigation chat work usage quota design-persona-0 design-persona-1 design-persona-2 design-persona-3 design-gallery design-capability; do
     adb logcat -c
     adb shell am force-stop "$package"
     adb shell am start -W -n "$package/$activity" \

@@ -480,7 +480,7 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.APPEARANCE -> {
-                        // 所有外观与阅读调节项集中在当前页面，避免再次深入设置导航。
+                        // Keep common appearance compact; advanced appearance expands in place.
                         SettingsCard(stringResource(R.string.settings_appearance)) {
                             AppearanceRow(settings) { mode ->
                                 viewModel.set { it.copy(themePreference = mode) }
@@ -500,9 +500,6 @@ fun SettingsScreen(
                                 onTextWeightChange = { value ->
                                     viewModel.set { it.copy(textWeightAdjustment = value.coerceIn(0, 2)) }
                                 },
-                                onTransparencyChange = { value ->
-                                    viewModel.set { it.copy(wallpaperSurfaceTransparency = value.coerceIn(0f, 1f)) }
-                                },
                             )
                             Text(
                                 stringResource(R.string.settings_appearance_preview),
@@ -514,13 +511,47 @@ fun SettingsScreen(
                         SettingsCard(stringResource(R.string.settings_background_image)) {
                             BackgroundRow(
                                 settings.backgroundImagePath,
-                                settings.backgroundAdaptiveContrast,
-                                onAdaptiveContrastChange = { enabled ->
-                                    viewModel.set { it.copy(backgroundAdaptiveContrast = enabled) }
-                                },
                                 onPick = { uri -> viewModel.setBackgroundImage(uri) { message -> toast.second(message) } },
                                 onClear = viewModel::clearBackgroundImage,
                             )
+                        }
+                        var advancedExpanded by rememberSaveable { mutableStateOf(false) }
+                        SettingsCard(stringResource(R.string.settings_advanced_appearance)) {
+                            ToggleRow(
+                                stringResource(R.string.settings_advanced_expand),
+                                advancedExpanded,
+                            ) { advancedExpanded = !advancedExpanded }
+                            if (advancedExpanded) {
+                                AppearanceAdvancedControls(
+                                    settings = settings,
+                                    onAmbientChange = { value ->
+                                        viewModel.set { it.copy(ambientGlow = value.coerceIn(0f, 1f)) }
+                                    },
+                                    onTransparencyChange = { value ->
+                                        viewModel.set { it.copy(wallpaperSurfaceTransparency = value.coerceIn(0f, 1f)) }
+                                    },
+                                    onMotionChange = { value ->
+                                        viewModel.set { it.copy(motionDurationScale = value.coerceIn(.7f, 1.3f)) }
+                                    },
+                                    onEmphasisChange = { value ->
+                                        viewModel.set { it.copy(componentEmphasis = value.coerceIn(0f, 1f)) }
+                                    },
+                                    onAdaptiveContrastChange = { enabled ->
+                                        viewModel.set { it.copy(backgroundAdaptiveContrast = enabled) }
+                                    },
+                                    onReset = {
+                                        viewModel.set {
+                                            it.copy(
+                                                ambientGlow = .5f,
+                                                wallpaperSurfaceTransparency = .5f,
+                                                motionDurationScale = 1f,
+                                                componentEmphasis = .5f,
+                                                backgroundAdaptiveContrast = true,
+                                            )
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                     SettingsDestination.CHAT -> {

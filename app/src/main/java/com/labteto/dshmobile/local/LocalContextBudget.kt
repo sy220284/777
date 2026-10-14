@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
+import com.labteto.dshmobile.local.model.LocalKimiPolicy
 import com.labteto.dshmobile.local.model.LocalModelBudgetPolicies
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelRuntimeCapabilities
@@ -99,7 +100,9 @@ private fun routedContextBudget(model: String?, baseUrl: String?, contextWindowT
     } else {
         LocalModelPresets.runtimeCapabilitiesFor(model, baseUrl)
     }
-    val window = capabilities.contextWindowTokens ?: contextWindowTokensOverride?.takeIf { it in 4_096..16_000_000 }
+    val window = LocalKimiPolicy.contextWindow(
+        model, baseUrl, contextWindowTokensOverride, capabilities.contextWindowTokens,
+    )
     if (window == null) {
         return RoutedContextBudget(
             messageBudgetTokens = UNKNOWN_ROUTE_OPERATIONAL_INPUT_TOKENS,
@@ -133,9 +136,11 @@ internal fun operationalInputLimitTokens(model: String?, baseUrl: String?, conte
     routedContextBudget(model, baseUrl, contextWindowTokensOverride).messageBudgetTokens
 
 internal fun documentedContextWindowTokens(model: String?, baseUrl: String?, contextWindowTokensOverride: Int? = null): Int? =
-    if (model.isNullOrBlank() || baseUrl.isNullOrBlank()) contextWindowTokensOverride
-    else LocalModelPresets.runtimeCapabilitiesFor(model, baseUrl).contextWindowTokens
-        ?: contextWindowTokensOverride?.takeIf { it in 4_096..16_000_000 }
+    LocalKimiPolicy.contextWindow(
+        model, baseUrl, contextWindowTokensOverride,
+        if (model.isNullOrBlank() || baseUrl.isNullOrBlank()) null
+        else LocalModelPresets.runtimeCapabilitiesFor(model, baseUrl).contextWindowTokens,
+    )
 
 private const val UNKNOWN_ROUTE_OPERATIONAL_INPUT_TOKENS = 192_000
 private const val UNKNOWN_ROUTE_TAIL_TOKENS = 48_000

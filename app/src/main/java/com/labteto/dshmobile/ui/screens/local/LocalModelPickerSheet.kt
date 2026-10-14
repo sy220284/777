@@ -87,7 +87,9 @@ internal fun LocalModelPickerSheet(
                         .fillMaxWidth()
                         .heightIn(min = 60.dp)
                         .clip(DsShapes.row)
-                        .background(if (selected) colors.materialL3 else colors.materialL3)
+                        .background(if (selected) com.shenyan.designsystem.components.syMaterialColor(
+                            com.shenyan.designsystem.components.SyMaterialTier.L3_CARD,
+                        ) else androidx.compose.ui.graphics.Color.Transparent)
                         .clickable {
                             onSelect(profile.id)
                             onDismiss()

@@ -307,6 +307,9 @@ fun DshTheme(
     textScale: Float = 1f,
     textWeightAdjustment: Int = 0,
     wallpaperSurfaceTransparency: Float = 0.5f,
+    ambientGlow: Float = 0.5f,
+    componentEmphasis: Float = 0.5f,
+    motionDurationScale: Float = 1f,
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
@@ -314,7 +317,14 @@ fun DshTheme(
     val projected = resolveV6ThemePalette(preference, accentKey, systemDark)
     val dark = projected.dark
     val themed = projected.page
-    val controlPalette = projected.controls
+    val standardColors = projected.controls
+    val weight = componentEmphasis.coerceIn(0f, 1f)
+    val emphasisFill = if (weight <= .5f) {
+        androidx.compose.ui.graphics.lerp(standardColors.materialL5, standardColors.selected, weight * 2f)
+    } else {
+        androidx.compose.ui.graphics.lerp(standardColors.selected, standardColors.primary, (weight - .5f) * .4f)
+    }
+    val controlPalette = standardColors.copy(selected = emphasisFill)
     val scheme = if (dark) materialDarkScheme(themed) else materialLightScheme(themed)
     val currentDensity = LocalDensity.current
     val clampedTextScale = textScale.coerceIn(AppDisplayLimits.MIN_READING_SCALE, AppDisplayLimits.MAX_READING_SCALE)
@@ -324,7 +334,9 @@ fun DshTheme(
         textScale = clampedTextScale,
         textWeightAdjustment = textWeightAdjustment.coerceIn(0, 2),
     )
+    val userMotionScale = motionDurationScale.coerceIn(.7f, 1.3f)
     CompositionLocalProvider(
+        com.shenyan.designsystem.foundation.LocalSyMotionTempo provides userMotionScale,
         LocalDsColors provides themed,
         LocalDsReadingPreferences provides readingPreferences,
         LocalDensity provides Density(
@@ -341,6 +353,7 @@ fun DshTheme(
             surfaceBase = themed.bgBase,
             surfaceTransparency = wallpaperSurfaceTransparency.coerceIn(0f, 1f),
             fluidGlass = preference != ThemePreference.MATTE_BLACK,
+            ambientGlow = ambientGlow.coerceIn(0f, 1f),
             ambientPalette = controlPalette,
         ) {
             // One canonical visual theme owns all Material3 colour and shape tokens.

@@ -346,6 +346,8 @@ internal class LocalWorkAgentTurnExecutor(
                         mode = selectedMode,
                         budget = imageRequestBudget,
                         maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.modelState.model, snapshot.modelState.baseUrl),
+                model = snapshot.modelState.model,
+                baseUrl = snapshot.modelState.baseUrl,
                     )
                     val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
                     agentRunCoordinator.ensureCurrentOwner(runContext)

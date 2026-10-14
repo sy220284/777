@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import kotlin.math.max
@@ -105,8 +106,8 @@ fun SyMaterialSurface(
     val interaction = interactionSource ?: defaultInteraction
     val pressed by interaction.collectIsPressedAsState()
     val press by animateFloatAsState(
-        if (pressed && enabled && onClick != null && !LocalSyReduceMotion.current) .985f else 1f,
-        tween(if (LocalSyReduceMotion.current) 0 else SyMotion.pressMs), label = "materialPress",
+        if (pressed && enabled && onClick != null && !LocalSyReduceMotion.current) SyMotion.pressedScale else 1f,
+        tween(SyMotion.duration(SyMotion.pressMs, LocalSyReduceMotion.current, LocalSyMotionTempo.current)), label = "materialPress",
     )
     // Without a spatial backing, use the same palette over its canvas rather than letting
     // unrelated content show through. Nested cards inherit their parent's backing.
@@ -183,15 +184,51 @@ fun SyMachineText(text: String, modifier: Modifier = Modifier) {
     )
 }
 
+/**
+ * Paint the exact root background behind a compact overlay, without a separate glass/white plate.
+ * This intentionally samples the same scene and screen coordinates as the app's background host.
+ * In previews without a scene, fall back to the active theme canvas (never hardcoded white).
+ */
+@Composable
+fun SySceneBackgroundSurface(
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(SyMetric.radiusSheet),
+    fallbackColor: Color? = null,
+    tag: String = "sySceneBackgroundSurface",
+    content: @Composable () -> Unit,
+) {
+    val scene = LocalSySceneBackdrop.current
+    val canvas = fallbackColor ?: scene?.canvas ?: LocalSyColors.current.canvas
+    val view = LocalView.current
+    val windowOnScreen = remember { IntArray(2) }
+    var origin by remember { mutableStateOf(IntOffset.Zero) }
+    Box(
+        modifier.clip(shape).testTag(tag).onGloballyPositioned { coordinates ->
+            view.rootView.getLocationOnScreen(windowOnScreen)
+            val point = coordinates.positionInWindow()
+            val next = IntOffset(point.x.roundToInt() + windowOnScreen[0],
+                point.y.roundToInt() + windowOnScreen[1])
+            if (origin != next) origin = next
+        },
+    ) {
+        // Show the theme canvas immediately while root coordinates are being measured.
+        Box(Modifier.matchParentSize().background(canvas))
+        if (scene != null) SyPaintAlignedScene(scene, origin, Modifier.matchParentSize())
+        content()
+    }
+}
+
 /** Renders only the wallpaper / designed static light fields, not sibling UI layers.
  * Coordinates reproduce ContentScale.Crop and the three root radial brushes exactly.
  * The parent material alone performs the blur; foreground remains sharp.
  */
 @Composable
-private fun SyPaintAlignedScene(scene: SySceneBackdrop, surfaceOrigin: IntOffset) {
+private fun SyPaintAlignedScene(
+    scene: SySceneBackdrop, surfaceOrigin: IntOffset, modifier: Modifier = Modifier.fillMaxSize(),
+) {
     val dx = surfaceOrigin.x - scene.viewportOrigin.x
     val dy = surfaceOrigin.y - scene.viewportOrigin.y
-    Canvas(Modifier.fillMaxSize()) {
+    Canvas(modifier) {
         val viewport = scene.viewportSize
         if (viewport.width <= 0 || viewport.height <= 0) return@Canvas
         drawRect(scene.canvas)
@@ -207,13 +244,14 @@ private fun SyPaintAlignedScene(scene: SySceneBackdrop, surfaceOrigin: IntOffset
             scene.veil?.let { drawRect(it) }
         } else if (scene.glowColors.size >= 3) {
             val extent = max(viewport.width, viewport.height).toFloat()
-            val opacity = if (scene.dark) 0.10f else 0.38f
+            val baselineOpacity = if (scene.dark) 0.10f else 0.38f
+            val opacity = baselineOpacity * (scene.ambientGlow.coerceIn(0f, 1f) * 2f)
             val centers = listOf(.06f to .08f, .98f to .36f, .24f to .92f)
             val radii = listOf(.72f, .65f, .55f)
             scene.glowColors.take(3).forEachIndexed { index, color ->
                 val (x, y) = centers[index]
                 drawRect(Brush.radialGradient(
-                    colors = listOf(color.copy(alpha = opacity * if (index == 2) .45f else 1f), Color.Transparent),
+                    colors = listOf(color.copy(alpha = color.alpha * opacity * if (index == 2) .45f else 1f), Color.Transparent),
                     center = Offset(viewport.width * x - dx, viewport.height * y - dy),
                     radius = extent * radii[index],
                 ))
