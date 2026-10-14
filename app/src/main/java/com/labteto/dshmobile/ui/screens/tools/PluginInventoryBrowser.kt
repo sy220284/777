@@ -311,6 +311,15 @@ internal fun PluginInventoryBrowser(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection),
                 )
             }
+            if (loading && list.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.common_loading),
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.textTertiary,
+                    modifier = Modifier.fillMaxWidth()
+                        .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapSm),
+                )
+            }
             if (error != null || list.isEmpty()) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(SyMetric.gapPage),
