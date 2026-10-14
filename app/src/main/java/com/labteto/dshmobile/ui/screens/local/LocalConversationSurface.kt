@@ -1732,6 +1732,7 @@ private fun EmptyLocalHarness(
             SyPopupMenu(
                 expanded = suggestionsOpen,
                 onDismiss = { suggestionsOpen = false },
+                seamlessBackground = true,
                 items = listOf(
                     SyMenuItem(stringResource(R.string.local_suggestion_files), com.labteto.dshmobile.ui.components.SyEntryIcons.WorkspaceFiles, onClick = { onSuggestion(filesPrompt) }),
                     SyMenuItem(stringResource(R.string.local_suggestion_research), com.labteto.dshmobile.ui.components.SyEntryIcons.Search, onClick = { onSuggestion(researchPrompt) }),

@@ -43,8 +43,6 @@ import androidx.compose.ui.unit.dp
 import com.shenyan.designsystem.foundation.LocalSyColors
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.shenyan.SyMaterialFrame
-import com.labteto.dshmobile.ui.shenyan.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SySlider
 import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.ui.shenyan.SySegment
@@ -64,20 +62,19 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun AppearanceReadingPreview() {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    SyMaterialFrame(
-        modifier = Modifier.fillMaxWidth(),
-        tier = SyMaterialTier.L2_BAR,
-        horizontalPadding = SyMetric.gapMd,
-        verticalPadding = SyMetric.gapSm,
-        verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
+    Column(
+        modifier = Modifier.fillMaxWidth()
+            .padding(horizontal = SyMetric.gapSm, vertical = SyMetric.gapXs),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         Text(
             stringResource(R.string.settings_appearance_preview_assistant),
             style = DsType.small13.withReadingWeight(),
-            maxLines = 1,
             color = colors.text,
         )
-        SyUserBubble(stringResource(R.string.settings_appearance_preview_user))
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+            SyUserBubble(stringResource(R.string.settings_appearance_preview_user))
+        }
     }
 }
 

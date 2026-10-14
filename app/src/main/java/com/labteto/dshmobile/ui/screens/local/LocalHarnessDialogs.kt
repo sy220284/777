@@ -151,6 +151,7 @@ internal fun ChatPersonaPickerDialog(
         title = stringResource(R.string.local_persona_picker_title),
         subtitle = stringResource(R.string.local_persona_picker_intro),
         onDismiss = onDismiss,
+        seamlessBackground = true,
         trailing = {
             SyButton(
                 text = stringResource(

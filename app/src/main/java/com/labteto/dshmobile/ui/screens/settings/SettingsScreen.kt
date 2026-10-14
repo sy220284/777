@@ -481,17 +481,17 @@ fun SettingsScreen(
 
                     SettingsDestination.APPEARANCE -> {
                         // Keep common appearance compact; advanced appearance expands in place.
-                        SettingsCard(stringResource(R.string.settings_appearance)) {
+                        SettingsSeamlessGroup(stringResource(R.string.settings_appearance)) {
                             AppearanceRow(settings) { mode ->
                                 viewModel.set { it.copy(themePreference = mode) }
                             }
                         }
-                        SettingsCard(stringResource(R.string.settings_accent_theme)) {
+                        SettingsSeamlessGroup(stringResource(R.string.settings_accent_theme)) {
                             AccentThemeRow(settings) { key ->
                                 viewModel.set { it.copy(accentTheme = key) }
                             }
                         }
-                        SettingsCard(stringResource(R.string.settings_reading_preferences)) {
+                        SettingsSeamlessGroup(stringResource(R.string.settings_reading_preferences)) {
                             ReadingPreferencesRow(
                                 settings,
                                 onTextScaleChange = { value ->
@@ -508,7 +508,7 @@ fun SettingsScreen(
                             )
                             AppearanceReadingPreview()
                         }
-                        SettingsCard(stringResource(R.string.settings_background_image)) {
+                        SettingsSeamlessGroup(stringResource(R.string.settings_background_image)) {
                             BackgroundRow(
                                 settings.backgroundImagePath,
                                 onPick = { uri -> viewModel.setBackgroundImage(uri) { message -> toast.second(message) } },
@@ -516,7 +516,7 @@ fun SettingsScreen(
                             )
                         }
                         var advancedExpanded by rememberSaveable { mutableStateOf(false) }
-                        SettingsCard(stringResource(R.string.settings_advanced_appearance)) {
+                        SettingsSeamlessGroup(stringResource(R.string.settings_advanced_appearance)) {
                             ToggleRow(
                                 stringResource(R.string.settings_advanced_expand),
                                 advancedExpanded,
@@ -1045,6 +1045,30 @@ private fun ChatFilterPhraseRow(
                 variant = SyButtonVariant.Ghost,
                 size = SyButtonSize.Small,
             )
+        }
+    }
+}
+
+/** The + menu's continuous scene is already behind this page.
+ * These two visual settings pages use open sections, not nested L3 glass cards.
+ * Other settings retain SettingsCard's existing material and behavior.
+ */
+@Composable
+internal fun SettingsSeamlessGroup(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+    ) {
+        SettingsGroupTitle(title)
+        Column(
+            modifier = Modifier.fillMaxWidth()
+                .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapXs),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+        ) {
+            content()
         }
     }
 }

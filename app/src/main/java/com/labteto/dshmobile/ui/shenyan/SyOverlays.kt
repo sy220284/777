@@ -35,6 +35,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SySceneBackgroundSurface
 import com.shenyan.designsystem.components.SyMaterialTier
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -202,6 +203,7 @@ fun SyPopupMenu(
     modifier: Modifier = Modifier,
     focusable: Boolean = true,
     containerColor: Color? = null,
+    seamlessBackground: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val p = LocalSyColors.current
@@ -223,15 +225,29 @@ fun SyPopupMenu(
             if (regionY != sampled) regionY = sampled
         },
         shape = RoundedCornerShape(SyMetric.radiusControl),
-        containerColor = containerColor ?: com.shenyan.designsystem.components.syMaterialColor(
-            SyMaterialTier.L4_OVERLAY, regionY),
+        containerColor = if (seamlessBackground) Color.Transparent else
+            (containerColor ?: com.shenyan.designsystem.components.syMaterialColor(
+                SyMaterialTier.L4_OVERLAY, regionY)),
         tonalElevation = 0.dp,
-        border = BorderStroke(1.dp, p.border),
+        shadowElevation = if (seamlessBackground) 0.dp else 8.dp,
+        border = if (seamlessBackground) null else BorderStroke(1.dp, p.border),
         properties = PopupProperties(
             focusable = focusable, dismissOnBackPress = true,
             dismissOnClickOutside = true, clippingEnabled = true,
         ),
-        content = content,
+        content = {
+            if (seamlessBackground) {
+                SySceneBackgroundSurface(
+                    modifier = Modifier.widthIn(min = 232.dp),
+                    shape = RoundedCornerShape(SyMetric.radiusControl),
+                    tag = "sySeamlessPopupScene",
+                ) {
+                    Column(content = content)
+                }
+            } else {
+                content()
+            }
+        },
     )
 }
 
@@ -241,10 +257,12 @@ fun SyPopupMenu(
     items: List<SyMenuItem>,
     focusable: Boolean = true,
     containerColor: Color? = null,
+    seamlessBackground: Boolean = false,
 ) {
     val p = LocalSyColors.current
     SyPopupMenu(expanded, onDismiss,
-        focusable = focusable, containerColor = containerColor) {
+        focusable = focusable, containerColor = containerColor,
+        seamlessBackground = seamlessBackground) {
         items.forEach { item ->
             DropdownMenuItem(
                 text = {
