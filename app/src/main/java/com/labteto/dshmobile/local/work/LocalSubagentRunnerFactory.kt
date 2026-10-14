@@ -142,6 +142,8 @@ internal class LocalSubagentRunnerFactory(
                 mode = mode,
                 budget = imageRequestBudget,
                 maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(model, baseUrl),
+                model = model,
+                baseUrl = baseUrl,
             )
         },
         resolveImageMode = { mode, baseUrl, model -> resolveLocalImageInputMode(mode, imageCapabilities, baseUrl, model) },

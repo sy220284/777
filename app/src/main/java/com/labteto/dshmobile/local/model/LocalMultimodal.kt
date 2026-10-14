@@ -195,6 +195,8 @@ internal suspend fun prepareLocalMultimodalMessages(
         maxRawBytes = 32L * 1024L * 1024L,
     ),
     maxImageBytes: Long = MAX_NATIVE_IMAGE_BYTES,
+    model: String? = null,
+    baseUrl: String? = null,
 ): List<JsonObject> = withContext(Dispatchers.IO) {
     val activeImageMessageIndices = activeImageMessageIndices(messages, mode)
     val activeFileMessageIndices = activeFileMessageIndices(messages)
@@ -202,6 +204,8 @@ internal suspend fun prepareLocalMultimodalMessages(
     var activeImages = 0
     var activeRawBytes = 0L
     var activeDocumentChars = 0
+    var activeVideoBytes = 0L
+    var activeVideos = 0
     val reservedDirectImages = messages.mapIndexed { index, message ->
         if (index in activeImageMessageIndices) {
             (message["content"] as? JsonArray).orEmpty().count { part ->
@@ -235,6 +239,30 @@ internal suspend fun prepareLocalMultimodalMessages(
                     }
                     val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: file.name
                     val mediaType = obj["mediaType"]?.jsonPrimitive?.contentOrNull ?: "application/octet-stream"
+                    val videoMime = LocalKimiPolicy.videoMediaType(name, mediaType)
+                    if (videoMime != null && baseUrl != null && LocalKimiPolicy.isOfficial(baseUrl)) {
+                        if (model == null || !LocalKimiPolicy.videoInputSupported(model, baseUrl)) {
+                            error("当前 Kimi Code 模型不支持视频输入；k3-256k 仅支持图片，请切换支持视频的型号")
+                        }
+                        require(file.length() in 1..MAX_KIMI_VIDEO_BYTES &&
+                            activeVideoBytes + file.length() <= MAX_KIMI_VIDEO_BYTES) {
+                            "视频附件过大：单次视频文件总量最多 20 MB；请压缩或剪辑后重试"
+                        }
+                        require(++activeVideos <= MAX_KIMI_VIDEOS_PER_REQUEST) {
+                            "每轮最多发送一个视频；请分批分析"
+                        }
+                        activeVideoBytes += file.length()
+                        // Bytes are only materialized for the live model request. Durable history
+                        // keeps local_file_ref and never stores Base64 media or replay payload.
+                        val bytes = readLocalImageBytesBounded(file, MAX_KIMI_VIDEO_BYTES)
+                        add(buildJsonObject {
+                            put("type", "video_url")
+                            put("video_url", buildJsonObject {
+                                put("url", "data:$videoMime;base64,${Base64.getEncoder().encodeToString(bytes)}")
+                            })
+                        })
+                        return@forEach
+                    }
                     val remainingChars = (MAX_LOCAL_DOCUMENT_CHARS_PER_REQUEST - activeDocumentChars)
                         .coerceAtLeast(1)
                     val extracted = LocalDocumentContent.extract(
@@ -475,10 +503,14 @@ internal fun redactModelImages(messages: List<JsonObject>): List<JsonObject> =
             content.forEach { part ->
                 val obj = part as? JsonObject
                 val type = obj?.get("type")?.jsonPrimitive?.contentOrNull
-                if (type == "image_url") {
+                if (type == "image_url" || type == "video_url") {
+                    val key = if (type == "video_url") "video_url" else "image_url"
                     add(buildJsonObject {
-                        put("type", "image_url")
-                        put("image_url", buildJsonObject { put("url", "[image data omitted]") })
+                        put("type", type)
+                        put(key, buildJsonObject {
+                            put("url", if (type == "video_url")
+                                "[video data omitted]" else "[image data omitted]")
+                        })
                     })
                 } else {
                     add(part)
@@ -507,6 +539,8 @@ internal const val MAX_LOCAL_IMAGE_EDGE = 8192
 internal const val MAX_LOCAL_IMAGE_PIXELS = 64_000_000L
 private const val MAX_NATIVE_IMAGE_BYTES = 20L * 1024L * 1024L
 private const val MAX_LOCAL_DOCUMENT_BYTES = 20L * 1024L * 1024L
+private const val MAX_KIMI_VIDEO_BYTES = 20L * 1024L * 1024L
+private const val MAX_KIMI_VIDEOS_PER_REQUEST = 1
 private const val MAX_LOCAL_DOCUMENT_CHARS_PER_FILE = 40_000
 private const val MAX_LOCAL_DOCUMENT_CHARS_PER_REQUEST = 80_000
 private const val MIN_RELIABLE_PDF_TEXT_CHARS = 1_200
