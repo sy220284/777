@@ -402,7 +402,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             readerMessageId = state.messages.lastOrNull { it.role == "assistant" }?.id
         }
     }
-    var workDesignSection by rememberSaveable(state.sessionId) { mutableStateOf(3) }
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val rootSurfaceColor = colors.rootSurface()
     // Custom wallpapers remain visible behind the chat toolbar; work mode still gets its
@@ -1118,15 +1117,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 }
             }
             }
-            if (state.usageMode == LocalUsageMode.WORK && workActions != null) {
-                LocalWorkDesignSurface(
-                    actions = workActions, sessionId = state.sessionId, title = sessionTitle,
-                    section = workDesignSection, onSelectSection = { workDesignSection = it },
-                    onAnswer = onAnswerQuestion, onCancelQuestion = onCancelQuestion,
-                    onOpenArtifact = onOpenWorkArtifact,
-                    execution = transcriptBody,
-                )
-            } else transcriptBody()
+            // Work and Chat share the normal transcript; no separate five-tab dashboard.
+            transcriptBody()
 
             ConversationScrollShortcut(
                 target = scrollHint.target,
@@ -1378,7 +1370,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     }
     state.pendingQuestion
         ?.takeIf { state.usageMode == LocalUsageMode.WORK }
-        ?.takeUnless { localPlanReviewOf(it) != null || workActions != null }
+        ?.takeUnless { localPlanReviewOf(it) != null }
         ?.let { question ->
         QuestionDialog(
             question = question.question,
