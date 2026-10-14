@@ -8,6 +8,7 @@ import com.shenyan.designsystem.components.SyMaterialSurface
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -209,41 +210,47 @@ internal fun PluginInventoryBrowser(
                 placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search else R.string.tools_catalog_search),
             )
             if (skillsOnly) {
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection),
-                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                 ) {
-                    if (onImportSkill != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                    ) {
+                        if (onImportSkill != null) {
+                            SyButton(
+                                text = stringResource(R.string.skills_import_file),
+                                onClick = onImportSkill,
+                                enabled = !loading,
+                                modifier = Modifier.weight(1f).testTag("skill-import-file"),
+                            )
+                        }
+                        if (onUseCapability != null) {
+                            SyButton(
+                                text = stringResource(R.string.skills_create_in_chat),
+                                onClick = { onUseCapability(skillCreationPrompt) },
+                                enabled = !loading,
+                                variant = SyButtonVariant.Info,
+                                modifier = Modifier.weight(1f).testTag("skill-create-in-chat"),
+                            )
+                        }
+                    }
+                    if (onCreateSkill != null) {
                         SyButton(
-                            text = stringResource(R.string.skills_import_file),
-                            onClick = onImportSkill,
+                            text = stringResource(R.string.skills_create_manual),
+                            variant = SyButtonVariant.Ghost,
+                            onClick = { showCreateSkill = true },
                             enabled = !loading,
-                            modifier = Modifier.weight(1f).testTag("skill-import-file"),
+                            modifier = Modifier.testTag("skill-create-manual"),
                         )
                     }
-                    if (onUseCapability != null) {
-                        SyButton(
-                            text = stringResource(R.string.skills_create_in_chat),
-                            onClick = { onUseCapability(skillCreationPrompt) },
-                            enabled = !loading,
-                            variant = SyButtonVariant.Info,
-                            modifier = Modifier.weight(1f).testTag("skill-create-in-chat"),
-                        )
-                    }
-                }
-                Text(
-                    stringResource(R.string.skills_import_hint),
-                    style = DsType.small13.withReadingWeight(),
-                    color = colors.textTertiary,
-                    modifier = Modifier.padding(horizontal = SyMetric.gapSection),
-                )
-                if (onCreateSkill != null) {
-                    SyButton(
-                        text = stringResource(R.string.skills_create_manual),
-                        variant = SyButtonVariant.Info,
-                        onClick = { showCreateSkill = true },
-                        enabled = !loading,
-                        modifier = Modifier.padding(horizontal = SyMetric.gapSection),
+                    Text(
+                        stringResource(R.string.skills_import_hint),
+                        style = DsType.small13.withReadingWeight(),
+                        color = colors.textTertiary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
@@ -329,55 +336,65 @@ internal fun PluginInventoryBrowser(
                 ) {
                     items(list, key = { it.id }) { item ->
                         SyMaterialSurface(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().testTag("plugin-inventory-card-${item.id}"),
                             onClick = { selectedRow = item },
                             tier = SyMaterialTier.L3_CARD,
                             shape = DsShapes.block,
                         ) {
-                            Row(
+                            Column(
                                 modifier = Modifier.fillMaxWidth().padding(SyMetric.gapSection),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
+                                verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                             ) {
-                                SyMaterialSurface(
-                                    tier = SyMaterialTier.L1_SECTION,
-                                    shape = DsShapes.row,
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                                 ) {
-                                    Icon(
-                                        imageVector = item.icon,
-                                        contentDescription = null,
-                                        tint = colors.textSecondary,
-                                        modifier = Modifier.padding(8.dp).size(24.dp),
-                                    )
-                                }
-                                Column(Modifier.weight(1f)) {
+                                    SyMaterialSurface(
+                                        modifier = Modifier.size(40.dp).testTag("plugin-inventory-icon-${item.id}"),
+                                        tier = SyMaterialTier.L1_SECTION,
+                                        shape = DsShapes.row,
+                                    ) {
+                                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = item.icon,
+                                                contentDescription = null,
+                                                tint = colors.textSecondary,
+                                                modifier = Modifier.size(20.dp),
+                                            )
+                                        }
+                                    }
                                     Text(
                                         item.name,
+                                        modifier = Modifier.weight(1f).testTag("plugin-inventory-title-${item.id}"),
                                         color = colors.text,
                                         style = DsType.std14Strong.withReadingWeight(),
-                                        maxLines = 1,
+                                        maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                     )
-                                    Text(
-                                        item.detail,
-                                        color = colors.textTertiary,
-                                        style = DsType.small13.withReadingWeight(),
+                                    val usePrompt = if (item.installedSkill) "@skill:${item.id.substringAfter(":")}\n" else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
+                                    SyButton(
+                                        text = stringResource(
+                                            if (item.installablePreset) R.string.skills_install
+                                            else if (onUseCapability != null && item.available) R.string.plugin_use
+                                            else R.string.tools_catalog_details
+                                        ),
+                                        variant = SyButtonVariant.Info,
+                                        size = SyButtonSize.Small,
+                                        onClick = {
+                                            if (item.installablePreset && onInstallPreset != null) onInstallPreset(item.id.substringAfter(":"))
+                                            else if (onUseCapability != null && item.available) onUseCapability(usePrompt)
+                                            else selectedRow = item
+                                        },
                                     )
                                 }
-                                val usePrompt = if (item.installedSkill) "@skill:${item.id.substringAfter(":")}\n" else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
-                                SyButton(
-                                    text = stringResource(
-                                        if (item.installablePreset) R.string.skills_install
-                                        else if (onUseCapability != null && item.available) R.string.plugin_use
-                                        else R.string.tools_catalog_details
-                                    ),
-                                    variant = SyButtonVariant.Info,
-                                    size = SyButtonSize.Small,
-                                    onClick = {
-                                        if (item.installablePreset && onInstallPreset != null) onInstallPreset(item.id.substringAfter(":"))
-                                        else if (onUseCapability != null && item.available) onUseCapability(usePrompt)
-                                        else selectedRow = item
-                                    },
+                                Text(
+                                    item.detail,
+                                    modifier = Modifier.fillMaxWidth().testTag("plugin-inventory-detail-${item.id}"),
+                                    color = colors.textTertiary,
+                                    style = DsType.small13.withReadingWeight(),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
                         }
