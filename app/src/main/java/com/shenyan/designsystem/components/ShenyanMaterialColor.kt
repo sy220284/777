@@ -65,14 +65,20 @@ internal fun syResolveMaterialFill(
         colors.successInk, colors.warningInk, colors.dangerInk,
     ).minOf { syContrastRatio(it, background) }
 
-    // The root palette defines the anchor, with only a restrained influence from the scene.
-    // Fall back toward the root's readable solid token on extreme wallpaper colours.
+    // Keep the sampled hue. Simply reducing saturation toward a pale neutral makes every
+    // colourful wallpaper look white and can erase the difference between screen regions.
     val anchor = colors.materialL5.copy(alpha = 1f)
-    var strength = if (scene.regionColors.isNotEmpty()) .30f else .18f
-    var tinted = lerp(anchor, sample.copy(alpha = 1f), strength)
-    while (contrast(tinted) < 4.5f && strength > 0f) {
-        strength = (strength - .03f).coerceAtLeast(0f)
-        tinted = lerp(anchor, sample.copy(alpha = 1f), strength)
+    var tinted = lerp(anchor, sample.copy(alpha = 1f),
+        if (scene.regionColors.isNotEmpty()) .30f else .18f)
+    val luminanceStep = if (colors.text.luminance() < .5f) .01f else -.01f
+    repeat(100) {
+        if (contrast(tinted) >= 4.5f) return@repeat
+        // Equal-channel correction protects contrast without discarding the wallpaper hue.
+        tinted = Color(
+            red = (tinted.red + luminanceStep).coerceIn(0f, 1f),
+            green = (tinted.green + luminanceStep).coerceIn(0f, 1f),
+            blue = (tinted.blue + luminanceStep).coerceIn(0f, 1f),
+        )
     }
     if (tier == SyMaterialTier.L5_SOLID) return tinted
 
