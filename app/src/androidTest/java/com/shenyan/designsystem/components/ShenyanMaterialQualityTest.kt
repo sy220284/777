@@ -63,6 +63,35 @@ class ShenyanMaterialQualityTest {
         } finally { file.delete() }
     }
 
+    @Test fun changingTransparencyUpdatesRenderedGlassWithoutReplacingWallpaper() {
+        val file = wallpaper()
+        val ready = AtomicBoolean()
+        val transparency = androidx.compose.runtime.mutableFloatStateOf(0f)
+        try {
+            compose.setContent {
+                DshTheme(preference = ThemePreference.LIGHT, backgroundPath = file.absolutePath,
+                    wallpaperSurfaceTransparency = transparency.floatValue) {
+                    val loaded = LocalAppBackgroundState.current.hasImage
+                    SideEffect { ready.set(loaded) }
+                    SyMaterialFrame(modifier = Modifier.fillMaxWidth().testTag("adjustable-glass")) {
+                        Text("前景保持清晰")
+                    }
+                }
+            }
+            compose.waitUntil(5_000) { ready.get() }
+            compose.waitForIdle()
+            val before = compose.onNodeWithTag("adjustable-glass").captureToImage().toPixelMap()
+            val darker = before[before.width / 2, 6]
+            compose.runOnIdle { transparency.floatValue = 1f }
+            compose.waitForIdle()
+            val after = compose.onNodeWithTag("adjustable-glass").captureToImage().toPixelMap()
+            val airier = after[after.width / 2, 6]
+            // The same purple image should be substantially more visible at the airy endpoint.
+            assertTrue("Changing the saved control must change actual rendered pixels",
+                (airier.blue - airier.green) > (darker.blue - darker.green) + .05f)
+        } finally { file.delete() }
+    }
+
     @Test fun matteKeepsAnOpaqueSemanticSurfaceOverTheSameWallpaper() {
         val file = wallpaper()
         val ready = AtomicBoolean()
