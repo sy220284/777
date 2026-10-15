@@ -2294,5 +2294,14 @@
     <string name="local_model_capability_video_or_generate">视频理解或生成</string>
     <string name="local_model_capability_speech_services">语音生成或转写</string>
     <string name="local_model_kimi_k3_context_invalid">Kimi K3 上下文只能设置 4096～1048576；留空使用 256K 默认值</string>
+    <string name="media_route_auto">自动选择支持的模型</string>
+    <string name="media_route_current_auto">自动选择 · %1$s</string>
+    <string name="media_route_current_manual">手动选择 · %1$s</string>
+    <string name="media_voice_required">请选择角色音色</string>
+    <string name="media_voice_current">当前音色：%1$s</string>
+    <string name="media_action_save">保存</string>
+    <string name="media_action_share">分享</string>
+    <string name="media_action_saved">已保存到设备</string>
+    <string name="media_action_save_failed">保存失败，请重试</string>
 </resources>
 
