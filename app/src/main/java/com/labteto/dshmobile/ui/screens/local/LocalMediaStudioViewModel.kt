@@ -35,7 +35,7 @@ class LocalMediaStudioViewModel @Inject constructor(private val creation: LocalM
         catch (_: Exception) { /* The store keeps its actionable recovery error visible. */ }
     }
     suspend fun dismissCreationJob(id: String) = creation.dismissCreationJob(id)
-    suspend fun submitImage(route: LocalMediaOffer, prompt: String, ratio: String, sessionId: String, sourceMessageId: String? = null, revisionOf: String? = null) = creation.submitImage(route, prompt, ratio, sessionId, sourceMessageId, revisionOf)
+    suspend fun submitImage(route: LocalMediaOffer, prompt: String, ratio: String, sessionId: String, sourceMessageId: String? = null, revisionOf: String? = null, editSourceImageId: String? = null) = creation.submitImage(route, prompt, ratio, sessionId, sourceMessageId, revisionOf, editSourceImageId)
     suspend fun submitSpeech(route: LocalMediaOffer, text: String, voice: String, sessionId: String, sourceMessageId: String? = null, revisionOf: String? = null) = creation.submitSpeech(route, text, voice, sessionId, sourceMessageId, revisionOf)
     suspend fun submitTranscribe(route: LocalMediaOffer, uri: Uri, sessionId: String, sourceMessageId: String? = null, revisionOf: String? = null) = creation.submitTranscribe(route, uri, sessionId, sourceMessageId, revisionOf)
     fun resultFile(item: LocalMediaResult) = creation.resultFile(item)
