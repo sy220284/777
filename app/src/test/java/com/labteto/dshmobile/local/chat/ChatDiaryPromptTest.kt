@@ -163,6 +163,27 @@ class ChatDiaryPromptTest {
     }
 
     @Test
+    fun aSinglePlayfulSentenceCanBeAViableImportantDiaryPatch() {
+        val patch = """
+            {
+              "turnSignificance": "MINOR",
+              "diaryDelta": {
+                "event": "说好了",
+                "privateReflection": "我那双鞋估计已经开始蹦跶了！",
+                "importance": 3
+              }
+            }
+        """.trimIndent()
+        val plan = planner.parse(
+            patch, ChatCharacterState(),
+            userMessage = "周末一起出去散步，说好了",
+            assistantMessage = "说好了。",
+        )
+        assertNotNull(plan)
+        assertEquals("我那双鞋估计已经开始蹦跶了！", plan!!.diaryDelta?.privateReflection)
+    }
+
+    @Test
     fun plannerPreservesStructuredDiaryDeltaForDurableProjection() {
         val plan = planner.parse(
             """
