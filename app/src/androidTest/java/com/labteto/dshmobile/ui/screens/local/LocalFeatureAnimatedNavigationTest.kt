@@ -33,4 +33,24 @@ class LocalFeatureAnimatedNavigationTest {
         compose.mainClock.autoAdvance = true
         compose.onNodeWithText(LocalFeaturePage.HOME.name).assertIsDisplayed()
     }
+    @Test fun eachFeatureRouteHasAWorkingEntranceAndReturnPath() {
+        val stack = mutableStateOf(localFeatureHome())
+        compose.setContent { DshTheme {
+            val holder = rememberSaveableStateHolder()
+            LocalFeatureAnimatedHost(stack.value) { page ->
+                holder.SaveableStateProvider(page.name) { Text(page.name) }
+            }
+        } }
+        compose.mainClock.autoAdvance = false
+        LocalFeaturePage.entries.filter { it != LocalFeaturePage.HOME }.forEach { page ->
+            compose.runOnIdle { stack.value = localFeaturePush(stack.value, page) }
+            compose.mainClock.advanceTimeBy(650)
+            compose.onNodeWithText(page.name).assertIsDisplayed()
+            compose.runOnIdle { stack.value = localFeaturePop(stack.value) }
+            compose.mainClock.advanceTimeBy(650)
+            compose.onNodeWithText(LocalFeaturePage.HOME.name).assertIsDisplayed()
+        }
+        compose.mainClock.autoAdvance = true
+    }
+
 }
