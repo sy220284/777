@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.ImageBitmap
@@ -491,7 +492,7 @@ internal fun QuestionDialog(
 internal fun ChatPersonaDialog(
     profile: PersonaProfile,
     onSave: suspend (PersonaProfile) -> Result<Unit>,
-    onAutoFill: suspend (String) -> Result<PersonaProfile>,
+    onAutoFill: suspend (PersonaProfile, String) -> Result<PersonaProfile>,
     onDismiss: () -> Unit,
     creatingNew: Boolean = false,
 ) {
@@ -521,7 +522,19 @@ internal fun ChatPersonaDialog(
     var saveError by remember(profile.id) { mutableStateOf<String?>(null) }
     var aiSucceeded by remember(profile.id) { mutableStateOf(false) }
     var aiError by remember(profile.id) { mutableStateOf<String?>(null) }
+    var confirmDiscard by remember(profile.id) { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+
+    fun currentDraft(): PersonaProfile = runtimeProfile.copy(
+        name = name,
+        coreIdentity = coreIdentity,
+        facts = factDrafts.filter { it.content.isNotBlank() },
+        franchise = franchise,
+        loreEntries = loreEntries.filter { it.content.isNotBlank() },
+    )
+    fun requestDismiss() {
+        if (currentDraft() != profile) confirmDiscard = true else onDismiss()
+    }
     val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
 
     fun addFactField(category: String) {
@@ -554,7 +567,7 @@ internal fun ChatPersonaDialog(
 
     SyResponsiveSheet(
         title = stringResource(R.string.local_persona_title),
-        onDismiss = onDismiss,
+        onDismiss = ::requestDismiss,
         scrollable = true,
         seamlessBackground = true,
         dismissEnabled = !aiGenerating && !saving,
@@ -569,15 +582,7 @@ internal fun ChatPersonaDialog(
                 saveError = null
                 coroutineScope.launch {
                     val result = runCatching {
-                        onSave(
-                            runtimeProfile.copy(
-                                name = name,
-                                coreIdentity = coreIdentity,
-                                facts = factDrafts.filter { it.content.isNotBlank() },
-                                franchise = franchise,
-                                loreEntries = loreEntries.filter { it.content.isNotBlank() },
-                            ),
-                        )
+                        onSave(currentDraft())
                     }.getOrElse { Result.failure(it) }
                     result.onSuccess { onDismiss() }
                         .onFailure { saveError = it.message ?: saveFailedText }
@@ -604,14 +609,100 @@ internal fun ChatPersonaDialog(
             "relationships" to R.string.persona_v4_relationships,
             "customFacts" to R.string.persona_v4_custom_facts,
         )
+        SyButton(
+            text = stringResource(if (aiOpen) R.string.persona_v4_hide_ai
+                else R.string.persona_v4_expand_ai),
+            onClick = { aiOpen = !aiOpen },
+            modifier = Modifier.fillMaxWidth(),
+            variant = SyButtonVariant.Ghost,
+        )
+        if (aiOpen) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+            ) {
+                SyTextField(
+                    value = aiDescription,
+                    onValueChange = { aiDescription = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.local_persona_ai_description)) },
+                    placeholder = { Text(stringResource(R.string.local_persona_ai_example_v3)) },
+                    minLines = 2,
+                    maxLines = 5,
+                    enabled = !aiGenerating,
+                )
+                SyButton(
+                    text = stringResource(if (aiGenerating) R.string.local_persona_ai_generating
+                        else if (creatingNew) R.string.local_persona_ai_generate_new
+                        else R.string.local_persona_ai_generate),
+                    onClick = {
+                        if (!aiGenerating) {
+                            val submittedDraft = currentDraft()
+                            aiGenerating = true
+                            aiSucceeded = false
+                            aiError = null
+                            coroutineScope.launch {
+                                try {
+                                    runCatching { onAutoFill(submittedDraft, aiDescription) }
+                                        .getOrElse { Result.failure(it) }
+                                        .onSuccess {
+                                            applyGenerated(it)
+                                            aiSucceeded = true
+                                        }
+                                        .onFailure { aiError = it.message ?: "persona_autofill_failed" }
+                                } finally {
+                                    aiGenerating = false
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !aiGenerating,
+                )
+                if (aiSucceeded) {
+                    Text(
+                        stringResource(if (creatingNew) R.string.local_persona_ai_new_draft
+                            else R.string.local_persona_ai_synced),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
+                    )
+                }
+                aiError?.let { error ->
+                    val message = when (error) {
+                        "persona_autofill_busy" -> stringResource(R.string.local_persona_ai_busy)
+                        "persona_autofill_unconfigured" -> stringResource(R.string.local_persona_ai_unconfigured)
+                        "persona_autofill_stale" -> stringResource(R.string.local_persona_ai_stale)
+                        "persona_autofill_failed" -> stringResource(R.string.local_persona_ai_failed)
+                        else -> error
+                    }
+                    Text(
+                        message,
+                        style = DsType.caption11.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk,
+                    )
+                }
+            }
+        }
         PersonaFormSection(stringResource(R.string.persona_v4_section_core_simple)) {
             PersonaTextField(stringResource(R.string.local_persona_name), name, { name = it }, singleLine = true)
-            PersonaTextField(stringResource(R.string.persona_v4_core_identity), coreIdentity, { coreIdentity = it })
+            PersonaTextField(stringResource(R.string.persona_v4_core_identity), coreIdentity,
+                { coreIdentity = it }, hint = stringResource(R.string.persona_v4_hint_identity))
         }
         availableFields.filterNot { it.first == "customFacts" }.forEach { (category, label) ->
             PersonaFactCategoryEditor(
                 category = category,
                 title = stringResource(label),
+                hint = when (category) {
+                    "personality" -> stringResource(R.string.persona_v4_hint_personality)
+                    "valuesAndTradeoffs" -> stringResource(R.string.persona_v4_hint_values)
+                    "selfNarrative" -> stringResource(R.string.persona_v4_hint_self)
+                    "subjectiveBeliefs" -> stringResource(R.string.persona_v4_hint_beliefs)
+                    "identityGap" -> stringResource(R.string.persona_v4_hint_gap)
+                    "preferencesAndHabits" -> stringResource(R.string.persona_v4_hint_habits)
+                    "voiceStyle" -> stringResource(R.string.persona_v4_hint_voice)
+                    "biography" -> stringResource(R.string.persona_v4_hint_biography)
+                    else -> stringResource(R.string.persona_v4_hint_relationships)
+                },
                 facts = factDrafts,
                 onChange = { factDrafts = it },
             )
@@ -622,10 +713,12 @@ internal fun ChatPersonaDialog(
             franchise,
             { franchise = it },
             singleLine = true,
+            hint = stringResource(R.string.persona_v4_hint_franchise),
         )
         PersonaFactCategoryEditor(
             category = "customFacts",
             title = stringResource(R.string.persona_v4_custom_facts),
+            hint = stringResource(R.string.persona_v4_hint_custom),
             facts = factDrafts,
             onChange = { factDrafts = it },
         )
@@ -635,7 +728,7 @@ internal fun ChatPersonaDialog(
             .forEach { category ->
                 PersonaFactCategoryEditor(
                     category = category,
-                    title = category,
+                    title = if (category == "identity") stringResource(R.string.persona_v4_extra_identity) else category,
                     facts = factDrafts,
                     onChange = { factDrafts = it },
                 )
@@ -647,7 +740,7 @@ internal fun ChatPersonaDialog(
         }.forEach { category ->
             PersonaFactCategoryEditor(
                 category = category,
-                title = category,
+                title = if (category == "identity") stringResource(R.string.persona_v4_extra_identity) else category,
                 facts = factDrafts,
                 onChange = { factDrafts = it },
             )
@@ -738,79 +831,28 @@ internal fun ChatPersonaDialog(
                 variant = SyButtonVariant.Ghost,
             )
         }
-        SyButton(
-            text = stringResource(if (aiOpen) R.string.persona_v4_hide_ai
-                else R.string.persona_v4_expand_ai),
-            onClick = { aiOpen = !aiOpen },
-            modifier = Modifier.fillMaxWidth(),
-            variant = SyButtonVariant.Ghost,
-        )
-        if (aiOpen) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-            ) {
-                SyTextField(
-                    value = aiDescription,
-                    onValueChange = { aiDescription = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.local_persona_ai_description)) },
-                    placeholder = { Text(stringResource(R.string.local_persona_ai_example_v3)) },
-                    minLines = 2,
-                    maxLines = 5,
-                    enabled = !aiGenerating,
-                )
+
+    }
+    if (confirmDiscard) {
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = false },
+            title = { Text(stringResource(R.string.persona_v4_discard_title)) },
+            text = { Text(stringResource(R.string.persona_v4_discard_body)) },
+            confirmButton = {
                 SyButton(
-                    text = stringResource(if (aiGenerating) R.string.local_persona_ai_generating
-                        else if (creatingNew) R.string.local_persona_ai_generate_new
-                        else R.string.local_persona_ai_generate),
-                    onClick = {
-                        if (!aiGenerating) {
-                            aiGenerating = true
-                            aiSucceeded = false
-                            aiError = null
-                            coroutineScope.launch {
-                                try {
-                                    runCatching { onAutoFill(aiDescription) }
-                                        .getOrElse { Result.failure(it) }
-                                        .onSuccess {
-                                            applyGenerated(it)
-                                            aiSucceeded = true
-                                        }
-                                        .onFailure { aiError = it.message ?: "persona_autofill_failed" }
-                                } finally {
-                                    aiGenerating = false
-                                }
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !aiGenerating,
+                    text = stringResource(R.string.persona_v4_discard_confirm),
+                    onClick = { confirmDiscard = false; onDismiss() },
+                    variant = SyButtonVariant.Ghost,
                 )
-                if (aiSucceeded) {
-                    Text(
-                        stringResource(if (creatingNew) R.string.local_persona_ai_new_draft
-                            else R.string.local_persona_ai_synced),
-                        style = DsType.caption11.withReadingWeight(),
-                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
-                    )
-                }
-                aiError?.let { error ->
-                    val message = when (error) {
-                        "persona_autofill_busy" -> stringResource(R.string.local_persona_ai_busy)
-                        "persona_autofill_unconfigured" -> stringResource(R.string.local_persona_ai_unconfigured)
-                        "persona_autofill_stale" -> stringResource(R.string.local_persona_ai_stale)
-                        "persona_autofill_failed" -> stringResource(R.string.local_persona_ai_failed)
-                        else -> error
-                    }
-                    Text(
-                        message,
-                        style = DsType.caption11.withReadingWeight(),
-                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk,
-                    )
-                }
-            }
-        }
+            },
+            dismissButton = {
+                SyButton(
+                    text = stringResource(R.string.persona_v4_discard_cancel),
+                    onClick = { confirmDiscard = false },
+                    variant = SyButtonVariant.Ghost,
+                )
+            },
+        )
     }
 }
 
@@ -820,76 +862,75 @@ private fun PersonaFactCategoryEditor(
     title: String,
     facts: List<CharacterFact>,
     onChange: (List<CharacterFact>) -> Unit,
-    showMetadata: Boolean = false,
+    hint: String = "",
 ) {
     val entries = facts.filter { it.category == category }
-    if (entries.isEmpty()) {
-        PersonaTextField(title, "", { content ->
+    // Existing facts remain separately editable to preserve their story stage and provenance.
+    // Exactly one empty entry is always available for an additional free-form fact.
+    entries.forEachIndexed { index, entry ->
+        val label = if (index == 0) title
+            else stringResource(R.string.persona_v4_fact_number, title, index + 1)
+        PersonaTextField(label, entry.content, { content ->
+            onChange(facts.map { fact ->
+                if (fact.id == entry.id) fact.copy(
+                    content = content,
+                    provenance = if (content == entry.content) entry.provenance
+                        else CharacterFactProvenance.USER_CREATED,
+                    // Keep the original reference for audit even after the author edits the fact.
+                    sourceReference = entry.sourceReference,
+                ) else fact
+            })
+        }, hint = hint)
+        var detailsOpen by remember(entry.id) { mutableStateOf(false) }
+        SyButton(
+            text = stringResource(if (detailsOpen) R.string.persona_v4_fact_hide_details
+                else R.string.persona_v4_fact_details),
+            onClick = { detailsOpen = !detailsOpen },
+            variant = SyButtonVariant.Ghost,
+        )
+        if (detailsOpen) {
+            PersonaTextField(
+                stringResource(R.string.persona_v4_fact_stage),
+                entry.temporalScope,
+                { value -> onChange(facts.map { fact ->
+                    if (fact.id == entry.id) fact.copy(temporalScope = value.take(160))
+                    else fact
+                }) },
+                singleLine = true,
+            )
+            PersonaTextField(
+                stringResource(R.string.persona_v4_fact_perspective),
+                entry.perspective,
+                { value -> onChange(facts.map { fact ->
+                    if (fact.id == entry.id) fact.copy(perspective = value.take(120))
+                    else fact
+                }) },
+                singleLine = true,
+            )
+            PersonaTextField(
+                stringResource(R.string.persona_v4_fact_source),
+                entry.sourceReference,
+                { value -> onChange(facts.map { fact ->
+                    if (fact.id == entry.id) fact.copy(sourceReference = value.take(240))
+                    else fact
+                }) },
+            )
+        }
+    }
+    PersonaTextField(
+        label = if (entries.isEmpty()) title
+            else stringResource(R.string.persona_v4_free_append),
+        value = "",
+        onValueChange = { content ->
             if (content.isNotBlank()) onChange(facts + CharacterFact(
                 id = UUID.randomUUID().toString(),
                 category = category,
                 content = content,
                 provenance = CharacterFactProvenance.USER_CREATED,
             ))
-        })
-    } else {
-        entries.forEachIndexed { index, entry ->
-            val label = if (index == 0) title
-                else stringResource(R.string.persona_v4_fact_number, title, index + 1)
-            PersonaTextField(label, entry.content, { content ->
-                // Keep the same input node while clearing/retyping; blank drafts are dropped on save.
-                onChange(facts.map { fact ->
-                    if (fact.id == entry.id) fact.copy(
-                        content = content,
-                        provenance = CharacterFactProvenance.USER_CREATED,
-                        sourceReference = "",
-                    ) else fact
-                })
-            })
-            if (showMetadata) {
-                PersonaTextField(
-                    stringResource(R.string.persona_v4_fact_stage),
-                    entry.temporalScope,
-                    { value -> onChange(facts.map { fact ->
-                        if (fact.id == entry.id) fact.copy(temporalScope = value.trim().take(160))
-                        else fact
-                    }) },
-                    singleLine = true,
-                )
-                PersonaTextField(
-                    stringResource(R.string.persona_v4_fact_perspective),
-                    entry.perspective,
-                    { value -> onChange(facts.map { fact ->
-                        if (fact.id == entry.id) fact.copy(perspective = value.trim().take(120))
-                        else fact
-                    }) },
-                    singleLine = true,
-                )
-                PersonaTextField(
-                    stringResource(R.string.persona_v4_fact_source),
-                    entry.sourceReference,
-                    { value -> onChange(facts.map { fact ->
-                        if (fact.id == entry.id) fact.copy(sourceReference = value.trim().take(240))
-                        else fact
-                    }) },
-                    singleLine = true,
-                )
-            }
-        }
-        SyButton(
-            text = stringResource(R.string.persona_v4_add_fact),
-            onClick = {
-                onChange(facts + CharacterFact(
-                    id = UUID.randomUUID().toString(),
-                    category = category,
-                    content = "",
-                    provenance = CharacterFactProvenance.USER_CREATED,
-                ))
-            },
-            modifier = Modifier.fillMaxWidth(),
-            variant = SyButtonVariant.Ghost,
-        )
-    }
+        },
+        hint = if (entries.isEmpty()) hint else stringResource(R.string.persona_v4_free_append_hint),
+    )
 }
 
 @Composable
@@ -909,12 +950,14 @@ private fun PersonaTextField(
     value: String,
     onValueChange: (String) -> Unit,
     singleLine: Boolean = false,
+    hint: String = "",
 ) {
     SyTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),
         label = { Text(label) },
+        placeholder = if (hint.isBlank()) null else ({ Text(hint) }),
         singleLine = singleLine,
         minLines = if (singleLine) 1 else 2,
         maxLines = if (singleLine) 1 else 6,
