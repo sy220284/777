@@ -185,4 +185,7 @@
     <string name="next_gallery_import_portrait">导入所选人物立绘</string>
     <string name="next_gallery_remove_portrait">移除所选人物立绘</string>
     <string name="next_gallery_confirm_remove_portrait">确认移除立绘</string>
+    <string name="next_gallery_empty">还没有保存的人物</string>
+    <string name="next_gallery_no_stories">这个人物还没有保存的故事</string>
+    <string name="next_gallery_action_rejected">故事没有启动，请确认当前会话和人物状态</string>
 </resources>
