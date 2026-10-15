@@ -1,7 +1,10 @@
 package com.labteto.dshmobile.local.presentation
 
 import com.labteto.dshmobile.local.chat.ChatDiaryDelta
-import com.labteto.dshmobile.uicontract.*
+import com.labteto.dshmobile.uicontract.DiaryUiPort
+import com.labteto.dshmobile.uicontract.UiDiaryEntry
+import com.labteto.dshmobile.uicontract.UiDiaryCorrection
+import com.labteto.dshmobile.uicontract.UiDiaryReceipt
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
