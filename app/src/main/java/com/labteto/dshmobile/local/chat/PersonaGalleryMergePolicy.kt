@@ -14,23 +14,14 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 internal fun isMeaningfulGalleryPersona(persona: PersonaProfile): Boolean {
-    val name = normalizePersonaText(persona.name)
+    val normalized = persona.canonicalV4()
+    val name = normalizePersonaText(normalized.name)
     if (name.isBlank() || name in DEFAULT_PERSONA_NAMES) return false
-    return persona.coreIdentity.isNotBlank() ||
-        persona.facts.isNotEmpty() ||
-        persona.portrait.isNotBlank() ||
-        persona.lifeContext.isNotBlank() ||
-        persona.attentionBiases.isNotEmpty() ||
-        persona.attentionKeywords.isNotEmpty() ||
-        persona.coreValues.isNotEmpty() ||
-        persona.stableTraits.isNotEmpty() ||
-        persona.worldSetting.isNotBlank() ||
-        persona.franchise.isNotBlank() ||
-        persona.timelinePosition.isNotBlank() ||
-        persona.knowledgeBoundary.isNotEmpty() ||
-        persona.loreEntries.isNotEmpty() ||
-        persona.hardConstraints.isNotEmpty() ||
-        persona.corrections.isNotEmpty()
+    // Retired prose/facts cannot turn an otherwise empty card into a meaningful profile.
+    return normalized.coreIdentity.isNotBlank() ||
+        normalized.facts.any { it.content.isNotBlank() } ||
+        normalized.franchise.isNotBlank() ||
+        normalized.loreEntries.any { it.content.isNotBlank() }
 }
 
 /**
