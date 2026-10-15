@@ -64,6 +64,7 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.CharacterFact
 import com.labteto.dshmobile.local.chat.CharacterFactProvenance
+import com.labteto.dshmobile.local.chat.CharacterFactCategories
 import com.labteto.dshmobile.local.presentation.PersonaPresetCatalog
 import com.labteto.dshmobile.local.chat.PersonaLoreEntry
 import com.labteto.dshmobile.local.interaction.LocalApproval
@@ -500,10 +501,10 @@ internal fun ChatPersonaDialog(
     var name by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.name) }
     var coreIdentity by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.coreIdentity) }
     var factDrafts by remember(profile.id, profile.updatedAt) {
-        mutableStateOf(profile.facts.filter { it.category !in setOf(
+        mutableStateOf(withBlankPersonaFacts(profile.facts.filter { it.category !in setOf(
             "definingChoices", "emotionalImprints", "lifeGravity",
             "unfinishedBusiness", "limitsAndCosts", "sensorySignature",
-        ) })
+        ) }))
     }
     var customCategory by rememberSaveable(profile.id) { mutableStateOf("") }
     var franchise by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.franchise) }
@@ -554,12 +555,12 @@ internal fun ChatPersonaDialog(
         runtimeProfile = generated
         name = generated.name
         coreIdentity = generated.coreIdentity
-        factDrafts = generated.facts.filter { fact ->
+        factDrafts = withBlankPersonaFacts(generated.facts.filter { fact ->
             fact.category !in setOf(
                 "definingChoices", "emotionalImprints", "lifeGravity",
                 "unfinishedBusiness", "limitsAndCosts", "sensorySignature",
             )
-        }
+        })
         visibleFields = factDrafts.map(CharacterFact::category).toSet()
         franchise = generated.franchise
         loreEntries = generated.loreEntries
@@ -856,6 +857,17 @@ internal fun ChatPersonaDialog(
     }
 }
 
+/** Stable empty records make each field immediately writable without a focus-changing node swap. */
+private fun withBlankPersonaFacts(input: List<CharacterFact>): List<CharacterFact> {
+    val categories = (CharacterFactCategories.canonical + input.map(CharacterFact::category)).distinct()
+    return input + categories.filterNot { category ->
+        input.any { it.category == category && it.content.isBlank() }
+    }.map { category ->
+        CharacterFact(id = UUID.randomUUID().toString(), category = category, content = "",
+            provenance = CharacterFactProvenance.USER_CREATED)
+    }
+}
+
 @Composable
 private fun PersonaFactCategoryEditor(
     category: String,
@@ -865,72 +877,66 @@ private fun PersonaFactCategoryEditor(
     hint: String = "",
 ) {
     val entries = facts.filter { it.category == category }
-    // Existing facts remain separately editable to preserve their story stage and provenance.
-    // Exactly one empty entry is always available for an additional free-form fact.
+    // Render the entire field in place, including one trailing blank box.
+    // No redundant "add fact" controls, and each existing fact retains its own metadata.
     entries.forEachIndexed { index, entry ->
-        val label = if (index == 0) title
-            else stringResource(R.string.persona_v4_fact_number, title, index + 1)
+        val label = when {
+            entry.content.isBlank() && index > 0 -> stringResource(R.string.persona_v4_free_append)
+            index == 0 -> title
+            else -> stringResource(R.string.persona_v4_fact_number, title, index + 1)
+        }
         PersonaTextField(label, entry.content, { content ->
-            onChange(facts.map { fact ->
+            val updated = facts.map { fact ->
                 if (fact.id == entry.id) fact.copy(
                     content = content,
                     provenance = if (content == entry.content) entry.provenance
                         else CharacterFactProvenance.USER_CREATED,
-                    // Keep the original reference for audit even after the author edits the fact.
                     sourceReference = entry.sourceReference,
                 ) else fact
-            })
-        }, hint = hint)
-        var detailsOpen by remember(entry.id) { mutableStateOf(false) }
-        SyButton(
-            text = stringResource(if (detailsOpen) R.string.persona_v4_fact_hide_details
-                else R.string.persona_v4_fact_details),
-            onClick = { detailsOpen = !detailsOpen },
-            variant = SyButtonVariant.Ghost,
-        )
-        if (detailsOpen) {
-            PersonaTextField(
-                stringResource(R.string.persona_v4_fact_stage),
-                entry.temporalScope,
-                { value -> onChange(facts.map { fact ->
-                    if (fact.id == entry.id) fact.copy(temporalScope = value.take(160))
-                    else fact
-                }) },
-                singleLine = true,
+            }
+            if (entry.content.isBlank() && content.isNotBlank()) {
+                onChange(withBlankPersonaFacts(updated))
+            } else onChange(updated)
+        }, hint = if (entry.content.isBlank() && index > 0)
+            stringResource(R.string.persona_v4_free_append_hint) else hint)
+        if (entry.content.isNotBlank()) {
+            var detailsOpen by remember(entry.id) { mutableStateOf(false) }
+            SyButton(
+                text = stringResource(if (detailsOpen) R.string.persona_v4_fact_hide_details
+                    else R.string.persona_v4_fact_details),
+                onClick = { detailsOpen = !detailsOpen },
+                variant = SyButtonVariant.Ghost,
             )
-            PersonaTextField(
-                stringResource(R.string.persona_v4_fact_perspective),
-                entry.perspective,
-                { value -> onChange(facts.map { fact ->
-                    if (fact.id == entry.id) fact.copy(perspective = value.take(120))
-                    else fact
-                }) },
-                singleLine = true,
-            )
-            PersonaTextField(
-                stringResource(R.string.persona_v4_fact_source),
-                entry.sourceReference,
-                { value -> onChange(facts.map { fact ->
-                    if (fact.id == entry.id) fact.copy(sourceReference = value.take(240))
-                    else fact
-                }) },
-            )
+            if (detailsOpen) {
+                PersonaTextField(
+                    stringResource(R.string.persona_v4_fact_stage),
+                    entry.temporalScope,
+                    { value -> onChange(facts.map { fact ->
+                        if (fact.id == entry.id) fact.copy(temporalScope = value.take(160))
+                        else fact
+                    }) },
+                    singleLine = true,
+                )
+                PersonaTextField(
+                    stringResource(R.string.persona_v4_fact_perspective),
+                    entry.perspective,
+                    { value -> onChange(facts.map { fact ->
+                        if (fact.id == entry.id) fact.copy(perspective = value.take(120))
+                        else fact
+                    }) },
+                    singleLine = true,
+                )
+                PersonaTextField(
+                    stringResource(R.string.persona_v4_fact_source),
+                    entry.sourceReference,
+                    { value -> onChange(facts.map { fact ->
+                        if (fact.id == entry.id) fact.copy(sourceReference = value.take(240))
+                        else fact
+                    }) },
+                )
+            }
         }
     }
-    PersonaTextField(
-        label = if (entries.isEmpty()) title
-            else stringResource(R.string.persona_v4_free_append),
-        value = "",
-        onValueChange = { content ->
-            if (content.isNotBlank()) onChange(facts + CharacterFact(
-                id = UUID.randomUUID().toString(),
-                category = category,
-                content = content,
-                provenance = CharacterFactProvenance.USER_CREATED,
-            ))
-        },
-        hint = if (entries.isEmpty()) hint else stringResource(R.string.persona_v4_free_append_hint),
-    )
 }
 
 @Composable
