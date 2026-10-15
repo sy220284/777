@@ -139,12 +139,13 @@ internal fun LocalComposerInvocationPicker(
                 items(pinned, key = { it.encode() }) { item ->
                     val option = options.firstOrNull { it.invocation == item }
                     val name = option?.label ?: item.id
+                    val removeDescription = stringResource(R.string.composer_invocation_remove, name)
                     Surface(
                         onClick = { onToggle(item) },
                         color = if (option?.available == false) colors.selected else colors.primary.copy(alpha = 0.10f),
                         shape = RoundedCornerShape(16.dp),
                         border = BorderStroke(1.dp, colors.border),
-                        modifier = Modifier.semantics { contentDescription = stringResource(R.string.composer_invocation_remove, name) },
+                        modifier = Modifier.semantics { contentDescription = removeDescription },
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
