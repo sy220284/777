@@ -206,7 +206,7 @@ internal fun LocalMemorySettingsCard(
 
 @Composable
 internal fun MemoryManagementCard(
-    records: List<MemoryRecord>,
+    page: MemoryManagementUiState,
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
     focusedSource: Boolean = false,
@@ -215,22 +215,17 @@ internal fun MemoryManagementCard(
     val memoryUpdatedMessage = stringResource(R.string.advanced_memory_updated)
     val memoryDeactivatedMessage = stringResource(R.string.advanced_memory_deactivated)
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    var query by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf(MemoryFilter.ALL) }
+    val records = page.records
+    val query = page.query
+    val filter = MemoryFilter.entries.firstOrNull { candidate ->
+        MemoryKind.entries.filter { it.matchesFilter(candidate) }.toSet() == page.kinds
+    } ?: MemoryFilter.ALL
     var vaultMode by remember { mutableStateOf(false) }
     var editingId by remember { mutableStateOf<String?>(null) }
-    var visibleLimit by remember(records, query, filter) { mutableStateOf(20) }
-
-    val filteredRecords = remember(records, query, filter) {
-        val needle = query.trim()
-        records.filter { record ->
-            record.kind.matchesFilter(filter) &&
-                (needle.isBlank() || record.content.contains(needle, ignoreCase = true))
-        }
-    }
-    val folders = remember(filteredRecords) { memoryVaultFolders(filteredRecords) }
-    val visibleRecords = remember(filteredRecords, folders, visibleLimit, vaultMode) {
-        (if (vaultMode) folders.flatMap { it.records } else filteredRecords).take(visibleLimit)
+    val filteredRecords = records
+    val folders = remember(records) { memoryVaultFolders(records) }
+    val visibleRecords = remember(records, folders, vaultMode) {
+        if (vaultMode) folders.flatMap { it.records } else records
     }
     val firstFolderRecords = remember(folders) {
         folders.mapNotNull { folder -> folder.records.firstOrNull()?.id?.let { it to folder } }.toMap()
@@ -249,7 +244,7 @@ internal fun MemoryManagementCard(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        if (records.isEmpty()) {
+        if (records.isEmpty() && query.isBlank() && filter == MemoryFilter.ALL && !page.loading && page.error == null) {
             Text(
                 stringResource(
                     if (focusedSource) R.string.advanced_memory_no_message_source
@@ -268,7 +263,9 @@ internal fun MemoryManagementCard(
         )
         SySearchField(
             value = query,
-            onValueChange = { query = it.take(200) },
+            onValueChange = { text ->
+                viewModel.searchMemories(text.take(200), MemoryKind.entries.filter { it.matchesFilter(filter) }.toSet())
+            },
             modifier = Modifier.fillMaxWidth(),
             placeholder = stringResource(R.string.advanced_memory_search),
         )
@@ -297,13 +294,14 @@ internal fun MemoryManagementCard(
                     stringResource(
                         R.string.advanced_memory_filter_count,
                         stringResource(label),
-                        records.count { it.kind.matchesFilter(candidate) },
+                        page.kindCounts.filterKeys { it.matchesFilter(candidate) }.values.sum(),
                     ),
                 )
             },
             selectedKey = filter.name,
             onSelect = { value ->
-                filter = MemoryFilter.entries.firstOrNull { it.name == value } ?: MemoryFilter.ALL
+                val nextFilter = MemoryFilter.entries.firstOrNull { it.name == value } ?: MemoryFilter.ALL
+                viewModel.searchMemories(query, MemoryKind.entries.filter { it.matchesFilter(nextFilter) }.toSet())
             },
             role = Role.Tab,
             hapticOnChange = true,
@@ -312,7 +310,7 @@ internal fun MemoryManagementCard(
         )
 
         Text(
-            stringResource(R.string.advanced_memory_visible_count, filteredRecords.size, records.size),
+            stringResource(R.string.advanced_memory_visible_count, records.size, page.totalMatching),
             style = DsType.caption11.withReadingWeight(),
             color = colors.textTertiary,
         )
@@ -375,6 +373,7 @@ internal fun MemoryManagementCard(
                         )
                         SyButton(
                             text = stringResource(R.string.advanced_deactivate),
+                            enabled = record.id !in page.busyIds,
                             onClick = {
                                 viewModel.forgetMemory(record.id) { error ->
                                     report(error ?: memoryDeactivatedMessage)
@@ -387,16 +386,16 @@ internal fun MemoryManagementCard(
                 }
             }
         }
-        if (visibleRecords.size < filteredRecords.size) {
-            val remaining = filteredRecords.size - visibleRecords.size
+        if (page.loading) Text(stringResource(R.string.common_loading), color = colors.textSecondary)
+        page.error?.let { error ->
+            Text(error, color = colors.dangerInk)
+            SyButton(stringResource(R.string.common_retry), onClick = viewModel::refreshMemories)
+        }
+        if (page.next != null) {
             SyButton(
-                text = stringResource(
-                    R.string.advanced_memory_show_more,
-                    minOf(20, remaining),
-                ),
-                onClick = {
-                    visibleLimit = (visibleLimit + 20).coerceAtMost(filteredRecords.size)
-                },
+                text = stringResource(R.string.advanced_memory_show_more, 20),
+                onClick = viewModel::loadOlderMemories,
+                enabled = !page.loading,
                 modifier = Modifier.fillMaxWidth(),
                 variant = SyButtonVariant.Ghost,
                 size = SyButtonSize.Small,

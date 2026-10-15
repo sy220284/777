@@ -604,6 +604,130 @@
         }
       ],
       "scope": "目标显式契约、真实退出码与当前成果版本证据入口和故障测试存在，方法级源码关联不等于完整产品验收"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 当前目标、阶段与执行步骤",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheet.kt",
+          "symbols": [
+            "LocalWorkEvidenceSheet"
+          ]
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalWorkUiState.kt",
+          "symbols": [
+            "LocalWorkUiState"
+          ]
+        }
+      ],
+      "scope": "当前生产声明及消费者已核对；源码存在不等于运行和设备验收通过，行为证据独立记录。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheet.kt",
+          "symbols": [
+            "LocalWorkEvidenceSheet",
+            "workToolPhaseLabel"
+          ]
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjection.kt",
+          "symbols": [
+            "projectLocalWorkHistoryPage"
+          ]
+        }
+      ],
+      "scope": "当前生产声明及消费者已核对；源码存在不等于运行和设备验收通过，行为证据独立记录。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 交付要求与真实成果事件来源绑定",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalRequirementEvidence.kt",
+          "symbols": [
+            "selectedRequirementEvidenceVersion",
+            "projectRequirementEvidenceLinks"
+          ]
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt",
+          "symbols": [
+            "linkRequirementEvidenceForUi"
+          ]
+        }
+      ],
+      "scope": "当前生产声明及消费者已核对；源码存在不等于运行和设备验收通过，行为证据独立记录。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 交付成果当前版本及证据变化提示",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkArtifactVersion.kt",
+          "symbols": [
+            "observeLocalWorkArtifact",
+            "localWorkFileSha256"
+          ]
+        }
+      ],
+      "scope": "当前生产声明及消费者已核对；源码存在不等于运行和设备验收通过，行为证据独立记录。"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 会话创建、读写、删除和归档",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt",
+          "symbols": [
+            "LocalSessionRepository"
+          ]
+        }
+      ],
+      "scope": "当前生产声明及消费者已核对；源码存在不等于运行和设备验收通过，行为证据独立记录。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4人物内核与13项人物资料",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaStore.kt",
+          "symbols": [
+            "CharacterFactCategories",
+            "PersonaProfile"
+          ]
+        }
+      ],
+      "scope": "当前生产声明及消费者已核对；源码存在不等于运行和设备验收通过，行为证据独立记录。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 13项人物资料按完整事实取用",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterRuntimeProjector.kt",
+          "symbols": [
+            "CharacterRuntimeProjector"
+          ]
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaStore.kt",
+          "symbols": [
+            "CharacterFactCategories"
+          ]
+        }
+      ],
+      "scope": "当前生产声明及消费者已核对；源码存在不等于运行和设备验收通过，行为证据独立记录。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务操作异常与受理回执",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementOperation.kt",
+          "symbols": [
+            "runTaskManagementOperation"
+          ]
+        }
+      ],
+      "scope": "当前生产声明及消费者已核对；源码存在不等于运行和设备验收通过，行为证据独立记录。"
     }
   ]
 }

@@ -31,4 +31,25 @@ class LocalWorkArtifactVersionTest {
         assertNull(localWorkArtifactFileVersion(root, "write_file", "已写入 ../outside（5 字节）"))
         assertNull(localWorkArtifactFileVersion(root, "write_file", "写入失败：results.md"))
     }
+
+    @Test fun overviewObservesIndependentFileChangesAndNeverInventsAContentHash() {
+        val root = tmp.newFolder("observations")
+        val file = java.io.File(root, "result.txt").apply { writeText("old") }
+        val item = com.labteto.dshmobile.local.presentation.LocalArtifactUiItem("result.txt", "file", "call", 1L)
+        val first = observeLocalWorkArtifact(root, item)
+        org.junit.Assert.assertEquals(true, first.currentlyAvailable)
+        org.junit.Assert.assertNotNull(first.fileObservation)
+        org.junit.Assert.assertNull(first.versionNow)
+        val checked = first.copy(versionNow = localWorkFileSha256(root, "result.txt"))
+        org.junit.Assert.assertEquals(checked.versionNow, observeLocalWorkArtifact(root, checked).versionNow)
+        file.writeText("changed without any session event")
+        val changed = observeLocalWorkArtifact(root, checked)
+        org.junit.Assert.assertNotEquals(first.fileObservation, changed.fileObservation)
+        org.junit.Assert.assertNull(changed.versionNow)
+        file.delete()
+        val deleted = observeLocalWorkArtifact(root, checked)
+        org.junit.Assert.assertEquals(false, deleted.currentlyAvailable)
+        org.junit.Assert.assertNull(deleted.fileObservation)
+        org.junit.Assert.assertNull(deleted.versionNow)
+    }
 }

@@ -9,4 +9,8 @@ data class LocalArtifactUiItem(
     val currentlyAvailable: Boolean? = null,
     val versionAtCreation: String? = null,
     val versionNow: String? = null,
+    /** Cheap observation for preview invalidation; never accepted as content/version evidence. */
+    val fileObservation: String? = null,
+    val logIdentity: String? = null,
+    val logGeneration: Long? = null,
 )

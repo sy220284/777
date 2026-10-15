@@ -103,6 +103,14 @@ internal data class LocalWorkFeatureUiActions(
     val previewWorkspaceFile: suspend (String) -> LocalWorkspaceFilePreview,
     val artifactsForUi: (String) -> List<LocalArtifactUiItem>,
     val eventSequenceForUi: (String) -> Long,
+    val artifactRevision: (String) -> com.labteto.dshmobile.local.presentation.LocalWorkHistoryRevision?,
+    val refreshArtifactFiles: (String, List<LocalArtifactUiItem>) -> List<LocalArtifactUiItem>,
+    val inspectArtifact: (String, LocalArtifactUiItem) -> LocalArtifactUiItem?,
+    val historyPage: (String, com.labteto.dshmobile.local.presentation.LocalWorkHistoryCursor?) -> com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi,
+    val toolActivities: (String) -> List<LocalToolActivityUiItem>,
+    val toolEvidence: (String, String, Long) -> String?,
+    val requirementEvidence: (String) -> List<com.labteto.dshmobile.local.work.LocalRequirementEvidenceLink>,
+    val linkRequirementEvidence: (String, com.labteto.dshmobile.local.presentation.LocalRequirementUiTarget, LocalArtifactUiItem) -> Boolean,
 )
 
 internal data class LocalAutomationFeatureUiActions(

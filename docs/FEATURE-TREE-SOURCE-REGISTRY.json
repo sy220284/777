@@ -2,6 +2,22 @@
   "version": 1,
   "nodes": [
     {
+      "id": "automation.management-receipts",
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务操作异常与受理回执",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementOperation.kt",
+      "entry": "runTaskManagementOperation",
+      "owner": "AUTOMATION",
+      "test": "app/src/test/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementOperationTest.kt#failedAcknowledgementReadsCurrentFactsWithoutReplayingMutation"
+    },
+    {
+      "id": "settings.memory.management-query",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 记忆记录查看和维护",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryStore.kt",
+      "entry": "managementPage",
+      "owner": "SETTINGS",
+      "test": "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryManagementQueryTest.kt#searchFindsOldestBeyond100AndStoreCanCorrectItAfterRestart"
+    },
+    {
       "id": "settings.minimax.quota",
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / MiniMax 侧边栏套餐额度",
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalSettingsUiContribution.kt",
@@ -15,7 +31,7 @@
       "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
       "entry": "LocalSkillStore",
       "owner": "TOOLS",
-      "test": "app/src/test/java/com/labteto/dshmobile/local/tools/LocalMiniMaxSkillBundleTest.kt#upgradeInstallsCompleteBundlesAndPreservesEditsAndDeletions"
+      "test": "app/src/test/java/com/labteto/dshmobile/local/tools/LocalMiniMaxSkillBundleTest.kt#installsOnlyMobileMediaSkillsAndUpdatesBuiltIns"
     },
     {
       "id": "tools.media.paged-history",
@@ -32,6 +48,14 @@
       "entry": "LocalMediaStore",
       "owner": "TOOLS",
       "test": "app/src/androidTest/java/com/labteto/dshmobile/local/model/LocalMediaStoreAndroidTest.kt#receiptAndResultCommitTogetherAndLateWriterCannotResurrectDeletion"
+    },
+    {
+      "id": "work.history-evidence-ui",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheet.kt",
+      "entry": "LocalWorkEvidenceSheet",
+      "owner": "WORK",
+      "test": "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheetTest.kt#olderPageIsReachableAndUnknownOutcomeKeepsItsMeaning"
     }
   ]
 }

@@ -343,7 +343,7 @@ internal class LocalSkillStore(
     }
 }
 
-// FEATURE_TREE: {"id":"skills.minimax-official-bundles","path":"第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 预置技能目录","owner":"TOOLS","entry":"LocalSkillStore","test":"app/src/test/java/com/labteto/dshmobile/local/tools/LocalMiniMaxSkillBundleTest.kt#upgradeInstallsCompleteBundlesAndPreservesEditsAndDeletions"}
+// FEATURE_TREE: {"id":"skills.minimax-official-bundles","path":"第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 预置技能目录","owner":"TOOLS","entry":"LocalSkillStore","test":"app/src/test/java/com/labteto/dshmobile/local/tools/LocalMiniMaxSkillBundleTest.kt#installsOnlyMobileMediaSkillsAndUpdatesBuiltIns"}
 @Singleton
 internal class LocalSkillManager @Inject constructor(
     storage: LocalSessionStorageRuntime,

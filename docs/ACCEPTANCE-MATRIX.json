@@ -208,6 +208,13 @@
       ]
     },
     {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheetTest.kt#olderPageIsReachableAndUnknownOutcomeKeepsItsMeaning"
+      ]
+    },
+    {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 中断、失败和恢复提示",
       "state": "automated_partial",
       "evidence": [
@@ -221,6 +228,14 @@
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjectionTest.kt#pagesReachEarliestArtifactBeyond4096EventsWithoutDuplicates",
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjectionTest.kt#cursorRejectsResetAndAnotherSessionLog",
         "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceArtifactPreviewTest.kt#requestedArtifactOpensEvenOutsideConversationFileList"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 交付要求与真实成果事件来源绑定",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalRequirementEvidenceProjectionTest.kt#selectedVersionCannotSilentlyBindAFileChangedAfterSelection",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheetTest.kt#failedLinkRetainsSelectedVersionAndDoesNotClaimAcceptance"
       ]
     },
     {
@@ -242,6 +257,14 @@
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/automation/AutomationMonthlyScheduleTest.kt#januaryAnchorRestoresDayAfterShortMonth"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务操作异常与受理回执",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementOperationTest.kt#failedAcknowledgementReadsCurrentFactsWithoutReplayingMutation",
+        "app/src/test/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementOperationTest.kt#rejectedCommandIsDifferentFromFailureAndReadFailureDoesNotInventEmptyTasks"
       ]
     },
     {
@@ -416,7 +439,9 @@
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 记忆记录查看和维护",
       "state": "automated_partial",
       "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryStoreTest.kt#updateAndForgetPersistAcrossRestart"
+        "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryStoreTest.kt#updateAndForgetPersistAcrossRestart",
+        "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryManagementQueryTest.kt#searchFindsOldestBeyond100AndStoreCanCorrectItAfterRestart",
+        "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryManagementQueryTest.kt#scopesKindsAndExactSourceRemainIsolatedAcrossPages"
       ]
     },
     {

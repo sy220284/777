@@ -267,6 +267,9 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun workspaceFiles() = runtime.session.workspaceFilesForUi()
     suspend fun conversationFiles(sessionId: String) = runtime.session.conversationFilesForUi(sessionId)
     suspend fun previewWorkspaceFile(path: String) = runtime.session.previewWorkspaceFileForUi(path)
+    internal fun artifactRevisionForUi(sessionId: String) = runtime.work.artifactRevisionForUi(sessionId)
+    internal fun refreshArtifactFilesForUi(sessionId: String, items: List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem>) = runtime.work.refreshArtifactFilesForUi(sessionId, items)
+    internal fun inspectArtifactForUi(sessionId: String, item: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem) = runtime.work.inspectArtifactForUi(sessionId, item)
     fun artifactsForUi(sessionId: String) = runtime.work.artifactsForUi(sessionId)
     fun historyPageForUi(sessionId: String, cursor: com.labteto.dshmobile.local.presentation.LocalWorkHistoryCursor?) =
         runtime.work.historyPageForUi(sessionId, cursor)
@@ -278,9 +281,9 @@ class LocalHarnessViewModel @Inject constructor(
         runtime.work.toolEvidenceForUi(sessionId, callId, sequence)
     internal fun requirementEvidenceForUi(sessionId: String) = runtime.work.requirementEvidenceForUi(sessionId)
     fun linkRequirementEvidenceForUi(
-        sessionId: String, index: Int,
+        sessionId: String, target: com.labteto.dshmobile.local.presentation.LocalRequirementUiTarget,
         artifact: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem,
-    ) = runtime.work.linkRequirementEvidenceForUi(sessionId, index, artifact)
+    ) = runtime.work.linkRequirementEvidenceForUi(sessionId, target, artifact)
     fun eventSequenceForUi(sessionId: String) = runtime.work.eventSequenceForUi(sessionId)
     internal fun teamMemberOutput(jobId: String): String = runtime.work.backgroundJobOutputForUi(jobId)
 

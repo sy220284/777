@@ -199,6 +199,10 @@ private fun WorkTasksScreen(
                 TasksNotice.MISSING -> R.string.tasks_missing
                 TasksNotice.RUN_STARTED -> R.string.tasks_run_started
                 TasksNotice.RUN_FAILED -> R.string.tasks_run_now_failed
+                TasksNotice.PAUSED -> R.string.tasks_paused_notice
+                TasksNotice.RESUMED -> R.string.tasks_resumed_notice
+                TasksNotice.OPERATION_FAILED -> R.string.tasks_operation_failed
+                TasksNotice.OPERATION_REJECTED -> R.string.tasks_operation_rejected
             },
         )
     }
@@ -262,7 +266,12 @@ private fun WorkTasksScreen(
                         .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                 ) {
+                    if (state.managementFailed) {
+                        Text(stringResource(R.string.tasks_operation_failed), color = colors.dangerInk)
+                        SyButton(stringResource(R.string.common_retry), onClick = { viewModel.refresh() })
+                    }
                     when {
+                        state.loading && state.tasks.isEmpty() -> Text(stringResource(R.string.common_loading))
                         showCreate -> TaskEditorPane(
                             state = editorState,
                             viewModel = viewModel,
@@ -278,6 +287,7 @@ private fun WorkTasksScreen(
                         ) {
                             TaskCard(
                                 task = selectedTask,
+                                enabled = selectedTask.id !in state.busyIds,
                                 onCancel = { viewModel.cancel(selectedTask.id) },
                                 onPause = { viewModel.pause(selectedTask.id) },
                                 onResume = { viewModel.resume(selectedTask.id) },

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.memory
 
+// FEATURE_TREE: {"id":"settings.memory.management-query","path":"第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 记忆记录查看和维护","owner":"SETTINGS","entry":"managementPage","test":"app/src/test/java/com/labteto/dshmobile/local/memory/MemoryManagementQueryTest.kt#searchFindsOldestBeyond100AndStoreCanCorrectItAfterRestart"}
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -427,6 +428,10 @@ class MemoryStore internal constructor(
         lastConsolidatedAt = now
         return consolidated.mergedCount
     }
+
+    @Synchronized
+    fun managementPage(query: MemoryManagementQuery): MemoryManagementPage =
+        queryManagedMemories(documents.read().records, query)
 
     @Synchronized
     fun listActive(

@@ -4,29 +4,6 @@
   "limits": "独立存在按是否具有产品级单独入口；静态可到达与真实能用须结合设备/模型运行验证，单元或仪表测试方法的存在不能视为通过",
   "items": [
     {
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 16类人物资料按完整事实取用",
-      "kind": "integrated_character_profile",
-      "independent": false,
-      "availability": "code_and_tests_present_execution_unverified",
-      "source": [
-        {
-          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaStore.kt",
-          "symbol": "CharacterFactCategories"
-        },
-        {
-          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterRuntimeProjector.kt",
-          "symbol": "CharacterRuntimeProjector"
-        }
-      ],
-      "test": [
-        {
-          "path": "app/src/test/java/com/labteto/dshmobile/local/chat/CharacterFactsV4Test.kt",
-          "method": "v4IdentityFactsAndSourcesRoundTrip"
-        }
-      ],
-      "conclusion": "确有16类规范人物资料与运行时投影；作为人物档案子能力存在，没有独立模块或入口。可在应用现有聊天/人设链路使用的静态证据成立，实际交互待设备验证。"
-    },
-    {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 模型温度独立采样",
       "kind": "active_sampling_subfeature",
       "independent": false,

@@ -2,6 +2,19 @@ package com.labteto.dshmobile.local.work
 
 import java.io.File
 import java.security.MessageDigest
+import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
+
+/** Current access metadata is cheap enough for a visible overview, unlike hashing every file. */
+internal fun observeLocalWorkArtifact(root: File, item: LocalArtifactUiItem): LocalArtifactUiItem {
+    if (item.category != "file") return item
+    val observation = runCatching {
+        val file = safeLocalWorkArtifactFile(root, item.reference) ?: return@runCatching null
+        val attributes = java.nio.file.Files.readAttributes(file.toPath(), java.nio.file.attribute.BasicFileAttributes::class.java)
+        "${attributes.fileKey()}:${attributes.size()}:${attributes.lastModifiedTime()}"
+    }.getOrNull()
+    return item.copy(currentlyAvailable = observation != null, fileObservation = observation,
+        versionNow = item.versionNow.takeIf { observation != null && observation == item.fileObservation })
+}
 
 internal data class LocalWorkFileVersion(val path: String, val sha256: String, val bytes: Long)
 
