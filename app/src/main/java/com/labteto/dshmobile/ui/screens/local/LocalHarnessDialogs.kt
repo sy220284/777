@@ -501,21 +501,16 @@ internal fun ChatPersonaDialog(
     var name by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.name) }
     var coreIdentity by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.coreIdentity) }
     var factDrafts by remember(profile.id, profile.updatedAt) {
-        mutableStateOf(withBlankPersonaFacts(profile.facts.filter { it.category !in setOf(
+        mutableStateOf(withEditablePersonaFields(profile.facts.filter { it.category !in setOf(
             "definingChoices", "emotionalImprints", "lifeGravity",
             "unfinishedBusiness", "limitsAndCosts", "sensorySignature",
         ) }))
     }
-    var customCategory by rememberSaveable(profile.id) { mutableStateOf("") }
     var franchise by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.franchise) }
     var loreEntries by remember(profile.id, profile.updatedAt) { mutableStateOf(profile.loreEntries) }
     val bundledPreset = remember(profile.presetId) { PersonaPresetCatalog.find(profile.presetId) }
     var aiDescription by rememberSaveable(profile.id) { mutableStateOf("") }
-    var visibleFields by remember(profile.id, profile.updatedAt) {
-        mutableStateOf(factDrafts.map(CharacterFact::category).toSet())
-    }
     var addFieldsOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
-    var customFieldOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
     var aiOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
     var loreOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
     var aiGenerating by remember(profile.id) { mutableStateOf(false) }
@@ -538,30 +533,16 @@ internal fun ChatPersonaDialog(
     }
     val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
 
-    fun addFactField(category: String) {
-        if (factDrafts.none { it.category == category }) {
-            factDrafts = factDrafts + CharacterFact(
-                id = UUID.randomUUID().toString(),
-                category = category,
-                content = "",
-                provenance = CharacterFactProvenance.USER_CREATED,
-            )
-        }
-        visibleFields = visibleFields + category
-        addFieldsOpen = false
-    }
-
     fun applyGenerated(generated: PersonaProfile) {
         runtimeProfile = generated
         name = generated.name
         coreIdentity = generated.coreIdentity
-        factDrafts = withBlankPersonaFacts(generated.facts.filter { fact ->
+        factDrafts = withEditablePersonaFields(generated.facts.filter { fact ->
             fact.category !in setOf(
                 "definingChoices", "emotionalImprints", "lifeGravity",
                 "unfinishedBusiness", "limitsAndCosts", "sensorySignature",
             )
         })
-        visibleFields = factDrafts.map(CharacterFact::category).toSet()
         franchise = generated.franchise
         loreEntries = generated.loreEntries
     }
@@ -743,18 +724,6 @@ internal fun ChatPersonaDialog(
                     onChange = { factDrafts = it },
                 )
             }
-        // A newly added custom category has no saved fact until the user types content.
-        visibleFields.filterNot { category ->
-            category == "franchise" || availableFields.any { it.first == category } ||
-                factDrafts.any { it.category == category }
-        }.forEach { category ->
-            PersonaFactCategoryEditor(
-                category = category,
-                title = if (category == "identity") stringResource(R.string.persona_v4_extra_identity) else category,
-                facts = factDrafts,
-                onChange = { factDrafts = it },
-            )
-        }
         if (loreOpen) {
             PersonaFormSection(stringResource(R.string.persona_v4_section_lore)) {
                 PersonaWorldBookEditor(entries = loreEntries, onChange = { loreEntries = it })
@@ -776,44 +745,12 @@ internal fun ChatPersonaDialog(
                     title = stringResource(R.string.persona_v4_section_lore),
                     onClick = { loreOpen = true; addFieldsOpen = false },
                 )
-                SySheetChoiceRow(
-                    title = stringResource(R.string.persona_v4_custom_field_name),
-                    onClick = { customFieldOpen = !customFieldOpen },
-                )
-                if (customFieldOpen) {
-                    PersonaTextField(
-                        stringResource(R.string.persona_v4_custom_field_name),
-                        customCategory,
-                        { customCategory = it },
-                        singleLine = true,
-                    )
-                    SyButton(
-                        text = stringResource(R.string.persona_v4_add_custom),
-                        onClick = {
-                            val category = customCategory.trim()
-                            if (category.isNotEmpty()) {
-                                if (category == "franchise") {
-                                    visibleFields = visibleFields + category
-                                    addFieldsOpen = false
-                                } else {
-                                    addFactField(category)
-                                }
-                                customCategory = ""
-                                customFieldOpen = false
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        variant = SyButtonVariant.Ghost,
-                        enabled = customCategory.isNotBlank(),
-                    )
-                }
                 bundledPreset?.let { preset ->
                     SyButton(
                         text = stringResource(R.string.persona_v4_load_preset),
                         onClick = {
                             coreIdentity = preset.persona.coreIdentity
-                            factDrafts = preset.persona.facts
-                            visibleFields = visibleFields + preset.persona.facts.map(CharacterFact::category)
+                            factDrafts = withEditablePersonaFields(preset.persona.facts)
                             addFieldsOpen = false
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -868,14 +805,24 @@ internal fun ChatPersonaDialog(
     }
 }
 
-/** Stable empty records make each field immediately writable without a focus-changing node swap. */
-private fun withBlankPersonaFacts(input: List<CharacterFact>): List<CharacterFact> {
-    val categories = (personaEditableFactCategories + input.map(CharacterFact::category)).distinct()
-    return input + categories.filterNot { category ->
-        input.any { it.category == category && it.content.isBlank() }
-    }.map { category ->
-        CharacterFact(id = UUID.randomUUID().toString(), category = category, content = "",
-            provenance = CharacterFactProvenance.USER_CREATED)
+/**
+ * The nine predefined sections get a single editable field only when they have no facts.
+ * Only customFacts always keeps ONE extra free-form entry for the entire page.
+ * All other populated sections have no extra blank inputs.
+ */
+private fun withEditablePersonaFields(input: List<CharacterFact>): List<CharacterFact> {
+    val missing = personaEditableFactCategories.filter { category ->
+        val entries = input.filter { it.category == category }
+        if (category == "customFacts") entries.none { it.content.isBlank() }
+        else entries.isEmpty()
+    }
+    return input + missing.map { category ->
+        CharacterFact(
+            id = UUID.randomUUID().toString(),
+            category = category,
+            content = "",
+            provenance = CharacterFactProvenance.USER_CREATED,
+        )
     }
 }
 
@@ -888,35 +835,38 @@ private fun PersonaFactCategoryEditor(
     hint: String = "",
 ) {
     val entries = facts.filter { it.category == category }
-    // Render the entire field in place, including one trailing blank box.
-    // No redundant "add fact" controls, and each existing fact retains its own metadata.
     entries.forEachIndexed { index, entry ->
-        val label = when {
-            entry.content.isBlank() && index > 0 -> stringResource(R.string.persona_v4_free_append)
-            index == 0 -> title
-            else -> stringResource(R.string.persona_v4_fact_number, title, index + 1)
-        }
-        PersonaTextField(label, entry.content, { content ->
-            val updated = facts.map { fact ->
-                if (fact.id == entry.id) fact.copy(
-                    content = content,
-                    provenance = if (content == entry.content) entry.provenance
-                        else CharacterFactProvenance.USER_CREATED,
-                    sourceReference = entry.sourceReference,
-                ) else fact
-            }
-            if (entry.content.isBlank() && content.isNotBlank()) {
-                onChange(withBlankPersonaFacts(updated))
-            } else if (entry.content.isNotBlank() && content.isBlank()) {
-                // Clearing a populated entry leaves this focused box as the one empty slot.
-                // Drop the old spare blank instead of showing two empty boxes.
-                val spare = updated.lastOrNull {
-                    it.category == category && it.content.isBlank() && it.id != entry.id
+        val isFreeSupplement = category == "customFacts" && entry.content.isBlank()
+        val label = if (index == 0 || isFreeSupplement) title
+            else stringResource(R.string.persona_v4_fact_number, title, index + 1)
+        PersonaTextField(
+            label = label,
+            value = entry.content,
+            onValueChange = { content ->
+                val updated = facts.map { fact ->
+                    if (fact.id == entry.id) fact.copy(
+                        content = content,
+                        provenance = if (content == entry.content) entry.provenance
+                            else CharacterFactProvenance.USER_CREATED,
+                        sourceReference = entry.sourceReference,
+                    ) else fact
                 }
-                onChange(if (spare == null) updated else updated.filterNot { it.id == spare.id })
-            } else onChange(updated)
-        }, hint = if (entry.content.isBlank() && index > 0)
-            stringResource(R.string.persona_v4_free_append_hint) else hint)
+                if (category == "customFacts") {
+                    if (entry.content.isBlank() && content.isNotBlank()) {
+                        // Keep only one new free-form input after this one is filled.
+                        onChange(withEditablePersonaFields(updated))
+                    } else if (entry.content.isNotBlank() && content.isBlank()) {
+                        // Reuse the focused editor as the empty box; remove the other spare.
+                        val spare = updated.lastOrNull {
+                            it.category == "customFacts" && it.id != entry.id && it.content.isBlank()
+                        }
+                        onChange(if (spare == null) updated else updated.filterNot { it.id == spare.id })
+                    } else onChange(updated)
+                } else onChange(updated)
+            },
+            hint = hint,
+            testTag = if (isFreeSupplement) "personaFreeSupplement" else null,
+        )
         if (entry.content.isNotBlank()) {
             var detailsOpen by remember(entry.id) { mutableStateOf(false) }
             SyButton(
@@ -975,12 +925,14 @@ private fun PersonaTextField(
     onValueChange: (String) -> Unit,
     singleLine: Boolean = false,
     hint: String = "",
+    testTag: String? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SyTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = if (testTag == null) Modifier.fillMaxWidth()
+            else Modifier.fillMaxWidth().testTag(testTag),
         label = { Text(label, color = colors.textSecondary) },
         placeholder = if (hint.isBlank()) null else ({ Text(hint, color = colors.textSecondary) }),
         singleLine = singleLine,
