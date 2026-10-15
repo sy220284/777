@@ -155,8 +155,7 @@ internal class CharacterRuntimeProjector(
         }
         lines += selected
         state.currentUserImpression.takeIf { it.isNotBlank() &&
-            !ChatTurnContextPolicy.isTopicRedirect(userInput) &&
-            ChatTurnContextPolicy.relevant(userInput, it, attention)
+            !ChatTurnContextPolicy.isTopicRedirect(userInput)
         }?.let {
             lines += "你目前怎么看对方：${it.take(240)}（人物的主观看法，不是事实或回复指令）"
         }
