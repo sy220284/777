@@ -135,6 +135,38 @@ class ChatDiaryStoreTest {
     }
 
     @Test
+    fun correctingInterpretationWithdrawsStaleVoiceButPreservesExplicitNewVoice() {
+        val diary = store()
+        val saved = diary.record(request(
+            delta = ChatDiaryDelta(
+                event = "我们约好周末去海边",
+                feeling = "我很期待",
+                privateReflection = "他肯定不会爽约，我很期待。",
+                importance = 4,
+            ),
+            evidence = "我们约好周末去海边",
+        ))!!
+        assertTrue(diary.correctEntry("gallery:a", saved.id, saved.updatedAt,
+            ChatDiaryDelta(
+                event = saved.event,
+                feeling = "我其实有点担忧",
+                privateReflection = saved.privateReflection,
+            )))
+        val withdrawn = store().listActive("gallery:a").single { it.id == saved.id }
+        assertEquals("", withdrawn.privateReflection)
+        assertEquals(saved.privateReflection, withdrawn.revisions.first().privateReflection)
+
+        assertTrue(store().correctEntry("gallery:a", withdrawn.id, withdrawn.updatedAt,
+            ChatDiaryDelta(
+                event = withdrawn.event,
+                feeling = "我更愿意慢慢相信他",
+                privateReflection = "我想给他一次机会，但还需要一点时间。",
+            )))
+        val revised = store().listActive("gallery:a").single { it.id == saved.id }
+        assertEquals("我想给他一次机会，但还需要一点时间。", revised.privateReflection)
+    }
+
+    @Test
     fun diaryVoiceCannotInsertUnboundedOrProductRoleNarration() {
         val diary = store()
         val saved = diary.record(request(
