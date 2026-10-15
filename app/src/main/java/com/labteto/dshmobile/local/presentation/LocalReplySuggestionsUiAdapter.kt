@@ -40,7 +40,7 @@ internal class LocalReplySuggestionsUiAdapter @Inject constructor(
             if (runtime.chat.generateReplySuggestions()) UiCommandReceipt.Accepted
             else UiCommandReceipt.NotAdmitted
         } catch (cancelled: CancellationException) { throw cancelled }
-        catch (failure: Exception) { UiCommandReceipt.Failed(failure.message) }
+        catch (failure: Exception) { UiCommandReceipt.Failed(failure.message?.takeIf(String::isNotBlank) ?: failure::class.java.simpleName) }
     }
 }
 

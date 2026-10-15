@@ -81,6 +81,7 @@ private fun LocalDocumentNode(node: UiDocumentNode, values: Map<String, String>,
     active: Boolean, update: (String, String) -> Unit, submit: (String) -> Unit) {
     when (node) {
         is UiDocumentNode.Text -> Text(node.text)
+        is UiDocumentNode.Media -> LocalDocumentMediaNode(node, snapshot.document.source.sessionId)
         is UiDocumentNode.Table -> Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             node.rows.forEachIndexed { index, row ->
                 Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {

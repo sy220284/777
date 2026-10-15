@@ -2434,5 +2434,16 @@
     <string name="skills_github_official_empty">官方技能目录为空或暂时无法读取</string>
     <string name="composer_invocation_skill_manual">仅在用户手动选中时调用</string>
     <string name="ui_r4_gallery_inspection_stale">人物档案或检查上下文已变化，请重新检查后选择建议。</string>
+    <string name="ui_document_media_unavailable">媒体尚未保存在本机，或无法访问此会话的媒体成果</string>
+    <string name="ui_document_media_loading">图片正在加载或无法解码</string>
+    <string name="ui_document_media_play">播放音频</string>
+    <string name="ui_document_media_pause">暂停音频</string>
+    <string name="ui_document_media_playback_failed">音频无法播放</string>
+    <string name="ui_document_media_video_hint">轻触视频播放器开始或暂停</string>
+    <string name="ui_document_media_export">保存到设备</string>
+    <string name="ui_document_media_exporting">正在保存媒体…</string>
+    <string name="ui_document_media_exported">媒体已保存</string>
+    <string name="ui_document_media_export_failed">保存未成功，请检查目标文件</string>
+    <string name="ui_document_media_export_cancelled">已取消保存</string>
 </resources>
 
