@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -57,7 +58,14 @@ internal fun LocalUsageModePill(
             val segmentWidth = maxWidth / 2
             val thumbOffset by animateDpAsState(
                 targetValue = if (selected == LocalUsageMode.CHAT) 0.dp else segmentWidth,
-                animationSpec = DsAnimations.segmentSlide,
+                animationSpec = tween(
+                    com.shenyan.designsystem.foundation.SyMotion.duration(
+                        com.shenyan.designsystem.foundation.SyMotion.selectMs,
+                        com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
+                        com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
+                    ),
+                    easing = com.shenyan.designsystem.foundation.SyMotion.ease,
+                ),
                 label = "usageModeThumb",
             )
             Surface(

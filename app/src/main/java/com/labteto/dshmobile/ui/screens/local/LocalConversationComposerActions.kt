@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import com.shenyan.designsystem.foundation.SyMetric
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -17,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntSize
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.ui.theme.DsAnimations
@@ -33,16 +35,21 @@ internal fun LocalConversationComposerExpandedRow(
     stopControl: @Composable () -> Unit,
     sendControl: @Composable (queue: Boolean) -> Unit,
 ) {
+    val motion = com.shenyan.designsystem.foundation.SyMotion
+    val reduced = com.shenyan.designsystem.foundation.LocalSyReduceMotion.current
+    val tempo = com.shenyan.designsystem.foundation.LocalSyMotionTempo.current
+    val reveal = tween<IntSize>(motion.duration(motion.composerRevealMs, reduced, tempo), easing = motion.ease)
+    val fade = tween<Float>(motion.duration(motion.composerFadeMs, reduced, tempo), easing = motion.ease)
     AnimatedVisibility(
         visible = visible,
         enter = expandVertically(
-            animationSpec = DsAnimations.composerReveal,
+            animationSpec = reveal,
             expandFrom = Alignment.Top,
-        ) + fadeIn(DsAnimations.composerFade),
+        ) + fadeIn(fade),
         exit = shrinkVertically(
-            animationSpec = DsAnimations.composerReveal,
+            animationSpec = reveal,
             shrinkTowards = Alignment.Top,
-        ) + fadeOut(DsAnimations.composerFade),
+        ) + fadeOut(fade),
     ) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val showLabels = maxWidth >= 290.dp
