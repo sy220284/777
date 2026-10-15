@@ -127,7 +127,7 @@
       "task": "7 路由/二级场景/深链/返回的通用 Host",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "新增 :ui-host 的 UiHostSceneNavigation 纯导航约定：基于 Host 场景目录与当前包 manifest 区分 PAGE/OVERLAY/SLOT/SYSTEM，支持包身份校验、返回、有限的显式深链键及严格状态恢复；App JVM 回归测试覆盖拒绝旧包/无实现页面/系统服务/伪造历史。仅是独立导航内核，不是现网 Host 接线或 renderer 的完成证明。 本批增加 32 层历史上限、root 导航清栈、页面覆盖弹层去重和非法覆盖/回到 root 历史拒绝；增加有版本/长度预算的编码快照及 Host 恢复入口，严格重新核验场景和包身份；补 JVM 回归源码，当前提交尚未执行 CI。",
+      "implemented": "新增 :ui-host 的 UiHostSceneNavigation 纯导航约定：基于 Host 场景目录与当前包 manifest 区分 PAGE/OVERLAY/SLOT/SYSTEM，支持包身份校验、返回、有限的显式深链键及严格状态恢复；App JVM 回归测试覆盖拒绝旧包/无实现页面/系统服务/伪造历史。仅是独立导航内核，不是现网 Host 接线或 renderer 的完成证明。 本批增加 32 层历史上限、root 导航清栈、页面覆盖弹层去重和非法覆盖/回到 root 历史拒绝；增加有版本/长度预算的编码快照及 Host 恢复入口，严格重新核验场景和包身份；补 JVM 回归源码，本轮新增 UiApplicationSceneHost 中间层：仅接收完整 Pack admission 的真实 Compose renderer，使用 SaveableState 中立快照接收导航与系统返回，实时重新验证 pack/历史/renderer 并拒绝迟到画面回调；修正向上返回的 scope 也使用实际 Host 回调，新增 JVM 回归源码。仍未接入 AppRoot，最新 CI 待回执。",
       "remaining": "全应用 7 一级路由与二级场景真实 Host 接线、导航快照 SavedState/持久化读写、DeepLink intent 绑定、Feature Owner 准入、系统返回/IME、包切换恢复、全应用 Scene Renderer 页面实现与真实设备回归仍未完成。"
     },
     {
