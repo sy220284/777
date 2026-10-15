@@ -588,7 +588,7 @@ internal fun PersonaDetails(persona: PersonaProfile) {
         var franchisePlaced = false
         facts.forEach { fact ->
             // 自定义内容最后展示，作品来源放在关系与自定义字段之间。
-            if (fact.category == CharacterFactCategories.CUSTOM_FACTS && !franchisePlaced) {
+            if (fact.category == "customFacts" && !franchisePlaced) {
                 if (franchise.isNotBlank()) {
                     PersonaDetailRow(stringResource(R.string.persona_field_franchise), franchise)
                 }
