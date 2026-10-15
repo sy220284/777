@@ -432,6 +432,7 @@ internal fun CharacterDiaryScreen(
             title = stringResource(R.string.chat_diary_deactivate),
             onDismiss = { if (!mutating) deactivatingEntry = null },
             dismissEnabled = !mutating,
+            seamlessBackground = false,
             footer = {
                 SyButton(
                     text = stringResource(R.string.chat_diary_deactivate),

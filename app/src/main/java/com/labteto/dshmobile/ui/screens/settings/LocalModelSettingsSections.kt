@@ -590,7 +590,7 @@ internal fun LocalModelSettingsCard(
     pendingRemoveId?.let { id ->
         SyResponsiveSheet(title = stringResource(R.string.local_model_remove),
             subtitle = stringResource(R.string.local_model_remove_confirm),
-            onDismiss = { pendingRemoveId = null }) {
+            onDismiss = { pendingRemoveId = null }, seamlessBackground = false) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 SyButton(stringResource(R.string.common_cancel), onClick = { pendingRemoveId = null },
                     modifier = Modifier.weight(1f), variant = SyButtonVariant.Ghost)

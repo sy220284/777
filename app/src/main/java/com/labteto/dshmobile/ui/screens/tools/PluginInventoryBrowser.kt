@@ -558,6 +558,7 @@ internal fun PluginInventoryBrowser(
         SyResponsiveSheet(
             title = stringResource(R.string.skills_remove_title),
             onDismiss = { removeSkillName = null },
+            seamlessBackground = false,
             footer = {
                 SyButton(
                     text = stringResource(R.string.common_remove),

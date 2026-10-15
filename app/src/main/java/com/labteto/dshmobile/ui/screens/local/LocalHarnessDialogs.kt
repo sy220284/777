@@ -333,7 +333,8 @@ internal fun ApprovalDialog(
             LocalApprovalImpact.CRITICAL -> R.string.local_approval_impact_critical
         },
     )
-    SyResponsiveSheet(title = stringResource(R.string.local_approval_title), onDismiss = onDeny, scrollable = true) {
+    SyResponsiveSheet(title = stringResource(R.string.local_approval_title), onDismiss = onDeny,
+        scrollable = true, seamlessBackground = false) {
         Text(
             stringResource(agentOperationLabelRes(approval.toolName)),
             style = DsType.base16Strong.withReadingWeight(),
