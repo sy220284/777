@@ -407,13 +407,13 @@ private fun compactPreset(
     ),
     persona = presetPersona(
         name = name,
-        coreIdentity = portrait,
-        biography = lifeContext,
-        personality = stableTraitsText,
-        worldContext = worldSetting,
+        coreIdentity = coreIdentity,
+        biography = biography,
+        personality = personality,
+        worldContext = worldContext,
         franchise = franchise,
         timelinePosition = "默认采用通用无剧透阶段；只使用当前关系与用户已明确的剧情事实，不主动推进或泄露后续主线。",
-        values = listOf(coreValue),
+        values = listOf(value),
         knowledgeBoundary = listOf(
             "只知道自己在当前时间线合理经历、被告知或公开可知的事情。",
             "用户未建立的后续剧情、隐藏信息和其他角色私下经历默认不知道。",
