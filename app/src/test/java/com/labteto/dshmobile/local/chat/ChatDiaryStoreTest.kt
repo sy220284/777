@@ -104,9 +104,13 @@ class ChatDiaryStoreTest {
         val reloaded = store().listActive("gallery:a").single { it.id == note.id }
         assertEquals(note.privateReflection, reloaded.privateReflection)
         assertEquals(note.privateReflection, reloaded.revisions.last().privateReflection)
-        // Reading prose is not part of the factual recall source block.
-        assertTrue(renderRecalledChatDiary(reloaded, false).contains("周末去海边"))
-        assertTrue(!renderRecalledChatDiary(reloaded, false).contains(reloaded.privateReflection))
+        // Subjective voice is recalled with an explicit non-factual label.
+        val recalledText = renderRecalledChatDiary(reloaded, false)
+        assertTrue(recalledText.contains("周末去海边"))
+        assertTrue(recalledText.contains(reloaded.privateReflection))
+        assertTrue(recalledText.contains("主观解释"))
+        assertTrue(store().search("竟有点高兴", "gallery:a", false, 6).any { it.id == note.id })
+        assertTrue(store().search("竟有点高兴", "gallery:other", false, 6).isEmpty())
     }
 
     @Test
@@ -1142,7 +1146,7 @@ class ChatDiaryStoreTest {
                         innerThought = longText,
                         relationshipMeaning = longText,
                         unresolvedEcho = longText,
-                privateReflection = longText,
+                        privateReflection = longText,
                         importance = 99,
                         updatedAt = index.toLong(),
                     )
