@@ -1,12 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import androidx.compose.foundation.shape.RoundedCornerShape
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 
 import androidx.compose.foundation.clickable
@@ -42,11 +39,8 @@ internal fun GroupAnnouncementCard(
     onClick: () -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    SyMaterialSurface(
-        tier = SyMaterialTier.L3_CARD,
-        shape = RoundedCornerShape(SyMetric.radiusCard),
-        modifier = Modifier
-            .fillMaxWidth()
+    Column(
+        modifier = Modifier.fillMaxWidth()
             .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs)
             .clickable(onClick = onClick),
     ) {
