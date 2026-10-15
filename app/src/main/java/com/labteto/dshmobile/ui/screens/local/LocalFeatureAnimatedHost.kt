@@ -58,7 +58,7 @@ internal fun LocalFeatureAnimatedHost(
     val push = tween<IntOffset>(motion.duration(motion.pushMs, reduced, tempo), easing = ease)
     val pop = tween<IntOffset>(motion.duration(motion.pagePopMs, reduced, tempo), easing = ease)
     val peer = tween<IntOffset>(motion.duration(motion.pagePeerMs, reduced, tempo), easing = ease)
-    val vertical = tween<Int>(motion.duration(motion.pushMs, reduced, tempo), easing = ease)
+    val vertical = tween<IntOffset>(motion.duration(motion.pushMs, reduced, tempo), easing = ease)
     val pageScale = tween<Float>(motion.duration(motion.pushMs, reduced, tempo), easing = ease)
     val rise = with(LocalDensity.current) { 14.dp.roundToPx() }
     val fadeEnter = tween<Float>(motion.duration(motion.pageEnterFadeMs, reduced, tempo),
