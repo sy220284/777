@@ -48,6 +48,7 @@ internal class LocalToolExecutionCoordinator(
     private val executionIdFactory: () -> String = { UUID.randomUUID().toString() },
     private val networkSearchEnabled: () -> Boolean = { true },
     private val pinnedConnectorIds: () -> List<String> = { emptyList() },
+    private val pinnedSkillIds: () -> List<String> = { emptyList() },
 ) {
     // 前台 Lead 与所有后台成员共用此闸门，文件写入工具不得并行交错执行。
     private val workspaceReadWriteGate = LocalWorkspaceReadWriteGate()
@@ -140,6 +141,7 @@ internal class LocalToolExecutionCoordinator(
         if (networkSearchEnabled()) enableOptionalTools(DEFAULT_NETWORK_TOOLS, resolvedTarget)
         // Preserve explicit user choices after ALL heuristic re-ranking, not before it.
         // The credential gate above determines whether GitHub is admitted.
+        enablePinnedMediaTools(resolvedTarget)
         prioritizePinnedConnectorTools(resolvedTarget, enableGitHub)
     }
 
@@ -159,7 +161,13 @@ internal class LocalToolExecutionCoordinator(
         val admittedGithub = synchronized(target) {
             target.any { name -> registry.get(name)?.let(::isGitHubConnectorTool) == true }
         }
+        enablePinnedMediaTools(target)
         prioritizePinnedConnectorTools(target, enableGitHub = admittedGithub)
+    }
+
+    private fun enablePinnedMediaTools(target: MutableSet<String>) {
+        if (pinnedSkillIds().none { it == "imagegen" || it == "minimax-media" }) return
+        enableOptionalTools(listOf("media_image_options", "media_image_status", "media_image_create"), target)
     }
 
     private fun prioritizePinnedConnectorTools(target: MutableSet<String>, enableGitHub: Boolean) {
