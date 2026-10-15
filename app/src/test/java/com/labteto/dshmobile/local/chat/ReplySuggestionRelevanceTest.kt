@@ -6,15 +6,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReplySuggestionRelevanceTest {
-    @Test fun ordinaryReplyHasNoAutomationInstructions() {
-        val prompt = "生成用户下一句"
-        assertEquals(prompt, enhanceReplySuggestionPromptForScheduling(prompt, "你好，今天心情很好"))
-    }
-
-    @Test fun futurePlanIncludesSchedulingSuggestionOnlyWhenRelevant() {
-        val prompt = enhanceReplySuggestionPromptForScheduling("下一句", "明天下午一起去公园吗")
-        assertTrue(prompt.contains("未来的共同计划"))
-        assertFalse(prompt.contains("已经创建"))
+    @Test fun suggestionsForFutureDialogueContainNoExtraSchedulingInstructions() {
+        val prompt = ChatInteractionPlanner(kotlinx.serialization.json.Json { ignoreUnknownKeys = true })
+            .suggestionsPrompt(
+                persona = PersonaProfile(name = "阿青"),
+                state = ChatCharacterState(),
+                userMessage = "明天下午一起去公园吗",
+                assistantMessage = "好啊",
+            )
+        assertTrue(prompt.contains("明天下午一起去公园吗"))
+        assertTrue(prompt.contains("生成用户下一句可直接发送的建议"))
+        assertFalse(prompt.contains("如果最近双方真实谈到未来的共同计划"))
+        assertFalse(prompt.contains("这里只生成可发送的话，不创建自动任务"))
     }
 
     @Test fun boldnessIsNotForcedByStyleName() {
