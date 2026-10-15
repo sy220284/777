@@ -14,6 +14,8 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.platform.app.InstrumentationRegistry
@@ -76,6 +78,13 @@ class UsageCalculationPageTest {
         compose.onNodeWithText("never-used ▾").assertExists()
         compose.onNodeWithText("450").assertDoesNotExist()
         compose.onAllNodesWithText("0").onFirst().assertExists()
+    }
+
+    @Test
+    fun compactMetricsRemainReadableWithoutNestedMaterialTiles() {
+        show(DeepSeekUsageSnapshot(inputTokens = 200, outputTokens = 25))
+        compose.onAllNodesWithTag("usageCompactMetric").assertCountEquals(2)
+        compose.onNodeWithText("225").assertExists()
     }
 
     @Test

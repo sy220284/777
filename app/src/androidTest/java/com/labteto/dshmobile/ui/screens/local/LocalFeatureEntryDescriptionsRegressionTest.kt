@@ -19,6 +19,8 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
+import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.ui.shenyan.SyContextActionMenu
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.local.send.LocalSendResult
@@ -34,6 +36,30 @@ import org.junit.Test
 class LocalFeatureEntryDescriptionsRegressionTest {
     @get:Rule val compose = createComposeRule()
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
+
+    @Test
+    fun groupPickerKeepsSceneBackgroundAndSelectableRows() {
+        var saved: List<String>? = null
+        compose.setContent {
+            DshTheme {
+                GroupChatMemberPickerSheet(
+                    entries = listOf(
+                        PersonaGalleryEntry(id = "a", persona = PersonaProfile(id = "pa", name = "角色甲")),
+                        PersonaGalleryEntry(id = "b", persona = PersonaProfile(id = "pb", name = "角色乙")),
+                    ),
+                    currentIds = emptyList(),
+                    enabled = true,
+                    onSave = { saved = it; true },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("sySceneBackgroundSurface").assertIsDisplayed()
+        compose.onNodeWithText("角色甲").performClick()
+        compose.onNodeWithText("角色乙").performClick()
+        compose.onNodeWithText(context.getString(R.string.local_group_chat_apply_members)).performClick()
+        compose.runOnIdle { assertEquals(listOf("a", "b"), saved) }
+    }
 
     @Test
     fun chatNewSessionShowsOnlyTitlesAndKeepsSelection() {

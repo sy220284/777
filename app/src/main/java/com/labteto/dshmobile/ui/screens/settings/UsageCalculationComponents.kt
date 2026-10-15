@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
@@ -466,7 +467,8 @@ internal fun CompactMetric(label: String, value: String, modifier: Modifier = Mo
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     // Metric columns share their parent section instead of nesting another glass tile.
     Column(
-        modifier = modifier.padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
+        modifier = modifier.testTag("usageCompactMetric")
+            .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
     ) {
         Text(label, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
