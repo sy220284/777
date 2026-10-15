@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.ui.host
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,6 +35,7 @@ import com.labteto.dshmobile.uihost.UiApplicationScenePack
 import com.labteto.dshmobile.uihost.UiHostSceneNavigation
 import com.labteto.dshmobile.uihost.UiPackAdmissionRequirements
 import com.labteto.dshmobile.uihost.RenderHostedScene
+import com.labteto.dshmobile.uihost.UiSceneRenderAccess
 
 /** The original shipped screen is an explicit compatibility mode, never a fake complete UiPack. */
 internal const val LEGACY_V6_APP_UI = "legacy-v6-shell"
@@ -81,6 +84,7 @@ internal fun LocalApplicationUiHost(
     legacyContent: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
+    val activity = remember(context) { context.findHostActivity() }
     val preference = remember(context) {
         context.getSharedPreferences("ui_application_pack", Context.MODE_PRIVATE)
     }
@@ -114,20 +118,43 @@ internal fun LocalApplicationUiHost(
                 UiHostSceneNavigation(LocalUiSceneCatalog.requirements,
                     decision.admission.pack.manifest, UiSceneId("route.home"))
             }
-            decision.admission.RenderHostedScene(nav, onAtRootBack = {})
-        }
-        is LocalApplicationUiDecision.Unavailable -> {
-            Surface(Modifier.fillMaxSize()) {
-                Column(Modifier.fillMaxSize().padding(24.dp),
-                    verticalArrangement = Arrangement.Center) {
-                    Text(stringResource(R.string.ui_pack_incompatible),
-                        style = MaterialTheme.typography.titleMedium)
-                    Button(onClick = {
-                        if (preference.edit().putString("selected_pack", LEGACY_V6_APP_UI).commit())
-                            selectionEpoch++
-                    }) { Text(stringResource(R.string.ui_pack_back_to_stable)) }
+            val result = decision.admission.RenderHostedScene(
+                nav, onAtRootBack = { activity?.finish() },
+            )
+            // An invalid restored history must not turn the application into an empty screen.
+            if (result is UiSceneRenderAccess.Rejected) {
+                UnavailablePackNotice {
+                    if (preference.edit().putString("selected_pack", LEGACY_V6_APP_UI).commit())
+                        selectionEpoch++
                 }
             }
         }
+        is LocalApplicationUiDecision.Unavailable -> {
+            UnavailablePackNotice {
+                if (preference.edit().putString("selected_pack", LEGACY_V6_APP_UI).commit())
+                    selectionEpoch++
+            }
+        }
     }
+}
+
+@Composable
+private fun UnavailablePackNotice(onSelectStable: () -> Unit) {
+    Surface(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().padding(24.dp),
+            verticalArrangement = Arrangement.Center) {
+            Text(stringResource(R.string.ui_pack_incompatible),
+                style = MaterialTheme.typography.titleMedium)
+            Button(onClick = onSelectStable) {
+                Text(stringResource(R.string.ui_pack_back_to_stable))
+            }
+        }
+    }
+}
+
+/** Hardware Back at the root delegates to the Activity; never silently enters an older pack. */
+private tailrec fun Context.findHostActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findHostActivity()
+    else -> null
 }
