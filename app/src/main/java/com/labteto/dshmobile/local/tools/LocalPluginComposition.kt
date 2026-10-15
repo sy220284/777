@@ -288,7 +288,8 @@ internal class LocalPluginComposition(
             (plugin as? GitHubConnectorPlugin ?: error("GitHub 插件管理接口不兼容")).validateCredential(token)
         }
 
-    suspend fun mcpServers(): List<McpServerSnapshot> = withMcp { plugin, _ -> plugin.serverSnapshots() }
+    /** Includes in-flight MCP reservations for status rendering; not a health or permission grant. */
+    suspend fun mcpServers(): List<McpServerSnapshot> = withMcp { plugin, _ -> plugin.lifecycleSnapshots() }
 
     suspend fun connectMcpHttp(serverId: String, endpoint: String): String = withMcp { plugin, active ->
         plugin.connectHttpFromUi(active, serverId, endpoint)
