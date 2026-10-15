@@ -53,7 +53,7 @@ private fun syLiveAlpha(active: Boolean): Float {
     if (!active || LocalSyReduceMotion.current) return 1f
     val transition = rememberInfiniteTransition(label = "syLiveStatus")
     val alpha by transition.animateFloat(.55f, 1f,
-        infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "syLiveAlpha")
+        infiniteRepeatable(tween(SyMotion.livePulseMs, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "syLiveAlpha")
     return alpha
 }
 
@@ -152,7 +152,8 @@ fun SyDisclosureRow(title: String, summary: String?, icon: ImageVector?, phase: 
     chevron: ImageVector, stateLabel: String, disclosureLabel: String,
     content: (@Composable () -> Unit)?) {
     val p = LocalSyColors.current
-    val ms = if (LocalSyReduceMotion.current) 0 else SyMotion.toolExpandMs
+    val ms = SyMotion.duration(SyMotion.toolExpandMs, LocalSyReduceMotion.current,
+        com.shenyan.designsystem.foundation.LocalSyMotionTempo.current)
     val rotation by animateFloatAsState(if (expanded) 90f else 0f, tween(ms), label = "syDisclosureChevron")
     Column(modifier) {
         Row(Modifier.fillMaxWidth().heightIn(min = if (onToggle != null) SyMetric.touch else 24.dp)
