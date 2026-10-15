@@ -18,11 +18,11 @@ class PersonaSchemaMigrationTest {
     @Test fun v4ShareAndCompactShareRespectFactScopes() {
         val card = PersonaProfile(name="阿青", coreIdentity="江湖剑客", facts=listOf(
             CharacterFact("a", CharacterFactCategories.VALUES_AND_TRADEOFFS, "重视诺言"),
-            CharacterFact("b", CharacterFactCategories.UNFINISHED_BUSINESS, "尚未完成约定"),
+            CharacterFact("b", CharacterFactCategories.SELF_NARRATIVE, "尚未完成约定"),
         ))
         assertEquals(card.facts, fullSharePersona(card).facts)
         val compact = compactSharePersona(card)
         assertEquals("重视诺言", compact.facts.single().content)
-        assertTrue(compact.facts.none { it.category == CharacterFactCategories.UNFINISHED_BUSINESS })
+        assertTrue(compact.facts.none { it.category == CharacterFactCategories.SELF_NARRATIVE })
     }
 }
