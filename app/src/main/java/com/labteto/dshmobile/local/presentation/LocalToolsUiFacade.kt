@@ -11,6 +11,8 @@ import com.labteto.dshmobile.local.tools.LocalToolsRuntime
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadinessProjector
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import com.labteto.dshmobile.observability.AppLog
 
 data class LocalCapabilityUiEntry(val name: String, val family: String, val access: String,
     val approval: String, val requirements: List<String>)
@@ -32,19 +34,26 @@ class LocalToolsUiFacade @Inject internal constructor(
 
     internal suspend fun composerInvocationOptions(): List<LocalComposerInvocationOption> {
         val available = mutableListOf<LocalComposerInvocationOption>()
-        if (githubConfigured()) {
+        // Failure to inspect one source must not hide every other connected tool or skill.
+        suspend fun <T> attempt(source: String, fallback: T, action: suspend () -> T): T =
+            try { action() } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) {
+                AppLog.failure("LocalToolsUiFacade", "composer_inventory_$source", error)
+                fallback
+            }
+        if (attempt("github", false, ::githubConfigured)) {
             available += LocalComposerInvocationOption(
                 LocalPinnedInvocation(LocalPinnedInvocation.Kind.CONNECTOR, "github"),
                 "GitHub", appContext.getString(R.string.composer_invocation_github_ready),
             )
         }
-        servers().filter { it.tools.isNotEmpty() }.forEach { server ->
+        attempt("mcp", emptyList(), ::servers).filter { it.tools.isNotEmpty() }.forEach { server ->
             available += LocalComposerInvocationOption(
                 LocalPinnedInvocation(LocalPinnedInvocation.Kind.CONNECTOR, server.id),
                 server.id, appContext.getString(R.string.composer_invocation_mcp_tools, server.tools.size),
             )
         }
-        installedSkills().filter { it.modelInvocable }.forEach { skill ->
+        attempt("skills", emptyList(), ::installedSkills).filter { it.modelInvocable }.forEach { skill ->
             available += LocalComposerInvocationOption(
                 LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, skill.name),
                 skill.displayName, skill.description,
