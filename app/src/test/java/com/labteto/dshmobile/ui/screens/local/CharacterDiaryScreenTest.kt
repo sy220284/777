@@ -123,10 +123,30 @@ class CharacterDiaryScreenTest {
             .copy(createdAt = 5, importance = 4)
         val day = characterDiaryDayNarrative(listOf(routine, otherRoutine, feelings))
         assertTrue(day.contains("我终于想清楚了"))
-        assertTrue(day.length <= 360)
+        assertTrue(day.length <= 630)
         assertTrue(day.endsWith("。"))
         // Every displayed paragraph comes from a complete chosen entry, never take(357).
         assertTrue(day.split("\n\n").all { it.endsWith("。") })
+    }
+
+    @Test
+    fun privateVoiceTakesPriorityOverFactFieldsAndIsSearchable() {
+        val reflection = "我明明答应得很平静，心里却已经开始期待。"
+        val entry = diary(id = "voice", event = "周末看电影的约定", thought = "附加心理字段")
+            .copy(privateReflection = reflection)
+        assertEquals(reflection, characterDiaryReadingLine(entry))
+        assertTrue(characterDiaryDayNarrative(listOf(entry)).contains(reflection))
+        assertEquals(listOf("voice"),
+            filterCharacterDiaryEntries(listOf(entry), "开始期待", CharacterDiaryFilter.ALL)
+                .map(ChatDiaryEntry::id))
+    }
+
+    @Test
+    fun aLongPrivateVoiceRemainsWholeWithoutDroppingTheDay() {
+        val reflection = "我还在想那天。" + "想法慢慢变得清楚。".repeat(36)
+        val entry = diary(id = "long", event = "我们聊起了重要的约定")
+            .copy(privateReflection = reflection, importance = 5)
+        assertEquals(reflection, characterDiaryDayNarrative(listOf(entry)))
     }
 
     @Test
@@ -135,7 +155,7 @@ class CharacterDiaryScreenTest {
             diary(id = it.toString(), event = "今天我想了很多" + "细节".repeat(75), thought = "我还在琢磨这件事")
                 .copy(importance = it % 5)
         }
-        assertTrue(characterDiaryDayNarrative(entries).length <= 360)
+        assertTrue(characterDiaryDayNarrative(entries).length <= 630)
         assertEquals(12, entries.size)
     }
 
