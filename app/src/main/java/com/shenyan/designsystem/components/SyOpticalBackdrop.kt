@@ -4,6 +4,7 @@ import android.graphics.RenderEffect as AndroidRenderEffect
 import android.graphics.RuntimeShader
 import android.os.Build
 import com.labteto.dshmobile.observability.AppLog
+import com.shenyan.designsystem.foundation.SyMaterialPolicy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -55,7 +56,7 @@ internal fun sySupportsOpticalRefraction(
 ): Boolean = enabled && sdk >= Build.VERSION_CODES.TIRAMISU &&
     transparent && hasScene && surfaceWidth > 0 && surfaceHeight > 0 &&
     // Limit the extra GPU pass to compact floating surfaces, not full-screen drawers.
-    surfaceWidth.toLong() * surfaceHeight.toLong() <= 1_300_000L
+    surfaceWidth.toLong() * surfaceHeight.toLong() <= SyMaterialPolicy.opticalMaxAreaPx
 
 /** Only an actual behind-the-surface scene enters the shader, never its foreground children. */
 @Composable
@@ -72,8 +73,8 @@ internal fun SyOpticalBackdrop(
         else try {
             val shader = RuntimeShader(SY_OPTICAL_REFRACTION_AGSL)
             shader.setFloatUniform("bounds", measured.width.toFloat(), measured.height.toFloat())
-            shader.setFloatUniform("edgeWidth", with(density) { 16.dp.toPx() })
-            shader.setFloatUniform("displacement", with(density) { 2.4.dp.toPx() })
+            shader.setFloatUniform("edgeWidth", with(density) { SyMaterialPolicy.opticalEdgeWidthDp.dp.toPx() })
+            shader.setFloatUniform("displacement", with(density) { SyMaterialPolicy.opticalDisplacementDp.dp.toPx() })
             AndroidRenderEffect.createRuntimeShaderEffect(shader, "scene").asComposeRenderEffect()
         } catch (failure: RuntimeException) {
             AppLog.warn("SyOpticalBackdrop", "failure=true operation=create_optical_shader fallback=scene cause_type=${failure.javaClass.simpleName}")
