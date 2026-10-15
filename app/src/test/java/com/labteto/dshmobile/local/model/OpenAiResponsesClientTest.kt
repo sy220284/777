@@ -1432,7 +1432,8 @@ class OpenAiResponsesClientTest {
     @Test
     fun explicitImageCommandsForceOnlyTheEligibleNativeTool() {
         listOf("生图吧", "生成一张图片", "请画一只猫", "Draw a picture",
-            "请根据之前的内容，生图吧").forEach { command ->
+            "请根据之前的内容，生图吧",
+            "请根据附图重新生成一张图片，修改要求：改成蓝色背景").forEach { command ->
             val payload = client.buildPayload(
                 model = "gpt-6.1-sol",
                 messages = listOf(buildJsonObject {
