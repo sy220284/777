@@ -23,7 +23,7 @@ class LocalMiniMaxSkillBundleTest {
             LocalSkillStore(workspace).remove("research-check")
             val store = LocalSkillStore(workspace, ::bundle)
             store.seedOnce()
-            assertEquals(10, store.installed().size) // 7 general + 3 mobile media
+            assertEquals(11, store.installed().size) // 8 general (after one removal) + 3 mobile media
             assertFalse(workspace.skills().contains("research-check"))
             assertEquals(setOf("minimax-media", "minimax-music-gen", "minimax-playlist"),
                 LocalMiniMaxSkillCatalog.entries.map { it.id }.toSet())
