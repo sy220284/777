@@ -2,7 +2,10 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import java.text.DateFormat
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -130,6 +133,65 @@ internal fun filterCharacterDiaryEntries(
         .toList()
 }
 
+
+/** A reading section contains only one date and one experience; independent stories never mix. */
+internal data class CharacterDiaryDay(
+    val dayStart: Long,
+    val experienceId: String,
+    val entries: List<ChatDiaryEntry>,
+) {
+    val key: String get() = dayStart.toString() + ":" + experienceId
+}
+
+internal fun groupCharacterDiaryDays(entries: List<ChatDiaryEntry>): List<CharacterDiaryDay> {
+    val calendar = Calendar.getInstance()
+    return entries.groupBy { entry ->
+        // A later manual correction must not move an old memory into today's diary.
+        calendar.timeInMillis = entry.createdAt.takeIf { it > 0L } ?: entry.updatedAt
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        calendar.timeInMillis to entry.experienceId.ifBlank {
+            entry.sources.lastOrNull()?.sessionId.orEmpty()
+        }
+    }.map { (identity, records) ->
+        CharacterDiaryDay(identity.first, identity.second, records.sortedBy(ChatDiaryEntry::createdAt))
+    }.sortedWith(compareByDescending<CharacterDiaryDay> { it.dayStart }
+        .thenByDescending { it.entries.maxOf(ChatDiaryEntry::updatedAt) })
+}
+
+/**
+ * Reading-only prose: retain the stored event as evidence, but hide technical field labels.
+ * Do not invent any emotion or rewrite the persisted facts / source references.
+ */
+internal fun characterDiaryReadingLine(entry: ChatDiaryEntry): String {
+    fun clean(text: String): String = text.trim().replace("用户", "对方").trimEnd('。', '，', '；', ' ', '\n')
+    val anchor = clean(entry.event).take(90)
+    val opening = if (anchor.startsWith("我") || anchor.startsWith("今天") || anchor.startsWith("昨")) {
+        anchor
+    } else if (anchor.isNotBlank()) {
+        "今天，" + anchor
+    } else ""
+    val reflections = listOf(entry.feeling, entry.innerThought, entry.unresolvedEcho)
+        .map(::clean)
+        .filter { it.isNotBlank() && it != opening && it != anchor }
+        .distinct()
+        .take(2)
+    return (listOf(opening) + reflections).filter(String::isNotBlank)
+        .joinToString("。") { it.take(110) }
+        .let { if (it.isBlank()) "" else it + "。" }
+}
+
+internal fun characterDiaryDayNarrative(entries: List<ChatDiaryEntry>): String {
+    val selected = entries.sortedWith(compareByDescending<ChatDiaryEntry> { it.importance }
+        .thenByDescending(ChatDiaryEntry::createdAt))
+        .take(3).sortedBy(ChatDiaryEntry::createdAt)
+    val prose = selected.map(::characterDiaryReadingLine)
+        .filter(String::isNotBlank).distinct().joinToString("\n\n")
+    return if (prose.length > 360) prose.take(357).trimEnd('。', '，', '\n', ' ') + "……" else prose
+}
+
 @Composable
 internal fun CharacterDiaryScreen(
     gallery: List<PersonaGalleryEntry>,
@@ -162,10 +224,12 @@ internal fun CharacterDiaryScreen(
     var mutating by remember { mutableStateOf(false) }
     var mutationError by remember { mutableStateOf(false) }
     var sourceError by remember { mutableStateOf(false) }
+    var expandedDayKey by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(selectedSubjectKey) {
         editingEntry = null
         deactivatingEntry = null
         sourceError = false
+        expandedDayKey = null
     }
 
     LaunchedEffect(subjects, preferredKey) {
@@ -208,6 +272,8 @@ internal fun CharacterDiaryScreen(
             filterCharacterDiaryEntries(entries, query, selectedFilter)
         } else emptyList()
     }
+
+    val diaryDays = remember(visibleEntries) { groupCharacterDiaryDays(visibleEntries) }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
@@ -323,10 +389,14 @@ internal fun CharacterDiaryScreen(
                             modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapHero),
                         )
                     }
-                    else -> items(visibleEntries, key = ChatDiaryEntry::id) { entry ->
-                        CharacterDiaryEntryCard(
-                            entry = entry,
-                            onEdit = {
+                    else -> items(diaryDays, key = CharacterDiaryDay::key) { day ->
+                        CharacterDiaryDayCard(
+                            day = day,
+                            expanded = expandedDayKey == day.key,
+                            onToggle = {
+                                expandedDayKey = if (expandedDayKey == day.key) null else day.key
+                            },
+                            onEdit = { entry ->
                                 editingEntry = entry
                                 editDraft = ChatDiaryDelta(
                                     event = entry.event, feeling = entry.feeling,
@@ -337,7 +407,7 @@ internal fun CharacterDiaryScreen(
                                 )
                                 mutationError = false
                             },
-                            onDeactivate = {
+                            onDeactivate = { entry ->
                                 deactivatingEntry = entry
                                 mutationError = false
                             },
@@ -474,122 +544,104 @@ internal fun CharacterDiaryScreen(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CharacterDiaryEntryCard(
-    entry: ChatDiaryEntry,
-    onEdit: () -> Unit,
-    onDeactivate: () -> Unit,
+private fun CharacterDiaryDayCard(
+    day: CharacterDiaryDay,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onEdit: (ChatDiaryEntry) -> Unit,
+    onDeactivate: (ChatDiaryEntry) -> Unit,
     onOpenSource: (String) -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    val dateText = remember(entry.updatedAt) {
-        DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(entry.updatedAt)
+    val dateText = remember(day.dayStart) {
+        SimpleDateFormat("M月d日 · EEEE", Locale.CHINA).format(Date(day.dayStart))
     }
-    // Reference screen 09: a centered reading sheet, with real recorded diary fields.
-    // Never synthesize first-person thoughts or comments that do not exist in the diary store.
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-    Column(modifier = Modifier.widthIn(max = 680.dp).fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
-        Text(
-            dateText,
-            style = DsType.caption11.withReadingWeight(),
-            color = colors.textTertiary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text(
-            entry.event,
-            style = DsType.base16Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
-            color = colors.text,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().testTag("diary_paper_event_${entry.id}"),
-        )
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd, Alignment.CenterHorizontally),
+        Column(
+            modifier = Modifier.widthIn(max = 680.dp).fillMaxWidth()
+                .padding(vertical = SyMetric.gapMd),
             verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
-            SyPill(
-                text = stringResource(
-                    if (entry.sourceMode == ChatDiarySourceMode.GROUP) {
-                        R.string.chat_diary_source_group
-                    } else {
-                        R.string.chat_diary_source_direct
-                    },
-                ),
-            )
-            SyPill(text = diaryDisclosureLabel(entry.disclosure))
-        }
-
-        CharacterDiaryNarrativeBlock(
-            label = stringResource(R.string.chat_diary_feeling),
-            text = entry.feeling,
-        )
-        CharacterDiaryNarrativeBlock(
-            label = stringResource(R.string.chat_diary_inner_thought),
-            text = entry.innerThought,
-        )
-        CharacterDiaryNarrativeBlock(
-            label = stringResource(R.string.chat_diary_relationship_meaning),
-            text = entry.relationshipMeaning,
-        )
-        CharacterDiaryNarrativeBlock(
-            label = stringResource(R.string.chat_diary_unresolved_echo),
-            text = entry.unresolvedEcho,
-        )
-
-        if (entry.revisions.lastOrNull()?.userCorrected == true) {
-            SyPill(text = stringResource(R.string.chat_diary_user_corrected))
-        }
-        entry.sources.lastOrNull()?.takeIf { it.sessionId.isNotBlank() }?.let { source ->
             Text(
-                stringResource(
-                    R.string.chat_diary_source_ref,
-                    source.sessionId.take(12),
-                    source.userMessageId.ifBlank { source.assistantMessageId }.take(12),
-                ),
-                style = DsType.caption11.withReadingWeight(),
+                text = dateText,
+                style = DsType.caption11Strong.withReadingWeight(),
                 color = colors.textTertiary,
+                modifier = Modifier.fillMaxWidth().testTag("diary_day_" + day.key),
+            )
+            // Default presentation is prose, not a five-column psychological analysis.
+            Text(
+                text = characterDiaryDayNarrative(day.entries),
+                style = DsType.chatBody.withReadingWeight().copy(fontFamily = DsType.contentFont),
+                color = colors.text,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth().testTag(
+                    "diary_paper_event_" + day.entries.first().id,
+                ),
             )
             SyButton(
-                text = stringResource(R.string.chat_diary_open_source),
-                onClick = { onOpenSource(source.sessionId) },
+                text = stringResource(
+                    if (expanded) R.string.chat_diary_collapse_records
+                    else R.string.chat_diary_expand_records, day.entries.size,
+                ),
+                onClick = onToggle,
                 variant = SyButtonVariant.Ghost,
-                modifier = Modifier.testTag("diary_source_${entry.id}"),
+                modifier = Modifier.testTag("diary_expand_" + day.entries.first().id),
             )
+            if (expanded) {
+                day.entries.forEach { entry ->
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapSm),
+                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                    ) {
+                        Text(
+                            text = entry.event,
+                            style = DsType.std14.withReadingWeight(),
+                            color = colors.textSecondary,
+                            modifier = Modifier.testTag("diary_raw_event_" + entry.id),
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                        ) {
+                            SyPill(text = stringResource(
+                                if (entry.sourceMode == ChatDiarySourceMode.GROUP) {
+                                    R.string.chat_diary_source_group
+                                } else R.string.chat_diary_source_direct,
+                            ))
+                            SyPill(text = diaryDisclosureLabel(entry.disclosure))
+                            if (entry.revisions.lastOrNull()?.userCorrected == true) {
+                                SyPill(text = stringResource(R.string.chat_diary_user_corrected))
+                            }
+                        }
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                        ) {
+                            entry.sources.lastOrNull()?.takeIf { it.sessionId.isNotBlank() }?.let { source ->
+                                SyButton(
+                                    text = stringResource(R.string.chat_diary_open_source),
+                                    onClick = { onOpenSource(source.sessionId) },
+                                    variant = SyButtonVariant.Ghost,
+                                    modifier = Modifier.testTag("diary_source_" + entry.id),
+                                )
+                            }
+                            SyButton(
+                                text = stringResource(R.string.chat_diary_edit_title),
+                                onClick = { onEdit(entry) },
+                                variant = SyButtonVariant.Ghost,
+                                modifier = Modifier.testTag("diary_edit_" + entry.id),
+                            )
+                            SyButton(
+                                text = stringResource(R.string.chat_diary_deactivate),
+                                onClick = { onDeactivate(entry) },
+                                variant = SyButtonVariant.Ghost,
+                                modifier = Modifier.testTag("diary_deactivate_" + entry.id),
+                            )
+                        }
+                    }
+                }
+            }
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-            SyButton(text = stringResource(R.string.chat_diary_edit_title),
-                onClick = onEdit, variant = SyButtonVariant.Ghost,
-                modifier = Modifier.testTag("diary_edit_${entry.id}"))
-            SyButton(text = stringResource(R.string.chat_diary_deactivate),
-                onClick = onDeactivate, variant = SyButtonVariant.Ghost,
-                modifier = Modifier.testTag("diary_deactivate_${entry.id}"))
-        }
-        Text(
-            stringResource(R.string.chat_diary_importance, entry.importance),
-            style = DsType.caption11.withReadingWeight(),
-            color = colors.textTertiary,
-        )
-    }
-    }
-}
-
-@Composable
-private fun CharacterDiaryNarrativeBlock(label: String, text: String) {
-    if (text.isBlank()) return
-    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
-        Text(
-            label,
-            style = DsType.caption11Strong.withReadingWeight(),
-            color = colors.textSecondary,
-        )
-        Text(
-            text,
-            style = DsType.chatBody.withReadingWeight(),
-            color = colors.textSecondary,
-        )
     }
 }
 
