@@ -67,6 +67,7 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryStory
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.CharacterFactCategories
 import com.labteto.dshmobile.local.presentation.MAX_PERSONA_TRANSFER_BYTES
 import com.labteto.dshmobile.local.presentation.PERSONA_WORD_MIME
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
@@ -554,12 +555,18 @@ internal fun GalleryPill(text: String) {
 
 @Composable
 internal fun PersonaDetails(persona: PersonaProfile) {
-    val scalars = listOf(
-        stringResource(R.string.persona_v4_core_identity) to persona.coreIdentity,
-        stringResource(R.string.persona_field_franchise) to persona.franchise,
-    ).filter { it.second.isNotBlank() }
-    val facts = persona.facts.filter { it.content.isNotBlank() }
-    if (scalars.isEmpty() && facts.isEmpty() && persona.loreEntries.isEmpty()) return
+    val identity = persona.coreIdentity
+    val franchise = persona.franchise
+    // 仅调整阅读顺序，不改变事实列表原始存储顺序，也不丢弃旧版分类。
+    val facts = persona.facts.filter { it.content.isNotBlank() }.sortedBy { fact ->
+        val index = CharacterFactCategories.selectable.indexOf(fact.category)
+        when {
+            fact.category == CharacterFactCategories.CUSTOM_FACTS -> 1000
+            index >= 0 -> index
+            else -> 900
+        }
+    }
+    if (identity.isBlank() && franchise.isBlank() && facts.isEmpty() && persona.loreEntries.isEmpty()) return
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
 
     // A readable character profile, not a transcript packed inside a second glass card.
@@ -572,10 +579,18 @@ internal fun PersonaDetails(persona: PersonaProfile) {
             style = DsType.base16Strong.withReadingWeight(),
             color = colors.text,
         )
-        scalars.forEach { (label, value) ->
-            PersonaDetailRow(label, value)
+        if (identity.isNotBlank()) {
+            PersonaDetailRow(stringResource(R.string.persona_v4_core_identity), identity)
         }
+        var franchisePlaced = false
         facts.forEach { fact ->
+            // 自定义内容最后展示，作品来源放在关系与自定义字段之间。
+            if (fact.category == CharacterFactCategories.CUSTOM_FACTS && !franchisePlaced) {
+                if (franchise.isNotBlank()) {
+                    PersonaDetailRow(stringResource(R.string.persona_field_franchise), franchise)
+                }
+                franchisePlaced = true
+            }
             val labelRes = when (fact.category) {
                 "personality" -> R.string.persona_v4_personality
                 "selfNarrative" -> R.string.persona_v4_self_narrative
@@ -613,6 +628,9 @@ internal fun PersonaDetails(persona: PersonaProfile) {
                 value = fact.content,
                 annotation = extra.joinToString(" · "),
             )
+        }
+        if (!franchisePlaced && franchise.isNotBlank()) {
+            PersonaDetailRow(stringResource(R.string.persona_field_franchise), franchise)
         }
         if (persona.loreEntries.isNotEmpty()) {
             PersonaDetailRow(
