@@ -112,13 +112,60 @@ internal fun parsePersonaDraft(json: Json, raw: String): PersonaDraft {
     val root = json.parseToJsonElement(objectText) as? JsonObject
         ?: error("persona response root is not a JSON object")
 
+    // Older model responses sometimes emit retired top-level fields and no V4 facts.
+    // Request a format repair instead of silently rendering an almost empty editor.
+    if (root["facts"] == null && listOf("portrait", "lifeContext", "stableTraits").any { it in root }) {
+        error("模型返回旧版人设字段，需转换为 V4 facts")
+    }
+    val parsedFacts = root.characterFacts()
+    val identityFact = parsedFacts.firstOrNull { it.category == "identity" }?.content.orEmpty()
+    val identity = root.text("coreIdentity").ifBlank { identityFact }
+    val normalizedFacts = parsedFacts.mapNotNull { fact ->
+        when (val category = normalizedGeneratedCategory(fact.category)) {
+            null -> null // Six retired categories must never be revived.
+            "identity" -> if (identityFact.isNotBlank() && identity == identityFact) null
+                else fact.copy(category = CharacterFactCategories.CUSTOM_FACTS)
+            else -> fact.copy(category = category)
+        }
+    }
+    if (parsedFacts.isNotEmpty() && normalizedFacts.isEmpty() &&
+        parsedFacts.any { normalizedGeneratedCategory(it.category) == null }
+    ) error("模型仅返回已废弃的事实类别，需重新生成新版内容")
     return PersonaDraft(
         name = root.text("name"),
         franchise = root.text("franchise"),
-        coreIdentity = root.text("coreIdentity"),
-        facts = root.characterFacts(),
+        coreIdentity = identity,
+        facts = normalizedFacts,
         loreEntries = root.loreEntries(),
     )
+}
+
+/** The nine standard facts are distinct from the optional free-form custom section. */
+internal fun missingPersonaCategories(existing: List<CharacterFact>, generated: List<CharacterFact>): List<String> {
+    val present = (existing + generated).asSequence()
+        .filter { it.content.isNotBlank() }
+        .map(CharacterFact::category).toSet()
+    return CharacterFactCategories.canonical.filterNot {
+        it == CharacterFactCategories.CUSTOM_FACTS || it in present
+    }
+}
+
+/** Keep non-standard model category names out of the UI without losing their facts. */
+internal fun normalizedGeneratedCategory(raw: String): String? = when (raw.trim()) {
+    "definingChoices", "emotionalImprints", "lifeGravity",
+    "unfinishedBusiness", "limitsAndCosts", "sensorySignature" -> null
+    "identity", "coreIdentity" -> "identity"
+    "personality", "personalityTraits", "stableTraits", "性格" -> CharacterFactCategories.PERSONALITY
+    "valuesAndTradeoffs", "values", "valuesAndChoices", "价值观" -> CharacterFactCategories.VALUES_AND_TRADEOFFS
+    "selfNarrative", "selfPerception", "selfStory", "自我认知" -> CharacterFactCategories.SELF_NARRATIVE
+    "subjectiveBeliefs", "beliefs", "worldview", "主观认知" -> CharacterFactCategories.SUBJECTIVE_BELIEFS
+    "identityGap", "innerOuterContrast", "publicPrivateGap", "反差" -> CharacterFactCategories.IDENTITY_GAP
+    "preferencesAndHabits", "preferences", "habits", "爱好习惯" -> CharacterFactCategories.PREFERENCES_AND_HABITS
+    "voiceStyle", "speechStyle", "communicationStyle", "说话方式" -> CharacterFactCategories.VOICE_STYLE
+    "biography", "backstory", "experiences", "人生经历" -> CharacterFactCategories.BIOGRAPHY
+    "relationships", "relations", "bonds", "人物关系" -> CharacterFactCategories.RELATIONSHIPS
+    "customFacts", "custom", "other" -> CharacterFactCategories.CUSTOM_FACTS
+    else -> if (raw.isBlank()) null else CharacterFactCategories.CUSTOM_FACTS
 }
 
 private fun JsonObject.text(name: String): String =
@@ -513,15 +560,82 @@ class PersonaAutoFillService @Inject constructor(
             draft = repairedDraft
         }
 
+        // A first response often omits less obvious dimensions even for fully described
+        // original characters. One targeted completion pass fills only missing fields.
+        val missingCategories = missingPersonaCategories(current.facts, draft.facts)
+        if (missingCategories.isNotEmpty() &&
+            (request.length >= 12 || current.coreIdentity.length >= 12 || draft.coreIdentity.length >= 12)
+        ) {
+            val completionReply = try {
+                modelGateway.complete(
+                baseUrl = baseUrl,
+                model = model,
+                messages = listOf(
+                    buildJsonObject { put("role", "system"); put("content", MISSING_FACTS_PROMPT) },
+                    buildJsonObject {
+                        put("role", "user")
+                        put("content", buildString {
+                            appendLine("缺少的事实类别：${missingCategories.joinToString(", ")}")
+                            appendLine("人物名称：${draft.name.ifBlank { current.name }}")
+                            appendLine("核心身份：${draft.coreIdentity.ifBlank { current.coreIdentity }}")
+                            appendLine("原作/来源：${draft.franchise.ifBlank { current.franchise }}")
+                            appendLine("原始创作要求：${request.take(MAX_DESCRIPTION_CHARS)}")
+                            if (recentContext.isNotBlank()) appendLine("已发生的对话：${recentContext.take(MAX_REPAIR_CHARS)}")
+                            appendLine("已有事实（勿重复）：")
+                            (current.facts + draft.facts).forEach { appendLine("${it.category}：${it.content}") }
+                        })
+                    },
+                ),
+                tools = JsonArray(emptyList()),
+                temperature = 0.35,
+            )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                // A failed optional second request must not destroy the successful first draft.
+                null
+            }
+            if (completionReply != null) withContext(Dispatchers.IO) {
+                usageTracker.record(
+                    model = model, usage = completionReply.usage,
+                    requestId = completionReply.requestId,
+                    context = TokenUsageContext(mode = LocalUsageMode.CHAT, action = TokenUsageAction.PERSONA_AUTOFILL),
+                    promptBreakdown = completionReply.promptBreakdown,
+                    route = completionReply.routeIdentity,
+                )
+            }
+            val supplement = completionReply?.content?.trim().orEmpty()
+            if (supplement.isNotBlank()) {
+                // Malformed supplementary responses must not erase the successful first draft.
+                runCatching { parsePersonaDraft(json, supplement) }.getOrNull()?.let { extra ->
+                    if (personaDraftImmersionViolations(extra).isNotEmpty()) return@let
+                    val allowed = missingCategories.toSet()
+                    draft = draft.copy(facts = mergeGeneratedCharacterFacts(
+                        draft.facts, extra.facts.filter { it.category in allowed },
+                    ))
+                }
+            }
+        }
+
+        // An explicit draft already in the editor is the source of truth.
+        // AI adds missing information; it cannot quietly rewrite authored core fields.
+        val authoredCategories = current.facts.filter {
+            it.content.isNotBlank() && it.provenance in setOf(
+                CharacterFactProvenance.USER_CREATED, CharacterFactProvenance.CANON)
+        }.map(CharacterFact::category).toSet()
         current.copy(
             id = current.id,
-            name = draft.name.ifBlank { current.name.ifBlank { "默认角色" } },
-            coreIdentity = draft.coreIdentity.ifBlank { current.coreIdentity },
+            name = current.name.takeIf { it.isNotBlank() && it != "默认角色" }
+                ?: draft.name.ifBlank { "默认角色" },
+            coreIdentity = current.coreIdentity.ifBlank { draft.coreIdentity },
             facts = mergeGeneratedCharacterFacts(
                 current.facts,
-                draft.facts.filter { CharacterFactCategories.isSupported(it.category) },
+                draft.facts.filter {
+                    CharacterFactCategories.isSupported(it.category) &&
+                        it.category !in authoredCategories
+                },
             ),
-            franchise = draft.franchise.ifBlank { current.franchise },
+            franchise = current.franchise.ifBlank { draft.franchise },
             // V4 AI only writes canonical identity, facts and world-book; no new
             // legacy trait copies or runtime/correction overrides are generated here.
             loreEntries = mergeGeneratedLoreEntries(current.loreEntries, draft.loreEntries),
@@ -542,8 +656,15 @@ class PersonaAutoFillService @Inject constructor(
             category推荐使用 personality、selfNarrative、identityGap、valuesAndTradeoffs、subjectiveBeliefs、
             biography、relationships、preferencesAndHabits、voiceStyle、customFacts。
             provenance只允许 CANON、INFERRED、USER_CREATED、UNVERIFIED。
-            1. name与核心身份尽可能明确；身份、性格、经历、重要关系、核心价值优先。
-            2. 其它类别仅当有可靠信息才生成，禁止为了凑满类别编造秘密、创伤、未来成长和关系进度。
+            1. 必须逐类检查下列9个预置字段是否可以生成：
+               personality（性格），valuesAndTradeoffs（取舍），selfNarrative（怎么看自己），
+               subjectiveBeliefs（怎么看世界），identityGap（对外表现和内心的差异），
+               preferencesAndHabits（日常习惯），voiceStyle（说话方式），
+               biography（经历），relationships（重要关系）。
+               对有足够设定的原创人物尽量填齐，不能只写性格和身份；customFacts为可选扩展。
+            2. 原创人物允许围绕用户提供的背景合理补充人物细节，必须标注INFERRED，
+               不得无依据强加秘密、创伤和关系进度。已有作品人物只写可靠原作或标为推断；
+               未知的具体经历与人物关系宁可空缺，绝不为了填满而杜撰。
             3. 同一事实存一次；历史事件可以通过relatedFactIds关联其选择和影响，不重复复制长段落。
             4. 原作事实与推断、用户二创明确区分；不确定的设定可留空或标记UNVERIFIED。
             5. 人物资料只描写已有的人生事实、固有认知与偏好；当前情绪、成长、主动性、亲密度、
@@ -557,9 +678,20 @@ class PersonaAutoFillService @Inject constructor(
         """.trimIndent()
 
         val REPAIR_PROMPT = """
-            修复下方角色卡 JSON。只输出可解析 JSON，不解释、不新增事实。
-            保留可可靠恢复的字段和值；规范数组；截断内容只保留确定部分并闭合结构。
-            不要新增或补写任何模型、平台、助手能力边界；所有人物内容保持角色世界内叙述。
+            修复下方角色卡 JSON。只输出含name、franchise、coreIdentity、facts、loreEntries的V4 JSON。
+            原顶层描述字段如果可确定属于现行10类，可以无损转到facts条目。
+            不要产生已废弃的definingChoices、emotionalImprints、lifeGravity、
+            unfinishedBusiness、limitsAndCosts、sensorySignature类别。
+            保留有依据的资料，不解释、不新增事实；截断部分只保留确定内容。
+            不要新增模型、平台或助手能力边界，人物内容保持故事内部视角。
+        """.trimIndent()
+
+        val MISSING_FACTS_PROMPT = """
+            你正在补全人物V4档案。仅输出JSON对象：{"facts":[{"id":"...","category":"...","content":"...","provenance":"INFERRED"}]}。
+            只补全用户指定的缺失类别，尽可能覆盖全部；其他类别不可生成。
+            原创人物可依据已有描述创作相容、具体、有辨识度的细节，标注INFERRED。
+            已有作品人物的未知经历、秘密、人物关系不能捏造；缺乏依据的类别可略过。
+            不要输出已废弃字段，不要重复已有内容，不要编造未经发生的关系进度或即时情绪。
         """.trimIndent()
 
         val IMMERSION_REPAIR_PROMPT = """

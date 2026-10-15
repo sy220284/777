@@ -42,6 +42,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Surface
@@ -63,6 +64,7 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.CharacterFact
 import com.labteto.dshmobile.local.chat.CharacterFactProvenance
+import com.labteto.dshmobile.local.presentation.personaEditableFactCategories
 import com.labteto.dshmobile.local.presentation.PersonaPresetCatalog
 import com.labteto.dshmobile.local.chat.PersonaLoreEntry
 import com.labteto.dshmobile.local.interaction.LocalApproval
@@ -491,7 +493,7 @@ internal fun QuestionDialog(
 internal fun ChatPersonaDialog(
     profile: PersonaProfile,
     onSave: suspend (PersonaProfile) -> Result<Unit>,
-    onAutoFill: suspend (String) -> Result<PersonaProfile>,
+    onAutoFill: suspend (PersonaProfile, String) -> Result<PersonaProfile>,
     onDismiss: () -> Unit,
     creatingNew: Boolean = false,
 ) {
@@ -499,21 +501,16 @@ internal fun ChatPersonaDialog(
     var name by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.name) }
     var coreIdentity by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.coreIdentity) }
     var factDrafts by remember(profile.id, profile.updatedAt) {
-        mutableStateOf(profile.facts.filter { it.category !in setOf(
+        mutableStateOf(withEditablePersonaFields(profile.facts.filter { it.category !in setOf(
             "definingChoices", "emotionalImprints", "lifeGravity",
             "unfinishedBusiness", "limitsAndCosts", "sensorySignature",
-        ) })
+        ) }))
     }
-    var customCategory by rememberSaveable(profile.id) { mutableStateOf("") }
     var franchise by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.franchise) }
     var loreEntries by remember(profile.id, profile.updatedAt) { mutableStateOf(profile.loreEntries) }
     val bundledPreset = remember(profile.presetId) { PersonaPresetCatalog.find(profile.presetId) }
     var aiDescription by rememberSaveable(profile.id) { mutableStateOf("") }
-    var visibleFields by remember(profile.id, profile.updatedAt) {
-        mutableStateOf(factDrafts.map(CharacterFact::category).toSet())
-    }
     var addFieldsOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
-    var customFieldOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
     var aiOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
     var loreOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
     var aiGenerating by remember(profile.id) { mutableStateOf(false) }
@@ -521,40 +518,38 @@ internal fun ChatPersonaDialog(
     var saveError by remember(profile.id) { mutableStateOf<String?>(null) }
     var aiSucceeded by remember(profile.id) { mutableStateOf(false) }
     var aiError by remember(profile.id) { mutableStateOf<String?>(null) }
+    var confirmDiscard by remember(profile.id) { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
-    val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
 
-    fun addFactField(category: String) {
-        if (factDrafts.none { it.category == category }) {
-            factDrafts = factDrafts + CharacterFact(
-                id = UUID.randomUUID().toString(),
-                category = category,
-                content = "",
-                provenance = CharacterFactProvenance.USER_CREATED,
-            )
-        }
-        visibleFields = visibleFields + category
-        addFieldsOpen = false
+    fun currentDraft(): PersonaProfile = runtimeProfile.copy(
+        name = name,
+        coreIdentity = coreIdentity,
+        facts = factDrafts.filter { it.content.isNotBlank() },
+        franchise = franchise,
+        loreEntries = loreEntries.filter { it.content.isNotBlank() },
+    )
+    fun requestDismiss() {
+        if (currentDraft() != profile) confirmDiscard = true else onDismiss()
     }
+    val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
 
     fun applyGenerated(generated: PersonaProfile) {
         runtimeProfile = generated
         name = generated.name
         coreIdentity = generated.coreIdentity
-        factDrafts = generated.facts.filter { fact ->
+        factDrafts = withEditablePersonaFields(generated.facts.filter { fact ->
             fact.category !in setOf(
                 "definingChoices", "emotionalImprints", "lifeGravity",
                 "unfinishedBusiness", "limitsAndCosts", "sensorySignature",
             )
-        }
-        visibleFields = factDrafts.map(CharacterFact::category).toSet()
+        })
         franchise = generated.franchise
         loreEntries = generated.loreEntries
     }
 
     SyResponsiveSheet(
         title = stringResource(R.string.local_persona_title),
-        onDismiss = onDismiss,
+        onDismiss = ::requestDismiss,
         scrollable = true,
         seamlessBackground = true,
         dismissEnabled = !aiGenerating && !saving,
@@ -569,15 +564,7 @@ internal fun ChatPersonaDialog(
                 saveError = null
                 coroutineScope.launch {
                     val result = runCatching {
-                        onSave(
-                            runtimeProfile.copy(
-                                name = name,
-                                coreIdentity = coreIdentity,
-                                facts = factDrafts.filter { it.content.isNotBlank() },
-                                franchise = franchise,
-                                loreEntries = loreEntries.filter { it.content.isNotBlank() },
-                            ),
-                        )
+                        onSave(currentDraft())
                     }.getOrElse { Result.failure(it) }
                     result.onSuccess { onDismiss() }
                         .onFailure { saveError = it.message ?: saveFailedText }
@@ -604,140 +591,6 @@ internal fun ChatPersonaDialog(
             "relationships" to R.string.persona_v4_relationships,
             "customFacts" to R.string.persona_v4_custom_facts,
         )
-        PersonaFormSection(stringResource(R.string.persona_v4_section_core_simple)) {
-            PersonaTextField(stringResource(R.string.local_persona_name), name, { name = it }, singleLine = true)
-            PersonaTextField(stringResource(R.string.persona_v4_core_identity), coreIdentity, { coreIdentity = it })
-        }
-        availableFields.filterNot { it.first == "customFacts" }.forEach { (category, label) ->
-            PersonaFactCategoryEditor(
-                category = category,
-                title = stringResource(label),
-                facts = factDrafts,
-                onChange = { factDrafts = it },
-            )
-        }
-        // 社会关系之后才补充所属世界，自定义设定始终放在最后。
-        PersonaTextField(
-            stringResource(R.string.local_persona_franchise),
-            franchise,
-            { franchise = it },
-            singleLine = true,
-        )
-        PersonaFactCategoryEditor(
-            category = "customFacts",
-            title = stringResource(R.string.persona_v4_custom_facts),
-            facts = factDrafts,
-            onChange = { factDrafts = it },
-        )
-        factDrafts.map(CharacterFact::category).distinct()
-            .filterNot { category -> availableFields.any { it.first == category } }
-            .filterNot { it == "franchise" }
-            .forEach { category ->
-                PersonaFactCategoryEditor(
-                    category = category,
-                    title = category,
-                    facts = factDrafts,
-                    onChange = { factDrafts = it },
-                )
-            }
-        // A newly added custom category has no saved fact until the user types content.
-        visibleFields.filterNot { category ->
-            category == "franchise" || availableFields.any { it.first == category } ||
-                factDrafts.any { it.category == category }
-        }.forEach { category ->
-            PersonaFactCategoryEditor(
-                category = category,
-                title = category,
-                facts = factDrafts,
-                onChange = { factDrafts = it },
-            )
-        }
-        if (loreOpen) {
-            PersonaFormSection(stringResource(R.string.persona_v4_section_lore)) {
-                PersonaWorldBookEditor(entries = loreEntries, onChange = { loreEntries = it })
-            }
-        }
-        SyButton(
-            text = stringResource(if (addFieldsOpen) R.string.persona_v4_hide_field_picker
-                else R.string.persona_v4_add_field_picker),
-            onClick = { addFieldsOpen = !addFieldsOpen },
-            modifier = Modifier.fillMaxWidth().testTag("personaAddFieldPicker"),
-            variant = SyButtonVariant.Ghost,
-        )
-        if (addFieldsOpen) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
-            ) {
-                SySheetChoiceRow(
-                    title = stringResource(R.string.persona_v4_section_lore),
-                    onClick = { loreOpen = true; addFieldsOpen = false },
-                )
-                SySheetChoiceRow(
-                    title = stringResource(R.string.persona_v4_custom_field_name),
-                    onClick = { customFieldOpen = !customFieldOpen },
-                )
-                if (customFieldOpen) {
-                    PersonaTextField(
-                        stringResource(R.string.persona_v4_custom_field_name),
-                        customCategory,
-                        { customCategory = it },
-                        singleLine = true,
-                    )
-                    SyButton(
-                        text = stringResource(R.string.persona_v4_add_custom),
-                        onClick = {
-                            val category = customCategory.trim()
-                            if (category.isNotEmpty()) {
-                                if (category == "franchise") {
-                                    visibleFields = visibleFields + category
-                                    addFieldsOpen = false
-                                } else {
-                                    addFactField(category)
-                                }
-                                customCategory = ""
-                                customFieldOpen = false
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        variant = SyButtonVariant.Ghost,
-                        enabled = customCategory.isNotBlank(),
-                    )
-                }
-                bundledPreset?.let { preset ->
-                    SyButton(
-                        text = stringResource(R.string.persona_v4_load_preset),
-                        onClick = {
-                            coreIdentity = preset.persona.coreIdentity
-                            factDrafts = preset.persona.facts
-                            visibleFields = visibleFields + preset.persona.facts.map(CharacterFact::category)
-                            addFieldsOpen = false
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        variant = SyButtonVariant.Ghost,
-                    )
-                    SyButton(
-                        text = stringResource(R.string.persona_v4_fill_lore),
-                        onClick = {
-                            val ids = loreEntries.map(PersonaLoreEntry::id).toSet()
-                            loreEntries += preset.persona.loreEntries.filterNot { it.id in ids }
-                            loreOpen = true
-                            addFieldsOpen = false
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        variant = SyButtonVariant.Ghost,
-                    )
-                }
-            }
-        }
-        if (loreEntries.isNotEmpty() && !loreOpen) {
-            SyButton(
-                text = stringResource(R.string.persona_v4_edit_lore, loreEntries.size),
-                onClick = { loreOpen = true },
-                modifier = Modifier.fillMaxWidth(),
-                variant = SyButtonVariant.Ghost,
-            )
-        }
         SyButton(
             text = stringResource(if (aiOpen) R.string.persona_v4_hide_ai
                 else R.string.persona_v4_expand_ai),
@@ -766,12 +619,13 @@ internal fun ChatPersonaDialog(
                         else R.string.local_persona_ai_generate),
                     onClick = {
                         if (!aiGenerating) {
+                            val submittedDraft = currentDraft()
                             aiGenerating = true
                             aiSucceeded = false
                             aiError = null
                             coroutineScope.launch {
                                 try {
-                                    runCatching { onAutoFill(aiDescription) }
+                                    runCatching { onAutoFill(submittedDraft, aiDescription) }
                                         .getOrElse { Result.failure(it) }
                                         .onSuccess {
                                             applyGenerated(it)
@@ -794,6 +648,15 @@ internal fun ChatPersonaDialog(
                         style = DsType.caption11.withReadingWeight(),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                     )
+                    val covered = factDrafts.asSequence().filter { it.content.isNotBlank() }
+                        .map(CharacterFact::category).toSet()
+                        .count { it != "customFacts" &&
+                            it in personaEditableFactCategories }
+                    Text(
+                        stringResource(R.string.persona_v4_ai_coverage, covered),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
+                    )
                 }
                 aiError?.let { error ->
                     val message = when (error) {
@@ -811,6 +674,155 @@ internal fun ChatPersonaDialog(
                 }
             }
         }
+        PersonaFormSection(stringResource(R.string.persona_v4_section_core_simple)) {
+            PersonaTextField(stringResource(R.string.local_persona_name), name, { name = it }, singleLine = true)
+            PersonaTextField(stringResource(R.string.persona_v4_core_identity), coreIdentity,
+                { coreIdentity = it }, hint = stringResource(R.string.persona_v4_hint_identity))
+        }
+        availableFields.filterNot { it.first == "customFacts" }.forEach { (category, label) ->
+            PersonaFactCategoryEditor(
+                category = category,
+                title = stringResource(label),
+                hint = when (category) {
+                    "personality" -> stringResource(R.string.persona_v4_hint_personality)
+                    "valuesAndTradeoffs" -> stringResource(R.string.persona_v4_hint_values)
+                    "selfNarrative" -> stringResource(R.string.persona_v4_hint_self)
+                    "subjectiveBeliefs" -> stringResource(R.string.persona_v4_hint_beliefs)
+                    "identityGap" -> stringResource(R.string.persona_v4_hint_gap)
+                    "preferencesAndHabits" -> stringResource(R.string.persona_v4_hint_habits)
+                    "voiceStyle" -> stringResource(R.string.persona_v4_hint_voice)
+                    "biography" -> stringResource(R.string.persona_v4_hint_biography)
+                    else -> stringResource(R.string.persona_v4_hint_relationships)
+                },
+                facts = factDrafts,
+                onChange = { factDrafts = it },
+            )
+        }
+        // 社会关系之后才补充所属世界，自定义设定始终放在最后。
+        PersonaTextField(
+            stringResource(R.string.persona_v4_franchise_simple),
+            franchise,
+            { franchise = it },
+            singleLine = true,
+            hint = stringResource(R.string.persona_v4_hint_franchise),
+        )
+        PersonaFactCategoryEditor(
+            category = "customFacts",
+            title = stringResource(R.string.persona_v4_custom_facts),
+            hint = stringResource(R.string.persona_v4_hint_custom),
+            facts = factDrafts,
+            onChange = { factDrafts = it },
+        )
+        factDrafts.map(CharacterFact::category).distinct()
+            .filterNot { category -> availableFields.any { it.first == category } }
+            .filterNot { it == "franchise" }
+            .forEach { category ->
+                PersonaFactCategoryEditor(
+                    category = category,
+                    title = if (category == "identity") stringResource(R.string.persona_v4_extra_identity) else category,
+                    facts = factDrafts,
+                    onChange = { factDrafts = it },
+                )
+            }
+        if (loreOpen) {
+            PersonaFormSection(stringResource(R.string.persona_v4_section_lore)) {
+                PersonaWorldBookEditor(entries = loreEntries, onChange = { loreEntries = it })
+            }
+        }
+        SyButton(
+            text = stringResource(if (addFieldsOpen) R.string.persona_v4_hide_field_picker
+                else R.string.persona_v4_add_field_picker),
+            onClick = { addFieldsOpen = !addFieldsOpen },
+            modifier = Modifier.fillMaxWidth().testTag("personaAddFieldPicker"),
+            variant = SyButtonVariant.Ghost,
+        )
+        if (addFieldsOpen) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
+            ) {
+                SySheetChoiceRow(
+                    title = stringResource(R.string.persona_v4_section_lore),
+                    onClick = { loreOpen = true; addFieldsOpen = false },
+                )
+                bundledPreset?.let { preset ->
+                    SyButton(
+                        text = stringResource(R.string.persona_v4_load_preset),
+                        onClick = {
+                            coreIdentity = preset.persona.coreIdentity
+                            factDrafts = withEditablePersonaFields(preset.persona.facts)
+                            addFieldsOpen = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        variant = SyButtonVariant.Ghost,
+                    )
+                    SyButton(
+                        text = stringResource(R.string.persona_v4_fill_lore),
+                        onClick = {
+                            val ids = loreEntries.map(PersonaLoreEntry::id).toSet()
+                            loreEntries += preset.persona.loreEntries.filterNot { it.id in ids }
+                            loreOpen = true
+                            addFieldsOpen = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        variant = SyButtonVariant.Ghost,
+                    )
+                }
+            }
+        }
+        if (loreEntries.isNotEmpty() && !loreOpen) {
+            SyButton(
+                text = stringResource(R.string.persona_v4_edit_lore, loreEntries.size),
+                onClick = { loreOpen = true },
+                modifier = Modifier.fillMaxWidth(),
+                variant = SyButtonVariant.Ghost,
+            )
+        }
+
+    }
+    if (confirmDiscard) {
+        com.labteto.dshmobile.ui.shenyan.SyDialog(
+            title = stringResource(R.string.persona_v4_discard_title),
+            onDismiss = { confirmDiscard = false },
+        ) {
+            Text(stringResource(R.string.persona_v4_discard_body))
+            Row(modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+                SyButton(
+                    text = stringResource(R.string.persona_v4_discard_cancel),
+                    onClick = { confirmDiscard = false },
+                    modifier = Modifier.weight(1f),
+                    variant = SyButtonVariant.Ghost,
+                )
+                SyButton(
+                    text = stringResource(R.string.persona_v4_discard_confirm),
+                    onClick = { confirmDiscard = false; onDismiss() },
+                    modifier = Modifier.weight(1f),
+                    variant = SyButtonVariant.Danger,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The nine predefined sections get a single editable field only when they have no facts.
+ * Only customFacts always keeps ONE extra free-form entry for the entire page.
+ * All other populated sections have no extra blank inputs.
+ */
+private fun withEditablePersonaFields(input: List<CharacterFact>): List<CharacterFact> {
+    val missing = personaEditableFactCategories.filter { category ->
+        val entries = input.filter { it.category == category }
+        if (category == "customFacts") entries.none { it.content.isBlank() }
+        else entries.isEmpty()
+    }
+    return input + missing.map { category ->
+        CharacterFact(
+            id = UUID.randomUUID().toString(),
+            category = category,
+            content = "",
+            provenance = CharacterFactProvenance.USER_CREATED,
+        )
     }
 }
 
@@ -820,38 +832,59 @@ private fun PersonaFactCategoryEditor(
     title: String,
     facts: List<CharacterFact>,
     onChange: (List<CharacterFact>) -> Unit,
-    showMetadata: Boolean = false,
+    hint: String = "",
 ) {
     val entries = facts.filter { it.category == category }
-    if (entries.isEmpty()) {
-        PersonaTextField(title, "", { content ->
-            if (content.isNotBlank()) onChange(facts + CharacterFact(
-                id = UUID.randomUUID().toString(),
-                category = category,
-                content = content,
-                provenance = CharacterFactProvenance.USER_CREATED,
-            ))
-        })
-    } else {
-        entries.forEachIndexed { index, entry ->
-            val label = if (index == 0) title
-                else stringResource(R.string.persona_v4_fact_number, title, index + 1)
-            PersonaTextField(label, entry.content, { content ->
-                // Keep the same input node while clearing/retyping; blank drafts are dropped on save.
-                onChange(facts.map { fact ->
+    entries.forEachIndexed { index, entry ->
+        val isFreeSupplement = category == "customFacts" && entry.content.isBlank()
+        val label = when {
+            category == "customFacts" && !isFreeSupplement ->
+                stringResource(R.string.persona_v4_fact_number, title, index + 1)
+            index == 0 || isFreeSupplement -> title
+            else -> stringResource(R.string.persona_v4_fact_number, title, index + 1)
+        }
+        PersonaTextField(
+            label = label,
+            value = entry.content,
+            onValueChange = { content ->
+                val updated = facts.map { fact ->
                     if (fact.id == entry.id) fact.copy(
                         content = content,
-                        provenance = CharacterFactProvenance.USER_CREATED,
-                        sourceReference = "",
+                        provenance = if (content == entry.content) entry.provenance
+                            else CharacterFactProvenance.USER_CREATED,
+                        sourceReference = entry.sourceReference,
                     ) else fact
-                })
-            })
-            if (showMetadata) {
+                }
+                if (category == "customFacts") {
+                    if (entry.content.isBlank() && content.isNotBlank()) {
+                        // Keep only one new free-form input after this one is filled.
+                        onChange(withEditablePersonaFields(updated))
+                    } else if (entry.content.isNotBlank() && content.isBlank()) {
+                        // Reuse the focused editor as the empty box; remove the other spare.
+                        val spare = updated.lastOrNull {
+                            it.category == "customFacts" && it.id != entry.id && it.content.isBlank()
+                        }
+                        onChange(if (spare == null) updated else updated.filterNot { it.id == spare.id })
+                    } else onChange(updated)
+                } else onChange(updated)
+            },
+            hint = hint,
+            testTag = if (isFreeSupplement) "personaFreeSupplement" else null,
+        )
+        if (entry.content.isNotBlank()) {
+            var detailsOpen by remember(entry.id) { mutableStateOf(false) }
+            SyButton(
+                text = stringResource(if (detailsOpen) R.string.persona_v4_fact_hide_details
+                    else R.string.persona_v4_fact_details),
+                onClick = { detailsOpen = !detailsOpen },
+                variant = SyButtonVariant.Ghost,
+            )
+            if (detailsOpen) {
                 PersonaTextField(
                     stringResource(R.string.persona_v4_fact_stage),
                     entry.temporalScope,
                     { value -> onChange(facts.map { fact ->
-                        if (fact.id == entry.id) fact.copy(temporalScope = value.trim().take(160))
+                        if (fact.id == entry.id) fact.copy(temporalScope = value.take(160))
                         else fact
                     }) },
                     singleLine = true,
@@ -860,7 +893,7 @@ private fun PersonaFactCategoryEditor(
                     stringResource(R.string.persona_v4_fact_perspective),
                     entry.perspective,
                     { value -> onChange(facts.map { fact ->
-                        if (fact.id == entry.id) fact.copy(perspective = value.trim().take(120))
+                        if (fact.id == entry.id) fact.copy(perspective = value.take(120))
                         else fact
                     }) },
                     singleLine = true,
@@ -869,26 +902,12 @@ private fun PersonaFactCategoryEditor(
                     stringResource(R.string.persona_v4_fact_source),
                     entry.sourceReference,
                     { value -> onChange(facts.map { fact ->
-                        if (fact.id == entry.id) fact.copy(sourceReference = value.trim().take(240))
+                        if (fact.id == entry.id) fact.copy(sourceReference = value.take(240))
                         else fact
                     }) },
-                    singleLine = true,
                 )
             }
         }
-        SyButton(
-            text = stringResource(R.string.persona_v4_add_fact),
-            onClick = {
-                onChange(facts + CharacterFact(
-                    id = UUID.randomUUID().toString(),
-                    category = category,
-                    content = "",
-                    provenance = CharacterFactProvenance.USER_CREATED,
-                ))
-            },
-            modifier = Modifier.fillMaxWidth(),
-            variant = SyButtonVariant.Ghost,
-        )
     }
 }
 
@@ -909,14 +928,19 @@ private fun PersonaTextField(
     value: String,
     onValueChange: (String) -> Unit,
     singleLine: Boolean = false,
+    hint: String = "",
+    testTag: String? = null,
 ) {
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SyTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text(label) },
+        modifier = if (testTag == null) Modifier.fillMaxWidth()
+            else Modifier.fillMaxWidth().testTag(testTag),
+        label = { Text(label, color = colors.textSecondary) },
+        placeholder = if (hint.isBlank()) null else ({ Text(hint, color = colors.textSecondary) }),
         singleLine = singleLine,
-        minLines = if (singleLine) 1 else 2,
+        minLines = if (singleLine || value.isBlank()) 1 else 2,
         maxLines = if (singleLine) 1 else 6,
     )
 }
