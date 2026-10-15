@@ -7,6 +7,10 @@ private val EXPLICIT_CN_IMAGE_COMMAND = Regex(
     """^(?:(?:请|帮我|给我|麻烦|现在|直接|马上|再|继续|那就|就|来|先)\s*){0,3}""" +
         """(?:生图|出图|画图|(?:生成|制作|创作|设计|画|绘制|渲染|做|出)\s*(?:一张|张|几张|一幅|幅|几幅|一个|个|一只)?\s*(?:图片|图像|照片|插画|效果图|立绘|海报|图|画|猫|狗))""",
 )
+// 带上下文的指令也需要路由，例如「把上面的方案生成一张图片」。
+private val CONTEXTUAL_CN_IMAGE_COMMAND = Regex(
+    """^(?:(?:请|帮我|给我|麻烦)\s*){0,2}(?:把|将).{1,140}(?:生成|转成|画成|做成)\s*(?:一张|张|几张|一幅|幅)?\s*(?:图片|图像|图|插画|海报|效果图)""",
+)
 private val EXPLICIT_EN_IMAGE_COMMAND = Regex(
     """^(?:please\s+)?(?:draw|generate|render|create|make)\s+(?:(?:me|an?|the|some)\s+){0,3}(?:image|picture|illustration|photo|portrait|poster)\b""",
     RegexOption.IGNORE_CASE,
@@ -23,6 +27,7 @@ internal fun isExplicitImageGenerationRequest(text: String): Boolean {
         .any { clause ->
             !NON_CREATION_QUESTION.containsMatchIn(clause) &&
                 (EXPLICIT_CN_IMAGE_COMMAND.containsMatchIn(clause) ||
+                    CONTEXTUAL_CN_IMAGE_COMMAND.containsMatchIn(clause) ||
                     EXPLICIT_EN_IMAGE_COMMAND.containsMatchIn(clause))
         }
 }
