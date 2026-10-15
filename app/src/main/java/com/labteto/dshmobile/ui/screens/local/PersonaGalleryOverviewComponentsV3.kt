@@ -295,9 +295,9 @@ internal fun PersonaGalleryAddPanel(
             ) {
                 items(presets, key = PersonaPreset::id) { preset ->
                     val installed = preset.id in installedPresetIds
-                    SyMaterialSurface(
+                    Surface(
                         shape = DsShapes.row,
-                        tier = SyMaterialTier.L3_CARD,
+                        color = Color.Transparent,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Row(

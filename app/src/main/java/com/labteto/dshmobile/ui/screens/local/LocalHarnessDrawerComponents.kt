@@ -338,9 +338,9 @@ internal fun LocalSessionDrawerRow(
                 .background(
                     animateColorAsState(
                         targetValue = when {
-                            selected -> colors.selected
-                            current -> colors.materialL3
-                            else -> colors.materialL2
+                            selected -> colors.selected.copy(alpha = .55f)
+                            current -> colors.materialL1.copy(alpha = .6f)
+                            else -> Color.Transparent
                         },
                         animationSpec = DsAnimations.interactionColor,
                         label = "sessionRowBackground",

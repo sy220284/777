@@ -274,7 +274,7 @@ internal fun PersonaGalleryOverviewV3(
         if (currentGalleryId == null || currentHasUnsavedChanges) {
             SyMaterialSurface(
                 shape = DsShapes.block,
-                tier = SyMaterialTier.L3_CARD,
+                tier = SyMaterialTier.L1_SECTION,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Row(
