@@ -82,6 +82,7 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.presentation.chatBranchInfo
 import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
+import com.labteto.dshmobile.local.model.LocalMediaRevisionDraft
 import com.labteto.dshmobile.local.model.visibleAssistantText
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelPresets
@@ -425,6 +426,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
     var showMediaStudio by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var mediaRevision by remember(state.sessionId) { mutableStateOf<LocalMediaRevisionDraft?>(null) }
     var mediaInitialPrompt by rememberSaveable(state.sessionId) { mutableStateOf("") }
     var mediaSourceMessageId by rememberSaveable(state.sessionId) { mutableStateOf<String?>(null) }
     var mediaInitialKind by rememberSaveable(state.sessionId) {
@@ -1002,6 +1004,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 },
                                 onEdit = { message -> editingUserMessage = message },
                                 onCreateMedia = { message, kind ->
+                                    mediaRevision = null
                                     mediaSourceMessageId = message.id
                                     mediaInitialPrompt = mediaCreativeDraft(
                                         kind, message.content,
@@ -1027,6 +1030,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         is LocalTranscriptItem.MediaResult -> LocalGeneratedMediaResultRow(
                             result = transcriptItem.result,
                             viewModel = mediaStudioViewModel,
+                            onRevise = { draft ->
+                                mediaRevision = draft
+                                mediaInitialPrompt = draft.prompt
+                                mediaSourceMessageId = draft.sourceMessageId
+                                mediaInitialKind = draft.kind.name
+                                showMediaStudio = true
+                            },
                             onInsertText = { text ->
                                 val previous = drafts[state.sessionId].orEmpty()
                                 drafts.putBoundedLocalDraft(
@@ -1043,6 +1053,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             task = transcriptItem.task,
                             offers = com.labteto.dshmobile.local.model.LocalMediaCatalog.offers(state.modelProfiles),
                             viewModel = mediaStudioViewModel,
+                            onRevise = { draft ->
+                                mediaRevision = draft
+                                mediaInitialPrompt = draft.prompt
+                                mediaSourceMessageId = draft.sourceMessageId
+                                mediaInitialKind = draft.kind.name
+                                showMediaStudio = true
+                            },
                         )
                         is LocalTranscriptItem.WorkArtifact -> LocalWorkArtifactMessageRow(
                             artifact = transcriptItem.artifact,
@@ -1561,6 +1578,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     modifier = Modifier.weight(1f),
                     onClick = {
                         showAttachmentPicker = false
+                        mediaRevision = null
                         mediaInitialPrompt = ""
                         mediaSourceMessageId = null
                         mediaInitialKind = com.labteto.dshmobile.local.model.LocalMediaKind.IMAGE.name
@@ -1616,6 +1634,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 onDelivered = { showMediaStudio = false },
                 initialPrompt = mediaInitialPrompt,
                 sourceMessageId = mediaSourceMessageId,
+                revision = mediaRevision,
                 personaVoiceStyle = if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled)
                     state.chatPersona.facts.filter { it.category == "voiceStyle" }.joinToString("；") { it.content }
                 else "",
