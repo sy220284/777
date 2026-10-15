@@ -142,7 +142,7 @@ internal fun LocalMediaStudioSheetContent(
         mutableStateOf(
             matchingRevision?.originFileName != null &&
                 selected?.provider == LocalMediaProvider.OPENAI &&
-                selected.kind == LocalMediaKind.IMAGE
+                selected?.kind == LocalMediaKind.IMAGE
         )
     }
     var busy by remember { mutableStateOf(false) }
