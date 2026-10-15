@@ -596,20 +596,18 @@ internal fun PersonaDetails(persona: PersonaProfile) {
                 "customFacts" -> R.string.persona_v4_custom_facts
                 else -> null
             }
+            val provenanceInferred = stringResource(R.string.persona_v4_provenance_inferred)
+            val provenanceUnverified = stringResource(R.string.persona_v4_provenance_unverified)
+            val stageLabel = stringResource(R.string.persona_v4_story_stage_label)
+            val sourceLabel = stringResource(R.string.persona_v4_fact_source)
             val extra = buildList {
                 when (fact.provenance) {
-                    com.labteto.dshmobile.local.chat.CharacterFactProvenance.INFERRED ->
-                        add(stringResource(R.string.persona_v4_provenance_inferred))
-                    com.labteto.dshmobile.local.chat.CharacterFactProvenance.UNVERIFIED ->
-                        add(stringResource(R.string.persona_v4_provenance_unverified))
+                    com.labteto.dshmobile.local.chat.CharacterFactProvenance.INFERRED -> add(provenanceInferred)
+                    com.labteto.dshmobile.local.chat.CharacterFactProvenance.UNVERIFIED -> add(provenanceUnverified)
                     else -> Unit
                 }
-                fact.temporalScope.takeIf(String::isNotBlank)?.let {
-                    add(stringResource(R.string.persona_v4_story_stage_label) + "：" + it)
-                }
-                fact.sourceReference.takeIf(String::isNotBlank)?.let {
-                    add(stringResource(R.string.persona_v4_fact_source) + "：" + it)
-                }
+                fact.temporalScope.takeIf(String::isNotBlank)?.let { add(stageLabel + "：" + it) }
+                fact.sourceReference.takeIf(String::isNotBlank)?.let { add(sourceLabel + "：" + it) }
             }
             PersonaDetailRow(
                 title = labelRes?.let { stringResource(it) } ?: fact.category,
