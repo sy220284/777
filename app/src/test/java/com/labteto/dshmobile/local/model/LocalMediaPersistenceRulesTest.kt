@@ -71,6 +71,7 @@ class LocalMediaPersistenceRulesTest {
         assertEquals("openai-account-2", restored.first().profileId)
         assertEquals(previous.credentialSignature, LocalMediaRevisionDraft.from(restored.first())?.credentialSignature)
         assertEquals("first.png", restored.first().fileName)
+        assertEquals("first.png", LocalMediaRevisionDraft.from(restored.first())?.originFileName)
         assertEquals("second.png", restored.last().fileName)
 
         val voice = LocalMediaResult(
@@ -92,6 +93,7 @@ class LocalMediaPersistenceRulesTest {
         assertNull(legacy.profileId)
         assertNull(legacy.routeFingerprint)
         assertNull(legacy.revisionOf)
+        assertNull(LocalMediaRevisionDraft.from(legacy)?.originFileName)
     }
 
     @Test fun videoTasksRetainOriginalSessionWhenPollingAndRestoring() {
