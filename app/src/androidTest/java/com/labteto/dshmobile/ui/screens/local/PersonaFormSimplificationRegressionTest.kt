@@ -2,6 +2,9 @@ package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.performClick
 import com.labteto.dshmobile.local.chat.CharacterFact
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -38,6 +41,9 @@ class PersonaFormSimplificationRegressionTest {
 
         // 扩展入口只负责添加新的资料，不是显示预置字段的前置步骤。
         compose.onNodeWithText("＋ 添加扩展资料").performClick()
+        compose.onNodeWithText("收起扩展资料").assertExists()
+        // 预置字段很长，新增选项在可滚动内容底部；先滚动使选项进入可见区域。
+        compose.onNodeWithTag("bottomSheetScrollBody").performTouchInput { swipeUp() }
         compose.onNodeWithText("自定义设定名称").assertExists()
         compose.onNodeWithText("人物专属知识库").assertExists()
     }
