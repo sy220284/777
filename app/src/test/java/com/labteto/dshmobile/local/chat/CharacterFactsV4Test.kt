@@ -9,6 +9,18 @@ import org.junit.Test
 class CharacterFactsV4Test {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
+    @Test fun newPersonasOfferTenFactCategoriesWithoutDiscardingHistoricalFacts() {
+        assertEquals(10, CharacterFactCategories.selectable.size)
+        assertEquals(6, CharacterFactCategories.removedFromNewProfiles.size)
+        assertEquals(16, CharacterFactCategories.canonical.size)
+        assertTrue(CharacterFactCategories.selectable.contains(CharacterFactCategories.PERSONALITY))
+        assertTrue(CharacterFactCategories.selectable.contains(CharacterFactCategories.VOICE_STYLE))
+        assertTrue(CharacterFactCategories.removedFromNewProfiles
+            .none { it in CharacterFactCategories.selectable })
+        assertTrue(CharacterFactCategories.canonical
+            .containsAll(CharacterFactCategories.removedFromNewProfiles))
+    }
+
     @Test fun v4IdentityFactsAndSourcesRoundTrip() {
         val profile = PersonaProfile(
             name = "叶澜",
