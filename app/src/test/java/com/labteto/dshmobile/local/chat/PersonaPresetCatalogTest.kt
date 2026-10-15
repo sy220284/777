@@ -94,10 +94,10 @@ class PersonaPresetCatalogTest {
         PersonaPresetCatalog.presets.forEach { preset ->
             val card = preset.persona
             identityAnchors.getValue(preset.id).forEach { anchor ->
-                assertTrue("${preset.id} missing identity anchor: $anchor", anchor in card.portrait)
+                assertTrue("${preset.id} missing identity anchor: $anchor", anchor in card.coreIdentity)
             }
-            assertTrue("${preset.id} lost formative life context", card.lifeContext.isNotBlank())
-            assertTrue("${preset.id} lost inner motivation", card.coreTension.isNotBlank())
+            assertTrue("${preset.id} lost formative life context", card.factText(CharacterFactCategories.BIOGRAPHY).isNotBlank())
+            assertTrue("${preset.id} lost inner motivation", card.factText(CharacterFactCategories.IDENTITY_GAP).isNotBlank())
             assertTrue("${preset.id} lost current story boundary", card.knowledgeBoundary.isNotEmpty())
             assertEquals("${preset.id} repeats a lore source", card.loreEntries.size,
                 card.loreEntries.map(PersonaLoreEntry::id).distinct().size)
@@ -105,37 +105,51 @@ class PersonaPresetCatalogTest {
     }
 
     @Test
-    fun starterPresetsDescribeCharacterWithoutRuntimeScripts() {
+    fun allTwentyOnePresetsHaveReauthoredIdentityAndNineDistinctFactCategories() {
+        val required = listOf(
+            CharacterFactCategories.PERSONALITY,
+            CharacterFactCategories.VALUES_AND_TRADEOFFS,
+            CharacterFactCategories.SELF_NARRATIVE,
+            CharacterFactCategories.SUBJECTIVE_BELIEFS,
+            CharacterFactCategories.IDENTITY_GAP,
+            CharacterFactCategories.PREFERENCES_AND_HABITS,
+            CharacterFactCategories.VOICE_STYLE,
+            CharacterFactCategories.BIOGRAPHY,
+            CharacterFactCategories.RELATIONSHIPS,
+        )
+        assertEquals(21, PersonaPresetCatalog.presets.size)
         PersonaPresetCatalog.presets.forEach { preset ->
-            assertTrue(preset.persona.coreValues.isNotEmpty())
-            assertTrue(preset.persona.coreTension.isNotBlank())
-            assertTrue(preset.persona.attentionBiases.isNotEmpty())
-            assertTrue(preset.persona.attentionKeywords.isNotEmpty())
-            assertTrue(preset.persona.perceptionBlindSpots.isNotEmpty())
-            assertTrue(preset.persona.quirks.isNotEmpty())
-            assertTrue(preset.persona.limitations.isNotEmpty())
-            assertTrue("${preset.id}: prewritten growth goals", preset.persona.mutableTraits.isEmpty())
-            assertTrue("${preset.id}: synthetic reply scripts", preset.persona.voiceSamples.isEmpty())
-            assertTrue("${preset.id}: predefined user relationship", preset.persona.initialUserImpression.isBlank())
-            assertEquals("${preset.id}: situational behavior scripted as stable traits", 1, preset.persona.stableTraits.size)
-            assertTrue("${preset.id}: relationship pacing scripted in hard limits",
-                preset.persona.hardConstraints.none { "亲密" in it || "几句" in it || "关系变化" in it })
-            assertTrue(preset.persona.portrait.isNotBlank())
+            val persona = preset.persona
+            assertTrue("${preset.id}: empty identity", persona.coreIdentity.isNotBlank())
+            assertEquals("${preset.id}: missing new category",
+                required.toSet(), persona.facts.map(CharacterFact::category).toSet())
+            assertEquals("${preset.id}: duplicate fact categories",
+                persona.facts.size, persona.facts.map(CharacterFact::category).distinct().size)
+            assertTrue("${preset.id}: unsupported fact",
+                persona.facts.all { CharacterFactCategories.isSupported(it.category) })
+            assertTrue("${preset.id}: old portrait resurrected", persona.portrait.isBlank())
+            assertTrue("${preset.id}: old life context resurrected", persona.lifeContext.isBlank())
+            assertTrue("${preset.id}: old tension resurrected", persona.coreTension.isBlank())
+            assertTrue("${preset.id}: old traits resurrected", persona.stableTraits.isEmpty())
+            assertTrue("${preset.id}: old preference list resurrected", persona.quirks.isEmpty())
+            assertTrue("${preset.id}: no story knowledge boundaries", persona.knowledgeBoundary.isNotEmpty())
+            assertTrue("${preset.id}: world background missing",
+                persona.loreEntries.any { it.id == "${preset.id}-world-context" })
         }
     }
 
     @Test
-    fun starterPresetsUseCharacterSpecificLifeFieldsInsteadOfLegacyTemplateFiller() {
-        val genericTension = "既有身份与个人愿望可能发生拉扯，具体变化必须由当前故事中的真实事件推动。"
-        val genericValues = setOf("重要关系与现实责任", "自身判断与边界", "长期目标与个人愿望")
-        val modelMetaBans = setOf("作为AI", "根据设定我应该", "身为一个语言模型")
-
-        PersonaPresetCatalog.presets.forEach { preset ->
-            assertTrue(preset.persona.coreTension.isNotBlank())
-            assertTrue(preset.persona.coreTension != genericTension)
-            assertTrue(preset.persona.coreValues.none { it in genericValues })
-            assertTrue(preset.persona.bannedPhrases.none { it in modelMetaBans })
+    fun eachPresetUsesPersonSpecificVoiceAndRelationships() {
+        val voices = PersonaPresetCatalog.presets.map {
+            it.persona.factText(CharacterFactCategories.VOICE_STYLE)
         }
+        val relationships = PersonaPresetCatalog.presets.map {
+            it.persona.factText(CharacterFactCategories.RELATIONSHIPS)
+        }
+        assertEquals(21, voices.distinct().size)
+        assertEquals(21, relationships.distinct().size)
+        assertTrue(voices.all(String::isNotBlank))
+        assertTrue(relationships.all(String::isNotBlank))
     }
 
     @Test
