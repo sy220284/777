@@ -34,7 +34,7 @@ class ChatDiaryPromptTest {
         assertTrue(system.contains("有趣"))
         // The prompt is a creative direction, not an aesthetic form to fill out.
         assertFalse(system.contains("60～200"))
-        assertFalse(system.contains("每篇必须"))
+        assertFalse(system.contains("必须使用固定结构"))
         assertFalse(system.contains("必须使用“我觉得"))
         assertFalse(system.contains("至少一项非空"))
         assertTrue(system.contains("只记录 event"))
@@ -89,8 +89,7 @@ class ChatDiaryPromptTest {
         assertTrue(instruction.contains("理智冷静"))
         assertTrue(instruction.contains("天马行空"))
         assertTrue(instruction.contains("碎碎念"))
-        assertTrue(instruction.contains("寥寥数语").not() ||
-            instruction.contains("轻轻一句"))
+        assertTrue(instruction.contains("轻轻一句"))
         assertTrue(instruction.contains("不要求情绪转折"))
         assertFalse(instruction.contains("约60～200"))
         assertFalse(instruction.contains("只能以"))
