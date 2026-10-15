@@ -101,6 +101,8 @@ internal fun PluginInventoryBrowser(
     onCreateSkill: ((String, String, String, String) -> Unit)? = null,
     onImportSkill: (() -> Unit)? = null,
     onInstallFromGitHub: ((String) -> Unit)? = null,
+    curatedSkills: List<String> = emptyList(),
+    onBrowseCuratedSkills: (() -> Unit)? = null,
     onRemoveSkill: ((String) -> Unit)? = null,
     onOpenSkillEditor: ((String) -> Unit)? = null,
     onCloseSkillEditor: (() -> Unit)? = null,
@@ -257,6 +259,30 @@ internal fun PluginInventoryBrowser(
                                 size = SyButtonSize.Small,
                                 modifier = Modifier.testTag("skill-github-install"),
                             )
+                        }
+                    }
+                    if (onBrowseCuratedSkills != null) {
+                        SyButton(
+                            text = stringResource(R.string.skills_github_browse_official),
+                            onClick = onBrowseCuratedSkills,
+                            enabled = !loading,
+                            variant = SyButtonVariant.Ghost,
+                            modifier = Modifier.testTag("skill-github-browse-official"),
+                        )
+                        if (curatedSkills.isNotEmpty()) {
+                            Text(stringResource(R.string.skills_github_official_heading),
+                                style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
+                                items(curatedSkills, key = { it }) { skillName ->
+                                    SyFilterChip(
+                                        text = skillName,
+                                        selected = false,
+                                        onClick = {
+                                            gitHubSkillUrl = "https://github.com/openai/skills/tree/main/skills/.curated/$skillName"
+                                        },
+                                    )
+                                }
+                            }
                         }
                     }
                     if (onCreateSkill != null) {
