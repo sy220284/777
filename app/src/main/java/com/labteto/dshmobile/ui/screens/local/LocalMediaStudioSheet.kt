@@ -55,6 +55,7 @@ import com.labteto.dshmobile.local.model.LocalMediaCatalog
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalMediaOffer
 import com.labteto.dshmobile.local.model.LocalMediaProvider
+import com.labteto.dshmobile.local.model.LocalMediaRevisionDraft
 import com.labteto.dshmobile.local.model.LocalMediaVideoPhase
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.presentation.LocalMediaVoice
@@ -84,6 +85,7 @@ internal fun LocalMediaStudioSheetContent(
     personaVoiceStyle: String = "",
     sourceMessageId: String? = null,
     initialKind: LocalMediaKind = LocalMediaKind.IMAGE,
+    revision: LocalMediaRevisionDraft? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val context = LocalContext.current
@@ -102,14 +104,18 @@ internal fun LocalMediaStudioSheetContent(
     val kind = LocalMediaKind.valueOf(mode)
     val available = models.filter { it.kind == kind }
     var chosenId by rememberSaveable(mode) { mutableStateOf("") }
-    val selected = LocalMediaCatalog.selectOffer(models, kind, preferredProfileId, chosenId.takeIf(String::isNotBlank))
+    // A revision may only inherit the same frozen provider+account route. For deleted or
+    // re-keyed accounts, require an explicit choice before any paid submission is possible.
+    val originalOffer = revision?.takeIf { it.kind == kind }?.originalOffer(models)
+    val selected = if (revision != null && revision.kind == kind && chosenId.isBlank()) originalOffer
+        else LocalMediaCatalog.selectOffer(models, kind, preferredProfileId, chosenId.takeIf(String::isNotBlank))
     val manualRouteActive = chosenId.isNotBlank() && selected?.id == chosenId
     val activeOfferId by rememberUpdatedState(selected?.id)
     var showModelChoices by remember { mutableStateOf(false) }
     var prompt by rememberSaveable { mutableStateOf(initialPrompt) }
-    var ratio by rememberSaveable { mutableStateOf("1:1") }
+    var ratio by rememberSaveable { mutableStateOf(revision?.ratio ?: "1:1") }
     var voiceId by rememberSaveable(selected?.id, personaVoiceStyle) {
-        mutableStateOf(selected?.provider?.let { LocalMediaVoiceLabels.suggestedId(it, personaVoiceStyle) }.orEmpty())
+        mutableStateOf(revision?.voiceId ?: selected?.provider?.let { LocalMediaVoiceLabels.suggestedId(it, personaVoiceStyle) }.orEmpty())
     }
     var busy by remember(selected?.id) { mutableStateOf(false) }
     var error by remember(selected?.id) { mutableStateOf<String?>(null) }
@@ -165,7 +171,20 @@ internal fun LocalMediaStudioSheetContent(
 
         if (selected == null) {
             com.shenyan.designsystem.components.SyEmptyState(FeatherIcons.Image,
-                stringResource(R.string.media_studio_no_model), body = "")
+                if (revision != null && revision.kind == kind) "原模型配置已变化，请重新选择生成账户"
+                else stringResource(R.string.media_studio_no_model), body = "")
+            if (available.isNotEmpty()) {
+                Text("重新选择会使用新账户的额度，旧成果保留。", color = colors.textSecondary,
+                    style = DsType.caption11.withReadingWeight())
+                available.forEach { option ->
+                    SyButton(
+                        text = "${option.label} · ${option.profile.displayName ?: option.profile.model}",
+                        size = SyButtonSize.Small, variant = SyButtonVariant.Ghost,
+                        onClick = { chosenId = option.id },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
         } else {
             // 模型仍可切换，但不再用整行大按钮和聊天模型名称挤占创作区。
             Row(
@@ -243,7 +262,7 @@ internal fun LocalMediaStudioSheetContent(
                     SyButton(text = stringResource(R.string.minimax_media_create_image),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            viewModel.submitImage(selected, prompt, ratio, sessionId, sourceMessageId)
+                            viewModel.submitImage(selected, prompt, ratio, sessionId, sourceMessageId, revision?.originId)
                             if (selected.id == activeOfferId) onDelivered()
                         } })
                 }
@@ -251,7 +270,7 @@ internal fun LocalMediaStudioSheetContent(
                     SyButton(text = stringResource(R.string.minimax_media_start_video),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            val task = viewModel.createVideo(selected, prompt, sessionId, sourceMessageId)
+                            val task = viewModel.createVideo(selected, prompt, sessionId, sourceMessageId, revision?.originId)
                             viewedVideoTaskId = task.id
                             onDelivered()
                         } })
@@ -366,7 +385,7 @@ internal fun LocalMediaStudioSheetContent(
                         enabled = !busy && prompt.isNotBlank() && voiceId.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            viewModel.submitSpeech(selected, prompt, voiceId, sessionId, sourceMessageId)
+                            viewModel.submitSpeech(selected, prompt, voiceId, sessionId, sourceMessageId, revision?.originId)
                             if (selected.id == activeOfferId) onDelivered()
                         } })
                     audioFile?.let { file ->
