@@ -191,23 +191,13 @@ internal class CharacterRuntimeProjector(
 
     private fun relevantBackgroundPrompt(persona: PersonaProfile, userInput: String): String {
         if (userInput.isBlank()) return ""
-        val anchors = (if (persona.facts.isNotEmpty()) {
-            listOf(
-                "人物身份与经历" to persona.coreIdentity,
-                "既有经历" to persona.trustedFactText(CharacterFactCategories.BIOGRAPHY),
-                "生活牵引" to persona.trustedFactText(CharacterFactCategories.LIFE_GRAVITY),
-                "世界" to persona.worldSetting,
-                "来源" to persona.franchise,
-            )
-        } else {
-            listOf(
-                "人物身份与经历" to persona.portrait,
-                "生活" to persona.lifeContext,
-                "世界" to persona.worldSetting,
-                "时间线" to persona.timelinePosition,
-                "来源" to persona.franchise,
-            )
-        }).filter { (_, value) -> value.isNotBlank() && relevantTo(value, userInput) }
+        val anchors = listOf(
+            "人物身份与经历" to persona.coreIdentity,
+            "既有经历" to persona.trustedFactText(CharacterFactCategories.BIOGRAPHY),
+            "重要人物关系" to persona.trustedFactText(CharacterFactCategories.RELATIONSHIPS),
+            "主观认知" to persona.trustedFactText(CharacterFactCategories.SUBJECTIVE_BELIEFS),
+            "来源" to persona.franchise,
+        ).filter { (_, value) -> value.isNotBlank() && relevantTo(value, userInput) }
         if (anchors.isEmpty()) return ""
         return buildString {
             appendLine("【本轮相关背景】")
