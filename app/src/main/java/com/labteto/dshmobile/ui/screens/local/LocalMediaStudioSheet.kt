@@ -155,6 +155,8 @@ internal fun LocalMediaStudioSheetContent(
     var showCustomVoiceId by rememberSaveable(selected?.id) { mutableStateOf(false) }
     var voiceFilter by remember(selected?.id) { mutableStateOf("") }
 
+    val credentialChangedText = stringResource(R.string.media_recreate_credential_changed)
+
     fun submit(offer: LocalMediaOffer, action: suspend () -> Unit) {
         if (busy) return
         // Reserve the UI operation synchronously so two rapid taps cannot queue two paid POSTs.
@@ -166,7 +168,7 @@ internal fun LocalMediaStudioSheetContent(
                 // Recheck at submission time: account credentials can change while the sheet is open.
                 if (matchingRevision != null && chosenId.isBlank()) {
                     check(viewModel.matchesOriginalCredential(matchingRevision, offer)) {
-                        context.getString(R.string.media_recreate_credential_changed)
+                        credentialChangedText
                     }
                 }
                 action()
