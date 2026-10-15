@@ -449,7 +449,7 @@ class PersonaTransferDocumentsTest {
         val subjectKey = "gallery:${prepared.entry.id}"
 
         gallery.save(
-            persona = PersonaProfile(name = "旁观者", portrait = "用于制造并发图集变更"),
+            persona = PersonaProfile(name = "旁观者", coreIdentity = "用于制造并发图集变更"),
             sourceSessionId = "",
             history = emptyList(),
             chatState = ChatCharacterState(),
@@ -501,7 +501,7 @@ class PersonaTransferDocumentsTest {
 
         assertEquals("阿青", imported.persona.name)
         assertEquals("剑客，直接", imported.persona.coreIdentity)
-        assertTrue(imported.persona.portrait.isEmpty())
+        assertEquals("剑客，直接", imported.persona.coreIdentity)
         assertTrue(imported.stories.isEmpty())
     }
 
