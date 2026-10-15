@@ -121,7 +121,7 @@ internal fun LocalMediaStudioSheetContent(
     var voiceId by rememberSaveable(selected?.id, personaVoiceStyle, activeRevision?.originId) {
         mutableStateOf(activeRevision?.voiceId ?: selected?.provider?.let { LocalMediaVoiceLabels.suggestedId(it, personaVoiceStyle) }.orEmpty())
     }
-    var busy by remember(selected?.id) { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
     var error by remember(selected?.id) { mutableStateOf<String?>(null) }
     var viewedVideoTaskId by rememberSaveable(selected?.id) { mutableStateOf("") }
     var transcript by remember(selected?.id) { mutableStateOf<String?>(null) }
@@ -133,10 +133,11 @@ internal fun LocalMediaStudioSheetContent(
 
     fun submit(offer: LocalMediaOffer, action: suspend () -> Unit) {
         if (busy) return
+        // Reserve the UI operation synchronously so two rapid taps cannot queue two paid POSTs.
+        busy = true
+        error = null
         val originId = offer.id
         scope.launch {
-            busy = true
-            error = null
             try {
                 action()
             } catch (cancelled: CancellationException) {
@@ -144,7 +145,7 @@ internal fun LocalMediaStudioSheetContent(
             } catch (failure: Exception) {
                 if (originId == activeOfferId) error = failure.message ?: ""
             } finally {
-                if (originId == activeOfferId) busy = false
+                busy = false
             }
         }
     }
