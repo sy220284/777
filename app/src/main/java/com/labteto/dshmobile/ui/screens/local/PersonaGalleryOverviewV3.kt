@@ -415,6 +415,7 @@ internal fun PersonaGalleryOverviewV3(
                 if (!managing) {
                     FluidPersonaGalleryGrid(pinnedEntries + regularEntries, onSelectEntry,
                         onLongClick = { id -> managing = true; if (id !in selectedIds) selectedIds.add(id) },
+                        pinnedIds = pinnedIds,
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                         animateOnEntrance = animateCards)
                 } else {

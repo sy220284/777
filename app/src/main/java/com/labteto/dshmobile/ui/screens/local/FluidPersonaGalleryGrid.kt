@@ -27,6 +27,7 @@ internal fun FluidPersonaGalleryGrid(
     entries: List<PersonaGalleryEntry>,
     onSelect: (String) -> Unit,
     onLongClick: (String) -> Unit,
+    pinnedIds: Set<String> = emptySet(),
     modifier: Modifier = Modifier,
     animateOnEntrance: Boolean = true,
 ) {
@@ -58,7 +59,7 @@ internal fun FluidPersonaGalleryGrid(
             }) {
                 CompactPersonaRow(
                     entry = entry,
-                    pinned = false,
+                    pinned = entry.id in pinnedIds,
                     managing = false,
                     selected = false,
                     dragEnabled = false,
