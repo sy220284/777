@@ -1263,6 +1263,8 @@
     <string name="chat_diary_subtitle">那些没有说出口的日常心绪</string>
     <string name="chat_diary_expand_records">查看原始记录（%1$d）</string>
     <string name="chat_diary_collapse_records">收起原始记录（%1$d）</string>
+    <string name="chat_diary_start_browse">查找与筛选</string>
+    <string name="chat_diary_finish_browse">返回日记</string>
     <string name="chat_diary_search_hint">搜索事件、感受或未说出口的念头</string>
     <string name="chat_diary_filter_all">全部</string>
     <string name="chat_diary_filter_direct">单聊</string>
