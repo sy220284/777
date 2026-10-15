@@ -11,6 +11,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.BuildConfig
 import com.labteto.dshmobile.ui.screens.local.LocalHarnessScreen
+import com.labteto.dshmobile.ui.screens.local.LocalHarnessViewModel
+import com.labteto.dshmobile.ui.host.LocalConversationPackGate
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.ui.theme.ThemePreference
 
@@ -43,6 +45,30 @@ fun AppRoot(
     }
     val updateInstallStatus by viewModel.updateInstallStatus.collectAsStateWithLifecycle()
 
+    // The application Host derives capabilities from actual Feature Owner composition,
+    // never from claims advertised by an installed UI pack.
+    val features: LocalHarnessViewModel = hiltViewModel()
+    val hostCapabilities = LocalConversationPackGate.capabilities(
+        chat = features.chatUiPort,
+        work = features.workConversationUiPort,
+        drafts = features.conversationDraftUiPort,
+        documents = features.nextUiDocumentUiPort,
+        forms = features.uiDocumentFormPort,
+        attachments = features.attachmentUiPort,
+        transcript = features.messageHistoryUiPort,
+        groups = features.chatGroupUiPort,
+        team = features.workTeamUiPort,
+        shell = features.conversationShellUiPort,
+        evidence = features.workEvidenceUiPort,
+        gallery = features.personaGalleryUiPort,
+        personas = features.personaSelectionUiPort,
+        personaTransfer = features.personaTransferUiPort,
+        stories = features.personaStoryUiPort,
+        galleryDeletion = features.personaGalleryDeletionUiPort,
+        gallerySave = features.personaGallerySaveUiPort,
+        portraits = features.personaPortraitUiPort,
+    )
+
     DshTheme(
         preference = themePreference,
         accentKey = settings.accentTheme,
@@ -57,6 +83,7 @@ fun AppRoot(
     ) {
         com.labteto.dshmobile.ui.host.LocalApplicationUiHost(
             installedPacks = com.labteto.dshmobile.ui.host.LocalApplicationPackInstallations.all,
+            availableCapabilities = hostCapabilities,
         ) {
             LocalHarnessScreen(
                 requestedSessionId = requestedLocalSessionId,

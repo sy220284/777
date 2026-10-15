@@ -81,6 +81,7 @@ internal fun decideApplicationUi(
 @Composable
 internal fun LocalApplicationUiHost(
     installedPacks: Collection<UiApplicationScenePack>,
+    availableCapabilities: Set<UiCapabilityId>,
     legacyContent: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -103,12 +104,12 @@ internal fun LocalApplicationUiHost(
         requiredScenes = LocalUiSceneCatalog.requirements,
         // A capability is admitted only after a production Owner composition declares it.
         // Never copy advertised capabilities from a pack's own manifest.
-        availableCapabilities = emptySet<UiCapabilityId>(),
+        availableCapabilities = availableCapabilities,
         windowClass = window,
         requiredAccessibility = UiAccessibility.entries.toSet(),
         dark = isSystemInDarkTheme(),
     )
-    val decision = remember(installedPacks, selectedId, window, requirements.dark) {
+    val decision = remember(installedPacks, selectedId, window, requirements.dark, availableCapabilities) {
         decideApplicationUi(selectedId, installedPacks, requirements)
     }
     when (decision) {
