@@ -35,6 +35,20 @@ import org.junit.Test
 
 /** Boundary/admission tests. External model/tool execution and device interaction remain S2 evidence. */
 class LocalConversationUiPortTest {
+    @Test fun editResultMappingRetainsEveryOwnerOutcomeWithoutCollapsingFailures() {
+        val mapped = LocalUserMessageEditResult.entries.map { it.toUiEditOutcome() }
+        org.junit.Assert.assertEquals(LocalUserMessageEditResult.entries.size, mapped.distinct().size)
+        org.junit.Assert.assertEquals(
+            com.labteto.dshmobile.uicontract.UiMessageEditOutcome.entries.toSet(), mapped.toSet())
+        org.junit.Assert.assertEquals(
+            com.labteto.dshmobile.uicontract.UiMessageEditOutcome.COMMITTED_NOT_STARTED,
+            LocalUserMessageEditResult.COMMITTED_NOT_STARTED.toUiEditOutcome())
+        org.junit.Assert.assertEquals(
+            com.labteto.dshmobile.uicontract.UiMessageEditOutcome.FAILED,
+            LocalUserMessageEditResult.FAILED.toUiEditOutcome())
+    }
+
+
     private class ChatOwner : LocalChatExecutionPort {
         val sent = mutableListOf<String>()
         var result = LocalSendResult.Started

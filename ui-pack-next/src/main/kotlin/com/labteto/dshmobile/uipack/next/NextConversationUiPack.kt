@@ -53,6 +53,7 @@ import com.labteto.dshmobile.uicontract.UiCommandRejection
 import com.labteto.dshmobile.uicontract.UiExecutionPhase
 import com.labteto.dshmobile.uicontract.UiMessageRole
 import com.labteto.dshmobile.uicontract.UiMessageSnapshot
+import com.labteto.dshmobile.uicontract.UiMessageEditOutcome
 import com.labteto.dshmobile.uicontract.UiPackManifest
 import com.labteto.dshmobile.uicontract.UiSceneId
 import com.labteto.dshmobile.uicontract.UiSceneStatus
@@ -333,8 +334,8 @@ object NextConversationUiPack : ConversationUiPack {
                 is UiCommandReceipt.Failed -> result.message
                 UiCommandReceipt.NotAdmitted -> editUnavailable
                 is UiCommandReceipt.MessageEdited -> when (result.result) {
-                    com.labteto.dshmobile.local.session.LocalUserMessageEditResult.SENT -> accepted
-                    com.labteto.dshmobile.local.session.LocalUserMessageEditResult.COMMITTED_NOT_STARTED -> editCommitted
+                    UiMessageEditOutcome.SENT -> accepted
+                    UiMessageEditOutcome.COMMITTED_NOT_STARTED -> editCommitted
                     else -> editUnavailable
                 }
                 UiCommandReceipt.OutcomeUnknown -> unknown
@@ -422,8 +423,8 @@ object NextConversationUiPack : ConversationUiPack {
                 val result = if (workMode) work.submit(WorkConversationUiCommand.EditUserMessage(target, message.id, replacement))
                     else chat.submit(ChatUiCommand.EditUserMessage(target, message.id, replacement))
                 show(result)
-                if (result is UiCommandReceipt.MessageEdited && (result.result == com.labteto.dshmobile.local.session.LocalUserMessageEditResult.SENT ||
-                    result.result == com.labteto.dshmobile.local.session.LocalUserMessageEditResult.COMMITTED_NOT_STARTED)) editing = null
+                if (result is UiCommandReceipt.MessageEdited && (result.result == UiMessageEditOutcome.SENT ||
+                    result.result == UiMessageEditOutcome.COMMITTED_NOT_STARTED)) editing = null
             }, enabled = identity != null && replacement.isNotBlank()) { Text(stringResource(R.string.next_edit_send)) } },
             dismissButton = { TextButton(onClick = { editing = null }) { Text(stringResource(R.string.next_cancel)) } })
         if (continuation != null && sessions != null) AlertDialog(onDismissRequest = { continuation = null },

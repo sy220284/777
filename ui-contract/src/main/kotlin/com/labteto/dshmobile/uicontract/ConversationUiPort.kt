@@ -32,10 +32,24 @@ sealed interface UiCommandReceipt {
     data class Failed(val message: String) : UiCommandReceipt
     /** Owner declined an operation without exposing a more specific cause. */
     data object NotAdmitted : UiCommandReceipt
-    data class MessageEdited(val result: com.labteto.dshmobile.local.session.LocalUserMessageEditResult) : UiCommandReceipt
+    data class MessageEdited(val result: UiMessageEditOutcome) : UiCommandReceipt
     data object OutcomeUnknown : UiCommandReceipt
 }
 
+/** All original Owner outcomes are preserved, but no Session domain class crosses the UI API. */
+enum class UiMessageEditOutcome {
+    SENT,
+    COMMITTED_NOT_STARTED,
+    BUSY,
+    UNAVAILABLE,
+    WRONG_MODE,
+    UNCONFIGURED,
+    HISTORY_UNAVAILABLE,
+    MESSAGE_MISSING,
+    EMPTY,
+    UNCHANGED,
+    FAILED,
+}
 enum class UiMessageRole { USER, ASSISTANT, SYSTEM, TOOL }
 data class UiMessageBranch(val index: Int, val count: Int)
 data class UiMessageSnapshot(val id: String, val role: UiMessageRole, val text: String, val createdAt: Long,

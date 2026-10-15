@@ -15,6 +15,8 @@ import com.labteto.dshmobile.uicontract.ChatUiPort
 import com.labteto.dshmobile.uicontract.UiActionAvailability
 import com.labteto.dshmobile.uicontract.UiApprovalSnapshot
 import com.labteto.dshmobile.uicontract.UiApprovalImpact
+import com.labteto.dshmobile.uicontract.UiMessageEditOutcome
+import com.labteto.dshmobile.local.session.LocalUserMessageEditResult
 import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.UiCommandRejection
 import com.labteto.dshmobile.uicontract.UiExecutionPhase
@@ -80,7 +82,7 @@ class LocalConversationUiPortComposition @Inject internal constructor(
                 is ChatUiCommand.SelectVariant -> operationReceipt(chatOwner.selectMessageVariant(command.messageId, command.targetIndex))
                 is ChatUiCommand.SendMessage -> chatOwner.send(command.text, command.attachments).toUiReceipt()
                 is ChatUiCommand.SendText -> chatOwner.send(command.text).toUiReceipt()
-                is ChatUiCommand.EditUserMessage -> UiCommandReceipt.MessageEdited(chatOwner.editAndResendUserMessage(command.messageId, command.replacement))
+                is ChatUiCommand.EditUserMessage -> UiCommandReceipt.MessageEdited(chatOwner.editAndResendUserMessage(command.messageId, command.replacement).toUiEditOutcome())
                 is ChatUiCommand.RegenerateReply -> operationReceipt(chatOwner.regenerateReply(command.messageId))
                 is ChatUiCommand.Stop -> operationReceipt(chatOwner.cancel(command.identity.sessionId))
             }
@@ -147,7 +149,7 @@ class LocalConversationUiPortComposition @Inject internal constructor(
                     else UiCommandReceipt.Accepted
                 }
                 is WorkConversationUiCommand.SendText -> workOwner.send(command.text).toUiReceipt()
-                is WorkConversationUiCommand.EditUserMessage -> UiCommandReceipt.MessageEdited(workOwner.editAndResendUserMessage(command.messageId, command.replacement))
+                is WorkConversationUiCommand.EditUserMessage -> UiCommandReceipt.MessageEdited(workOwner.editAndResendUserMessage(command.messageId, command.replacement).toUiEditOutcome())
                 is WorkConversationUiCommand.RegenerateReply -> operationReceipt(workOwner.regenerateReply(command.messageId))
                 is WorkConversationUiCommand.Stop -> operationReceipt(workOwner.cancel(command.identity.sessionId))
                 is WorkConversationUiCommand.AnswerApproval -> {
@@ -230,3 +232,18 @@ internal fun LocalSendResult.toUiReceipt(): UiCommandReceipt = when (disposition
 
 private fun operationReceipt(admitted: Boolean): UiCommandReceipt =
     if (admitted) UiCommandReceipt.Accepted else UiCommandReceipt.NotAdmitted
+
+/** Exhaustive translation: never collapse an Owner failure into a successful UI receipt. */
+internal fun LocalUserMessageEditResult.toUiEditOutcome(): UiMessageEditOutcome = when (this) {
+    LocalUserMessageEditResult.SENT -> UiMessageEditOutcome.SENT
+    LocalUserMessageEditResult.COMMITTED_NOT_STARTED -> UiMessageEditOutcome.COMMITTED_NOT_STARTED
+    LocalUserMessageEditResult.BUSY -> UiMessageEditOutcome.BUSY
+    LocalUserMessageEditResult.UNAVAILABLE -> UiMessageEditOutcome.UNAVAILABLE
+    LocalUserMessageEditResult.WRONG_MODE -> UiMessageEditOutcome.WRONG_MODE
+    LocalUserMessageEditResult.UNCONFIGURED -> UiMessageEditOutcome.UNCONFIGURED
+    LocalUserMessageEditResult.HISTORY_UNAVAILABLE -> UiMessageEditOutcome.HISTORY_UNAVAILABLE
+    LocalUserMessageEditResult.MESSAGE_MISSING -> UiMessageEditOutcome.MESSAGE_MISSING
+    LocalUserMessageEditResult.EMPTY -> UiMessageEditOutcome.EMPTY
+    LocalUserMessageEditResult.UNCHANGED -> UiMessageEditOutcome.UNCHANGED
+    LocalUserMessageEditResult.FAILED -> UiMessageEditOutcome.FAILED
+}
