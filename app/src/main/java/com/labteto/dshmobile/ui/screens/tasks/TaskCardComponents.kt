@@ -114,6 +114,7 @@ internal fun TaskCard(
     onRunNow: () -> Unit,
     onEdit: () -> Unit,
     onOpenSession: (String) -> Unit,
+    enabled: Boolean = true,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var confirmDelete by remember(task.id) { mutableStateOf(false) }
@@ -190,6 +191,7 @@ internal fun TaskCard(
                     icon = FeatherIcons.MoreVertical,
                     contentDescription = stringResource(R.string.tasks_actions),
                     onClick = { actionsOpen = true },
+                    enabled = enabled,
                 )
                 SyPopupMenu(
                     expanded = actionsOpen,
@@ -288,12 +290,14 @@ internal fun TaskCard(
                 SyButton(
                     text = stringResource(R.string.tasks_try_now),
                     onClick = onRunNow,
+                    enabled = enabled,
                     size = SyButtonSize.Small,
                     variant = SyButtonVariant.Ghost,
                 )
                 SyButton(
                     text = stringResource(R.string.tasks_edit),
                     onClick = onEdit,
+                    enabled = enabled,
                     size = SyButtonSize.Small,
                     variant = SyButtonVariant.Ghost,
                 )
@@ -312,6 +316,7 @@ internal fun TaskCard(
                             else R.string.tasks_pause,
                         ),
                         onClick = if (task.status == AutomationStatus.PAUSED) onResume else onPause,
+                        enabled = enabled,
                         size = SyButtonSize.Small,
                         variant = SyButtonVariant.Ghost,
                     )

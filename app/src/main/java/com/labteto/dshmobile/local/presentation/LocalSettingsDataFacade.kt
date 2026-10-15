@@ -33,8 +33,8 @@ class LocalSettingsDataFacade @Inject internal constructor(
         usage.analyticsGroupDetail(kind, key, modelFilter = modelFilter)
     internal fun usageRecord(requestId: String): TokenUsageRecord? = usage.analyticsRecord(requestId)
 
-    internal fun memories(scopes: Set<MemoryScope>, projectId: String?, lineageId: String?): List<MemoryRecord> =
-        memoryStore.listActive(allowedScopes = scopes, projectId = projectId, lineageId = lineageId, limit = 100)
+    internal fun memoryPage(query: com.labteto.dshmobile.local.memory.MemoryManagementQuery) =
+        memoryStore.managementPage(query)
     internal fun updateMemory(existing: MemoryRecord, content: String, pinned: Boolean): MemoryRecord {
         val updated = memoryManager.update(existing = existing, content = content, pinned = pinned)
         recoverDiaryAfterMemorySave("记忆已保存")

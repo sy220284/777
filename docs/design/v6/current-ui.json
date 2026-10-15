@@ -21,7 +21,8 @@
         "加号",
         "模型／能力",
         "运行中停止／排队",
-        "审批／提问弹窗"
+        "审批／提问弹窗",
+        "工作会话菜单：工作记录与交付（历史分页、工具详情、目标步骤与成果版本关联）"
       ]
     },
     {
@@ -64,7 +65,8 @@
       "entries": [
         "任务列表",
         "任务编辑",
-        "真实任务状态"
+        "真实任务状态",
+        "暂停／恢复／取消／立即运行的处理中、受理、拒绝与异常回执"
       ]
     },
     {
@@ -93,7 +95,8 @@
         "记忆",
         "权限",
         "通知",
-        "高级诊断"
+        "高级诊断",
+        "记忆管理：源数据搜索、类型计数与游标分页"
       ]
     }
   ],
@@ -192,5 +195,10 @@
   ],
   "designVersion": "V6.3",
   "deliveryVersion": "6.3.0",
-  "designStatus": "candidate / PR #715 pending merge"
+  "designStatus": "candidate / PR #715 pending merge",
+  "workingTreeUpgrade": {
+    "date": "2026-10-15",
+    "baseCommit": "45bb1f54c9fa5136368879d4e80ca2f48f130aff",
+    "status": "PR candidate; merge and device acceptance pending"
+  }
 }

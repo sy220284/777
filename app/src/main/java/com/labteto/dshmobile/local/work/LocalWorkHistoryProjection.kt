@@ -21,7 +21,12 @@ internal fun projectLocalWorkHistoryPage(log: LocalSessionEventLog, cursor: Loca
             ?: event.data["arguments"]?.toString() ?: event.data.toString()
         LocalWorkHistoryRecord(event.sequence, event.type, name,
             com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair(content, 4_000),
-            (event.data["id"] as? JsonPrimitive)?.contentOrNull, projectLocalWorkArtifacts(listOf(event)))
+            (event.data["id"] as? JsonPrimitive)?.contentOrNull, projectLocalWorkArtifacts(listOf(event)),
+            phase = com.labteto.dshmobile.local.tools.reduceLocalToolActivity(
+                com.labteto.dshmobile.local.tools.LocalToolActivityState(),
+                com.labteto.dshmobile.harness.session.SessionEvent(event.sequence,
+                    if (event.type == "subagent/tool-result") "tool/result" else event.type, event.createdAt, event.data),
+            ).activities.lastOrNull()?.phase?.let { com.labteto.dshmobile.local.presentation.LocalToolUiPhase.valueOf(it.name) })
     }
     if (log.isClosed || generation != log.resetGeneration) return LocalWorkHistoryPageUi(emptyList(), null, true)
     return LocalWorkHistoryPageUi(records, if (events.size > PAGE_SIZE) {

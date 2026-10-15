@@ -53,7 +53,7 @@ class SettingsViewModel @Inject constructor(
 
     private val appContext = context.applicationContext
     private val deviceCapabilitiesController = DeviceCapabilitiesController(appContext)
-    private val memorySettingsController = MemorySettingsController(localHarness, settingsData)
+    private val memorySettingsController = MemorySettingsController(viewModelScope, localHarness::memoryContext, settingsData::memoryPage, settingsData::updateMemory, settingsData::forgetMemory)
     private val backgroundChangeMutex = Mutex()
 
     private val _state = MutableStateFlow(AppSettings())
@@ -79,7 +79,7 @@ class SettingsViewModel @Inject constructor(
             initialValue = TokenUsageAnalyticsSnapshot(),
         )
 
-    val memories: StateFlow<List<MemoryRecord>> = memorySettingsController.memories
+    internal val memoryManagement = memorySettingsController.state
 
     val deviceCapabilities: StateFlow<DeviceCapabilitiesState> =
         deviceCapabilitiesController.state
@@ -301,6 +301,9 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun refreshMemories() = memorySettingsController.refresh()
+    fun loadOlderMemories() = memorySettingsController.loadOlder()
+    fun searchMemories(query: String, kinds: Set<com.labteto.dshmobile.local.memory.MemoryKind>) =
+        memorySettingsController.search(query, kinds)
     fun focusMemorySourceMessage(sessionId: String?, messageId: String?) =
         memorySettingsController.focusSourceMessage(sessionId, messageId)
 

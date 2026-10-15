@@ -252,7 +252,8 @@ class ChatProactivePolicyTest {
 
         val relevant = characterProactiveDirective("提醒一下旧花盆归还的约定", persona, state)
         assertTrue(relevant.contains("还没把旧花盆归还给朋友"))
-        assertTrue(relevant.contains("延续当前人物、关系和故事"))
+        assertTrue(relevant.contains("可以关心、分享或接续未完事项"))
+        assertTrue(relevant.contains("不要编造新发生的共同经历"))
     }
 
     private fun message(

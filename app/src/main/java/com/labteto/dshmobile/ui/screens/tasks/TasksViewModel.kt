@@ -22,7 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-enum class TasksNotice { CANCELLED, MISSING, RUN_STARTED, RUN_FAILED }
+enum class TasksNotice { CANCELLED, MISSING, RUN_STARTED, RUN_FAILED, PAUSED, RESUMED, OPERATION_FAILED, OPERATION_REJECTED }
 enum class PlannerUiError { SESSION_CHANGED, SAVE_FAILED, PLAN_FAILED }
 internal enum class AutomationCadence { ONCE, DAILY, WEEKLY, MONTHLY, CUSTOM }
 data class TasksUiState(
@@ -31,6 +31,9 @@ data class TasksUiState(
     val planning: Boolean = false,
     val plannerError: PlannerUiError? = null,
     val saveRevision: Long = 0L,
+    val busyIds: Set<String> = emptySet(),
+    val loading: Boolean = false,
+    val managementFailed: Boolean = false,
 )
 @HiltViewModel
 class TasksViewModel @Inject constructor(
@@ -43,38 +46,60 @@ class TasksViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = localRuntime.initialState,
     )
-    private val _state = MutableStateFlow(TasksUiState(tasks = scheduler.list()))
+    private val _state = MutableStateFlow(TasksUiState(loading = true))
     val state: StateFlow<TasksUiState> = _state.asStateFlow()
     fun acknowledgeNotice(notice: TasksNotice) {
         if (_state.value.notice == notice) _state.update { it.copy(notice = null) }
     }
-    fun refresh() = _state.update { it.copy(tasks = scheduler.list(), notice = null) }
-    fun cancel(id: String) {
-        val removed = scheduler.cancelTask(id)
-        _state.update {
-            it.copy(
-                tasks = scheduler.list(),
-                notice = if (removed) TasksNotice.CANCELLED else TasksNotice.MISSING,
-            )
+    fun refresh() = viewModelScope.launch {
+        _state.update { it.copy(loading = true) }
+        val result = runTaskManagementOperation({ true }, scheduler::list)
+        _state.update { it.copy(tasks = observedTasks?.value ?: result.tasks ?: it.tasks, loading = false,
+            managementFailed = result.failed) }
+        observeTasks()
+    }
+    fun cancel(id: String) = manage(id, TasksNotice.CANCELLED) { scheduler.cancelTask(id) }
+    fun pause(id: String) = manage(id, TasksNotice.PAUSED) { scheduler.pauseTask(id) }
+    fun resume(id: String) = manage(id, TasksNotice.RESUMED) { scheduler.resumeTask(id) }
+    fun runNow(id: String) = manage(id, TasksNotice.RUN_STARTED) { scheduler.runTaskNow(id) }
+
+    private fun manage(id: String, success: TasksNotice, operation: () -> Boolean) {
+        if (id in _state.value.busyIds) return
+        _state.update { it.copy(busyIds = it.busyIds + id, notice = null) }
+        viewModelScope.launch {
+            try {
+                val result = runTaskManagementOperation(operation, scheduler::list)
+                _state.update { it.copy(tasks = observedTasks?.value ?: result.tasks ?: it.tasks,
+                    managementFailed = result.failed,
+                    notice = when {
+                        result.failed -> TasksNotice.OPERATION_FAILED
+                        !result.accepted -> TasksNotice.OPERATION_REJECTED
+                        else -> success
+                    }) }
+            } finally { _state.update { it.copy(busyIds = it.busyIds - id) } }
         }
     }
-    fun pause(id: String) { scheduler.pauseTask(id); refresh() }
-    fun resume(id: String) { scheduler.resumeTask(id); refresh() }
-    fun runNow(id: String): Boolean {
-        val started = scheduler.runTaskNow(id)
-        _state.update {
-            it.copy(
-                tasks = scheduler.list(),
-                notice = if (started) TasksNotice.RUN_STARTED else TasksNotice.RUN_FAILED,
-            )
+    private var observation: kotlinx.coroutines.Job? = null
+    private var observedTasks: StateFlow<List<AutomationTask>>? = null
+    private fun observeTasks() {
+        if (observation?.isActive == true) return
+        observation = viewModelScope.launch {
+            try {
+                val tasks = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { scheduler.tasks }
+                observedTasks = tasks
+                tasks.collect { current -> _state.update { it.copy(tasks = current) } }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (error: Exception) {
+                AppLog.failure("TaskScheduling", "observe_tasks", error)
+                _state.update { it.copy(managementFailed = true, loading = false) }
+            }
         }
-        return started
     }
     private val planner = AutomationPlannerUiController(
         viewModelScope, localRuntime, planningService, _state, ::saveChatDraft, scheduler::list,
     )
     init {
-        viewModelScope.launch { scheduler.tasks.collect { tasks -> _state.update { it.copy(tasks = tasks) } } }
+        refresh()
     }
     fun submitChatPlan(input: String, editingTaskId: String? = null) = planner.submitChatPlan(input, editingTaskId)
     private fun saveChatDraft(

@@ -25,7 +25,7 @@ def leaves_from_tree(text):
         if len(m.group(1)) % 3:
             raise ValueError("invalid tree depth")
         depth = len(m.group(1)) // 3
-        title = re.sub(r"\s+\[PR #\d+.*$", "", m.group(3).strip())
+        title = re.sub(r"\s+\[(?:来源 )?PR #\d+[^\]]*\]$", "", m.group(3).strip())
         if depth > len(chain):
             raise ValueError("tree jumped over a parent")
         chain = chain[:depth] + [title]
@@ -84,6 +84,8 @@ def self_test():
     sample = "```text\n ROOT\n├─ A\n│  ├─ leaf1\n│  └─ leaf2\n└─ B\n   └─ leaf3\n```"
     assert len(leaves_from_tree(sample)) == 3
     assert leaves_from_tree(sample)[-1] == "B / leaf3"
+    assert leaves_from_tree(sample.replace("leaf3", "leaf3 [来源 PR #610]"))[-1] == "B / leaf3"
+    assert leaves_from_tree(sample.replace("leaf3", "leaf3 [PR #610]"))[-1] == "B / leaf3"
     # Subset validation: only evidence-backed leaves belong in the repo index;
     # duplicate/out-of-tree records must be rejected by validate().
     assert [leaf for leaf in leaves_from_tree(sample) if leaf.endswith("leaf2")] == ["A / leaf2"]

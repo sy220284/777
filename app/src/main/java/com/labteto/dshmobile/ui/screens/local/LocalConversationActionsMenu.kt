@@ -21,6 +21,7 @@ internal fun ConversationActionsMenu(
     onTogglePin: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
+    onOpenWorkEvidence: (() -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var expanded by remember { mutableStateOf(false) }
@@ -39,7 +40,9 @@ internal fun ConversationActionsMenu(
             onDismiss = { expanded = false },
             // Match the attachment + menu: paint the aligned chat scene, not an opaque L4 plate.
             seamlessBackground = true,
-            items = listOf(
+            items = onOpenWorkEvidence?.let { open -> listOf(SyMenuItem(
+                text = stringResource(R.string.work_evidence_title), icon = FeatherIcons.FileText, onClick = open,
+            )) }.orEmpty() + listOf(
                 SyMenuItem(
                     text = stringResource(R.string.common_rename),
                     icon = FeatherIcons.Edit3,

@@ -10,6 +10,7 @@ import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
 import com.labteto.dshmobile.local.tools.LocalToolActivityPhase
 import com.labteto.dshmobile.local.tools.LocalToolActivityProjectionRuntime
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import com.labteto.dshmobile.local.session.LocalSessionFilesRuntime
 import java.io.File
@@ -54,15 +55,40 @@ class LocalWorkRuntime @Inject internal constructor(
         if (sessionId != runtimeStateStore.currentSessionId) return emptyList()
         val boundedScan = eventLimit.coerceIn(384, 4_096)
         val root = File(sessionFiles.workspace.path)
+        val log = eventLogs.get(sessionId)
+        val generation = log.resetGeneration
         return projectLocalWorkArtifacts(
-            eventLogs.get(sessionId).pageBeforeChronological(limit = boundedScan),
+            log.pageBeforeChronological(limit = boundedScan),
             limit = (boundedScan / 8).coerceIn(40, 100),
-        ).map { item ->
-            if (item.category == "file") item.copy(
-                currentlyAvailable = localWorkArtifactFileAvailable(root, item.reference),
-                versionNow = localWorkFileSha256(root, item.reference),
-            ) else item
-        }
+        ).map { observeLocalWorkArtifact(root, it.copy(logIdentity = log.historyInstanceIdentity, logGeneration = generation)) }
+    }
+
+    internal fun artifactRevisionForUi(sessionId: String): com.labteto.dshmobile.local.presentation.LocalWorkHistoryRevision? {
+        if (sessionId != runtimeStateStore.currentSessionId) return null
+        val log = eventLogs.get(sessionId)
+        return com.labteto.dshmobile.local.presentation.LocalWorkHistoryRevision(log.historyInstanceIdentity, log.resetGeneration, log.latestSequence())
+    }
+
+    internal fun refreshArtifactFilesForUi(sessionId: String, items: List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem>): List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem> {
+        if (sessionId != runtimeStateStore.currentSessionId) return emptyList()
+        val root = File(sessionFiles.workspace.path)
+        return items.map { observeLocalWorkArtifact(root, it) }
+    }
+
+    /** Hash only an explicitly inspected file; link/acceptance still revalidate exact bytes. */
+    internal fun inspectArtifactForUi(sessionId: String, item: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem): com.labteto.dshmobile.local.presentation.LocalArtifactUiItem? {
+        if (sessionId != runtimeStateStore.currentSessionId || item.category != "file") return null
+        val log = eventLogs.get(sessionId)
+        val generation = log.resetGeneration
+        if (!artifactBelongsToLog(item, log)) return null
+        if (!sourceArtifactMatchesEvidence(log.pageAfter(item.asOfSequence - 1, 1).singleOrNull(), item)) return null
+        val root = File(sessionFiles.workspace.path)
+        val before = observeLocalWorkArtifact(root, item)
+        val version = localWorkFileSha256(root, item.reference) ?: return before
+        val after = observeLocalWorkArtifact(root, before)
+        if (before.fileObservation != after.fileObservation || log.isClosed || generation != log.resetGeneration ||
+            sessionId != runtimeStateStore.currentSessionId) return null
+        return after.copy(versionNow = version)
     }
 
     internal fun historyPageForUi(sessionId: String, cursor: com.labteto.dshmobile.local.presentation.LocalWorkHistoryCursor?): com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi {
@@ -72,9 +98,8 @@ class LocalWorkRuntime @Inject internal constructor(
         val root = File(sessionFiles.workspace.path)
         val page = projectLocalWorkHistoryPage(log, cursor)
         val projected = page.copy(records = page.records.map { record ->
-            record.copy(artifacts = record.artifacts.map { item -> if (item.category == "file") item.copy(
-                currentlyAvailable = localWorkArtifactFileAvailable(root, item.reference),
-                versionNow = localWorkFileSha256(root, item.reference)) else item })
+            record.copy(artifacts = record.artifacts.map { observeLocalWorkArtifact(root,
+                it.copy(logIdentity = log.historyInstanceIdentity, logGeneration = generation)) })
         })
         return if (sessionId == runtimeStateStore.currentSessionId && !log.isClosed && generation == log.resetGeneration) projected
         else com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi(emptyList(), null, true)
@@ -83,17 +108,20 @@ class LocalWorkRuntime @Inject internal constructor(
     /** Store an explicit user-chosen source for one requirement, never a synthetic pass. */
     internal fun linkRequirementEvidenceForUi(
         sessionId: String,
-        requirementIndex: Int,
+        target: com.labteto.dshmobile.local.presentation.LocalRequirementUiTarget,
         artifact: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem,
     ): Boolean {
         val snapshot = runtimeStateStore.state.value
         if (sessionId != runtimeStateStore.currentSessionId ||
             snapshot.sessionId != sessionId || snapshot.usageMode != LocalUsageMode.WORK
         ) return false
+        val requirementIndex = target.index
         val requirement = snapshot.work.todos.getOrNull(requirementIndex)?.content ?: return false
+        if (requirement != target.content || snapshot.work.goal?.id != target.goalId) return false
         val sourceCallId = artifact.sourceCallId?.takeIf(String::isNotBlank) ?: return false
         val log = eventLogs.get(sessionId)
         val generation = log.resetGeneration
+        if (!artifactBelongsToLog(artifact, log)) return false
         val origin = log.pageAfter(artifact.asOfSequence - 1, 1).singleOrNull()
         val version = selectedRequirementEvidenceVersion(
             File(sessionFiles.workspace.path), origin, artifact,
@@ -102,11 +130,13 @@ class LocalWorkRuntime @Inject internal constructor(
         if (sessionId != runtimeStateStore.currentSessionId || current.sessionId != sessionId ||
             current.usageMode != LocalUsageMode.WORK ||
             current.work.todos.getOrNull(requirementIndex)?.content != requirement ||
+            current.work.goal?.id != target.goalId ||
             log.isClosed || log.resetGeneration != generation
         ) return false
         log.append("work/requirement-evidence", buildJsonObject {
             put("requirement_index", requirementIndex)
             put("requirement", requirement)
+            target.goalId?.let { put("goal_id", it) }
             put("artifact_path", artifact.reference)
             put("origin_sequence", artifact.asOfSequence)
             put("source_call_id", sourceCallId)
@@ -124,10 +154,7 @@ class LocalWorkRuntime @Inject internal constructor(
         ) return emptyList()
         return checkRequirementEvidenceVersions(
             File(sessionFiles.workspace.path),
-            projectRequirementEvidenceLinks(
-                eventLogs.get(sessionId).pageBeforeChronological(limit = 8_192),
-                snapshot.work.todos,
-            ),
+            eventLogs.get(sessionId).withEvents { projectRequirementEvidenceLinks(it, snapshot.work.todos, snapshot.work.goal?.id) },
         )
     }
 
@@ -163,7 +190,7 @@ class LocalWorkRuntime @Inject internal constructor(
 
     /** Exact bounded lookup; the selected event must still belong to this session and call. */
     internal fun toolEvidenceForUi(sessionId: String, callId: String, sequence: Long): String? {
-        if (sessionId != runtimeStateStore.currentSessionId || sequence <= 0L) return null
+        if (sessionId != runtimeStateStore.currentSessionId || sequence < 0L) return null
         val event = eventLogs.get(sessionId).pageAfter(sequence - 1L, limit = 1).singleOrNull()
             ?.takeIf { it.sequence == sequence && it.data["id"]?.jsonPrimitive?.contentOrNull == callId }
             ?: return null
@@ -242,3 +269,7 @@ internal fun localWorkArtifactFileAvailable(root: File, relative: String): Boole
     val target = File(root, relative).canonicalFile.toPath()
     target != canonicalRoot && target.startsWith(canonicalRoot) && java.nio.file.Files.isRegularFile(target)
 }.getOrDefault(false)
+
+/** UI selections from before reset/reopen cannot acquire a new log's submission rights. */
+private fun artifactBelongsToLog(item: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem, log: LocalSessionEventLog): Boolean =
+    !log.isClosed && item.logIdentity == log.historyInstanceIdentity && item.logGeneration == log.resetGeneration

@@ -186,7 +186,7 @@ fun SettingsScreen(
     val deviceCapabilities by viewModel.deviceCapabilities.collectAsStateWithLifecycle()
     // Re-probe after returning from Android settings; a stale permission badge is misleading.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshDeviceCapabilities() }
-    val memories by viewModel.memories.collectAsStateWithLifecycle()
+    val memoryManagement by viewModel.memoryManagement.collectAsStateWithLifecycle()
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val toast = rememberSyToast()
     val context = LocalContext.current
@@ -811,7 +811,7 @@ fun SettingsScreen(
                                 onClick = { openPage(SettingsDestination.MEMORY_SETTINGS) })
                             AppSettingsDivider()
                             AppSettingsRow(SyEntryIcons.Memory, stringResource(R.string.advanced_manage_memory),
-                                value = stringResource(R.string.advanced_memory_active_count, memories.size),
+                                value = stringResource(R.string.advanced_memory_active_count, memoryManagement.totalMatching),
                                 onClick = { openPage(SettingsDestination.MEMORY_MANAGEMENT) })
                         }
                     }
@@ -820,7 +820,7 @@ fun SettingsScreen(
                     }
                     SettingsDestination.MEMORY_MANAGEMENT -> {
                         MemoryManagementCard(
-                            memories, viewModel, toast.second,
+                            memoryManagement, viewModel, toast.second,
                             focusedSource = !showAllMemories && !memorySourceSessionId.isNullOrBlank() &&
                                 !memorySourceMessageId.isNullOrBlank(),
                             onShowAll = { showAllMemories = true },

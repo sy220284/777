@@ -485,6 +485,14 @@ fun LocalHarnessScreen(
         previewWorkspaceFile = viewModel::previewWorkspaceFile,
         artifactsForUi = viewModel::artifactsForUi,
         eventSequenceForUi = viewModel::eventSequenceForUi,
+        artifactRevision = viewModel::artifactRevisionForUi,
+        refreshArtifactFiles = viewModel::refreshArtifactFilesForUi,
+        inspectArtifact = viewModel::inspectArtifactForUi,
+        historyPage = viewModel::historyPageForUi,
+        toolActivities = viewModel::toolActivitiesForUi,
+        toolEvidence = viewModel::toolEvidenceForUi,
+        requirementEvidence = viewModel::requirementEvidenceForUi,
+        linkRequirementEvidence = viewModel::linkRequirementEvidenceForUi,
     )
     val automationActions = LocalAutomationFeatureUiActions(
         switchSession = { switchToSessionAndShowConversation(it) },
