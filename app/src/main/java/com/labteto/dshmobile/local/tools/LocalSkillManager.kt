@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.files.parseLocalSkillMetadata
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import java.io.File
 import java.nio.file.Files
+import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -163,20 +164,49 @@ internal class LocalSkillStore(
                     if (!target.exists() || target.readText() != text) workspace.write(path, text)
                 }
             }
-            // App-owned instructions are versioned; preserve only the user's invocation toggle.
-            val disabled = runCatching { !workspace.skillMetadata(preset.id).modelInvocable }.getOrDefault(false)
             val baseDocument = buildLocalSkillDocument(
                 preset.id, preset.description, preset.instructions, preset.whenToUse, preset.title,
             )
-            val next = if (disabled) baseDocument.replaceFirst(
-                "\n---\n", "\ndisable-model-invocation: true\n---\n",
-            ) else baseDocument
             val path = ".dsh/skills/${preset.id}/SKILL.md"
-            // A malformed/oversized shipped file should recover to the current official version.
-            if (runCatching { workspace.readSkill(preset.id) }.getOrNull() != next) {
-                workspace.write(path, next)
+            val current = runCatching { workspace.readSkill(preset.id) }.getOrNull()
+            val disabled = runCatching { !workspace.skillMetadata(preset.id).modelInvocable }.getOrDefault(false)
+            val desired = withModelInvocationDisabled(baseDocument, disabled)
+            val baseline = File(skillsDir, "${preset.id}/.bundled-baseline-sha256")
+            val previousBaseline = runCatching { baseline.readText().trim() }.getOrNull()
+            val clean = current != null && (
+                // Known upstream version: upgrade only if the user never edited its content.
+                (previousBaseline != null && skillFingerprint(current) == previousBaseline) ||
+                    // Legacy installation without a baseline: don't erase an unknown user edit.
+                    (previousBaseline == null && current == desired)
+                )
+            if (current != null && !clean && current != desired) {
+                // The user controls SKILL.md; never silently replace a readable custom version.
+                // Malformed/too large content is backed up before restoring the bundled rule.
+                if (current.toByteArray(Charsets.UTF_8).size <= 24_000) continue
             }
+            if (current == null || current.toByteArray(Charsets.UTF_8).size > 24_000) {
+                val raw = runCatching { File(skillsDir, "${preset.id}/SKILL.md").readText() }.getOrNull()
+                if (raw != null && raw != desired) {
+                    val backup = File(skillsDir, "${preset.id}/SKILL.pre-repair.md")
+                    if (!backup.exists()) backup.writeText(raw)
+                }
+            }
+            if (current != desired) workspace.write(path, desired)
+            baseline.writeText(skillFingerprint(baseDocument) + "\n")
         }
+    }
+
+    private fun withModelInvocationDisabled(document: String, disabled: Boolean): String =
+        if (disabled) document.replaceFirst("\n---\n", "\ndisable-model-invocation: true\n---\n")
+        else document
+
+    private fun skillFingerprint(document: String): String {
+        // Invocation is a separate user preference, not a modification of the rule body.
+        val canonical = document.replace(
+            Regex("(?m)^disable-model-invocation: (?:true|false)\\r?\\n"), "",
+        )
+        return MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
     }
 
     /** First launch only: users removing a bundled skill must not see it reappear on restart. */
@@ -269,7 +299,9 @@ internal class LocalSkillStore(
                 if (!File(workspace.path, path).exists()) workspace.write(path, text)
             }
         }
-        addDocument(id, buildLocalSkillDocument(id, preset.description, preset.instructions, preset.whenToUse, preset.title))
+        val bundledDocument = buildLocalSkillDocument(id, preset.description, preset.instructions, preset.whenToUse, preset.title)
+        addDocument(id, bundledDocument)
+        File(skillsDir, "$id/.bundled-baseline-sha256").writeText(skillFingerprint(bundledDocument) + "\n")
     }
 
     fun create(id: String, displayName: String, description: String, instructions: String) {
