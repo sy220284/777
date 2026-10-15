@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 
@@ -66,9 +67,11 @@ internal fun SyOpticalBackdrop(
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
+    val accelerated = LocalView.current.isHardwareAccelerated
     var measured by remember { mutableStateOf(IntSize.Zero) }
-    val effect = remember(enabled, measured, density.density) {
-        if (!enabled || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+    val effect = remember(enabled, measured, density.density, accelerated) {
+        if (!enabled || !accelerated ||
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             measured.width <= 0 || measured.height <= 0) null
         else try {
             val shader = RuntimeShader(SY_OPTICAL_REFRACTION_AGSL)
