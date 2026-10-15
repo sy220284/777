@@ -84,9 +84,9 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         })
     }
 
-    suspend fun submitImage(offer: LocalMediaOffer, prompt: String, ratio: String, sessionId: String, sourceMessageId: String? = null): LocalMediaCreationJob {
+    suspend fun submitImage(offer: LocalMediaOffer, prompt: String, ratio: String, sessionId: String, sourceMessageId: String? = null, revisionOf: String? = null): LocalMediaCreationJob {
         validate(offer, LocalMediaKind.IMAGE); require(prompt.isNotBlank())
-        return submit(offer, sessionId, prompt, sourceMessageId) { id ->
+        return submit(offer, sessionId, prompt, sourceMessageId, revisionOf) { id ->
             val result = when (offer.provider) {
                 LocalMediaProvider.MINIMAX -> com.labteto.dshmobile.local.model.LocalMediaImageResult(url = miniMax.generateImage(offer.profile, prompt, ratio))
                 else -> api.image(offer, prompt, ratio)
@@ -97,19 +97,19 @@ class LocalMediaCreationRuntime @Inject internal constructor(
                 catch (cancelled: CancellationException) { throw cancelled }
                 catch (failure: Exception) { AppLog.warn("MediaCreation", "save_generated_image", failure); null }
             }
-            store.addResult(offer, LocalMediaKind.IMAGE, sessionId, prompt, id, file = file, link = result.url.takeIf { file == null }, sourceMessageId = sourceMessageId)
+            store.addResult(offer, LocalMediaKind.IMAGE, sessionId, prompt, id, file = file, link = result.url.takeIf { file == null }, sourceMessageId = sourceMessageId, imageRatio = ratio, revisionOf = revisionOf)
         }
     }
-    suspend fun submitSpeech(offer: LocalMediaOffer, text: String, voice: String, sessionId: String, sourceMessageId: String? = null): LocalMediaCreationJob {
+    suspend fun submitSpeech(offer: LocalMediaOffer, text: String, voice: String, sessionId: String, sourceMessageId: String? = null, revisionOf: String? = null): LocalMediaCreationJob {
         validate(offer, LocalMediaKind.SPEECH); require(text.isNotBlank() && voice.isNotBlank())
-        return submit(offer, sessionId, text, sourceMessageId) { id ->
+        return submit(offer, sessionId, text, sourceMessageId, revisionOf) { id ->
             val file = when (offer.provider) {
                 LocalMediaProvider.MINIMAX -> miniMax.synthesizeSpeech(offer.profile, text, voice)
                 LocalMediaProvider.OPENAI -> api.speech(offer, text, voice)
                 else -> error("此服务商未接入配音")
             }
             markMediaProviderSucceeded()
-            store.addResult(offer, LocalMediaKind.SPEECH, sessionId, text, id, file = file, sourceMessageId = sourceMessageId)
+            store.addResult(offer, LocalMediaKind.SPEECH, sessionId, text, id, file = file, sourceMessageId = sourceMessageId, voiceId = voice, revisionOf = revisionOf)
         }
     }
     suspend fun submitTranscribe(offer: LocalMediaOffer, uri: Uri, sessionId: String, sourceMessageId: String? = null): LocalMediaCreationJob {
@@ -124,8 +124,8 @@ class LocalMediaCreationRuntime @Inject internal constructor(
             store.addResult(offer, LocalMediaKind.TRANSCRIBE, sessionId, operationId = id, text = text, sourceMessageId = sourceMessageId)
         }
     }
-    private suspend fun submit(offer: LocalMediaOffer, sessionId: String, prompt: String?, sourceMessageId: String?, execute: suspend (String) -> Unit): LocalMediaCreationJob {
-        val job = withContext(Dispatchers.IO) { store.beginCreation(offer, sessionId, prompt, sourceMessageId) }
+    private suspend fun submit(offer: LocalMediaOffer, sessionId: String, prompt: String?, sourceMessageId: String?, revisionOf: String? = null, execute: suspend (String) -> Unit): LocalMediaCreationJob {
+        val job = withContext(Dispatchers.IO) { store.beginCreation(offer, sessionId, prompt, sourceMessageId, revisionOf) }
         scope.launch(LocalMediaRequestAdmission({ store.requestStarted(job.id) }, { store.providerSucceeded(job.id) })) {
             try { execute(job.id) }
             catch (cancelled: CancellationException) { store.creationFailure(job.id, cancelled); throw cancelled }
@@ -133,9 +133,9 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         }
         return job
     }
-    suspend fun createVideo(offer: LocalMediaOffer, prompt: String, sessionId: String? = null, sourceMessageId: String? = null): LocalMediaVideoTask {
+    suspend fun createVideo(offer: LocalMediaOffer, prompt: String, sessionId: String? = null, sourceMessageId: String? = null, revisionOf: String? = null): LocalMediaVideoTask {
         validate(offer, LocalMediaKind.VIDEO); require(prompt.isNotBlank())
-        val task = withContext(Dispatchers.IO) { store.beginVideo(offer, sessionId, prompt, sourceMessageId) }
+        val task = withContext(Dispatchers.IO) { store.beginVideo(offer, sessionId, prompt, sourceMessageId, revisionOf) }
         scope.launch {
             try {
                 val external = when (offer.provider) {
