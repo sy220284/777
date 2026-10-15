@@ -6,51 +6,49 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PersonaCanonicalV4Test {
-    @Test fun differentLegacyFactsKeepIndependentStableIdentityDuringMerge() {
-        val first = PersonaProfile(name = "角色", coreValues = listOf("保持选择权")).canonicalV4()
-        val second = PersonaProfile(name = "角色", coreValues = listOf("推动长期计划")).canonicalV4()
-        val merged = mergePersonaProfiles(first, second)
-        assertEquals(setOf("保持选择权", "推动长期计划"), merged.facts.map { it.content }.toSet())
-        assertEquals(2, merged.facts.map { it.id }.distinct().size)
-        assertEquals(first.facts, PersonaProfile(name = "角色", coreValues = listOf("保持选择权")).canonicalV4().facts)
-        assertEquals(merged.facts, mergePersonaProfiles(merged, second).facts)
-    }
-
-    @Test fun legacyOnlyCharacterMigratesToFactsAndIndependentLoreExactlyOnce() {
+    @Test fun legacyOnlyCardDoesNotRegenerateFactsOrWorldBook() {
         val old = PersonaProfile(
-            name = "晴川", portrait = "少年时是制琴师", lifeContext = "每天修琴",
-            quirks = listOf("习惯喝浓茶"), worldSetting = "世界存在浮空岛",
-            coreValues = listOf("答应的事必须兑现"),
-            hardConstraints = listOf("不可背叛家人"),
+            name = "晴川", portrait = "少年时是制琴师",
+            lifeContext = "每天修琴", quirks = listOf("喜欢浓茶"),
+            worldSetting = "世界存在浮空岛", coreValues = listOf("守住承诺"),
         )
-        val migrated = old.canonicalV4()
-        assertTrue(migrated.facts.any { it.category == CharacterFactCategories.BIOGRAPHY &&
-            it.content == "少年时是制琴师" })
-        assertTrue(migrated.facts.any { it.category == CharacterFactCategories.LIFE_GRAVITY &&
-            it.content == "每天修琴" })
-        assertEquals("世界存在浮空岛", migrated.loreEntries.single().content)
-        assertEquals(old.hardConstraints, migrated.hardConstraints)
-        assertEquals("", migrated.portrait)
-        assertEquals("", migrated.worldSetting)
-        assertEquals(migrated, migrated.canonicalV4())
+        val normalized = old.canonicalV4()
+        assertTrue(normalized.facts.isEmpty())
+        assertTrue(normalized.loreEntries.isEmpty())
+        assertTrue(normalized.portrait.isBlank())
+        assertTrue(normalized.worldSetting.isBlank())
+        assertTrue(normalized.coreValues.isEmpty())
+        assertEquals(normalized, normalized.canonicalV4())
     }
 
-    @Test fun existingV4NeverResurrectsConflictingHiddenLegacyPersonalityOrSpoiler() {
-        val current = PersonaProfile(
-            coreIdentity = "在小城开书店",
-            facts = listOf(CharacterFact(
-                id = "fact-1", category = CharacterFactCategories.LIFE_GRAVITY,
-                content = "每天整理新书", temporalScope = "opening",
-            )),
-            portrait = "旧资料：已知结局与终极秘密",
-            lifeContext = "旧资料：每天驾驶宇宙飞船",
-            worldSetting = "旧世界设定：提前知道终章",
-        )
-        val normalized = current.canonicalV4()
-        assertEquals(current.facts, normalized.facts)
-        assertEquals(current.coreIdentity, normalized.coreIdentity)
-        assertTrue(normalized.loreEntries.isEmpty())
-        assertFalse(normalized.toString().contains("宇宙飞船"))
-        assertFalse(normalized.toString().contains("提前知道终章"))
+    @Test fun droppedCategoriesAreNeverRecreatedAsOtherFields() {
+        val retired = listOf(
+            "definingChoices", "emotionalImprints", "lifeGravity",
+            "unfinishedBusiness", "limitsAndCosts", "sensorySignature",
+        ).mapIndexed { index, category ->
+            CharacterFact("old-$index", category, "过去的分类 $category")
+        }
+        val current = CharacterFact("present", CharacterFactCategories.PERSONALITY, "认真")
+        val custom = CharacterFact("custom", "自己的补充设定", "喜欢看星星")
+        val persona = PersonaProfile(name = "小岚", coreIdentity = "书店店主",
+            facts = retired + current + custom, portrait = "旧版身份说法")
+        val clean = persona.canonicalV4()
+        assertEquals(listOf(current, custom), clean.facts)
+        assertEquals("书店店主", clean.coreIdentity)
+        assertFalse(clean.toString().contains("旧版身份说法"))
+        assertEquals(clean, clean.canonicalV4())
+    }
+
+    @Test fun distinctNewFactsRemainIndependentAndDeduplicatedByIdentity() {
+        val one = PersonaProfile(name = "角色", coreIdentity = "手艺人",
+            facts = listOf(CharacterFact("one", CharacterFactCategories.VALUES_AND_TRADEOFFS,
+                "保持选择权", provenance = CharacterFactProvenance.USER_CREATED))).canonicalV4()
+        val two = PersonaProfile(name = "角色", coreIdentity = "手艺人",
+            facts = listOf(CharacterFact("two", CharacterFactCategories.VALUES_AND_TRADEOFFS,
+                "推动长期计划", provenance = CharacterFactProvenance.USER_CREATED))).canonicalV4()
+        val merged = mergePersonaProfiles(one, two)
+        assertEquals(setOf("保持选择权", "推动长期计划"),
+            merged.facts.map(CharacterFact::content).toSet())
+        assertEquals(merged.facts, mergePersonaProfiles(merged, two).facts)
     }
 }
