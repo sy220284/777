@@ -47,6 +47,9 @@ class LocalHarnessViewModel @Inject constructor(
     val workTeamUiPort: com.labteto.dshmobile.uicontract.WorkTeamUiPort,
     val workReadUiPort: com.labteto.dshmobile.uicontract.WorkReadUiPort,
     val filesUiPort: com.labteto.dshmobile.uicontract.FilesUiPort,
+    val automationUiPort: com.labteto.dshmobile.uicontract.AutomationUiPort,
+    val mediaUiPort: com.labteto.dshmobile.uicontract.MediaUiPort,
+    val diaryUiPort: com.labteto.dshmobile.uicontract.DiaryUiPort,
     val attachmentUiPort: com.labteto.dshmobile.uicontract.AttachmentUiPort,
     val chatGroupUiPort: com.labteto.dshmobile.uicontract.ChatGroupUiPort,
     val personaGalleryUiPort: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort,
@@ -67,7 +70,7 @@ class LocalHarnessViewModel @Inject constructor(
     val messageHistoryUiPort: com.labteto.dshmobile.uicontract.UiMessageHistoryPort,
     private val toolsUi: LocalToolsUiFacade,
     val composerInvocationUiPort: com.labteto.dshmobile.uicontract.ComposerInvocationUiPort,
-    private val usageUi: com.labteto.dshmobile.uicontract.UsageUiPort,
+    val usageUiPort: com.labteto.dshmobile.uicontract.UsageUiPort,
     val workPolicyUiPort: com.labteto.dshmobile.uicontract.WorkPolicyUiPort,
     private val networkSearchSettings: LocalNetworkSearchSettings,
     @ApplicationContext private val appContext: Context,
@@ -125,12 +128,12 @@ class LocalHarnessViewModel @Inject constructor(
     val workSurfaceState = state.projectWorkSurfaceState(viewModelScope)
     val activeModelProfile = runtime.model.activeProfile
     val workState = state.projectWorkState(viewModelScope)
-    internal val usageRevision = usageUi.revision
-    internal fun sessionUsage(sessionId: String) = usageUi.sessionSnapshot(sessionId)
-    internal fun taskUsage(runId: String) = usageUi.taskDetail(runId)
-    internal fun turnUsageSummaries(sessionId: String) = usageUi.turnSummaries(sessionId)
-    internal fun turnUsage(sessionId: String, turnId: String) = usageUi.turnDetail(sessionId, turnId)
-    internal fun requestUsage(requestId: String) = usageUi.requestDetail(requestId)
+    internal val usageRevision = usageUiPort.revision
+    internal fun sessionUsage(sessionId: String) = usageUiPort.sessionSnapshot(sessionId)
+    internal fun taskUsage(runId: String) = usageUiPort.taskDetail(runId)
+    internal fun turnUsageSummaries(sessionId: String) = usageUiPort.turnSummaries(sessionId)
+    internal fun turnUsage(sessionId: String, turnId: String) = usageUiPort.turnDetail(sessionId, turnId)
+    internal fun requestUsage(requestId: String) = usageUiPort.requestDetail(requestId)
     private val personaGalleryController = LocalPersonaGalleryUiController(
         runtime = runtime,
         chatUi = chatUi,

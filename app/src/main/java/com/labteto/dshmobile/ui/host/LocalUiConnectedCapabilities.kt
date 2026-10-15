@@ -39,6 +39,10 @@ internal object LocalUiConnectedCapabilities {
         files: com.labteto.dshmobile.uicontract.FilesUiPort? = null,
         memory: com.labteto.dshmobile.uicontract.MemoryUiPort? = null,
         settings: com.labteto.dshmobile.uicontract.SettingsUiPort? = null,
+        automation: com.labteto.dshmobile.uicontract.AutomationUiPort? = null,
+        media: com.labteto.dshmobile.uicontract.MediaUiPort? = null,
+        usage: com.labteto.dshmobile.uicontract.UsageUiPort? = null,
+        diary: com.labteto.dshmobile.uicontract.DiaryUiPort? = null,
     ): Set<UiCapabilityId> = buildSet {
         if (chat != null && drafts != null) {
             listOf("chat.send_text", "chat.edit", "chat.regenerate",
@@ -69,6 +73,10 @@ internal object LocalUiConnectedCapabilities {
         if (currentPersona != null) add(UiCapabilityId("chat.current_persona"))
         if (files != null) add(UiCapabilityId("files.read"))
         if (memory != null && settings != null) add(UiCapabilityId("memory.manage"))
+        if (automation != null) add(UiCapabilityId("automation.manage"))
+        if (media != null) add(UiCapabilityId("media.create"))
+        if (usage != null) add(UiCapabilityId("usage.read"))
+        if (diary != null) add(UiCapabilityId("chat.diary_manage"))
     }
 
 }

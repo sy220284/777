@@ -49,6 +49,11 @@ data class NextApplicationFeaturePorts(
     val currentPersona: CurrentPersonaUiPort? = null,
     val memory: MemoryUiPort? = null,
     val settings: SettingsUiPort? = null,
+    val automation: AutomationUiPort? = null,
+    val media: MediaUiPort? = null,
+    val usage: UsageUiPort? = null,
+    val activeSessionId: () -> String? = { null },
+    val diary: DiaryUiPort? = null,
 )
 
 /**
@@ -64,13 +69,35 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
     private val toolsRoute = UiSceneId("route.tools")
     private val toolsMcp = UiSceneId("tools.mcp")
     private val toolsPlugins = UiSceneId("tools.plugins")
+    private val toolsGithub = UiSceneId("tools.github")
     private val workspace = UiSceneId("route.workspace")
     private val memories = UiSceneId("settings.memory_management")
+    private val globalSearch = UiSceneId("shell.search")
+    private val diaryRoute = UiSceneId("route.diary")
+    private val diaryPage = UiSceneId("chat.diary")
+    private val tasksRoute = UiSceneId("route.tasks")
+    private val tasksPage = UiSceneId("automation.tasks")
+    private val taskEditor = UiSceneId("automation.editor")
+    private val chatTasks = UiSceneId("automation.persona_interaction")
+    private val mediaCreation = UiSceneId("media.creation")
+    private val mediaResults = UiSceneId("media.result")
+    private val settingsScenes = setOf(
+        "route.settings", "settings.root", "settings.models", "settings.chat",
+        "settings.memory", "settings.memory_settings", "settings.advanced",
+        "settings.session", "settings.usage", "settings.model_usage",
+        "settings.usage_log", "settings.usage_detail",
+        "settings.session_storage", "settings.diagnostics", "settings.account",
+    ).map(::UiSceneId).toSet()
     private val implementedScenes = buildSet {
         addAll(setOf(home, galleryRoute, chat, work, galleryPage))
-        if (ports.tools != null) addAll(setOf(toolsRoute, toolsMcp, toolsPlugins))
+        if (ports.tools != null) addAll(setOf(toolsRoute, toolsMcp, toolsPlugins, toolsGithub))
         if (ports.files != null) add(workspace)
         if (ports.memory != null && ports.settings != null) add(memories)
+        if (ports.automation != null) addAll(setOf(tasksRoute, tasksPage, taskEditor, chatTasks))
+        if (ports.diary != null) addAll(setOf(diaryRoute, diaryPage))
+        if (ports.sessions != null && ports.transcript != null) add(globalSearch)
+        if (ports.media != null && ports.settings != null) addAll(setOf(mediaCreation, mediaResults))
+        if (ports.settings != null) addAll(settingsScenes)
     }
 
     override val manifest = UiPackManifest(
@@ -83,6 +110,11 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
             if (ports.memory != null && ports.settings != null) add("memory.manage")
             if (ports.authoring != null) add("chat.persona_authoring")
             if (ports.currentPersona != null) add("chat.current_persona")
+            if (ports.automation != null) add("automation.manage")
+            if (ports.media != null) add("media.create")
+            if (ports.usage != null) add("usage.read")
+            if (ports.diary != null) add("chat.diary_manage")
+            if (ports.sessions != null && ports.transcript != null) add("session.transcript_read")
         }.map(::UiCapabilityId).toSet(),
         windowClasses = UiWindowClass.entries.toSet(),
         accessibility = UiAccessibility.entries.toSet(),
@@ -102,21 +134,85 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
         if (memoryOwner != null && settingsOwner != null) put(memories, UiSceneRenderer { scope ->
             NextMemoryScene(memoryOwner, settingsOwner, onBack = { scope.onBack() })
         })
+        val sessionOwner = ports.sessions
+        val historyOwner = ports.transcript
+        if (sessionOwner != null && historyOwner != null) {
+            put(globalSearch, UiSceneRenderer { scope ->
+                NextGlobalSearchScene(sessionOwner, historyOwner,
+                    onOpenSession = { scope.onNavigate(home) },
+                    onBack = { scope.onBack() })
+            })
+        }
+        ports.diary?.let { owner ->
+            put(diaryRoute, UiSceneRenderer { scope ->
+                NextDiaryScene(ports.gallery, owner, onBack = { scope.onBack() })
+            })
+            put(diaryPage, UiSceneRenderer { scope ->
+                NextDiaryScene(ports.gallery, owner, onBack = { scope.onBack() })
+            })
+        }
+        ports.automation?.let { owner ->
+            put(tasksRoute, UiSceneRenderer { scope ->
+                NextAutomationScene(owner, onBack = { scope.onBack() })
+            })
+            put(tasksPage, UiSceneRenderer { scope ->
+                NextAutomationScene(owner, onBack = { scope.onBack() })
+            })
+            put(taskEditor, UiSceneRenderer { scope ->
+                NextAutomationScene(owner, onBack = { scope.onBack() }, openEditor = true)
+            })
+            put(chatTasks, UiSceneRenderer { scope ->
+                NextAutomationScene(owner, onBack = { scope.onBack() }, onlyChat = true)
+            })
+        }
+        val mediaOwner = ports.media
+        if (mediaOwner != null && settingsOwner != null) {
+            put(mediaCreation, UiSceneRenderer { scope ->
+                NextMediaScene(mediaOwner, settingsOwner, ports.activeSessionId(),
+                    onBack = { scope.onBack() }, creationFirst = true)
+            })
+            put(mediaResults, UiSceneRenderer { scope ->
+                NextMediaScene(mediaOwner, settingsOwner, ports.activeSessionId(),
+                    onBack = { scope.onBack() }, creationFirst = false)
+            })
+        }
+        if (settingsOwner != null) {
+            settingsScenes.forEach { id ->
+                put(id, UiSceneRenderer { scope ->
+                    if (id.value == "settings.account") {
+                        NextAccountScene(settingsOwner, onBack = { scope.onBack() })
+                    } else {
+                        NextSettingsScene(id.value, settingsOwner, ports.usage,
+                            onBack = { scope.onBack() },
+                            onNavigate = { key -> scope.onNavigate(UiSceneId(key)) })
+                    }
+                })
+            }
+        }
         ports.tools?.let { owner ->
             put(toolsRoute, UiSceneRenderer { scope ->
                 NextToolsScene(owner, NextToolsPage.OVERVIEW, onBack = { scope.onBack() },
                     onOpenMcp = { scope.onNavigate(toolsMcp) },
-                    onOpenPlugins = { scope.onNavigate(toolsPlugins) })
+                    onOpenPlugins = { scope.onNavigate(toolsPlugins) },
+                    onOpenGithub = { scope.onNavigate(toolsGithub) })
             })
             put(toolsMcp, UiSceneRenderer { scope ->
                 NextToolsScene(owner, NextToolsPage.MCP, onBack = { scope.onBack() },
                     onOpenMcp = { scope.onNavigate(toolsMcp) },
-                    onOpenPlugins = { scope.onNavigate(toolsPlugins) })
+                    onOpenPlugins = { scope.onNavigate(toolsPlugins) },
+                    onOpenGithub = { scope.onNavigate(toolsGithub) })
             })
             put(toolsPlugins, UiSceneRenderer { scope ->
                 NextToolsScene(owner, NextToolsPage.PLUGINS, onBack = { scope.onBack() },
                     onOpenMcp = { scope.onNavigate(toolsMcp) },
-                    onOpenPlugins = { scope.onNavigate(toolsPlugins) })
+                    onOpenPlugins = { scope.onNavigate(toolsPlugins) },
+                    onOpenGithub = { scope.onNavigate(toolsGithub) })
+            })
+            put(toolsGithub, UiSceneRenderer { scope ->
+                NextToolsScene(owner, NextToolsPage.GITHUB, onBack = { scope.onBack() },
+                    onOpenMcp = { scope.onNavigate(toolsMcp) },
+                    onOpenPlugins = { scope.onNavigate(toolsPlugins) },
+                    onOpenGithub = { scope.onNavigate(toolsGithub) })
             })
         }
     }
@@ -144,6 +240,21 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
             }
             if (ports.memory != null && ports.settings != null) TextButton(onClick = { scope.onNavigate(memories) }) {
                 Text(stringResource(R.string.next_memory_title))
+            }
+            if (ports.sessions != null && ports.transcript != null) TextButton(onClick = { scope.onNavigate(globalSearch) }) {
+                Text("跨会话搜索")
+            }
+            if (ports.diary != null) TextButton(onClick = { scope.onNavigate(diaryRoute) }) {
+                Text("人物日记")
+            }
+            if (ports.automation != null) TextButton(onClick = { scope.onNavigate(tasksRoute) }) {
+                Text("任务")
+            }
+            if (ports.media != null && ports.settings != null) TextButton(onClick = { scope.onNavigate(mediaCreation) }) {
+                Text("媒体创作")
+            }
+            if (ports.settings != null) TextButton(onClick = { scope.onNavigate(UiSceneId("route.settings")) }) {
+                Text("设置")
             }
             Box(Modifier.weight(1f)) {
                 NextConversationUiPack.Render(

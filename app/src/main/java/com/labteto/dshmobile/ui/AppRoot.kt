@@ -73,6 +73,10 @@ fun AppRoot(
         files = features.filesUiPort,
         memory = features.memoryUiPort,
         settings = features.settingsUiPort,
+        automation = features.automationUiPort,
+        media = features.mediaUiPort,
+        usage = features.usageUiPort,
+        diary = features.diaryUiPort,
     )
 
     DshTheme(

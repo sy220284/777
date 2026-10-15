@@ -1,7 +1,7 @@
 {
   "schema": "777.ui-r4.code-tasks/1",
   "asOf": "2026-10-15",
-  "baseline": "2026-10-15 功能代码批次：审计修复、人物端口/编辑、Next工作区和记忆管理；按用户要求不测试编译",
+  "baseline": "2026-10-15 一次代码提交准备：Next 原生任务、媒体、设置、账户、日记、搜索真实 Port 入口；不执行编译、CI、设备与交付验收",
   "scope": "整个 R4，非单一功能",
   "verificationPolicy": "当前 HEAD 基础 CI 可通过不代表 R4 交付验收；新增提交需自身 CI，真实双包使用/进程恢复/设备矩阵按 S2/S5 单独验证。",
   "sceneCount": 78,
@@ -85,8 +85,8 @@
       "task": "Shell 重命名/置顶/删除/搜索/定位",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "重命名、置顶、两包删除及Host清理已接线。V6已有实际会话标题搜索，本批不重复开发。Next新增按实际标题及Host覆盖标题筛选、置顶优先会话选择，保留拒绝回执；会话命令异常转失败回执并记录原因类型。原Session分页接口新增中立消息检索：不另建索引，按同一Owner的授权/日志实例/重置代次逐页检索当前会话，命中后保留该有界历史页，用户可继续查更早批次；查询变化不能重用旧游标，关闭窗口取消扫描。Next独立历史搜索及命中消息所在页定位/复制已接线，不向主时间线拼接有缺口的历史。",
-      "remaining": "当前会话真实历史检索、Next会话标题筛选和只读历史页定位已实现；跨会话全文检索、全局入口统一、命中到主时间线的完整导航/阅读恢复仍缺。没有将跨Feature/跨会话完整搜索和设备行为视为已完成；测试编译按用户要求延后。"
+      "implemented": "重命名、置顶、两包删除及Host清理已接线。V6已有实际会话标题搜索，本批不重复开发。Next新增按实际标题及Host覆盖标题筛选、置顶优先会话选择，保留拒绝回执；会话命令异常转失败回执并记录原因类型。原Session分页接口新增中立消息检索：不另建索引，按同一Owner的授权/日志实例/重置代次逐页检索当前会话，命中后保留该有界历史页，用户可继续查更早批次；查询变化不能重用旧游标，关闭窗口取消扫描。Next独立历史搜索及命中消息所在页定位/复制已接线，不向主时间线拼接有缺口的历史。 Next 独立 shell.search 接入 Session Owner 全会话目录及每会话原历史搜索 Port，逐游标读取、取消传播、结果条目打开所属会话；达到搜索预算明确提示未扫完，不伪装为全文全覆盖。",
+      "remaining": "跨会话检索已新增受限独立页面，但主时间线消息锚点精准定位、全量无预算上限扫描和设备级恢复仍缺。"
     },
     {
       "id": "S1-07",
@@ -107,7 +107,8 @@
       "task": "全量旧 UI 回调退场",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "持续移除群聊、团队、图库故事/删除/保存/立绘的 UI 业务编排；现行大型 UI 回调与其他设置/人物业务尚待迁出。 Next 历史分页已改用中立 UiMessageHistoryPort/UiMessageSnapshot，由同一 Session Owner 投影；旧 V6 的 TranscriptUiPort 保留兼容、未宣称退场。 将编辑/重发结果从旧 LocalUserMessageEditResult 改为完整的中立 UiMessageEditOutcome，Next 无需读取该 Session 枚举；补保留全部 11 类结果的回归测试。 本批预置人物安装和图库检查/建议应用迁入Chat Owner：预置图片先暂存并校验，档案/图片引用一次提交，失败后只清理实际未引用图片；模型检查冻结会话/模型和图库版本，建议由用户选择后条件版本追加。V6旧安装器和检查/建议业务编排退出，Next独立图库接入预置列表安装、显式模型检查、冲突阅读及建议选择。建议只更新图库，当前故事由用户重新选择应用。 当前人物配置/采样/模型补全已迁出旧UI业务编排，原LocalChatRuntime.configureChatPersona和Facade模型补全转发退出。"
+      "implemented": "持续移除群聊、团队、图库故事/删除/保存/立绘的 UI 业务编排；现行大型 UI 回调与其他设置/人物业务尚待迁出。 Next 历史分页已改用中立 UiMessageHistoryPort/UiMessageSnapshot，由同一 Session Owner 投影；旧 V6 的 TranscriptUiPort 保留兼容、未宣称退场。 将编辑/重发结果从旧 LocalUserMessageEditResult 改为完整的中立 UiMessageEditOutcome，Next 无需读取该 Session 枚举；补保留全部 11 类结果的回归测试。 本批预置人物安装和图库检查/建议应用迁入Chat Owner：预置图片先暂存并校验，档案/图片引用一次提交，失败后只清理实际未引用图片；模型检查冻结会话/模型和图库版本，建议由用户选择后条件版本追加。V6旧安装器和检查/建议业务编排退出，Next独立图库接入预置列表安装、显式模型检查、冲突阅读及建议选择。建议只更新图库，当前故事由用户重新选择应用。 当前人物配置/采样/模型补全已迁出旧UI业务编排，原LocalChatRuntime.configureChatPersona和Facade模型补全转发退出。 新增日记专用 DiaryUiPort，由原 Chat Runtime 条件版本更新和停用，不借用旧 App UI；Next 新页面跨功能操作通过 Automation/Media/Settings/Usage/Tools Port。",
+      "remaining": "原 V6 大型页面/回调和其余隐性业务依赖仍未完全退场；不能以新增 Next 页面计为 V6 拆包完成。"
     },
     {
       "id": "S1-10",
@@ -151,8 +152,8 @@
       "task": "Next 全应用必要场景原生实现",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": " Next 的历史读取现只依赖中立消息快照（独立角色映射单测）；完整 Next 全场景仍待完成。 Next 独立包新增人物图库真正的 Owner 归档读取、按 Gallery/Story 身份启动故事、拒绝回执/缺身份不导航；页面避免在 UI 自建人物/故事状态。 Next图库接入13字段独立档案编辑/创建及AI补全，既有8场景清单未冒增为完整78场景。 Next工作区支持真实文件列表、筛选和有界文本/二进制预览；记忆管理支持原Owner搜索/类型筛选/游标分页、精确版本编辑/置顶/停用确认、部分成功提醒及上下文切换拒绝。 Next图库增加当前人物编辑/采样和模型补全实际子流程，仍未额外登记为独立Scene。",
-      "remaining": "日记、任务、设置其余页面和完整媒体等仍未迁完；完整双包覆盖未交付。"
+      "implemented": " Next 的历史读取现只依赖中立消息快照（独立角色映射单测）；完整 Next 全场景仍待完成。 Next 独立包新增人物图库真正的 Owner 归档读取、按 Gallery/Story 身份启动故事、拒绝回执/缺身份不导航；页面避免在 UI 自建人物/故事状态。 Next图库接入13字段独立档案编辑/创建及AI补全，既有8场景清单未冒增为完整78场景。 Next工作区支持真实文件列表、筛选和有界文本/二进制预览；记忆管理支持原Owner搜索/类型筛选/游标分页、精确版本编辑/置顶/停用确认、部分成功提醒及上下文切换拒绝。 Next图库增加当前人物编辑/采样和模型补全实际子流程，仍未额外登记为独立Scene。 新增 Next 独立调度页（列表、创建、编辑、暂停、恢复、删除、手动执行）、媒体创建/成果页（付费确认、创建回执、旧凭据刷新、图片预览、本地保存恢复）、原生设置/模型用量/ChatGPT账户/诊断及 GitHub 凭据入口、人物日记读写与条件修订、跨会话历史搜索。页面经现有 Owner Port 操作，不复制任务/媒体/日记存储。完整包 Scene 登记从原 10 项增加到 35 项，仍严格拒绝不足 75 项的整包。",
+      "remaining": "当前 Next 35/75 个包内 Scene 有注册 renderer，仍缺 40 项，包括多种真实弹层、消息槽位、高级编辑、外观与其它设置；完整 V6 包迁移、生产选包与设备运行未实现。"
     },
     {
       "id": "S3-05",
@@ -200,7 +201,9 @@
       "id": "S4-02",
       "task": "动态图片/音频/视频状态/预览/保存",
       "codeStatus": "CODE_PENDING",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "implemented": " Next 新增独立媒体创作及成果管理界面，经原 MediaUiPort 显示真实创建、视频、保存状态并做受控操作；这是媒体功能页面，不是 UiDocument 中的动态媒体节点。",
+      "remaining": "UiDocument 图片/音频/视频节点、源会话绑定、播放控件与自动恢复仍未实现；因此本任务继续 CODE_PENDING。"
     },
     {
       "id": "S4-03",

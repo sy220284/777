@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,7 +41,7 @@ import com.labteto.dshmobile.uihost.UiSceneNavigationResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-enum class NextToolsPage { OVERVIEW, MCP, PLUGINS }
+enum class NextToolsPage { OVERVIEW, MCP, PLUGINS, GITHUB }
 
 data class NextToolsSnapshot(
     val servers: List<UiMcpServerSnapshot>,
@@ -73,6 +74,7 @@ fun NextToolsScene(
     onBack: () -> Unit,
     onOpenMcp: () -> UiSceneNavigationResult,
     onOpenPlugins: () -> UiSceneNavigationResult,
+    onOpenGithub: () -> UiSceneNavigationResult = { UiSceneNavigationResult.AtRoot },
 ) {
     var revision by remember { mutableIntStateOf(0) }
     var snapshot by remember(owner) { mutableStateOf<NextToolsSnapshot?>(null) }
@@ -81,6 +83,9 @@ fun NextToolsScene(
     var pendingDisconnect by remember { mutableStateOf<UiMcpServerSnapshot?>(null) }
     var serverId by rememberSaveable { mutableStateOf("") }
     var endpoint by rememberSaveable { mutableStateOf("") }
+    // Secret is only transient editor state, never part of SavedState.
+    var githubToken by remember { mutableStateOf("") }
+    var confirmClearGithub by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val applied = stringResource(R.string.next_tools_connection_applied)
@@ -107,6 +112,16 @@ fun NextToolsScene(
         try { snapshot = readNextToolsSnapshot(owner) }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (error: Exception) { snapshot = null; readError = error.message ?: errorLabel }
+    }
+    if (confirmClearGithub) {
+        AlertDialog(onDismissRequest = { confirmClearGithub = false },
+            title = { Text("移除 GitHub 连接凭据？") },
+            text = { Text("不删除已有文件，但 GitHub 工具将无法继续访问。") },
+            confirmButton = { TextButton(onClick = {
+                confirmClearGithub = false
+                request(ToolsUiCommand.ClearGitHub, "已提交移除凭据")
+            }) { Text("移除凭据") } },
+            dismissButton = { TextButton(onClick = { confirmClearGithub = false }) { Text("取消") } })
     }
     if (pendingDisconnect != null) {
         val target = pendingDisconnect!!
@@ -141,6 +156,9 @@ fun NextToolsScene(
                 val result = onOpenPlugins()
                 if (result is UiSceneNavigationResult.Rejected) feedback = errorLabel
             }) { Text(stringResource(R.string.next_tools_plugins)) }
+        }
+        if (page == NextToolsPage.OVERVIEW) {
+            TextButton(onClick = { onOpenGithub() }) { Text("GitHub 连接") }
         }
         TextButton(enabled = !busy, onClick = { revision++ }) {
             Text(stringResource(R.string.next_tools_refresh))
@@ -187,6 +205,24 @@ fun NextToolsScene(
                     }, enabled = !busy && serverId.isNotBlank() && endpoint.isNotBlank()) {
                         Text(stringResource(R.string.next_tools_connect))
                     }
+                }
+            }
+            if (page == NextToolsPage.GITHUB) {
+                Text(if (facts.githubConfigured) "已保存 GitHub 凭据（未验证当前权限）" else "尚未配置 GitHub")
+                OutlinedTextField(
+                    githubToken, { githubToken = it },
+                    visualTransformation = PasswordVisualTransformation(),
+                    label = { Text("GitHub 访问令牌") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                Button(onClick = {
+                    val token = githubToken
+                    githubToken = ""
+                    request(ToolsUiCommand.ConfigureGitHub(token), "GitHub 凭据已提交；实际权限需调用时校验")
+                }, enabled = !busy && githubToken.isNotBlank()) { Text("保存凭据") }
+                if (facts.githubConfigured) {
+                    TextButton(onClick = { confirmClearGithub = true }, enabled = !busy) { Text("移除 GitHub 凭据") }
                 }
             }
             if (page == NextToolsPage.PLUGINS) {
