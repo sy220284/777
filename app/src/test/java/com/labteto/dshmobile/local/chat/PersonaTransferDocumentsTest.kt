@@ -70,10 +70,10 @@ class PersonaTransferDocumentsTest {
                         content = "后来出现的另一座城市", keywords = listOf("城市"),
                         temporalScope = "act-2")),
                     facts = listOf(
-                        CharacterFact("choice", CharacterFactCategories.DEFINING_CHOICES,
+                        CharacterFact("choice", CharacterFactCategories.VALUES_AND_TRADEOFFS,
                             "决定辞职旅行", relatedFactIds = listOf("memory"),
                             provenance = CharacterFactProvenance.USER_CREATED),
-                        CharacterFact("memory", CharacterFactCategories.EMOTIONAL_IMPRINTS,
+                        CharacterFact("memory", CharacterFactCategories.BIOGRAPHY,
                             "第二幕发现一封旧信", perspective = "本人",
                             temporalScope = "act-2", provenance = CharacterFactProvenance.CANON,
                             sourceReference = "第二幕第三章"),
