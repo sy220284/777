@@ -72,10 +72,12 @@ fun UiApplicationPackAdmission.Admitted.RenderHostedScene(
             return checked
         }
         BackHandler { commit(navigation.back(restored.state)) }
-        access.renderer.Render(access.scope.copy(
+        val hosted = access.copy(scope = access.scope.copy(
             onNavigate = { target -> commit(navigation.navigate(restored.state, target)) },
             onBack = { commit(navigation.back(restored.state)) },
         ))
+        hosted.renderer.Render(hosted.scope)
+        return hosted
     }
     // No legacy-page fallback on rejected/missing scenes.
     return access
