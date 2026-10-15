@@ -510,6 +510,8 @@ internal fun ChatPersonaDialog(
         mutableStateOf(profile.facts.map(CharacterFact::category).toSet())
     }
     var addFieldsOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
+    var showAllFieldTypes by rememberSaveable(profile.id) { mutableStateOf(false) }
+    var customFieldOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
     var aiOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
     var loreOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
     var aiGenerating by remember(profile.id) { mutableStateOf(false) }
@@ -668,37 +670,63 @@ internal fun ChatPersonaDialog(
                         onClick = { visibleFields = visibleFields + "franchise"; addFieldsOpen = false },
                     )
                 }
-                availableFields.filterNot { (category, _) ->
+                val remainingFields = availableFields.filterNot { (category, _) ->
                     category in visibleFields || factDrafts.any { it.category == category }
+                }
+                val commonTypes = setOf(
+                    "personality", "biography", "relationships", "valuesAndTradeoffs", "voiceStyle",
+                )
+                remainingFields.filter { (category, _) ->
+                    showAllFieldTypes || category in commonTypes
                 }.forEach { (category, label) ->
                     SySheetChoiceRow(
                         title = stringResource(label),
                         onClick = { addFactField(category) },
                     )
                 }
+                if (!showAllFieldTypes && remainingFields.any { it.first !in commonTypes }) {
+                    SyButton(
+                        text = stringResource(R.string.persona_v4_show_more_field_types),
+                        onClick = { showAllFieldTypes = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        variant = SyButtonVariant.Ghost,
+                    )
+                }
                 SySheetChoiceRow(
                     title = stringResource(R.string.persona_v4_section_lore),
                     onClick = { loreOpen = true; addFieldsOpen = false },
                 )
-                PersonaTextField(
-                    stringResource(R.string.persona_v4_custom_field_name),
-                    customCategory,
-                    { customCategory = it },
-                    singleLine = true,
+                SySheetChoiceRow(
+                    title = stringResource(R.string.persona_v4_custom_field_name),
+                    onClick = { customFieldOpen = !customFieldOpen },
                 )
-                SyButton(
-                    text = stringResource(R.string.persona_v4_add_custom),
-                    onClick = {
-                        val category = customCategory.trim()
-                        if (category.isNotEmpty()) {
-                            addFactField(category)
-                            customCategory = ""
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    variant = SyButtonVariant.Ghost,
-                    enabled = customCategory.isNotBlank(),
-                )
+                if (customFieldOpen) {
+                    PersonaTextField(
+                        stringResource(R.string.persona_v4_custom_field_name),
+                        customCategory,
+                        { customCategory = it },
+                        singleLine = true,
+                    )
+                    SyButton(
+                        text = stringResource(R.string.persona_v4_add_custom),
+                        onClick = {
+                            val category = customCategory.trim()
+                            if (category.isNotEmpty()) {
+                                if (category == "franchise") {
+                                    visibleFields = visibleFields + category
+                                    addFieldsOpen = false
+                                } else {
+                                    addFactField(category)
+                                }
+                                customCategory = ""
+                                customFieldOpen = false
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        variant = SyButtonVariant.Ghost,
+                        enabled = customCategory.isNotBlank(),
+                    )
+                }
                 bundledPreset?.let { preset ->
                     SyButton(
                         text = stringResource(R.string.persona_v4_load_preset),
