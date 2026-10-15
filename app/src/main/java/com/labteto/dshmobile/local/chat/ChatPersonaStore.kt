@@ -67,6 +67,12 @@ object CharacterFactCategories {
         LIFE_GRAVITY, UNFINISHED_BUSINESS, RELATIONSHIPS, LIMITS_AND_COSTS,
         SENSORY_SIGNATURE, PREFERENCES_AND_HABITS, VOICE_STYLE, CUSTOM_FACTS,
     )
+    /** No longer offered for new characters; old saved facts retain their original category. */
+    val removedFromNewProfiles: Set<String> = setOf(
+        DEFINING_CHOICES, EMOTIONAL_IMPRINTS, LIFE_GRAVITY,
+        UNFINISHED_BUSINESS, LIMITS_AND_COSTS, SENSORY_SIGNATURE,
+    )
+    val selectable: List<String> = canonical.filterNot { it in removedFromNewProfiles }
 }
 
 /** Actual source of character facts; unrelated chat state is owned by its runtime. */
