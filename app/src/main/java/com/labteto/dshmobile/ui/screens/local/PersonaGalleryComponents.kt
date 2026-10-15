@@ -67,7 +67,6 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryStory
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.local.chat.CharacterFactCategories
 import com.labteto.dshmobile.local.presentation.MAX_PERSONA_TRANSFER_BYTES
 import com.labteto.dshmobile.local.presentation.PERSONA_WORD_MIME
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
@@ -557,11 +556,15 @@ internal fun GalleryPill(text: String) {
 internal fun PersonaDetails(persona: PersonaProfile) {
     val identity = persona.coreIdentity
     val franchise = persona.franchise
-    // 仅调整阅读顺序，不改变事实列表原始存储顺序，也不丢弃旧版分类。
+    // UI 仅负责阅读顺序，不读取业务层的分类策略；历史事实和存储顺序不变。
+    val preferredOrder = listOf(
+        "personality", "valuesAndTradeoffs", "selfNarrative", "subjectiveBeliefs",
+        "identityGap", "preferencesAndHabits", "voiceStyle", "biography", "relationships",
+    )
     val facts = persona.facts.filter { it.content.isNotBlank() }.sortedBy { fact ->
-        val index = CharacterFactCategories.selectable.indexOf(fact.category)
+        val index = preferredOrder.indexOf(fact.category)
         when {
-            fact.category == CharacterFactCategories.CUSTOM_FACTS -> 1000
+            fact.category == "customFacts" -> 1000
             index >= 0 -> index
             else -> 900
         }
