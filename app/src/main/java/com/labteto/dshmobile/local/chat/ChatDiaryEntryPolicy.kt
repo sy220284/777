@@ -15,7 +15,7 @@ internal object ChatDiaryEntryPolicy {
         // this is an alternative inside the original diary pipeline, not a second writer.
         val thoughtful = privateReflection.length >= MIN_SUBSTANTIVE_REFLECTION_CHARS
         if (importance < MIN_IMPORTANCE) return null
-        if (event.length < if (thoughtful) MIN_THOUGHT_EVENT_CHARS else MIN_EVENT_CHARS) return null
+        if (event.length < (if (thoughtful) MIN_THOUGHT_EVENT_CHARS else MIN_EVENT_CHARS)) return null
         if (significance != "MAJOR" && importance < MINOR_IMPORTANCE && !thoughtful) return null
         if (!eventGrounded(event, request.evidenceText)) return null
 
