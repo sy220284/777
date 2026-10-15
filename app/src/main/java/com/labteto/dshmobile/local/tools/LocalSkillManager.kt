@@ -175,7 +175,16 @@ internal class LocalSkillStore(
                         '\\' !in relative && relative != "SKILL.md") { "技能资源路径无效" }
                     val path = ".dsh/skills/${preset.id}/$relative"
                     val target = File(workspace.path, path)
-                    if (!target.exists() || target.readText() != text) workspace.write(path, text)
+                    val marker = File(skillsDir, "${preset.id}/.bundled-resource-${rawFingerprint(relative)}")
+                    val existing = runCatching { target.readText() }.getOrNull()
+                    val clean = existing == text || (
+                        marker.isFile && rawFingerprint(existing.orEmpty()) == marker.readText().trim()
+                    )
+                    // Never overwrite an untracked user-edited MOBILE.md, CLI.md or other asset.
+                    if (existing == null || clean) {
+                        if (existing != text) workspace.write(path, text)
+                        marker.writeText(rawFingerprint(text) + "\n")
+                    }
                 }
             }
             val baseDocument = buildLocalSkillDocument(
@@ -217,6 +226,10 @@ internal class LocalSkillStore(
     private fun withModelInvocationDisabled(document: String, disabled: Boolean): String =
         if (disabled) document.replaceFirst("\n---\n", "\ndisable-model-invocation: true\n---\n")
         else document
+
+    private fun rawFingerprint(text: String): String =
+        MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
 
     private fun skillFingerprint(document: String): String {
         // Invocation is a separate user preference, not a modification of the rule body.
@@ -314,7 +327,12 @@ internal class LocalSkillStore(
                 require(relative.split('/').none { it.isBlank() || it == "." || it == ".." } &&
                     '\\' !in relative && relative != "SKILL.md") { "技能资源路径无效" }
                 val path = ".dsh/skills/$id/$relative"
-                if (!File(workspace.path, path).exists()) workspace.write(path, text)
+                val target = File(workspace.path, path)
+                if (!target.exists()) workspace.write(path, text)
+                if (target.readText() == text) {
+                    File(skillsDir, "$id/.bundled-resource-${rawFingerprint(relative)}")
+                        .writeText(rawFingerprint(text) + "\n")
+                }
             }
         }
         val bundledDocument = buildLocalSkillDocument(id, preset.description, preset.instructions, preset.whenToUse, preset.title)
