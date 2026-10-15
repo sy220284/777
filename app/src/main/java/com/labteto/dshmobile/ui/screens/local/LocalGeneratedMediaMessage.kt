@@ -54,8 +54,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -72,6 +70,7 @@ import com.labteto.dshmobile.local.model.LocalMediaVideoTask
 import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -523,8 +522,12 @@ private fun MediaImageDetailDialog(file: File?, remoteUrl: String?, onDismiss: (
         offsetX = if (next <= 1f) 0f else (offsetX + panChange.x).coerceIn(-1100f, 1100f)
         offsetY = if (next <= 1f) 0f else (offsetY + panChange.y).coerceIn(-1100f, 1100f)
     }
-    Dialog(onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    SyResponsiveSheet(
+        title = null,
+        onDismiss = onDismiss,
+        scrollable = true,
+        showDragHandle = false,
+    ) {
         Column(
             modifier = Modifier.fillMaxWidth().heightIn(max = 740.dp)
                 .background(Color.Black)
