@@ -11,14 +11,15 @@ class CharacterFactsV4Test {
 
     @Test fun newPersonasOfferTenFactCategoriesWithoutDiscardingHistoricalFacts() {
         assertEquals(10, CharacterFactCategories.selectable.size)
-        assertEquals(6, CharacterFactCategories.removedFromNewProfiles.size)
-        assertEquals(16, CharacterFactCategories.canonical.size)
+        assertEquals(10, CharacterFactCategories.canonical.size)
+        assertEquals(CharacterFactCategories.canonical, CharacterFactCategories.selectable)
         assertTrue(CharacterFactCategories.selectable.contains(CharacterFactCategories.PERSONALITY))
         assertTrue(CharacterFactCategories.selectable.contains(CharacterFactCategories.VOICE_STYLE))
-        assertTrue(CharacterFactCategories.removedFromNewProfiles
-            .none { it in CharacterFactCategories.selectable })
-        assertTrue(CharacterFactCategories.canonical
-            .containsAll(CharacterFactCategories.removedFromNewProfiles))
+        listOf(
+            "definingChoices", "emotionalImprints", "lifeGravity",
+            "unfinishedBusiness", "limitsAndCosts", "sensorySignature",
+        ).forEach { assertFalse(CharacterFactCategories.isSupported(it)) }
+        assertTrue(CharacterFactCategories.isSupported("myOriginalCustomFact"))
         assertEquals(
             listOf(
                 CharacterFactCategories.PERSONALITY,
@@ -168,7 +169,7 @@ class CharacterFactsV4Test {
             name = "阿云",
             coreIdentity = "咖啡师",
             facts = listOf(
-                CharacterFact("life", CharacterFactCategories.LIFE_GRAVITY, "周末会去看外婆"),
+                CharacterFact("life", CharacterFactCategories.BIOGRAPHY, "周末会去看外婆"),
                 CharacterFact("bio", CharacterFactCategories.BIOGRAPHY, "从小住在江南"),
             ),
             lifeContext = "旧版本生活资料：每天驾驶宇宙飞船",
@@ -186,9 +187,9 @@ class CharacterFactsV4Test {
         val persona = PersonaProfile(
             name = "阿云", coreIdentity = "档案管理员",
             facts = listOf(
-                CharacterFact("decision", CharacterFactCategories.DEFINING_CHOICES,
+                CharacterFact("decision", CharacterFactCategories.VALUES_AND_TRADEOFFS,
                     "阿云决定守护旧图书馆", relatedFactIds = listOf("memory")),
-                CharacterFact("memory", CharacterFactCategories.EMOTIONAL_IMPRINTS,
+                CharacterFact("memory", CharacterFactCategories.BIOGRAPHY,
                     "童年的那场洪水留下无法磨灭的记忆",
                     temporalScope = "act-2", sourceReference = "原作第二幕"),
             ),
@@ -241,7 +242,7 @@ class CharacterFactsV4Test {
                 CharacterFact("later", CharacterFactCategories.PERSONALITY,
                     "得知真相后变得格外谨慎", temporalScope = "act-2",
                     provenance = CharacterFactProvenance.CANON),
-                CharacterFact("later-life", CharacterFactCategories.LIFE_GRAVITY,
+                CharacterFact("later-life", CharacterFactCategories.BIOGRAPHY,
                     "夜里会整理那封密信", temporalScope = "act-2"),
             ),
         )
@@ -510,9 +511,9 @@ class CharacterFactsV4Test {
         assertFalse(prompt.contains("来自火星"))
         assertFalse(prompt.contains("驾驶宇宙飞船"))
         assertFalse(prompt.contains("预知未来"))
-        // A genuinely legacy-only in-memory profile retains its fallback until converted.
+        // Legacy-only prose is never projected even when canonical identity is absent.
         val old = projector.project(profile.copy(coreIdentity = ""),
             ChatCharacterState(), ChatContextState(), "你的背景？", null)
-        assertTrue(old.stablePrompt.contains("来自火星"))
+        assertFalse(old.stablePrompt.contains("来自火星"))
     }
 }
