@@ -109,7 +109,7 @@ internal class ChatInteractionPromptBuilder {
         appendLine("- continuity 只保留当前有效的关键事件、决定和待续事项，合并重复，不复制旧台词。")
         appendLine("- NONE=无需记录显著长期事件，但仍必须更新本轮有证据的短期状态、结清与纠正；MINOR=有短期或连续性事件；MAJOR=重大关系事件、共同经历或稳定事实。")
         appendLine("- NONE 下新增非空状态时须在 stateEvidence 提供本轮双方真实原话。显式空字段清理不受重要程度阻止；不能编造新状态。")
-        appendLine("- suggestions 固定为空；不得替用户作重大决定。现实关系建议禁止跟踪、胁迫、欺骗操控或绕过明确拒绝。")
+        appendLine("- suggestions 固定为空；不得替用户作重大决定。")
     }.trim()
 
     fun suggestionsPrompt(
@@ -153,7 +153,6 @@ internal class ChatInteractionPromptBuilder {
         appendLine("- 用户明确纠正和当前上下文决定承接节奏；模糊表达要结合前后行为与关系语境理解，不把单个模糊推辞自动解释为关系拒绝；针对当前行为的清晰明确停止、退出或拒绝继续一次即生效。")
         appendLine("- 直接承接人物最后一句，按最近对话中真实的用户表达和当前关系自然写作，不使用旧画像评分。")
         appendLine("- 不用同义改写凑数，不虚构事实，不替用户作重大决定。")
-        appendLine("- 现实关系建议不得包含跟踪、胁迫、欺骗操控或绕过明确拒绝。")
     }.trim()
 
     private companion object {
