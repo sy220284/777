@@ -1449,7 +1449,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 color = colors.textSecondary,
             )
             state.replySuggestions.filter { it.text.isNotBlank() }.forEach { suggestion ->
-                SyMaterialSurface(
+                Surface(
                     onClick = {
                         drafts.putBoundedLocalDraft(state.sessionId, suggestion.text)
                         showReplySuggestions = false
@@ -1457,7 +1457,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !state.running,
                     shape = DsShapes.row,
-                    tier = SyMaterialTier.L1_SECTION,
+                    color = Color.Transparent,
                 ) {
                     Column(
                         Modifier.heightIn(min = SyMetric.touch)
