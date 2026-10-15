@@ -73,6 +73,35 @@ class LocalApplicationUiHostDecisionTest {
         assertEquals(7, renderableScenes.count { it.value.startsWith("route.") })
     }
 
+    @Test fun emptyPersistedPackNameCannotQuietlyRestoreLegacy() {
+        val result = decideApplicationUi("", emptyList(), requirements)
+        assertTrue(result is LocalApplicationUiDecision.Unavailable)
+    }
+
+    @Test fun twoSeparateFullCatalogPacksCannotReuseEachOthersNavigationState() {
+        val v6 = pack("full-v6", renderableScenes, renderableScenes)
+        val next = pack("full-next", renderableScenes, renderableScenes)
+        val packs = listOf(v6, next)
+        val first = decideApplicationUi("full-v6", packs, requirements)
+        val second = decideApplicationUi("full-next", packs, requirements)
+        assertTrue(first is LocalApplicationUiDecision.Hosted)
+        assertTrue(second is LocalApplicationUiDecision.Hosted)
+        val firstNav = com.labteto.dshmobile.uihost.UiHostSceneNavigation(
+            required, v6.manifest, UiSceneId("route.home"))
+        val secondNav = com.labteto.dshmobile.uihost.UiHostSceneNavigation(
+            required, next.manifest, UiSceneId("route.home"))
+        val settings = firstNav.navigate(firstNav.initial, UiSceneId("route.settings"))
+        assertTrue(settings is com.labteto.dshmobile.uihost.UiSceneNavigationResult.Changed)
+        val foreign = (settings as com.labteto.dshmobile.uihost.UiSceneNavigationResult.Changed).state
+        assertEquals(
+            com.labteto.dshmobile.uihost.UiSceneNavigationResult.Rejected(
+                com.labteto.dshmobile.uihost.UiSceneNavigationRejection.WRONG_PACK),
+            secondNav.restore(foreign),
+        )
+        val local = secondNav.navigate(secondNav.initial, UiSceneId("route.settings"))
+        assertTrue(local is com.labteto.dshmobile.uihost.UiSceneNavigationResult.Changed)
+    }
+
     @Test fun staleSelectionMustNotSilentlyRenderOldV6() {
         val decision = decideApplicationUi("uninstalled", emptyList(), requirements)
         assertTrue(decision is LocalApplicationUiDecision.Unavailable)

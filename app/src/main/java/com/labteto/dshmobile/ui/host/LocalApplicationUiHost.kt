@@ -64,7 +64,7 @@ internal fun decideApplicationUi(
     installed: Collection<UiApplicationScenePack>,
     requirements: UiPackAdmissionRequirements,
 ): LocalApplicationUiDecision {
-    if (selectedId.isNullOrBlank() || selectedId == LEGACY_V6_APP_UI)
+    if (selectedId == null || selectedId == LEGACY_V6_APP_UI)
         return LocalApplicationUiDecision.Legacy
     val admission = UiApplicationPackRegistry(installed).select(selectedId, requirements)
     return when (admission) {
