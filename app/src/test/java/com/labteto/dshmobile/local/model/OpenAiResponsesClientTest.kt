@@ -1411,10 +1411,24 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
-    fun knownModernGptPlanModelsExposeNativeImageToolButProxyDoesNot() {
+    fun planPayloadCannotEnableImageGenerationEvenWhenForcedByCaller() {
+        val payload = client.buildPayload(
+            model = "gpt-6-astra",
+            messages = listOf(buildJsonObject { put("role", "user"); put("content", "画一只猫") }),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            planSharing = true,
+            enableImageGenerationTool = true,
+        )
+        assertFalse("tool_choice" in payload)
+        assertFalse("tools" in payload)
+    }
+
+    @Test
+    fun knownModernGptPlanModelsCannotUsePlanImageTool() {
         listOf("gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna",
             "gpt-5.6", "gpt-5.6-sol", "gpt-5.5").forEach { model ->
-            assertTrue(resolveOpenAiImageGenerationToolEnabled(
+            assertFalse(resolveOpenAiImageGenerationToolEnabled(
                 baseUrl = "https://api.openai.com/v1", model = model,
                 planSharing = true, requested = true,
             ))
@@ -1442,7 +1456,7 @@ class OpenAiResponsesClientTest {
                 }),
                 tools = JsonArray(emptyList()),
                 temperature = null,
-                planSharing = true,
+                planSharing = false,
                 enableImageGenerationTool = true,
             )
             assertEquals("image_generation",
@@ -1463,7 +1477,7 @@ class OpenAiResponsesClientTest {
                 }),
                 tools = JsonArray(emptyList()),
                 temperature = null,
-                planSharing = true,
+                planSharing = false,
                 enableImageGenerationTool = true,
             )
             assertFalse("tool_choice" in payload)
@@ -1476,7 +1490,7 @@ class OpenAiResponsesClientTest {
             }),
             tools = JsonArray(emptyList()),
             temperature = null,
-            planSharing = true,
+            planSharing = false,
             enableImageGenerationTool = false,
         )
         assertFalse("tool_choice" in disabled)
@@ -1500,6 +1514,7 @@ class OpenAiResponsesClientTest {
             tools = JsonArray(emptyList()),
             temperature = null,
             enableImageGenerationTool = true,
+            planSharing = false,
         )
         assertEquals("image_generation",
             payload["tool_choice"]?.jsonObject?.get("type")?.jsonPrimitive?.content)
@@ -1521,7 +1536,7 @@ class OpenAiResponsesClientTest {
             }),
             tools = JsonArray(emptyList()),
             temperature = null,
-            planSharing = true,
+            planSharing = false,
             enableImageGenerationTool = true,
         )
         listOf("请根据附图重新生成一张图片，修改要求：把背景改成蓝色",

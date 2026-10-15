@@ -167,7 +167,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     requested = true,
                 )
             ) {
-                error("当前 GPT 套餐模型 ${snapshot.modelState.model} 未接通聊天生图工具。请切换支持生图的 GPT 型号，或在「+」中选择已配置的图片生成服务。")
+                error("ChatGPT 套餐授权暂不支持图片生成或编辑。请在「+」中选择已配置的独立图片生成服务，不会自动改为付费 API。")
             }
 
             val branchEligible = snapshot.transcriptIndex.branchingEligible

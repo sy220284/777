@@ -275,6 +275,8 @@ class OpenAiResponsesClient @Inject constructor(
         promptCacheTtl: String? = null,
         enableImageGenerationTool: Boolean = false,
     ): JsonObject = buildJsonObject {
+        // Do not trust caller opt-in: plan sharing never accepts image_generation.
+        val nativeImageToolEnabled = enableImageGenerationTool && !planSharing
         put("model", model)
         responseInstructions(messages).takeIf(String::isNotBlank)?.let { put("instructions", it) }
         put("input", responseInput(messages))
@@ -307,10 +309,10 @@ class OpenAiResponsesClient @Inject constructor(
             put("include", buildJsonArray { add(JsonPrimitive("reasoning.encrypted_content")) })
         }
         val adaptedTools = responseTools(tools, planSharing, enforceOpenAiToolSchema)
-        if (adaptedTools.isNotEmpty() || enableImageGenerationTool) {
+        if (adaptedTools.isNotEmpty() || nativeImageToolEnabled) {
             put("tools", buildJsonArray {
                 adaptedTools.forEach(::add)
-                if (enableImageGenerationTool) {
+                if (nativeImageToolEnabled) {
                     add(buildJsonObject {
                         put("type", "image_generation")
                         if (explicitImageEditRequested(messages)) put("action", "edit")
@@ -320,7 +322,7 @@ class OpenAiResponsesClient @Inject constructor(
         }
         // Explicit image commands must invoke the actual built-in tool, not return a text-only workaround.
         // Only force when the current Responses request already passed native-tool eligibility.
-        if (enableImageGenerationTool && explicitImageGenerationRequested(messages)) {
+        if (nativeImageToolEnabled && explicitImageGenerationRequested(messages)) {
             put("tool_choice", buildJsonObject { put("type", LOCAL_NATIVE_TOOL_IMAGE_GENERATION) })
         }
         if (!planSharing) temperature?.let { put("temperature", it) }

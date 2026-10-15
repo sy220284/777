@@ -86,6 +86,7 @@ internal fun resolveOpenAiImageGenerationToolEnabled(
     requested: Boolean,
 ): Boolean =
     requested &&
+        !planSharing && // ChatGPT plan OAuth cannot invoke the hosted image_generation tool.
         usesOfficialOpenAiResponsesContract(baseUrl, planSharing) &&
         supportsOpenAiImageGenerationModel(model)
 
