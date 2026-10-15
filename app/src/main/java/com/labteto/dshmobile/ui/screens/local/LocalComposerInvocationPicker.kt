@@ -67,7 +67,7 @@ internal fun LocalComposerInvocationPicker(
     ) {
         Box {
             IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(40.dp)) {
-                Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.composer_invocation_add),
+                Icon(FeatherIcons.Tool, contentDescription = stringResource(R.string.composer_invocation_add),
                     tint = colors.textSecondary, modifier = Modifier.size(20.dp))
             }
             SyPopupMenu(
