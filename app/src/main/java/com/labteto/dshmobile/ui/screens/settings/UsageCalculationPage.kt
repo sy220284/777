@@ -180,11 +180,13 @@ internal fun UsageCalculationPage(
             label = stringResource(R.string.usage_calculation_total_tokens),
             value = formatTokens(modeAnalytics.aggregate.totalTokens),
             modifier = Modifier.weight(1f),
+            testTag = "usagePrimaryMetric",
         )
         CompactMetric(
             label = stringResource(R.string.usage_today),
             value = formatTokens(todayAggregate(days).totalTokens),
             modifier = Modifier.weight(1f),
+            testTag = "usagePrimaryMetric",
         )
     }
 
