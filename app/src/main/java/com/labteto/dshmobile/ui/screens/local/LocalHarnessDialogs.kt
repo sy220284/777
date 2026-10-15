@@ -510,7 +510,6 @@ internal fun ChatPersonaDialog(
         mutableStateOf(profile.facts.map(CharacterFact::category).toSet())
     }
     var addFieldsOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
-    var showAllFieldTypes by rememberSaveable(profile.id) { mutableStateOf(false) }
     var customFieldOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
     var aiOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
     var loreOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
@@ -597,37 +596,31 @@ internal fun ChatPersonaDialog(
             "relationships" to R.string.persona_v4_relationships,
             "customFacts" to R.string.persona_v4_custom_facts,
         )
-        Text(
-            stringResource(R.string.local_persona_intro_simple),
-            style = DsType.small13.withReadingWeight(),
-            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
-        )
         PersonaFormSection(stringResource(R.string.persona_v4_section_core_simple)) {
             PersonaTextField(stringResource(R.string.local_persona_name), name, { name = it }, singleLine = true)
             PersonaTextField(stringResource(R.string.persona_v4_core_identity), coreIdentity, { coreIdentity = it })
         }
         availableFields.filterNot { it.first == "customFacts" }.forEach { (category, label) ->
-            if (category in visibleFields || factDrafts.any { it.category == category }) {
-                PersonaFactCategoryEditor(
-                    category = category,
-                    title = stringResource(label),
-                    facts = factDrafts,
-                    onChange = { factDrafts = it },
-                )
-            }
-        }
-        // 社会关系之后才补充所属世界，自定义设定始终放在最后。
-        if (franchise.isNotBlank() || "franchise" in visibleFields) {
-            PersonaTextField(stringResource(R.string.local_persona_franchise), franchise, { franchise = it }, singleLine = true)
-        }
-        if ("customFacts" in visibleFields || factDrafts.any { it.category == "customFacts" }) {
             PersonaFactCategoryEditor(
-                category = "customFacts",
-                title = stringResource(R.string.persona_v4_custom_facts),
+                category = category,
+                title = stringResource(label),
                 facts = factDrafts,
                 onChange = { factDrafts = it },
             )
         }
+        // 社会关系之后才补充所属世界，自定义设定始终放在最后。
+        PersonaTextField(
+            stringResource(R.string.local_persona_franchise),
+            franchise,
+            { franchise = it },
+            singleLine = true,
+        )
+        PersonaFactCategoryEditor(
+            category = "customFacts",
+            title = stringResource(R.string.persona_v4_custom_facts),
+            facts = factDrafts,
+            onChange = { factDrafts = it },
+        )
         factDrafts.map(CharacterFact::category).distinct()
             .filterNot { category -> availableFields.any { it.first == category } }
             .filterNot { it == "franchise" }
@@ -676,45 +669,6 @@ internal fun ChatPersonaDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
             ) {
-                val remainingFields = availableFields.filterNot { (category, _) ->
-                    category in visibleFields || factDrafts.any { it.category == category }
-                }
-                // 首屏先提供最接近人物内核的类别；其余内容按向外顺序展开。
-                val commonTypes = setOf(
-                    "personality", "valuesAndTradeoffs", "selfNarrative",
-                    "subjectiveBeliefs", "identityGap",
-                )
-                remainingFields.filter { (category, _) ->
-                    category != "customFacts" && (showAllFieldTypes || category in commonTypes)
-                }.forEach { (category, label) ->
-                    SySheetChoiceRow(
-                        title = stringResource(label),
-                        onClick = { addFactField(category) },
-                    )
-                }
-                if (!showAllFieldTypes && (
-                        remainingFields.any { it.first !in commonTypes } ||
-                        (franchise.isBlank() && "franchise" !in visibleFields)
-                    )) {
-                    SyButton(
-                        text = stringResource(R.string.persona_v4_show_more_field_types),
-                        onClick = { showAllFieldTypes = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        variant = SyButtonVariant.Ghost,
-                    )
-                }
-                if (showAllFieldTypes && franchise.isBlank() && "franchise" !in visibleFields) {
-                    SySheetChoiceRow(
-                        title = stringResource(R.string.local_persona_franchise),
-                        onClick = { visibleFields = visibleFields + "franchise"; addFieldsOpen = false },
-                    )
-                }
-                if (showAllFieldTypes && remainingFields.any { it.first == "customFacts" }) {
-                    SySheetChoiceRow(
-                        title = stringResource(R.string.persona_v4_custom_facts),
-                        onClick = { addFactField("customFacts") },
-                    )
-                }
                 SySheetChoiceRow(
                     title = stringResource(R.string.persona_v4_section_lore),
                     onClick = { loreOpen = true; addFieldsOpen = false },
