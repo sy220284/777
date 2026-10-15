@@ -32,14 +32,14 @@ class LocalMediaStudioViewModel @Inject constructor(private val creation: LocalM
         catch (_: Exception) { /* The store keeps its actionable recovery error visible. */ }
     }
     suspend fun dismissCreationJob(id: String) = creation.dismissCreationJob(id)
-    suspend fun submitImage(route: LocalMediaOffer, prompt: String, ratio: String, sessionId: String) = creation.submitImage(route, prompt, ratio, sessionId)
-    suspend fun submitSpeech(route: LocalMediaOffer, text: String, voice: String, sessionId: String) = creation.submitSpeech(route, text, voice, sessionId)
-    suspend fun submitTranscribe(route: LocalMediaOffer, uri: Uri, sessionId: String) = creation.submitTranscribe(route, uri, sessionId)
+    suspend fun submitImage(route: LocalMediaOffer, prompt: String, ratio: String, sessionId: String, sourceMessageId: String? = null) = creation.submitImage(route, prompt, ratio, sessionId, sourceMessageId)
+    suspend fun submitSpeech(route: LocalMediaOffer, text: String, voice: String, sessionId: String, sourceMessageId: String? = null) = creation.submitSpeech(route, text, voice, sessionId, sourceMessageId)
+    suspend fun submitTranscribe(route: LocalMediaOffer, uri: Uri, sessionId: String, sourceMessageId: String? = null) = creation.submitTranscribe(route, uri, sessionId, sourceMessageId)
     fun resultFile(item: LocalMediaResult) = creation.resultFile(item)
     fun videoFile(task: LocalMediaVideoTask) = creation.videoFile(task)
     suspend fun removeResult(id: String) = creation.removeResult(id)
     suspend fun retryVideoSave(id: String) = creation.retryVideoSave(id)
     suspend fun voices(route: LocalMediaOffer) = creation.voices(route)
-    suspend fun createVideo(route: LocalMediaOffer, prompt: String, sessionId: String? = null) = creation.createVideo(route, prompt, sessionId)
+    suspend fun createVideo(route: LocalMediaOffer, prompt: String, sessionId: String? = null, sourceMessageId: String? = null) = creation.createVideo(route, prompt, sessionId, sourceMessageId)
     suspend fun refreshVideo(route: LocalMediaOffer, taskId: String) = creation.refreshVideo(route, taskId)
 }

@@ -16,6 +16,8 @@ data class LocalMediaResult(
     val sessionId: String? = null,
     val description: String? = null,
     val textOutput: String? = null,
+    /** Originating chat message, not a fabricated assistant turn. */
+    val sourceMessageId: String? = null,
 ) {
     init { require(listOf(fileName, remoteUrl, textOutput).count { it != null } == 1) }
 }

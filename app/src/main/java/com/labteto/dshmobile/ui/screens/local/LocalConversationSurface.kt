@@ -426,6 +426,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
     var showMediaStudio by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var mediaInitialPrompt by rememberSaveable(state.sessionId) { mutableStateOf("") }
+    var mediaSourceMessageId by rememberSaveable(state.sessionId) { mutableStateOf<String?>(null) }
     var mediaInitialKind by rememberSaveable(state.sessionId) {
         mutableStateOf(com.labteto.dshmobile.local.model.LocalMediaKind.IMAGE.name)
     }
@@ -1001,6 +1002,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 },
                                 onEdit = { message -> editingUserMessage = message },
                                 onCreateMedia = { message, kind ->
+                                    mediaSourceMessageId = message.id
                                     mediaInitialPrompt = mediaCreativeDraft(
                                         kind, message.content,
                                         if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) state.chatPersona.name else "",
@@ -1560,6 +1562,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     onClick = {
                         showAttachmentPicker = false
                         mediaInitialPrompt = ""
+                        mediaSourceMessageId = null
                         mediaInitialKind = com.labteto.dshmobile.local.model.LocalMediaKind.IMAGE.name
                         showMediaStudio = true
                     },
@@ -1612,6 +1615,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 viewModel = mediaStudioViewModel,
                 onDelivered = { showMediaStudio = false },
                 initialPrompt = mediaInitialPrompt,
+                sourceMessageId = mediaSourceMessageId,
                 personaVoiceStyle = if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled)
                     state.chatPersona.facts.filter { it.category == "voiceStyle" }.joinToString("；") { it.content }
                 else "",

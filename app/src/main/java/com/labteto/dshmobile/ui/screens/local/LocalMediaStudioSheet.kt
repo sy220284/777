@@ -82,6 +82,7 @@ internal fun LocalMediaStudioSheetContent(
     viewModel: LocalMediaStudioViewModel = hiltViewModel(),
     initialPrompt: String = "",
     personaVoiceStyle: String = "",
+    sourceMessageId: String? = null,
     initialKind: LocalMediaKind = LocalMediaKind.IMAGE,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
@@ -141,7 +142,7 @@ internal fun LocalMediaStudioSheetContent(
         if (uri != null && selected != null) {
             val chosen = selected
             submit(chosen) {
-                viewModel.submitTranscribe(chosen, uri, sessionId)
+                viewModel.submitTranscribe(chosen, uri, sessionId, sourceMessageId)
                 if (chosen.id == activeOfferId) onDelivered()
             }
         }
@@ -241,7 +242,7 @@ internal fun LocalMediaStudioSheetContent(
                     SyButton(text = stringResource(R.string.minimax_media_create_image),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            viewModel.submitImage(selected, prompt, ratio, sessionId)
+                            viewModel.submitImage(selected, prompt, ratio, sessionId, sourceMessageId)
                             if (selected.id == activeOfferId) onDelivered()
                         } })
                 }
@@ -249,7 +250,7 @@ internal fun LocalMediaStudioSheetContent(
                     SyButton(text = stringResource(R.string.minimax_media_start_video),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            val task = viewModel.createVideo(selected, prompt, sessionId)
+                            val task = viewModel.createVideo(selected, prompt, sessionId, sourceMessageId)
                             viewedVideoTaskId = task.id
                             onDelivered()
                         } })
@@ -364,7 +365,7 @@ internal fun LocalMediaStudioSheetContent(
                         enabled = !busy && prompt.isNotBlank() && voiceId.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            viewModel.submitSpeech(selected, prompt, voiceId, sessionId)
+                            viewModel.submitSpeech(selected, prompt, voiceId, sessionId, sourceMessageId)
                             if (selected.id == activeOfferId) onDelivered()
                         } })
                     audioFile?.let { file ->
