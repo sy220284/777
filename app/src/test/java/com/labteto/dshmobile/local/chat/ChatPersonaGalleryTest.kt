@@ -486,17 +486,21 @@ class ChatPersonaGalleryTest {
     @Test
     fun selectedInspectionSuggestionAppendsOnceAndKeepsExistingPersona() {
         val profile = PersonaProfile(
-            name = "小岚",
-            initialUserImpression = "和用户是多年好友",
-            voiceSamples = listOf("少来"),
+            name = "小岚", coreIdentity = "设计师",
+            facts = listOf(
+                CharacterFact("belief", CharacterFactCategories.SUBJECTIVE_BELIEFS,
+                    "和用户是多年好友", provenance = CharacterFactProvenance.USER_CREATED),
+                CharacterFact("voice", CharacterFactCategories.VOICE_STYLE,
+                    "少来", provenance = CharacterFactProvenance.USER_CREATED),
+            ),
         )
         val suggestion = PersonaAppendSuggestion(
-            field = "initialUserImpression",
+            field = "subjectiveBeliefs",
             value = "私下会叫用户小名",
             evidence = "对话里多次使用小名",
         )
         val phrase = PersonaAppendSuggestion(
-            field = "voiceSamples",
+            field = "voiceStyle",
             value = "少来",
             evidence = "已有内容，不应重复",
         )
@@ -738,9 +742,14 @@ class ChatPersonaGalleryTest {
         val saved = source.save(
             persona = PersonaProfile(
                 name = "阿青",
-                portrait = "剑客".repeat(600),
-                lifeContext = "很长的背景".repeat(600),
-                stableTraits = listOf("克制".repeat(300)),
+                coreIdentity = "剑客".repeat(600),
+                facts = listOf(
+                    CharacterFact("bio", CharacterFactCategories.BIOGRAPHY,
+                        "剑客生活，背景悠长".repeat(100),
+                        provenance = CharacterFactProvenance.USER_CREATED),
+                    CharacterFact("trait", CharacterFactCategories.PERSONALITY,
+                        "克制".repeat(300), provenance = CharacterFactProvenance.USER_CREATED),
+                ),
             ),
             sourceSessionId = "session-a",
             history = emptyList(),
@@ -754,6 +763,7 @@ class ChatPersonaGalleryTest {
             .importPersona(payload)
         assertEquals("阿青", imported.persona.name)
         assertTrue(imported.persona.factText(CharacterFactCategories.BIOGRAPHY).startsWith("剑客"))
+        assertTrue(imported.persona.coreIdentity.startsWith("剑客"))
         assertTrue(imported.persona.factText(CharacterFactCategories.PERSONALITY).startsWith("克制"))
         assertTrue(imported.persona.portrait.isEmpty())
     }
@@ -763,7 +773,7 @@ class ChatPersonaGalleryTest {
         assertFalse(isMeaningfulGalleryPersona(PersonaProfile()))
         assertTrue(
             isMeaningfulGalleryPersona(
-                PersonaProfile(name = "小岚", portrait = "花店店主"),
+                PersonaProfile(name = "小岚", coreIdentity = "花店店主"),
             ),
         )
     }
