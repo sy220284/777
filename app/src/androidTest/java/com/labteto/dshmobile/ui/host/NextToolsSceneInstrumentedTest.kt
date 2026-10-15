@@ -42,6 +42,9 @@ class NextToolsSceneInstrumentedTest {
         override suspend fun installedSkills(): List<UiSkillSnapshot> =
             listOf(UiSkillSnapshot("my-skill", "sample purpose", true, "演示技能"))
         override suspend fun presetSkills(): List<UiPresetSkillSnapshot> = emptyList()
+        override suspend fun curatedGitHubSkills(): List<String> = emptyList()
+        override suspend fun installGitHubSkill(link: String): String =
+            error("not used in this test")
         override suspend fun readSkillDocument(id: String): String = ""
         override suspend fun installPreset(id: String) = Unit
         override suspend fun createSkill(id: String, displayName: String, description: String, instructions: String) = Unit
