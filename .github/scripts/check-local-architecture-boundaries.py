@@ -757,6 +757,13 @@ for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT):
             f"{relative} introduces a new aggregate write seam; "
             "use a domain StatePort or explicit Runtime projection command"
         )
+    allowed_aggregate_flow_declarations = {
+        "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeProjection.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureStatePortComposition.kt",
+    }
+    if re.search(r"\bMutableStateFlow\s*<\s*LocalHarnessState\s*>", source) and relative not in allowed_aggregate_flow_declarations:
+        die(f"{relative} declares an aggregate writable flow outside the Runtime/adapter owner")
 
 for feature_name in ("chat", "work"):
     for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / feature_name):

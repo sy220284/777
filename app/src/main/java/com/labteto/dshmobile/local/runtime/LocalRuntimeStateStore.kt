@@ -220,7 +220,7 @@ class LocalRuntimeStateStore internal constructor(
         )
 
     @Synchronized
-    internal fun initialize(initialState: LocalHarnessState): MutableStateFlow<LocalHarnessState> {
+    internal fun initialize(initialState: LocalHarnessState) {
         check(!initialized) { "LocalRuntimeStateStore 已完成初始化" }
         require(initialState.sessionId.isNotBlank()) { "初始会话编号不能为空" }
         foregroundRunHandle.rebindSession(initialState.sessionId)
@@ -231,7 +231,6 @@ class LocalRuntimeStateStore internal constructor(
             resourceScheduler.snapshot(),
         )
         initialized = true
-        return mutable
     }
 
     internal fun publishSendFeedback(feedback: LocalSendFeedbackState) {

@@ -35,7 +35,9 @@ if __name__ == "__main__":
         print("UI color boundary guard self-test passed")
         sys.exit(0)
     violations = []
-    for directory in (UI / "components", UI / "screens"):
+    # V6 business widgets are shipped from a separate module; include them in the UI lint surface.
+    V6_FEATURES = ROOT / "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/features"
+    for directory in (UI / "components", UI / "screens", V6_FEATURES):
         for file in directory.rglob("*.kt"):
             violations.extend(violations_in_text(file.read_text(encoding="utf-8"), str(file.relative_to(ROOT))))
     # A fixed shade baked into a full-circle send/stop vector bypasses dynamic accent.
