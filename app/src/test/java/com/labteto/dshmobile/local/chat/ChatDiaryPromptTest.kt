@@ -47,6 +47,34 @@ class ChatDiaryPromptTest {
     }
 
     @Test
+    fun threeDistinctPersonasKeepTheirOwnValuesInTheDiaryGenerationPrompt() {
+        val personalities = listOf(
+            "习惯隐忍，独处时会反复权衡是否信任别人",
+            "外向爽快，遇到误会会先追问缘由",
+            "理性克制，重视承诺也尊重边界",
+        )
+        val prompts = personalities.mapIndexed { index, identity ->
+            planner.prompt(
+                persona = PersonaProfile(name = "人物$index", coreIdentity = identity),
+                state = ChatCharacterState(),
+                userMessage = "周末去看电影吧",
+                assistantMessage = "好，我记下了。",
+            )
+        }
+        assertEquals(3, prompts.distinct().size)
+        prompts.forEachIndexed { index, prompt ->
+            assertTrue(prompt.contains(personalities[index]))
+            personalities.forEachIndexed { other, description ->
+                if (other != index) assertFalse(prompt.contains(description))
+            }
+            val instruction = chatPostTurnModelMessages(prompt)
+                .first()["content"]!!.jsonPrimitive.content
+            assertTrue(instruction.contains("privateReflection"))
+            assertTrue(instruction.contains("角色说话方式取决于自身性格"))
+        }
+    }
+
+    @Test
     fun plannerPreservesStructuredDiaryDeltaForDurableProjection() {
         val plan = planner.parse(
             """
