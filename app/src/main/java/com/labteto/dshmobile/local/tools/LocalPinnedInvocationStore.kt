@@ -54,7 +54,6 @@ internal class LocalPinnedInvocationStore @Inject constructor(@ApplicationContex
     fun toggle(item: LocalPinnedInvocation): List<LocalPinnedInvocation> = synchronized(lock) {
         val previous = mutable.value
         val next = if (item in previous) previous - item else {
-            require(previous.size < 12) { "最多可以同时固定 12 个连接器和技能" }
             previous + item
         }
         save(next)
@@ -75,7 +74,7 @@ internal class LocalPinnedInvocationStore @Inject constructor(@ApplicationContex
         runCatching {
             if (!file.isFile) emptyList() else file.readLines(Charsets.UTF_8)
                 .filter(String::isNotBlank).mapNotNull(LocalPinnedInvocation::decode)
-                .distinct().take(12)
+                .distinct()
         }.getOrDefault(emptyList())
 
     private fun save(value: List<LocalPinnedInvocation>) {
