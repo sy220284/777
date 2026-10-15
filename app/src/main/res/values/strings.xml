@@ -1260,7 +1260,9 @@
     <string name="tasks_chat_times_value">%1$d 次</string>
     <string name="tasks_waiting_user_timing">等待你下一次回复后恢复</string>
     <string name="chat_diary_title">人物日记</string>
-    <string name="chat_diary_subtitle">角色记住的经历、心绪与关系变化</string>
+    <string name="chat_diary_subtitle">那些没有说出口的日常心绪</string>
+    <string name="chat_diary_expand_records">查看原始记录（%1$d）</string>
+    <string name="chat_diary_collapse_records">收起原始记录（%1$d）</string>
     <string name="chat_diary_search_hint">搜索事件、感受或未说出口的念头</string>
     <string name="chat_diary_filter_all">全部</string>
     <string name="chat_diary_filter_direct">单聊</string>
