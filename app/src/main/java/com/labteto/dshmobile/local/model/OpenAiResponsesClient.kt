@@ -313,6 +313,7 @@ class OpenAiResponsesClient @Inject constructor(
                 if (enableImageGenerationTool) {
                     add(buildJsonObject {
                         put("type", "image_generation")
+                        if (explicitImageEditRequested(messages)) put("action", "edit")
                     })
                 }
             })
@@ -324,6 +325,25 @@ class OpenAiResponsesClient @Inject constructor(
         }
         if (!planSharing) temperature?.let { put("temperature", it) }
         // ChatGPT plan sharing rejects sampling controls; API-key Responses keeps its own contract.
+    }
+
+    /** Force edits only when the latest turn includes an image and an explicit editing command. */
+    private fun explicitImageEditRequested(messages: List<JsonObject>): Boolean {
+        if (!explicitImageGenerationRequested(messages)) return false
+        val user = messages.lastOrNull { it["role"]?.jsonPrimitive?.contentOrNull == "user" }
+            ?: return false
+        val parts = user["content"] as? JsonArray ?: return false
+        val hasImage = parts.any { part ->
+            (part as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull in
+                setOf("image_url", "input_image")
+        }
+        val text = parts.mapNotNull { part ->
+            val obj = part as? JsonObject ?: return@mapNotNull null
+            if (obj["type"]?.jsonPrimitive?.contentOrNull in setOf("text", "input_text"))
+                obj["text"]?.jsonPrimitive?.contentOrNull else null
+        }.joinToString(" ")
+        return hasImage && Regex("""修改|编辑|重绘|改成|edit|modify|retouch|redraw""",
+            RegexOption.IGNORE_CASE).containsMatchIn(text)
     }
 
     private fun explicitImageGenerationRequested(messages: List<JsonObject>): Boolean {
