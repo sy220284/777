@@ -137,6 +137,9 @@ object SyMetric {
 }
 /** Opacity response shared by V6 glass and retained legacy surface adapters. */
 object SyMaterialPolicy {
+    const val opticalEdgeWidthDp = 16f
+    const val opticalDisplacementDp = 2.4f
+    const val opticalMaxAreaPx = 1_300_000L
     const val transparencyStrength = .46f
     fun adjustment(transparency: Float): Float =
         (.5f - transparency.coerceIn(0f, 1f)) * transparencyStrength
