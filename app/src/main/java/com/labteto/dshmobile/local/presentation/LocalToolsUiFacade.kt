@@ -7,8 +7,9 @@ import javax.inject.Singleton
 
 /** Tools page boundary; plugin/runtime implementations stay outside UI. */
 @Singleton
-class LocalToolsUiFacade @Inject constructor(
+class LocalToolsUiFacade @Inject internal constructor(
     private val tools: LocalToolsRuntime,
+    private val gitHubSkillImporter: com.labteto.dshmobile.local.tools.LocalGitHubSkillImporter,
 ) : com.labteto.dshmobile.uicontract.ToolsUiPort {
     override suspend fun servers() = tools.servers().map {
         val lifecycle = it.lifecycle
@@ -69,6 +70,8 @@ class LocalToolsUiFacade @Inject constructor(
     override suspend fun presetSkills() = tools.presetSkills().map {
         com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot(it.id, it.title, it.description, it.installed)
     }
+    override suspend fun curatedGitHubSkills() = gitHubSkillImporter.curatedSkills()
+    override suspend fun installGitHubSkill(link: String) = gitHubSkillImporter.install(link)
     override suspend fun installPreset(id: String) = tools.installPreset(id)
     override suspend fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         tools.createSkill(id, displayName, description, instructions)

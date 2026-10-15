@@ -27,6 +27,8 @@ interface ToolsUiPort {
     suspend fun installedSkills(): List<UiSkillSnapshot>
     suspend fun presetSkills(): List<UiPresetSkillSnapshot>
     suspend fun readSkillDocument(id: String): String
+    suspend fun curatedGitHubSkills(): List<String>
+    suspend fun installGitHubSkill(link: String): String
     suspend fun installPreset(id: String)
     suspend fun createSkill(id: String, displayName: String, description: String, instructions: String)
     suspend fun importSkill(filename: String, bytes: ByteArray): String
@@ -48,6 +50,7 @@ sealed interface ToolsUiCommand {
         override fun toString() = "ConfigureGitHub(<redacted>)"
     }
     data object ClearGitHub : ToolsUiCommand
+    data class InstallGitHubSkill(val url: String) : ToolsUiCommand
     data class InstallPreset(val id: String) : ToolsUiCommand
     data class CreateSkill(val id: String, val displayName: String, val description: String, val instructions: String) : ToolsUiCommand
     class ImportSkill(val filename: String, val bytes: ByteArray) : ToolsUiCommand {
@@ -86,6 +89,7 @@ suspend fun ToolsUiPort.submit(command: ToolsUiCommand): ToolsUiReceipt = try {
         is ToolsUiCommand.Disconnect -> disconnect(command.serverId)
         is ToolsUiCommand.ConfigureGitHub -> { configureGitHub(command.token); null }
         ToolsUiCommand.ClearGitHub -> { clearGitHub(); null }
+        is ToolsUiCommand.InstallGitHubSkill -> installGitHubSkill(command.url)
         is ToolsUiCommand.InstallPreset -> { installPreset(command.id); null }
         is ToolsUiCommand.CreateSkill -> { createSkill(command.id, command.displayName, command.description, command.instructions); null }
         is ToolsUiCommand.ImportSkill -> importSkill(command.filename, command.bytes)

@@ -104,6 +104,7 @@ data class ToolsUiState(
     val githubConfigured: Boolean = false,
     val localPlugins: List<String> = emptyList(),
     val skills: List<com.labteto.dshmobile.uicontract.UiSkillSnapshot> = emptyList(),
+    val curatedSkills: List<String> = emptyList(),
     val presets: List<com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot> = emptyList(),
     val createdSkillId: String? = null,
     val skillEditor: com.labteto.dshmobile.uicontract.UiSkillEditorSnapshot? = null,
@@ -245,6 +246,36 @@ class ToolsViewModel @Inject constructor(
     fun installPreset(id: String) = changeSkills { localTools.installPreset(id) }
     fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         changeSkills(createdId = id) { localTools.createSkill(id, displayName, description, instructions) }
+    fun browseCuratedSkills() {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null)
+            try {
+                val results = localTools.curatedGitHubSkills()
+                _state.value = _state.value.copy(loading = false, curatedSkills = results,
+                    feedbackRes = if (results.isEmpty()) R.string.skills_github_official_empty else null)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false, feedback = error.message)
+            }
+        }
+    }
+
+    fun importGitHubSkill(link: String) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                val id = localTools.installGitHubSkill(link)
+                _state.value = _state.value.copy(loading = false,
+                    skills = localTools.installedSkills(), presets = localTools.presetSkills(),
+                    createdSkillId = id, feedback = appContext.getString(R.string.skills_import_success, id))
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false,
+                    feedback = error.message ?: appContext.getString(R.string.skills_import_failed))
+            }
+        }
+    }
+
     fun importSkill(uri: Uri) {
         launchOperation {
             _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
@@ -592,6 +623,9 @@ fun ToolsScreen(
             onInstallPreset = viewModel::installPreset,
             onCreateSkill = viewModel::createSkill,
             onImportSkill = { skillFilePicker.launch(arrayOf("*/*")) },
+            onInstallFromGitHub = viewModel::importGitHubSkill,
+            curatedSkills = state.curatedSkills,
+            onBrowseCuratedSkills = viewModel::browseCuratedSkills,
             onRemoveSkill = viewModel::removeSkill,
             onOpenSkillEditor = viewModel::openSkillEditor,
             onCloseSkillEditor = viewModel::closeSkillEditor,
