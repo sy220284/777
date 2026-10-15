@@ -2316,5 +2316,8 @@
     <string name="media_recreate_transcribe_select_audio">重新选择音频转写</string>
     <string name="media_recreate_route_missing">原模型配置已变化，请重新选择生成账户</string>
     <string name="media_recreate_change_account_notice">重新选择会使用新账户的额度，旧成果保留。</string>
+    <string name="media_chat_edit_generated_image">修改这张图片</string>
+    <string name="media_chat_edit_generated_image_prompt">请根据附图重新生成一张图片，修改要求：</string>
+    <string name="media_chat_edit_generated_image_missing">原图已不可用，无法继续修改</string>
 </resources>
 

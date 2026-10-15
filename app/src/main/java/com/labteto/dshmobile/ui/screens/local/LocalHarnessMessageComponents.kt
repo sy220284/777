@@ -72,6 +72,7 @@ import com.labteto.dshmobile.local.presentation.groupMessageVisibleContent
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalMessageBlock
+import com.labteto.dshmobile.local.session.LocalMessageMediaSource
 import com.labteto.dshmobile.local.session.visibleBlocks
 import com.labteto.dshmobile.ui.AgentOperationKind
 import com.labteto.dshmobile.ui.agentOperationKind
@@ -151,6 +152,7 @@ internal fun LocalMessageRow(
     skillDisplayNames: Map<String, String> = emptyMap(),
     onLocateSourceMemory: ((LocalHarnessMessage) -> Unit)? = null,
     onCreateMedia: ((LocalHarnessMessage, LocalMediaKind) -> Unit)? = null,
+    onEditGeneratedImage: ((LocalHarnessMessage) -> Unit)? = null,
     onConvertToWork: ((LocalHarnessMessage) -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
@@ -257,6 +259,15 @@ internal fun LocalMessageRow(
                             }
                             if (chatMode && copyText.isNotBlank()) onCreateMedia?.let { create ->
                                 addAll(fluidMessageMediaItems(message.copy(content = copyText), create))
+                            }
+                            if (chatMode && !streaming && editableGeneratedImage(message.visibleBlocks()) != null) {
+                                onEditGeneratedImage?.let { edit ->
+                                    add(SyMenuItem(
+                                        text = stringResource(R.string.media_chat_edit_generated_image),
+                                        icon = FeatherIcons.Edit3,
+                                        onClick = { edit(message) },
+                                    ))
+                                }
                             }
                         },
                     )
@@ -385,11 +396,27 @@ internal fun LocalMessageRow(
                             size = SyButtonSize.Small,
                         )
                     }
+                    if (chatMode && !streaming && editableGeneratedImage(message.visibleBlocks()) != null) {
+                        onEditGeneratedImage?.let { edit ->
+                            SyButton(
+                                text = stringResource(R.string.media_chat_edit_generated_image),
+                                icon = FeatherIcons.Edit3,
+                                onClick = { edit(message) },
+                                variant = SyButtonVariant.Ghost,
+                                size = SyButtonSize.Small,
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
+
+/** Model-produced image only; user-uploaded and tool images are not generated assets. */
+internal fun editableGeneratedImage(blocks: List<LocalMessageBlock>): LocalMessageBlock.Image? =
+    blocks.filterIsInstance<LocalMessageBlock.Image>()
+        .firstOrNull { it.source == LocalMessageMediaSource.MODEL }
 
 @Composable
 private fun LocalUserMessageContent(

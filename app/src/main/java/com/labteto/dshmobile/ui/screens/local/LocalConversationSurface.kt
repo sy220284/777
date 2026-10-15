@@ -96,6 +96,8 @@ import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalMessageBlock
+import com.labteto.dshmobile.local.session.visibleBlocks
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
@@ -588,6 +590,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     }
 
     val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
+    val generatedImageEditPrompt = stringResource(R.string.media_chat_edit_generated_image_prompt)
+    val generatedImageMissingMessage = stringResource(R.string.media_chat_edit_generated_image_missing)
     val imageImportFailedMessage = stringResource(R.string.local_image_import_failed)
     val fileImportFailedMessage = stringResource(R.string.local_file_import_failed)
     val cameraFailedMessage = stringResource(R.string.composer_camera_failed)
@@ -1003,6 +1007,38 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                     null
                                 },
                                 onEdit = { message -> editingUserMessage = message },
+                                onEditGeneratedImage = { message ->
+                                    val generated = editableGeneratedImage(message.visibleBlocks())
+                                    val reusable = generated?.let { candidate ->
+                                        // Reuse the already saved local attachment; never re-download
+                                        // an untrusted URL or copy the image bytes into prompt/history.
+                                        val original = resolveLocalTranscriptFile(state.workspacePath, candidate.relativePath)
+                                        if (original?.isFile == true && original.length() > 0L) {
+                                            LocalImportedAttachment(
+                                                name = candidate.name, relativePath = candidate.relativePath,
+                                                mediaType = candidate.mediaType, bytes = original.length(),
+                                                attachmentId = candidate.attachmentId,
+                                                width = candidate.width, height = candidate.height,
+                                            )
+                                        } else null
+                                    }
+                                    if (reusable == null) {
+                                        attachmentError = generatedImageMissingMessage
+                                    } else {
+                                        attachmentError = when (localComposerAttachmentDecision(attachments, reusable)) {
+                                            LocalComposerAttachmentDecision.ACCEPT -> {
+                                                attachments += reusable
+                                                val current = drafts[state.sessionId].orEmpty()
+                                                drafts.putBoundedLocalDraft(state.sessionId,
+                                                    listOf(generatedImageEditPrompt, current)
+                                                        .filter(String::isNotBlank).joinToString("\n\n"))
+                                                null
+                                            }
+                                            LocalComposerAttachmentDecision.DUPLICATE -> null
+                                            LocalComposerAttachmentDecision.IMAGE_LIMIT -> imageLimitMessage
+                                        }
+                                    }
+                                },
                                 onCreateMedia = { message, kind ->
                                     mediaRevision = null
                                     mediaSourceMessageId = message.id
