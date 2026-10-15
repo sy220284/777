@@ -44,8 +44,9 @@ internal fun mergeGeneratedCharacterFacts(
     previous: List<CharacterFact>,
     incoming: List<CharacterFact>,
 ): List<CharacterFact> {
-    val result = previous.toMutableList()
-    incoming.filter { it.category.isNotBlank() && it.content.isNotBlank() }.forEach { fact ->
+    val result = previous.filter { CharacterFactCategories.isSupported(it.category) }.toMutableList()
+    incoming.filter { CharacterFactCategories.isSupported(it.category) && it.content.isNotBlank() }
+        .forEach { fact ->
         val suggestion = fact.asModelSuggestion()
         // Stable IDs identify individual facts, not authority to rewrite their provenance.
         val index = result.indexOfFirst { it.id == suggestion.id }
