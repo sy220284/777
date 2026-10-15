@@ -31,8 +31,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.shenyan.designsystem.components.SyIconBox
-import com.shenyan.designsystem.components.SyMaterialSurface
-import com.shenyan.designsystem.components.SyMaterialTier
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -43,20 +41,13 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
  */
 @Composable
 internal fun AppSettingsSection(compact: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
-    // UI-UX: the landing menu retains one quiet L1 group plate and hairline dividers,
-    // not separate deep L3 cards or a completely borderless list.
-    SyMaterialSurface(
-        modifier = Modifier.fillMaxWidth().testTag("settingsOpenSection"),
-        tier = SyMaterialTier.L1_SECTION,
-        shape = if (compact) DsShapes.settingsGroup else DsShapes.block,
-        shadowElevation = 0.dp,
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = SyMetric.gapXs),
-            verticalArrangement = Arrangement.Top,
-            content = content,
-        )
-    }
+    // Only headings and dividers separate entries; no plate or shadow.
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("settingsOpenSection")
+            .padding(vertical = if (compact) SyMetric.gapXs else SyMetric.gapSm),
+        verticalArrangement = Arrangement.Top,
+        content = content,
+    )
 }
 
 @Composable
