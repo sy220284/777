@@ -32,84 +32,53 @@ internal object LocalPresetSkillCatalog {
         "translation-localization" to "翻译、术语统一和本地化",
     )
     val entries = listOf(
-        LocalPresetSkill("writing-polish", "写作润色", "改善文笔、逻辑和节奏，保留原意与风格。",
-            """
-            1. 先提取写作目的、受众、原文语气及不可更改的内容。
-            2. 检查歧义、重复、语病、信息缺失与节奏；不得凭空添加事实或剧情。
-            3. 给出能直接使用的修订稿，保留人物口吻和专有名词。
-            4. 只在必要时说明关键修改与待作者决定的歧义。
-            5. 复核人称、时间、术语及事实；先交付可用修订稿，必要时补充歧义说明；未提供原文时不虚构原文。
+        LocalPresetSkill("writing-polish", "写作润色", "润色文字、调整逻辑与语气，并保留作者表达。", """
+            用途：对已有文章、段落、文案进行改写、校对和语言优化。
+            适用：润色、改写、统一语气、精简内容及文字精修。
+            执行：识别原文用途和语气；修改歧义、重复、语病与结构；核查人物、数字、专有名词及原意。
+            交付：可以直接使用的修订稿；必要时简述关键修改与仍需作者确定的地方。
             """.trimIndent()),
-        LocalPresetSkill("longform-outline", "长文与小说大纲", "设计人物、冲突、章节推进与伏笔回收。",
-            """
-            1. 确定题材、读者、主线目标、篇幅、人物欲望和已确立世界规则。
-            2. 用起因、行动、阻力、代价、转折、收束搭建连续推进的情节链。
-            3. 记录主要人物动机、能力边界、重要选择及成长，并校验连续性。
-            4. 交付分阶段大纲与关键伏笔回收表，避免重复事件和无代价转折。
-            5. 对已有章节先核实原文；未知条件须标为待确定，不自行改动设定。
-            6. 将已确定设定与临时假设分开，逐章检查时间线、人物位置、角色知情范围和状态变化。
-            7. 对关键伏笔登记埋设章、证据与回收时机；无法从现有资料确认的地方明确标注。
-            8. 交付包括主线推进、人物弧线、阶段事件表和连续性风险，不为了制造冲突强行违背设定。
+        LocalPresetSkill("longform-outline", "长文与小说大纲", "设计人物、冲突、章节推进与伏笔回收。", """
+            用途：创作或完善小说、剧本及长篇叙事的整体结构。
+            适用：故事大纲、人物弧线、章节规划与伏笔安排。
+            执行：确认题材和已有设定；构造动机、阻力、选择、转折与后果；梳理章节时间线和角色知情范围；安排伏笔回收。
+            交付：分阶段大纲、章节事件、人物弧线及连续性提示。
             """.trimIndent()),
-        LocalPresetSkill("document-summary", "文档提炼", "提取材料结论、待办、风险和可复核依据。",
-            """
-            1. 使用当前可用的文件工具读取材料；若只读到部分内容，标注范围。
-            2. 分清原文事实、作者观点、推断和未定事项。
-            3. 先给核心结论，再按需要整理依据、行动事项、责任人与风险。
-            4. 回查日期、数字、姓名与约束，保留文件及段落位置。
-            5. 严禁杜撰未阅读的章节、引文或决定。
-            6. 对行动项列出责任人、期限、完成标准；原文没有的信息标为未指定。
-            7. 交付前核对每项结论能否从已读材料追溯，不能证明的判断独立列为推断。
+        LocalPresetSkill("document-summary", "文档提炼", "整理文件结论、重点、行动事项和依据。", """
+            用途：从用户提供的文件或会议资料中提取可回查的信息。
+            适用：摘要、会议纪要、风险梳理、行动项与资料对比。
+            执行：读取相关内容并标明读取范围；区分事实、观点与推断；提取日期、数字、结论、决策与责任信息。
+            交付：核心结论、重要依据及待办事项；原文未提供的字段标为未指定。
             """.trimIndent()),
-        LocalPresetSkill("research-check", "资料研究与核实", "交叉查证事实、来源与时效性。",
-            """
-            1. 明确待核实主张和时间范围，分辨哪些结论要求最新资料。
-            2. 优先使用官方和一手来源，用现有联网或文件工具取得证据。
-            3. 逐项对比事实、推断、争议和无法验证的部分。
-            4. 给出结论、可回查来源及其日期，指出适用边界。
-            5. 缺少联网或原始证据时直接说明，不虚构来源或结论。
-            6. 查证至少尝试对比两个独立来源；不能获得时写明来源不足与检索边界。
-            7. 交付结论、证据列表、来源日期、互相冲突的说法及仍需核实的点。
+        LocalPresetSkill("research-check", "资料研究与核实", "检索资料、核实主张、对比证据与时效。", """
+            用途：研究问题并检验关键结论是否由可靠证据支持。
+            适用：资料查询、官方文档、产品/技术调查与事实核验。
+            执行：确定问题与时效；优先获取一手材料；对比不同来源的证据与适用条件；标明尚存争议。
+            交付：结论、证据来源及日期、冲突观点和待核查事项。
             """.trimIndent()),
-        LocalPresetSkill("code-review", "代码审查", "核查改动正确性、安全边界及回归问题。",
-            """
-            1. 读取相关代码、调用链、测试和仓库权威规范，确认目标与基线。
-            2. 沿输入、状态、执行、副作用、错误处理和恢复路径核对缺陷。
-            3. 明确列出可复现问题、代码位置、触发条件与影响，按严重度排序。
-            4. 使用现有测试工具验证关键问题，不得把静态阅读称为测试通过。
-            5. 修复建议应指向根因并覆盖横向关联和纵向链路。
-            6. 区分实测复现与静态推断；修复后运行可用测试覆盖关键路径，未运行的测试不得报通过。
-            7. 按严重度交付缺陷、证据、修复和验证状态。
+        LocalPresetSkill("code-review", "代码审查", "检查代码正确性、回归风险及实现质量。", """
+            用途：沿业务调用链审查实现并发现有证据支持的问题。
+            适用：代码审查、PR 评审、重构评估、架构和测试覆盖。
+            执行：确定版本基线；沿输入、状态、副作用和异常路径检查；定位缺陷与触发条件；按实际可用条件执行验证。
+            交付：按严重度排序的问题、代码位置、修复建议及验证状态。
             """.trimIndent()),
-        LocalPresetSkill("bug-investigation", "故障定位", "追踪异常根因并验证修复。",
-            """
-            1. 记录现象、复现条件、时间线、最近变动和期望结果。
-            2. 用现有日志与代码工具追踪首个异常状态及上游来源。
-            3. 分清报错表象与根因，设计能证伪不同假设的检查步骤。
-            4. 处理后检查正常、异常、并发、取消及恢复路径。
-            5. 最后区分已验证结果与仍待验证的部分。
-            6. 用日志和调用链复核根因；以原场景复测并补充回归检查，交付证据和已验证范围。
+        LocalPresetSkill("bug-investigation", "故障定位", "追踪异常根因、提出修复并验证结果。", """
+            用途：定位用户可见的错误、崩溃、超时与异常行为。
+            适用：日志分析、失败复现、故障排查与修复回归。
+            执行：收集现象和触发步骤；追踪日志、调用链及状态转移；对比假设；修复后按原场景与关键边界验证。
+            交付：根因、证据、实际修复、回归结果以及仍待验证的条件。
             """.trimIndent()),
-        LocalPresetSkill("data-insights", "数据分析", "核算指标、整理趋势与异常，说明统计口径。",
-            """
-            1. 明确数据来源、单位、口径、缺失值与分析时间范围。
-            2. 用可用工具实际计算，检查重复记录、分母和汇总方式。
-            3. 解释趋势、分组差异与异常，避免将相关性当成因果。
-            4. 提供关键发现、支持数字、限制条件和下一步建议。
-            5. 假设、预测和观测值必须清晰区分。
-            6. 对关键合计和比率复算，核查空值、异常值、样本量、单位和分母；不要编造数字。
-            7. 数据来自表格时优先用可用计算工具得出结果，记录口径及公式，不能计算时标注限制。
-            8. 交付关键数值、计算依据、异常解释和适用条件。
+        LocalPresetSkill("data-insights", "数据分析", "统计指标、复核数据并解释趋势和异常。", """
+            用途：从提供的数据中形成可核算、可追溯的分析结果。
+            适用：数据清洗、统计、表格分析、指标比较和趋势解释。
+            执行：确认来源、单位、时间范围与计算口径；使用可用工具计算并复核；分析趋势、差异和异常，区分相关性与因果。
+            交付：关键指标、计算依据、可视化或表格及结论边界。
             """.trimIndent()),
-        LocalPresetSkill("translation-localization", "翻译与本地化", "保持语义准确，适配目标语言的自然表达。",
-            """
-            1. 识别源语言、目标语言、用途、受众和语气。
-            2. 忠实保留数字、专有名词、链接、格式、代码及限定条件。
-            3. 使用地道目标语言，保持术语一致，避免逐字硬译。
-            4. 对双关、文化背景和歧义提供简短说明或选项。
-            5. 不添写原文没有的事实或立场。
-            6. 校验遗漏、错译、数字和术语一致性；需要保留原格式的内容逐项对应。
-            7. 交付完整译文，存在歧义时给出处置建议，不随意改写原作者观点。
+        LocalPresetSkill("translation-localization", "翻译与本地化", "准确翻译文本并适配目标语言语境。", """
+            用途：将文本转换为目标语言，保留意思、格式与专业术语。
+            适用：多语言翻译、字幕文案、产品本地化和术语统一。
+            执行：确定语言、受众、语气及用途；翻译并统一术语；核对数字、姓名、链接、格式和语义。
+            交付：可直接使用的译文；必要时说明有歧义的表达及译法选择。
             """.trimIndent()),
     ).map { it.copy(whenToUse = triggers[it.id].orEmpty()) } + LocalMiniMaxSkillCatalog.entries
 }
@@ -261,6 +230,7 @@ internal class LocalSkillStore(
             workspace.write(".dsh/skills/.minimax-seed-v1", "seeded\n")
         }
         migrateMiniMaxMobileSkills()
+        archiveRetiredMiniMaxAdaptations()
     }
 
     /** Retire unavailable hosts and upgrade only untouched bundled instructions. */
@@ -293,6 +263,24 @@ internal class LocalSkillStore(
                 buildLocalSkillDocument(preset.id, preset.description, preset.instructions, preset.whenToUse, preset.title))
         }
         workspace.write(".dsh/skills/.minimax-mobile-v2", "seeded\n")
+    }
+
+    /** Retire six desktop-adapted presets while preserving every user file and edit. */
+    private fun archiveRetiredMiniMaxAdaptations() {
+        val marker = File(skillsDir, ".minimax-retired-desktop-v3")
+        if (marker.exists()) return
+        val archivePath = ".dsh/retired-skills/minimax-desktop-v3"
+        for (id in LocalMiniMaxSkillCatalog.retiredDesktopAdaptations) {
+            if (!workspace.skills().contains(id)) continue
+            requireInstalled(id)
+            val destination = File(workspace.path, "$archivePath/$id")
+            require(!destination.exists() && !Files.isSymbolicLink(destination.toPath())) {
+                "已存在同名归档技能：$id"
+            }
+            destination.parentFile?.mkdirs()
+            Files.move(File(skillsDir, id).toPath(), destination.toPath())
+        }
+        workspace.write(".dsh/skills/.minimax-retired-desktop-v3", "done\\n")
     }
 
     private val bundledIds = LocalMiniMaxSkillCatalog.entries.map { it.id }.toSet()
