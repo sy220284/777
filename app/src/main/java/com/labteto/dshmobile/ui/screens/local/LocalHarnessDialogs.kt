@@ -837,8 +837,12 @@ private fun PersonaFactCategoryEditor(
     val entries = facts.filter { it.category == category }
     entries.forEachIndexed { index, entry ->
         val isFreeSupplement = category == "customFacts" && entry.content.isBlank()
-        val label = if (index == 0 || isFreeSupplement) title
-            else stringResource(R.string.persona_v4_fact_number, title, index + 1)
+        val label = when {
+            category == "customFacts" && !isFreeSupplement ->
+                stringResource(R.string.persona_v4_fact_number, title, index + 1)
+            index == 0 || isFreeSupplement -> title
+            else -> stringResource(R.string.persona_v4_fact_number, title, index + 1)
+        }
         PersonaTextField(
             label = label,
             value = entry.content,
