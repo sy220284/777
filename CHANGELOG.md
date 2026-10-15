@@ -7,6 +7,8 @@ All notable changes to DSH Mobile are documented here. Format based on
 
 ### Added
 
+- 工作会话菜单新增“工作记录与交付”，支持历史分页、工具事件详情、当前目标步骤及成果版本来源关联。
+
 - **The app can wear a background image.** Settings → Appearance & Reading now takes a picture from the device
   and paints it behind the whole shell. Cards, sheets and list rows keep their own opaque fills, so
   text keeps its contrast; only the surfaces that cover the window — the local home, the chat screen
@@ -16,6 +18,9 @@ All notable changes to DSH Mobile are documented here. Format based on
   one; removing it returns the plain theme colour.
 
 ### Changed
+
+- 记忆管理在完整可见记录中先检索和筛选再分页，可定位与纠正旧记忆；自动化暂停、恢复、取消和立即运行提供异步受理与异常回执。
+- 工作成果独立观察文件变化并刷新预览，概览不再自动批量计算内容哈希；显式核验和来源关联仍检查精确文件版本。
 
 - Agent Runtime 3.1 基础能力开始收口：子代理将稳定身份指令与本轮任务分离，并随持久任务冷恢复；审批升级为默认/手动/全自动三档，旧设置按原行为迁移；工具与 Agent Team 的运行活动继续从 EventLog、Job、Task DAG 等现有事实派生，不新增第二套运行账本。
 - Work 上下文增加中立 Prompt 分层编排，长期规则保持稳定前缀，按当前请求召回的记忆与 handoff 保持动态尾部；业务 Prompt 语义仍归各 Feature，权限和副作用边界继续由运行时代码强制执行。

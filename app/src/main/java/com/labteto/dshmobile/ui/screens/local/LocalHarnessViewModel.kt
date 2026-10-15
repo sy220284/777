@@ -372,6 +372,11 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun workspaceFiles() = filesUiPort.workspaceFiles()
     suspend fun conversationFiles(sessionId: String) = filesUiPort.conversationFiles(sessionId)
     suspend fun previewWorkspaceFile(path: String) = filesUiPort.previewWorkspaceFile(path)
+    internal fun artifactRevisionForUi(sessionId: String) = workReadUiPort.artifactRevisionForUi(sessionId)
+    internal fun refreshArtifactFilesForUi(sessionId: String, items: List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem>) =
+        workReadUiPort.refreshArtifactFilesForUi(sessionId, items)
+    internal fun inspectArtifactForUi(sessionId: String, item: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem) =
+        workReadUiPort.inspectArtifactForUi(sessionId, item)
     fun artifactsForUi(sessionId: String) = workReadUiPort.artifactsForUi(sessionId)
     fun historyPageForUi(sessionId: String, cursor: com.labteto.dshmobile.local.presentation.LocalWorkHistoryCursor?) =
         workReadUiPort.historyPageForUi(sessionId, cursor)

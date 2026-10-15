@@ -572,7 +572,7 @@
     },
     {
       "id": "existing.0072",
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4人物内核与16类可扩展人物事实",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4人物内核与13项人物资料",
       "source": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaStore.kt",
       "entry": "CharacterFactCategories",
       "owner": "CHAT",

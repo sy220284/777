@@ -179,6 +179,7 @@ internal fun ChatAutomationScreen(
                     backIcon = FeatherIcons.X,
                 )
             }
+            TaskManagementFeedback(state, onRefresh = { viewModel.refresh() })
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f),
@@ -249,6 +250,7 @@ internal fun ChatAutomationScreen(
                         )
                         ChatAutomationEventRow(
                             task = task,
+                            enabled = task.id !in state.busyIds,
                             scheduleDescription = scheduleDescription,
                             currentSessionId = harnessState.sessionId,
                             onEdit = {
@@ -389,6 +391,7 @@ private fun ChatAutomationEventRow(
     onPause: () -> Unit,
     onResume: () -> Unit,
     onDelete: () -> Unit,
+    enabled: Boolean = true,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val visualStatus = chatAutomationVisualStatus(task)
@@ -437,6 +440,7 @@ private fun ChatAutomationEventRow(
                         if (task.status == AutomationStatus.PAUSED) R.string.tasks_resume else R.string.tasks_pause,
                     ),
                     onClick = if (task.status == AutomationStatus.PAUSED) onResume else onPause,
+                    enabled = enabled,
                     variant = SyButtonVariant.Ghost,
                     size = SyButtonSize.Small,
                 )
@@ -473,6 +477,7 @@ private fun ChatAutomationEventRow(
             SyButton(
                 text = stringResource(R.string.tasks_delete_confirm),
                 onClick = { confirmDelete = true },
+                enabled = enabled,
                 variant = SyButtonVariant.Ghost,
                 size = SyButtonSize.Small,
             )

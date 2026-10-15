@@ -8,13 +8,17 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
 
-enum class TasksNotice { CANCELLED, MISSING, RUN_STARTED, RUN_FAILED }
+enum class TasksNotice { CANCELLED, MISSING, RUN_STARTED, RUN_FAILED, PAUSED, RESUMED, OPERATION_FAILED, OPERATION_REJECTED }
 enum class PlannerUiError { SESSION_CHANGED, SAVE_FAILED, PLAN_FAILED }
 internal enum class AutomationCadence { ONCE, DAILY, WEEKLY, MONTHLY, CUSTOM }
 data class TasksUiState(
     val tasks: List<AutomationTask> = emptyList(), val notice: TasksNotice? = null,
     val planning: Boolean = false, val plannerError: PlannerUiError? = null, val saveRevision: Long = 0L,
+    val busyIds: Set<String> = emptySet(), val loading: Boolean = false, val managementFailed: Boolean = false,
 )
 @HiltViewModel
 class TasksViewModel @Inject constructor(private val automation: AutomationUiPort) : ViewModel() {
@@ -29,22 +33,46 @@ class TasksViewModel @Inject constructor(private val automation: AutomationUiPor
     fun acknowledgeNotice(notice: TasksNotice) {
         if (_state.value.notice == notice) _state.update { it.copy(notice = null) }
     }
-    fun refresh() = _state.update { it.copy(tasks = automation.snapshot().tasks, notice = null) }
+    fun refresh() {
+        try { _state.update { it.copy(tasks = automation.snapshot().tasks, notice = null, managementFailed = false) } }
+        catch (_: Exception) { _state.update { it.copy(managementFailed = true) } }
+    }
     private fun applied(command: AutomationUiCommand): Boolean {
         val result = automation.submit(command)
         if (result is AutomationUiReceipt.Applied) refresh()
         return result is AutomationUiReceipt.Applied
     }
-    fun cancel(id: String) {
-        val removed = applied(AutomationUiCommand.Delete(id))
-        _state.update { it.copy(notice = if (removed) TasksNotice.CANCELLED else TasksNotice.MISSING) }
+    private fun manage(id: String, command: AutomationUiCommand, success: TasksNotice) {
+        if (id in _state.value.busyIds) return
+        _state.update { it.copy(busyIds = it.busyIds + id, notice = null) }
+        viewModelScope.launch {
+            try {
+                val (receipt, latest) = withContext(Dispatchers.IO) {
+                    val accepted = automation.submit(command)
+                    val facts = runCatching { automation.snapshot().tasks }.getOrNull()
+                    accepted to facts
+                }
+                _state.update { old -> old.copy(
+                    tasks = latest ?: old.tasks,
+                    managementFailed = receipt is AutomationUiReceipt.Failed,
+                    notice = when (receipt) {
+                        is AutomationUiReceipt.Applied -> success
+                        is AutomationUiReceipt.Rejected -> TasksNotice.OPERATION_REJECTED
+                        is AutomationUiReceipt.Failed -> TasksNotice.OPERATION_FAILED
+                    },
+                ) }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { _state.update { it.copy(managementFailed = true, notice = TasksNotice.OPERATION_FAILED) } }
+            finally { _state.update { it.copy(busyIds = it.busyIds - id) } }
+        }
     }
-    fun pause(id: String) { applied(AutomationUiCommand.Pause(id)) }
-    fun resume(id: String) { applied(AutomationUiCommand.Resume(id)) }
+    fun cancel(id: String) = manage(id, AutomationUiCommand.Delete(id), TasksNotice.CANCELLED)
+    fun pause(id: String) = manage(id, AutomationUiCommand.Pause(id), TasksNotice.PAUSED)
+    fun resume(id: String) = manage(id, AutomationUiCommand.Resume(id), TasksNotice.RESUMED)
     fun runNow(id: String): Boolean {
-        val started = applied(AutomationUiCommand.RunNow(id))
-        _state.update { it.copy(notice = if (started) TasksNotice.RUN_STARTED else TasksNotice.RUN_FAILED) }
-        return started
+        if (id in _state.value.busyIds) return false
+        manage(id, AutomationUiCommand.RunNow(id), TasksNotice.RUN_STARTED)
+        return true // Request queued, not a claim of execution completion.
     }
     fun submitChatPlan(input: String, editingTaskId: String? = null) = planner.submitChatPlan(input, editingTaskId)
     fun updateTask(

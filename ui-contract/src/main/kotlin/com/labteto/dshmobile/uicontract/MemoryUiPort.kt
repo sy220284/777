@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.uicontract
 
 import com.labteto.dshmobile.local.memory.MemoryRecord
+import com.labteto.dshmobile.local.memory.MemoryManagementQuery
+import com.labteto.dshmobile.local.memory.MemoryManagementPage
 import com.labteto.dshmobile.local.memory.MemoryScope
 
 sealed interface MemoryUiCommand {
@@ -16,6 +18,7 @@ sealed interface MemoryUiReceipt {
     data class Failed(val message: String?) : MemoryUiReceipt
 }
 interface MemoryUiPort {
+    fun memoryPage(query: MemoryManagementQuery): MemoryManagementPage
     fun memories(scopes: Set<MemoryScope>, projectId: String?, lineageId: String?): List<MemoryRecord>
     fun memoriesFromSourceMessage(sessionId: String, messageId: String): List<MemoryRecord>
     fun submit(command: MemoryUiCommand): MemoryUiReceipt

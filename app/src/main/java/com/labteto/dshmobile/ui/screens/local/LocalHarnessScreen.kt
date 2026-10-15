@@ -581,6 +581,22 @@ fun LocalHarnessScreen(
         previewWorkspaceFile = viewModel::previewWorkspaceFile,
         artifactsForUi = viewModel::artifactsForUi,
         eventSequenceForUi = viewModel::eventSequenceForUi,
+        artifactRevision = viewModel::artifactRevisionForUi,
+        refreshArtifactFiles = viewModel::refreshArtifactFilesForUi,
+        inspectArtifact = viewModel::inspectArtifactForUi,
+        historyPage = viewModel::historyPageForUi,
+        toolActivities = viewModel::toolActivitiesForUi,
+        toolEvidence = viewModel::toolEvidenceForUi,
+        requirementEvidence = viewModel::requirementEvidenceForUi,
+        linkRequirementEvidence = { sessionId, target, artifact ->
+            val identity = sendIdentity
+            if (identity == null || identity.sessionId != sessionId) false
+            else if (target.goalId != viewModel.workState.value.goal?.id) false
+            else viewModel.workEvidenceUiPort.submit(
+                com.labteto.dshmobile.uicontract.LinkWorkEvidenceReferenceCommand(
+                    identity, target.index, target.content, artifact),
+            ) == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
+        },
     )
     val automationActions = LocalAutomationFeatureUiActions(
         switchSession = { switchToSessionAndShowConversation(it) },

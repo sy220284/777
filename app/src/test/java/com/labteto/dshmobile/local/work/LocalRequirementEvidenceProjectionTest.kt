@@ -107,4 +107,16 @@ class LocalRequirementEvidenceProjectionTest {
         val tasks = listOf(LocalTodoItem("交付", "completed"))
         assertTrue(projectRequirementEvidenceLinks(listOf(link(1, 0, "交付", "madeup")), tasks).isEmpty())
     }
+
+    @Test fun scopedLinksCannotMoveToAnotherGoalAndLegacyReferencesRemainReadable() {
+        val todos = listOf(LocalTodoItem("交付", "completed"))
+        val legacy = link(20, 0, "交付", "a".repeat(64))
+        val scoped = legacy.copy(sequence = 21, data = buildJsonObject {
+            legacy.data.forEach { (key, value) -> put(key, value) }
+            put("goal_id", "goal-a")
+        })
+        assertEquals(21L, projectRequirementEvidenceLinks(sequenceOf(scoped), todos, "goal-a").single().eventSequence)
+        assertTrue(projectRequirementEvidenceLinks(sequenceOf(scoped), todos, "goal-b").isEmpty())
+        assertEquals(20L, projectRequirementEvidenceLinks(sequenceOf(legacy), todos, "goal-b").single().eventSequence)
+    }
 }

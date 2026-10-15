@@ -459,6 +459,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
     val loadedSearchState = rememberV6LoadedConversationSearchState(state.sessionId)
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
+    var showWorkEvidence by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showCharacterTuning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showGroupMemberPicker by remember(documentIdentity) { mutableStateOf(false) }
     var showGroupAnnouncement by remember(documentIdentity) { mutableStateOf(false) }
@@ -496,15 +497,16 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     LaunchedEffect(state.sessionId, state.usageMode, workActions) {
         workArtifacts = emptyList()
         if (state.usageMode == LocalUsageMode.WORK && workActions != null) {
-            var lastSequence = Long.MIN_VALUE
+            var lastRevision: com.labteto.dshmobile.local.presentation.LocalWorkHistoryRevision? = null
             while (true) {
                 try {
-                    val (sequence, next) = withContext(Dispatchers.IO) {
-                        val current = workActions.eventSequenceForUi(state.sessionId)
-                        current to if (current != lastSequence) workActions.artifactsForUi(state.sessionId) else null
+                    val (revision, next) = withContext(Dispatchers.IO) {
+                        val current = workActions.artifactRevision(state.sessionId)
+                        val items = if (current != lastRevision) workActions.artifactsForUi(state.sessionId) else workArtifacts
+                        current to workActions.refreshArtifactFiles(state.sessionId, items)
                     }
-                    next?.let { workArtifacts = it }
-                    lastSequence = sequence
+                    workArtifacts = next
+                    lastRevision = revision
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
@@ -837,6 +839,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             onTogglePin = onTogglePinSession,
                             onRenameSession = { renameSessionOpen = true },
                             onDeleteSession = onDeleteSession,
+                            onOpenWorkEvidence = workActions?.let { { showWorkEvidence = true } },
                         )
                     }
                 }
@@ -1165,6 +1168,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             workspacePath = state.workspacePath,
                             actions = workActions,
                             onOpen = { onOpenWorkArtifact(transcriptItem.artifact.reference) },
+                            sessionId = state.sessionId,
                         )
                         is LocalTranscriptItem.Thinking -> ChatThinkingRow(transcriptItem.messages)
                         is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
@@ -1751,6 +1755,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     }
 
     val teamPanelResources = androidx.compose.ui.platform.LocalResources.current
+    if (showWorkEvidence && workActions != null && state.usageMode == LocalUsageMode.WORK) {
+        LocalWorkEvidenceSheet(state.sessionId, state.workspacePath, workActions,
+            onOpenFile = { path -> showWorkEvidence = false; onOpenWorkArtifact(path) },
+            onDismiss = { showWorkEvidence = false })
+    }
     if (showTeamPanel && state.usageMode == LocalUsageMode.WORK && state.team.visible) {
         LocalAgentTeamSheet(
             team = state.team,

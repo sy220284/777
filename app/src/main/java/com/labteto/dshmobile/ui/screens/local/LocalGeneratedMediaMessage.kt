@@ -782,10 +782,15 @@ internal fun LocalWorkArtifactMessageRow(
     workspacePath: String,
     actions: LocalWorkFeatureUiActions?,
     onOpen: () -> Unit,
+    sessionId: String? = null,
 ) {
     val resources = LocalResources.current
     val context = LocalContext.current
-    val file = remember(workspacePath, artifact.reference, artifact.versionNow) {
+    val scope = rememberCoroutineScope()
+    var inspected by remember(artifact.reference, artifact.fileObservation) { mutableStateOf<LocalArtifactUiItem?>(null) }
+    var inspecting by remember(artifact.reference, artifact.fileObservation) { mutableStateOf(false) }
+    val currentVersion = inspected?.versionNow ?: artifact.versionNow
+    val file = remember(workspacePath, artifact.reference, artifact.fileObservation, artifact.versionNow) {
         runCatching {
             require(workspacePath.isNotBlank())
             val root = File(workspacePath).canonicalFile
@@ -794,12 +799,12 @@ internal fun LocalWorkArtifactMessageRow(
             }
         }.getOrNull()
     }
-    var preview by remember(artifact.reference, artifact.versionNow) {
+    var preview by remember(artifact.reference, artifact.fileObservation, artifact.versionNow) {
         mutableStateOf<LocalWorkspaceFilePreview?>(null)
     }
     var expanded by remember(artifact.reference) { mutableStateOf(false) }
     var error by remember(artifact.reference) { mutableStateOf<String?>(null) }
-    LaunchedEffect(artifact.reference, artifact.versionNow, artifact.currentlyAvailable, actions) {
+    LaunchedEffect(artifact.reference, artifact.fileObservation, artifact.versionNow, artifact.currentlyAvailable, actions) {
         preview = null
         if (artifact.category == "file" && artifact.currentlyAvailable != false && actions != null) {
             try {
@@ -824,7 +829,9 @@ internal fun LocalWorkArtifactMessageRow(
         } else Modifier,
     ) {
         if (isImage && file != null) {
-            MediaInlinePicture(file, null)
+            androidx.compose.runtime.key(artifact.fileObservation, currentVersion) {
+                MediaInlinePicture(file, null)
+            }
         } else if (!preview?.text.isNullOrBlank()) {
             val text = preview!!.text!!
             androidx.compose.foundation.text.selection.SelectionContainer {
@@ -849,10 +856,26 @@ internal fun LocalWorkArtifactMessageRow(
                 style = DsType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
         }
-        if (artifact.versionAtCreation != null && artifact.versionNow != null &&
-            artifact.versionAtCreation != artifact.versionNow) {
+        if (artifact.versionAtCreation != null && currentVersion != null &&
+            artifact.versionAtCreation != currentVersion) {
             Text(resources.getString(R.string.media_chat_work_file_changed), style = DsType.caption11.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+        }
+        if (artifact.category == "file" && actions != null && sessionId != null && artifact.currentlyAvailable != false) {
+            if (currentVersion == null) Text(resources.getString(R.string.work_evidence_not_checked),
+                style = DsType.caption11, color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+            SyButton(resources.getString(R.string.work_evidence_current_version), enabled = !inspecting,
+                variant = SyButtonVariant.Ghost, size = SyButtonSize.Small, onClick = {
+                    inspecting = true
+                    scope.launch {
+                        try {
+                            inspected = withContext(Dispatchers.IO) { actions.inspectArtifact(sessionId, artifact) }
+                            if (inspected == null) error = resources.getString(R.string.work_evidence_link_failed)
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (_: Exception) { error = resources.getString(R.string.work_evidence_failed) }
+                        finally { inspecting = false }
+                    }
+                })
         }
         Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             if (artifact.category == "file") {

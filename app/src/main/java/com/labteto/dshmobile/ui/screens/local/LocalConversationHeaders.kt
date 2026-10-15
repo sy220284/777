@@ -178,6 +178,7 @@ internal fun WorkSurfaceHeader(
     onTogglePin: () -> Unit,
     onRenameSession: () -> Unit,
     onDeleteSession: () -> Unit,
+    onOpenWorkEvidence: (() -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Row(
@@ -226,6 +227,7 @@ internal fun WorkSurfaceHeader(
             onTogglePin = onTogglePin,
             onRename = onRenameSession,
             onDelete = onDeleteSession,
+            onOpenWorkEvidence = onOpenWorkEvidence,
         )
     }
 }

@@ -12,11 +12,19 @@ import kotlinx.serialization.json.longOrNull
 internal fun projectRequirementEvidenceLinks(
     events: List<LocalSessionEventLog.Event>,
     todos: List<LocalTodoItem>,
+): List<LocalRequirementEvidenceLink> = projectRequirementEvidenceLinks(events.asSequence(), todos)
+
+internal fun projectRequirementEvidenceLinks(
+    events: Sequence<LocalSessionEventLog.Event>,
+    todos: List<LocalTodoItem>,
+    goalId: String? = null,
 ): List<LocalRequirementEvidenceLink> {
     val linked = linkedMapOf<Pair<Int, String>, LocalRequirementEvidenceLink>()
     events.forEach { event ->
         if (event.type != "work/requirement-evidence") return@forEach
         val data = event.data
+        val savedGoal = (data["goal_id"] as? JsonPrimitive)?.contentOrNull
+        if (savedGoal != null && savedGoal != goalId) return@forEach
         val index = (data["requirement_index"] as? JsonPrimitive)?.intOrNull ?: return@forEach
         val text = (data["requirement"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
         val path = (data["artifact_path"] as? JsonPrimitive)?.contentOrNull ?: return@forEach

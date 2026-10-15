@@ -27,6 +27,7 @@ class LocalSettingsDataFacade @Inject internal constructor(
     internal val deepSeekPricing: StateFlow<DeepSeekPricingState> = pricing.state
     internal suspend fun refreshDeepSeekPricing() = pricing.refreshFromOfficial()
 
+    override fun memoryPage(query: com.labteto.dshmobile.local.memory.MemoryManagementQuery) = memoryStore.managementPage(query)
     override fun memories(scopes: Set<MemoryScope>, projectId: String?, lineageId: String?): List<MemoryRecord> =
         memoryStore.listActive(allowedScopes = scopes, projectId = projectId, lineageId = lineageId, limit = 100)
     override fun submit(command: com.labteto.dshmobile.uicontract.MemoryUiCommand): com.labteto.dshmobile.uicontract.MemoryUiReceipt = try {
