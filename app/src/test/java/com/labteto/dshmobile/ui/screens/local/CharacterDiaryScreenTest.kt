@@ -100,6 +100,36 @@ class CharacterDiaryScreenTest {
     }
 
     @Test
+    fun oldEventDoesNotGetAnInventedTodayPrefix() {
+        assertEquals(
+            "那次一起去了海边。",
+            characterDiaryReadingLine(diary(id = "history", event = "那次一起去了海边")),
+        )
+        assertEquals(
+            "我们第一次有了属于两个人的计划。",
+            characterDiaryReadingLine(
+                diary(id = "meaning", event = "", meaning = "我们第一次有了属于两个人的计划"),
+            ),
+        )
+    }
+
+    @Test
+    fun conciseReadingKeepsWholeSentencesAndPrefersPsychologyOverRoutineEvents() {
+        val feelings = diary(id = "feelings", event = "和他聊过之后", thought = "我终于想清楚了")
+            .copy(createdAt = 3, importance = 1)
+        val longEvent = "这一天" + "做了很多日常小事".repeat(23)
+        val routine = diary(id = "routine", event = longEvent).copy(createdAt = 4, importance = 4)
+        val otherRoutine = diary(id = "routine2", event = longEvent + "另外一件事")
+            .copy(createdAt = 5, importance = 4)
+        val day = characterDiaryDayNarrative(listOf(routine, otherRoutine, feelings))
+        assertTrue(day.contains("我终于想清楚了"))
+        assertTrue(day.length <= 360)
+        assertTrue(day.endsWith("。"))
+        // Every displayed paragraph comes from a complete chosen entry, never take(357).
+        assertTrue(day.split("\n\n").all { it.endsWith("。") })
+    }
+
+    @Test
     fun dailySummaryRemainsBriefEvenWithManyLongMemories() {
         val entries = (0 until 12).map {
             diary(id = it.toString(), event = "今天我想了很多" + "细节".repeat(75), thought = "我还在琢磨这件事")
