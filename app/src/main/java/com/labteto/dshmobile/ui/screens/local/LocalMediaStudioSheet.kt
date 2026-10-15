@@ -152,7 +152,7 @@ internal fun LocalMediaStudioSheetContent(
         if (uri != null && selected != null) {
             val chosen = selected
             submit(chosen) {
-                viewModel.submitTranscribe(chosen, uri, sessionId, sourceMessageId)
+                viewModel.submitTranscribe(chosen, uri, sessionId, activeRevision?.sourceMessageId ?: sourceMessageId, activeRevision?.originId)
                 if (chosen.id == activeOfferId) onDelivered()
             }
         }

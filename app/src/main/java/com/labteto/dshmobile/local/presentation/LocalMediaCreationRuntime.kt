@@ -112,16 +112,16 @@ class LocalMediaCreationRuntime @Inject internal constructor(
             store.addResult(offer, LocalMediaKind.SPEECH, sessionId, text, id, file = file, sourceMessageId = sourceMessageId, voiceId = voice, revisionOf = revisionOf)
         }
     }
-    suspend fun submitTranscribe(offer: LocalMediaOffer, uri: Uri, sessionId: String, sourceMessageId: String? = null): LocalMediaCreationJob {
+    suspend fun submitTranscribe(offer: LocalMediaOffer, uri: Uri, sessionId: String, sourceMessageId: String? = null, revisionOf: String? = null): LocalMediaCreationJob {
         validate(offer, LocalMediaKind.TRANSCRIBE)
-        return submit(offer, sessionId, null, sourceMessageId) { id ->
+        return submit(offer, sessionId, null, sourceMessageId, revisionOf) { id ->
             val text = when (offer.provider) {
                 LocalMediaProvider.MINIMAX -> miniMax.transcribe(offer.profile, uri)
                 LocalMediaProvider.OPENAI -> api.transcription(offer, uri)
                 else -> error("此服务商未接入语音转写")
             }
             markMediaProviderSucceeded()
-            store.addResult(offer, LocalMediaKind.TRANSCRIBE, sessionId, operationId = id, text = text, sourceMessageId = sourceMessageId)
+            store.addResult(offer, LocalMediaKind.TRANSCRIBE, sessionId, operationId = id, text = text, sourceMessageId = sourceMessageId, revisionOf = revisionOf)
         }
     }
     private suspend fun submit(offer: LocalMediaOffer, sessionId: String, prompt: String?, sourceMessageId: String?, revisionOf: String? = null, execute: suspend (String) -> Unit): LocalMediaCreationJob {
