@@ -19,12 +19,15 @@ class V4DeliveryMemoryOfflineAcceptanceTest {
     @get:Rule val tmp = TemporaryFolder()
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
-    @Test fun oldCharacterImportBecomesV4AndPreservesPlotKnowledgeBoundaryAfterSerialization() {
-        val old = PersonaProfile(
-            name = "青岚", portrait = "书店老板", lifeContext = "每天会照顾旧书店",
-            worldSetting = "镇上有一座塔",
+    @Test fun newPersonaDocumentPreservesPlotKnowledgeBoundaryAfterSerialization() {
+        val newProfile = PersonaProfile(
+            name = "青岚", coreIdentity = "书店老板",
+            facts = listOf(CharacterFact("bio", CharacterFactCategories.BIOGRAPHY,
+                "每天会照顾旧书店", provenance = CharacterFactProvenance.USER_CREATED)),
+            loreEntries = listOf(PersonaLoreEntry(id = "tower", title = "小镇世界",
+                content = "镇上有一座塔", keywords = listOf("塔"))),
         )
-        val normalized = old.canonicalV4()
+        val normalized = newProfile.canonicalV4()
         val expanded = normalized.copy(facts = normalized.facts + CharacterFact(
             id = "future", category = CharacterFactCategories.RELATIONSHIPS,
             content = "结局知道钥匙的秘密", temporalScope = "ending",

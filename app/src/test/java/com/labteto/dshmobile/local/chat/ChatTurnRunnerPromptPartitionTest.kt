@@ -44,7 +44,9 @@ class ChatTurnRunnerPromptPartitionTest {
         )
         val persona = PersonaProfile(
             name = "阿青",
-            portrait = "剑客，嘴硬心软",
+            coreIdentity = "剑客，嘴硬心软",
+            facts = listOf(CharacterFact("temperament", CharacterFactCategories.PERSONALITY,
+                "嘴硬心软", provenance = CharacterFactProvenance.USER_CREATED)),
             hardConstraints = listOf("不替用户做决定"),
             bannedPhrases = listOf("作为AI"),
             corrections = listOf(
@@ -141,7 +143,9 @@ class ChatTurnRunnerPromptPartitionTest {
         val context = runner.prepareProfile(
             persona = PersonaProfile(
                 name = "阿青",
-                portrait = "克制谨慎，表达含蓄",
+                coreIdentity = "旅人",
+                facts = listOf(CharacterFact("temperament", CharacterFactCategories.PERSONALITY,
+                    "克制谨慎，表达含蓄", provenance = CharacterFactProvenance.USER_CREATED)),
             ),
             state = ChatCharacterState(),
             context = ChatContextState(),

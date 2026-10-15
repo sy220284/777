@@ -14,7 +14,7 @@ class ChatDiaryPromptTest {
     @Test
     fun diaryPromptAllowsEventOnlyRecordsAndMarksUncertainPsychology() {
         val prompt = planner.prompt(
-            persona = PersonaProfile(name = "阿青", portrait = "嘴硬心软，但不会为了证明这一点每轮都表演出来。"),
+            persona = PersonaProfile(name = "阿青", coreIdentity = "嘴硬心软，但不会为了证明这一点每轮都表演出来。"),
             state = ChatCharacterState(),
             userMessage = "周末一起去海边吧",
             assistantMessage = "……行，别迟到。",
@@ -127,7 +127,7 @@ class ChatDiaryPromptTest {
         assertFalse(sunny == quiet)
         val diaryInstruction = chatPostTurnModelMessages(sunny)
             .first()["content"]!!.jsonPrimitive.content
-        assertTrue(diaryInstruction.contains("同一人物"))
+        assertTrue(diaryInstruction.contains("这个人物独有的个人判断"))
         assertTrue(diaryInstruction.contains("当天的处境"))
     }
 

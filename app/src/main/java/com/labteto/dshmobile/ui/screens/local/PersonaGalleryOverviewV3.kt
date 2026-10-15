@@ -188,7 +188,10 @@ internal fun PersonaGalleryOverviewV3(
         } else {
             orderedEntries.filter { entry ->
                 entry.persona.name.contains(normalizedQuery, ignoreCase = true) ||
-                    entry.persona.portrait.contains(normalizedQuery, ignoreCase = true) ||
+                    entry.persona.coreIdentity.contains(normalizedQuery, ignoreCase = true) ||
+                    entry.persona.facts.any { fact ->
+                        fact.content.contains(normalizedQuery, ignoreCase = true)
+                    } ||
                     entry.persona.franchise.contains(normalizedQuery, ignoreCase = true)
             }
         }

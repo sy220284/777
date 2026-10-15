@@ -9,6 +9,34 @@ import org.junit.Test
 class CharacterFactsV4Test {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
+    @Test fun newPersonasOfferTenFactCategoriesWithoutDiscardingHistoricalFacts() {
+        assertEquals(10, CharacterFactCategories.selectable.size)
+        assertEquals(10, CharacterFactCategories.canonical.size)
+        assertEquals(CharacterFactCategories.canonical, CharacterFactCategories.selectable)
+        assertTrue(CharacterFactCategories.selectable.contains(CharacterFactCategories.PERSONALITY))
+        assertTrue(CharacterFactCategories.selectable.contains(CharacterFactCategories.VOICE_STYLE))
+        listOf(
+            "definingChoices", "emotionalImprints", "lifeGravity",
+            "unfinishedBusiness", "limitsAndCosts", "sensorySignature",
+        ).forEach { assertFalse(CharacterFactCategories.isSupported(it)) }
+        assertTrue(CharacterFactCategories.isSupported("myOriginalCustomFact"))
+        assertEquals(
+            listOf(
+                CharacterFactCategories.PERSONALITY,
+                CharacterFactCategories.VALUES_AND_TRADEOFFS,
+                CharacterFactCategories.SELF_NARRATIVE,
+                CharacterFactCategories.SUBJECTIVE_BELIEFS,
+                CharacterFactCategories.IDENTITY_GAP,
+                CharacterFactCategories.PREFERENCES_AND_HABITS,
+                CharacterFactCategories.VOICE_STYLE,
+                CharacterFactCategories.BIOGRAPHY,
+                CharacterFactCategories.RELATIONSHIPS,
+                CharacterFactCategories.CUSTOM_FACTS,
+            ),
+            CharacterFactCategories.selectable,
+        )
+    }
+
     @Test fun v4IdentityFactsAndSourcesRoundTrip() {
         val profile = PersonaProfile(
             name = "叶澜",
@@ -141,11 +169,9 @@ class CharacterFactsV4Test {
             name = "阿云",
             coreIdentity = "咖啡师",
             facts = listOf(
-                CharacterFact("life", CharacterFactCategories.LIFE_GRAVITY, "周末会去看外婆"),
+                CharacterFact("life", CharacterFactCategories.BIOGRAPHY, "周末会去看外婆"),
                 CharacterFact("bio", CharacterFactCategories.BIOGRAPHY, "从小住在江南"),
             ),
-            lifeContext = "旧版本生活资料：每天驾驶宇宙飞船",
-            portrait = "旧版本人物背景：天外来客",
         )
         val runtime = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
             .project(persona, ChatCharacterState(), ChatContextState(),
@@ -159,9 +185,9 @@ class CharacterFactsV4Test {
         val persona = PersonaProfile(
             name = "阿云", coreIdentity = "档案管理员",
             facts = listOf(
-                CharacterFact("decision", CharacterFactCategories.DEFINING_CHOICES,
+                CharacterFact("decision", CharacterFactCategories.VALUES_AND_TRADEOFFS,
                     "阿云决定守护旧图书馆", relatedFactIds = listOf("memory")),
-                CharacterFact("memory", CharacterFactCategories.EMOTIONAL_IMPRINTS,
+                CharacterFact("memory", CharacterFactCategories.BIOGRAPHY,
                     "童年的那场洪水留下无法磨灭的记忆",
                     temporalScope = "act-2", sourceReference = "原作第二幕"),
             ),
@@ -207,14 +233,12 @@ class CharacterFactsV4Test {
     @Test fun storyStageGatesStableTraitsLifeAndLegacyFallbackTogether() {
         val persona = PersonaProfile(
             name = "阿云", coreIdentity = "旧书店店主",
-            portrait = "隐藏旧版背景：后来的全部秘密",
-            lifeContext = "隐藏旧版生活：被永远安排的计划",
             facts = listOf(
                 CharacterFact("early", CharacterFactCategories.BIOGRAPHY, "在小镇经营书店"),
                 CharacterFact("later", CharacterFactCategories.PERSONALITY,
                     "得知真相后变得格外谨慎", temporalScope = "act-2",
                     provenance = CharacterFactProvenance.CANON),
-                CharacterFact("later-life", CharacterFactCategories.LIFE_GRAVITY,
+                CharacterFact("later-life", CharacterFactCategories.BIOGRAPHY,
                     "夜里会整理那封密信", temporalScope = "act-2"),
             ),
         )
@@ -424,7 +448,7 @@ class CharacterFactsV4Test {
             assertTrue(preset.id, p.coreIdentity.isNotBlank())
             assertTrue(preset.id, p.factText(CharacterFactCategories.PERSONALITY).isNotBlank())
             assertTrue(preset.id, p.factText(CharacterFactCategories.BIOGRAPHY).isNotBlank())
-            assertTrue(preset.id, p.mutableTraits.isEmpty())
+            assertTrue(preset.id, p.facts.all { CharacterFactCategories.isSupported(it.category) })
             assertFalse(preset.id, p.facts.any { it.content.isBlank() })
         }
     }
@@ -466,26 +490,13 @@ class CharacterFactsV4Test {
     }
 
     @Test
-    fun v4IdentityWithoutFactsDoesNotReviveHiddenLegacyPersona() {
-        val profile = PersonaProfile(
-            name = "阿云", coreIdentity = "旧书店店主",
-            portrait = "过时背景：来自火星",
-            lifeContext = "过时生活：驾驶宇宙飞船",
-            stableTraits = listOf("过时特征：无所不知"),
-            mutableTraits = listOf("过时变化：预知未来"),
-            attentionKeywords = listOf("火星"),
-        )
+    fun emptyFactsNeverRecreateDiscardedPersonaProperties() {
+        val profile = PersonaProfile(name = "阿云", coreIdentity = "旧书店店主")
         val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
-        val v4 = projector.project(profile, ChatCharacterState(), ChatContextState(),
+        val runtime = projector.project(profile, ChatCharacterState(), ChatContextState(),
             "你每天都做什么？", null)
-        val prompt = v4.stablePrompt + v4.dynamicPrompt
-        assertTrue(prompt.contains("旧书店店主"))
-        assertFalse(prompt.contains("来自火星"))
-        assertFalse(prompt.contains("驾驶宇宙飞船"))
-        assertFalse(prompt.contains("预知未来"))
-        // A genuinely legacy-only in-memory profile retains its fallback until converted.
-        val old = projector.project(profile.copy(coreIdentity = ""),
-            ChatCharacterState(), ChatContextState(), "你的背景？", null)
-        assertTrue(old.stablePrompt.contains("来自火星"))
+        assertTrue(runtime.stablePrompt.contains("旧书店店主"))
+        assertFalse(runtime.stablePrompt.contains("来自火星"))
+        assertEquals(profile, profile.canonicalV4())
     }
 }

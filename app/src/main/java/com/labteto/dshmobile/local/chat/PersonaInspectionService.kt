@@ -151,7 +151,7 @@ class PersonaInspectionService @Inject constructor(
                     evidence = it.evidence.trim().take(500),
                 )
             }
-            .filter { it.field in ALLOWED_FIELDS && it.value.isNotBlank() }
+            .filter { it.field in SUGGESTION_FIELDS && it.value.isNotBlank() }
             .filterNot { PersonaImmersionPolicy.breaksImmersion(it.value) }
             .distinctBy { "${it.field}|${normalize(it.value)}" }
             .take(MAX_SUGGESTIONS)
@@ -194,6 +194,7 @@ class PersonaInspectionService @Inject constructor(
         const val MAX_SUGGESTIONS = 20
 
         val ALLOWED_FIELDS = CharacterFactCategories.canonical.toSet() + "coreIdentity"
+        val SUGGESTION_FIELDS = CharacterFactCategories.canonical.toSet() + "coreIdentity"
 
         val SYSTEM_PROMPT = """
             核查V4人物事实与最近的对话是否存在长期一致性问题。只输出JSON：
@@ -201,8 +202,7 @@ class PersonaInspectionService @Inject constructor(
              "suggestions":[{"field":"","value":"","evidence":""}]}
             field仅允许coreIdentity及以下资料类别：
             personality,selfNarrative,identityGap,valuesAndTradeoffs,subjectiveBeliefs,biography,
-            definingChoices,emotionalImprints,lifeGravity,unfinishedBusiness,relationships,
-            limitsAndCosts,sensorySignature,preferencesAndHabits,voiceStyle,customFacts。
+            relationships,preferencesAndHabits,voiceStyle,customFacts。
             只能根据稳定且明确的证据提出事实补充。原作身份和能力要区分可靠事实与推断。
             当前情绪、互动频率、关系进度、临时关注和未来成长属于运行时；
             不可写入人物卡，也不应将模型限制描述成人物设定。

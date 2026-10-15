@@ -55,7 +55,7 @@ class ChatPersonaStorageSafetyTest {
             PersonaProfile(
                 id = "persona-a",
                 name = "阿青",
-                portrait = "嘴硬心软",
+                coreIdentity = "嘴硬心软",
             ),
         )
         assertTrue(File(temporary.root, "personas.json.bak").isFile)
@@ -77,7 +77,7 @@ class ChatPersonaStorageSafetyTest {
     fun corruptedGalleryPrimaryRecoversArchivedCharacterBeforeNextWrite() {
         val store = galleryStore()
         val saved = store.save(
-            persona = PersonaProfile(name = "阿青", portrait = "剑客"),
+            persona = PersonaProfile(name = "阿青", coreIdentity = "剑客"),
             sourceSessionId = "session-a",
             history = listOf(
                 LocalHarnessMessage("m1", "user", "你来了", createdAt = 1L),
@@ -98,7 +98,7 @@ class ChatPersonaStorageSafetyTest {
         )
 
         store.save(
-            persona = PersonaProfile(name = "小岚", portrait = "花店店主"),
+            persona = PersonaProfile(name = "小岚", coreIdentity = "花店店主"),
             sourceSessionId = "session-b",
             history = emptyList(),
             chatState = ChatCharacterState(),

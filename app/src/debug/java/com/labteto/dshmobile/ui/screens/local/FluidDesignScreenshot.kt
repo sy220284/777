@@ -34,7 +34,7 @@ internal fun FluidDesignScreenshot(screen: String) {
 }
 
 private fun fluidPersonaFixture() = PersonaGalleryEntry("design-persona",
-    PersonaProfile(id = "design-profile", name = "沈昀", portrait = "邻居 · 大学同学"),
+    PersonaProfile(id = "design-profile", name = "沈昀", coreIdentity = "邻居 · 大学同学"),
     stories = listOf(PersonaGalleryStory("design-story", "上线前的这一周",
         chatState = ChatCharacterState(mood = "累，但安心", relationshipState = "稳定期",
             unresolvedThreads = listOf("接口文档"), updatedAt = 1,
@@ -57,7 +57,7 @@ private fun FluidPersonaScreenshot(section: Int) {
 @Composable
 private fun FluidGalleryScreenshot() {
     val entries = remember { listOf(fluidPersonaFixture(), fluidPersonaFixture().copy(id = "design-persona-2",
-        persona = PersonaProfile(id = "design-profile-2", name = "陆棠", portrait = "周末看展吗"))) }
+        persona = PersonaProfile(id = "design-profile-2", name = "陆棠", coreIdentity = "周末看展吗"))) }
     Column(Modifier.fillMaxSize().padding(SyMetric.gapLg)) {
         SyTopBar("人物图集 · 设计样例", onBack = {}, backContentDescription = "返回")
         SySearchField("", {}, "搜索人物", Modifier.padding(bottom = 14.dp))

@@ -18,8 +18,6 @@ class ChatInteractionPlannerTest {
         val persona = PersonaProfile(
             name = "青岚",
             coreIdentity = "小镇的书店店员",
-            // Retired fields must not leak into V4 auxiliary model requests.
-            portrait = "旧版预告：结局变成了猎人",
             facts = listOf(
                 CharacterFact("known", CharacterFactCategories.PERSONALITY,
                     "性格沉稳", provenance = CharacterFactProvenance.CANON),
@@ -440,7 +438,7 @@ class ChatInteractionPlannerTest {
     fun plannerAndSuggestionsHonorCorrectionsWithoutFixedExpressionRecipe() {
         val persona = PersonaProfile(
             name = "阿青",
-            portrait = "嘴硬心软",
+            coreIdentity = "嘴硬心软",
             corrections = listOf("不善于拒绝，会服软，很多推辞只是她自己的表达方式"),
         )
         val state = ChatCharacterState(
@@ -477,7 +475,7 @@ class ChatInteractionPlannerTest {
     fun genericRestraintAloneDoesNotEnableIndirectRefusalSemantics() {
         val persona = PersonaProfile(
             name = "阿青",
-            portrait = "克制谨慎，表达含蓄",
+            coreIdentity = "克制谨慎，表达含蓄",
         )
         val prompt = planner.prompt(
             persona = persona,
@@ -493,7 +491,7 @@ class ChatInteractionPlannerTest {
     fun trackerRecordsActualExpressionsAndUserDraftRespectsExplicitBoundaries() {
         val persona = PersonaProfile(
             name = "阿青",
-            portrait = "嘴硬心软",
+            coreIdentity = "嘴硬心软",
         )
         val plannerPrompt = planner.prompt(
             persona = persona,
@@ -1381,7 +1379,7 @@ class ChatInteractionPlannerTest {
         assertTrue(prompt.contains("suggestions 固定为空"))
         assertTrue(prompt.contains("interaction* 由系统维护"))
         assertTrue(prompt.contains("scene 和 interaction* 由系统维护"))
-        assertTrue(prompt.contains("NONE=无需记录显著长期事件"))
+        assertTrue(prompt.contains("NONE=无值得长期记住的经历或人物思想变化"))
         assertTrue(prompt.contains("NONE 下新增非空状态时须在 stateEvidence"))
         assertTrue(prompt.contains("合并重复"))
     }

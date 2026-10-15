@@ -132,4 +132,45 @@ class PersonaAutoFillParsingTest {
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("unterminated"))
     }
+
+    @Test
+    fun normalizesModelFieldAliasesWithoutRevivingRetiredCategories() {
+        val draft = parsePersonaDraft(json, """
+            {"name":"沈知遥","facts":[
+                {"id":"identity","category":"identity","content":"旧物修复师"},
+                {"id":"habit","category":"habits","content":"喜欢修书"},
+                {"id":"voice","category":"speechStyle","content":"话少但直接"},
+                {"id":"unknown","category":"speciality","content":"辨认旧纸"},
+                {"id":"deleted","category":"emotionalImprints","content":"旧版废弃字段"}
+            ]}
+        """.trimIndent())
+        assertEquals("旧物修复师", draft.coreIdentity)
+        assertEquals(setOf("preferencesAndHabits", "voiceStyle", "customFacts"),
+            draft.facts.map { it.category }.toSet())
+        assertTrue(draft.facts.none { it.content.contains("旧版废弃") })
+    }
+
+    @Test
+    fun detectsOldTopLevelModelFormatInsteadOfSilentlyDroppingItsContent() {
+        val result = runCatching {
+            parsePersonaDraft(json, """{"name":"沈知遥","stableTraits":"倔强","lifeContext":"经营修复工作室"}""")
+        }
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("旧版"))
+    }
+
+    @Test
+    fun supplementaryGenerationTargetsOnlyMissingStandardFacts() {
+        val existing = listOf(CharacterFact("personality", "personality", "细心"))
+        val generated = listOf(
+            CharacterFact("biography", "biography", "曾修复古籍"),
+            CharacterFact("custom", "customFacts", "其他记录"),
+        )
+        val missing = missingPersonaCategories(existing, generated)
+        assertEquals(7, missing.size)
+        assertTrue("personality" !in missing)
+        assertTrue("biography" !in missing)
+        assertTrue("customFacts" !in missing)
+        assertTrue("voiceStyle" in missing)
+    }
 }

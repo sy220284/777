@@ -140,8 +140,8 @@ class LocalHarnessViewModel @Inject constructor(
         personaGalleryController.selectGalleryPersonaForCurrentChat(id)
     suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGalleryEntry> =
         personaGalleryController.createGalleryPersona(profile)
-    suspend fun autoFillNewPersona(description: String): Result<PersonaProfile> =
-        personaGalleryController.autoFillNewPersona(description)
+    suspend fun autoFillNewPersona(current: PersonaProfile, description: String): Result<PersonaProfile> =
+        personaGalleryController.autoFillNewPersona(current, description)
     suspend fun inspectGalleryPersona(id: String, storyId: String?): Result<PersonaInspectionResult> =
         personaGalleryController.inspectGalleryPersona(id, storyId)
     suspend fun applyGallerySuggestions(
@@ -337,8 +337,8 @@ class LocalHarnessViewModel @Inject constructor(
         }
     }
 
-    suspend fun autoFillChatPersona(description: String): Result<PersonaProfile> =
-        chatModelAssistController.autoFillCurrentPersona(description)
+    suspend fun autoFillChatPersona(current: PersonaProfile, description: String): Result<PersonaProfile> =
+        chatModelAssistController.autoFillCurrentPersona(current, description)
     fun switchSession(sessionId: String) = runtime.session.switchSession(sessionId)
     fun clearCredential() = runtime.model.clearCredential()
 }
