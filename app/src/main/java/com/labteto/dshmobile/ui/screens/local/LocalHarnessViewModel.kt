@@ -50,6 +50,8 @@ class LocalHarnessViewModel @Inject constructor(
     val automationUiPort: com.labteto.dshmobile.uicontract.AutomationUiPort,
     val mediaUiPort: com.labteto.dshmobile.uicontract.MediaUiPort,
     val diaryUiPort: com.labteto.dshmobile.uicontract.DiaryUiPort,
+    val hostPreferencesUiPort: com.labteto.dshmobile.uicontract.HostPreferencesUiPort,
+    val replySuggestionsUiPort: com.labteto.dshmobile.uicontract.ReplySuggestionsUiPort,
     val attachmentUiPort: com.labteto.dshmobile.uicontract.AttachmentUiPort,
     val chatGroupUiPort: com.labteto.dshmobile.uicontract.ChatGroupUiPort,
     val personaGalleryUiPort: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort,

@@ -28,6 +28,8 @@ import com.labteto.dshmobile.local.model.MiniMaxNativeMediaClient
 import com.labteto.dshmobile.local.model.markMediaProviderSucceeded
 import com.labteto.dshmobile.observability.AppLog
 import java.io.File
+import java.io.OutputStream
+import kotlinx.coroutines.ensureActive
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -61,11 +63,54 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     override fun canRefresh(task: LocalMediaVideoTask, offer: LocalMediaOffer) = task.belongsTo(offer)
     override fun asset(id: String): UiMediaAsset? {
         store.result(id)?.let { result -> return UiMediaAsset(result.id,
-            resultFile(result)?.absolutePath, result.remoteUrl, result.textOutput) }
+            resultFile(result)?.absolutePath, result.remoteUrl, result.textOutput,
+            mediaUiKind(result.kind)) }
         store.video(id)?.let { task -> return UiMediaAsset(task.id,
-            videoFile(task)?.absolutePath, task.downloadUrl, null) }
+            videoFile(task)?.absolutePath, task.downloadUrl, null,
+            com.labteto.dshmobile.uicontract.UiDocumentMediaKind.VIDEO) }
         return null
     }
+    override fun assetForSession(id: String, sessionId: String): UiMediaAsset? {
+        if (sessionId.isBlank()) return null
+        store.result(id)?.takeIf { it.sessionId == sessionId }?.let { result ->
+            return UiMediaAsset(id, resultFile(result)?.absolutePath, result.remoteUrl,
+                result.textOutput, mediaUiKind(result.kind))
+        }
+        store.video(id)?.takeIf { it.sessionId == sessionId }?.let { video ->
+            return UiMediaAsset(id, videoFile(video)?.absolutePath, video.downloadUrl,
+                null, com.labteto.dshmobile.uicontract.UiDocumentMediaKind.VIDEO)
+        }
+        return null
+    }
+    private fun mediaUiKind(value: String) = when (value.uppercase()) {
+        "IMAGE" -> com.labteto.dshmobile.uicontract.UiDocumentMediaKind.IMAGE
+        "SPEECH" -> com.labteto.dshmobile.uicontract.UiDocumentMediaKind.AUDIO
+        "VIDEO" -> com.labteto.dshmobile.uicontract.UiDocumentMediaKind.VIDEO
+        else -> null
+    }
+
+    override suspend fun exportToSessionAsset(
+        id: String, sessionId: String, output: OutputStream,
+    ): MediaUiReceipt = try {
+        withContext(Dispatchers.IO) {
+            val safe = assetForSession(id, sessionId)?.localPath
+                ?: return@withContext MediaUiReceipt.Failed("Media not saved or session mismatch")
+            val file = File(safe)
+            if (!file.isFile) return@withContext MediaUiReceipt.Failed("Media file is unavailable")
+            file.inputStream().buffered().use { input ->
+                val buffer = ByteArray(16 * 1024)
+                while (true) {
+                    currentCoroutineContext().ensureActive()
+                    val bytes = input.read(buffer)
+                    if (bytes < 0) break
+                    output.write(buffer, 0, bytes)
+                }
+                output.flush()
+            }
+            MediaUiReceipt.Applied
+        }
+    } catch (cancelled: CancellationException) { throw cancelled }
+    catch (failure: Exception) { MediaUiReceipt.Failed(failure.message) }
     override suspend fun submit(command: MediaUiCommand): MediaUiReceipt = try {
         when (command) {
             is MediaUiCommand.Image -> MediaUiReceipt.CreationAdmitted(submitImage(command.offer, command.prompt, command.ratio, command.sessionId,

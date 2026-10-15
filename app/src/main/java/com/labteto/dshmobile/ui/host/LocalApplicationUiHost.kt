@@ -52,7 +52,10 @@ internal const val LEGACY_V6_APP_UI = "legacy-v6-shell"
  * The incremental Next pack is intentionally incomplete and cannot replace V6 yet.
  */
 internal object LocalApplicationPackInstallations {
-    fun fromOwners(owner: LocalHarnessViewModel): List<UiApplicationScenePack> =
+    fun fromOwners(owner: LocalHarnessViewModel,
+        updateStatus: kotlinx.coroutines.flow.StateFlow<String?>? = null,
+        checkForUpdate: (() -> Unit)? = null,
+    ): List<UiApplicationScenePack> =
         listOf(NextApplicationScenePack(NextApplicationFeaturePorts(
             chat = owner.chatUiPort, work = owner.workConversationUiPort,
             drafts = owner.conversationDraftUiPort, reading = owner.conversationReadingUiPort,
@@ -71,6 +74,9 @@ internal object LocalApplicationPackInstallations {
             automation = owner.automationUiPort, media = owner.mediaUiPort,
             usage = owner.usageUiPort, activeSessionId = { owner.shellState.value.sessionId },
             diary = owner.diaryUiPort,
+            hostPreferences = owner.hostPreferencesUiPort,
+            replySuggestions = owner.replySuggestionsUiPort,
+            updateStatus = updateStatus, checkForUpdate = checkForUpdate,
             personaTransfer = owner.personaTransferUiPort,
             stories = owner.personaStoryUiPort, galleryDeletion = owner.personaGalleryDeletionUiPort,
             gallerySave = owner.personaGallerySaveUiPort, portraits = owner.personaPortraitUiPort,

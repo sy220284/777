@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.Flow
 import androidx.compose.ui.Modifier
@@ -54,6 +55,10 @@ data class NextApplicationFeaturePorts(
     val usage: UsageUiPort? = null,
     val activeSessionId: () -> String? = { null },
     val diary: DiaryUiPort? = null,
+    val hostPreferences: HostPreferencesUiPort? = null,
+    val replySuggestions: ReplySuggestionsUiPort? = null,
+    val updateStatus: kotlinx.coroutines.flow.StateFlow<String?>? = null,
+    val checkForUpdate: (() -> Unit)? = null,
 )
 
 /**
@@ -81,15 +86,52 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
     private val chatTasks = UiSceneId("automation.persona_interaction")
     private val mediaCreation = UiSceneId("media.creation")
     private val mediaResults = UiSceneId("media.result")
+    private val conversationSlots = setOf(
+        "conversation.header", "conversation.timeline", "conversation.composer",
+        "conversation.reply_status", "conversation.message_actions",
+        "conversation.edit", "conversation.reader", "chat.branches",
+    ).map(::UiSceneId).toSet()
+    private val documentSlots = setOf(
+        "conversation.ui_document", "conversation.ui_document_generate",
+    ).map(::UiSceneId).toSet()
+    private val groupSlots = setOf("chat.group_members", "chat.group_announcement")
+        .map(::UiSceneId).toSet()
+    private val workPrompts = setOf("work.approval", "work.question")
+        .map(::UiSceneId).toSet()
+    private val galleryMaintenance = setOf(
+        "chat.gallery_profile", "chat.gallery_delete", "chat.gallery_portrait",
+    ).map(::UiSceneId).toSet()
+    private val sessionWelcome = setOf("shell.empty", "shell.onboarding")
+        .map(::UiSceneId).toSet()
     private val settingsScenes = setOf(
         "route.settings", "settings.root", "settings.models", "settings.chat",
         "settings.memory", "settings.memory_settings", "settings.advanced",
         "settings.session", "settings.usage", "settings.model_usage",
         "settings.usage_log", "settings.usage_detail",
         "settings.session_storage", "settings.diagnostics", "settings.account",
+        "settings.minimax_quota",
     ).map(::UiSceneId).toSet()
     private val implementedScenes = buildSet {
         addAll(setOf(home, galleryRoute, chat, work, galleryPage))
+        addAll(conversationSlots)
+        if (ports.documents != null && ports.forms != null) addAll(documentSlots)
+        if (ports.settings != null) add(UiSceneId("conversation.model_picker"))
+        add(UiSceneId("chat.persona_picker"))
+        if (ports.galleryDeletion != null || ports.portraits != null || ports.stories != null)
+            addAll(galleryMaintenance)
+        if (ports.authoring != null) addAll(setOf("chat.persona_editor", "chat.world_book").map(::UiSceneId))
+        if (ports.replySuggestions != null) add(UiSceneId("chat.reply_suggestions"))
+        if (ports.currentPersona != null) add(UiSceneId("chat.character_tuning"))
+        if (ports.groups != null) addAll(groupSlots)
+        addAll(workPrompts)
+        if (ports.team != null) add(UiSceneId("work.team"))
+        if (ports.evidence != null) add(UiSceneId("work.requirement_evidence"))
+        if (ports.policy != null) add(UiSceneId("work.steering_choice"))
+        if (ports.workReads != null) add(UiSceneId("work.plan_review"))
+        if (ports.tools != null) add(UiSceneId("work.capabilities"))
+        if (ports.sessions != null) addAll(sessionWelcome + UiSceneId("shell.new_session"))
+        add(UiSceneId("shell.error"))
+        if (ports.files != null) add(UiSceneId("workspace.preview"))
         if (ports.tools != null) addAll(setOf(toolsRoute, toolsMcp, toolsPlugins, toolsGithub))
         if (ports.files != null) add(workspace)
         if (ports.memory != null && ports.settings != null) add(memories)
@@ -97,7 +139,12 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
         if (ports.diary != null) addAll(setOf(diaryRoute, diaryPage))
         if (ports.sessions != null && ports.transcript != null) add(globalSearch)
         if (ports.media != null && ports.settings != null) addAll(setOf(mediaCreation, mediaResults))
-        if (ports.settings != null) addAll(settingsScenes)
+        if (ports.settings != null) addAll(settingsScenes + UiSceneId("settings.model_performance") +
+            UiSceneId("settings.pricing"))
+        if (ports.hostPreferences != null) addAll(setOf("settings.appearance",
+            "settings.notifications", "settings.permissions").map(::UiSceneId))
+        if (ports.checkForUpdate != null && ports.updateStatus != null)
+            add(UiSceneId("settings.update"))
     }
 
     override val manifest = UiPackManifest(
@@ -126,6 +173,128 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
         put(work, UiSceneRenderer { scope -> ConversationRoute(scope, true) })
         put(galleryRoute, UiSceneRenderer { scope -> GalleryRoute(scope) })
         put(galleryPage, UiSceneRenderer { scope -> GalleryRoute(scope) })
+        conversationSlots.forEach { id ->
+            put(id, UiSceneRenderer { scope ->
+                CompositionLocalProvider(LocalNextMediaPort provides ports.media) {
+                    NextConversationSubScene(id, ports, onBack = { scope.onBack() })
+                }
+            })
+        }
+        if (ports.documents != null && ports.forms != null) {
+            documentSlots.forEach { id ->
+                put(id, UiSceneRenderer { scope ->
+                    CompositionLocalProvider(LocalNextMediaPort provides ports.media) {
+                        NextConversationSubScene(id, ports, onBack = { scope.onBack() })
+                    }
+                })
+            }
+        }
+        if (ports.settings != null) put(UiSceneId("conversation.model_picker"), UiSceneRenderer { scope ->
+            NextSettingsScene("settings.models", ports.settings, ports.usage,
+                onBack = { scope.onBack() }, onNavigate = { key -> scope.onNavigate(UiSceneId(key)) })
+        })
+        if (ports.galleryDeletion != null || ports.portraits != null || ports.stories != null) {
+            galleryMaintenance.forEach { id ->
+                put(id, UiSceneRenderer { scope ->
+                    val selection = ports.selection.snapshots.collectAsStateWithLifecycle(
+                        initialValue = ports.selection.snapshot()).value
+                    NextPersonaGalleryDialog(
+                        port = ports.gallery, personas = ports.selection, selection = selection,
+                        transfer = ports.personaTransfer, stories = ports.stories,
+                        deletion = ports.galleryDeletion, save = ports.gallerySave,
+                        portraits = ports.portraits, authoring = ports.authoring,
+                        close = { scope.onBack() },
+                    )
+                })
+            }
+        }
+        put(UiSceneId("chat.persona_picker"), UiSceneRenderer { scope ->
+            NextPersonaPickerScene(ports.gallery, ports.selection, onBack = { scope.onBack() })
+        })
+        ports.replySuggestions?.let { owner ->
+            put(UiSceneId("chat.reply_suggestions"), UiSceneRenderer { scope ->
+                NextReplySuggestionsScene(owner, ports.drafts, onBack = { scope.onBack() })
+            })
+        }
+        ports.authoring?.let { owner ->
+            put(UiSceneId("chat.world_book"), UiSceneRenderer { scope ->
+                NextWorldBookScene(ports.gallery, owner, onBack = { scope.onBack() })
+            })
+            put(UiSceneId("chat.persona_editor"), UiSceneRenderer { scope ->
+                NextPersonaAuthoringScene(owner, ports.selection, galleryId = null,
+                    onBack = { scope.onBack() }, onSaved = { scope.onBack() })
+            })
+        }
+        ports.currentPersona?.let { owner ->
+            put(UiSceneId("chat.character_tuning"), UiSceneRenderer { scope ->
+                NextCurrentPersonaScene(owner, close = { scope.onBack() })
+            })
+        }
+        ports.groups?.let { owner ->
+            groupSlots.forEach { id ->
+                put(id, UiSceneRenderer { scope ->
+                    NextChatGroupScene(owner, announcementOnly = id.value == "chat.group_announcement",
+                        onBack = { scope.onBack() })
+                })
+            }
+        }
+        workPrompts.forEach { id ->
+            put(id, UiSceneRenderer { scope ->
+                NextWorkPromptScene(ports.work, approval = id.value == "work.approval",
+                    onBack = { scope.onBack() })
+            })
+        }
+        ports.team?.let { owner ->
+            put(UiSceneId("work.team"), UiSceneRenderer { scope ->
+                NextWorkTeamScene(owner, onBack = { scope.onBack() })
+            })
+        }
+        ports.evidence?.let { owner ->
+            put(UiSceneId("work.requirement_evidence"), UiSceneRenderer { scope ->
+                NextWorkEvidenceScene(owner, ports.work, onBack = { scope.onBack() })
+            })
+        }
+        ports.workReads?.let { owner ->
+            put(UiSceneId("work.plan_review"), UiSceneRenderer { scope ->
+                NextWorkPlanScene(owner, ports.activeSessionId(), onBack = { scope.onBack() })
+            })
+        }
+        ports.policy?.let { owner ->
+            put(UiSceneId("work.steering_choice"), UiSceneRenderer { scope ->
+                NextWorkPolicyScene(owner, onBack = { scope.onBack() })
+            })
+        }
+        ports.tools?.let { owner ->
+            put(UiSceneId("work.capabilities"), UiSceneRenderer { scope ->
+                NextToolsScene(owner, NextToolsPage.OVERVIEW, onBack = { scope.onBack() },
+                    onOpenMcp = { scope.onNavigate(toolsMcp) },
+                    onOpenPlugins = { scope.onNavigate(toolsPlugins) },
+                    onOpenGithub = { scope.onNavigate(toolsGithub) })
+            })
+        }
+        put(UiSceneId("shell.error"), UiSceneRenderer { scope ->
+            NextErrorScene(ports.chat, ports.work,
+                onBack = { scope.onBack() },
+                onDiagnostics = { scope.onNavigate(UiSceneId("settings.diagnostics")) })
+        })
+        ports.sessions?.let { owner ->
+            put(UiSceneId("shell.new_session"), UiSceneRenderer { scope ->
+                NextNewSessionScene(owner, onBack = { scope.onBack() },
+                    onCreated = { scope.onNavigate(home) })
+            })
+            sessionWelcome.forEach { id ->
+                put(id, UiSceneRenderer { scope ->
+                    NextSessionLandingScene(owner, onBack = { scope.onBack() },
+                        onCreate = { scope.onNavigate(UiSceneId("shell.new_session")) },
+                        onOpen = { scope.onNavigate(home) })
+                })
+            }
+        }
+        ports.files?.let { owner ->
+            put(UiSceneId("workspace.preview"), UiSceneRenderer { scope ->
+                NextWorkspaceScene(owner, onBack = { scope.onBack() })
+            })
+        }
         ports.files?.let { owner ->
             put(workspace, UiSceneRenderer { scope -> NextWorkspaceScene(owner, onBack = { scope.onBack() }) })
         }
@@ -176,8 +345,20 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
                     onBack = { scope.onBack() }, creationFirst = false)
             })
         }
+        if (ports.checkForUpdate != null && ports.updateStatus != null) {
+            put(UiSceneId("settings.update"), UiSceneRenderer { scope ->
+                NextUpdateScene(ports.checkForUpdate, ports.updateStatus, onBack = { scope.onBack() })
+            })
+        }
+        ports.hostPreferences?.let { owner ->
+            listOf("settings.appearance", "settings.notifications", "settings.permissions").forEach { key ->
+                put(UiSceneId(key), UiSceneRenderer { scope ->
+                    NextHostPreferencesScene(key, owner, onBack = { scope.onBack() })
+                })
+            }
+        }
         if (settingsOwner != null) {
-            settingsScenes.forEach { id ->
+            (settingsScenes + UiSceneId("settings.model_performance") + UiSceneId("settings.pricing")).forEach { id ->
                 put(id, UiSceneRenderer { scope ->
                     if (id.value == "settings.account") {
                         NextAccountScene(settingsOwner, onBack = { scope.onBack() })
@@ -257,6 +438,7 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
                 Text("设置")
             }
             Box(Modifier.weight(1f)) {
+                CompositionLocalProvider(LocalNextMediaPort provides ports.media) {
                 NextConversationUiPack.Render(
                     documents = ports.documents, forms = ports.forms,
                     reading = ports.reading, drafts = ports.drafts,
@@ -271,6 +453,7 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
                     galleryDeletion = ports.galleryDeletion, gallerySave = ports.gallerySave,
                     portraits = ports.portraits, invocations = ports.invocations,
                 )
+                }
             }
         }
     }

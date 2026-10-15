@@ -92,8 +92,14 @@ fun AppRoot(
         motionDurationScale = settings.motionDurationScale,
     ) {
         com.labteto.dshmobile.ui.host.LocalApplicationUiHost(
-            installedPacks = remember(features) {
-                com.labteto.dshmobile.ui.host.LocalApplicationPackInstallations.fromOwners(features)
+            installedPacks = remember(features, viewModel) {
+                com.labteto.dshmobile.ui.host.LocalApplicationPackInstallations.fromOwners(
+                    features,
+                    updateStatus = viewModel.updateInstallStatus,
+                    checkForUpdate = {
+                        viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
+                    },
+                )
             },
             availableCapabilities = hostCapabilities,
             requestedSceneKey = requestedExternalSceneKey ?: requestedHostScene,

@@ -7,6 +7,7 @@ import com.labteto.dshmobile.uicontract.UiDocumentSource
 import com.labteto.dshmobile.uicontract.UiDocumentBudget
 import com.labteto.dshmobile.uicontract.UiSceneId
 import com.labteto.dshmobile.uicontract.UiDocumentNode
+import com.labteto.dshmobile.uicontract.UiDocumentMediaKind
 import com.labteto.dshmobile.uicontract.UiDocumentBinding
 import com.labteto.dshmobile.uicontract.UiDocumentAction
 import kotlinx.serialization.json.Json
@@ -58,6 +59,7 @@ internal object LocalUiDocumentCodec {
             val kind = value.string("type")
             val properties = when (kind) {
                 "text" -> mapOf("text" to text)
+                "media" -> mapOf("assetId" to text, "kind" to text, "label" to text)
                 "table" -> mapOf("headers" to strings, "rows" to stringRows)
                 "bound_text" -> mapOf("label" to text, "binding" to text)
                 "column", "row" -> mapOf("children" to objects)
@@ -73,6 +75,8 @@ internal object LocalUiDocumentCodec {
             fun children() = value.array("children").map { node(it.jsonObject, depth + 1) }
             return when (kind) {
                 "text" -> UiDocumentNode.Text(id, value.string("text"))
+                "media" -> UiDocumentNode.Media(id, value.string("assetId"),
+                    UiDocumentMediaKind.valueOf(value.string("kind")), value.string("label"))
                 "table" -> UiDocumentNode.Table(id, value.array("headers").map { it.jsonPrimitive.content },
                     value.array("rows").map { row -> row.jsonArray.map { it.jsonPrimitive.content } })
                 "bound_text" -> UiDocumentNode.BoundText(id, value.string("label"), UiDocumentBinding.valueOf(value.string("binding")))
@@ -115,6 +119,10 @@ internal object LocalUiDocumentCodec {
             put("id", value.id)
             when (value) {
                 is UiDocumentNode.Text -> { put("type", "text"); put("text", value.text) }
+                is UiDocumentNode.Media -> {
+                    put("type", "media"); put("assetId", value.assetId)
+                    put("kind", value.kind.name); put("label", value.label)
+                }
                 is UiDocumentNode.Table -> {
                     put("type", "table")
                     put("headers", JsonArray(value.headers.map(::JsonPrimitive)))

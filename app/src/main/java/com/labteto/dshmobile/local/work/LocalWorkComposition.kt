@@ -60,6 +60,7 @@ internal class LocalWorkComposition @Inject constructor(
     usageTracker: DeepSeekUsageTracker,
     contextComposer: ContextComposer,
     private val workRunRegistry: LocalWorkRunRegistry,
+    private val workUiDocumentPublisher: LocalWorkUiDocumentPublisher,
     workMemoryRuntime: LocalWorkMemoryRuntime,
     workModelHistoryRuntime: LocalWorkModelHistoryRuntime,
     workSessionProjection: LocalWorkSessionProjectionRuntime,
@@ -282,6 +283,7 @@ internal class LocalWorkComposition @Inject constructor(
         workSessionProjection = workSessionProjection,
         workToolResultRuntime = toolResultRuntime,
         workTurnToolRuntime = turnToolRuntime,
+        workUiDocumentPublisher = workUiDocumentPublisher,
     )
 
     internal val turnStarter = LocalWorkTurnStarter(

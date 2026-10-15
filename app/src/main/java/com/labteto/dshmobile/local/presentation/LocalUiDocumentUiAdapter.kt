@@ -30,6 +30,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
@@ -44,6 +45,7 @@ internal class LocalUiDocumentUiAdapter(
     private val generation: LocalUiDocumentGeneration,
     private val store: LocalUiDocumentSessionStore,
     private val workReads: com.labteto.dshmobile.uicontract.WorkReadUiPort,
+    private val media: com.labteto.dshmobile.uicontract.MediaUiPort,
     private val drafts: ConversationDraftUiPort,
     private val knownScenes: Set<UiSceneId>,
     private val navigationScenes: Set<UiSceneId>,
@@ -144,6 +146,35 @@ internal class LocalUiDocumentUiAdapter(
                             ),
                         )
                     }
+                    com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.MEDIA_RESULTS -> {
+                        // Owner indexes actual saved results for this specific session, not arbitrary model URLs.
+                        val page = media.observe(source.sessionId, media.pageSize).first()
+                        val assets = buildList {
+                            page.results.take(12).forEach { result ->
+                                val kind = when (result.kind.uppercase()) {
+                                    "IMAGE" -> com.labteto.dshmobile.uicontract.UiDocumentMediaKind.IMAGE
+                                    "VIDEO" -> com.labteto.dshmobile.uicontract.UiDocumentMediaKind.VIDEO
+                                    "SPEECH" -> com.labteto.dshmobile.uicontract.UiDocumentMediaKind.AUDIO
+                                    else -> null
+                                }
+                                if (kind != null && result.sessionId == source.sessionId &&
+                                    media.assetForSession(result.id, source.sessionId) != null) {
+                                    add(com.labteto.dshmobile.uicontract.UiDocumentNode.Media(
+                                        "media_${result.id}", result.id, kind,
+                                        result.description?.take(150)?.ifBlank { result.kind } ?: result.kind))
+                                }
+                            }
+                            page.videos.take(8).forEach { video ->
+                                if (video.sessionId == source.sessionId &&
+                                    media.assetForSession(video.id, source.sessionId) != null)
+                                    add(com.labteto.dshmobile.uicontract.UiDocumentNode.Media(
+                                        "video_${video.id}", video.id,
+                                        com.labteto.dshmobile.uicontract.UiDocumentMediaKind.VIDEO,
+                                        video.description?.take(150)?.ifBlank { "视频" } ?: "视频"))
+                            }
+                        }
+                        com.labteto.dshmobile.uicontract.UiLocalDocumentData.MediaResults(assets)
+                    }
                     com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.WORK_TOOL_RESULT -> {
                         if (!command.workMode) return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
                         val activity = workReads.toolActivitiesForUi(source.sessionId)
@@ -240,9 +271,10 @@ class LocalUiDocumentUiPortFactory @javax.inject.Inject internal constructor(
     private val generation: LocalUiDocumentGeneration,
     private val store: LocalUiDocumentSessionStore,
     private val workReads: com.labteto.dshmobile.uicontract.WorkReadUiPort,
+    private val media: com.labteto.dshmobile.uicontract.MediaUiPort,
 ) {
     fun create(scope: CoroutineScope, drafts: ConversationDraftUiPort, knownScenes: Set<UiSceneId>,
         navigationScenes: Set<UiSceneId> = knownScenes,
         navigate: (UiSceneId) -> Unit): UiDocumentUiPort =
-        LocalUiDocumentUiAdapter(scope, state, conversations, generation, store, workReads, drafts, knownScenes, navigationScenes, navigate)
+        LocalUiDocumentUiAdapter(scope, state, conversations, generation, store, workReads, media, drafts, knownScenes, navigationScenes, navigate)
 }

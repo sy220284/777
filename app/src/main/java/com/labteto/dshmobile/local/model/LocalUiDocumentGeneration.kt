@@ -141,9 +141,12 @@ internal class LocalUiDocumentGeneration @Inject constructor(
         Produce one JSON object for a native editable UI. No tools, code, URLs, styling or execution facts.
         Required keys: schemaVersion=1, documentId, revision=0, title, nodes, actions, fallbackText.
         Nodes require id,type. Allowed types and required fields:
-        text(text); bound_text(label,binding); column(children); row(children); disclosure(title,children);
+        text(text); media(assetId,kind,label); bound_text(label,binding); column(children); row(children); disclosure(title,children);
         bound_text binding is one of EXECUTION_PHASE, QUEUED_INPUT_COUNT, PENDING_APPROVAL_TOOL, CURRENT_ERROR.
         These display actual host facts, never authored percentages, success, verification or tool results.
+        A media node's assetId must be a genuine pre-existing Media Owner result in this conversation.
+        Allowed kind values: IMAGE, AUDIO, VIDEO. Never invent ids, URLs, paths, or paid downloads.
+        Unknown and cross-session media references resolve as unavailable and cannot grant file access.
         field(label,initial,required); textarea(label,initial,required);
         select(label,options,initial); switch(label,initial); button(label,actionId).
         Actions require id,type. Allowed actions:

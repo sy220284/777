@@ -12,6 +12,26 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.viewinterop.AndroidView
+import android.graphics.BitmapFactory
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import com.labteto.dshmobile.uicontract.MediaUiReceipt
+import android.media.MediaPlayer
+import android.widget.MediaController
+import android.widget.VideoView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+import com.labteto.dshmobile.uicontract.MediaUiPort
+import com.labteto.dshmobile.uicontract.UiDocumentMediaKind
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +56,9 @@ import com.labteto.dshmobile.uicontract.UiCommandRejection
 import com.labteto.dshmobile.uicontract.UiMessageEditOutcome
 import com.labteto.dshmobile.uicontract.UiSessionIdentity
 import com.labteto.dshmobile.uicontract.initialFields
+
+/** App composition supplies the Media Owner, not an untrusted UiDocument field. */
+internal val LocalNextMediaPort = staticCompositionLocalOf<MediaUiPort?> { null }
 
 @Composable
 internal fun NextUiDocument(snapshot: UiDocumentSnapshot, identity: UiSessionIdentity?,
@@ -74,6 +97,7 @@ private fun NextDocumentNode(node: UiDocumentNode, values: Map<String, String>, 
     active: Boolean, update: (String, String) -> Unit, submit: (String) -> Unit) {
     when (node) {
         is UiDocumentNode.Text -> Text(node.text)
+        is UiDocumentNode.Media -> NextDocumentMediaNode(node, snapshot.document.source.sessionId)
         is UiDocumentNode.Table -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             node.rows.forEachIndexed { index, row ->
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -171,3 +195,114 @@ private fun nextDocumentRejectionText(reason: UiCommandRejection): String = stri
     UiCommandRejection.QUESTION_EXPIRED -> R.string.next_reject_question
     UiCommandRejection.UNSUPPORTED -> R.string.next_reject_unsupported
 })
+
+/**
+ * Closed Media reference: only assets belonging to the document's session can render.
+ * Native playback is scoped to the composable and uses Media Owner's on-device file.
+ * Remote-only and not-yet-saved results never trigger an implicit paid download.
+ */
+@Composable
+private fun NextDocumentMediaNode(node: UiDocumentNode.Media, sessionId: String) {
+    val media = LocalNextMediaPort.current
+    val asset = remember(media, sessionId, node.assetId, node.kind) {
+        media?.assetForSession(node.assetId, sessionId)?.takeIf { it.kind == node.kind }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(node.label)
+        if (asset?.localPath != null) NextDocumentMediaSaveButton(media, node, sessionId)
+        val path = asset?.localPath
+        if (path == null) {
+            Text("媒体尚未保存在本机，或无权访问这条会话的媒体成果")
+        } else when (node.kind) {
+            UiDocumentMediaKind.IMAGE -> {
+                val bitmap by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(
+                    initialValue = null, key1 = path
+                ) {
+                    value = withContext(Dispatchers.IO) {
+                        runCatching {
+                            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                            BitmapFactory.decodeFile(path, bounds)
+                            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) null else {
+                                var sample = 1
+                                while (bounds.outWidth / sample > 1200 || bounds.outHeight / sample > 1200) sample *= 2
+                                BitmapFactory.decodeFile(path, BitmapFactory.Options().apply {
+                                    inSampleSize = sample
+                                })?.asImageBitmap()
+                            }
+                        }.getOrNull()
+                    }
+                }
+                if (bitmap != null) Image(bitmap!!, contentDescription = node.label,
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp))
+                else Text("图片正在载入或无法解码")
+            }
+            UiDocumentMediaKind.AUDIO -> {
+                var playing by remember(path) { mutableStateOf(false) }
+                val player = remember(path) { MediaPlayer() }
+                androidx.compose.runtime.DisposableEffect(path) {
+                    try {
+                        player.setDataSource(path)
+                        player.prepare()
+                        player.setOnCompletionListener { playing = false }
+                    } catch (_: Exception) { playing = false }
+                    onDispose { player.release() }
+                }
+                TextButton(onClick = {
+                    try { if (player.isPlaying) player.pause() else player.start()
+                        playing = player.isPlaying
+                    } catch (_: Exception) { playing = false }
+                }) { Text(if (playing) "暂停" else "播放音频") }
+            }
+            UiDocumentMediaKind.VIDEO -> {
+                AndroidView(factory = { context ->
+                    VideoView(context).apply {
+                        setVideoPath(path)
+                        setMediaController(MediaController(context).also { it.setAnchorView(this) })
+                    }
+                }, modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 330.dp))
+                Text("点击播放器开始或暂停视频")
+            }
+        }
+    }
+}
+
+/** Save is a user-granted SAF operation; raw media paths never enter the document. */
+@Composable
+private fun NextDocumentMediaSaveButton(media: MediaUiPort?, node: UiDocumentNode.Media, sessionId: String) {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var result by remember(node.assetId) { mutableStateOf<String?>(null) }
+    val mime = when (node.kind) {
+        UiDocumentMediaKind.IMAGE -> "image/*"
+        UiDocumentMediaKind.AUDIO -> "audio/*"
+        UiDocumentMediaKind.VIDEO -> "video/*"
+    }
+    val extension = when (node.kind) {
+        UiDocumentMediaKind.IMAGE -> ".png"
+        UiDocumentMediaKind.AUDIO -> ".mp3"
+        UiDocumentMediaKind.VIDEO -> ".mp4"
+    }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mime)) { uri ->
+        if (uri == null) result = "已取消导出"
+        else scope.launch {
+            result = "正在保存媒体…"
+            try {
+                val receipt = withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri, "wt")?.use { stream ->
+                        media?.exportToSessionAsset(node.assetId, sessionId, stream)
+                    } ?: MediaUiReceipt.Failed("目标位置无法写入")
+                }
+                result = when (receipt) {
+                    MediaUiReceipt.Applied -> "媒体已保存"
+                    is MediaUiReceipt.Failed -> receipt.message ?: "保存失败，目标文件可能不完整"
+                    else -> "保存尚未确认，请检查目标文件"
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { result = failure.message ?: "保存失败，目标文件可能不完整" }
+        }
+    }
+    TextButton(onClick = { launcher.launch("media-${node.assetId.take(24)}$extension") }) {
+        Text("保存到设备")
+    }
+    result?.let { Text(it) }
+}

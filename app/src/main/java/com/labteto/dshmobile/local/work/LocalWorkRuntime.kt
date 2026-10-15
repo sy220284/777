@@ -157,6 +157,16 @@ class LocalWorkRuntime @Inject internal constructor(
         )
     }
 
+    override fun planForUi(sessionId: String): com.labteto.dshmobile.uicontract.UiWorkPlanSnapshot? {
+        val current = runtimeStateStore.state.value
+        if (current.sessionId != sessionId || current.usageMode != LocalUsageMode.WORK) return null
+        return com.labteto.dshmobile.uicontract.UiWorkPlanSnapshot(
+            sessionId, current.work.plan.toList(),
+            current.work.todos.map { com.labteto.dshmobile.uicontract.UiWorkPlanStep(it.content, it.status) },
+            current.work.planMode,
+        )
+    }
+
     /** Read the authoritative EventLog revision; no parallel persisted tool activity stream. */
     override fun eventSequenceForUi(sessionId: String): Long =
         if (sessionId == runtimeStateStore.currentSessionId) eventLogs.get(sessionId).latestSequence() else -1L

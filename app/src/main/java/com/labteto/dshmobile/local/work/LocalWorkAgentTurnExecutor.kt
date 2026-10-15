@@ -95,6 +95,7 @@ internal class LocalWorkAgentTurnExecutor(
     private val workSessionProjection: LocalWorkSessionProjectionRuntime,
     private val workToolResultRuntime: LocalWorkToolResultRuntime,
     private val workTurnToolRuntime: LocalWorkTurnToolRuntime,
+    private val workUiDocumentPublisher: LocalWorkUiDocumentPublisher,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val resourceScheduler
@@ -597,6 +598,15 @@ internal class LocalWorkAgentTurnExecutor(
                             workModelHistoryRuntime.updateContextMetrics(binding)
                             runTranscript.applyMessages(listOf(transcriptMessage), toolEvent.sequence)
                             workModelHistoryRuntime.persist(binding)
+                            // Event is durable before exposing a UI snapshot. A broken card must
+                            // never abort a completed tool or alter its execution result.
+                            try {
+                                workUiDocumentPublisher.onToolResult(binding)
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (failure: Exception) {
+                                AppLog.failure("WorkUiDocument", "publish_tool_progress", failure)
+                            }
                         }
                         is AgentEvent.StepFinished -> {
                             runEventLog.append("step/end", buildJsonObject {

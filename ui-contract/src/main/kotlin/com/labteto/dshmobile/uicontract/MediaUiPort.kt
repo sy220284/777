@@ -8,9 +8,11 @@ import com.labteto.dshmobile.local.model.LocalMediaVoice
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import java.io.OutputStream
 
 /** Paths are readonly native-decoder references. Removal is an explicit Owner command. */
-data class UiMediaAsset(val id: String, val localPath: String?, val remoteUrl: String?, val textOutput: String?)
+data class UiMediaAsset(val id: String, val localPath: String?, val remoteUrl: String?,
+    val textOutput: String?, val kind: UiDocumentMediaKind? = null)
 sealed interface MediaUiCommand {
     data class Image(val offer: LocalMediaOffer, val prompt: String, val ratio: String, val sessionId: String,
         val sourceMessageId: String? = null, val revisionOf: String? = null, val editSourceImageId: String? = null) : MediaUiCommand
@@ -43,6 +45,11 @@ interface MediaUiPort {
     /** Compare credential at the Owner; never claim a past paid route is safe from a display ID alone. */
     suspend fun hasMatchingCredential(offer: LocalMediaOffer, expectedSignature: String?): Boolean = false
     fun asset(id: String): UiMediaAsset?
+    /** Deny references to different sessions, including media created before scope enforcement. */
+    fun assetForSession(id: String, sessionId: String): UiMediaAsset? = null
+    /** User-picked SAF output. Owner rechecks session and local file at copy time. */
+    suspend fun exportToSessionAsset(id: String, sessionId: String, output: OutputStream): MediaUiReceipt =
+        MediaUiReceipt.Failed("Export is not available")
     suspend fun voices(offer: LocalMediaOffer): List<LocalMediaVoice>
     suspend fun submit(command: MediaUiCommand): MediaUiReceipt
 }

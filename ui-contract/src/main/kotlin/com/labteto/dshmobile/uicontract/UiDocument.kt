@@ -28,9 +28,14 @@ sealed interface UiDocumentBoundValue {
     data class Phase(val value: UiExecutionPhase) : UiDocumentBoundValue
     data object Unavailable : UiDocumentBoundValue
 }
+enum class UiDocumentMediaKind { IMAGE, AUDIO, VIDEO }
+
 sealed interface UiDocumentNode {
     val id: String
     data class Text(override val id: String, val text: String) : UiDocumentNode
+    /** References an existing Media Owner asset; never a raw URL or local filesystem path. */
+    data class Media(override val id: String, val assetId: String, val kind: UiDocumentMediaKind,
+        val label: String) : UiDocumentNode
     /** Read-only presentation data. A table never authorizes tools, payment or progress claims. */
     data class Table(override val id: String, val headers: List<String>, val rows: List<List<String>>) : UiDocumentNode
     data class BoundText(override val id: String, val label: String, val binding: UiDocumentBinding) : UiDocumentNode
@@ -89,6 +94,12 @@ fun UiDocument.validate(
         if (node.id.isBlank() || nodesById.put(node.id, node) != null) problems += "node_identity"
         when (node) {
             is UiDocumentNode.Text -> textChars += node.text.length
+            is UiDocumentNode.Media -> {
+                textChars += node.label.length.toLong() + node.assetId.length
+                if (node.assetId.isBlank() || node.assetId.length > 200 ||
+                    node.assetId.any(Char::isISOControl) || node.label.isBlank() ||
+                    node.label.length > 500) problems += "media_reference"
+            }
             is UiDocumentNode.Table -> {
                 val cells = node.headers.size.toLong() + node.rows.sumOf { it.size.toLong() }
                 val nextCount = count.toLong() + cells

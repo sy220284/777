@@ -7,10 +7,14 @@ sealed interface UiLocalDocumentData {
     /** Receives Owner-issued typed data; never guess a table from untrusted free text. */
     data class TableData(val title: String, val headers: List<String>, val rows: List<List<String>>) : UiLocalDocumentData
     data class ReplyForm(val initial: String) : UiLocalDocumentData
+    /** Session-scoped result identities come from Media Owner, never model-authored URLs. */
+    data class MediaResults(val assets: List<UiDocumentNode.Media>) : UiLocalDocumentData
     /** Owner-selected tool result. JSON fields are content, never action or layout instructions. */
     data class StructuredResult(val title: String, val encoded: String) : UiLocalDocumentData
 }
-enum class UiLocalDocumentTemplate { STATUS, MESSAGE, REPLY_FORM, FACTS_TABLE, WORK_TOOL_ACTIVITY, WORK_TOOL_RESULT }
+enum class UiLocalDocumentTemplate {
+    STATUS, MESSAGE, REPLY_FORM, FACTS_TABLE, WORK_TOOL_ACTIVITY, WORK_TOOL_RESULT, MEDIA_RESULTS,
+}
 data class GenerateLocalUiDocumentCommand(val identity: UiSessionIdentity, val workMode: Boolean,
     val messageId: String, val template: UiLocalDocumentTemplate)
 
@@ -59,6 +63,14 @@ object LocalUiDocumentBuilder {
                 nodes = listOf(UiDocumentNode.Field("reply", "回复内容", data.initial, true, true),
                     UiDocumentNode.Button("prepare", "放入草稿，确认后发送", "prepare_reply"))
                 actions += UiDocumentAction.SendUserInput("prepare_reply", "", listOf("reply"))
+            }
+            is UiLocalDocumentData.MediaResults -> {
+                title = "当前会话媒体成果"
+                fallback = if (data.assets.isEmpty()) "当前会话还没有可用的媒体结果" else
+                    data.assets.joinToString("\n") { it.label }
+                nodes = if (data.assets.isEmpty()) listOf(
+                    UiDocumentNode.Text("no_media", fallback)
+                ) else data.assets
             }
             is UiLocalDocumentData.StructuredResult -> {
                 title = data.title

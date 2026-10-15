@@ -91,6 +91,9 @@ internal fun NextSettingsScene(
             Text(when (page) {
                 "route.settings", "settings.root" -> "设置"
                 "settings.models" -> "模型"
+                "settings.minimax_quota" -> "MiniMax 额度"
+                "settings.model_performance" -> "模型使用统计"
+                "settings.pricing" -> "已记录费用"
                 "settings.chat" -> "聊天设置"
                 "settings.memory", "settings.memory_settings" -> "记忆与个人规则"
                 "settings.advanced", "settings.session" -> "运行参数"
@@ -110,6 +113,13 @@ internal fun NextSettingsScene(
                     val destinations = listOf(
                         "settings.models" to "模型配置",
                         "settings.account" to "ChatGPT 账户",
+                        "settings.minimax_quota" to "MiniMax 额度",
+                        "settings.model_performance" to "模型使用记录",
+                        "settings.pricing" to "已记录费用",
+                        "settings.appearance" to "界面外观",
+                        "settings.notifications" to "通知偏好",
+                        "settings.permissions" to "系统权限",
+                        "settings.update" to "检查版本更新",
                         "settings.chat" to "聊天",
                         "settings.memory" to "记忆与规则",
                         "settings.advanced" to "运行限制",
@@ -124,6 +134,16 @@ internal fun NextSettingsScene(
                             }
                             HorizontalDivider()
                         }
+                    }
+                }
+                "settings.minimax_quota" -> {
+                    val profile = state.miniMaxQuotaProfile
+                    if (profile == null) Text("当前没有可用的 MiniMax 额度查询账户")
+                    else {
+                        Text("通过 MiniMax 原账户查询实时额度，不推算，也不代扣余额")
+                        Button(enabled = !busy, onClick = {
+                            read { settings.queryMiniMaxQuota(profile).toString() }
+                        }) { Text("查询实际额度") }
                     }
                 }
                 "settings.models" -> {
@@ -217,7 +237,8 @@ internal fun NextSettingsScene(
                     }, enabled = !busy && m != null && s != null && a != null &&
                         m in 1..10000 && s in 1..10000 && a in 1..100) { Text("保存运行参数") }
                 }
-                "settings.usage", "settings.model_usage", "settings.usage_log", "settings.usage_detail" -> {
+                "settings.usage", "settings.model_usage", "settings.usage_log",
+                "settings.usage_detail", "settings.model_performance", "settings.pricing" -> {
                     val owner = usage
                     if (owner == null) {
                         Text("用量服务不可用")
@@ -245,6 +266,11 @@ internal fun NextSettingsScene(
                         Text("输入 Token：${filtered.tracked.inputTokens}")
                         Text("输出 Token：${filtered.tracked.outputTokens}")
                         Text("预估费用：¥${"%.4f".format(filtered.tracked.estimatedCostCny)}")
+                        if (page == "settings.pricing") Text("仅显示请求台账中的估算费用，实际计价与账单请以服务商官方为准。")
+                        if (page == "settings.model_performance") {
+                            Text("这里展示实际请求和用量，不能据此推断模型响应速度。")
+                            Text("聊天请求：${filtered.chat.aggregate.requestCount}；工作请求：${filtered.work.aggregate.requestCount}")
+                        }
                         if (filtered.tracked.unreportedRequestCount > 0)
                             Text("${filtered.tracked.unreportedRequestCount} 次请求未报告完整用量，费用可能不完整")
                         LazyColumn {
