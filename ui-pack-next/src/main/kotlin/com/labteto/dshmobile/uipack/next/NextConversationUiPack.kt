@@ -154,6 +154,10 @@ object NextConversationUiPack : ConversationUiPack {
         var continuationSummary by remember(identity) { mutableStateOf("") }
         var questionAnswer by remember(question?.pendingId) { mutableStateOf("") }
         val listState = remember(identity?.sessionId) { LazyListState() }
+        var historySearchOpen by rememberSaveable(identity?.sessionId) { mutableStateOf(false) }
+        if (historySearchOpen && identity != null && transcript != null) androidx.compose.runtime.key(identity) {
+            NextMessageSearchDialog(transcript, identity.sessionId) { historySearchOpen = false }
+        }
         var readingAnchorMissing by remember(identity?.sessionId) { mutableStateOf(false) }
         var readingReady by remember(identity?.sessionId) { mutableStateOf(false) }
         LaunchedEffect(identity?.sessionId, status, messages.isNotEmpty()) {
@@ -516,26 +520,23 @@ object NextConversationUiPack : ConversationUiPack {
                 }
             }, enabled = !deleting) { Text(stringResource(R.string.next_delete_session)) } },
             dismissButton = { TextButton(onClick = { deletingSession = null }, enabled = !deleting) { Text(stringResource(R.string.next_cancel)) } })
-        if (sessionChooser && sessions != null && sessionSnapshot != null) AlertDialog(onDismissRequest = { sessionChooser = false },
-            title = { Text(stringResource(R.string.next_sessions)) },
-            text = { LazyColumn(Modifier.heightIn(max = 360.dp)) {
-                items(sessionSnapshot.sessions, key = { it.id }) { session ->
-                    TextButton(onClick = { show(sessions.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.Open(session.id))); sessionChooser = false }) {
-                        Text(titleOverrides[session.id] ?: session.title)
-                    }
-                    TextButton(onClick = { deletingSession = session.id; deletionError = null; sessionChooser = false }) {
-                        Text(stringResource(R.string.next_delete_session))
-                    }
-                    if (shell != null) {
-                        TextButton(onClick = { show(shell.submit(com.labteto.dshmobile.uicontract.ConversationShellUiCommand.SetPinned(session.id, session.id !in pinnedSessions))) }) {
-                            Text(stringResource(if (session.id in pinnedSessions) R.string.next_unpin_session else R.string.next_pin_session))
-                        }
-                        TextButton(onClick = { renamingSession = session.id; sessionTitle = titleOverrides[session.id] ?: session.title; sessionChooser = false }) {
-                            Text(stringResource(R.string.next_rename_session))
-                        }
-                    }
-                }
-            } }, confirmButton = { TextButton(onClick = { sessionChooser = false }) { Text(stringResource(R.string.next_close)) } })
+        if (sessionChooser && sessions != null && sessionSnapshot != null) NextSessionChooser(
+            entries = sessionSnapshot.sessions, titles = titleOverrides, pinned = pinnedSessions,
+            feedback = receipt, loading = sessionSnapshot.loading, close = { sessionChooser = false },
+            onOpen = { id ->
+                val result = sessions.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.Open(id))
+                show(result)
+                if (result == UiCommandReceipt.Accepted || result == UiCommandReceipt.Queued) sessionChooser = false
+            },
+            onDelete = { id -> deletingSession = id; deletionError = null; sessionChooser = false },
+            onPin = if (shell == null) null else { id ->
+                show(shell.submit(com.labteto.dshmobile.uicontract.ConversationShellUiCommand.SetPinned(id, id !in pinnedSessions)))
+            },
+            onRename = if (shell == null) null else { id ->
+                renamingSession = id; sessionTitle = titleOverrides[id] ?: sessionSnapshot.sessions.firstOrNull { it.id == id }?.title.orEmpty()
+                sessionChooser = false
+            },
+        )
             Surface(Modifier.fillMaxSize()) {
                 Column(Modifier.safeDrawingPadding().imePadding().padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -556,7 +557,7 @@ object NextConversationUiPack : ConversationUiPack {
                     }
                     if (!workMode && gallery != null) NextPersonaGalleryPanel(gallery, personas, personaTransfer, stories, galleryDeletion, gallerySave, portraits)
                     if (sessions != null && sessionSnapshot != null) {
-                        TextButton(onClick = { sessionChooser = true }) { Text(stringResource(R.string.next_sessions)) }
+                        TextButton(onClick = { receipt = null; sessionChooser = true }) { Text(stringResource(R.string.next_sessions)) }
                         TextButton(onClick = { show(sessions.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.SelectMode(com.labteto.dshmobile.local.LocalUsageMode.CHAT))) }) {
                             Text(stringResource(R.string.next_chat_mode))
                         }
@@ -619,6 +620,9 @@ object NextConversationUiPack : ConversationUiPack {
                             identity?.let { show(policy.submit(com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.RevokeDeviceTurn(it))) }
                         }) { Text(stringResource(R.string.next_revoke_device)) }
                     }
+                    }
+                    if (transcript != null && identity != null) TextButton(onClick = { historySearchOpen = true }) {
+                        Text(stringResource(R.string.next_search_history))
                     }
                     if (queued > 0) Text(stringResource(R.string.next_queued, queued))
                     if (status == UiSceneStatus.LOADING) Text(stringResource(R.string.next_loading))

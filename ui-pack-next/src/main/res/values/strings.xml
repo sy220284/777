@@ -308,4 +308,20 @@
     <string name="next_current_persona_apply">保存并应用到当前人物</string>
     <string name="next_current_persona_saved">当前人物已保存。</string>
     <string name="next_current_persona_unavailable">请在单人聊天空闲时操作；会话或人物变化后，请重新读取再编辑。原草稿仍保留。</string>
+    <string name="next_search_history">搜索当前会话历史</string>
+    <string name="next_search_keyword">消息关键词</string>
+    <string name="next_search_scanning">正在查找历史，关闭窗口可取消。</string>
+    <string name="next_search_count">本批找到 %1$d 条；本次已读取 %2$d 条消息</string>
+    <string name="next_search_no_more">没有更多匹配消息。</string>
+    <string name="next_search_locate">在历史页查看位置</string>
+    <string name="next_search_context">命中消息所在历史页</string>
+    <string name="next_search_start">从最新记录查找</string>
+    <string name="next_search_older">继续查找更早记录</string>
+    <string name="next_search_failed">历史搜索未完成，请重新查找。</string>
+    <string name="next_session_search">按会话标题筛选</string>
+    <string name="next_session_search_empty">没有匹配的会话。</string>
+    <string name="next_search_role_user">用户</string>
+    <string name="next_search_role_assistant">助手</string>
+    <string name="next_search_role_tool">工具</string>
+    <string name="next_search_role_system">系统</string>
 </resources>

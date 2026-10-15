@@ -28,19 +28,25 @@ class LocalSessionUiPortComposition @Inject internal constructor(
         UiSessionsSnapshot(state.uiBindingIdentity(current), current.usageMode, current.loading,
             current.sessions.toList(), current.error)
     }
-    override fun submit(command: SessionUiCommand): UiCommandReceipt = synchronized(state.foregroundRunHandle.lock) {
-        when (command) {
-            is SessionUiCommand.Open -> if (lifecycle.switchSession(command.sessionId)) UiCommandReceipt.Queued else UiCommandReceipt.NotAdmitted
-            is SessionUiCommand.SelectMode -> { lifecycle.switchUsageMode(command.mode); UiCommandReceipt.Queued }
-            is SessionUiCommand.Create -> {
-                if (state.uiBindingIdentity(state.state.value) != command.identity)
-                    UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
-                else if (command.mode == LocalConversationMode.PROJECT)
-                    UiCommandReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
-                else if (lifecycle.createSession(command.mode, command.usageMode, handoffSummaryOverride = command.handoffSummary))
-                    UiCommandReceipt.Accepted else UiCommandReceipt.NotAdmitted
+    override fun submit(command: SessionUiCommand): UiCommandReceipt = try {
+        synchronized(state.foregroundRunHandle.lock) {
+            when (command) {
+                is SessionUiCommand.Open -> if (lifecycle.switchSession(command.sessionId)) UiCommandReceipt.Queued else UiCommandReceipt.NotAdmitted
+                is SessionUiCommand.SelectMode -> { lifecycle.switchUsageMode(command.mode); UiCommandReceipt.Queued }
+                is SessionUiCommand.Create -> {
+                    if (state.uiBindingIdentity(state.state.value) != command.identity)
+                        UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                    else if (command.mode == LocalConversationMode.PROJECT)
+                        UiCommandReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+                    else if (lifecycle.createSession(command.mode, command.usageMode, handoffSummaryOverride = command.handoffSummary))
+                        UiCommandReceipt.Accepted else UiCommandReceipt.NotAdmitted
+                }
             }
         }
+    } catch (cancelled: CancellationException) { throw cancelled }
+    catch (failure: Exception) {
+        com.labteto.dshmobile.observability.AppLog.warn("SessionUi", "failure=true operation=session_ui_command command_type=${command.javaClass.simpleName} cause_type=${failure.javaClass.simpleName}")
+        UiCommandReceipt.Failed(failure.message ?: "会话操作未完成，请刷新后确认状态")
     }
     override fun handoffSummary(identity: UiSessionIdentity): String? = synchronized(state.foregroundRunHandle.lock) {
         if (state.uiBindingIdentity(state.state.value) == identity && !state.sessionTransitioning)
