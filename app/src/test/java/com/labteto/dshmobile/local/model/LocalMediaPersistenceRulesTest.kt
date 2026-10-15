@@ -12,7 +12,7 @@ class LocalMediaPersistenceRulesTest {
         val job = LocalMediaCreationJob(
             id = "operation", sessionId = "chat-one", kind = "SPEECH",
             provider = "OPENAI", model = "gpt-4o-mini-tts",
-            prompt = "朗读一下", createdAtMillis = 100L,
+            prompt = "朗读一下", createdAtMillis = 100L, sourceMessageId = "source-1",
         )
         val stored = Json.encodeToString(LocalMediaCreationJobList.serializer(), LocalMediaCreationJobList(listOf(job)))
         val restored = Json.decodeFromString(LocalMediaCreationJobList.serializer(), stored)
@@ -20,6 +20,7 @@ class LocalMediaPersistenceRulesTest {
         assertEquals(LocalMediaCreationPhase.OUTCOME_UNKNOWN, recovered.single().phase)
         assertEquals("chat-one", recovered.single().sessionId)
         assertEquals(job.id, recovered.single().id)
+        assertEquals("source-1", recovered.single().sourceMessageId)
         assertEquals(recovered, LocalMediaCreationJobRecovery.recover(recovered))
         val done = LocalMediaCreationJobRecovery.recover(listOf(job.copy(phase = LocalMediaCreationPhase.SUCCEEDED)))
         assertEquals(LocalMediaCreationPhase.SUCCEEDED, done.single().phase)
@@ -33,11 +34,12 @@ class LocalMediaPersistenceRulesTest {
         val image = LocalMediaResult(
             id = "image", model = "image-01", provider = "MINIMAX", kind = "IMAGE",
             createdAtMillis = 300L, remoteUrl = "https://cdn.example.com/image.png",
-            sessionId = "chat-1", description = "山间茶室",
+            sessionId = "chat-1", description = "山间茶室", sourceMessageId = "reply-5",
         )
         val encoded = Json.encodeToString(LocalMediaResultList.serializer(), LocalMediaResultList(listOf(image, transcript)))
         val restored = Json.decodeFromString(LocalMediaResultList.serializer(), encoded).results
         assertEquals(listOf(image, transcript), restored)
+        assertEquals("reply-5", restored.first().sourceMessageId)
         assertTrue(runCatching { transcript.copy(remoteUrl = "https://invalid.example/duplicate") }.isFailure)
 
         // Old global archive results must never appear in an unrelated conversation.
@@ -48,7 +50,7 @@ class LocalMediaPersistenceRulesTest {
 
     @Test fun videoTasksRetainOriginalSessionWhenPollingAndRestoring() {
         val pending = job(LocalMediaVideoPhase.SUBMITTING).copy(
-            sessionId = "chat-1", description = "视频提示词",
+            sessionId = "chat-1", description = "视频提示词", sourceMessageId = "reply-6",
         )
         val recorded = Json.decodeFromString(LocalMediaVideoTask.serializer(),
             Json.encodeToString(LocalMediaVideoTask.serializer(), pending))
@@ -58,6 +60,7 @@ class LocalMediaPersistenceRulesTest {
         )
         assertEquals("chat-1", finished.sessionId)
         assertEquals("视频提示词", finished.description)
+        assertEquals("reply-6", finished.sourceMessageId)
         assertEquals(pending.id, finished.id)
     }
 
