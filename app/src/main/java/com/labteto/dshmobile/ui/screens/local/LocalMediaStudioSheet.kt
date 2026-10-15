@@ -96,26 +96,29 @@ internal fun LocalMediaStudioSheetContent(
     val generatedResults = archive.results
     val storageError by viewModel.storageError.collectAsState()
     var showHistory by remember { mutableStateOf(false) }
+    var archiveRevision by remember { mutableStateOf<LocalMediaRevisionDraft?>(null) }
+    val activeRevision = archiveRevision ?: revision
     var showVideoArchive by remember { mutableStateOf(false) }
     var videoRefreshBusy by remember { mutableStateOf<String?>(null) }
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
     var historyError by remember { mutableStateOf<String?>(null) }
-    var mode by rememberSaveable { mutableStateOf(initialKind.name) }
+    var mode by rememberSaveable(activeRevision?.originId) { mutableStateOf(activeRevision?.kind?.name ?: initialKind.name) }
     val kind = LocalMediaKind.valueOf(mode)
     val available = models.filter { it.kind == kind }
-    var chosenId by rememberSaveable(mode) { mutableStateOf("") }
+    var chosenId by rememberSaveable(mode, activeRevision?.originId) { mutableStateOf("") }
     // A revision may only inherit the same frozen provider+account route. For deleted or
     // re-keyed accounts, require an explicit choice before any paid submission is possible.
-    val originalOffer = revision?.takeIf { it.kind == kind }?.originalOffer(models)
-    val selected = if (revision != null && revision.kind == kind && chosenId.isBlank()) originalOffer
-        else LocalMediaCatalog.selectOffer(models, kind, preferredProfileId, chosenId.takeIf(String::isNotBlank))
+    val originalOffer = activeRevision?.takeIf { it.kind == kind }?.originalOffer(models)
+    val selected = if (activeRevision != null && activeRevision.kind == kind) {
+        if (chosenId.isBlank()) originalOffer else available.firstOrNull { it.id == chosenId }
+    } else LocalMediaCatalog.selectOffer(models, kind, preferredProfileId, chosenId.takeIf(String::isNotBlank))
     val manualRouteActive = chosenId.isNotBlank() && selected?.id == chosenId
     val activeOfferId by rememberUpdatedState(selected?.id)
     var showModelChoices by remember { mutableStateOf(false) }
-    var prompt by rememberSaveable { mutableStateOf(initialPrompt) }
-    var ratio by rememberSaveable { mutableStateOf(revision?.ratio ?: "1:1") }
-    var voiceId by rememberSaveable(selected?.id, personaVoiceStyle) {
-        mutableStateOf(revision?.voiceId ?: selected?.provider?.let { LocalMediaVoiceLabels.suggestedId(it, personaVoiceStyle) }.orEmpty())
+    var prompt by rememberSaveable(activeRevision?.originId) { mutableStateOf(activeRevision?.prompt ?: initialPrompt) }
+    var ratio by rememberSaveable(activeRevision?.originId) { mutableStateOf(activeRevision?.ratio ?: "1:1") }
+    var voiceId by rememberSaveable(selected?.id, personaVoiceStyle, activeRevision?.originId) {
+        mutableStateOf(activeRevision?.voiceId ?: selected?.provider?.let { LocalMediaVoiceLabels.suggestedId(it, personaVoiceStyle) }.orEmpty())
     }
     var busy by remember(selected?.id) { mutableStateOf(false) }
     var error by remember(selected?.id) { mutableStateOf<String?>(null) }
@@ -171,7 +174,7 @@ internal fun LocalMediaStudioSheetContent(
 
         if (selected == null) {
             com.shenyan.designsystem.components.SyEmptyState(FeatherIcons.Image,
-                if (revision != null && revision.kind == kind) "原模型配置已变化，请重新选择生成账户"
+                if (activeRevision != null && activeRevision.kind == kind) "原模型配置已变化，请重新选择生成账户"
                 else stringResource(R.string.media_studio_no_model), body = "")
             if (available.isNotEmpty()) {
                 Text("重新选择会使用新账户的额度，旧成果保留。", color = colors.textSecondary,
@@ -262,7 +265,7 @@ internal fun LocalMediaStudioSheetContent(
                     SyButton(text = stringResource(R.string.minimax_media_create_image),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            viewModel.submitImage(selected, prompt, ratio, sessionId, sourceMessageId, revision?.originId)
+                            viewModel.submitImage(selected, prompt, ratio, sessionId, activeRevision?.sourceMessageId ?: sourceMessageId, activeRevision?.originId)
                             if (selected.id == activeOfferId) onDelivered()
                         } })
                 }
@@ -270,7 +273,7 @@ internal fun LocalMediaStudioSheetContent(
                     SyButton(text = stringResource(R.string.minimax_media_start_video),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            val task = viewModel.createVideo(selected, prompt, sessionId, sourceMessageId, revision?.originId)
+                            val task = viewModel.createVideo(selected, prompt, sessionId, activeRevision?.sourceMessageId ?: sourceMessageId, activeRevision?.originId)
                             viewedVideoTaskId = task.id
                             onDelivered()
                         } })
@@ -385,7 +388,7 @@ internal fun LocalMediaStudioSheetContent(
                         enabled = !busy && prompt.isNotBlank() && voiceId.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            viewModel.submitSpeech(selected, prompt, voiceId, sessionId, sourceMessageId, revision?.originId)
+                            viewModel.submitSpeech(selected, prompt, voiceId, sessionId, activeRevision?.sourceMessageId ?: sourceMessageId, activeRevision?.originId)
                             if (selected.id == activeOfferId) onDelivered()
                         } })
                     audioFile?.let { file ->
@@ -510,6 +513,13 @@ internal fun LocalMediaStudioSheetContent(
                                         onClick = { pendingDeleteId = null })
                                 }
                             }
+                            if (task.phase in setOf(LocalMediaVideoPhase.SUCCEEDED, LocalMediaVideoPhase.FAILED)) {
+                                SyButton(text = "修改并重新生成", size = SyButtonSize.Small,
+                                    variant = SyButtonVariant.Ghost, onClick = {
+                                        archiveRevision = LocalMediaRevisionDraft.from(task)
+                                        showVideoArchive = false
+                                    })
+                            }
                             task.downloadUrl?.let { url ->
                                 SyButton(
                                     text = stringResource(R.string.minimax_media_open_video),
@@ -594,6 +604,16 @@ internal fun LocalMediaStudioSheetContent(
                                     Text(stringResource(R.string.media_studio_result_missing),
                                         style = DsType.caption11.withReadingWeight(),
                                         color = colors.textSecondary)
+                                }
+                                LocalMediaRevisionDraft.from(asset)?.let { draft ->
+                                    SyButton(text = if (draft.kind == LocalMediaKind.TRANSCRIBE)
+                                        "重新选择音频转写" else "修改并重新生成",
+                                        size = SyButtonSize.Small,
+                                        variant = SyButtonVariant.Ghost,
+                                        onClick = {
+                                            archiveRevision = draft
+                                            showHistory = false
+                                        })
                                 }
                                 SyButton(
                                     text = stringResource(R.string.media_studio_delete_record),
