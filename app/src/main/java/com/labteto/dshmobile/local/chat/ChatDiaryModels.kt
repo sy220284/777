@@ -24,6 +24,8 @@ data class ChatDiaryDelta(
     val innerThought: String = "",
     val relationshipMeaning: String = "",
     val unresolvedEcho: String = "",
+    /** First-person private voice, never a verified fact or an instruction to the character. */
+    val privateReflection: String = "",
     val importance: Int = 0,
     val disclosure: String = "SHAREABLE",
     /** Search-only concepts grounded in this event; never instructions for the character. */
@@ -46,6 +48,8 @@ data class ChatDiaryRevision(
     val innerThought: String = "",
     val relationshipMeaning: String = "",
     val unresolvedEcho: String = "",
+    /** First-person private voice, never a verified fact or an instruction to the character. */
+    val privateReflection: String = "",
     val importance: Int = 3,
     val disclosure: ChatDiaryDisclosure = ChatDiaryDisclosure.SHAREABLE,
     val sources: List<ChatDiarySourceRef> = emptyList(),
@@ -68,6 +72,8 @@ data class ChatDiaryEntry(
     val innerThought: String = "",
     val relationshipMeaning: String = "",
     val unresolvedEcho: String = "",
+    /** First-person private voice, never a verified fact or an instruction to the character. */
+    val privateReflection: String = "",
     val importance: Int = 3,
     val sourceMode: ChatDiarySourceMode = ChatDiarySourceMode.DIRECT,
     val disclosure: ChatDiaryDisclosure = ChatDiaryDisclosure.SHAREABLE,
