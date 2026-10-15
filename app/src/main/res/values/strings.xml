@@ -2366,5 +2366,8 @@
     <string name="composer_invocation_unavailable">已离线或已移除 · 点击取消固定</string>
     <string name="skills_github_url_hint">GitHub 技能目录地址</string>
     <string name="skills_github_install">安装</string>
+    <string name="skills_github_browse_official">浏览 OpenAI 官方技能库</string>
+    <string name="skills_github_official_heading">官方精选技能</string>
+    <string name="skills_github_official_empty">官方技能目录为空或暂时无法读取</string>
 </resources>
 
