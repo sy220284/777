@@ -141,14 +141,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "load_older": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "TranscriptUiPort.transcriptPage(sessionId, cursor, limit)",
+          "receiptType": "UiTranscriptPage",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "locate_message": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ConversationReadingUiPort.anchor(sessionId) / rememberAnchor(sessionId, anchor)",
+          "receiptType": "UiReadingAnchor",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -177,8 +177,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "queue": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.SendMessage) / WorkConversationUiPort.submit(WorkConversationUiCommand.SendMessage)",
+          "receiptType": "UiCommandReceipt.Queued / UiCommandReceipt.Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1097,20 +1097,20 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "connect": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.ConnectHttp / ToolsUiCommand.ConnectStdio)",
+          "receiptType": "ToolsUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "disconnect": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.Disconnect)",
+          "receiptType": "ToolsUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "list_tools": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ToolsUiPort.servers()",
+          "receiptType": "List<UiMcpServerSnapshot>",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1132,14 +1132,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "save_credentials": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.ConfigureGitHub)",
+          "receiptType": "ToolsUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "clear_credentials": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.ClearGitHub)",
+          "receiptType": "ToolsUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1277,14 +1277,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "create_chat": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.Create(mode=CHAT, usageMode=CHAT))",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "create_work": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.Create(mode=WORK, usageMode=WORK))",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },

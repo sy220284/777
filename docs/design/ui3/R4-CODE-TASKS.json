@@ -1,12 +1,12 @@
 {
   "schema": "777.ui-r4.code-tasks/1",
   "asOf": "2026-10-15",
-  "baseline": "828b5434",
+  "baseline": "73a9abdc / R4 review addendum 2026-10-15",
   "scope": "整个 R4，非单一功能",
   "verificationPolicy": "当前 HEAD 基础 CI 可通过不代表 R4 交付验收；新增提交需自身 CI，真实双包使用/进程恢复/设备矩阵按 S2/S5 单独验证。",
   "sceneCount": 78,
   "actionCount": 173,
-  "sourceMappedActions": 65,
+  "sourceMappedActions": 75,
   "tasks": [
     {
       "id": "S-1-01",
@@ -24,7 +24,9 @@
       "id": "S0-01",
       "task": "全量动作 Port/准入/回执/恢复映射",
       "codeStatus": "CODE_PARTIAL",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "implemented": "补充工具 MCP 注册/断开/工具清单、GitHub 凭据、历史分页/阅读锚点、Chat/Work 会话创建与入队回执的 10 个实际存在的源码级 Port 映射。",
+      "remaining": "剩余 98 个未映射；173 项动作仍无 E2E/恢复签收，源码映射不等于双包验收。"
     },
     {
       "id": "S0-02",
