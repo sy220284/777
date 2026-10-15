@@ -10,6 +10,10 @@ internal fun mediaCreativeDraft(
     personaIdentity: String,
 ): String {
     val message = reply.trim().take(1800)
+    // Visual generation consumes visible stage directions, not the actor's spoken dialogue.
+    val stageDirections = Regex("（([^）]+)）|\\(([^)]+)\\)")
+        .findAll(message).map { it.value.drop(1).dropLast(1).trim() }
+        .filter(String::isNotBlank).take(8).joinToString("；")
     val character = personaName.trim().take(60).takeUnless { it.isBlank() || it == "默认角色" }
     val identity = personaIdentity.trim().take(500)
     return when (kind) {
@@ -20,7 +24,7 @@ internal fun mediaCreativeDraft(
             if (character != null) append("\n画面人物：${character}。")
             if (identity.isNotBlank()) append("\n人物身份和已知形象设定：${identity}。不要猜测未提供的外貌细节。")
             append("\n仅表现以下场景的可见动作、环境和情绪，不要把对白绘制成字：\n")
-            append(message)
+            append(stageDirections.ifBlank { message.take(200) })
         }
         LocalMediaKind.SPEECH -> spokenDialogueOnly(message)
         LocalMediaKind.TRANSCRIBE -> ""
