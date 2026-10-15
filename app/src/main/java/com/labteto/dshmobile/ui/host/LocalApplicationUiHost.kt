@@ -82,6 +82,8 @@ internal fun decideApplicationUi(
 internal fun LocalApplicationUiHost(
     installedPacks: Collection<UiApplicationScenePack>,
     availableCapabilities: Set<UiCapabilityId>,
+    requestedSceneKey: String? = null,
+    onSceneRequestProcessed: (String, com.labteto.dshmobile.uihost.UiSceneNavigationResult) -> Unit = { _, _ -> },
     legacyContent: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -117,10 +119,13 @@ internal fun LocalApplicationUiHost(
         is LocalApplicationUiDecision.Hosted -> {
             val nav = remember(decision.admission.pack.manifest.id) {
                 UiHostSceneNavigation(LocalUiSceneCatalog.requirements,
-                    decision.admission.pack.manifest, UiSceneId("route.home"))
+                    decision.admission.pack.manifest, UiSceneId("route.home"),
+                    deepLinks = LocalApplicationSceneDeepLinks.targets)
             }
             val result = decision.admission.RenderHostedScene(
                 nav, onAtRootBack = { activity?.finish() },
+                requestedDeepLinkKey = requestedSceneKey,
+                onDeepLinkProcessed = onSceneRequestProcessed,
             )
             // An invalid restored history must not turn the application into an empty screen.
             if (result is UiSceneRenderAccess.Rejected) {

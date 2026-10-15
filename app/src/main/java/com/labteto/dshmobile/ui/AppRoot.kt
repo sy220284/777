@@ -48,6 +48,7 @@ fun AppRoot(
     // The application Host derives capabilities from actual Feature Owner composition,
     // never from claims advertised by an installed UI pack.
     val features: LocalHarnessViewModel = hiltViewModel()
+    val requestedHostScene by features.uiSceneRequest.collectAsStateWithLifecycle()
     val hostCapabilities = LocalConversationPackGate.capabilities(
         chat = features.chatUiPort,
         work = features.workConversationUiPort,
@@ -84,6 +85,8 @@ fun AppRoot(
         com.labteto.dshmobile.ui.host.LocalApplicationUiHost(
             installedPacks = com.labteto.dshmobile.ui.host.LocalApplicationPackInstallations.all,
             availableCapabilities = hostCapabilities,
+            requestedSceneKey = requestedHostScene,
+            onSceneRequestProcessed = { key, _ -> features.consumeUiSceneRequest(key) },
         ) {
             LocalHarnessScreen(
                 requestedSessionId = requestedLocalSessionId,

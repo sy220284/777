@@ -2,6 +2,7 @@ package com.labteto.dshmobile.uihost
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -52,6 +53,8 @@ fun UiApplicationPackAdmission.Admitted.validateHostedTransition(
 fun UiApplicationPackAdmission.Admitted.RenderHostedScene(
     navigation: UiHostSceneNavigation,
     onAtRootBack: () -> Unit,
+    requestedDeepLinkKey: String? = null,
+    onDeepLinkProcessed: (String, UiSceneNavigationResult) -> Unit = { _, _ -> },
 ): UiSceneRenderAccess {
     var encoded by rememberSaveable(pack.manifest.id) {
         mutableStateOf(UiSceneNavigationSnapshotCodec.encode(navigation.initial))
@@ -65,6 +68,28 @@ fun UiApplicationPackAdmission.Admitted.RenderHostedScene(
     }
     val access = resolve(restored.state, navigation)
     if (access is UiSceneRenderAccess.Ready) {
+        // External route requests enter through the same Host-owned whitelist and
+        // navigation CAS as renderer proposals; V6 does not silently handle rejects.
+        LaunchedEffect(requestedDeepLinkKey, navigation) {
+            val key = requestedDeepLinkKey ?: return@LaunchedEffect
+            val currentEncoded = encoded
+            val currentEpoch = transitionEpoch
+            val active = navigation.restoreEncodedSnapshot(currentEncoded)
+            val proposal = if (active is UiSceneNavigationResult.Changed)
+                navigation.openDeepLink(active.state, key) else active
+            val result = validateHostedTransition(
+                currentEncoded, currentEncoded, proposal, navigation,
+                capturedEpoch = currentEpoch, currentEpoch = transitionEpoch,
+            )
+            if (result is UiSceneNavigationResult.Changed) {
+                val replacement = UiSceneNavigationSnapshotCodec.encode(result.state)
+                if (replacement != encoded) {
+                    encoded = replacement
+                    transitionEpoch++
+                }
+            }
+            onDeepLinkProcessed(key, result)
+        }
         val captured = encoded
         val capturedEpoch = transitionEpoch
         fun commit(proposal: UiSceneNavigationResult): UiSceneNavigationResult {

@@ -102,6 +102,17 @@ class LocalApplicationUiHostDecisionTest {
         assertTrue(local is com.labteto.dshmobile.uihost.UiSceneNavigationResult.Changed)
     }
 
+    @Test fun productionDeepLinksCoverSevenRoutesAndCurrentSettingsOnly() {
+        val targets = LocalApplicationSceneDeepLinks.targets
+        assertEquals(7, targets.keys.count { it.startsWith("route.") })
+        assertEquals(com.labteto.dshmobile.ui.screens.settings.SettingsDestination.entries.size,
+            targets.keys.count { it.startsWith("settings.") })
+        assertEquals(targets.size, targets.values.toSet().size)
+        assertTrue("system.permissions" !in targets)
+        assertTrue("conversation.composer" !in targets)
+        assertTrue("settings.__unregistered" !in targets)
+    }
+
     @Test fun staleSelectionMustNotSilentlyRenderOldV6() {
         val decision = decideApplicationUi("uninstalled", emptyList(), requirements)
         assertTrue(decision is LocalApplicationUiDecision.Unavailable)
