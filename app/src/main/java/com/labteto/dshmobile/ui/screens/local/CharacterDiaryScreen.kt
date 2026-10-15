@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.local.chat.ChatDiaryDisclosure
@@ -128,6 +129,7 @@ internal fun filterCharacterDiaryEntries(
                 entry.innerThought,
                 entry.relationshipMeaning,
                 entry.unresolvedEcho,
+                entry.privateReflection,
                 entry.personaName,
             ).any { it.lowercase().contains(normalizedQuery) }
         }
@@ -173,6 +175,10 @@ internal fun characterDiaryReadingLine(entry: ChatDiaryEntry): String {
     fun clean(text: String): String = text.trim()
         .replace(ChatDiaryReadingVocabulary.TECHNICAL_USER, ChatDiaryReadingVocabulary.OTHER_PERSON)
         .trimEnd('。', '，', '；', ' ', '\n')
+    val privateProse = entry.privateReflection.trim()
+        .replace(ChatDiaryReadingVocabulary.TECHNICAL_USER, ChatDiaryReadingVocabulary.OTHER_PERSON)
+    if (privateProse.isNotBlank()) return privateProse
+    // Historical entries predate private prose; show only the stored evidence.
     val event = clean(entry.event)
     val thoughts = listOf(
         entry.feeling,
@@ -197,21 +203,23 @@ internal fun characterDiaryReadingLine(entry: ChatDiaryEntry): String {
 }
 
 internal fun characterDiaryDayNarrative(entries: List<ChatDiaryEntry>): String {
-    // Mental and emotional observations deserve a place before routine event-only notes.
-    // Keep complete thoughts. Never chop a diary sentence at an arbitrary character index.
+    // A day is an edited reading selection, not a fixed slice of chat.
+    // Keep original evidence accessible in the expandable record section.
     val selected = entries.sortedWith(
-        compareByDescending<ChatDiaryEntry> {
-            listOf(it.feeling, it.innerThought, it.relationshipMeaning, it.unresolvedEcho)
-                .count(String::isNotBlank)
-        }.thenByDescending { it.importance }.thenByDescending(ChatDiaryEntry::createdAt),
+        compareByDescending<ChatDiaryEntry> { it.privateReflection.isNotBlank() }
+            .thenByDescending { it.importance }
+            .thenByDescending(ChatDiaryEntry::createdAt),
     ).take(3).sortedBy(ChatDiaryEntry::createdAt)
     val paragraphs = mutableListOf<String>()
     selected.map(::characterDiaryReadingLine).filter(String::isNotBlank).distinct()
-        .forEach { text ->
-            val nextLength = paragraphs.sumOf(String::length) + text.length +
-                paragraphs.size * 2
-            if (nextLength <= 360) paragraphs += text
+        .forEach { paragraph ->
+            if (paragraphs.sumOf(String::length) + paragraph.length + paragraphs.size * 2 <= 630) {
+                paragraphs += paragraph
+            }
         }
+    // A verified event-only day must never appear as a blank page.
+    if (paragraphs.isEmpty()) entries.firstOrNull()?.let(::characterDiaryReadingLine)
+        ?.takeIf(String::isNotBlank)?.let(paragraphs::add)
     return paragraphs.joinToString("\n\n")
 }
 
@@ -453,6 +461,7 @@ internal fun CharacterDiaryScreen(
                                     innerThought = entry.innerThought,
                                     relationshipMeaning = entry.relationshipMeaning,
                                     unresolvedEcho = entry.unresolvedEcho,
+                                    privateReflection = entry.privateReflection,
                                     importance = entry.importance,
                                 )
                                 mutationError = false
@@ -518,6 +527,14 @@ internal fun CharacterDiaryScreen(
                 value = editDraft.event, onValueChange = { editDraft = editDraft.copy(event = it) },
                 label = { Text(stringResource(R.string.chat_diary_edit_event)) },
                 modifier = Modifier.fillMaxWidth().testTag("diary_edit_event"), enabled = !mutating, maxLines = 5,
+            )
+            SyTextField(
+                value = editDraft.privateReflection,
+                onValueChange = { editDraft = editDraft.copy(privateReflection = it) },
+                label = { Text(stringResource(R.string.chat_diary_private_reflection)) },
+                modifier = Modifier.fillMaxWidth().testTag("diary_edit_private_reflection"),
+                enabled = !mutating,
+                maxLines = 9,
             )
             SyTextField(
                 value = editDraft.feeling, onValueChange = { editDraft = editDraft.copy(feeling = it) },
@@ -612,21 +629,35 @@ private fun CharacterDiaryDayCard(
                 .padding(vertical = SyMetric.gapMd),
             verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
+            // A personal journal: date and voice lead; source tools are quiet.
             Text(
                 text = dateText,
-                style = DsType.caption11Strong.withReadingWeight(),
-                color = colors.textTertiary,
+                style = DsType.titleSerif20.withReadingWeight(),
+                color = colors.text,
                 modifier = Modifier.fillMaxWidth().testTag("diary_day_" + day.key),
             )
-            // Default presentation is prose, not a five-column psychological analysis.
+            Text(
+                text = stringResource(
+                    if (day.entries.any { it.privateReflection.isNotBlank() })
+                        R.string.chat_diary_private_voice
+                    else R.string.chat_diary_legacy_excerpt,
+                ),
+                style = DsType.caption11Strong.withReadingWeight(),
+                color = colors.textTertiary,
+            )
             Text(
                 text = characterDiaryDayNarrative(day.entries),
-                style = DsType.chatBody.withReadingWeight().copy(fontFamily = DsType.contentFont),
+                style = DsType.chatBody.withReadingWeight().copy(
+                    fontFamily = DsType.titleFont,
+                    lineHeight = 29.sp,
+                ),
                 color = colors.text,
                 textAlign = TextAlign.Start,
-                modifier = Modifier.fillMaxWidth().testTag(
-                    "diary_paper_event_" + day.entries.first().id,
-                ),
+                modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd)
+                    .testTag("diary_paper_event_" + day.entries.first().id),
+            )
+            androidx.compose.material3.HorizontalDivider(
+                color = colors.textTertiary.copy(alpha = 0.18f),
             )
             SyButton(
                 text = stringResource(
