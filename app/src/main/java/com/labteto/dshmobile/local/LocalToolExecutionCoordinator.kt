@@ -152,6 +152,16 @@ internal class LocalToolExecutionCoordinator(
         enableOptionalTools(githubTools, target)
     }
 
+    /** Reassert explicit pins after each model-step heuristic rerank, including step-2+ schemas. */
+    fun prioritizePinnedForModelStep(target: MutableSet<String> = enabledOptionalTools) {
+        // Only re-order tools already credential-admitted during prepare().
+        // Avoid adding GitHub tools after an unavailable/auth-failed preflight.
+        val admittedGithub = synchronized(target) {
+            target.any { name -> registry.get(name)?.let(::isGitHubConnectorTool) == true }
+        }
+        prioritizePinnedConnectorTools(target, enableGitHub = admittedGithub)
+    }
+
     private fun prioritizePinnedConnectorTools(target: MutableSet<String>, enableGitHub: Boolean) {
         val pins = pinnedConnectorIds().distinct()
         if (pins.isEmpty()) return
