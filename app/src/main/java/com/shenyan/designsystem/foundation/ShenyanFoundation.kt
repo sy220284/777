@@ -151,27 +151,29 @@ object SyMotion {
     fun duration(ms: Int, reducedMotion: Boolean, tempo: Float = 1f): Int =
         if (reducedMotion) reducedMotionMs
         else (ms * tempo.coerceIn(.7f, 1.3f)).roundToInt()
-    const val pressMs = 80
-    const val selectMs = 200
-    const val dialogMs = 280
-    const val sheetMs = 380
-    const val pushMs = 360
-    const val morphMs = 360
-    const val toolExpandMs = 200
-    const val toolDetailDelayMs = 80
-    const val toastMs = 200
-    const val sidebarMs = 280
-    const val sidebarContentDelayMs = 60
-    const val progressMs = 340
-    const val composerRevealMs = 190
-    const val composerFadeMs = 120
-    const val chevronMs = 150
-    const val interactionColorMs = 140
-    const val fadeMs = 150
-    const val pagePopMs = 320
-    const val pagePeerMs = 160
-    const val pageEnterFadeMs = 150
-    const val pageExitFadeMs = 110
+    // Responsive V6 motion: input first, geometry second; all lengths in milliseconds.
+    const val pressMs = 70
+    const val selectMs = 150
+    const val dialogMs = 220
+    const val sheetMs = 280
+    const val pushMs = 260
+    const val morphMs = 260
+    const val toolExpandMs = 170
+    const val toolDetailDelayMs = 55
+    const val toastMs = 170
+    const val sidebarMs = 240
+    const val sidebarContentDelayMs = 0
+    const val progressMs = 280
+    const val composerRevealMs = 155
+    const val composerFadeMs = 95
+    const val chevronMs = 130
+    const val interactionColorMs = 120
+    const val fadeMs = 130
+    const val pagePopMs = 220
+    const val pagePeerMs = 140
+    const val pageEnterFadeMs = 130
+    const val pageExitFadeMs = 95
+    const val cascadeStaggerMs = 55
     const val livePulseMs = 900
     const val holdStartMs = 420L
     const val holdRepeatMs = 90L

@@ -2,9 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 
 import androidx.compose.animation.Crossfade
@@ -231,22 +229,25 @@ private fun PersonaPickerAvatarTile(
             decodePersonaPortraitBitmap(entry.portraitPath, maxEdgePx = 256)
         }
     }
+    val reduced = com.shenyan.designsystem.foundation.LocalSyReduceMotion.current
+    val tempo = com.shenyan.designsystem.foundation.LocalSyMotionTempo.current
+    val motion = com.shenyan.designsystem.foundation.SyMotion
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (pressed && enabled) DsAnimations.Scale.pressed else DsAnimations.Scale.normal,
-        animationSpec = DsAnimations.pressScale,
+        targetValue = if (pressed && enabled && !reduced) motion.pressedScale else 1f,
+        animationSpec = tween(motion.duration(motion.pressMs, reduced, tempo), easing = motion.ease),
         label = "personaAvatarPress",
     )
     val background by animateColorAsState(
         targetValue = if (selected) colors.selected
         else colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-        animationSpec = DsAnimations.interactionColor,
+        animationSpec = tween(motion.duration(motion.interactionColorMs, reduced, tempo), easing = motion.ease),
         label = "personaAvatarBackground",
     )
     val outline by animateColorAsState(
         targetValue = if (selected) colors.primary else colors.border,
-        animationSpec = DsAnimations.interactionColor,
+        animationSpec = tween(motion.duration(motion.interactionColorMs, reduced, tempo), easing = motion.ease),
         label = "personaAvatarOutline",
     )
     Surface(
@@ -272,7 +273,7 @@ private fun PersonaPickerAvatarTile(
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Crossfade(
                 targetState = portrait,
-                animationSpec = tween(durationMillis = 180),
+                animationSpec = tween(durationMillis = motion.duration(motion.fadeMs, reduced, tempo)),
                 label = "personaAvatarReveal",
                 modifier = Modifier.fillMaxSize(),
             ) { image ->
@@ -335,7 +336,8 @@ internal fun ApprovalDialog(
             LocalApprovalImpact.CRITICAL -> R.string.local_approval_impact_critical
         },
     )
-    SyResponsiveSheet(title = stringResource(R.string.local_approval_title), onDismiss = onDeny, scrollable = true) {
+    SyResponsiveSheet(title = stringResource(R.string.local_approval_title), onDismiss = onDeny,
+        scrollable = true, seamlessBackground = false) {
         Text(
             stringResource(agentOperationLabelRes(approval.toolName)),
             style = DsType.base16Strong.withReadingWeight(),
@@ -352,11 +354,7 @@ internal fun ApprovalDialog(
             },
         )
 
-        SyMaterialSurface(
-            shape = DsShapes.block,
-            tier = SyMaterialTier.L3_CARD,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Column(
                 Modifier.padding(SyMetric.gapLg),
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),

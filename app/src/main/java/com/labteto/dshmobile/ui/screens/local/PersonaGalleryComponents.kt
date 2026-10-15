@@ -19,6 +19,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -433,7 +434,7 @@ internal fun GalleryStoryCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(DsShapes.row)
-            .background(if (selected) com.shenyan.designsystem.foundation.LocalSyColors.current.selected
+            .background(if (selected) com.shenyan.designsystem.foundation.LocalSyColors.current.selected.copy(alpha = .22f)
                 else androidx.compose.ui.graphics.Color.Transparent)
             .clickable(onClick = onClick),
     ) {
@@ -492,7 +493,7 @@ private fun ArchivedDialogueRow(text: String, onLongClick: () -> Unit) {
 
 @Composable
 internal fun PersonaHero(persona: PersonaProfile, subtitle: String) {
-    SyGlassCard {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PersonaAvatar(persona.name, large = true)
             Spacer(Modifier.width(SyMetric.gapLg))
@@ -729,7 +730,7 @@ internal fun PersonaInspectionPanel(
         )
         result.suggestions.forEach { suggestion ->
             val key = suggestionKey(suggestion)
-            SyGlassCard(onClick = { onToggle(suggestion) }) {
+            Column(modifier = Modifier.fillMaxWidth().clickable { onToggle(suggestion) }) {
                 Row(verticalAlignment = Alignment.Top) {
                     SyCheckboxControl(
                         checked = key in selectedKeys,

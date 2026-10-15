@@ -2,9 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 
 import android.content.Context
@@ -65,9 +63,6 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -131,10 +126,7 @@ internal fun PersonaGalleryDetailHeaderV3(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
     ) {
-        SyMaterialSurface(
-            shape = RoundedCornerShape(24.dp),
-            tier = SyMaterialTier.L3_CARD,
-            shadowElevation = 0.dp,
+        Column(
             modifier = Modifier
                 .fillMaxWidth(frameLayout.widthFraction)
                 .combinedClickable(
@@ -295,9 +287,9 @@ internal fun PersonaGalleryAddPanel(
             ) {
                 items(presets, key = PersonaPreset::id) { preset ->
                     val installed = preset.id in installedPresetIds
-                    SyMaterialSurface(
+                    Surface(
                         shape = DsShapes.row,
-                        tier = SyMaterialTier.L3_CARD,
+                        color = Color.Transparent,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Row(
@@ -427,12 +419,7 @@ internal fun CompactPersonaRow(
     var dragDistance by remember(entry.id) { mutableFloatStateOf(0f) }
     val tick = rememberHapticPulse(minIntervalMillis = 65L)
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    val backgroundState = LocalAppBackgroundState.current
-    val rowColor = when {
-        selected -> colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, base = colors.selected)
-        backgroundState.hasImage -> colors.wallpaperSurface(WallpaperSurfaceLevel.CARD)
-        else -> Color.Transparent
-    }
+    val rowColor = if (selected) colors.selected.copy(alpha = .24f) else Color.Transparent
     Surface(
         shape = DsShapes.row,
         color = rowColor,

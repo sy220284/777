@@ -8,10 +8,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
-import com.shenyan.designsystem.foundation.LocalSySceneBackdrop
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import com.shenyan.designsystem.foundation.LocalSyColors
@@ -31,10 +27,6 @@ fun SySectionHeader(title: String, modifier: Modifier = Modifier, subtitle: Stri
             }
         }
     }
-    if (LocalSySceneBackdrop.current?.image != null) {
-        SyMaterialSurface(modifier = modifier.fillMaxWidth(), tier = SyMaterialTier.L1_SECTION,
-            border = BorderStroke(0.dp, Color.Transparent), shadowElevation = 0.dp) {
-            androidx.compose.foundation.layout.Box(Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) { body() }
-        }
-    } else androidx.compose.foundation.layout.Box(modifier) { body() }
+    // Headers remain text-only even with custom wallpaper: do not reintroduce horizontal glass strips.
+    androidx.compose.foundation.layout.Box(modifier) { body() }
 }

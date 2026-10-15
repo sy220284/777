@@ -9,6 +9,8 @@ import android.content.Context
 import android.text.format.DateFormat as AndroidDateFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -93,16 +95,13 @@ private fun TaskCardSurface(
         AutomationStatus.FAILED, AutomationStatus.BLOCKED -> colors.dangerInk.copy(alpha = 0.28f)
         else -> colors.border
     }
-    com.shenyan.designsystem.components.SyMaterialFrame(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(SyMetric.radiusCard),
-        border = BorderStroke(1.dp, borderColor),
-        horizontalPadding = SyMetric.gapSection,
-        verticalPadding = SyMetric.gapSection,
+    Column(
+        modifier = Modifier.fillMaxWidth()
+            .border(BorderStroke(1.dp, borderColor), RoundedCornerShape(SyMetric.radiusCard))
+            .padding(SyMetric.gapSection),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-    ) {
-        content()
-    }
+        content = content,
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -426,12 +425,8 @@ private fun taskTiming(task: AutomationTask): String {
 @Composable
 internal fun TaskSummaryRow(task: AutomationTask, onClick: () -> Unit) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    com.shenyan.designsystem.components.SyMaterialFrame(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(SyMetric.radiusCard),
-        horizontalPadding = SyMetric.gapSection,
-        verticalPadding = SyMetric.gapSection,
+    Column(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(SyMetric.gapSection),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically,

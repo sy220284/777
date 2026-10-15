@@ -2,9 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 
 import android.content.Context
@@ -275,11 +273,7 @@ internal fun PersonaGalleryOverviewV3(
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         if (currentGalleryId == null || currentHasUnsavedChanges) {
-            SyMaterialSurface(
-                shape = DsShapes.block,
-                tier = SyMaterialTier.L3_CARD,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier.padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
                     verticalAlignment = Alignment.CenterVertically,
@@ -418,6 +412,7 @@ internal fun PersonaGalleryOverviewV3(
                 if (!managing) {
                     FluidPersonaGalleryGrid(pinnedEntries + regularEntries, onSelectEntry,
                         onLongClick = { id -> managing = true; if (id !in selectedIds) selectedIds.add(id) },
+                        pinnedIds = pinnedIds,
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                         animateOnEntrance = animateCards)
                 } else {

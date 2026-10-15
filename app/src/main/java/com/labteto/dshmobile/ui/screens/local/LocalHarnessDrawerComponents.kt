@@ -3,12 +3,12 @@ package com.labteto.dshmobile.ui.screens.local
 import com.shenyan.designsystem.foundation.SyMetric
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,7 +27,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,11 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -61,12 +56,10 @@ import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.relativeTime
-import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
-import kotlin.math.roundToInt
 
 /** The drawer uses only public persona-card fields; private dialogue/diaries are never searched here. */
 internal fun localDrawerMatchingPersonas(
@@ -215,7 +208,13 @@ internal fun DrawerQuickAction(
             hovered -> sy.l3
             else -> Color.Transparent
         },
-        animationSpec = DsAnimations.interactionColor,
+        animationSpec = tween(
+                            com.shenyan.designsystem.foundation.SyMotion.duration(
+                                com.shenyan.designsystem.foundation.SyMotion.interactionColorMs,
+                                com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
+                                com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
+                            ), easing = com.shenyan.designsystem.foundation.SyMotion.ease,
+                        ),
         label = "drawerQuickActionFeedback",
     )
     Row(
@@ -284,7 +283,6 @@ internal fun LocalSessionDrawerRow(
     running: Boolean,
     selected: Boolean,
     selectionOpen: Boolean,
-    drawerVisible: Boolean,
     onClick: () -> Unit,
     onSelectMultiple: () -> Unit,
     onRename: () -> Unit,
@@ -294,61 +292,32 @@ internal fun LocalSessionDrawerRow(
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var menuOpen by remember { mutableStateOf(false) }
-    val density = LocalDensity.current
-    val reveal = with(density) { 76.dp.toPx() }
-    var swipe by remember(session.id) { mutableStateOf(0f) }
-    val thresholdPulse = rememberHapticPulse()
-    LaunchedEffect(selectionOpen, drawerVisible) {
-        if (selectionOpen || !drawerVisible) swipe = 0f
-    }
-
     Box(Modifier.fillMaxWidth().clip(DsShapes.row)) {
-        // The action must not exist at rest, including under a translucent rounded row.
-        if (swipe < 0f && !selectionOpen && drawerVisible) {
-            SyIconButton(
-                icon = FeatherIcons.Trash2,
-                contentDescription = stringResource(R.string.local_delete_session),
-                onClick = {
-                    swipe = 0f
-                    onDelete()
-                },
-                tint = colors.dangerInk,
-                modifier = Modifier.align(Alignment.CenterEnd),
-            )
-        }
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .offset { IntOffset(swipe.roundToInt(), 0) }
-                .pointerInput(reveal, selectionOpen, drawerVisible) {
-                    if (!selectionOpen && drawerVisible) detectHorizontalDragGestures(
-                        onHorizontalDrag = { change, amount ->
-                            change.consume()
-                            val wasPastThreshold = swipe <= -reveal / 2f
-                            swipe = (swipe + amount).coerceIn(-reveal, 0f)
-                            if ((swipe <= -reveal / 2f) != wasPastThreshold) thresholdPulse()
-                        },
-                        onDragEnd = { swipe = if (swipe < -reveal / 2) -reveal else 0f },
-                        onDragCancel = { swipe = 0f },
-                    )
-                }
                 .heightIn(min = SyMetric.touch)
                 .clip(DsShapes.row)
                 .background(
                     animateColorAsState(
                         targetValue = when {
-                            selected -> colors.selected
-                            current -> colors.materialL3
-                            else -> colors.materialL2
+                            selected -> colors.selected.copy(alpha = .32f)
+                            current -> colors.selected.copy(alpha = .18f)
+                            else -> Color.Transparent
                         },
-                        animationSpec = DsAnimations.interactionColor,
+                        animationSpec = tween(
+                            com.shenyan.designsystem.foundation.SyMotion.duration(
+                                com.shenyan.designsystem.foundation.SyMotion.interactionColorMs,
+                                com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
+                                com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
+                            ), easing = com.shenyan.designsystem.foundation.SyMotion.ease,
+                        ),
                         label = "sessionRowBackground",
                     ).value,
                 )
                 .combinedClickable(
-                    onClick = { swipe = 0f; onClick() },
-                    onLongClick = { swipe = 0f; menuOpen = true },
+                    onClick = onClick,
+                    onLongClick = { menuOpen = true },
                 )
                 .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapMd),
             verticalAlignment = Alignment.CenterVertically,

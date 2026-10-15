@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import com.shenyan.designsystem.foundation.SyMetric
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -35,6 +36,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntSize
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
@@ -357,6 +359,15 @@ internal fun LocalConversationComposer(
             }
         }
 
+        val motion = com.shenyan.designsystem.foundation.SyMotion
+        val reducedMotion = com.shenyan.designsystem.foundation.LocalSyReduceMotion.current
+        val tempo = com.shenyan.designsystem.foundation.LocalSyMotionTempo.current
+        val composerRevealSpec = tween<IntSize>(
+            motion.duration(motion.composerRevealMs, reducedMotion, tempo), easing = motion.ease
+        )
+        val composerFadeSpec = tween<Float>(
+            motion.duration(motion.composerFadeMs, reducedMotion, tempo), easing = motion.ease
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Bottom,
@@ -364,8 +375,8 @@ internal fun LocalConversationComposer(
         ) {
             AnimatedVisibility(
                 visible = !expanded,
-                enter = expandHorizontally(DsAnimations.composerReveal) + fadeIn(DsAnimations.composerFade),
-                exit = shrinkHorizontally(DsAnimations.composerReveal) + fadeOut(DsAnimations.composerFade),
+                enter = expandHorizontally(composerRevealSpec) + fadeIn(composerFadeSpec),
+                exit = shrinkHorizontally(composerRevealSpec) + fadeOut(composerFadeSpec),
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                     AttachmentControl()
@@ -401,8 +412,8 @@ internal fun LocalConversationComposer(
             )
             AnimatedVisibility(
                 visible = !expanded,
-                enter = expandHorizontally(DsAnimations.composerReveal) + fadeIn(DsAnimations.composerFade),
-                exit = shrinkHorizontally(DsAnimations.composerReveal) + fadeOut(DsAnimations.composerFade),
+                enter = expandHorizontally(composerRevealSpec) + fadeIn(composerFadeSpec),
+                exit = shrinkHorizontally(composerRevealSpec) + fadeOut(composerFadeSpec),
             ) {
                 if (state.running) StopControl() else SendControl()
             }

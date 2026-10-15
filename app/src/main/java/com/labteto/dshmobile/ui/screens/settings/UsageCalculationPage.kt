@@ -2,12 +2,9 @@ package com.labteto.dshmobile.ui.screens.settings
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
-
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 
-import com.labteto.dshmobile.ui.shenyan.SyGlassCard
+
 import com.labteto.dshmobile.ui.shenyan.SyProgressBar
 
 import androidx.compose.foundation.background
@@ -183,16 +180,21 @@ internal fun UsageCalculationPage(
             label = stringResource(R.string.usage_calculation_total_tokens),
             value = formatTokens(modeAnalytics.aggregate.totalTokens),
             modifier = Modifier.weight(1f),
+            testTag = "usagePrimaryMetric",
         )
         CompactMetric(
             label = stringResource(R.string.usage_today),
             value = formatTokens(todayAggregate(days).totalTokens),
             modifier = Modifier.weight(1f),
+            testTag = "usagePrimaryMetric",
         )
     }
 
     if (selectedModel == null && analytics.byModel.isNotEmpty()) {
-        SyGlassCard {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+        ) {
             Text(stringResource(R.string.fluid_model_composition), style = DsType.std14Strong,
                 color = colors.text)
             val total = analytics.byModel.values.sumOf { it.tracked.totalTokens.toDouble() }.coerceAtLeast(1.0)
@@ -204,12 +206,12 @@ internal fun UsageCalculationPage(
                     item(key = entry.key) {
                         // Design #04: the model-composition rows are functional filter
                         // entrances backed by the same selectedModel source as the menu.
-                        SyMaterialSurface(
+                        Surface(
                             onClick = { onSelectModel(entry.key) },
                             modifier = Modifier.fillMaxWidth()
                                 .testTag("usage-model-select:" + entry.key),
                             shape = DsShapes.row,
-                            tier = SyMaterialTier.L3_CARD,
+                            color = androidx.compose.ui.graphics.Color.Transparent,
                         ) {
                             Column(
                                 modifier = Modifier.padding(SyMetric.gapMd),
@@ -239,11 +241,7 @@ internal fun UsageCalculationPage(
         }
     }
 
-    SyMaterialSurface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.block,
-        tier = SyMaterialTier.L3_CARD,
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(SyMetric.gapLg),
             verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
@@ -297,11 +295,7 @@ internal fun UsageCalculationPage(
     if (groups.isEmpty()) {
         EmptyUsageDetail()
     } else {
-        SyMaterialSurface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = DsShapes.block,
-            tier = SyMaterialTier.L3_CARD,
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Column {
                 val visibleGroups = if (showAllGroups) groups else groups.take(12)
                 visibleGroups.forEachIndexed { index, group ->
@@ -425,11 +419,7 @@ internal fun UsageLogPage(
         EmptyUsageDetail(message = stringResource(R.string.usage_log_empty))
         return
     }
-    SyMaterialSurface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.block,
-        tier = SyMaterialTier.L3_CARD,
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Column {
             val records = visibleAnalytics.recentRecords.take(120)
             records.forEachIndexed { index, record ->
@@ -457,11 +447,7 @@ internal fun UsageGroupDetailPage(
 
     if (detail.agents.size > 1 || detail.agents.any { it.runKind.isNotBlank() }) {
         SectionHeading(stringResource(R.string.usage_agents))
-        SyMaterialSurface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = DsShapes.block,
-            tier = SyMaterialTier.L3_CARD,
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Column {
                 detail.agents.forEachIndexed { index, agent ->
                     UsageValueLine(agent.title, formatTokens(agent.aggregate.totalTokens))
@@ -473,11 +459,7 @@ internal fun UsageGroupDetailPage(
 
     if (detail.actions.isNotEmpty()) {
         SectionHeading(stringResource(R.string.usage_actions))
-        SyMaterialSurface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = DsShapes.block,
-            tier = SyMaterialTier.L3_CARD,
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Column {
                 detail.actions.forEachIndexed { index, item ->
                     UsageValueLine(actionLabel(item.action), formatTokens(item.aggregate.totalTokens))
@@ -488,11 +470,7 @@ internal fun UsageGroupDetailPage(
     }
 
     SectionHeading(stringResource(R.string.usage_log_title))
-    SyMaterialSurface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.block,
-        tier = SyMaterialTier.L3_CARD,
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Column {
             val records = detail.records.take(120)
             records.forEachIndexed { index, record ->
@@ -525,11 +503,7 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
         badge = stringResource(R.string.usage_exact_badge),
     )
 
-    SyMaterialSurface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.block,
-        tier = SyMaterialTier.L3_CARD,
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(SyMetric.gapLg),
             verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),

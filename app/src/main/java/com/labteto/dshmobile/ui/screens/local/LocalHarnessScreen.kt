@@ -105,8 +105,6 @@ import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
 import com.labteto.dshmobile.ui.shenyan.SyDimensions
-import com.labteto.dshmobile.ui.shenyan.SyMaterialFrame
-import com.labteto.dshmobile.ui.shenyan.SyMaterialTier
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -756,6 +754,7 @@ fun LocalHarnessScreen(
         scope.launch { drawerState.open() }
     }
 
+    val reduceMotionForBackGesture = com.shenyan.designsystem.foundation.LocalSyReduceMotion.current
     PredictiveBackHandler(
         enabled = (syWideViewport || !drawerState.isOpen) && featurePage != LocalFeaturePage.HOME,
     ) { progress ->
@@ -782,10 +781,14 @@ fun LocalHarnessScreen(
             }
         } catch (cancelled: CancellationException) {
             withContext(NonCancellable) {
-                predictiveBackProgress.animateTo(
-                    targetValue = 0f,
-                    animationSpec = DsAnimations.predictiveBackSettle,
-                )
+                if (reduceMotionForBackGesture) {
+                    predictiveBackProgress.snapTo(0f)
+                } else {
+                    predictiveBackProgress.animateTo(
+                        targetValue = 0f,
+                        animationSpec = DsAnimations.predictiveBackSettle,
+                    )
+                }
             }
             throw cancelled
         }
@@ -881,10 +884,9 @@ fun LocalHarnessScreen(
             if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 1440 &&
                 featurePage == LocalFeaturePage.HOME) {
                 val syInk = LocalSyPalette.current
-                SyMaterialFrame(
+                Column(
                     modifier = Modifier.width(SyDimensions.inspector).fillMaxHeight()
                         .padding(12.dp),
-                    tier = SyMaterialTier.L2_BAR,
                 ) {
                     Text(stringResource(R.string.sy_v5_session_current), color = syInk.text, style = DsType.headline17)
                     Text(

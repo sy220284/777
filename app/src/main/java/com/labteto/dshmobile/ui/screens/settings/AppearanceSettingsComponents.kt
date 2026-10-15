@@ -296,7 +296,8 @@ private fun AppearanceChip(label: String, selected: Boolean, onClick: () -> Unit
         modifier = Modifier
             .heightIn(min = SyMetric.touch)
             .clip(DsShapes.cube)
-            .background(if (selected) colors.selected else LocalSyColors.current.materialL1)
+            .background(if (selected) colors.selected else Color.Transparent)
+            .border(1.dp, colors.border.copy(alpha = .6f), DsShapes.cube)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = SyMetric.gapMd),
     ) {
