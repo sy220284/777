@@ -2310,5 +2310,7 @@
     <string name="media_image_zoom_close">关闭</string>
     <string name="media_image_zoom_reset">还原大小</string>
     <string name="media_image_zoom_hint">双指可放大、移动图片</string>
+    <string name="media_studio_archive_compact">历史成果 · %1$d 项</string>
+    <string name="media_route_account_fallback">当前账户不支持，已自动选用：%1$s</string>
 </resources>
 

@@ -96,6 +96,7 @@ internal fun LocalMediaStudioSheetContent(
     val generatedResults = archive.results
     val storageError by viewModel.storageError.collectAsState()
     var showHistory by remember { mutableStateOf(false) }
+    var showArchive by rememberSaveable { mutableStateOf(false) }
     var archiveRevision by remember { mutableStateOf<LocalMediaRevisionDraft?>(null) }
     val activeRevision = archiveRevision ?: revision
     var showVideoArchive by remember { mutableStateOf(false) }
@@ -210,6 +211,15 @@ internal fun LocalMediaStudioSheetContent(
                     contentDescription = stringResource(R.string.media_studio_select_model),
                     modifier = Modifier.size(18.dp),
                     tint = colors.textSecondary,
+                )
+            }
+            if (!manualRouteActive && preferredProfileId != null && selected.profile.id != preferredProfileId) {
+                Text(
+                    text = stringResource(R.string.media_route_account_fallback,
+                        selected.profile.displayName ?: selected.profile.model),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.textSecondary,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
             if (showModelChoices) {
@@ -427,6 +437,19 @@ internal fun LocalMediaStudioSheetContent(
         if (archive.hasMore) {
             SyButton(text = stringResource(R.string.media_load_older), onClick = viewModel::loadOlderArchive)
         }
+        if (videoTasks.isNotEmpty() || generatedResults.isNotEmpty()) {
+            SyButton(
+                text = stringResource(R.string.media_studio_archive_compact,
+                    videoTasks.size + generatedResults.size),
+                onClick = {
+                    showArchive = !showArchive
+                    if (!showArchive) { showHistory = false; showVideoArchive = false }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                variant = SyButtonVariant.Ghost,
+            )
+        }
+        if (showArchive) {
         if (videoTasks.isNotEmpty()) {
             SyButton(
                 text = stringResource(R.string.media_studio_video_archive, videoTasks.size),
@@ -648,6 +671,7 @@ internal fun LocalMediaStudioSheetContent(
                     }
                 }
             }
+        }
         }
         historyError?.let { Text(it, color = colors.text,
             style = DsType.caption11.withReadingWeight()) }
