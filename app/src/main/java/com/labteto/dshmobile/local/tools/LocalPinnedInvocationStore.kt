@@ -94,3 +94,11 @@ internal class LocalPinnedInvocationStore @Inject constructor(@ApplicationContex
         }
     }
 }
+
+/** A live entry in the composer picker; disconnected pins remain visible for removal. */
+internal data class LocalComposerInvocationOption(
+    val invocation: LocalPinnedInvocation,
+    val label: String,
+    val detail: String,
+    val available: Boolean = true,
+)
