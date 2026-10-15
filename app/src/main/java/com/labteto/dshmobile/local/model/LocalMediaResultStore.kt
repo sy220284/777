@@ -24,6 +24,7 @@ data class LocalMediaResult(
     val imageRatio: String? = null,
     val voiceId: String? = null,
     val revisionOf: String? = null,
+    val credentialSignature: String? = null,
 ) {
     init { require(listOf(fileName, remoteUrl, textOutput).count { it != null } == 1) }
 }
