@@ -128,6 +128,9 @@ internal fun parsePersonaDraft(json: Json, raw: String): PersonaDraft {
             else -> fact.copy(category = category)
         }
     }
+    if (parsedFacts.isNotEmpty() && normalizedFacts.isEmpty() &&
+        parsedFacts.any { normalizedGeneratedCategory(it.category) == null }
+    ) error("模型仅返回已废弃的事实类别，需重新生成新版内容")
     return PersonaDraft(
         name = root.text("name"),
         franchise = root.text("franchise"),
@@ -135,6 +138,16 @@ internal fun parsePersonaDraft(json: Json, raw: String): PersonaDraft {
         facts = normalizedFacts,
         loreEntries = root.loreEntries(),
     )
+}
+
+/** The nine standard facts are distinct from the optional free-form custom section. */
+internal fun missingPersonaCategories(existing: List<CharacterFact>, generated: List<CharacterFact>): List<String> {
+    val present = (existing + generated).asSequence()
+        .filter { it.content.isNotBlank() }
+        .map(CharacterFact::category).toSet()
+    return CharacterFactCategories.canonical.filterNot {
+        it == CharacterFactCategories.CUSTOM_FACTS || it in present
+    }
 }
 
 /** Keep non-standard model category names out of the UI without losing their facts. */
@@ -549,13 +562,12 @@ class PersonaAutoFillService @Inject constructor(
 
         // A first response often omits less obvious dimensions even for fully described
         // original characters. One targeted completion pass fills only missing fields.
-        val presentCategories = (current.facts + draft.facts).map { it.category }.toSet()
-        val missingCategories = CharacterFactCategories.canonical
-            .filterNot { it == CharacterFactCategories.CUSTOM_FACTS || it in presentCategories }
+        val missingCategories = missingPersonaCategories(current.facts, draft.facts)
         if (missingCategories.isNotEmpty() &&
             (request.length >= 12 || current.coreIdentity.length >= 12 || draft.coreIdentity.length >= 12)
         ) {
-            val completionReply = modelGateway.complete(
+            val completionReply = try {
+                modelGateway.complete(
                 baseUrl = baseUrl,
                 model = model,
                 messages = listOf(
@@ -576,7 +588,13 @@ class PersonaAutoFillService @Inject constructor(
                 tools = JsonArray(emptyList()),
                 temperature = 0.35,
             )
-            withContext(Dispatchers.IO) {
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                // A failed optional second request must not destroy the successful first draft.
+                null
+            }
+            if (completionReply != null) withContext(Dispatchers.IO) {
                 usageTracker.record(
                     model = model, usage = completionReply.usage,
                     requestId = completionReply.requestId,
@@ -585,10 +603,11 @@ class PersonaAutoFillService @Inject constructor(
                     route = completionReply.routeIdentity,
                 )
             }
-            val supplement = completionReply.content?.trim().orEmpty()
+            val supplement = completionReply?.content?.trim().orEmpty()
             if (supplement.isNotBlank()) {
                 // Malformed supplementary responses must not erase the successful first draft.
                 runCatching { parsePersonaDraft(json, supplement) }.getOrNull()?.let { extra ->
+                    if (personaDraftImmersionViolations(extra).isNotEmpty()) return@let
                     val allowed = missingCategories.toSet()
                     draft = draft.copy(facts = mergeGeneratedCharacterFacts(
                         draft.facts, extra.facts.filter { it.category in allowed },
