@@ -2307,5 +2307,8 @@
     <string name="media_action_save_failed">保存失败，请重试</string>
     <string name="media_user_created">由你创建 · 媒体成果</string>
     <string name="media_based_on_reply">由你创建 · 基于角色回复</string>
+    <string name="media_image_zoom_close">关闭</string>
+    <string name="media_image_zoom_reset">还原大小</string>
+    <string name="media_image_zoom_hint">双指可放大、移动图片</string>
 </resources>
 
