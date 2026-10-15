@@ -14,6 +14,7 @@ import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.local.presentation.ChatGptSettingsController
 import com.labteto.dshmobile.notify.DshNotifications
 import com.labteto.dshmobile.ui.AppRoot
+import com.labteto.dshmobile.ui.host.LocalApplicationSceneDeepLinks
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -26,6 +27,7 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var notifications: DshNotifications
 
     private val requestedLocalSession = mutableStateOf<String?>(null)
+    private val requestedExternalScene = mutableStateOf<String?>(null)
     private val requestedConversationUiSlice = mutableStateOf(false)
     private var appliedApplicationNightMode: Int? = null
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,6 +40,9 @@ class MainActivity : AppCompatActivity() {
         requestedLocalSession.value = savedInstanceState?.getString("pending_local_session")
             ?: notificationLocalSession(intent)
         requestedConversationUiSlice.value = BuildConfig.DEBUG && intent.getStringExtra("ui_pack") == "next-conversation-slice"
+        // A saved null means the previous VIEW request was consumed; do not replay it.
+        requestedExternalScene.value = if (savedInstanceState?.containsKey("pending_ui_scene") == true)
+            savedInstanceState.getString("pending_ui_scene") else externalSceneFromIntent(intent)
         applyWindowBackground(storedTheme)
         enableEdgeToEdge()
         notifications.ensureChannels()
@@ -54,6 +59,11 @@ class MainActivity : AppCompatActivity() {
             AppRoot(
                 requestedLocalSessionId = requestedLocalSession.value,
                 openConversationUiSlice = requestedConversationUiSlice.value,
+                requestedExternalSceneKey = requestedExternalScene.value,
+                onExternalSceneRequestConsumed = {
+                    requestedExternalScene.value = null
+                    intent.data = null
+                },
                 onConversationUiSliceRequestConsumed = {
                     requestedConversationUiSlice.value = false
                     intent.removeExtra("ui_pack")
@@ -77,15 +87,22 @@ class MainActivity : AppCompatActivity() {
         intent.getStringExtra(DshNotifications.EXTRA_LOCAL_SESSION_ID)
             ?.takeIf { it.isNotBlank() && it.length <= 256 && it.none(Char::isISOControl) }
 
+    private fun externalSceneFromIntent(intent: Intent): String? =
+        if (intent.action == Intent.ACTION_VIEW)
+            LocalApplicationSceneDeepLinks.fromExternalUri(intent.dataString)
+        else null
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         requestedLocalSession.value = notificationLocalSession(intent)
+        requestedExternalScene.value = externalSceneFromIntent(intent)
         requestedConversationUiSlice.value = BuildConfig.DEBUG && intent.getStringExtra("ui_pack") == "next-conversation-slice"
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("pending_local_session", requestedLocalSession.value)
+        outState.putString("pending_ui_scene", requestedExternalScene.value)
         super.onSaveInstanceState(outState)
     }
 

@@ -113,6 +113,25 @@ class LocalApplicationUiHostDecisionTest {
         assertTrue("settings.__unregistered" !in targets)
     }
 
+    @Test fun externalSceneUrisRejectUnknownOrAmbiguousRoutes() {
+        assertEquals("route.tools",
+            LocalApplicationSceneDeepLinks.fromExternalUri("dsh777://scene/route.tools"))
+        assertEquals("settings.models",
+            LocalApplicationSceneDeepLinks.fromExternalUri("dsh777://scene/settings.models"))
+        listOf(
+            null, "", "https://example.com", "dsh777://scene/system.permissions",
+            "dsh777://scene/settings.__unregistered",
+            "dsh777://scene/route.home/extra",
+            "dsh777://scene/route.home?redirect=route.tools",
+            "dsh777://scene/%72oute.home",
+            "dsh777://scene/route.home#fragment",
+            "DSH777://scene/route.home",
+        ).forEach { candidate ->
+            assertEquals("Unexpected accepted URI: $candidate", null,
+                LocalApplicationSceneDeepLinks.fromExternalUri(candidate))
+        }
+    }
+
     @Test fun internalSceneRequestsUseHostWhitelistAndCanNavigateSettings() {
         val full = pack("next", renderableScenes, renderableScenes)
         val navigation = com.labteto.dshmobile.uihost.UiHostSceneNavigation(

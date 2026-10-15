@@ -20,6 +20,15 @@ internal object LocalApplicationSceneDeepLinks {
         }
     }
 
+    /** Only an exact, Host-owned URI can request a visible scene. No arbitrary URLs. */
+    private val externalSceneUri = Regex("""dsh777://scene/([a-z0-9_.-]{1,80})""")
+
+    fun fromExternalUri(raw: String?): String? {
+        val key = raw?.let { externalSceneUri.matchEntire(it)?.groupValues?.get(1) }
+            ?: return null
+        return key.takeIf(targets::containsKey)
+    }
+
     init {
         val requirements = LocalUiSceneCatalog.requirements.associateBy { it.id }
         require(targets.values.all { requirements[it]?.let { scene ->

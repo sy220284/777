@@ -23,6 +23,8 @@ fun AppRoot(
     onLocalSessionRequestConsumed: () -> Unit = {},
     openConversationUiSlice: Boolean = false,
     onConversationUiSliceRequestConsumed: () -> Unit = {},
+    requestedExternalSceneKey: String? = null,
+    onExternalSceneRequestConsumed: () -> Unit = {},
 ) {
     var sliceOpen by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(openConversationUiSlice) {
@@ -90,8 +92,11 @@ fun AppRoot(
                 com.labteto.dshmobile.ui.host.LocalApplicationPackInstallations.fromOwners(features)
             },
             availableCapabilities = hostCapabilities,
-            requestedSceneKey = requestedHostScene,
-            onSceneRequestProcessed = { key, _ -> features.consumeUiSceneRequest(key) },
+            requestedSceneKey = requestedExternalSceneKey ?: requestedHostScene,
+            onSceneRequestProcessed = { key, _ ->
+                if (requestedExternalSceneKey == key) onExternalSceneRequestConsumed()
+                else features.consumeUiSceneRequest(key)
+            },
         ) {
             LocalHarnessScreen(
                 requestedSessionId = requestedLocalSessionId,

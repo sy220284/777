@@ -16,6 +16,7 @@ import com.labteto.dshmobile.uicontract.UiWindowClass
 import com.labteto.dshmobile.uihost.UiApplicationScenePack
 import com.labteto.dshmobile.uihost.UiSceneRenderer
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -54,6 +55,27 @@ class LocalApplicationUiHostInstrumentedTest {
                 }
             }
         }
+    }
+
+    @Test fun externalSceneRequestNavigatesThroughFullPackAndReportsActualResult() {
+        val next = fullFixture("fixture-next", "Next full-pack home")
+        preference.edit().putString("selected_pack", next.manifest.id).commit()
+        val acknowledgements = mutableListOf<String>()
+        compose.setContent {
+            MaterialTheme {
+                LocalApplicationUiHost(
+                    installedPacks = listOf(next),
+                    availableCapabilities = emptySet(),
+                    requestedSceneKey = "settings.models",
+                    onSceneRequestProcessed = { key, result ->
+                        if (result is com.labteto.dshmobile.uihost.UiSceneNavigationResult.Changed)
+                            acknowledgements += key
+                    },
+                ) { Text("Explicit legacy screen") }
+            }
+        }
+        compose.onNodeWithText("settings.models").assertExists()
+        compose.runOnIdle { assertEquals(listOf("settings.models"), acknowledgements) }
     }
 
     @Test fun changingDurableSelectionActuallySwapsTwoWholeApplicationRenderers() {
