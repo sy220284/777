@@ -1,5 +1,8 @@
 # UI 3.0-R4 实施台账
 
+> **2026-10-15 设备 CI 二次编译修复与 MCP 观察补全（PR #705）**：读取 `#38697453814` x86 构建日志，确认 `NextConversationOwnerPortIntegrationTest.kt` 两个 AndroidTest 编译错误：无效 `assertExists` import、从 App 的 R 引用 Next 的字符串；`238b1c02` 移除错误导入并使用 `com.labteto.dshmobile.uipack.next.R`。此前单测 Job 已成功，但设备失败没有被证明为行为回归。新增 `98ffdfbb` 在用户发起 MCP 连接/断开时通过独立于命令互斥锁的短时观察协程刷新真实生命周期（操作完成即停止），避免长握手阻断页面状态。仍缺主动远程健康检查、外部操作的长期状态订阅、选中和授权事实；S-1 继续 `CODE_PARTIAL`。本轮新 CI 结果未出，S5 未签收。
+
+
 > **2026-10-15 CI 阻断修复及 S-1 MCP 生命周期增量（PR #705）**：`#38696536117` 真实编译失败原因是 UI 编辑回执已经改为 `UiMessageEditOutcome`，旧 V6 的 `LocalHarnessViewModel.editAndResendUserMessage` 仍要求旧 `LocalUserMessageEditResult`；`b4eb3bfb` 增加 11/11 穷举反向兼容映射，随后 `#38697453814` 的 `unit-tests` 作业成功，其他设备/构建任务不可据此认定通过。`dd10d5bb` + `1ea41356` + `476f89f6` 将 MCP 注册/连接过渡阶段原位透传至工具页，区分建立连接、已登记但未探测健康、重连、在途工具排空断开；新旧工具列表分开“已注册”数量，过渡中不误报在线/可调用，增加慢连接、重连和断开测试断言。**S-1-01 从 `CODE_PENDING` 改为 `CODE_PARTIAL`，真实工具选择、认证状态、主动健康检查、完整实时订阅仍缺**。S0 动作映射仍 **75/173**，恢复验收仍 **0/173**；整个 R4 UI 包替换仍未完成。最新 SHA 的 CI 必须独立验证。
 
 
