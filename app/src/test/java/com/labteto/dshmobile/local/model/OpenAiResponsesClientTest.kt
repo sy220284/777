@@ -795,6 +795,38 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun planPayloadRejectsUnsupportedHostedToolsAndUploadedFileId() {
+        val blocked = buildJsonObject {
+            put("model", "gpt-6-astra")
+            put("input", buildJsonArray {
+                add(buildJsonObject { put("role", "user"); put("content", "测试") })
+            })
+            put("tools", buildJsonArray {
+                add(buildJsonObject { put("type", "image_generation") })
+            })
+        }
+        val rejected = runCatching {
+            client.validateRequestPayload(blocked, planSharing = true)
+        }.exceptionOrNull()
+        assertTrue(rejected is LocalModelException)
+        assertEquals("CHATGPT_PLAN_UNSUPPORTED_CAPABILITY", (rejected as LocalModelException).code)
+        val invalidFile = buildJsonObject {
+            put("input", buildJsonArray {
+                add(buildJsonObject {
+                    put("role", "user")
+                    put("content", buildJsonArray {
+                        add(buildJsonObject { put("type", "input_file"); put("file_id", "file-test") })
+                    })
+                })
+            })
+        }
+        assertTrue(runCatching {
+            client.validateRequestPayload(invalidFile, planSharing = true)
+        }.exceptionOrNull() is LocalModelException)
+        client.validateRequestPayload(blocked, planSharing = false)
+    }
+
+    @Test
     fun chatGptPlanWrapsFunctionToolsInNamespace() {
         val tools = JsonArray(
             listOf(
