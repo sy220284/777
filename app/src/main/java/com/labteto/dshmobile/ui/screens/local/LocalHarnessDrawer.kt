@@ -41,8 +41,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
-import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
-import com.labteto.dshmobile.ui.theme.rootSurface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import com.labteto.dshmobile.ui.shenyan.SyDimensions
@@ -135,10 +133,10 @@ internal fun LocalModeDrawer(
     val docked = LocalConfiguration.current.screenWidthDp >= 1024
     var syRailCollapsed by rememberSaveable { mutableStateOf(false) }
     if (docked && syRailCollapsed) {
-        // A functional 64dp rail: never leave a collapsed sidebar full of clipped labels.
+        // Compact rail shares the exact scene without drawing a solid vertical strip.
+        SySceneBackgroundSurface(Modifier.width(SyDimensions.navigationCollapsed).fillMaxHeight()) {
         Column(
-            Modifier.width(SyDimensions.navigationCollapsed).fillMaxHeight()
-                .background(colors.rootSurface()).safeDrawingPadding(),
+            Modifier.fillMaxHeight().safeDrawingPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -162,6 +160,7 @@ internal fun LocalModeDrawer(
                 onClick = onTasks, containerColor = sy.l3, tint = sy.text)
             SyIconButton(icon = SyEntryIcons.Settings, contentDescription = stringResource(R.string.sy_v5_settings),
                 onClick = onSettings, containerColor = sy.l3, tint = sy.text)
+        }
         }
         return
     }
