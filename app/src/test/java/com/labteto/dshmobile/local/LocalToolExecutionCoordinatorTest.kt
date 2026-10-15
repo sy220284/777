@@ -36,7 +36,7 @@ class LocalToolExecutionCoordinatorTest {
     fun pinnedGitHubIsLoadedAcrossTurnsAndNeverBypassesCredentialGate() = runBlocking {
         val registry = ToolRegistry().apply {
             register(tool("github_list_prs", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER,
-                exposure = ToolExposure.OPTIONAL, family = "GitHub") { ToolResult("ok") })
+                exposure = ToolExposure.OPTIONAL, family = "GitHub", keywords = setOf("github")) { ToolResult("ok") })
             register(tool("unrelated_task", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
                 exposure = ToolExposure.OPTIONAL, keywords = setOf("处理")) { ToolResult("ok") })
         }
@@ -60,11 +60,11 @@ class LocalToolExecutionCoordinatorTest {
     fun pinnedMcpLoadsOnlyRegisteredServiceToolsAheadOfHeuristicTools() = runBlocking {
         val registry = ToolRegistry().apply {
             register(tool("mcp_figma_get_file", ToolAccess.NETWORK, ToolApprovalPolicy.ALWAYS,
-                exposure = ToolExposure.OPTIONAL, family = "MCP") { ToolResult("ok") })
+                exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("figma")) { ToolResult("ok") })
             register(tool("mcp_other_get_file", ToolAccess.NETWORK, ToolApprovalPolicy.ALWAYS,
-                exposure = ToolExposure.OPTIONAL, family = "MCP") { ToolResult("ok") })
+                exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("figma")) { ToolResult("ok") })
             register(tool("mcp_figma_fake", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER,
-                exposure = ToolExposure.OPTIONAL, family = "Other") { ToolResult("ok") })
+                exposure = ToolExposure.OPTIONAL, family = "Other", keywords = setOf("fake")) { ToolResult("ok") })
             register(tool("background_job", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
                 exposure = ToolExposure.OPTIONAL, keywords = setOf("设计")) { ToolResult("ok") })
         }
@@ -86,11 +86,11 @@ class LocalToolExecutionCoordinatorTest {
     fun pinnedConnectorRecoversPriorityAfterLaterModelStepHeuristics() = runBlocking {
         val registry = ToolRegistry().apply {
             register(tool("mcp_figma_frame", ToolAccess.NETWORK, ToolApprovalPolicy.ALWAYS,
-                exposure = ToolExposure.OPTIONAL, family = "MCP") { ToolResult("ok") })
+                exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("figma")) { ToolResult("ok") })
             register(tool("autodiscovered", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
                 exposure = ToolExposure.OPTIONAL, keywords = setOf("查找")) { ToolResult("ok") })
             register(tool("github_prs", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER,
-                exposure = ToolExposure.OPTIONAL, family = "GitHub") { ToolResult("ok") })
+                exposure = ToolExposure.OPTIONAL, family = "GitHub", keywords = setOf("github")) { ToolResult("ok") })
         }
         val c = coordinator(registry, pinnedConnectorIds = { listOf("figma", "github") })
         c.prepareWorkTurnCapabilities("继续", emptyList(), { false })
