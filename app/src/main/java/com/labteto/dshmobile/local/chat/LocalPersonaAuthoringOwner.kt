@@ -3,7 +3,14 @@ package com.labteto.dshmobile.local.chat
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.uiBindingIdentity
-import com.labteto.dshmobile.uicontract.*
+import com.labteto.dshmobile.uicontract.PersonaAuthoringUiPort
+import com.labteto.dshmobile.uicontract.UiCommandRejection
+import com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt
+import com.labteto.dshmobile.uicontract.UiPersonaAuthoringSnapshot
+import com.labteto.dshmobile.uicontract.UiPersonaDraft
+import com.labteto.dshmobile.uicontract.UiPersonaFact
+import com.labteto.dshmobile.uicontract.UiPersonaLore
+import com.labteto.dshmobile.uicontract.UiSessionIdentity
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
