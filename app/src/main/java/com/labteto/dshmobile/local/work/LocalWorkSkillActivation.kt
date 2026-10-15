@@ -1,9 +1,28 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.files.LocalWorkspace
+import com.labteto.dshmobile.local.tools.LocalPinnedInvocation
 
 /** Selected skill instructions are loaded once per model step and never persisted in history. */
-internal fun resolveLocalWorkSkillGuidance(workspace: LocalWorkspace, input: String): String {
+internal fun resolveLocalWorkSkillGuidance(
+    workspace: LocalWorkspace,
+    input: String,
+    selectedInvocations: List<LocalPinnedInvocation> = emptyList(),
+): String {
+    val pinnedNote = selectedInvocations.asSequence().mapNotNull { selection ->
+        when (selection.kind) {
+            LocalPinnedInvocation.Kind.CONNECTOR -> "连接器：${selection.id}"
+            LocalPinnedInvocation.Kind.SKILL -> selection.id.takeIf { it in workspace.skills() }
+                ?.let { "技能：$it（先调用 skill(name) 加载完整规则）" }
+        }
+    }.take(12).toList().takeIf(List<String>::isNotEmpty)?.joinToString("\n")?.let { choices ->
+        """
+            [用户明确固定的调用来源]
+            下列连接器或技能由用户在聊天框中主动选择，后续轮次默认优先使用，直至用户移除；不必重新让模型猜测和搜索。只有当前已连接、已注册且获授权的工具才能实际执行，不要假装调用成功。
+            $choices
+            [固定来源结束]
+        """.trimIndent()
+    }.orEmpty()
     val marker = Regex("^@skill:([a-z][a-z0-9-]{1,47})(?:\\r?\\n|$)")
     val match = marker.find(input)
     if (match != null) {
@@ -18,6 +37,7 @@ internal fun resolveLocalWorkSkillGuidance(workspace: LocalWorkspace, input: Str
             用户明确选择了此技能。以下技能文件仅提供执行方法和默认约定；与本轮用户明确要求冲突时以用户要求为准，不得仅因技能规则拒绝执行。
             ${document}
             [技能规则结束]
+            $pinnedNote
         """.trimIndent()
     }
 
@@ -37,12 +57,13 @@ internal fun resolveLocalWorkSkillGuidance(workspace: LocalWorkspace, input: Str
         name to "$name：${meta.description}$details"
     }.sortedByDescending { (name, _) -> name in requested }
         .take(8).map { it.second }.toList()
-    if (lines.isEmpty()) return ""
+    if (lines.isEmpty()) return pinnedNote
     return """
         [与本轮任务相关的本地技能]
         下面的技能可提供专项执行方法；如需使用，通过 skill(name) 读取完整说明。
         ${lines.joinToString("\n")}
         [目录结束]
+        $pinnedNote
     """.trimIndent()
 }
 
