@@ -101,7 +101,8 @@ class LocalWorkRunBindingTest {
 
     @Test fun schedulerChangeUpdatesDetachedWorkWithoutCopyingItsExecutionIntoChat() = runTest {
         val runtime = LocalRuntimeStateStore()
-        val visible = runtime.initialize(LocalHarnessState(sessionId = "chat", usageMode = LocalUsageMode.CHAT))
+        runtime.initialize(LocalHarnessState(sessionId = "chat", usageMode = LocalUsageMode.CHAT))
+        val visible = runtime.state
         val binding = binding(LocalHarnessState(
             sessionId = "work",
             kernel = LocalKernelState(running = true, queuedInputCount = 2, contextChars = 32_000),

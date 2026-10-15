@@ -65,9 +65,10 @@ class LocalWorkApprovalCoordinatorTest {
         val preferences = Preferences().store
         val events = LocalSessionEventLogRegistry(temporary.newFolder(), Json)
         val runtime = LocalRuntimeStateStore()
-        val runtimeOwnerState = runtime.initialize(
-            LocalHarnessState(loading = false, sessionId = "a", safeAutoApprovalEnabled = false),
-        )
+        init {
+            runtime.initialize(LocalHarnessState(loading = false, sessionId = "a", safeAutoApprovalEnabled = false))
+        }
+        val runtimeOwnerState = runtime.projection
         val runs = LocalWorkRunRegistry(runtime)
         val approvals = LocalWorkApprovalCoordinator(preferences, events, runtime, runs)
         fun binding(id: String) = LocalWorkRunBinding(
@@ -251,11 +252,11 @@ class LocalWorkApprovalCoordinatorTest {
         assertFalse(f.preferences.isSafeAutoApprovalEnabled())
 
         f.runtime.activateSession("b")
-        f.runtimeOwnerState.value = f.runtime.state.value.copy(sessionId = "b")
+        f.runtimeOwnerState.update { it.copy(sessionId = "b") }
         f.approvals.disableDeviceApprovalLease(f.runtime.state.value.sessionId)
         assertTrue(a.state.value.work.deviceApprovalLease)
         f.runtime.activateSession("a")
-        f.runtimeOwnerState.value = f.runtime.state.value.copy(sessionId = "a", work = f.runtime.state.value.work.copy(deviceApprovalLease = true))
+        f.runtimeOwnerState.update { it.copy(sessionId = "a", work = it.work.copy(deviceApprovalLease = true)) }
         f.approvals.disableDeviceApprovalLease(f.runtime.state.value.sessionId)
         assertFalse(a.state.value.work.deviceApprovalLease)
         assertFalse(f.runtime.state.value.work.deviceApprovalLease)
@@ -267,10 +268,10 @@ class LocalWorkApprovalCoordinatorTest {
         val b = f.binding("b")
         a.state.value = a.state.value.copy(work = a.state.value.work.copy(deviceApprovalLease = true))
         b.state.value = b.state.value.copy(work = b.state.value.work.copy(deviceApprovalLease = true))
-        f.runtimeOwnerState.value = f.runtime.state.value.copy(
+        f.runtimeOwnerState.update { it.copy(
             sessionId = "a",
-            work = f.runtime.state.value.work.copy(deviceApprovalLease = true),
-        )
+            work = it.work.copy(deviceApprovalLease = true),
+        ) }
 
         // Session identity advances before the visible projection switches away from A.
         f.runtime.activateSession("b")

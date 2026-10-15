@@ -124,7 +124,7 @@ class LocalWorkPlanModeCoordinatorTest {
     @Test
     fun chatOrLoadingStateCannotEnterWorkPlanMode() {
         val runtime = LocalRuntimeStateStore()
-        val ownerState = runtime.initialize(
+        runtime.initialize(
             LocalHarnessState(
                 loading = false,
                 sessionId = "chat",
@@ -140,10 +140,10 @@ class LocalWorkPlanModeCoordinatorTest {
         val coordinator = LocalWorkPlanModeCoordinator(runtime, registry, logs)
 
         assertFalse(coordinator.setEnabled(true))
-        ownerState.value = runtime.state.value.copy(
+        runtime.projection.update { it.copy(
             usageMode = LocalUsageMode.WORK,
             loading = true,
-        )
+        ) }
         assertFalse(coordinator.setEnabled(true))
         assertFalse(runtime.state.value.work.planMode)
     }
@@ -173,32 +173,33 @@ class LocalWorkPlanModeCoordinatorTest {
     @Test
     fun restoredPendingPlanReviewOrApprovalCannotReleaseReadOnlyMode() {
         val runtime = LocalRuntimeStateStore()
-        val ownerState = runtime.initialize(LocalHarnessState(
+        runtime.initialize(LocalHarnessState(
             loading = false, sessionId = "pending-plan", usageMode = LocalUsageMode.WORK,
         ))
+        val ownerState = runtime.projection
         val logs = LocalSessionEventLogRegistry(
             sessionsRoot = File(temporary.root, "pending-plan-logs").apply { mkdirs() },
             json = json,
         )
         val coordinator = LocalWorkPlanModeCoordinator(runtime, LocalWorkRunRegistry(runtime), logs)
-        ownerState.value = ownerState.value.copy(work = LocalWorkState(
+        ownerState.update { it.copy(work = LocalWorkState(
             planMode = true,
             pendingQuestion = LocalQuestion(
                 callId = "plan-review", question = "Harness 已完成计划，是否批准并进入执行模式？",
             ),
-        ))
+        )) }
 
         assertFalse(coordinator.setEnabled(false))
         assertTrue(runtime.state.value.work.planMode)
         assertTrue(logs.get("pending-plan").latest("plan/mode") == null)
 
-        ownerState.value = ownerState.value.copy(work = LocalWorkState(
+        ownerState.update { it.copy(work = LocalWorkState(
             planMode = true,
             pendingApproval = LocalApproval(
                 callId = "tool-approval", toolName = "bash", summary = "执行",
                 arguments = "{}", access = "process",
             ),
-        ))
+        )) }
         assertFalse(coordinator.setEnabled(false))
         assertTrue(runtime.state.value.work.planMode)
         assertTrue(logs.get("pending-plan").latest("plan/mode") == null)
