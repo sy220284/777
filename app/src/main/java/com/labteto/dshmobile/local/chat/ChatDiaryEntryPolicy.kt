@@ -9,8 +9,14 @@ internal object ChatDiaryEntryPolicy {
 
         val event = raw.event.trim().take(ChatDiaryBounds.MAX_EVENT_CHARS)
         val importance = raw.importance.coerceIn(0, 5)
-        if (event.length < MIN_EVENT_CHARS || importance < MIN_IMPORTANCE) return null
-        if (significance != "MAJOR" && importance < MINOR_IMPORTANCE) return null
+        val privateReflection = sanitizePrivateReflection(raw.privateReflection)
+        // A grounded change in someone's personal outlook can be memorable even when
+        // the triggering event is brief. Keep evidence and significance gates intact:
+        // this is an alternative inside the original diary pipeline, not a second writer.
+        val thoughtful = privateReflection.length >= MIN_SUBSTANTIVE_REFLECTION_CHARS
+        if (importance < MIN_IMPORTANCE) return null
+        if (event.length < if (thoughtful) MIN_THOUGHT_EVENT_CHARS else MIN_EVENT_CHARS) return null
+        if (significance != "MAJOR" && importance < MINOR_IMPORTANCE && !thoughtful) return null
         if (!eventGrounded(event, request.evidenceText)) return null
 
         return ChatDiaryDelta(
@@ -19,7 +25,7 @@ internal object ChatDiaryEntryPolicy {
             innerThought = raw.innerThought.trim().take(ChatDiaryBounds.MAX_THOUGHT_CHARS),
             relationshipMeaning = raw.relationshipMeaning.trim().take(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS),
             unresolvedEcho = raw.unresolvedEcho.trim().take(ChatDiaryBounds.MAX_ECHO_CHARS),
-            privateReflection = sanitizePrivateReflection(raw.privateReflection),
+            privateReflection = privateReflection,
             importance = importance,
             disclosure = raw.disclosure.trim().uppercase(),
             recallAnchors = raw.recallAnchors.map { it.trim().take(80) }
@@ -286,6 +292,8 @@ internal object ChatDiaryEntryPolicy {
         else (0 until text.length - 1).mapTo(linkedSetOf()) { text.substring(it, it + 2) }
 
     private const val MAX_SOURCE_IDS = 16
+    private const val MIN_THOUGHT_EVENT_CHARS = 3
+    private const val MIN_SUBSTANTIVE_REFLECTION_CHARS = 36
     private const val MIN_EVENT_CHARS = 6
     private const val MIN_IMPORTANCE = 2
     private const val MINOR_IMPORTANCE = 3
