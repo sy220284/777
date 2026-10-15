@@ -65,6 +65,7 @@ fun SyResponsiveSheet(
     floating: Boolean = false,
     surfaceTier: SyMaterialTier = SyMaterialTier.L4_OVERLAY,
     seamlessBackground: Boolean = false,
+    dimScrimWhenSeamless: Boolean = false,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -166,7 +167,7 @@ fun SyResponsiveSheet(
             modifier = if (floating && !seamlessBackground) modifier.padding(horizontal = 6.dp) else modifier,
             shape = RoundedCornerShape(SyDimensions.cornerOverlay),
             containerColor = Color.Transparent,
-            scrimColor = if (seamlessBackground) Color.Transparent else p.scrim,
+            scrimColor = if (seamlessBackground && !dimScrimWhenSeamless) Color.Transparent else p.scrim,
             tonalElevation = 0.dp,
             dragHandle = null,
             contentWindowInsets = { WindowInsets.navigationBars },
