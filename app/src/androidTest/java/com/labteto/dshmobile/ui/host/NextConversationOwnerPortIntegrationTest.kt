@@ -88,11 +88,12 @@ class NextConversationOwnerPortIntegrationTest {
         // This exercises real application port admission and Next rendering, but not a provider call.
         val store = LocalRuntimeStateStore()
         val pending = LocalApproval("call-1", "write_file", "真实审批", "{}", "write", requestId = "owner-nonce-1")
-        val state = store.initialize(LocalHarnessState(
+        store.initialize(LocalHarnessState(
             sessionId = "approval-session", usageMode = LocalUsageMode.WORK, loading = false,
             modelState = LocalModelState(configured = true),
             work = LocalWorkState(pendingApproval = pending),
         ))
+        val state = store.state
         val approvals = mutableListOf<Pair<String, Boolean>>()
         val approvalOwner = object : LocalWorkApprovalUiPort {
             override fun pendingQuestion(): LocalQuestion? = null
@@ -101,7 +102,7 @@ class NextConversationOwnerPortIntegrationTest {
             override fun answerApproval(pendingId: String, approved: Boolean): Boolean {
                 if (pendingId != state.value.work.pendingApproval?.requestId) return false
                 approvals += pendingId to approved
-                state.value = state.value.copy(work = state.value.work.copy(pendingApproval = null))
+                store.projection.update { it.copy(work = it.work.copy(pendingApproval = null)) }
                 return true
             }
         }
@@ -126,7 +127,7 @@ class NextConversationOwnerPortIntegrationTest {
 
     @Test fun sameNextPackUsesActualOwnerPortsAndNeverReusesOldModeIdentity() {
         val store = LocalRuntimeStateStore()
-        val current = store.initialize(LocalHarnessState(
+        store.initialize(LocalHarnessState(
             sessionId = "integration-session",
             usageMode = LocalUsageMode.CHAT,
             loading = false,
@@ -150,7 +151,7 @@ class NextConversationOwnerPortIntegrationTest {
         compose.runOnIdle {
             assertEquals(listOf("real port chat"), chat.sends)
             assertEquals(emptyList<String>(), work.sends)
-            current.value = current.value.copy(usageMode = LocalUsageMode.WORK)
+            store.projection.update { it.copy(usageMode = LocalUsageMode.WORK) }
             workMode.value = true
         }
         compose.onNode(hasSetTextAction()).performTextInput("real port work")
