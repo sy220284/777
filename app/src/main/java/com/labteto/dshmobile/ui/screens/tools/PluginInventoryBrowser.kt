@@ -247,7 +247,7 @@ internal fun PluginInventoryBrowser(
                             com.shenyan.designsystem.components.SyTextField(
                                 value = gitHubSkillUrl,
                                 onValueChange = { gitHubSkillUrl = it },
-                                placeholder = "GitHub 技能目录地址",
+                                placeholder = { Text("GitHub 技能目录地址") },
                                 modifier = Modifier.weight(1f).testTag("skill-github-url"),
                             )
                             SyButton(
