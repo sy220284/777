@@ -35,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
@@ -189,8 +190,10 @@ internal fun characterDiaryReadingLine(entry: ChatDiaryEntry): String {
         ) parts += thought
     }
     if (parts.isEmpty() && event.isNotBlank()) parts += event
-    return parts.joinToString("。") { it.trimEnd('。', '！', '？', '；') }
-        .let { if (it.isBlank()) "" else it.trimEnd('。') + "。" }
+    return parts.joinToString("") { part ->
+        if (part.lastOrNull() in listOf('。', '！', '？', '!', '?', '；')) part
+        else part + "。"
+    }
 }
 
 internal fun characterDiaryDayNarrative(entries: List<ChatDiaryEntry>): String {
@@ -224,6 +227,7 @@ internal fun CharacterDiaryScreen(
     onDismiss: () -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     val subjects = remember(gallery, currentPersona, currentGalleryId) {
         characterDiarySubjects(gallery, currentPersona, currentGalleryId)
@@ -354,6 +358,7 @@ internal fun CharacterDiaryScreen(
                             ),
                             onClick = {
                                 if (browseExpanded) {
+                                    focusManager.clearFocus()
                                     query = ""
                                     selectedFilterIndex = 0
                                 }
