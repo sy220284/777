@@ -542,10 +542,10 @@ class PersonaAutoFillService @Inject constructor(
             category推荐使用 personality、selfNarrative、identityGap、valuesAndTradeoffs、subjectiveBeliefs、
             biography、relationships、preferencesAndHabits、voiceStyle、customFacts。
             provenance只允许 CANON、INFERRED、USER_CREATED、UNVERIFIED。
-            1. name与核心身份尽可能明确；身份、性格、经历、重要关系、核心价值优先。
-            2. 其它类别仅当有可靠信息才生成，禁止为了凑满类别编造秘密、创伤、未来成长和关系进度。
-            3. 同一事实存一次；历史事件可以通过relatedFactIds关联其选择和影响，不重复复制长段落。
-            4. 原作事实与推断、用户二创明确区分；不确定的设定可留空或标记UNVERIFIED。
+            1. 逐类检查全部10类 facts：有可靠原作、用户输入或已确认聊天依据的类别都应生成，尤其关注性格、价值取舍、主观认知、表达特征与习惯；一类可有多条独立事实，不因生成核心身份就提前结束。
+            2. 没有证据的类别允许不生成；不得为填满字段编造秘密、创伤、未来成长和关系进度。已有用户编辑事实优先，缺失字段不意味着可覆盖旧值。
+            3. 同一事实只记一次；以relatedFactIds关联相关经历，不重复长段落。
+            4. 区分原作事实、可靠推断和用户二创；不确定内容标记UNVERIFIED或省略，不能伪称确定。
             5. 人物资料只描写已有的人生事实、固有认知与偏好；当前情绪、成长、主动性、亲密度、
                回复节奏、行为频率和日常行动安排完全交给运行时。
             6. temporalScope填写明确的故事阶段ID时才需要；未来剧情、他人秘密不写成此刻已知事实。
@@ -553,7 +553,7 @@ class PersonaAutoFillService @Inject constructor(
                复杂原作背景保留在可检索资料中；只有确切需要的资料才生成，不设置固定三条上限。
             8. 用户明确编辑过的资料保留；不得擅自覆盖已存在的USER_CREATED事实。
             9. 所有资料只从人物世界内部陈述，禁止添加通用模型限制或聊天平台元叙事。
-            10. 语言风格可以记录固有表达特征，不预设固定台词与表演脚本。
+            10. 语言风格描述人物有依据的独特表达特征，不强加固定台词、情绪或表演脚本。
         """.trimIndent()
 
         val REPAIR_PROMPT = """

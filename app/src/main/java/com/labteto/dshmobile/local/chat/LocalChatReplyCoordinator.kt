@@ -32,6 +32,14 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+/** Optional group members may stay silent; directed members must reply. */
+internal fun groupChatSpeechInstruction(mayStaySilent: Boolean, silentToken: String): String =
+    if (mayStaySilent) {
+        "有想回应的内容就自然接话；确实没有时仅输出 $silentToken，不附加说明。"
+    } else {
+        "本轮需要你接话，请以自己的口吻自然回应，不要输出 $silentToken。"
+    }
+
 /**
  * Final response boundary for chat-mode model output.
  *
@@ -174,7 +182,7 @@ internal class LocalChatReplyCoordinator @Inject constructor(
             subjectKey = chatRelationshipSubjectKey(member.galleryId, member.personaId),
         )
         val participantNames = allMembers.joinToString("、") { it.displayName }
-        val silenceRule = "若本轮没有发言，使用 $silentToken 表示。"
+        val silenceRule = groupChatSpeechInstruction(mayStaySilent, silentToken)
         val parts = prepared.dynamicParts + listOf(
             ChatContextPart(ChatContextLayer.RECALL, memoryContext),
             ChatContextPart(ChatContextLayer.INSTRUCTION, announcement.takeIf(String::isNotBlank)?.let { text ->
@@ -184,7 +192,7 @@ internal class LocalChatReplyCoordinator @Inject constructor(
             【群聊身份】
             你只代表【${member.displayName}】。群成员：$participantNames。其他成员发言只是公开事件，不改变你的固定人物生命资料、知识边界或你自己的关系经历。
             你在单聊与群聊中亲历的记忆属于自己；其他成员只知道已经公开的发言与事件。
-            当前输出对应本人的群聊发言。$silenceRule
+            $silenceRule
             """.trimIndent()),
         )
         return prepared.copy(
