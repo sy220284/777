@@ -48,6 +48,50 @@ class LocalMediaPersistenceRulesTest {
         assertNull(legacy.sessionId)
     }
 
+    @Test fun savedCreatorAccountParametersAndRevisionLineageSurviveProcessRestore() {
+        val previous = LocalMediaResult(
+            id = "first", provider = "OPENAI", model = "gpt-image-2.5-flare",
+            kind = "IMAGE", createdAtMillis = 100L, fileName = "first.png",
+            description = "保留完整的原图提示词", sessionId = "session-1",
+            sourceMessageId = "message-1", profileId = "openai-account-2",
+            routeFingerprint = "frozen-route", imageRatio = "9:16",
+        )
+        val later = previous.copy(
+            id = "second", fileName = "second.png",
+            revisionOf = "first", description = "重新出图的修改版提示词",
+        )
+        val serialized = Json.encodeToString(
+            LocalMediaResultList.serializer(), LocalMediaResultList(listOf(previous, later)),
+        )
+        val restored = Json.decodeFromString(LocalMediaResultList.serializer(), serialized).results
+        assertEquals(listOf(previous, later), restored)
+        assertEquals(previous.id, restored.last().revisionOf)
+        assertEquals("9:16", LocalMediaRevisionDraft.from(restored.first())?.ratio)
+        assertEquals("openai-account-2", restored.first().profileId)
+        assertEquals("first.png", restored.first().fileName)
+        assertEquals("second.png", restored.last().fileName)
+
+        val voice = LocalMediaResult(
+            id = "voice-2", provider = "OPENAI", model = "gpt-4o-mini-tts",
+            kind = "SPEECH", createdAtMillis = 300L, fileName = "voice.mp3",
+            profileId = "openai-account-2", routeFingerprint = "frozen-route",
+            voiceId = "alloy", revisionOf = "voice-1",
+        )
+        val decodedVoice = Json.decodeFromString(
+            LocalMediaResult.serializer(), Json.encodeToString(LocalMediaResult.serializer(), voice),
+        )
+        assertEquals("alloy", LocalMediaRevisionDraft.from(decodedVoice)?.voiceId)
+        assertEquals("voice-1", decodedVoice.revisionOf)
+
+        // Older records remain readable but cannot silently acquire an original account.
+        val legacy = Json.decodeFromString(LocalMediaResult.serializer(),
+            """{"id":"legacy","model":"image-01","provider":"MINIMAX","kind":"IMAGE","createdAtMillis":1,"remoteUrl":"https://cdn.example.com/x.png"}"""
+        )
+        assertNull(legacy.profileId)
+        assertNull(legacy.routeFingerprint)
+        assertNull(legacy.revisionOf)
+    }
+
     @Test fun videoTasksRetainOriginalSessionWhenPollingAndRestoring() {
         val pending = job(LocalMediaVideoPhase.SUBMITTING).copy(
             sessionId = "chat-1", description = "视频提示词", sourceMessageId = "reply-6",
