@@ -660,7 +660,11 @@ object NextConversationUiPack : ConversationUiPack {
                                     UiMessageRole.SYSTEM -> R.string.next_role_system
                                     UiMessageRole.TOOL -> R.string.next_role_tool
                                 }), style = MaterialTheme.typography.labelMedium)
-                                Text(message.text)
+                                if (message.role == UiMessageRole.ASSISTANT) {
+                                    androidx.compose.foundation.text.selection.SelectionContainer {
+                                        NextRichMessage(message.text, preserveSoftLineBreaks = !workMode)
+                                    }
+                                } else Text(message.text)
                                 val actionsAvailable = identity != null && phase == UiExecutionPhase.IDLE && queued == 0 && send.available
                                 if (message.editableText != null) TextButton(onClick = {
                                     editing = message; replacement = message.editableText.orEmpty()

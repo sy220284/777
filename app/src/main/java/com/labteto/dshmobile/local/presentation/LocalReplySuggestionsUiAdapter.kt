@@ -25,7 +25,7 @@ internal class LocalReplySuggestionsUiAdapter @Inject constructor(
                 state.uiBindingIdentity(current) else null,
             values = if (current.usageMode == LocalUsageMode.CHAT)
                 current.chat.replySuggestions.map {
-                    UiChatReplySuggestion(it.label, it.text, it.style, it.bold)
+                    UiChatReplySuggestion(it.label, it.text, it.style.orEmpty(), it.bold)
                 } else emptyList(),
         )
     }

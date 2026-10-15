@@ -1,6 +1,7 @@
 <resources>
     <string name="next_title">独立界面验证</string>
     <string name="next_scope">仅验证会话发送与审批；完整页面尚未适配</string>
+    <string name="next_copy_code">复制代码</string>
     <string name="next_close">返回当前界面</string>
     <string name="next_input">消息</string>
     <string name="next_send">发送</string>
