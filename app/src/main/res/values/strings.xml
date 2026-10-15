@@ -1909,7 +1909,7 @@
     <string name="local_persona_lore_remove">删除此条目</string>
     <string name="local_persona_lore_empty">还没有世界书条目。可以补充原作事实，也可以先留空。</string>
     <string name="local_persona_lore_entry_number">原作条目 %1$d</string>
-    <string name="persona_v4_personality">稳定性格</string>
+    <string name="persona_v4_personality">性格</string>
     <string name="persona_v4_values_tradeoffs">价值与取舍</string>
     <string name="persona_v4_biography">人生经历</string>
     <string name="persona_v4_relationships">重要人物关系</string>
@@ -1926,6 +1926,13 @@
     <string name="persona_v4_voice_style">语言风格</string>
     <string name="persona_v4_custom_facts">自定义事实</string>
     <string name="persona_v4_section_core">人物核心 · V4</string>
+    <string name="persona_v4_section_core_simple">基础信息</string>
+    <string name="persona_v4_add_field_picker">＋ 添加扩展资料</string>
+    <string name="persona_v4_hide_field_picker">收起扩展资料</string>
+    <string name="persona_v4_custom_field_name">自定义设定名称</string>
+    <string name="persona_v4_edit_lore">编辑人物知识（%1$d 条）</string>
+    <string name="persona_v4_expand_ai">AI 帮我完善人物</string>
+    <string name="persona_v4_hide_ai">收起 AI 完善</string>
     <string name="persona_v4_core_identity">核心身份</string>
     <string name="persona_v4_section_depth">人物深度 · 按需填写</string>
     <string name="persona_v4_section_advanced">进阶人物档案</string>

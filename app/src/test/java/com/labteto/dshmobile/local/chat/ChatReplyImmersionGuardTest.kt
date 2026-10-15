@@ -10,7 +10,7 @@ class ChatReplyImmersionGuardTest {
     fun offendingRoleReplyIsRewrittenBeforeCommit() = runTest {
         val persona = PersonaProfile(
             name = "阿青",
-            portrait = "住在杭州的年轻摄影师，习惯用行动表达关心。",
+            coreIdentity = "住在杭州的年轻摄影师，习惯用行动表达关心。",
         )
         var retries = 0
         val events = mutableListOf<String>()
@@ -36,7 +36,7 @@ class ChatReplyImmersionGuardTest {
 
     @Test
     fun clearlyAttributedQuotedMaterialDoesNotBlockLegitimateRoleplay() = runTest {
-        val persona = PersonaProfile(name = "阿青", portrait = "人类摄影师")
+        val persona = PersonaProfile(name = "阿青", coreIdentity = "人类摄影师")
         var attempted = false
         val text = "她读着纸条：“我是AI，没有身体。”然后将纸条揉成一团。"
         val result = ChatReplyImmersionGuard.enforce(
@@ -49,7 +49,7 @@ class ChatReplyImmersionGuardTest {
 
     @Test
     fun emotionsAndCommunicationLimitsDoNotInstallAReactionRepair() = runTest {
-        val persona = PersonaProfile(name = "阿青", portrait = "寡情的人类摄影师")
+        val persona = PersonaProfile(name = "阿青", coreIdentity = "寡情的人类摄影师")
         var retries = 0
         listOf("我没有真实的感情。", "今晚只能通过文字和你交流。").forEach { text ->
             val result = ChatReplyImmersionGuard.enforce(persona, text, contentOf = { it },
@@ -63,7 +63,7 @@ class ChatReplyImmersionGuardTest {
     fun secondOutOfRoleReplyIsLoggedAndDelivered() = runTest {
         val persona = PersonaProfile(
             name = "阿青",
-            portrait = "普通人类，住在杭州。",
+            coreIdentity = "普通人类，住在杭州。",
         )
 
         val actions = mutableListOf<String>()
@@ -81,7 +81,7 @@ class ChatReplyImmersionGuardTest {
 
     @Test
     fun failedOptionalImmersionRepairKeepsAlreadyGeneratedReply() = runTest {
-        val persona = PersonaProfile(name = "阿青", portrait = "住在杭州的人类摄影师")
+        val persona = PersonaProfile(name = "阿青", coreIdentity = "住在杭州的人类摄影师")
         val events = mutableListOf<String>()
         val initial = "我是AI，没有身体。"
         val result = ChatReplyImmersionGuard.enforce(

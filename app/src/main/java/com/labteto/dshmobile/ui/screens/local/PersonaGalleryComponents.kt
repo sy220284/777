@@ -16,6 +16,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -231,7 +233,10 @@ internal fun StoryDetailSection(
     onDeleteHistoryMessage: (String) -> Unit,
 ) {
     if (story.chatState.updatedAt > 0L) {
-        SyGlassCard {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapSm),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+        ) {
             Text(
                 stringResource(R.string.persona_gallery_story_relation),
                 style = DsType.std14Strong.withReadingWeight(),
@@ -288,7 +293,10 @@ internal fun StoryDetailSection(
     }
 
     if (showHistory) {
-        SyGlassCard {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapSm),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     FeatherIcons.Clock,
@@ -368,7 +376,10 @@ internal fun StoryDetailSection(
     }
 
     var editingNotes by rememberSaveable(entry.id, story.id) { mutableStateOf(false) }
-    SyGlassCard {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapSm),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -419,15 +430,16 @@ internal fun GalleryStoryCard(
     unsaved: Boolean,
     onClick: () -> Unit,
 ) {
-    androidx.compose.material3.Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
-        color = if (selected) com.shenyan.designsystem.foundation.LocalSyColors.current.selected.copy(alpha=.22f)
-            else androidx.compose.ui.graphics.Color.Transparent,
-        modifier = Modifier.fillMaxWidth(),
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(DsShapes.row)
+            .background(if (selected) com.shenyan.designsystem.foundation.LocalSyColors.current.selected.copy(alpha = .22f)
+                else androidx.compose.ui.graphics.Color.Transparent)
+            .clickable(onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
@@ -466,27 +478,17 @@ internal fun GalleryStoryCard(
 }
 
 @Composable
-private fun ArchivedDialogueRow(
-    text: String,
-    onLongClick: () -> Unit,
-) {
-    androidx.compose.material3.Surface(
+private fun ArchivedDialogueRow(text: String, onLongClick: () -> Unit) {
+    Text(
+        text,
+        style = DsType.std14.withReadingWeight(),
+        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(
-                onClick = onLongClick,
-                onLongClick = onLongClick,
-            ),
-        shape = DsShapes.row,
-        color = androidx.compose.ui.graphics.Color.Transparent,
-    ) {
-        Text(
-            text,
-            style = DsType.small13.withReadingWeight(),
-            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
-            modifier = Modifier.padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapMd),
-        )
-    }
+            .clip(DsShapes.row)
+            .combinedClickable(onClick = onLongClick, onLongClick = onLongClick)
+            .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapMd),
+    )
 }
 
 @Composable
@@ -553,20 +555,46 @@ internal fun GalleryPill(text: String) {
 
 @Composable
 internal fun PersonaDetails(persona: PersonaProfile) {
-    val scalars = listOf(
-        stringResource(R.string.persona_v4_core_identity) to persona.coreIdentity,
-        stringResource(R.string.persona_field_franchise) to persona.franchise,
-    ).filter { it.second.isNotBlank() }
-    val details = persona.facts.filter { it.content.isNotBlank() }
-    if (scalars.isEmpty() && details.isEmpty() && persona.loreEntries.isEmpty()) return
-    SyGlassCard {
+    val identity = persona.coreIdentity
+    val franchise = persona.franchise
+    // UI 仅负责阅读顺序，不读取业务层的分类策略；历史事实和存储顺序不变。
+    val preferredOrder = listOf(
+        "personality", "valuesAndTradeoffs", "selfNarrative", "subjectiveBeliefs",
+        "identityGap", "preferencesAndHabits", "voiceStyle", "biography", "relationships",
+    )
+    val facts = persona.facts.filter { it.content.isNotBlank() }.sortedBy { fact ->
+        val index = preferredOrder.indexOf(fact.category)
+        when {
+            fact.category == "customFacts" -> 1000
+            index >= 0 -> index
+            else -> 900
+        }
+    }
+    if (identity.isBlank() && franchise.isBlank() && facts.isEmpty() && persona.loreEntries.isEmpty()) return
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+
+    // A readable character profile, not a transcript packed inside a second glass card.
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+    ) {
         Text(
             stringResource(R.string.persona_gallery_fixed_persona),
-            style = DsType.std14Strong.withReadingWeight(),
-            color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
+            style = DsType.base16Strong.withReadingWeight(),
+            color = colors.text,
         )
-        scalars.forEach { (title, value) -> PersonaDetailRow(title, value) }
-        details.forEach { fact ->
+        if (identity.isNotBlank()) {
+            PersonaDetailRow(stringResource(R.string.persona_v4_core_identity), identity)
+        }
+        var franchisePlaced = false
+        facts.forEach { fact ->
+            // 自定义内容最后展示，作品来源放在关系与自定义字段之间。
+            if (fact.category == "customFacts" && !franchisePlaced) {
+                if (franchise.isNotBlank()) {
+                    PersonaDetailRow(stringResource(R.string.persona_field_franchise), franchise)
+                }
+                franchisePlaced = true
+            }
             val labelRes = when (fact.category) {
                 "personality" -> R.string.persona_v4_personality
                 "selfNarrative" -> R.string.persona_v4_self_narrative
@@ -574,40 +602,35 @@ internal fun PersonaDetails(persona: PersonaProfile) {
                 "valuesAndTradeoffs" -> R.string.persona_v4_values_tradeoffs
                 "subjectiveBeliefs" -> R.string.persona_v4_subjective_beliefs
                 "biography" -> R.string.persona_v4_biography
-                "definingChoices" -> R.string.persona_v4_defining_choices
-                "emotionalImprints" -> R.string.persona_v4_emotional_imprints
-                "lifeGravity" -> R.string.persona_v4_life_gravity
-                "unfinishedBusiness" -> R.string.persona_v4_unfinished_business
+
                 "relationships" -> R.string.persona_v4_relationships
-                "limitsAndCosts" -> R.string.persona_v4_limits_costs
-                "sensorySignature" -> R.string.persona_v4_sensory_signature
+
                 "preferencesAndHabits" -> R.string.persona_v4_preferences_habits
                 "voiceStyle" -> R.string.persona_v4_voice_style
                 "customFacts" -> R.string.persona_v4_custom_facts
                 else -> null
             }
-            val provenanceLabel = when (fact.provenance) {
-                com.labteto.dshmobile.local.chat.CharacterFactProvenance.INFERRED ->
-                    stringResource(R.string.persona_v4_provenance_inferred)
-                com.labteto.dshmobile.local.chat.CharacterFactProvenance.UNVERIFIED ->
-                    stringResource(R.string.persona_v4_provenance_unverified)
-                com.labteto.dshmobile.local.chat.CharacterFactProvenance.CANON ->
-                    stringResource(R.string.persona_v4_provenance_canon)
-                com.labteto.dshmobile.local.chat.CharacterFactProvenance.USER_CREATED ->
-                    stringResource(R.string.persona_v4_provenance_user)
-            }
-            val storyStageLabel = stringResource(R.string.persona_v4_story_stage_label)
+            val provenanceInferred = stringResource(R.string.persona_v4_provenance_inferred)
+            val provenanceUnverified = stringResource(R.string.persona_v4_provenance_unverified)
+            val stageLabel = stringResource(R.string.persona_v4_story_stage_label)
             val sourceLabel = stringResource(R.string.persona_v4_fact_source)
-            val metadata = buildList {
-                add(provenanceLabel)
-                fact.temporalScope.takeIf(String::isNotBlank)?.let { add("$storyStageLabel：$it") }
+            val extra = buildList {
+                when (fact.provenance) {
+                    com.labteto.dshmobile.local.chat.CharacterFactProvenance.INFERRED -> add(provenanceInferred)
+                    com.labteto.dshmobile.local.chat.CharacterFactProvenance.UNVERIFIED -> add(provenanceUnverified)
+                    else -> Unit
+                }
+                fact.temporalScope.takeIf(String::isNotBlank)?.let { add(stageLabel + "：" + it) }
+                fact.sourceReference.takeIf(String::isNotBlank)?.let { add(sourceLabel + "：" + it) }
             }
-            val label = labelRes?.let { stringResource(it) } ?: fact.category
             PersonaDetailRow(
-                "$label · ${metadata.joinToString(" · ")}",
-                fact.content + fact.sourceReference.takeIf(String::isNotBlank)
-                    ?.let { "\n$sourceLabel：$it" }.orEmpty(),
+                title = labelRes?.let { stringResource(it) } ?: fact.category,
+                value = fact.content,
+                annotation = extra.joinToString(" · "),
             )
+        }
+        if (!franchisePlaced && franchise.isNotBlank()) {
+            PersonaDetailRow(stringResource(R.string.persona_field_franchise), franchise)
         }
         if (persona.loreEntries.isNotEmpty()) {
             PersonaDetailRow(
@@ -619,10 +642,21 @@ internal fun PersonaDetails(persona: PersonaProfile) {
 }
 
 @Composable
-private fun PersonaDetailRow(title: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(title, style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary)
-        Text(value, style = DsType.small13.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+private fun PersonaDetailRow(title: String, value: String, annotation: String = "") {
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapSm),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
+    ) {
+        Text(title, style = DsType.std14Strong.withReadingWeight(), color = colors.text)
+        Text(
+            value,
+            style = DsType.base16.copy(fontFamily = DsType.contentFont).withReadingWeight(),
+            color = colors.textSecondary,
+        )
+        if (annotation.isNotBlank()) {
+            Text(annotation, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+        }
     }
 }
 
@@ -735,23 +769,22 @@ internal fun suggestionKey(suggestion: PersonaAppendSuggestion): String =
 
 @Composable
 private fun personaFieldLabel(field: String): String = when (field) {
-    "identity" -> stringResource(R.string.persona_field_identity)
-    "background" -> stringResource(R.string.persona_field_background)
-    "personality" -> stringResource(R.string.persona_field_personality)
-    "speechStyle" -> stringResource(R.string.persona_field_speech_style)
-    "relationship" -> stringResource(R.string.persona_field_relationship)
-    "worldSetting" -> stringResource(R.string.persona_field_world_setting)
+    "coreIdentity" -> stringResource(R.string.persona_v4_core_identity)
+    "personality" -> stringResource(R.string.persona_v4_personality)
+    "valuesAndTradeoffs" -> stringResource(R.string.persona_v4_values_tradeoffs)
+    "selfNarrative" -> stringResource(R.string.persona_v4_self_narrative)
+    "subjectiveBeliefs" -> stringResource(R.string.persona_v4_subjective_beliefs)
+    "identityGap" -> stringResource(R.string.persona_v4_identity_gap)
+    "preferencesAndHabits" -> stringResource(R.string.persona_v4_preferences_habits)
+    "voiceStyle" -> stringResource(R.string.persona_v4_voice_style)
+    "biography" -> stringResource(R.string.persona_v4_biography)
+    "relationships" -> stringResource(R.string.persona_v4_relationships)
+    "customFacts" -> stringResource(R.string.persona_v4_custom_facts)
     "franchise" -> stringResource(R.string.persona_field_franchise)
     "timelinePosition" -> stringResource(R.string.persona_field_timeline)
-    "coreMotivations" -> stringResource(R.string.persona_field_motivations)
-    "valuePriorities" -> stringResource(R.string.persona_field_values)
-    "behaviorPatterns" -> stringResource(R.string.persona_field_behavior_patterns)
-    "internalContradictions" -> stringResource(R.string.persona_field_internal_contradictions)
     "knowledgeBoundary" -> stringResource(R.string.persona_field_knowledge_boundary)
     "hardConstraints" -> stringResource(R.string.persona_field_constraints)
-    "exampleDialogues" -> stringResource(R.string.persona_field_dialogues)
     "bannedPhrases" -> stringResource(R.string.persona_field_banned)
-    "signaturePhrases" -> stringResource(R.string.persona_field_signature)
     "corrections" -> stringResource(R.string.persona_field_corrections)
     else -> field
 }

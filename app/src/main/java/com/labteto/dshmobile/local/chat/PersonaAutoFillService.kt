@@ -44,8 +44,9 @@ internal fun mergeGeneratedCharacterFacts(
     previous: List<CharacterFact>,
     incoming: List<CharacterFact>,
 ): List<CharacterFact> {
-    val result = previous.toMutableList()
-    incoming.filter { it.category.isNotBlank() && it.content.isNotBlank() }.forEach { fact ->
+    val result = previous.filter { CharacterFactCategories.isSupported(it.category) }.toMutableList()
+    incoming.filter { CharacterFactCategories.isSupported(it.category) && it.content.isNotBlank() }
+        .forEach { fact ->
         val suggestion = fact.asModelSuggestion()
         // Stable IDs identify individual facts, not authority to rewrite their provenance.
         val index = result.indexOfFirst { it.id == suggestion.id }
@@ -516,7 +517,10 @@ class PersonaAutoFillService @Inject constructor(
             id = current.id,
             name = draft.name.ifBlank { current.name.ifBlank { "默认角色" } },
             coreIdentity = draft.coreIdentity.ifBlank { current.coreIdentity },
-            facts = mergeGeneratedCharacterFacts(current.facts, draft.facts),
+            facts = mergeGeneratedCharacterFacts(
+                current.facts,
+                draft.facts.filter { CharacterFactCategories.isSupported(it.category) },
+            ),
             franchise = draft.franchise.ifBlank { current.franchise },
             // V4 AI only writes canonical identity, facts and world-book; no new
             // legacy trait copies or runtime/correction overrides are generated here.
@@ -536,11 +540,10 @@ class PersonaAutoFillService @Inject constructor(
             name, franchise, coreIdentity, facts, loreEntries。
             facts是数组，每项含id、category、content，可选perspective、temporalScope、provenance、sourceReference、relatedFactIds。
             category推荐使用 personality、selfNarrative、identityGap、valuesAndTradeoffs、subjectiveBeliefs、
-            biography、definingChoices、emotionalImprints、lifeGravity、unfinishedBusiness、
-            relationships、limitsAndCosts、sensorySignature、preferencesAndHabits、voiceStyle、customFacts。
+            biography、relationships、preferencesAndHabits、voiceStyle、customFacts。
             provenance只允许 CANON、INFERRED、USER_CREATED、UNVERIFIED。
-            1. name与核心身份尽可能明确；身份、稳定性格、经历、重要关系、能力边界、核心价值优先。
-            2. 其它类别仅当有可靠信息才生成，禁止为了凑满16类编造秘密、创伤、未来成长和关系进度。
+            1. name与核心身份尽可能明确；身份、性格、经历、重要关系、核心价值优先。
+            2. 其它类别仅当有可靠信息才生成，禁止为了凑满类别编造秘密、创伤、未来成长和关系进度。
             3. 同一事实存一次；历史事件可以通过relatedFactIds关联其选择和影响，不重复复制长段落。
             4. 原作事实与推断、用户二创明确区分；不确定的设定可留空或标记UNVERIFIED。
             5. 人物资料只描写已有的人生事实、固有认知与偏好；当前情绪、成长、主动性、亲密度、

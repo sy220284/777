@@ -25,8 +25,9 @@ class PersonaTransferDocumentsTest {
     fun gameCanonFieldsAndWorldBookSurviveAllExportFormats() {
         val original = PersonaProfile(
             name = "神里绫华",
-            portrait = "社奉行神里家大小姐",
-            attentionKeywords = listOf("社奉行", "托马", "冰元素"),
+            coreIdentity = "社奉行神里家大小姐",
+            facts = listOf(CharacterFact("temperament", CharacterFactCategories.PERSONALITY,
+                "重礼仪也珍视朋友", provenance = CharacterFactProvenance.CANON)),
             franchise = "原神",
             timelinePosition = "稻妻主线已相识阶段",
             knowledgeBoundary = listOf("未经历的后续事件不知道"),
@@ -51,7 +52,8 @@ class PersonaTransferDocumentsTest {
                     exported.bytes, "角色.persona.${format.extension}",
                 )
                 val restored = PersonaTransferDocuments.decodeArchive(json, canonical).entry.persona
-                assertEquals(original.attentionKeywords, restored.attentionKeywords)
+                assertEquals(original.coreIdentity, restored.coreIdentity)
+                assertEquals(original.facts, restored.facts)
                 assertEquals(original.franchise, restored.franchise)
                 assertEquals(original.timelinePosition, restored.timelinePosition)
                 assertEquals(original.knowledgeBoundary, restored.knowledgeBoundary)
@@ -70,10 +72,10 @@ class PersonaTransferDocumentsTest {
                         content = "后来出现的另一座城市", keywords = listOf("城市"),
                         temporalScope = "act-2")),
                     facts = listOf(
-                        CharacterFact("choice", CharacterFactCategories.DEFINING_CHOICES,
+                        CharacterFact("choice", CharacterFactCategories.VALUES_AND_TRADEOFFS,
                             "决定辞职旅行", relatedFactIds = listOf("memory"),
                             provenance = CharacterFactProvenance.USER_CREATED),
-                        CharacterFact("memory", CharacterFactCategories.EMOTIONAL_IMPRINTS,
+                        CharacterFact("memory", CharacterFactCategories.BIOGRAPHY,
                             "第二幕发现一封旧信", perspective = "本人",
                             temporalScope = "act-2", provenance = CharacterFactProvenance.CANON,
                             sourceReference = "第二幕第三章"),
@@ -447,7 +449,7 @@ class PersonaTransferDocumentsTest {
         val subjectKey = "gallery:${prepared.entry.id}"
 
         gallery.save(
-            persona = PersonaProfile(name = "旁观者", portrait = "用于制造并发图集变更"),
+            persona = PersonaProfile(name = "旁观者", coreIdentity = "用于制造并发图集变更"),
             sourceSessionId = "",
             history = emptyList(),
             chatState = ChatCharacterState(),
@@ -478,7 +480,7 @@ class PersonaTransferDocumentsTest {
         val saved = source.save(
             persona = PersonaProfile(
                 name = "阿青",
-                portrait = "剑客，直接",
+                coreIdentity = "剑客，直接",
             ),
             sourceSessionId = "",
             history = emptyList(),
@@ -498,8 +500,8 @@ class PersonaTransferDocumentsTest {
         )
 
         assertEquals("阿青", imported.persona.name)
-        assertTrue(imported.persona.factText(CharacterFactCategories.BIOGRAPHY).contains("剑客"))
-        assertTrue(imported.persona.portrait.isEmpty())
+        assertEquals("剑客，直接", imported.persona.coreIdentity)
+        assertEquals("剑客，直接", imported.persona.coreIdentity)
         assertTrue(imported.stories.isEmpty())
     }
 
@@ -591,12 +593,20 @@ class PersonaTransferDocumentsTest {
             id = "gallery-lan",
             name = "小岚",
             coreIdentity = "旅行摄影师",
-            portrait = "旅行摄影师，爽快、细心，说话简短自然。",
-            lifeContext = "常年在沿海城市旅行。",
-            initialUserImpression = "和用户是多年朋友",
-            worldSetting = "现代城市",
-            coreValues = listOf("记录真实生活"),
-            stableTraits = listOf("答应的事会做到"),
+            facts = listOf(
+                CharacterFact("persona", CharacterFactCategories.PERSONALITY,
+                    "爽快、细心，答应的事会做到", provenance = CharacterFactProvenance.USER_CREATED),
+                CharacterFact("life", CharacterFactCategories.BIOGRAPHY,
+                    "常年在沿海城市旅行", provenance = CharacterFactProvenance.USER_CREATED),
+                CharacterFact("values", CharacterFactCategories.VALUES_AND_TRADEOFFS,
+                    "记录真实生活", provenance = CharacterFactProvenance.USER_CREATED),
+                CharacterFact("relations", CharacterFactCategories.RELATIONSHIPS,
+                    "和用户是多年朋友", provenance = CharacterFactProvenance.USER_CREATED),
+            ),
+            loreEntries = listOf(PersonaLoreEntry(
+                id = "city", title = "现代城市", content = "主要生活在现代城市",
+                keywords = listOf("城市"),
+            )),
             hardConstraints = listOf("不故意撒谎"),
         ),
         stories = listOf(
