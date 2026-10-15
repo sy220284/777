@@ -49,6 +49,7 @@ internal fun NextPersonaGallerySaveActions(port: PersonaGallerySaveUiPort, selec
 internal fun NextPersonaPortraitActions(port: PersonaPortraitUiPort, galleryId: String?,
     onChanged: suspend () -> Unit, onFeedback: (String) -> Unit) {
     var pending by remember { mutableStateOf(false) }
+    var previewTarget by rememberSaveable { mutableStateOf<String?>(null) }
     var pickingTarget by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmRemove by remember(galleryId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -70,6 +71,9 @@ internal fun NextPersonaPortraitActions(port: PersonaPortraitUiPort, galleryId: 
             finally { pending = false }
         }
     }
+    previewTarget?.let { target ->
+        key(target) { NextPersonaPortraitPreview(port, target) { previewTarget = null } }
+    }
     val pick = rememberUiAttachmentPicker { uri ->
         val captured = pickingTarget
         pickingTarget = null
@@ -79,6 +83,9 @@ internal fun NextPersonaPortraitActions(port: PersonaPortraitUiPort, galleryId: 
         else submit(PersonaPortraitUiCommand.Import(captured, uri))
     }
     Row(Modifier.horizontalScroll(rememberScrollState())) {
+        TextButton(onClick = { previewTarget = galleryId }, enabled = !pending && galleryId != null) {
+            Text(stringResource(R.string.next_gallery_portrait_preview))
+        }
         TextButton(onClick = {
             pickingTarget = galleryId
             try { pick() }

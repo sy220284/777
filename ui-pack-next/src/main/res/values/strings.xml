@@ -276,4 +276,20 @@
     <string name="next_invocations_search">搜索连接器和技能</string>
     <string name="next_gallery_manage">导入与管理档案</string>
     <string name="next_gallery_manage_persona">故事、立绘与档案管理</string>
+    <string name="next_gallery_history">查看故事记录</string>
+    <string name="next_gallery_history_count">本页 %1$d 条，共 %2$d 条记录</string>
+    <string name="next_gallery_history_latest">重新读取最新记录</string>
+    <string name="next_gallery_history_older">更早的记录</string>
+    <string name="next_gallery_history_stale">故事记录已发生变化，请重新读取最新记录。</string>
+    <string name="next_gallery_history_missing">人物或故事已不存在。</string>
+    <string name="next_gallery_history_user">你</string>
+    <string name="next_gallery_history_persona">人物</string>
+    <string name="next_gallery_history_delete">删除这条归档记录</string>
+    <string name="next_gallery_history_delete_confirm">确认删除这条记录</string>
+    <string name="next_gallery_history_delete_effect">仅删除此人物故事中的这条归档记录，不会删除正在聊天的会话消息。此操作无法撤销。</string>
+    <string name="next_gallery_history_deleted">归档记录已删除，已重新读取最新记录。</string>
+    <string name="next_gallery_portrait_preview">预览人物立绘</string>
+    <string name="next_gallery_portrait_missing">暂时没有可预览的立绘。</string>
+    <string name="next_gallery_portrait_invalid">立绘无法解码，请重新导入图片。</string>
+    <string name="next_gallery_history_system">系统记录</string>
 </resources>

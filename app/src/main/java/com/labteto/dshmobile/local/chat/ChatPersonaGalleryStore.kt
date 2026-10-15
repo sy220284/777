@@ -12,12 +12,18 @@ import kotlinx.serialization.json.Json
 import com.labteto.dshmobile.uicontract.PersonaGalleryUiPort
 import com.labteto.dshmobile.uicontract.PersonaGalleryUiCommand
 import com.labteto.dshmobile.uicontract.UiCommandReceipt
+import com.labteto.dshmobile.uicontract.UiMessageSnapshot
+import com.labteto.dshmobile.uicontract.UiMessageRole
+import com.labteto.dshmobile.uicontract.UiPersonaGalleryHistoryPage
+import com.labteto.dshmobile.uicontract.UiPersonaGalleryHistoryReceipt
 import com.labteto.dshmobile.uicontract.UiPersonaGalleryEntry
 import com.labteto.dshmobile.uicontract.UiPersonaGalleryStory
 import com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.coroutineContext
 
 @Singleton
 class ChatPersonaGalleryStore internal constructor(
@@ -49,6 +55,47 @@ class ChatPersonaGalleryStore internal constructor(
         } catch (failure: Exception) {
             UiPersonaGalleryReadReceipt.Failed(failure.message)
         }
+    }
+
+    @Serializable
+    private data class HistoryCursor(val galleryId: String, val storyId: String,
+        val revision: Long, val offset: Long, val length: Long, val modified: Long)
+
+    override suspend fun history(galleryId: String, storyId: String, cursor: String?): UiPersonaGalleryHistoryReceipt =
+        withContext(Dispatchers.IO) {
+            val requestContext = coroutineContext
+            try { readHistoryForUi(galleryId, storyId, cursor) { requestContext.ensureActive() } }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { UiPersonaGalleryHistoryReceipt.Failed(failure.message) }
+        }
+
+    @Synchronized
+    private fun readHistoryForUi(galleryId: String, storyId: String, cursor: String?, checkActive: () -> Unit): UiPersonaGalleryHistoryReceipt {
+        checkActive()
+        val entry = readNormalized().entries.firstOrNull { it.id == galleryId }
+            ?: return UiPersonaGalleryHistoryReceipt.Missing
+        val story = entry.stories.firstOrNull { it.id == storyId }
+            ?: return UiPersonaGalleryHistoryReceipt.Missing
+        val before = cursor?.let {
+            val decoded = runCatching { json.decodeFromString(HistoryCursor.serializer(), it) }.getOrNull()
+                ?: return UiPersonaGalleryHistoryReceipt.Stale
+            if (decoded.galleryId != galleryId || decoded.storyId != storyId || decoded.revision != story.updatedAt)
+                return UiPersonaGalleryHistoryReceipt.Stale
+            decoded
+        }
+        val page = history.pageBefore(entry, storyId, before?.offset, before?.length, before?.modified, checkActive)
+            ?: return UiPersonaGalleryHistoryReceipt.Stale
+        val next = page.nextOffset?.let {
+            json.encodeToString(HistoryCursor.serializer(), HistoryCursor(galleryId, storyId, story.updatedAt, it, page.archiveLength, page.archiveModified))
+        }
+        return UiPersonaGalleryHistoryReceipt.Available(UiPersonaGalleryHistoryPage(
+            page.messages.map { message -> UiMessageSnapshot(galleryMessageArchiveKey(message),
+                when (message.role) {
+                    "user" -> UiMessageRole.USER
+                    "assistant" -> UiMessageRole.ASSISTANT
+                    "tool" -> UiMessageRole.TOOL
+                    else -> UiMessageRole.SYSTEM
+                }, message.content, message.createdAt) }, page.totalCount, next))
     }
 
     override suspend fun submit(command: PersonaGalleryUiCommand): UiCommandReceipt = withContext(Dispatchers.IO) {

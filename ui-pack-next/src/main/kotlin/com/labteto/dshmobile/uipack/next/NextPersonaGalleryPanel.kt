@@ -46,6 +46,8 @@ internal fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: Pers
     var stage by rememberSaveable { mutableStateOf("") }
     var confirmDelete by remember(port) { mutableStateOf(false) }
     var deletingEntry by rememberSaveable { mutableStateOf<String?>(null) }
+    var historyGallery by rememberSaveable { mutableStateOf<String?>(null) }
+    var historyStory by rememberSaveable { mutableStateOf<String?>(null) }
     var pending by remember(port) { mutableStateOf(false) }
     var feedback by remember(port) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -109,6 +111,16 @@ internal fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: Pers
         }
     }
     LaunchedEffect(port) { pending = true; try { read() } finally { pending = false } }
+    if (historyGallery != null && historyStory != null) {
+        key(historyGallery, historyStory) {
+            NextPersonaHistoryDialog(port, historyGallery!!, historyStory!!, onClose = {
+                historyGallery = null; historyStory = null
+                pending = true
+                scope.launch { try { read() } finally { pending = false } }
+            })
+        }
+        return
+    }
     AlertDialog(onDismissRequest = { if (!pending) close() }, title = { Text(stringResource(R.string.next_gallery_archive)) },
         text = { LazyColumn(Modifier.heightIn(max = 360.dp)) {
             item { feedback?.let { Text(it) }; selection?.unavailableReason?.let { Text(it) } }
@@ -156,6 +168,9 @@ internal fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: Pers
                 items(entry.stories, key = { "story:${entry.id}:${it.id}" }) { story ->
                     TextButton(onClick = { selectedGallery = entry.id; selectedStory = story.id; title = story.title; notes = story.notes; stage = story.storyStage; confirmDelete = false }, enabled = !pending) {
                         Text(stringResource(R.string.next_gallery_story_summary, story.title, story.messageCount))
+                    }
+                    TextButton(onClick = { historyGallery = entry.id; historyStory = story.id }, enabled = !pending) {
+                        Text(stringResource(R.string.next_gallery_history))
                     }
                     selection?.identity?.let { identity ->
                         TextButton(onClick = { submitSelection(PersonaSelectionUiCommand.StartStory(identity, entry.id, story.id, false)) },

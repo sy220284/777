@@ -1,8 +1,8 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1645,
-  "production_source_count": 957,
+  "repository_code_file_count": 1647,
+  "production_source_count": 959,
   "test_code_file_count": 543,
   "workflow_files": [
     ".github/workflows/capture-readme-ui.yml",
@@ -582,7 +582,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaGalleryStore.kt",
-      "sha256": "252b0f91c85dbc2d"
+      "sha256": "22f26a1721eb06ae"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaStore.kt",
@@ -882,7 +882,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalPersonaPortraitOwner.kt",
-      "sha256": "28487b68fe05e247"
+      "sha256": "24f79524ccbefa0a"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalPersonaTransferOwner.kt",
@@ -930,11 +930,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaGalleryHistoryCoordinator.kt",
-      "sha256": "17c9ecf13adf9c93"
+      "sha256": "a07ea60a7a6e91d1"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaGalleryHistoryStore.kt",
-      "sha256": "d8cc6a2835f87e81"
+      "sha256": "cde741304daf2a61"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaGalleryImportPlanner.kt",
@@ -3638,11 +3638,11 @@
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/PersonaGalleryUiPort.kt",
-      "sha256": "73b3bb464c8988e5"
+      "sha256": "71c7819feb2fdac7"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/PersonaPortraitUiPort.kt",
-      "sha256": "bf37d97ed82301d3"
+      "sha256": "10c8449c7fefc318"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/PersonaSelectionUiPort.kt",
@@ -3786,15 +3786,23 @@
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextPersonaGalleryMaintenance.kt",
-      "sha256": "a451132e45f296f8"
+      "sha256": "24c2a72dcbf4aa57"
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextPersonaGalleryPanel.kt",
-      "sha256": "dd58664876b334f4"
+      "sha256": "19536bc45a5fef17"
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextPersonaGalleryScene.kt",
       "sha256": "832a0d288772721f"
+    },
+    {
+      "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextPersonaHistoryDialog.kt",
+      "sha256": "095301d771227f16"
+    },
+    {
+      "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextPersonaPortraitPreview.kt",
+      "sha256": "2ee4578e71a52ed8"
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextPersonaTransferActions.kt",
@@ -3890,31 +3898,15 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "660069f6bdef",
+  "source_snapshot": "fd56092dc27a",
   "observed_delta": {
-    "baseline": "79fc061afd9b",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalPersonaAuthoringUiProjection.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextInvocationPicker.kt"
-    ],
+    "baseline": "d8b5f99b64a8",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDirectTurnExecutor.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalPersonaAuthoringOwner.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalComposerInvocationUiAdapter.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalApplicationUiHost.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalConversationSliceHost.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaGalleryUiController.kt",
-      "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/ConversationUiPack.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextApplicationScenePack.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationUiPack.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextPersonaGalleryMaintenance.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextPersonaGalleryPanel.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextPersonaGalleryScene.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextPersonaTransferActions.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaGalleryStore.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaGalleryHistoryCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaGalleryHistoryStore.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

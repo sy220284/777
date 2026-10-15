@@ -21,6 +21,12 @@ internal class PersonaGalleryHistoryCoordinator(
         return store.tail(entry.id, storyId, limit)
     }
 
+    fun pageBefore(entry: PersonaGalleryEntry, storyId: String, before: Long?,
+        expectedLength: Long?, expectedModified: Long?, checkActive: () -> Unit): PersonaGalleryHistoryPage? {
+        require(entry.stories.any { it.id == storyId }) { "人物故事不存在" }
+        return store.pageBefore(entry.id, storyId, before, expectedLength, expectedModified, checkActive)
+    }
+
     fun hydrate(entry: PersonaGalleryEntry): PersonaGalleryEntry = entry.copy(
         stories = entry.stories.map { story ->
             story.copy(

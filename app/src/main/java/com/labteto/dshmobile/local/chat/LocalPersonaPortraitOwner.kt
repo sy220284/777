@@ -7,6 +7,8 @@ import android.webkit.MimeTypeMap
 import com.labteto.dshmobile.uicontract.PersonaPortraitUiCommand
 import com.labteto.dshmobile.uicontract.PersonaPortraitUiPort
 import com.labteto.dshmobile.uicontract.UiPersonaPortraitReceipt
+import com.labteto.dshmobile.uicontract.UiPersonaPortraitPreviewReceipt
+import java.io.ByteArrayOutputStream
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.UUID
@@ -27,6 +29,33 @@ class LocalPersonaPortraitOwner @Inject constructor(
     private val gallery: ChatPersonaGalleryStore,
 ) : PersonaPortraitUiPort {
     override val maxImportBytes: Long get() = MAX_PERSONA_PORTRAIT_BYTES
+    override suspend fun preview(galleryId: String): UiPersonaPortraitPreviewReceipt = withContext(Dispatchers.IO) {
+        try {
+            val path = gallery.findEntry(galleryId)?.portraitPath?.takeIf(String::isNotBlank)
+                ?: return@withContext UiPersonaPortraitPreviewReceipt.Missing
+            val root = File(context.filesDir, "local-harness/chat/persona-portraits").canonicalFile
+            val image = File(path).canonicalFile
+            require(image.parentFile == root) { "人物立绘不在受管理的图片目录" }
+            if (!image.isFile) return@withContext UiPersonaPortraitPreviewReceipt.Missing
+            val bytes = image.inputStream().use { input ->
+                val output = ByteArrayOutputStream()
+                val buffer = ByteArray(16 * 1024)
+                while (true) {
+                    coroutineContext.ensureActive()
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    require(output.size().toLong() + count <= maxImportBytes) { "人物立绘超过允许的图片大小" }
+                    output.write(buffer, 0, count)
+                }
+                output.toByteArray()
+            }
+            if (gallery.findEntry(galleryId)?.portraitPath != path)
+                UiPersonaPortraitPreviewReceipt.Failed("人物立绘已变化，请重新打开预览")
+            else UiPersonaPortraitPreviewReceipt.Ready(bytes)
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) { UiPersonaPortraitPreviewReceipt.Failed(failure.message) }
+    }
+
     override suspend fun submit(command: PersonaPortraitUiCommand): UiPersonaPortraitReceipt = withContext(Dispatchers.IO) {
         var target: File? = null
         try {

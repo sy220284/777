@@ -39,7 +39,23 @@ sealed interface PersonaGalleryUiCommand {
     ) : PersonaGalleryUiCommand
 }
 
+data class UiPersonaGalleryHistoryPage(
+    val messages: List<UiMessageSnapshot>,
+    val totalCount: Int,
+    val olderCursor: String?,
+)
+sealed interface UiPersonaGalleryHistoryReceipt {
+    data class Available(val page: UiPersonaGalleryHistoryPage) : UiPersonaGalleryHistoryReceipt
+    data object Missing : UiPersonaGalleryHistoryReceipt
+    /** The archive changed; reload its latest page rather than replaying an old cursor. */
+    data object Stale : UiPersonaGalleryHistoryReceipt
+    data class Failed(val message: String?) : UiPersonaGalleryHistoryReceipt
+}
+
 interface PersonaGalleryUiPort {
+    /** Owner-issued opaque cursor; each response is a bounded page, oldest message first. */
+    suspend fun history(galleryId: String, storyId: String, cursor: String? = null): UiPersonaGalleryHistoryReceipt =
+        UiPersonaGalleryHistoryReceipt.Failed(null)
     suspend fun read(): UiPersonaGalleryReadReceipt
     suspend fun submit(command: PersonaGalleryUiCommand): UiCommandReceipt
 }
