@@ -19,6 +19,7 @@ internal object ChatDiaryEntryPolicy {
             innerThought = raw.innerThought.trim().take(ChatDiaryBounds.MAX_THOUGHT_CHARS),
             relationshipMeaning = raw.relationshipMeaning.trim().take(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS),
             unresolvedEcho = raw.unresolvedEcho.trim().take(ChatDiaryBounds.MAX_ECHO_CHARS),
+            privateReflection = sanitizePrivateReflection(raw.privateReflection),
             importance = importance,
             disclosure = raw.disclosure.trim().uppercase(),
             recallAnchors = raw.recallAnchors.map { it.trim().take(80) }
@@ -26,6 +27,17 @@ internal object ChatDiaryEntryPolicy {
             subjectiveEvidence = raw.subjectiveEvidence.trim().take(400)
                 .takeIf { it.isNotBlank() && request.characterEvidenceText.contains(it) }.orEmpty(),
         )
+    }
+
+    /**
+     * A model-authored diary voice is a subjective reading of grounded events, never
+     * permission to introduce a new event or leak internal model/product terminology.
+     */
+    private fun sanitizePrivateReflection(raw: String): String {
+        val prose = raw.trim()
+        if (prose.length > ChatDiaryBounds.MAX_PRIVATE_REFLECTION_CHARS) return ""
+        if (listOf("用户", "模型", "系统提示", "AI助手", "作为角色").any(prose::contains)) return ""
+        return prose
     }
 
     fun disclosureFor(request: ChatDiaryWriteRequest, delta: ChatDiaryDelta): ChatDiaryDisclosure {
@@ -91,6 +103,7 @@ internal object ChatDiaryEntryPolicy {
                     innerThought = entry.innerThought,
                     relationshipMeaning = entry.relationshipMeaning,
                     unresolvedEcho = entry.unresolvedEcho,
+                    privateReflection = entry.privateReflection,
                     recallAnchors = entry.recallAnchors,
                     subjectiveEvidence = entry.subjectiveEvidence,
                     subjectiveInferred = entry.subjectiveInferred,
@@ -115,6 +128,7 @@ internal object ChatDiaryEntryPolicy {
             innerThought = current.innerThought.take(ChatDiaryBounds.MAX_THOUGHT_CHARS),
             relationshipMeaning = current.relationshipMeaning.take(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS),
             unresolvedEcho = current.unresolvedEcho.take(ChatDiaryBounds.MAX_ECHO_CHARS),
+            privateReflection = current.privateReflection,
             recallAnchors = current.recallAnchors,
             subjectiveEvidence = current.subjectiveEvidence,
             subjectiveInferred = current.subjectiveInferred,
