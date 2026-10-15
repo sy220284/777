@@ -50,7 +50,7 @@ import androidx.compose.ui.window.DialogProperties
 /**
  * V5: mobile bottom sheet, tablet/desktop right-side panel.
  * Controlled callbacks only: approvals stay caller-owned, no implicit acceptance on dismiss.
- * Ordinary sheets share the aligned scene by default; risk/destructive confirmations opt into an explicit L4 overlay. 
+ * Ordinary sheets share the aligned scene by default; risk/destructive confirmations opt into an explicit L4 overlay.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
