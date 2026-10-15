@@ -4,9 +4,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
@@ -404,11 +402,12 @@ private fun TaskEmptyState(
                     )
                 }
             }
-            if (onCreateViaChat != null) SyMaterialSurface(
+            if (onCreateViaChat != null) Surface(
                 onClick = onCreateViaChat,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                tier = SyMaterialTier.L1_SECTION,
+                color = androidx.compose.ui.graphics.Color.Transparent,
                 shape = RoundedCornerShape(SyMetric.radiusControl),
+                border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(SyMetric.gapLg)) {
                     Text(
