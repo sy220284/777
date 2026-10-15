@@ -215,8 +215,8 @@ private fun NextDocumentMediaNode(node: UiDocumentNode.Media, sessionId: String)
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(node.label)
-        if (asset?.localPath != null) NextDocumentMediaSaveButton(media, node, sessionId, asset.localPath)
         val path = asset?.localPath
+        if (path != null) NextDocumentMediaSaveButton(media, node, sessionId, path)
         if (path == null) {
             Text("媒体尚未保存在本机，或无权访问这条会话的媒体成果")
         } else when (node.kind) {
