@@ -99,7 +99,7 @@ class PersonaGalleryDetailActionsTest {
         }
         val row = compose.onNodeWithTag("personaGalleryEntry_${entry.id}").assertIsDisplayed()
         assertTrue("V6 gallery must use compact rows, not large artwork cards",
-            row.getUnclippedBoundsInRoot().height.value < 110f)
+            row.getUnclippedBoundsInRoot().let { (it.bottom - it.top).value < 110f })
         row.performClick()
         compose.runOnIdle { assertEquals(entry.id, opened) }
     }
