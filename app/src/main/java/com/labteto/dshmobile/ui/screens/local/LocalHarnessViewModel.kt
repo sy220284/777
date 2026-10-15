@@ -312,7 +312,7 @@ class LocalHarnessViewModel @Inject constructor(
                 LocalUsageMode.CHAT -> chatUiPort.submit(com.labteto.dshmobile.uicontract.ChatUiCommand.EditUserMessage(identity, messageId, text))
             }
             when (receipt) {
-                is com.labteto.dshmobile.uicontract.UiCommandReceipt.MessageEdited -> receipt.result
+                is com.labteto.dshmobile.uicontract.UiCommandReceipt.MessageEdited -> receipt.result.toLegacyMessageEditResult()
                 else -> LocalChatUserEditResult.UNAVAILABLE
             }
         }
@@ -444,4 +444,23 @@ class LocalHarnessViewModel @Inject constructor(
         chatModelAssistController.autoFillCurrentPersona(description)
     fun switchSession(sessionId: String): Boolean = sessionUiPort.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.Open(sessionId)) == com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued
     fun clearCredential() = runtime.model.clearCredential()
+}
+
+/**
+ * V6 compatibility only. Next uses the neutral UiMessageEditOutcome and does not import
+ * the Session-domain enum. Exhaustive translation preserves durable-edit partial success.
+ */
+private fun com.labteto.dshmobile.uicontract.UiMessageEditOutcome.toLegacyMessageEditResult():
+    com.labteto.dshmobile.local.session.LocalUserMessageEditResult = when (this) {
+    com.labteto.dshmobile.uicontract.UiMessageEditOutcome.SENT -> com.labteto.dshmobile.local.session.LocalUserMessageEditResult.SENT
+    com.labteto.dshmobile.uicontract.UiMessageEditOutcome.COMMITTED_NOT_STARTED -> com.labteto.dshmobile.local.session.LocalUserMessageEditResult.COMMITTED_NOT_STARTED
+    com.labteto.dshmobile.uicontract.UiMessageEditOutcome.BUSY -> com.labteto.dshmobile.local.session.LocalUserMessageEditResult.BUSY
+    com.labteto.dshmobile.uicontract.UiMessageEditOutcome.UNAVAILABLE -> com.labteto.dshmobile.local.session.LocalUserMessageEditResult.UNAVAILABLE
+    com.labteto.dshmobile.uicontract.UiMessageEditOutcome.WRONG_MODE -> com.labteto.dshmobile.local.session.LocalUserMessageEditResult.WRONG_MODE
+    com.labteto.dshmobile.uicontract.UiMessageEditOutcome.UNCONFIGURED -> com.labteto.dshmobile.local.session.LocalUserMessageEditResult.UNCONFIGURED
+    com.labteto.dshmobile.uicontract.UiMessageEditOutcome.HISTORY_UNAVAILABLE -> com.labteto.dshmobile.local.session.LocalUserMessageEditResult.HISTORY_UNAVAILABLE
+    com.labteto.dshmobile.uicontract.UiMessageEditOutcome.MESSAGE_MISSING -> com.labteto.dshmobile.local.session.LocalUserMessageEditResult.MESSAGE_MISSING
+    com.labteto.dshmobile.uicontract.UiMessageEditOutcome.EMPTY -> com.labteto.dshmobile.local.session.LocalUserMessageEditResult.EMPTY
+    com.labteto.dshmobile.uicontract.UiMessageEditOutcome.UNCHANGED -> com.labteto.dshmobile.local.session.LocalUserMessageEditResult.UNCHANGED
+    com.labteto.dshmobile.uicontract.UiMessageEditOutcome.FAILED -> com.labteto.dshmobile.local.session.LocalUserMessageEditResult.FAILED
 }
