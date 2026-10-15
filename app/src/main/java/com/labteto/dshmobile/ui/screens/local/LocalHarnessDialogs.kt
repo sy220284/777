@@ -592,12 +592,6 @@ internal fun ChatPersonaDialog(
             "selfNarrative" to R.string.persona_v4_self_narrative,
             "identityGap" to R.string.persona_v4_identity_gap,
             "subjectiveBeliefs" to R.string.persona_v4_subjective_beliefs,
-            "definingChoices" to R.string.persona_v4_defining_choices,
-            "emotionalImprints" to R.string.persona_v4_emotional_imprints,
-            "lifeGravity" to R.string.persona_v4_life_gravity,
-            "unfinishedBusiness" to R.string.persona_v4_unfinished_business,
-            "limitsAndCosts" to R.string.persona_v4_limits_costs,
-            "sensorySignature" to R.string.persona_v4_sensory_signature,
             "preferencesAndHabits" to R.string.persona_v4_preferences_habits,
             "voiceStyle" to R.string.persona_v4_voice_style,
             "customFacts" to R.string.persona_v4_custom_facts,
@@ -630,7 +624,15 @@ internal fun ChatPersonaDialog(
             .forEach { category ->
                 PersonaFactCategoryEditor(
                     category = category,
-                    title = category,
+                    title = when (category) {
+                        "definingChoices" -> stringResource(R.string.persona_v4_defining_choices)
+                        "emotionalImprints" -> stringResource(R.string.persona_v4_emotional_imprints)
+                        "lifeGravity" -> stringResource(R.string.persona_v4_life_gravity)
+                        "unfinishedBusiness" -> stringResource(R.string.persona_v4_unfinished_business)
+                        "limitsAndCosts" -> stringResource(R.string.persona_v4_limits_costs)
+                        "sensorySignature" -> stringResource(R.string.persona_v4_sensory_signature)
+                        else -> category
+                    },
                     facts = factDrafts,
                     onChange = { factDrafts = it },
                 )
