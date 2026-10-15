@@ -65,6 +65,16 @@ object LocalToolCatalog {
         add(tool("job_kill", "停止一个后台任务", properties(
             "job_id" to string("后台任务编号"),
         ), listOf("job_id")))
+        add(tool("media_image_options", "列出当前已配置且有真实 API Key 的图像创作服务和精确 offer_id；不会收费", properties()))
+        add(tool("media_image_create", "使用明确 offer_id 的已配置媒体 API 提交图片生成或原图编辑；每次收费调用须经原有权限审批；返回真实异步回执编号，不代表已完成", properties(
+            "offer_id" to string("必须来自 media_image_options，不能猜测或跨账户替换"),
+            "prompt" to string("用户要求的图像内容或基于真实原图的修改指令"),
+            "ratio" to string("图片比例，如 1:1 或 16:9；可选，默认 1:1"),
+            "edit_source_image_id" to string("可选；当前会话已保存图片的 ID；原图编辑仅限服务商真实支持的 API"),
+        ), listOf("offer_id", "prompt")))
+        add(tool("media_image_status", "按任务 ID 查询当前会话已提交的真实图片生成回执与成果；不触发新的付费调用", properties(
+            "job_id" to string("media_image_create 返回的任务 ID"),
+        ), listOf("job_id")))
         add(tool("web_search", "搜索最新公开网页信息；默认使用免密公共搜索，连接失败时可使用已配置的 DeepSeek 备用通道", properties(
             "queries" to buildJsonObject {
                 put("type", "array")

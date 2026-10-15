@@ -23,10 +23,10 @@ class LocalSkillStoreTest {
     fun bundledSkillsAreRealInvocableInstructions() = inWorkspace { store, workspace, _ ->
         store.seedOnce()
         val all = store.presets().filterNot { it.id in LocalMiniMaxSkillCatalog.entries.map { item -> item.id } }
-        assertEquals(8, all.size)
+        assertEquals(9, all.size)
         assertTrue(all.all { it.installed })
-        assertEquals(8, all.map { it.id }.distinct().size)
-        assertEquals(8, store.installed().size)
+        assertEquals(9, all.map { it.id }.distinct().size)
+        assertEquals(9, store.installed().size)
         for (preset in all) {
             val content = workspace.readModelSkill(preset.id)
             assertTrue(content.contains("description:"))
@@ -117,12 +117,12 @@ class LocalSkillStoreTest {
     }
 
     @Test
-    fun installedOfficialPresetsRefreshWhileRemovedOnesStayRemoved() = inWorkspace { store, workspace, _ ->
+    fun customizedOfficialPresetsStayEditedWhileRemovedOnesStayRemoved() = inWorkspace { store, workspace, _ ->
         store.seedOnce()
         store.updateDocument("code-review", store.readDocument("code-review") + "\n用户自定义后续规则\n")
         store.remove("research-check")
         store.seedOnce()
-        assertFalse(store.readDocument("code-review").contains("用户自定义后续规则"))
+        assertTrue(store.readDocument("code-review").contains("用户自定义后续规则"))
         assertTrue(store.readDocument("code-review").contains("用途："))
         assertFalse(workspace.skills().contains("research-check"))
     }
@@ -135,7 +135,7 @@ class LocalSkillStoreTest {
         store.updateDocument("code-review", store.readDocument("code-review") + "\n旧附加说明\n")
         store.seedOnce()
         assertFalse(store.installed().first { it.name == "code-review" }.modelInvocable)
-        assertFalse(store.readDocument("code-review").contains("旧附加说明"))
+        assertTrue(store.readDocument("code-review").contains("旧附加说明"))
         assertTrue(store.readDocument("code-review").contains("用途："))
     }
 
@@ -161,6 +161,31 @@ class LocalSkillStoreTest {
         val prompt = com.labteto.dshmobile.local.work.resolveLocalWorkSkillGuidance(workspace, "@skill:long-rules\n执行")
         assertTrue(prompt.contains("禁止删除原始文件"))
         assertEquals("完整读取", store.installed().single().description)
+    }
+
+    @Test fun untouchedOfficialPresetRefreshesWhenBundledRuleChanges() = inWorkspace { store, workspace, root ->
+        store.seedOnce()
+        val current = store.readDocument("code-review")
+        val baseline = root.resolve(".dsh/skills/code-review/.bundled-baseline-sha256")
+        assertTrue(baseline.isFile)
+        // Simulate an older upstream release: content and its recorded hash agree.
+        val previous = current.replace("代码审查", "旧版审查")
+        workspace.write(".dsh/skills/code-review/SKILL.md", previous)
+        val checksum = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(previous.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        baseline.writeText(checksum + "\n")
+        store.seedOnce()
+        assertEquals(current, store.readDocument("code-review"))
+    }
+
+    @Test fun unknownLegacyEditsAreNotSilentlyReplaced() = inWorkspace { store, workspace, root ->
+        store.seedOnce()
+        root.resolve(".dsh/skills/code-review/.bundled-baseline-sha256").delete()
+        val edited = store.readDocument("code-review") + "\n旧版本用户自己的规则\n"
+        workspace.write(".dsh/skills/code-review/SKILL.md", edited)
+        store.seedOnce()
+        assertEquals(edited.trimEnd() + "\n", store.readDocument("code-review"))
     }
 
     @Test fun oversizedOfficialSkillIsRepairedFromBundledVersion() = inWorkspace { store, workspace, root ->

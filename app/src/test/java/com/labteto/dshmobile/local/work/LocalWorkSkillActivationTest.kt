@@ -60,6 +60,17 @@ class LocalWorkSkillActivationTest {
     }
 
     @Test
+    fun genericImageRoutesToUnifiedSkillWithoutDuplicateMiniMaxGuide() {
+        val generic = relevantSkillIdsForTask("帮我生成图片")
+        assertTrue("imagegen" in generic)
+        assertFalse("minimax-media" in generic)
+        val named = relevantSkillIdsForTask("用 MiniMax 生成图片")
+        assertTrue("imagegen" in named)
+        assertTrue("minimax-media" in named)
+        assertTrue("minimax-media" in relevantSkillIdsForTask("生成视频"))
+    }
+
+    @Test
     fun ordinaryWorkPromptOffersDiscoveryWithoutForcingSkill() {
         val root = Files.createTempDirectory("skill-catalog").toFile()
         try {

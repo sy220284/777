@@ -21,6 +21,7 @@ class LocalToolCatalogTest {
                 setOf(
                     "read", "file_inspect", "write", "edit", "apply_patch", "glob", "grep", "bash", "job_list",
                     "web_search", "web_fetch", "http_request", "download_file", "json_query",
+                    "media_image_options", "media_image_create", "media_image_status",
                     "network_diagnose", "environment_info", "capability_search",
                     "skill", "todo_write", "create_goal",
                     "ask_user_question", "subagent", "subagent_fork", "workflow",
