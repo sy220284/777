@@ -6,18 +6,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PersonaCanonicalV4Test {
-    @Test fun legacyOnlyCardDoesNotRegenerateFactsOrWorldBook() {
-        val old = PersonaProfile(
-            name = "晴川", portrait = "少年时是制琴师",
-            lifeContext = "每天修琴", quirks = listOf("喜欢浓茶"),
-            worldSetting = "世界存在浮空岛", coreValues = listOf("守住承诺"),
-        )
-        val normalized = old.canonicalV4()
+    @Test fun retiredJsonPropertiesDoNotReturnAfterDecodingAndSerializing() {
+        val json = kotlinx.serialization.json.Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = true
+        }
+        val legacyJson = """{"name":"晴川","portrait":"制琴师","lifeContext":"每天修琴",
+            "quirks":["喜欢浓茶"],"worldSetting":"浮空岛","coreValues":["守诺"]}"""
+        val decoded = json.decodeFromString(PersonaProfile.serializer(), legacyJson)
+        val normalized = decoded.canonicalV4()
         assertTrue(normalized.facts.isEmpty())
         assertTrue(normalized.loreEntries.isEmpty())
-        assertTrue(normalized.portrait.isBlank())
-        assertTrue(normalized.worldSetting.isBlank())
-        assertTrue(normalized.coreValues.isEmpty())
+        assertTrue(normalized.coreIdentity.isEmpty())
+        val exported = json.encodeToString(PersonaProfile.serializer(), normalized)
+        listOf("portrait", "lifeContext", "quirks", "worldSetting", "coreValues")
+            .forEach { assertFalse(exported.contains("\"$it\"")) }
         assertEquals(normalized, normalized.canonicalV4())
     }
 
@@ -31,11 +34,11 @@ class PersonaCanonicalV4Test {
         val current = CharacterFact("present", CharacterFactCategories.PERSONALITY, "认真")
         val custom = CharacterFact("custom", "自己的补充设定", "喜欢看星星")
         val persona = PersonaProfile(name = "小岚", coreIdentity = "书店店主",
-            facts = retired + current + custom, portrait = "旧版身份说法")
+            facts = retired + current + custom)
         val clean = persona.canonicalV4()
         assertEquals(listOf(current, custom), clean.facts)
         assertEquals("书店店主", clean.coreIdentity)
-        assertFalse(clean.toString().contains("旧版身份说法"))
+        assertTrue(clean.facts.none { it.category in retired.map(CharacterFact::category) })
         assertEquals(clean, clean.canonicalV4())
     }
 
