@@ -516,7 +516,10 @@ class PersonaAutoFillService @Inject constructor(
             id = current.id,
             name = draft.name.ifBlank { current.name.ifBlank { "默认角色" } },
             coreIdentity = draft.coreIdentity.ifBlank { current.coreIdentity },
-            facts = mergeGeneratedCharacterFacts(current.facts, draft.facts),
+            facts = mergeGeneratedCharacterFacts(
+                current.facts,
+                draft.facts.filterNot { it.category in CharacterFactCategories.removedFromNewProfiles },
+            ),
             franchise = draft.franchise.ifBlank { current.franchise },
             // V4 AI only writes canonical identity, facts and world-book; no new
             // legacy trait copies or runtime/correction overrides are generated here.
