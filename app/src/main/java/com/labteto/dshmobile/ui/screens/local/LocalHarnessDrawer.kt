@@ -2,13 +2,10 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -59,6 +56,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
+import com.shenyan.designsystem.components.SySceneBackgroundSurface
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
@@ -306,10 +304,8 @@ internal fun LocalModeDrawer(
             else LocalConfiguration.current.screenWidthDp.dp * DsMetrics.drawerWidthFraction
         ),
     ) {
-        // Sample the same app scene under a light overlay, rather than a solid drawer slab.
-        SyMaterialSurface(modifier = Modifier.fillMaxHeight(), tier = SyMaterialTier.L1_SECTION,
-            shape = androidx.compose.ui.graphics.RectangleShape,
-            shadowElevation = 0.dp, border = BorderStroke(0.dp, Color.Transparent)) {
+        // The drawer continues the original background without a full-screen slab.
+        SySceneBackgroundSurface(Modifier.fillMaxHeight()) {
         Column(Modifier.fillMaxHeight().safeDrawingPadding()) {
             Column(
                 modifier = Modifier
@@ -578,10 +574,7 @@ internal fun LocalModeDrawer(
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
                 if (selectionOpen) {
-                    SyMaterialSurface(
-                        shape = DsShapes.block,
-                        tier = SyMaterialTier.L4_OVERLAY,
-                    ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             Modifier
                                 .fillMaxWidth()
