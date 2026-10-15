@@ -151,7 +151,7 @@ class PersonaInspectionService @Inject constructor(
                     evidence = it.evidence.trim().take(500),
                 )
             }
-            .filter { it.field in ALLOWED_FIELDS && it.value.isNotBlank() }
+            .filter { it.field in SUGGESTION_FIELDS && it.value.isNotBlank() }
             .filterNot { PersonaImmersionPolicy.breaksImmersion(it.value) }
             .distinctBy { "${it.field}|${normalize(it.value)}" }
             .take(MAX_SUGGESTIONS)
@@ -194,6 +194,7 @@ class PersonaInspectionService @Inject constructor(
         const val MAX_SUGGESTIONS = 20
 
         val ALLOWED_FIELDS = CharacterFactCategories.canonical.toSet() + "coreIdentity"
+        val SUGGESTION_FIELDS = CharacterFactCategories.selectable.toSet() + "coreIdentity"
 
         val SYSTEM_PROMPT = """
             核查V4人物事实与最近的对话是否存在长期一致性问题。只输出JSON：
