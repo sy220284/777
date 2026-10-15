@@ -19,6 +19,8 @@ class LocalMediaCreativeDraftTest {
         assertTrue(prompt.contains("绫华"))
         assertTrue(prompt.contains("稻妻少女"))
         assertTrue(prompt.contains("对话框"))
+        assertTrue(prompt.contains("微笑"))
+        assertFalse(prompt.contains("今天很开心。"))
         assertFalse(prompt.contains("姓名不详"))
     }
 
