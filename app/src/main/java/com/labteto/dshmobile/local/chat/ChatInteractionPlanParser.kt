@@ -67,7 +67,7 @@ internal class ChatInteractionPlanParser(
         // while rejecting NONE and a short event without substantive reflection.
         val hasDiary = diaryImportance >= 2 && diaryHasPerspective &&
             diarySignificance != "NONE" &&
-            diaryEvent.trim().length >= if (substantiveThought) 3 else 6
+            diaryEvent.trim().length >= (if (substantiveThought) 3 else 6)
         // A model can include system-owned fields (scene, evolution, lifeState) as
         // decoration. Those fields are intentionally ignored and must not turn a
         // valid no-op result into a retry loop. Reject only an unusable requested
