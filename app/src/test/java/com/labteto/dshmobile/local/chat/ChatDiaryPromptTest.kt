@@ -28,6 +28,8 @@ class ChatDiaryPromptTest {
         assertTrue(system.contains("心理活动"))
         assertTrue(system.contains("可以只记录 event"))
         assertTrue(system.contains("subjectiveEvidence"))
+        assertTrue(system.contains("privateReflection"))
+        assertTrue(system.contains("个人判断"))
         assertTrue(system.contains("保留不确定性"))
         assertFalse(system.contains("至少一项非空"))
         assertTrue(system.contains("PRIVATE"))
@@ -58,6 +60,7 @@ class ChatDiaryPromptTest {
                 "innerThought":"我想装得不在意，但已经开始想那天的安排",
                 "relationshipMeaning":"我们第一次有了明确的共同计划",
                 "unresolvedEcho":"希望他别临时改主意",
+                "privateReflection":"我嘴上说着没关系，心里却已经开始期待那一天。",
                 "importance":5,
                 "disclosure":"SHAREABLE"
               }
@@ -72,5 +75,6 @@ class ChatDiaryPromptTest {
         assertEquals("用户确认周末和我去海边", plan!!.diaryDelta?.event)
         assertEquals(5, plan.diaryDelta?.importance)
         assertTrue(plan.diaryDelta?.innerThought?.contains("装得不在意") == true)
+        assertTrue(plan.diaryDelta?.privateReflection?.contains("开始期待") == true)
     }
 }
