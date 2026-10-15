@@ -53,14 +53,20 @@ internal object LocalPresetSkillCatalog {
         LocalPresetSkill("research-check", "资料研究与核实", "检索资料、核实主张、对比证据与时效。", """
             用途：研究问题并检验关键结论是否由可靠证据支持。
             适用：资料查询、官方文档、产品/技术调查与事实核验。
-            执行：确定问题与时效；优先获取一手材料；对比不同来源的证据与适用条件；标明尚存争议。
-            交付：结论、证据来源及日期、冲突观点和待核查事项。
+            执行：确定问题、版本与时效；优先检索并实际读取官方正文（OpenAI 问题优先官方开发者文档）；逐项核对证据与适用条件，避免依据搜索摘要猜测 API 细节。
+            交付：结论、精确来源链接及日期、冲突观点和待核查事项。
             """.trimIndent()),
         LocalPresetSkill("code-review", "代码审查", "检查代码正确性、回归风险及实现质量。", """
             用途：沿业务调用链审查实现并发现有证据支持的问题。
             适用：代码审查、PR 评审、重构评估、架构和测试覆盖。
-            执行：确定版本基线；沿输入、状态、副作用和异常路径检查；定位缺陷与触发条件；按实际可用条件执行验证。
-            交付：按严重度排序的问题、代码位置、修复建议及验证状态。
+            执行：PR 审查按实际合并基点读取差异；全量审计按项目模块和调用链检查。追踪输入、状态、副作用、异常与测试路径，定位本次变更引入的真实缺陷；允许使用只读子代理并行核对。
+            交付：P0—P3 级问题、精确代码位置、触发条件、修复建议与验证状态；没有可信发现时明确说明。
+            """.trimIndent()),
+        LocalPresetSkill("imagegen", "图片创作", "使用已配置的模型生成和编辑真实图片。", """
+            用途：创建插画、UI 素材、图标、照片，以及根据参考图修改已有图片。
+            适用：图片生成、参考图创作、原图局部编辑与批量素材需求。
+            执行：整理主体、构图、风格和保持不变的元素；选择现有多模态创作能力实际支持的模型。编辑时传入真实原图，遵守用户指定账户和模型，不静默切换到其他付费服务。检查产出并按需调整。
+            交付：在当前聊天展示、保存可预览的真实图片及必要的版本说明。
             """.trimIndent()),
         LocalPresetSkill("bug-investigation", "故障定位", "追踪异常根因、提出修复并验证结果。", """
             用途：定位用户可见的错误、崩溃、超时与异常行为。
@@ -179,6 +185,11 @@ internal class LocalSkillStore(
                 if (!workspace.skills().contains(preset.id)) install(preset.id)
             }
             workspace.write(".dsh/skills/.preset-seed-v1", "seeded\n")
+        }
+        // Newly bundled image workflow is added once without restoring later user deletions.
+        if (!File(skillsDir, ".imagegen-seed-v1").exists()) {
+            if (!workspace.skills().contains("imagegen")) install("imagegen")
+            workspace.write(".dsh/skills/.imagegen-seed-v1", "seeded\n")
         }
         // A separate one-time migration preserves deletions of the original presets.
         if (bundleFiles != null && !File(skillsDir, ".minimax-seed-v1").exists()) {
