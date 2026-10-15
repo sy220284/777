@@ -79,7 +79,6 @@ class ChatDiaryPromptTest {
         val reflection = "我一直以为沉默能让我更安全。今天想起来，原来我也很在乎自己的感受和决定。"
         fun payload(significance: String, voice: String): String = """
             {
-              "state": {},
               "turnSignificance": "$significance",
               "suggestions": [],
               "diaryDelta": {
