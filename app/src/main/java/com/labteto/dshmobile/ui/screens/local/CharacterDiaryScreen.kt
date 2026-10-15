@@ -47,7 +47,7 @@ import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.local.chat.ChatDiaryDisclosure
 import com.labteto.dshmobile.local.chat.ChatDiaryDelta
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
-import com.labteto.dshmobile.local.chat.ChatDiaryReadingVocabulary
+import com.labteto.dshmobile.local.presentation.ChatDiaryReadingVocabulary
 import com.labteto.dshmobile.local.chat.ChatDiarySourceMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
