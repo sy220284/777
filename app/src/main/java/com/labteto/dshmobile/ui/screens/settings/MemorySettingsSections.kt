@@ -2,9 +2,7 @@ package com.labteto.dshmobile.ui.screens.settings
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 
 import com.labteto.dshmobile.ui.shenyan.SySearchField
@@ -341,11 +339,7 @@ internal fun MemoryManagementCard(
                     )
                 }
             }
-            SyMaterialSurface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = DsShapes.block,
-                tier = SyMaterialTier.L3_CARD,
-            ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(SyMetric.gapLg),
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),

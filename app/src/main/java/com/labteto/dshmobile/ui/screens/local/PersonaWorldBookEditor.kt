@@ -2,9 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -60,11 +58,7 @@ internal fun PersonaWorldBookEditor(
     // Keep the same state/data source on both form factors. For >=600dp the
     // reference is a two-column master/detail editor; phones stack list and edit.
     val entryList: @Composable () -> Unit = {
-        SyMaterialSurface(
-            shape = DsShapes.block,
-            tier = SyMaterialTier.L3_CARD,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(SyMetric.gapLg),
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
@@ -124,11 +118,7 @@ internal fun PersonaWorldBookEditor(
     val entryEditor: @Composable () -> Unit = {
         expandedIndex.takeIf { it in entries.indices }?.let { index ->
             val entry = entries[index]
-            SyMaterialSurface(
-                shape = DsShapes.block,
-                tier = SyMaterialTier.L3_CARD,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(SyMetric.gapLg),
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),

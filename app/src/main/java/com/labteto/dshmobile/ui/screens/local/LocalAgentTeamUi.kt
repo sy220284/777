@@ -2,9 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -71,7 +69,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
-/** Shared compact team disclosure, respecting device reduced motion and user tempo. */
+/** Shared team transitions respect reduced motion and custom tempo. */
 @Composable
 private fun teamFadeSpec() = com.shenyan.designsystem.foundation.SyMotion.run {
     tween<Float>(duration(composerFadeMs,
@@ -152,14 +150,13 @@ internal fun LocalAgentTeamStatusBar(
         exit = fadeOut(teamFadeSpec()) +
             shrinkVertically(animationSpec = teamRevealSpec()),
     ) {
-        SyMaterialSurface(
+        androidx.compose.material3.Surface(
             onClick = onClick,
             enabled = team.visible,
             modifier = modifier.fillMaxWidth(),
             shape = DsShapes.block,
-            tier = SyMaterialTier.L3_CARD,
+            color = androidx.compose.ui.graphics.Color.Transparent,
             border = BorderStroke(1.dp, colors.border),
-            tonalElevation = 0.dp,
         ) {
             Column {
                 Row(
@@ -526,18 +523,15 @@ private fun TeamMemberRow(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val expansionLabel = stringResource(if (selected) R.string.local_team_expanded else R.string.local_team_collapsed)
     val pulse = rememberHapticPulse()
-    SyMaterialSurface(
+    androidx.compose.material3.Surface(
         onClick = { pulse(); onClick() },
         modifier = Modifier.fillMaxWidth().semantics { stateDescription = expansionLabel },
         shape = DsShapes.block,
-        tint = if (selected) colors.primary.copy(alpha = 0.06f) else {
-            androidx.compose.ui.graphics.Color.Transparent
-        },
+        color = if (selected) colors.selected.copy(alpha = .18f) else androidx.compose.ui.graphics.Color.Transparent,
         border = BorderStroke(
             1.dp,
             if (selected) colors.primary.copy(alpha = 0.32f) else colors.border,
         ),
-        tonalElevation = 0.dp,
     ) {
         Row(
             modifier = Modifier.padding(
@@ -625,13 +619,7 @@ private fun TeamMemberDetail(
         } while (true)
     }
 
-    SyMaterialSurface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.settingsGroup,
-        tier = SyMaterialTier.L3_CARD,
-        border = BorderStroke(1.dp, colors.border),
-        tonalElevation = 0.dp,
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(SyMetric.gapLg),
             verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
@@ -798,13 +786,12 @@ private fun TeamTaskRow(task: LocalAgentTeamTaskUiState) {
         if (task.writeConflict) add(stringResource(R.string.local_team_write_conflict))
         if (task.description.isNotBlank()) add(task.description)
     }
-    SyMaterialSurface(
+    androidx.compose.material3.Surface(
         onClick = { pulse(); expanded = !expanded },
         modifier = Modifier.fillMaxWidth().semantics { stateDescription = expansionLabel },
         shape = DsShapes.row,
-        tier = SyMaterialTier.L3_CARD,
+        color = androidx.compose.ui.graphics.Color.Transparent,
         border = BorderStroke(1.dp, colors.border),
-        tonalElevation = 0.dp,
     ) {
         Column(
             modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
@@ -992,7 +979,7 @@ private fun TeamMemberWorksite(member: LocalAgentTeamMemberUiState, output: Stri
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val clipboard = LocalClipboardManager.current
     var expanded by rememberSaveable(member.id) { mutableStateOf(false) }
-    SyMaterialSurface(modifier = Modifier.fillMaxWidth(), shape = DsShapes.block, tier = SyMaterialTier.L3_CARD,) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(SyMetric.gapMd), verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 WorkOperationIcon(com.labteto.dshmobile.ui.AgentOperationKind.Delegate, member.activity == "running" || member.phase == "provisioning")

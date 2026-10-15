@@ -2,9 +2,7 @@ package com.labteto.dshmobile.ui.screens.tools
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -344,10 +342,10 @@ internal fun PluginInventoryBrowser(
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                 ) {
                     items(list, key = { it.id }) { item ->
-                        SyMaterialSurface(
+                        Surface(
                             modifier = Modifier.fillMaxWidth().testTag("plugin-inventory-card-${item.id}"),
                             onClick = { selectedRow = item },
-                            tier = SyMaterialTier.L3_CARD,
+                            color = androidx.compose.ui.graphics.Color.Transparent,
                             shape = DsShapes.block,
                         ) {
                             Column(
@@ -359,10 +357,8 @@ internal fun PluginInventoryBrowser(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                                 ) {
-                                    SyMaterialSurface(
+                                    Box(
                                         modifier = Modifier.size(40.dp).testTag("plugin-inventory-icon-${item.id}"),
-                                        tier = SyMaterialTier.L1_SECTION,
-                                        shape = DsShapes.row,
                                     ) {
                                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                             Icon(
@@ -562,6 +558,7 @@ internal fun PluginInventoryBrowser(
         SyResponsiveSheet(
             title = stringResource(R.string.skills_remove_title),
             onDismiss = { removeSkillName = null },
+            seamlessBackground = false,
             footer = {
                 SyButton(
                     text = stringResource(R.string.common_remove),

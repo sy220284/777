@@ -92,6 +92,7 @@ internal fun CharacterBehaviorTuningDialog(
     SyResponsiveSheet(
         title = stringResource(R.string.local_character_tuning_title),
         onDismiss = { if (!saving) onDismiss() },
+        seamlessBackground = true,
         scrollable = true,
         dismissEnabled = !saving,
         footer = {
