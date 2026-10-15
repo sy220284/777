@@ -21,7 +21,7 @@ data class LocalSkillEditorUiEntry(val id: String, val document: String)
 
 /** Tools page boundary; plugin/runtime implementations stay outside UI. */
 @Singleton
-class LocalToolsUiFacade @Inject constructor(
+class LocalToolsUiFacade @Inject internal constructor(
     private val tools: LocalToolsRuntime,
     private val pinnedStore: LocalPinnedInvocationStore,
     @ApplicationContext private val appContext: Context,
