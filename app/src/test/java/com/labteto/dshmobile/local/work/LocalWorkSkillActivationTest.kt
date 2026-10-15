@@ -35,7 +35,7 @@ class LocalWorkSkillActivationTest {
         try {
             val workspace = LocalWorkspace(root)
             workspace.write(".dsh/skills/private-doc/SKILL.md",
-                "---\\ndescription: private\\ndisable-model-invocation: true\\n---\\nSecret policy.")
+                "---\ndescription: private\ndisable-model-invocation: true\n---\nSecret policy.")
             val pinned = listOf(
                 LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "private-doc"),
                 LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "missing-skill"),
