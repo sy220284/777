@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,7 +33,10 @@ internal fun FluidPersonaGalleryGrid(
     animateOnEntrance: Boolean = true,
     pinnedIds: Set<String> = emptySet(),
 ) {
-    val animateEntrance = animateOnEntrance && !LocalSyReducedMotion.current
+    val reduced = LocalSyReducedMotion.current
+    val animateEntrance = animateOnEntrance && !reduced
+    val tempo = com.shenyan.designsystem.foundation.LocalSyMotionTempo.current
+    val motion = com.shenyan.designsystem.foundation.SyMotion
     val enterOffset = with(LocalDensity.current) { 12.dp.toPx() }
     LazyColumn(
         modifier = modifier,
@@ -45,13 +49,13 @@ internal fun FluidPersonaGalleryGrid(
             LaunchedEffect(entry.id, animateEntrance) {
                 if (!appeared) {
                     delay(index.coerceAtMost(DsAnimations.cascadeMaxItems - 1) *
-                        DsAnimations.cascadeStaggerMs)
+                        motion.duration(motion.cascadeStaggerMs, reduced, tempo).toLong())
                     appeared = true
                 }
             }
             val reveal by animateFloatAsState(
                 targetValue = if (appeared) 1f else 0f,
-                animationSpec = DsAnimations.cascade,
+                animationSpec = tween(motion.duration(motion.pushMs, reduced, tempo), easing = motion.ease),
                 label = "personaGalleryCascade",
             )
             Box(Modifier.fillMaxWidth().graphicsLayer {
