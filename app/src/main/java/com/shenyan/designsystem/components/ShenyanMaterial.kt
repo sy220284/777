@@ -87,7 +87,7 @@ fun SyMaterialSurface(
     contentColor: Color = LocalSyColors.current.text,
     tonalElevation: Dp = 0.dp,
     shadowElevation: Dp? = null,
-    opticalGlass: Boolean = true,
+    opticalGlass: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val c = LocalSyColors.current
