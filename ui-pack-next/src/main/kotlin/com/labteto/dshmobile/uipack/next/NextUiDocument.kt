@@ -32,6 +32,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import com.labteto.dshmobile.uicontract.MediaUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentMediaKind
+import com.labteto.dshmobile.local.model.LocalMediaPage
+import kotlinx.coroutines.flow.flowOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -204,12 +206,16 @@ private fun nextDocumentRejectionText(reason: UiCommandRejection): String = stri
 @Composable
 private fun NextDocumentMediaNode(node: UiDocumentNode.Media, sessionId: String) {
     val media = LocalNextMediaPort.current
-    val asset = remember(media, sessionId, node.assetId, node.kind) {
+    val mediaUpdates = remember(media, sessionId) {
+        media?.observe(sessionId, media.pageSize) ?: flowOf(LocalMediaPage())
+    }
+    val mediaPage by mediaUpdates.collectAsStateWithLifecycle(initialValue = LocalMediaPage())
+    val asset = remember(media, sessionId, node.assetId, node.kind, mediaPage) {
         media?.assetForSession(node.assetId, sessionId)?.takeIf { it.kind == node.kind }
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(node.label)
-        if (asset?.localPath != null) NextDocumentMediaSaveButton(media, node, sessionId)
+        if (asset?.localPath != null) NextDocumentMediaSaveButton(media, node, sessionId, asset.localPath)
         val path = asset?.localPath
         if (path == null) {
             Text("媒体尚未保存在本机，或无权访问这条会话的媒体成果")
@@ -237,29 +243,39 @@ private fun NextDocumentMediaNode(node: UiDocumentNode.Media, sessionId: String)
                 else Text("图片正在载入或无法解码")
             }
             UiDocumentMediaKind.AUDIO -> {
+                var ready by remember(path) { mutableStateOf(false) }
                 var playing by remember(path) { mutableStateOf(false) }
                 val player = remember(path) { MediaPlayer() }
-                androidx.compose.runtime.DisposableEffect(path) {
-                    try {
-                        player.setDataSource(path)
-                        player.prepare()
-                        player.setOnCompletionListener { playing = false }
-                    } catch (_: Exception) { playing = false }
-                    onDispose { player.release() }
+                androidx.compose.runtime.DisposableEffect(path, player) {
+                    player.setOnPreparedListener { ready = true }
+                    player.setOnCompletionListener { playing = false }
+                    player.setOnErrorListener { _, _, _ -> ready = false; playing = false; true }
+                    try { player.setDataSource(path); player.prepareAsync() }
+                    catch (_: Exception) { ready = false }
+                    onDispose {
+                        runCatching { player.stop() }
+                        player.release()
+                    }
                 }
-                TextButton(onClick = {
-                    try { if (player.isPlaying) player.pause() else player.start()
+                TextButton(enabled = ready, onClick = {
+                    try {
+                        if (player.isPlaying) player.pause() else player.start()
                         playing = player.isPlaying
                     } catch (_: Exception) { playing = false }
-                }) { Text(if (playing) "暂停" else "播放音频") }
+                }) { Text(if (playing) "暂停" else if (ready) "播放音频" else "准备音频…") }
             }
             UiDocumentMediaKind.VIDEO -> {
+                var video by remember(path) { mutableStateOf<VideoView?>(null) }
                 AndroidView(factory = { context ->
                     VideoView(context).apply {
                         setVideoPath(path)
                         setMediaController(MediaController(context).also { it.setAnchorView(this) })
+                        video = this
                     }
                 }, modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 330.dp))
+                androidx.compose.runtime.DisposableEffect(video) {
+                    onDispose { video?.stopPlayback() }
+                }
                 Text("点击播放器开始或暂停视频")
             }
         }
@@ -268,7 +284,8 @@ private fun NextDocumentMediaNode(node: UiDocumentNode.Media, sessionId: String)
 
 /** Save is a user-granted SAF operation; raw media paths never enter the document. */
 @Composable
-private fun NextDocumentMediaSaveButton(media: MediaUiPort?, node: UiDocumentNode.Media, sessionId: String) {
+private fun NextDocumentMediaSaveButton(media: MediaUiPort?, node: UiDocumentNode.Media,
+    sessionId: String, originalPath: String) {
     val context = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var result by remember(node.assetId) { mutableStateOf<String?>(null) }
@@ -277,11 +294,9 @@ private fun NextDocumentMediaSaveButton(media: MediaUiPort?, node: UiDocumentNod
         UiDocumentMediaKind.AUDIO -> "audio/*"
         UiDocumentMediaKind.VIDEO -> "video/*"
     }
-    val extension = when (node.kind) {
-        UiDocumentMediaKind.IMAGE -> ".png"
-        UiDocumentMediaKind.AUDIO -> ".mp3"
-        UiDocumentMediaKind.VIDEO -> ".mp4"
-    }
+    val extension = originalPath.substringAfterLast('.', "").lowercase()
+        .takeIf { it in setOf("png", "jpg", "jpeg", "webp", "gif", "mp3", "ogg",
+            "wav", "m4a", "aac", "flac", "mp4", "webm", "mov", "mkv") } ?: "bin"
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mime)) { uri ->
         if (uri == null) result = "已取消导出"
         else scope.launch {
@@ -301,7 +316,7 @@ private fun NextDocumentMediaSaveButton(media: MediaUiPort?, node: UiDocumentNod
             catch (failure: Exception) { result = failure.message ?: "保存失败，目标文件可能不完整" }
         }
     }
-    TextButton(onClick = { launcher.launch("media-${node.assetId.take(24)}$extension") }) {
+    TextButton(onClick = { launcher.launch("media-${node.assetId.take(24)}.$extension") }) {
         Text("保存到设备")
     }
     result?.let { Text(it) }

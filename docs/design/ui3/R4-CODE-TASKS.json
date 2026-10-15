@@ -1,7 +1,7 @@
 {
   "schema": "777.ui-r4.code-tasks/1",
-  "asOf": "2026-10-15",
-  "baseline": "2026-10-15 新 Next Scene 75 个非 Host 注册入口及媒体/Work Owner 代码增量；功能未运行验证，V6 全页面独立移包仍未完成，保持 CODE_PARTIAL。",
+  "asOf": "2026-10-16",
+  "baseline": "以 PR #705 先完成 CI 编译阻塞修复、V6 真实媒体节点消费、Work 同消息多文档版本共存与后台只读恢复；Next 仅保留独立架构验证切片，不再按全量 75 场景宣称业务实现。仍有大量 V6 视图未移包及 98/173 动作映射缺口，后续功能未验收。",
   "scope": "整个 R4，非单一功能",
   "verificationPolicy": "当前 HEAD 基础 CI 可通过不代表 R4 交付验收；新增提交需自身 CI，真实双包使用/进程恢复/设备矩阵按 S2/S5 单独验证。",
   "sceneCount": 78,
@@ -107,8 +107,8 @@
       "task": "全量旧 UI 回调退场",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "持续移除群聊、团队、图库故事/删除/保存/立绘的 UI 业务编排；现行大型 UI 回调与其他设置/人物业务尚待迁出。 Next 历史分页已改用中立 UiMessageHistoryPort/UiMessageSnapshot，由同一 Session Owner 投影；旧 V6 的 TranscriptUiPort 保留兼容、未宣称退场。 将编辑/重发结果从旧 LocalUserMessageEditResult 改为完整的中立 UiMessageEditOutcome，Next 无需读取该 Session 枚举；补保留全部 11 类结果的回归测试。 本批预置人物安装和图库检查/建议应用迁入Chat Owner：预置图片先暂存并校验，档案/图片引用一次提交，失败后只清理实际未引用图片；模型检查冻结会话/模型和图库版本，建议由用户选择后条件版本追加。V6旧安装器和检查/建议业务编排退出，Next独立图库接入预置列表安装、显式模型检查、冲突阅读及建议选择。建议只更新图库，当前故事由用户重新选择应用。 当前人物配置/采样/模型补全已迁出旧UI业务编排，原LocalChatRuntime.configureChatPersona和Facade模型补全转发退出。 新增日记专用 DiaryUiPort，由原 Chat Runtime 条件版本更新和停用，不借用旧 App UI；Next 新页面跨功能操作通过 Automation/Media/Settings/Usage/Tools Port。\n2026-10-15 本次增量：新 Next 世界资料经 PersonaAuthoringUiPort 的原版 lore/revision 修改；回复建议经 Chat Runtime 的既有生成器与草稿 Port；Host DataStore 外观/通知与系统设置经 HostPreferencesUiPort，应用更新仍使用 AppViewModel 原有升级流程；Work 自动发布保持 Work/Session Owner。",
-      "remaining": "V6 旧设置/各高级功能及业务回调仍大量存在于 App Shell，UI 控制逻辑尚未全部退场。"
+      "implemented": "持续移除群聊、团队、图库故事/删除/保存/立绘的 UI 业务编排；现行大型 UI 回调与其他设置/人物业务尚待迁出。 Next 历史分页已改用中立 UiMessageHistoryPort/UiMessageSnapshot，由同一 Session Owner 投影；旧 V6 的 TranscriptUiPort 保留兼容、未宣称退场。 将编辑/重发结果从旧 LocalUserMessageEditResult 改为完整的中立 UiMessageEditOutcome，Next 无需读取该 Session 枚举；补保留全部 11 类结果的回归测试。 本批预置人物安装和图库检查/建议应用迁入Chat Owner：预置图片先暂存并校验，档案/图片引用一次提交，失败后只清理实际未引用图片；模型检查冻结会话/模型和图库版本，建议由用户选择后条件版本追加。V6旧安装器和检查/建议业务编排退出，Next独立图库接入预置列表安装、显式模型检查、冲突阅读及建议选择。建议只更新图库，当前故事由用户重新选择应用。 当前人物配置/采样/模型补全已迁出旧UI业务编排，原LocalChatRuntime.configureChatPersona和Facade模型补全转发退出。 新增日记专用 DiaryUiPort，由原 Chat Runtime 条件版本更新和停用，不借用旧 App UI；Next 新页面跨功能操作通过 Automation/Media/Settings/Usage/Tools Port。\n2026-10-15 本次增量：新 Next 世界资料经 PersonaAuthoringUiPort 的原版 lore/revision 修改；回复建议经 Chat Runtime 的既有生成器与草稿 Port；Host DataStore 外观/通知与系统设置经 HostPreferencesUiPort，应用更新仍使用 AppViewModel 原有升级流程；Work 自动发布保持 Work/Session Owner。\n2026-10-16 本轮源代码：V6 原有媒体时间线与动态 UiDocument 都消费同一个 MediaUiPort，消除漏实现媒体节点的 when；Next 仅架构探针。",
+      "remaining": "其他 V6 巨型回调与专有业务逻辑仍留 App Shell，尚未完全迁出。"
     },
     {
       "id": "S1-10",
@@ -129,8 +129,8 @@
       "task": "全应用 UiPack Scene Renderer API",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "新增独立 :ui-host 全应用 UiApplicationScenePack 逐 Scene Compose Renderer 契约、实际 renderer 覆盖与 manifest 双门禁、Host 历史/包身份准入的场景调度与 JVM 测试源码。 AppRoot 现接入真实全应用 UiApplicationScenePack 准入/Compose Renderer 路径，拒绝缺失 Scene/实际 Renderer 的包；当前注册表有意为空，不能宣称整包完工。 Next 独立 ui-pack-next 模块新增 NextApplicationScenePack：8 个真实 Compose Renderer（route.home、conversation.chat、conversation.work、route.persona_gallery、chat.gallery），包含实际 Chat/Work/图库选择 Port 调用。 本批Next增加route.workspace与settings.memory_management两个实际Owner驱动Renderer；全量接线时共10场景，工作区预览在本页实际弹层呈现，未重复登记为独立完成Scene。",
-      "remaining": "当前只有Next 10个真实Renderer，完整V6包及其他65个独立渲染Scene（另3项系统服务由Host提供）尚未完成，缺页时整包仍拒绝启用。"
+      "implemented": "新增独立 :ui-host 全应用 UiApplicationScenePack 逐 Scene Compose Renderer 契约、实际 renderer 覆盖与 manifest 双门禁、Host 历史/包身份准入的场景调度与 JVM 测试源码。 AppRoot 现接入真实全应用 UiApplicationScenePack 准入/Compose Renderer 路径，拒绝缺失 Scene/实际 Renderer 的包；当前注册表有意为空，不能宣称整包完工。 Next 独立 ui-pack-next 模块新增 NextApplicationScenePack：8 个真实 Compose Renderer（route.home、conversation.chat、conversation.work、route.persona_gallery、chat.gallery），包含实际 Chat/Work/图库选择 Port 调用。 本批Next增加route.workspace与settings.memory_management两个实际Owner驱动Renderer；全量接线时共10场景，工作区预览在本页实际弹层呈现，未重复登记为独立完成Scene。\n2026-10-16 本轮源代码：在 NextApplicationScenePack 中只把实际架构验证切片列入 manifest 且过滤 renderer，阻止共用简化页面被生产 Host 当作完整替代。",
+      "remaining": "生产 V6 仍需全 75 场景原生 Renderer，Next 不负责实现第二套完整业务 UI；正式换皮插拔能力不能靠该探针宣布完全达标。"
     },
     {
       "id": "S3-02",
@@ -145,24 +145,24 @@
       "task": "完整 V6 页面/导航/Composer/时间线/设置移包",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "remaining": "V6 页面、导航、Composer、时间线、设置、旧弹层及资源仍有完整独立移包工作，当前 :ui-pack-v6 主要是设计系统和独立证据小组件。未完成。",
-      "implemented": "\n2026-10-15 本次增量：本次不借用 App Shell 老页面冒充 V6 独立包；新增 Next 入口不等于 V6 功能移包。"
+      "remaining": "V6 的应用级导航、页面树、Composer、时间线、设置及旧弹层仍未搬进 :ui-pack-v6，本项未完成。",
+      "implemented": "\n2026-10-15 本次增量：本次不借用 App Shell 老页面冒充 V6 独立包；新增 Next 入口不等于 V6 功能移包。\n2026-10-16 本轮源代码：在仍在 App 的 V6 会话动态文档路径补齐真实 IMAGE/AUDIO/VIDEO 媒体消费：按 Session 的 Media Owner 读本地文件、异步音频播放、平台文件选址保存，避免新节点编译阻塞。"
     },
     {
       "id": "S3-04",
       "task": "Next 全应用必要场景原生实现",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": " Next 的历史读取现只依赖中立消息快照（独立角色映射单测）；完整 Next 全场景仍待完成。 Next 独立包新增人物图库真正的 Owner 归档读取、按 Gallery/Story 身份启动故事、拒绝回执/缺身份不导航；页面避免在 UI 自建人物/故事状态。 Next图库接入13字段独立档案编辑/创建及AI补全，既有8场景清单未冒增为完整78场景。 Next工作区支持真实文件列表、筛选和有界文本/二进制预览；记忆管理支持原Owner搜索/类型筛选/游标分页、精确版本编辑/置顶/停用确认、部分成功提醒及上下文切换拒绝。 Next图库增加当前人物编辑/采样和模型补全实际子流程，仍未额外登记为独立Scene。 新增 Next 独立调度页（列表、创建、编辑、暂停、恢复、删除、手动执行）、媒体创建/成果页（付费确认、创建回执、旧凭据刷新、图片预览、本地保存恢复）、原生设置/模型用量/ChatGPT账户/诊断及 GitHub 凭据入口、人物日记读写与条件修订、跨会话历史搜索。页面经现有 Owner Port 操作，不复制任务/媒体/日记存储。完整包 Scene 登记从原 10 项增加到 35 项，仍严格拒绝不足 75 项的整包。\n2026-10-15 本次增量：Next 编写并注册全目录 75 个非 Host Scene 的具体渲染入口：含会话/文档/消息二级视图、群聊/人物世界资料/回复建议、Work 团队/证据/审批/提问/计划、应用偏好/更新/通知/模型统计。新页面使用现有 Owner Port 与真实会话数据，不另建业务存储。静态注册数 75 不构成完成独立页面体验/视觉/跨会话恢复证明。",
-      "remaining": "静态 Scene Catalog 已找到对应注册 renderer，但页面功能与旧 V6 全量业务深度等价、实际运行和视觉规范未核实；仍需全量视图移包、隐形弹层/焦点/系统服务覆盖和自动恢复完善。"
+      "implemented": " Next 的历史读取现只依赖中立消息快照（独立角色映射单测）；完整 Next 全场景仍待完成。 Next 独立包新增人物图库真正的 Owner 归档读取、按 Gallery/Story 身份启动故事、拒绝回执/缺身份不导航；页面避免在 UI 自建人物/故事状态。 Next图库接入13字段独立档案编辑/创建及AI补全，既有8场景清单未冒增为完整78场景。 Next工作区支持真实文件列表、筛选和有界文本/二进制预览；记忆管理支持原Owner搜索/类型筛选/游标分页、精确版本编辑/置顶/停用确认、部分成功提醒及上下文切换拒绝。 Next图库增加当前人物编辑/采样和模型补全实际子流程，仍未额外登记为独立Scene。 新增 Next 独立调度页（列表、创建、编辑、暂停、恢复、删除、手动执行）、媒体创建/成果页（付费确认、创建回执、旧凭据刷新、图片预览、本地保存恢复）、原生设置/模型用量/ChatGPT账户/诊断及 GitHub 凭据入口、人物日记读写与条件修订、跨会话历史搜索。页面经现有 Owner Port 操作，不复制任务/媒体/日记存储。完整包 Scene 登记从原 10 项增加到 35 项，仍严格拒绝不足 75 项的整包。\n2026-10-15 本次增量：Next 编写并注册全目录 75 个非 Host Scene 的具体渲染入口：含会话/文档/消息二级视图、群聊/人物世界资料/回复建议、Work 团队/证据/审批/提问/计划、应用偏好/更新/通知/模型统计。新页面使用现有 Owner Port 与真实会话数据，不另建业务存储。静态注册数 75 不构成完成独立页面体验/视觉/跨会话恢复证明。\n2026-10-16 本轮源代码：按需求变更，Next 只保留 10 个可独立编译的架构验证 Scene；过去静态注册的其他场景不再算作实装或生产准入依据。",
+      "remaining": "Next 架构验证自身的代码存在，但完整 V6/Next 75 场景业务一致性未证明；后续只对验证切片做架构证据，不扩展空壳以刷场景数。"
     },
     {
       "id": "S3-05",
       "task": "生产级包选择/注册/持久恢复",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "新增 Host 持久选择协调器：只有通过全应用真实 renderer 与 manifest 双门禁的包才能写入选择；过期/缺失选择仅返回显式稳定包选项，不暗中回退 V6；持久写失败拒绝报成功。含 JVM 回归源码。 AppRoot 使用本地 SharedPreferences 持久选包，实时观察其变更，只有通过 Host manifest+Renderer+已接 Feature Owner 能力校验的已登记整包可渲染，非法/缺失选择显式失败且必须点击恢复 Legacy；新增合成完整双包 Compose 切换 instrumentation 测试源码。 将 AppRoot 真实 Feature Owner 依赖注入 NextApplicationScenePack 增量候选包；保留完整全应用 Scene Renderer 双门禁，缺页候选即使安装也不得替换 V6。 2026-10-15 增量：整包 Host 导航栈现按 UI 包 ID 独立写 SharedPreferences，冷启动从保存的版本化快照恢复；保存前验证本包目录和真实 Renderer，不合法的异包/损坏历史显式拒绝，用户明确选回稳定模式时清除该包坏历史；补真实 Host Compose 仪器化测试源码。\n2026-10-15 本次增量：Next 当前 75 个非 Host 场景在源码中登记真实渲染入口；生产整包依然依赖 Host 的场景、契约、能力和 Renderer 准入门禁，不直接修改默认 V6 模式。",
-      "remaining": "V6 独立整包尚未完成，Next 注册数不等于全部真实产品细节完成；完整生产 UI 包选择控制、跨版本完整业务状态迁移未闭环。"
+      "implemented": "新增 Host 持久选择协调器：只有通过全应用真实 renderer 与 manifest 双门禁的包才能写入选择；过期/缺失选择仅返回显式稳定包选项，不暗中回退 V6；持久写失败拒绝报成功。含 JVM 回归源码。 AppRoot 使用本地 SharedPreferences 持久选包，实时观察其变更，只有通过 Host manifest+Renderer+已接 Feature Owner 能力校验的已登记整包可渲染，非法/缺失选择显式失败且必须点击恢复 Legacy；新增合成完整双包 Compose 切换 instrumentation 测试源码。 将 AppRoot 真实 Feature Owner 依赖注入 NextApplicationScenePack 增量候选包；保留完整全应用 Scene Renderer 双门禁，缺页候选即使安装也不得替换 V6。 2026-10-15 增量：整包 Host 导航栈现按 UI 包 ID 独立写 SharedPreferences，冷启动从保存的版本化快照恢复；保存前验证本包目录和真实 Renderer，不合法的异包/损坏历史显式拒绝，用户明确选回稳定模式时清除该包坏历史；补真实 Host Compose 仪器化测试源码。\n2026-10-15 本次增量：Next 当前 75 个非 Host 场景在源码中登记真实渲染入口；生产整包依然依赖 Host 的场景、契约、能力和 Renderer 准入门禁，不直接修改默认 V6 模式。\n2026-10-16 本轮源代码：生产包 admission 仍要求全目录，Next 新的 manifest 只声明 10 个架构切片，阻止误入生产。",
+      "remaining": "完整 V6 独立迁移、真实生产选包、跨版本恢复仍未完成。"
     },
     {
       "id": "S3-06",
@@ -203,8 +203,8 @@
       "task": "动态图片/音频/视频状态/预览/保存",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": " Next 新增独立媒体创作及成果管理界面，经原 MediaUiPort 显示真实创建、视频、保存状态并做受控操作；这是媒体功能页面，不是 UiDocument 中的动态媒体节点。\n2026-10-15 本次增量：新增 UiDocument.Media IMAGE/AUDIO/VIDEO 结构化节点，闭合 JSON codec 和预算校验；Next 本地图片限尺寸解码、音视频原生预览、SAF 用户选址保存；Owner 按 Session ID + 真实媒体类型解析和受控字节导出，不接受文档指定原始 URL/路径。MEDIA_RESULTS 本地模板从真实 Media Owner 构造文档节点。",
-      "remaining": "远端未落地成果的播放/保存、音频/视频播放生命周期和下载状态恢复等边界尚无完整运行证据；本轮仅完成代码路径，未编译测试。"
+      "implemented": " Next 新增独立媒体创作及成果管理界面，经原 MediaUiPort 显示真实创建、视频、保存状态并做受控操作；这是媒体功能页面，不是 UiDocument 中的动态媒体节点。\n2026-10-15 本次增量：新增 UiDocument.Media IMAGE/AUDIO/VIDEO 结构化节点，闭合 JSON codec 和预算校验；Next 本地图片限尺寸解码、音视频原生预览、SAF 用户选址保存；Owner 按 Session ID + 真实媒体类型解析和受控字节导出，不接受文档指定原始 URL/路径。MEDIA_RESULTS 本地模板从真实 Media Owner 构造文档节点。\n2026-10-16 本轮源代码：V6 与 Next 的媒体卡现在都监听 Media Owner 状态变化；音频异步 prepare、播放器销毁释放；导出沿用原文件实际已识别的后缀。",
+      "remaining": "远程未落地媒体仍不自动消费可能计费的下载，需独立实现权限化下载/恢复与错误状态。未进行设备或 CI 验收。"
     },
     {
       "id": "S4-03",
@@ -223,8 +223,8 @@
       "task": "原 Work Owner 运行内自动发布",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "\n2026-10-15 本次增量：Work AgentToolFinished 在 tool/result 原始事件已持久化后通过 LocalWorkUiDocumentPublisher 同步发布单会话版本化 UiDocument；投影真实阶段、最近工具回执与错误，原 Session EventLog CAS，避免覆盖用户手工/AI设计，卡片失败不改变工具执行结果，无二次模型请求。",
-      "remaining": "离线/后台 Work 会话身份恢复、同源多种文档共存、长任务事件聚合以及跨重启连续恢复仍需功能完善；不等于证明 Work 产物已验收。"
+      "implemented": "\n2026-10-15 本次增量：Work AgentToolFinished 在 tool/result 原始事件已持久化后通过 LocalWorkUiDocumentPublisher 同步发布单会话版本化 UiDocument；投影真实阶段、最近工具回执与错误，原 Session EventLog CAS，避免覆盖用户手工/AI设计，卡片失败不改变工具执行结果，无二次模型请求。\n2026-10-16 本轮源代码：Work 活动文档使用 work-live:<sourceMessageId> 稳定 ID，隔离用户本地模板和模型生成卡；跨前后台保留同一卡原来源，纯只读历史卡可在前台会话切换后继续显示，不恢复已过期的执行授权。",
+      "remaining": "长任务多轮任务来源、后台读写负载和真正的成果核验仍需完善；不标已完成。"
     },
     {
       "id": "S4-06",
@@ -237,7 +237,8 @@
       "task": "历史编辑/分页/删除/版本迁移与完整恢复",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": " Next归档历史新增有界冷档案分页与单条删除入口；页面仅保存人物/故事ID和不透明游标，恢复后重新读取，变化返回Stale。删除确认/副作用不自动恢复或重放；完整跨版本迁移、崩溃与双包恢复验收仍缺。"
+      "implemented": " Next归档历史新增有界冷档案分页与单条删除入口；页面仅保存人物/故事ID和不透明游标，恢复后重新读取，变化返回Stale。删除确认/副作用不自动恢复或重放；完整跨版本迁移、崩溃与双包恢复验收仍缺。\n2026-10-16 本轮源代码：Session 文档读写按 (sourceMessageId, documentId) 维护独立最新版本；本地模板按身份与模板建立稳定 ID，模型生成仅更新模型起源卡，损坏记录不得覆盖；增加同消息并存与并发版本冲突测试源码。",
+      "remaining": "完整历史编辑、导入/删除与重组崩溃恢复仍未完成。"
     },
     {
       "id": "S4-08",
@@ -283,5 +284,8 @@
   "uiPackSceneCount": 75,
   "nextRendererCount": 10,
   "nextRemainingRendererCount": 65,
-  "sceneCoveragePolicy": "78项中3项系统服务由Host提供；独立UI包需覆盖75项，Next已注册10个实际Renderer，尚缺65项。页内子流程的实际功能不冒增为独立Scene覆盖；完整V6包仍未完成。"
+  "sceneCoveragePolicy": "78项中3项系统服务由Host提供。75项是完整生产级 UI Pack 的要求，不再将 Next 架构验证包当作生产级全量替代；Next 的 10 个独立架构验证 Renderer 只能证明 Chat/Work/Gallery/Tools/Files Port 到 Host 的接线。V6 全业务 UI 仍需完成独立移包，不能以 Next 的共用简化 Renderer 登记数充数。",
+  "nextScope": "ARCHITECTURE_PROBE_ONLY",
+  "nextProductionEligibility": "NOT_READY",
+  "nextProductionParityRequired": false
 }

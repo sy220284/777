@@ -62,8 +62,10 @@ data class NextApplicationFeaturePorts(
 )
 
 /**
- * Ten independently rendered scenes when Tools, Files and Memory Owners are connected; still incomplete.
- * The production Host must reject this incomplete manifest for 78-scene admission.
+ * Architecture verification pack, not a second production UI.
+ * The V6 migration is responsible for full product parity; this pack only proves
+ * independently-compiled chat, Work, gallery, tools and files can consume Owner Ports.
+ * Do not advertise placeholder sub-scenes as a production migration.
  */
 class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) : UiApplicationScenePack {
     private val home = UiSceneId("route.home")
@@ -111,6 +113,13 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
         "settings.session_storage", "settings.diagnostics", "settings.account",
         "settings.minimax_quota",
     ).map(::UiSceneId).toSet()
+    // Only independently meaningful vertical slices belong to the admission manifest.
+    // Remaining candidate renderers below are development references, NOT feature parity.
+    private val architectureProbeScenes: Set<UiSceneId> = buildSet {
+        addAll(setOf(home, galleryRoute, chat, work, galleryPage))
+        if (ports.tools != null) addAll(setOf(toolsRoute, toolsMcp, toolsPlugins, toolsGithub))
+        if (ports.files != null) add(workspace)
+    }
     private val implementedScenes = buildSet {
         addAll(setOf(home, galleryRoute, chat, work, galleryPage))
         addAll(conversationSlots)
@@ -150,7 +159,7 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
     override val manifest = UiPackManifest(
         id = "next-application-incremental", version = 1,
         minContractVersion = UI_CONTRACT_VERSION, maxContractVersion = UI_CONTRACT_VERSION,
-        scenes = implementedScenes,
+        scenes = architectureProbeScenes,
         requiredCapabilities = buildSet {
             addAll(setOf("chat.send_text", "work.send_text", "chat.gallery_archive", "chat.persona_selection"))
             if (ports.files != null) add("files.read")
@@ -396,7 +405,7 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
                     onOpenGithub = { scope.onNavigate(toolsGithub) })
             })
         }
-    }
+     }.filterKeys { it in architectureProbeScenes }
 
     @Composable
     private fun HomeRoute(scope: UiSceneRenderScope) {
@@ -419,24 +428,7 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
             if (ports.files != null) TextButton(onClick = { scope.onNavigate(workspace) }) {
                 Text(stringResource(R.string.next_workspace_title))
             }
-            if (ports.memory != null && ports.settings != null) TextButton(onClick = { scope.onNavigate(memories) }) {
-                Text(stringResource(R.string.next_memory_title))
-            }
-            if (ports.sessions != null && ports.transcript != null) TextButton(onClick = { scope.onNavigate(globalSearch) }) {
-                Text("跨会话搜索")
-            }
-            if (ports.diary != null) TextButton(onClick = { scope.onNavigate(diaryRoute) }) {
-                Text("人物日记")
-            }
-            if (ports.automation != null) TextButton(onClick = { scope.onNavigate(tasksRoute) }) {
-                Text("任务")
-            }
-            if (ports.media != null && ports.settings != null) TextButton(onClick = { scope.onNavigate(mediaCreation) }) {
-                Text("媒体创作")
-            }
-            if (ports.settings != null) TextButton(onClick = { scope.onNavigate(UiSceneId("route.settings")) }) {
-                Text("设置")
-            }
+            // No links to incomplete candidate scenes in an architecture-only probe.
             Box(Modifier.weight(1f)) {
                 CompositionLocalProvider(LocalNextMediaPort provides ports.media) {
                 NextConversationUiPack.Render(

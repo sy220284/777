@@ -34,6 +34,8 @@ import com.labteto.dshmobile.uicontract.MediaUiPort
 import com.labteto.dshmobile.uicontract.MediaUiReceipt
 import com.labteto.dshmobile.uicontract.UiDocumentMediaKind
 import com.labteto.dshmobile.uicontract.UiDocumentNode
+import com.labteto.dshmobile.local.model.LocalMediaPage
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -62,7 +64,12 @@ internal fun LocalDocumentMediaNode(node: UiDocumentNode.Media, sessionId: Strin
             context.applicationContext, LocalDocumentMediaEntryPoint::class.java
         ).mediaUiPort()
     }
-    val asset = media.assetForSession(node.assetId, sessionId)?.takeIf { it.kind == node.kind }
+    val pageFlow = remember(media, sessionId) { media.observe(sessionId, media.pageSize) }
+    val page by pageFlow.collectAsStateWithLifecycle(initialValue = LocalMediaPage())
+    // Media Owner's persistent archive invalidates a previously missing file or download.
+    val asset = remember(media, node.assetId, sessionId, node.kind, page) {
+        media.assetForSession(node.assetId, sessionId)?.takeIf { it.kind == node.kind }
+    }
     val localPath = asset?.localPath
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(node.label)
@@ -74,7 +81,7 @@ internal fun LocalDocumentMediaNode(node: UiDocumentNode.Media, sessionId: Strin
                 UiDocumentMediaKind.AUDIO -> LocalDocumentMediaAudio(localPath)
                 UiDocumentMediaKind.VIDEO -> LocalDocumentMediaVideo(localPath)
             }
-            LocalDocumentMediaExport(media, node, sessionId)
+            LocalDocumentMediaExport(media, node, sessionId, localPath)
         }
     }
 }
@@ -107,16 +114,20 @@ private fun LocalDocumentMediaAudio(path: String) {
     val player = remember(path) { MediaPlayer() }
     var ready by remember(path) { mutableStateOf(false) }
     var playing by remember(path) { mutableStateOf(false) }
-    DisposableEffect(path) {
+    DisposableEffect(path, player) {
+        player.setOnPreparedListener { ready = true }
+        player.setOnCompletionListener { playing = false }
+        player.setOnErrorListener { _, _, _ -> ready = false; playing = false; true }
         try {
             player.setDataSource(path)
-            player.prepare()
-            player.setOnCompletionListener { playing = false }
-            ready = true
+            player.prepareAsync()
         } catch (_: Exception) {
             ready = false
         }
-        onDispose { player.release() }
+        onDispose {
+            runCatching { player.stop() }
+            player.release()
+        }
     }
     if (!ready) Text(stringResource(R.string.ui_document_media_playback_failed))
     SyButton(
@@ -137,11 +148,13 @@ private fun LocalDocumentMediaAudio(path: String) {
 
 @Composable
 private fun LocalDocumentMediaVideo(path: String) {
+    var playerView by remember(path) { mutableStateOf<VideoView?>(null) }
     AndroidView(
         factory = { context ->
             VideoView(context).apply {
                 setVideoPath(path)
                 setMediaController(MediaController(context).also { it.setAnchorView(this) })
+                playerView = this
             }
         },
         modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 330.dp),
@@ -150,12 +163,16 @@ private fun LocalDocumentMediaVideo(path: String) {
             view.tag = path
         } },
     )
+    DisposableEffect(playerView) {
+        onDispose { playerView?.stopPlayback() }
+    }
     Text(stringResource(R.string.ui_document_media_video_hint))
 }
 
 /** The Media Owner checks session scope a second time immediately before copying bytes. */
 @Composable
-private fun LocalDocumentMediaExport(media: MediaUiPort, node: UiDocumentNode.Media, sessionId: String) {
+private fun LocalDocumentMediaExport(media: MediaUiPort, node: UiDocumentNode.Media,
+    sessionId: String, originalPath: String) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var result by remember(node.assetId, sessionId) { mutableStateOf<String?>(null) }
@@ -164,11 +181,11 @@ private fun LocalDocumentMediaExport(media: MediaUiPort, node: UiDocumentNode.Me
         UiDocumentMediaKind.AUDIO -> "audio/*"
         UiDocumentMediaKind.VIDEO -> "video/*"
     }
-    val suffix = when (node.kind) {
-        UiDocumentMediaKind.IMAGE -> ".png"
-        UiDocumentMediaKind.AUDIO -> ".mp3"
-        UiDocumentMediaKind.VIDEO -> ".mp4"
-    }
+    // Preserve the original encoded format; never relabel JPEG/OGG/WEBM as PNG/MP3/MP4.
+    val suffix = originalPath.substringAfterLast('.', "").lowercase()
+        .takeIf { it in setOf("png", "jpg", "jpeg", "webp", "gif", "mp3", "ogg",
+            "wav", "m4a", "aac", "flac", "mp4", "webm", "mov", "mkv") }
+        ?.let { ".$it" } ?: ".bin"
     val cancelled = stringResource(R.string.ui_document_media_export_cancelled)
     val exporting = stringResource(R.string.ui_document_media_exporting)
     val exported = stringResource(R.string.ui_document_media_exported)

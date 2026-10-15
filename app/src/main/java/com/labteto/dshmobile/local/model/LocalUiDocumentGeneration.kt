@@ -100,7 +100,9 @@ internal class LocalUiDocumentGeneration @Inject constructor(
                     val value = Json.parseToJsonElement(raw).jsonObject.toMutableMap()
                     val previous = withContext(Dispatchers.IO) {
                         documents.read(sessionId, setOf(command.messageId), budget, knownScenes)
-                            .firstOrNull { it.recoveryNotice == null && it.document.source == source }?.document
+                            .firstOrNull { it.recoveryNotice == null &&
+                                it.provenance.origin == com.labteto.dshmobile.uicontract.UiDocumentOrigin.MODEL &&
+                                it.document.source == source }?.document
                     }
                     val documentId = previous?.documentId ?: UUID.randomUUID().toString()
                     val revision = previous?.revision?.let { Math.addExact(it, 1L) } ?: 0L

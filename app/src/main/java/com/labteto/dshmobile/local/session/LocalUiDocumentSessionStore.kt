@@ -43,8 +43,11 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
     fun publish(document: UiDocument, provenance: UiDocumentProvenance, pendingApprovalId: String?,
         expected: UiDocument?, budget: UiDocumentBudget, knownScenes: Set<UiSceneId>): Boolean {
         val source = document.source
-        val current = read(source.sessionId, setOf(source.messageId), budget, knownScenes)
-            .firstOrNull { it.recoveryNotice == null && it.document.source == source }?.document
+        val occupied = read(source.sessionId, setOf(source.messageId), budget, knownScenes)
+            .firstOrNull { it.document.documentId == document.documentId }
+        if (occupied?.recoveryNotice != null || occupied?.document?.source?.let { it != source } == true)
+            return false
+        val current = occupied?.document
         if (current != expected) return false
         if (current == null) {
             if (document.revision != 0L) return false
@@ -76,10 +79,24 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
         val key = ReadKey(log.historyInstanceIdentity, log.resetGeneration, mutableRevision.value,
             sessionId, messageIds.toSet(), budget, knownScenes.toSet())
         lastRead?.takeIf { it.key == key }?.let { return it.records }
-        val found = log.latestMatchingByKey(setOf(UI_DOCUMENT_EVENT), messageIds) { event ->
-            runCatching { event.data["source"]?.jsonObject?.get("messageId")?.jsonPrimitive?.content }.getOrNull()
+        // A user design, media summary and Work progress may share the same message.
+        // Stream durable facts without creating a second persisted document authority.
+        val found = log.withEvents { stream ->
+            val newest = LinkedHashMap<Pair<String, String>, LocalSessionEventLog.Event>()
+            stream.forEach { event ->
+                if (event.type != UI_DOCUMENT_EVENT) return@forEach
+                val anchor = runCatching {
+                    event.data["source"]?.jsonObject?.get("messageId")?.jsonPrimitive?.content
+                }.getOrNull() ?: return@forEach
+                if (anchor !in messageIds) return@forEach
+                val documentId = runCatching {
+                    event.data["definition"]?.jsonObject?.get("documentId")?.jsonPrimitive?.content
+                }.getOrNull() ?: "malformed:${event.sequence}"
+                newest[anchor to documentId] = event
+            }
+            newest.values.sortedBy { it.sequence }
         }
-        val records = found.values.sortedBy { it.sequence }.mapNotNull { event ->
+        val records = found.mapNotNull { event ->
             val anchorId = runCatching { event.data["source"]?.jsonObject?.get("messageId")?.jsonPrimitive?.content }
                 .getOrNull()?.takeIf { it in messageIds } ?: return@mapNotNull null
             try {
@@ -97,7 +114,12 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
                 val fallback = runCatching { definition.jsonObject["fallbackText"]?.jsonPrimitive?.content }.getOrNull().orEmpty()
                     .takeIf { it.length <= budget.maxTextChars }.orEmpty()
                 // An incompatible historical card is readable but cannot regain executable actions.
-                val document = decoded.getOrNull() ?: UiDocument(1, "unavailable:${event.sequence}", source, 0,
+                val originalId = runCatching {
+                    definition.jsonObject["documentId"]?.jsonPrimitive?.content
+                }.getOrNull()?.takeIf { it.isNotBlank() && it.length <= 200 &&
+                    it.none(Char::isISOControl) }
+                val document = decoded.getOrNull() ?: UiDocument(1,
+                    originalId ?: "unavailable:${event.sequence}", source, 0,
                     "", if (fallback.isBlank()) emptyList() else listOf(UiDocumentNode.Text("fallback", fallback)),
                     emptyList(), "")
                 val provenance = value.getValue("provenance").jsonObject

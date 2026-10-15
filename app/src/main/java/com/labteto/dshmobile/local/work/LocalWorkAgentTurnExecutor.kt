@@ -601,7 +601,7 @@ internal class LocalWorkAgentTurnExecutor(
                             // Event is durable before exposing a UI snapshot. A broken card must
                             // never abort a completed tool or alter its execution result.
                             try {
-                                workUiDocumentPublisher.onToolResult(binding)
+                                workUiDocumentPublisher.onToolResult(binding, sourceMessageId)
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
                             } catch (failure: Exception) {

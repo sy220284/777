@@ -12,7 +12,6 @@ import com.labteto.dshmobile.uicontract.UiDocumentBinding
 import com.labteto.dshmobile.uicontract.UiDocument
 import com.labteto.dshmobile.uicontract.UiDocumentProvenance
 import com.labteto.dshmobile.uicontract.UiDocumentOrigin
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.jsonPrimitive
@@ -32,9 +31,13 @@ internal class LocalWorkUiDocumentPublisher @Inject constructor(
     private val budget = UiDocumentBudget(512, 16, 262_144)
     private val scenes = emptySet<UiSceneId>()
 
-    fun onToolResult(binding: LocalWorkRunBinding) {
+    fun onToolResult(binding: LocalWorkRunBinding, originatingMessageId: String?) {
         val snapshot = binding.state.value
-        val sourceMessage = snapshot.messages.lastOrNull { it.role == "user" } ?: return
+        // The authenticated Work turn already captured its source message before execution.
+        // A long tool-only transcript may evict that user message from the in-memory window.
+        val sourceMessageId = originatingMessageId?.takeIf(String::isNotBlank)
+            ?: snapshot.messages.lastOrNull { it.role == "user" }?.id
+            ?: return
         // Only the current session's actual identity can grant live actions or bindings.
         val identity = synchronized(runtime.foregroundRunHandle.lock) {
             val current = runtime.state.value
@@ -42,20 +45,21 @@ internal class LocalWorkUiDocumentPublisher @Inject constructor(
                 current.usageMode == LocalUsageMode.WORK) runtime.uiBindingIdentity(current)
             else null
         }
-        val source = UiDocumentSource(
+        val docId = "work-live:${sourceMessageId}"
+        val records = documents.read(binding.sessionId, setOf(sourceMessageId), budget, scenes)
+        // Work progress has its own identity, independent of user/model cards on this message.
+        val existing = records.firstOrNull { it.document.documentId == docId }
+        if (existing?.recoveryNotice != null) return
+        val previous = existing?.document
+        // Preserve the source provenance across foreground/background transitions.
+        val source = previous?.source ?: UiDocumentSource(
             sessionId = binding.sessionId,
-            messageId = sourceMessage.id,
+            messageId = sourceMessageId,
             contextGeneration = identity?.contextGeneration ?: 0L,
             profileId = identity?.profileId ?: snapshot.modelState.modelSelection.activeProfileId,
             projectId = identity?.projectId ?: snapshot.projectId,
             workMode = true,
         )
-        val records = documents.read(binding.sessionId, setOf(sourceMessage.id), budget, scenes)
-        // Never overwrite a user-requested design or revive an undecodable legacy document.
-        val last = records.firstOrNull { it.document.source.messageId == sourceMessage.id }
-        if (last != null && (last.recoveryNotice != null ||
-            !last.document.documentId.startsWith("work-live:"))) return
-        val previous = last?.document?.takeIf { it.source == source }
         val history = binding.eventLog.pageBeforeChronological(limit = 120)
         val toolRows = history.asSequence().filter { it.type == "tool/result" }.toList().takeLast(24)
             .map { event ->
@@ -78,7 +82,7 @@ internal class LocalWorkUiDocumentPublisher @Inject constructor(
         )
         val revision = previous?.revision?.let { Math.addExact(it, 1L) } ?: 0L
         val document = UiDocument(
-            1, previous?.documentId ?: "work-live:${UUID.randomUUID()}",
+            1, docId,
             source, revision, "Work 实时活动", nodes, emptyList(),
             "工具事件已记录；当前结果未经独立核验。",
         )

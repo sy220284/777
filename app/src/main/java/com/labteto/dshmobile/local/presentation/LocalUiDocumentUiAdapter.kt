@@ -68,7 +68,14 @@ internal class LocalUiDocumentUiAdapter(
             val records = id?.let { store.read(it.sessionId, context.messages, generation.budget, knownScenes) }.orEmpty()
             UiDocumentsSceneSnapshot(id?.sessionId, records.map { record ->
                 val document = record.document
-                val current = record.recoveryNotice == null && sourceMatches(document.source, id, context.workMode)
+                val readOnlyWorkProgress = record.provenance.origin ==
+                    com.labteto.dshmobile.uicontract.UiDocumentOrigin.LOCAL &&
+                    document.documentId == "work-live:${document.source.messageId}" &&
+                    document.actions.isEmpty() && document.source.workMode &&
+                    context.workMode && id?.sessionId == document.source.sessionId
+                // A detached Work card has no actions and cannot grant expired permissions.
+                val current = record.recoveryNotice == null &&
+                    (sourceMatches(document.source, id, context.workMode) || readOnlyWorkProgress)
                 UiDocumentSnapshot(document, record.provenance, document.actions.associate { action ->
                     val reason = when {
                         !current -> UiCommandRejection.STALE_IDENTITY
@@ -187,10 +194,16 @@ internal class LocalUiDocumentUiAdapter(
                         )
                     }
                 }
+                // Each local template has a stable independent document identity.
+                // Never replace the Work progress card or another local/model card merely
+                // because they share the same message and Session context.
+                val localDocId = "local-template:" + java.util.UUID.nameUUIDFromBytes(
+                    "${command.template}:${source}".toByteArray(Charsets.UTF_8)).toString()
                 val previous = store.read(source.sessionId, setOf(source.messageId), generation.budget, knownScenes)
-                    .firstOrNull { it.recoveryNotice == null && it.document.source == source }?.document
+                    .firstOrNull { it.recoveryNotice == null &&
+                        it.document.documentId == localDocId && it.document.source == source }?.document
                 val built = com.labteto.dshmobile.uicontract.LocalUiDocumentBuilder.build(
-                    previous?.documentId ?: java.util.UUID.randomUUID().toString(), source,
+                    localDocId, source,
                     previous?.revision?.let { Math.addExact(it, 1L) } ?: 0L, data, generation.budget, knownScenes)
                 val document = built.getOrNull()
                     ?: return@withContext UiDocumentReceipt.Fallback(messageText, "ui_document_unavailable")

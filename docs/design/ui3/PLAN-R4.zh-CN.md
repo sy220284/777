@@ -1,5 +1,8 @@
 # 777 UI v3.0-R4 · 可插拔界面底座与存量问题治理完整实施方案
 
+> **2026-10-16 实施范围修订（不降低生产接入门禁）：** Next UI 包仅作为独立编译与真实 Owner Port/Host/Renderer 接线的架构验证切片；不再要求 Next 复刻 75 项 V6 页面，也不得利用共用简化渲染器虚报完整功能。完整生产 UI 移包任务集中于 V6，现有 Legacy V6 App Shell 必须逐项退出到 :ui-pack-v6 才算迁移完成。Host 继续要求生产包 75 项独立真实场景覆盖；Next 探针不得被选为全应用生产 UI。这只能证明架构切片可插拔，**不等于已完成两个完整界面的热插拔对比或全业务交互验收**。
+
+
 > **方案定位：** 在 v2.2-R2 核实基础上做架构层级升级，**以本文件第 0–13 章及新增第 13.7 节为当前实施决策；第 13.7 节给出最新主线对旧基线的修订与验收条件**；所附 v2.2-R2 全文仅作已核实问题和原技术路线的历史底稿，出现冲突以 v3.0 为准。
 >
 > **R3 起草核查基线：** `sy220284/777` `main @ 3b243ec966b147d09f5210011092af5a3329b73e`（2026-10-13）；**R4 最新复核基线见第 13.1 节**。已核对 `ARCHITECTURE.md`、`LocalFeatureCatalog.kt`、`LocalFeaturePageContent.kt`、`LocalShellUiContribution.kt`、`LocalHarnessScreen.kt`、`LocalConversationSurface.kt`、`LocalConversationComposer.kt`、`LocalFeatureUiActions.kt` 和相关状态/时间线/设计组件；这是静态设计审查，非新功能实现或设备验收。

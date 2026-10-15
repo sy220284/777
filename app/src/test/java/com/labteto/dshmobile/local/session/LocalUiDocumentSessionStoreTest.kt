@@ -54,4 +54,44 @@ class LocalUiDocumentSessionStoreTest {
             registry.clearAndEvict(setOf("session"))
         } finally { directory.deleteRecursively() }
     }
+    @Test fun multipleCardsOnOneMessageKeepIndependentRevisionsAcrossReopen() {
+        val directory = Files.createTempDirectory("ui-doc-multi").toFile()
+        try {
+            val registry = LocalSessionEventLogRegistry(directory, Json)
+            val store = LocalUiDocumentSessionStore(registry)
+            val designed = document("same")
+            val progress = designed.copy(
+                documentId = "work-live:same", title = "实时事件",
+                nodes = listOf(UiDocumentNode.Text("event", "已持久化工具结果")),
+                fallbackText = "执行事件", actions = emptyList(),
+            )
+            assertTrue(store.publish(designed, provenance, null, null, budget, emptySet()))
+            assertTrue(store.publish(progress, provenance, null, null, budget, emptySet()))
+            val progressNew = progress.copy(revision = 1, title = "实时事件更新")
+            assertTrue(store.publish(progressNew, provenance, null, progress, budget, emptySet()))
+            assertFalse(store.publish(progress.copy(revision = 1), provenance, null, progress, budget, emptySet()))
+            val restored = LocalUiDocumentSessionStore(registry).read(
+                "session", setOf("same"), budget, emptySet())
+            assertEquals(2, restored.size)
+            assertEquals(designed, restored.single { it.document.documentId == designed.documentId }.document)
+            assertEquals(progressNew, restored.single { it.document.documentId == progressNew.documentId }.document)
+            registry.clearAndEvict(setOf("session"))
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test fun unrelatedCardCannotClaimAnotherCardRevision() {
+        val directory = Files.createTempDirectory("ui-doc-source").toFile()
+        try {
+            val registry = LocalSessionEventLogRegistry(directory, Json)
+            val store = LocalUiDocumentSessionStore(registry)
+            val first = document("same")
+            assertTrue(store.publish(first, provenance, null, null, budget, emptySet()))
+            assertFalse(store.publish(first.copy(
+                source = first.source.copy(contextGeneration = 999),
+                revision = 1), provenance, null, first, budget, emptySet()))
+            assertEquals(first, store.read("session", setOf("same"), budget, emptySet()).single().document)
+            registry.clearAndEvict(setOf("session"))
+        } finally { directory.deleteRecursively() }
+    }
+
 }
