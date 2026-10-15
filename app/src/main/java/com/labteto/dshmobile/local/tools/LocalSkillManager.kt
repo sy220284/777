@@ -156,11 +156,19 @@ internal class LocalSkillStore(
                     if (!target.exists() || target.readText() != text) workspace.write(path, text)
                 }
             }
-            val next = buildLocalSkillDocument(
+            // App-owned instructions are versioned; preserve only the user's invocation toggle.
+            val disabled = runCatching { !workspace.skillMetadata(preset.id).modelInvocable }.getOrDefault(false)
+            val baseDocument = buildLocalSkillDocument(
                 preset.id, preset.description, preset.instructions, preset.whenToUse, preset.title,
             )
+            val next = if (disabled) baseDocument.replaceFirst(
+                "\n---\n", "\ndisable-model-invocation: true\n---\n",
+            ) else baseDocument
             val path = ".dsh/skills/${preset.id}/SKILL.md"
-            if (workspace.readSkill(preset.id) != next) workspace.write(path, next)
+            // A malformed/oversized shipped file should recover to the current official version.
+            if (runCatching { workspace.readSkill(preset.id) }.getOrNull() != next) {
+                workspace.write(path, next)
+            }
         }
     }
 
