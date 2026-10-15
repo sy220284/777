@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.files.LocalWorkspace
+import com.labteto.dshmobile.local.tools.LocalPinnedInvocation
 import java.nio.file.Files
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -8,6 +9,43 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalWorkSkillActivationTest {
+    @Test
+    fun pinnedSkillLoadsFullInstructionsWithoutWaitingForModelToDiscoverIt() {
+        val root = Files.createTempDirectory("skill-pins").toFile()
+        try {
+            val workspace = LocalWorkspace(root)
+            workspace.write(".dsh/skills/code-review/SKILL.md",
+                "---\ndescription: review\n---\n# Evidence rules\nOnly report confirmed defects.")
+            val pinned = listOf(
+                LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "code-review"),
+                LocalPinnedInvocation(LocalPinnedInvocation.Kind.CONNECTOR, "github"),
+            )
+            val first = resolveLocalWorkSkillGuidance(workspace, "继续", pinned)
+            val second = resolveLocalWorkSkillGuidance(workspace, "继续下一轮", pinned)
+            assertTrue(first.contains("Only report confirmed defects."))
+            assertTrue(first.contains("已选连接器：github"))
+            assertTrue(second.contains("Only report confirmed defects."))
+            assertFalse(resolveLocalWorkSkillGuidance(workspace, "继续").contains("Only report confirmed defects."))
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test
+    fun explicitOnlySkillRunsWhenPinnedButRemovedSkillDoesNot() {
+        val root = Files.createTempDirectory("skill-pin-disabled").toFile()
+        try {
+            val workspace = LocalWorkspace(root)
+            workspace.write(".dsh/skills/private-doc/SKILL.md",
+                "---\ndescription: private\ndisable-model-invocation: true\n---\nSecret policy.")
+            val pinned = listOf(
+                LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "private-doc"),
+                LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "missing-skill"),
+            )
+            val guidance = resolveLocalWorkSkillGuidance(workspace, "继续", pinned)
+            assertTrue(guidance.contains("Secret policy."))
+            assertFalse(guidance.contains("missing-skill"))
+        } finally { root.deleteRecursively() }
+    }
+
     @Test
     fun chosenSkillIsLoadedBeforeModelRequestAndIsNotGuesswork() {
         val root = Files.createTempDirectory("selected-skill").toFile()

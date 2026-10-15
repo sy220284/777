@@ -33,6 +33,102 @@ import org.junit.Test
 
 class LocalToolExecutionCoordinatorTest {
     @Test
+    fun pinnedGitHubIsLoadedAcrossTurnsAndNeverBypassesCredentialGate() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("github_list_prs", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, family = "GitHub", keywords = setOf("github")) { ToolResult("ok") })
+            register(tool("unrelated_task", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, keywords = setOf("处理")) { ToolResult("ok") })
+        }
+        var pinned = listOf("github")
+        val coordinator = coordinator(registry, pinnedConnectorIds = { pinned })
+        coordinator.prepareWorkTurnCapabilities("处理当前项目", emptyList(), { true })
+        assertEquals("github_list_prs", coordinator.enabledOptionalSnapshot().first())
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", emptyList(), { true })
+        assertTrue("github_list_prs" in coordinator.enabledOptionalSnapshot())
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", emptyList(), { false })
+        assertFalse("github_list_prs" in coordinator.enabledOptionalSnapshot())
+        pinned = emptyList()
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", emptyList(), { true })
+        assertFalse("github_list_prs" in coordinator.enabledOptionalSnapshot())
+    }
+
+    @Test
+    fun pinnedMcpLoadsOnlyRegisteredServiceToolsAheadOfHeuristicTools() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("mcp_figma_get_file", ToolAccess.NETWORK, ToolApprovalPolicy.ALWAYS,
+                exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("figma")) { ToolResult("ok") })
+            register(tool("mcp_other_get_file", ToolAccess.NETWORK, ToolApprovalPolicy.ALWAYS,
+                exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("figma")) { ToolResult("ok") })
+            register(tool("mcp_figma_fake", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, family = "Other", keywords = setOf("fake")) { ToolResult("ok") })
+            register(tool("background_job", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, keywords = setOf("设计")) { ToolResult("ok") })
+        }
+        var pinned = listOf("figma")
+        val coordinator = coordinator(registry, pinnedConnectorIds = { pinned })
+        coordinator.prepareWorkTurnCapabilities("设计", emptyList(), { false })
+        val selected = coordinator.enabledOptionalSnapshot().toList()
+        assertEquals("mcp_figma_get_file", selected.first())
+        assertTrue("background_job" in selected)
+        assertFalse("mcp_other_get_file" in selected)
+        assertFalse("mcp_figma_fake" in selected)
+        pinned = emptyList()
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", emptyList(), { false })
+        assertFalse("mcp_figma_get_file" in coordinator.enabledOptionalSnapshot())
+    }
+
+    @Test
+    fun pinnedConnectorRecoversPriorityAfterLaterModelStepHeuristics() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("mcp_figma_frame", ToolAccess.NETWORK, ToolApprovalPolicy.ALWAYS,
+                exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("figma")) { ToolResult("ok") })
+            register(tool("autodiscovered", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, keywords = setOf("查找")) { ToolResult("ok") })
+            register(tool("github_prs", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, family = "GitHub", keywords = setOf("github")) { ToolResult("ok") })
+        }
+        val c = coordinator(registry, pinnedConnectorIds = { listOf("figma", "github") })
+        c.prepareWorkTurnCapabilities("继续", emptyList(), { false })
+        c.enableTaskRelevantOptionalTools("查找", prioritize = true)
+        assertEquals("autodiscovered", c.enabledOptionalSnapshot().first())
+        c.prioritizePinnedForModelStep()
+        assertEquals("mcp_figma_frame", c.enabledOptionalSnapshot().first())
+        // A fixed but unauthenticated GitHub may never appear during a later model step.
+        assertFalse("github_prs" in c.enabledOptionalSnapshot())
+    }
+
+    @Test
+    fun pinnedImagegenMakesRealMediaToolsVisibleAcrossStepsWithoutAutoSubmitting() = runBlocking {
+        val registry = ToolRegistry().apply {
+            for (name in listOf("media_image_options", "media_image_create", "media_image_status")) {
+                register(tool(
+                    name, if (name == "media_image_create") ToolAccess.PRIVILEGED else ToolAccess.READ_ONLY,
+                    if (name == "media_image_create") ToolApprovalPolicy.ALWAYS else ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL, family = "媒体创作",
+                    keywords = setOf("生图"),
+                ) { ToolResult("stub") })
+            }
+        }
+        var selected = listOf("imagegen")
+        val coordinator = coordinator(registry, pinnedSkillIds = { selected })
+        coordinator.prepareWorkTurnCapabilities("继续", enableGitHub = false)
+        assertTrue("media_image_create" in coordinator.enabledOptionalSnapshot())
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", enableGitHub = false)
+        coordinator.prioritizePinnedForModelStep()
+        assertTrue("media_image_options" in coordinator.enabledOptionalSnapshot())
+        selected = emptyList()
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", enableGitHub = false)
+        assertFalse("media_image_create" in coordinator.enabledOptionalSnapshot())
+    }
+
+    @Test
     fun githubKeywordPreactivationCannotBypassNegationOrCredentialGate() = runBlocking {
         val registry = ToolRegistry().apply {
             register(tool(
@@ -1257,6 +1353,8 @@ class LocalToolExecutionCoordinatorTest {
         ) -> Unit = { _, _, _ -> },
         executionIdFactory: () -> String = { "exec-test" },
         networkSearchEnabled: () -> Boolean = { true },
+        pinnedConnectorIds: () -> List<String> = { emptyList() },
+        pinnedSkillIds: () -> List<String> = { emptyList() },
     ) = LocalToolExecutionCoordinator(
         registry = registry,
         currentSessionId = { "s1" },
@@ -1266,6 +1364,8 @@ class LocalToolExecutionCoordinatorTest {
         recordExecutionStarted = recordExecutionStarted,
         executionIdFactory = executionIdFactory,
         networkSearchEnabled = networkSearchEnabled,
+        pinnedConnectorIds = pinnedConnectorIds,
+        pinnedSkillIds = pinnedSkillIds,
     )
 
     private fun webFetchTool(execute: suspend () -> ToolResult) = HarnessTool(
