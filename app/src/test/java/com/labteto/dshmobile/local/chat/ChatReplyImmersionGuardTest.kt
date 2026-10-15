@@ -75,7 +75,7 @@ class ChatReplyImmersionGuardTest {
             onEvent = { action, _ -> actions += action },
         )
 
-        assertEquals("作为语言模型，我没有实体身体。", result)
+        assertEquals("我是语言模型，所以只能通过文字交流。", result)
         assertEquals(listOf("retry", "accepted-with-warning"), actions)
     }
 

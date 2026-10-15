@@ -28,6 +28,7 @@ class LocalWorkRuntimeContextTest {
             model = "gpt-5.6-luna",
             baseUrl = "https://api.openai.com/v1",
             profile = profile,
+            task = "检查模型配置与额度",
             configuredProfiles = listOf(profile, LocalModelProfile(
                 id = "secondary-route", model = "MiniMax-M3",
                 baseUrl = "https://api.minimaxi.com/v1", provider = "MiniMax",
@@ -36,8 +37,7 @@ class LocalWorkRuntimeContextTest {
         )
 
         assertTrue(context.contains("777 本机 Harness · 工作模式"))
-        assertTrue(context.contains("用户指令优先级"))
-        assertTrue(context.contains("文件要求与用户本轮要求冲突时，按用户要求推进"))
+        assertFalse(context.contains("用户指令优先级"))
         assertTrue(context.contains("工作区：/workspace"))
         assertTrue(context.contains("当前路由模型：gpt-5.6-luna"))
         assertTrue(context.contains("模型提供方：OpenAI"))
@@ -46,9 +46,32 @@ class LocalWorkRuntimeContextTest {
         assertTrue(context.contains("已保存模型档案"))
         assertTrue(context.contains("MiniMax-M3（profileId=secondary-route）"))
         assertFalse(context.contains("secret-key-reference"))
-        assertTrue(context.contains("environment_info"))
-        assertTrue(context.contains("读取工作区文件使用 read"))
+        assertFalse(context.contains("TokenUsageAnalyticsStore"))
         assertTrue(context.contains("用户规则：完成后复查。"))
         assertFalse(context.contains("account-private-reference"))
     }
+    @Test
+    fun businessBudgetAndSalesStatsDoNotLoadModelTokenLedger() {
+        for (task in listOf("写一份预算表", "统计销售额")) {
+            val prompt = withWorkRuntimeContext("", "/workspace", "model", "", null, task = task)
+            assertFalse(prompt.contains("TokenUsageAnalyticsStore"))
+        }
+        val modelUsage = withWorkRuntimeContext("", "/workspace", "model", "", null, task = "检查模型用量")
+        assertTrue(modelUsage.contains("TokenUsageAnalyticsStore"))
+    }
+
+    @Test
+    fun ordinaryRequestSkipsIrrelevantCapabilityAndUsageGuides() {
+        val context = withWorkRuntimeContext(
+            context = "当前需求", workspacePath = "/workspace", model = "test-model",
+            baseUrl = "", profile = null, task = "写一个短诗",
+        )
+        assertFalse(context.contains("list_subagent_models"))
+        assertFalse(context.contains("TokenUsageAnalyticsStore"))
+        assertFalse(context.contains("session_event_search"))
+        assertFalse(context.contains("媒体工具"))
+        assertFalse(context.contains("用户指令优先级"))
+        assertTrue(context.contains("capability_search"))
+    }
+
 }

@@ -46,6 +46,15 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /** Only string IDs are valid; a drifting model field must not abort the other members. */
+/** Share identical status-update rules while retaining separate per-character evidence. */
+internal fun compactGroupPostTurnRules(prompts: List<String>): Pair<String, List<String>> {
+    val delimiter = "\n规则：\n"
+    if (prompts.size < 2) return "" to prompts
+    val rules = prompts.map { it.substringAfterLast(delimiter, "") }.distinct()
+    if (rules.size != 1 || rules.single().isBlank()) return "" to prompts
+    return "规则：\n${rules.single()}" to prompts.map { it.substringBeforeLast(delimiter) }
+}
+
 internal fun validGroupGalleryId(item: JsonObject): String? =
     (item["galleryId"] as? JsonPrimitive)
         ?.takeIf { it.isString }
@@ -507,8 +516,8 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             appendLine("""{"plans":[{"galleryId":"人物ID","plan":{"state":{},"suggestions":[],"turnSignificance":"NONE|MINOR|MAJOR","diaryDelta":null}}],"observerDiaries":[{"galleryId":"人物ID","turnSignificance":"NONE|MINOR|MAJOR","diaryDelta":null}]}""")
             appendLine("每个 plan 必须分别遵循对应角色下面的状态更新规则；suggestions 固定输出空数组，禁止附加解释。")
             appendLine("observerDiaries 只给本轮在场但未发言的角色记录其亲历后的主观记忆，不更新 state；无持续影响时 diaryDelta=null。")
-            replies.forEach { reply ->
-                val memberPrompt = chatTurnCoordinator.postTurnPrompt(
+            val memberPrompts = replies.map { reply ->
+                chatTurnCoordinator.postTurnPrompt(
                     persona = reply.persona,
                     state = reply.member.chatState.withContextForPlanner(
                         snapshot.chat.groupChat.context,
@@ -520,6 +529,13 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     "不要继续扮演角色，不要解释过程，不要使用 Markdown，只输出一个 JSON 对象。",
                     "不要继续扮演角色，不要解释过程。",
                 )
+            }
+            val (sharedRules, personContexts) = compactGroupPostTurnRules(memberPrompts)
+            if (sharedRules.isNotBlank()) {
+                appendLine("【所有人物共用的状态输出规则】")
+                appendLine(sharedRules)
+            }
+            replies.zip(personContexts).forEach { (reply, memberPrompt) ->
                 appendLine()
                 appendLine("===== 人物 ${reply.member.galleryId} / ${reply.persona.name} =====")
                 appendLine(memberPrompt)

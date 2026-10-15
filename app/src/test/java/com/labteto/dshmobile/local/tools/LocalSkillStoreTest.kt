@@ -117,15 +117,27 @@ class LocalSkillStoreTest {
     }
 
     @Test
-    fun editedAndRemovedPresetsStayUnchangedOnSeedRestart() = inWorkspace { store, workspace, _ ->
+    fun installedOfficialPresetsRefreshWhileRemovedOnesStayRemoved() = inWorkspace { store, workspace, _ ->
         store.seedOnce()
         store.updateDocument("code-review", store.readDocument("code-review") + "\n用户自定义后续规则\n")
         store.remove("research-check")
         store.seedOnce()
-        assertTrue(store.readDocument("code-review").contains("用户自定义后续规则"))
+        assertFalse(store.readDocument("code-review").contains("用户自定义后续规则"))
+        assertTrue(store.readDocument("code-review").contains("用途："))
         assertFalse(workspace.skills().contains("research-check"))
     }
 
+
+    @Test
+    fun disablingAnOfficialSkillSurvivesVersionRefresh() = inWorkspace { store, workspace, _ ->
+        store.seedOnce()
+        store.setModelInvocable("code-review", false)
+        store.updateDocument("code-review", store.readDocument("code-review") + "\n旧附加说明\n")
+        store.seedOnce()
+        assertFalse(store.installed().first { it.name == "code-review" }.modelInvocable)
+        assertFalse(store.readDocument("code-review").contains("旧附加说明"))
+        assertTrue(store.readDocument("code-review").contains("用途："))
+    }
 
     @Test
     fun existingCustomSkillReadsChineseHeadingAndRefreshesAfterRename() = inWorkspace { store, workspace, _ ->
@@ -151,15 +163,15 @@ class LocalSkillStoreTest {
         assertEquals("完整读取", store.installed().single().description)
     }
 
-    @Test fun oversizedSkillIsIsolatedFromCatalogAndBootstrap() = inWorkspace { store, workspace, root ->
+    @Test fun oversizedOfficialSkillIsRepairedFromBundledVersion() = inWorkspace { store, workspace, root ->
         store.seedOnce()
         val bad = root.resolve(".dsh/skills/writing-polish/SKILL.md")
         bad.writeText("x".repeat(128 * 1024 + 1))
         store.seedOnce()
         assertTrue(workspace.modelSkillCatalog().contains("code-review"))
-        assertFalse(workspace.modelSkillCatalog().contains("writing-polish"))
-        assertFalse(store.installed().single { it.name == "writing-polish" }.modelInvocable)
-        assertThrows(IllegalArgumentException::class.java) { workspace.readSkill("writing-polish") }
+        assertTrue(workspace.modelSkillCatalog().contains("writing-polish"))
+        assertTrue(store.installed().single { it.name == "writing-polish" }.modelInvocable)
+        assertTrue(workspace.readSkill("writing-polish").contains("用途："))
     }
 
 }

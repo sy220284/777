@@ -217,7 +217,7 @@ class VisionClient @Inject constructor(
                 put("role", "system")
                 put(
                     "content",
-                    "你是 Android 界面视觉分析器。只描述画面中可见事实；需要坐标时按原图像素坐标给出。若无法确定，明确说明不确定。",
+                    "你负责分析用户提供的图片，按当前任务识别可见内容、解释图表或评估界面；区分观察与推断。需要定位时使用原图像素坐标，无法确认时说明。",
                 )
             })
             add(buildJsonObject {

@@ -292,7 +292,7 @@ class LocalVisionPlugin(
             ?: return ToolResult("当前模型密钥尚未配置", isError = true)
         val boundedPrompt = buildString {
             appendLine(intro)
-            appendLine("只描述可见事实，不要臆测画面外内容。")
+            appendLine("依据可见内容回答；需要分析或建议时区分可见事实与推断，不臆测画面外事实。")
             append("任务：")
             append(prompt.take(4_000))
         }

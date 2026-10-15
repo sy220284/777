@@ -113,6 +113,54 @@ class ChatTurnRunnerPromptPartitionTest {
     }
 
     @Test
+    fun authoredVoiceAndJudgmentRemainCompleteUnderLongBiography() {
+        val runner = ChatTurnRunner(
+            personaStore = ChatPersonaStore(File(temporary.root, "persona-voice-budget.json"), json),
+            relationshipEngine = ChatRelationshipEngine(),
+            loreEngine = CharacterLoreEngine(),
+        )
+        val voice = "话很少，但偶尔会用干巴巴的笑话掩饰担心。"
+        val values = "宁可暂时争执，也不拿没有证据的推测当结论。"
+        val persona = PersonaProfile(
+            name = "阿青",
+            coreIdentity = "独立的书店店主",
+            facts = listOf(
+                CharacterFact("voice-unique", CharacterFactCategories.VOICE_STYLE,
+                    voice, provenance = CharacterFactProvenance.USER_CREATED),
+                CharacterFact("values-unique", CharacterFactCategories.VALUES_AND_TRADEOFFS,
+                    values, provenance = CharacterFactProvenance.USER_CREATED),
+                CharacterFact("long-biography", CharacterFactCategories.BIOGRAPHY,
+                    "在旧城区经营书店多年。".repeat(150),
+                    provenance = CharacterFactProvenance.USER_CREATED),
+            ),
+        )
+        val response = runner.prepareProfile(persona, userInput = "最近怎么样？")
+        assertTrue(response.stablePrompt.contains(voice))
+        assertTrue(response.stablePrompt.contains(values))
+        assertFalse(response.stablePrompt.contains("【角色表达脚本】"))
+    }
+
+    @Test
+    fun explicitTopicChangeDoesNotReinjectUnrelatedCurrentImpression() {
+        val runner = ChatTurnRunner(
+            personaStore = ChatPersonaStore(File(temporary.root, "persona-new-topic.json"), json),
+            relationshipEngine = ChatRelationshipEngine(),
+            loreEngine = CharacterLoreEngine(),
+        )
+        val persona = PersonaProfile(name = "阿青", coreIdentity = "喜欢研究天文的园丁")
+        val state = ChatCharacterState(
+            currentUserImpression = "他昨天答应赴约却失约，我还没想通",
+        )
+        val ordinary = runner.prepareProfile(persona, state = state,
+            userInput = "你还在生气吗？")
+        assertTrue(ordinary.dynamicPrompt.contains("你目前怎么看对方"))
+        val redirected = runner.prepareProfile(persona, state = state,
+            userInput = "先换个话题")
+        assertFalse(redirected.dynamicPrompt.contains("你目前怎么看对方"))
+        assertTrue(redirected.stablePrompt.contains("喜欢研究天文"))
+    }
+
+    @Test
     fun emptyDefaultPersonaUsesNeutralUnboundChatPrompt() {
         val runner = ChatTurnRunner(
             personaStore = ChatPersonaStore(File(temporary.root, "personas-unbound.json"), json),

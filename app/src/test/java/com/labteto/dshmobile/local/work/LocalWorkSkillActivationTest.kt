@@ -42,6 +42,24 @@ class LocalWorkSkillActivationTest {
     }
 
     @Test
+    fun matchingCustomSkillsAreDiscoverableWithoutUnrelatedPresets() {
+        val root = Files.createTempDirectory("custom-skill-routing").toFile()
+        try {
+            val workspace = LocalWorkspace(root)
+            workspace.write(".dsh/skills/budget-planner/SKILL.md",
+                "---\ndescription: budget planning\nwhen-to-use: 整理预算\n---\nProduce a budget table.")
+            workspace.write(".dsh/skills/other-task/SKILL.md",
+                "---\ndescription: unrelated action\n---\nDifferent task")
+            val context = resolveLocalWorkSkillGuidance(workspace, "请帮我整理预算")
+            assertTrue(context.contains("budget-planner：budget planning"))
+            assertFalse(context.contains("other-task"))
+            assertFalse(context.contains("Produce a budget table."))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun ordinaryWorkPromptOffersDiscoveryWithoutForcingSkill() {
         val root = Files.createTempDirectory("skill-catalog").toFile()
         try {
@@ -50,8 +68,12 @@ class LocalWorkSkillActivationTest {
                 "---\ndescription: Review code\nwhen-to-use: PR analysis\n---\nInspect call chains.")
             val context = resolveLocalWorkSkillGuidance(workspace, "请检查这个 PR")
             assertTrue(context.contains("code-review：Review code"))
+            assertFalse(relevantSkillIdsForTask("优化prompt结构").contains("code-review"))
+            assertFalse(relevantSkillIdsForTask("Prepare the report").contains("code-review"))
+            assertTrue(relevantSkillIdsForTask("请检查这个 PR").contains("code-review"))
             assertTrue(context.contains("适用：PR analysis"))
             assertFalse(context.contains("Inspect call chains."))
+            assertFalse(resolveLocalWorkSkillGuidance(workspace, "今天天气不错").contains("本地技能"))
         } finally {
             root.deleteRecursively()
         }
