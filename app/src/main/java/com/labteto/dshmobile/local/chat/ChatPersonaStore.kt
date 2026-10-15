@@ -51,41 +51,26 @@ object CharacterFactCategories {
     const val VALUES_AND_TRADEOFFS = "valuesAndTradeoffs"
     const val SUBJECTIVE_BELIEFS = "subjectiveBeliefs"
     const val BIOGRAPHY = "biography"
-    const val DEFINING_CHOICES = "definingChoices"
-    const val EMOTIONAL_IMPRINTS = "emotionalImprints"
-    const val LIFE_GRAVITY = "lifeGravity"
-    const val UNFINISHED_BUSINESS = "unfinishedBusiness"
     const val RELATIONSHIPS = "relationships"
-    const val LIMITS_AND_COSTS = "limitsAndCosts"
-    const val SENSORY_SIGNATURE = "sensorySignature"
     const val PREFERENCES_AND_HABITS = "preferencesAndHabits"
     const val VOICE_STYLE = "voiceStyle"
     const val CUSTOM_FACTS = "customFacts"
-    val canonical = listOf(
-        PERSONALITY, SELF_NARRATIVE, IDENTITY_GAP, VALUES_AND_TRADEOFFS,
-        SUBJECTIVE_BELIEFS, BIOGRAPHY, DEFINING_CHOICES, EMOTIONAL_IMPRINTS,
-        LIFE_GRAVITY, UNFINISHED_BUSINESS, RELATIONSHIPS, LIMITS_AND_COSTS,
-        SENSORY_SIGNATURE, PREFERENCES_AND_HABITS, VOICE_STYLE, CUSTOM_FACTS,
+    /** The complete authoring contract: 10 fact categories plus name/identity/franchise. */
+    val canonical: List<String> = listOf(
+        PERSONALITY, VALUES_AND_TRADEOFFS, SELF_NARRATIVE, SUBJECTIVE_BELIEFS,
+        IDENTITY_GAP, PREFERENCES_AND_HABITS, VOICE_STYLE, BIOGRAPHY,
+        RELATIONSHIPS, CUSTOM_FACTS,
     )
-    /** No longer offered for new characters; old saved facts retain their original category. */
-    val removedFromNewProfiles: Set<String> = setOf(
-        DEFINING_CHOICES, EMOTIONAL_IMPRINTS, LIFE_GRAVITY,
-        UNFINISHED_BUSINESS, LIMITS_AND_COSTS, SENSORY_SIGNATURE,
+    val selectable: List<String> = canonical
+
+    // Reject six removed category codes at every read/write boundary; never map or recover them.
+    // All other nonblank category names remain valid for user-defined custom facts.
+    private val unsupportedCategories = setOf(
+        "definingChoices", "emotionalImprints", "lifeGravity",
+        "unfinishedBusiness", "limitsAndCosts", "sensorySignature",
     )
-    // 编辑器和人物详情使用同一条「自身 → 内在 → 表达 → 经历 → 关系」顺序。
-    // 旧数据的 canonical 保持原样，不改变序列化和兼容路径。
-    val selectable: List<String> = listOf(
-        PERSONALITY,
-        VALUES_AND_TRADEOFFS,
-        SELF_NARRATIVE,
-        SUBJECTIVE_BELIEFS,
-        IDENTITY_GAP,
-        PREFERENCES_AND_HABITS,
-        VOICE_STYLE,
-        BIOGRAPHY,
-        RELATIONSHIPS,
-        CUSTOM_FACTS,
-    )
+    fun isSupported(category: String): Boolean =
+        category.isNotBlank() && category !in unsupportedCategories
 }
 
 /** Actual source of character facts; unrelated chat state is owned by its runtime. */
