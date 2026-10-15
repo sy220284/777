@@ -18,8 +18,8 @@
     <string name="persona_v4_story_stage_label">当前剧情阶段</string>
     <string name="persona_v4_story_stage_hint">可选择已有阶段或输入自定义标识。阶段调整控制人物设定与世界书的可用范围，返回较早阶段会收回后续阶段设定的解锁。已发生的聊天与人物经历不会清空；要重新经历剧情，请新建故事。空闲故事保存后立即生效，回复中重新进入故事生效。</string>
     <string name="persona_vnext_saved_stage_path">当前故事已保存的知识路径：%1$s</string>
-    <string name="persona_v4_fact_stage">适用剧情阶段 ID（空白为基础事实）</string>
-    <string name="persona_v4_fact_perspective">事实陈述视角（可选）</string>
-    <string name="persona_v4_fact_source">来源依据（可选）</string>
+    <string name="persona_v4_fact_stage">适用剧情阶段（留空则一直生效）</string>
+    <string name="persona_v4_fact_perspective">这是谁的看法（留空默认为本人）</string>
+    <string name="persona_v4_fact_source">设定出处或作者备注（可选）</string>
     <string name="persona_v4_ai_coverage">主要人物设定已填写 %1$d/9 项；缺少依据的内容仍可在下方补充。</string>
 </resources>
