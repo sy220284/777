@@ -1277,13 +1277,13 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "create_chat": {
-          "ownerPort": "SessionUiPort.submit(SessionUiCommand.Create(mode=CHAT, usageMode=CHAT))",
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.Create(mode=INDEPENDENT, usageMode=CHAT))",
           "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "create_work": {
-          "ownerPort": "SessionUiPort.submit(SessionUiCommand.Create(mode=WORK, usageMode=WORK))",
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.Create(mode=INDEPENDENT, usageMode=WORK))",
           "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
