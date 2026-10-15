@@ -53,10 +53,10 @@ class LocalToolsUiFacade @Inject internal constructor(
                 server.id, appContext.getString(R.string.composer_invocation_mcp_tools, server.tools.size),
             )
         }
-        attempt("skills", emptyList(), ::installedSkills).filter { it.modelInvocable }.forEach { skill ->
+        attempt("skills", emptyList(), ::installedSkills).forEach { skill ->
             available += LocalComposerInvocationOption(
                 LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, skill.name),
-                skill.displayName, skill.description,
+                skill.displayName, if (skill.modelInvocable) skill.description else appContext.getString(R.string.composer_invocation_skill_manual),
             )
         }
         val availableIds = available.map { it.invocation }.toSet()
