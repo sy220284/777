@@ -179,12 +179,16 @@ internal class LocalSkillStore(
                     // Legacy installation without a baseline: don't erase an unknown user edit.
                     (previousBaseline == null && current == desired)
                 )
-            if (current != null && !clean && current != desired) {
-                // The user controls SKILL.md; never silently replace a readable custom version.
-                // Malformed/too large content is backed up before restoring the bundled rule.
-                if (current.toByteArray(Charsets.UTF_8).size <= 24_000) continue
+            val validCustomDocument = current != null &&
+                current.toByteArray(Charsets.UTF_8).size <= 24_000 &&
+                current.lineSequence().firstOrNull()?.trim() == "---" &&
+                parseLocalSkillMetadata(preset.id, current).description.isNotBlank()
+            if (validCustomDocument && !clean && current != desired) {
+                // A valid local override wins over bundled updates, including legacy
+                // installations created before the fingerprint marker existed.
+                continue
             }
-            if (current == null || current.toByteArray(Charsets.UTF_8).size > 24_000) {
+            if (current != null && !clean && current != desired) {
                 val raw = runCatching { File(skillsDir, "${preset.id}/SKILL.md").readText() }.getOrNull()
                 if (raw != null && raw != desired) {
                     val backup = File(skillsDir, "${preset.id}/SKILL.pre-repair.md")
