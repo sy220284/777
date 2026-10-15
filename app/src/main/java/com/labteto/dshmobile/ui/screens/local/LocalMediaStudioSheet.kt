@@ -103,6 +103,7 @@ internal fun LocalMediaStudioSheetContent(
     val available = models.filter { it.kind == kind }
     var chosenId by rememberSaveable(mode) { mutableStateOf("") }
     val selected = LocalMediaCatalog.selectOffer(models, kind, preferredProfileId, chosenId.takeIf(String::isNotBlank))
+    val manualRouteActive = chosenId.isNotBlank() && selected?.id == chosenId
     val activeOfferId by rememberUpdatedState(selected?.id)
     var showModelChoices by remember { mutableStateOf(false) }
     var prompt by rememberSaveable { mutableStateOf(initialPrompt) }
@@ -175,7 +176,7 @@ internal fun LocalMediaStudioSheetContent(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = stringResource(if (chosenId.isBlank()) R.string.media_route_current_auto else R.string.media_route_current_manual, selected.label),
+                    text = stringResource(if (!manualRouteActive) R.string.media_route_current_auto else R.string.media_route_current_manual, selected.label),
                     modifier = Modifier.weight(1f),
                     style = DsType.small13Strong.withReadingWeight(),
                     color = colors.textSecondary,
@@ -198,7 +199,7 @@ internal fun LocalMediaStudioSheetContent(
                         SyButton(text = stringResource(R.string.media_route_auto),
                             onClick = { chosenId = ""; showModelChoices = false },
                             size = SyButtonSize.Small,
-                            variant = if (chosenId.isBlank()) SyButtonVariant.Primary else SyButtonVariant.Ghost,
+                            variant = if (!manualRouteActive) SyButtonVariant.Primary else SyButtonVariant.Ghost,
                             modifier = Modifier.fillMaxWidth())
                     }
                     items(available, key = { it.id }) { option ->
