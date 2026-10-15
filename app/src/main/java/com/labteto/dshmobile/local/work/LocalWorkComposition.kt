@@ -65,6 +65,7 @@ internal class LocalWorkComposition @Inject constructor(
     memoryStore: MemoryStore,
     memoryManager: MemoryManager,
     private val toolApproval: LocalToolApprovalRuntime,
+    private val pinnedInvocations: com.labteto.dshmobile.local.tools.LocalPinnedInvocationStore,
     json: Json,
 ) {
     private val backgroundTools = LocalWorkBackgroundToolExecutor(runtimeStateStore, sessionStorage,
@@ -264,6 +265,7 @@ internal class LocalWorkComposition @Inject constructor(
     }
     private val turnExecutor = LocalWorkAgentTurnExecutor(
         context = context,
+        pinnedInvocations = pinnedInvocations,
         runtimeStateStore = runtimeStateStore,
         sessionStorage = sessionStorage,
         modelGateway = modelGateway,
