@@ -158,6 +158,11 @@ internal class LocalToolCompositionRoot @Inject constructor(
                     .filter { it.kind == com.labteto.dshmobile.local.tools.LocalPinnedInvocation.Kind.CONNECTOR }
                     .map { it.id }
             },
+            pinnedSkillIds = {
+                pinnedInvocations.selected.value
+                    .filter { it.kind == com.labteto.dshmobile.local.tools.LocalPinnedInvocation.Kind.SKILL }
+                    .map { it.id }
+            },
             requestApproval = { call, tool, summary ->
                 approvalRuntime.approve(call, tool, summary)
             },
