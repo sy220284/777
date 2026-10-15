@@ -54,7 +54,7 @@ internal class ChatInteractionPlanParser(
             ?.takeIf { it.isString }?.content.orEmpty()
         val diaryImportance = (diary?.get("importance") as? kotlinx.serialization.json.JsonPrimitive)
             ?.intOrNull ?: 0
-        val diaryHasPerspective = listOf("feeling", "innerThought").any { name ->
+        val diaryHasPerspective = listOf("feeling", "innerThought", "privateReflection").any { name ->
             (diary?.get(name) as? kotlinx.serialization.json.JsonPrimitive)
                 ?.takeIf { it.isString }?.content?.isNotBlank() == true
         }
