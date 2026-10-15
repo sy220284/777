@@ -119,7 +119,11 @@ internal fun LocalMediaStudioSheetContent(
     var prompt by rememberSaveable(activeRevision?.originId) { mutableStateOf(activeRevision?.prompt ?: initialPrompt) }
     var ratio by rememberSaveable(activeRevision?.originId) { mutableStateOf(activeRevision?.ratio ?: "1:1") }
     var voiceId by rememberSaveable(selected?.id, personaVoiceStyle, activeRevision?.originId) {
-        mutableStateOf(activeRevision?.voiceId ?: selected?.provider?.let { LocalMediaVoiceLabels.suggestedId(it, personaVoiceStyle) }.orEmpty())
+        // An old provider voice ID is never valid evidence for a newly selected account/provider.
+        val originalVoice = activeRevision?.voiceId?.takeIf { selected?.id == originalOffer?.id }
+        mutableStateOf(originalVoice ?: selected?.provider?.let {
+            LocalMediaVoiceLabels.suggestedId(it, personaVoiceStyle)
+        }.orEmpty())
     }
     var busy by remember { mutableStateOf(false) }
     var error by remember(selected?.id) { mutableStateOf<String?>(null) }
