@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.presentation
 
 import com.labteto.dshmobile.local.session.LocalSessionReadRuntime
 import com.labteto.dshmobile.local.session.LocalTranscriptPageCursor
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.uicontract.TranscriptUiPort
 import com.labteto.dshmobile.uicontract.UiTranscriptCursor
 import com.labteto.dshmobile.uicontract.UiTranscriptPage
@@ -35,16 +36,19 @@ class LocalSessionUiFacade @Inject constructor(
     }
     override suspend fun messagePage(sessionId: String, cursor: UiTranscriptCursor?, limit: Int): UiMessagePage {
         val page = transcriptPage(sessionId, cursor, limit)
-        return UiMessagePage(page.messages.map { message ->
-            UiMessageSnapshot(message.id, when (message.role) {
-                "user" -> UiMessageRole.USER
-                "assistant" -> UiMessageRole.ASSISTANT
-                "tool" -> UiMessageRole.TOOL
-                else -> UiMessageRole.SYSTEM
-            }, message.content, message.createdAt, proactive = message.proactive)
-        }, page.nextCursor)
+        return UiMessagePage(page.messages.map(::projectTranscriptHistoryMessage), page.nextCursor)
     }
 }
+
+/** Only semantic presentation fields cross into Next; Session metadata stays in the Owner. */
+internal fun projectTranscriptHistoryMessage(message: LocalHarnessMessage): UiMessageSnapshot =
+    UiMessageSnapshot(message.id, when (message.role) {
+        "user" -> UiMessageRole.USER
+        "assistant" -> UiMessageRole.ASSISTANT
+        "tool" -> UiMessageRole.TOOL
+        else -> UiMessageRole.SYSTEM
+    }, message.content, message.createdAt, proactive = message.proactive)
+
 
 @dagger.Module
 @dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
