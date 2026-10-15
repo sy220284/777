@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local.presentation
 
 import android.net.Uri
 import com.labteto.dshmobile.local.model.LocalMediaApiClient
+import com.labteto.dshmobile.local.model.LocalModelCredentialResolver
+import com.labteto.dshmobile.local.model.LocalMediaRevisionDraft
 import com.labteto.dshmobile.local.model.LocalMediaCatalog
 import com.labteto.dshmobile.local.model.LocalMediaCreationJob
 import com.labteto.dshmobile.local.model.LocalMediaDeliveryPhase
@@ -45,6 +47,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     private val miniMax: MiniMaxNativeMediaClient,
     private val api: LocalMediaApiClient,
     private val store: LocalMediaStore,
+    private val credentialResolver: LocalModelCredentialResolver,
 ) {
     companion object { const val PAGE_SIZE = LocalMediaStore.PAGE_SIZE }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO +
@@ -73,6 +76,10 @@ class LocalMediaCreationRuntime @Inject internal constructor(
             }
         }
     }
+
+    suspend fun matchesOriginalCredential(draft: LocalMediaRevisionDraft, offer: LocalMediaOffer): Boolean =
+        draft.originalOffer(listOf(offer)) != null &&
+            draft.matchesOriginalCredential(credentialResolver.mediaCredentialSignature(offer.profile))
 
     suspend fun voices(offer: LocalMediaOffer): List<LocalMediaVoice> {
         validate(offer, LocalMediaKind.SPEECH)
@@ -125,7 +132,11 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         }
     }
     private suspend fun submit(offer: LocalMediaOffer, sessionId: String, prompt: String?, sourceMessageId: String?, revisionOf: String? = null, execute: suspend (String) -> Unit): LocalMediaCreationJob {
-        val job = withContext(Dispatchers.IO) { store.beginCreation(offer, sessionId, prompt, sourceMessageId, revisionOf) }
+        val signature = credentialResolver.mediaCredentialSignature(offer.profile)
+            ?: error("当前创作账户 API Key 不可用，请重新选择账户")
+        val job = withContext(Dispatchers.IO) {
+            store.beginCreation(offer, sessionId, prompt, sourceMessageId, revisionOf, signature)
+        }
         scope.launch(LocalMediaRequestAdmission({ store.requestStarted(job.id) }, { store.providerSucceeded(job.id) })) {
             try { execute(job.id) }
             catch (cancelled: CancellationException) { store.creationFailure(job.id, cancelled); throw cancelled }
@@ -135,7 +146,9 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     }
     suspend fun createVideo(offer: LocalMediaOffer, prompt: String, sessionId: String? = null, sourceMessageId: String? = null, revisionOf: String? = null): LocalMediaVideoTask {
         validate(offer, LocalMediaKind.VIDEO); require(prompt.isNotBlank())
-        val task = withContext(Dispatchers.IO) { store.beginVideo(offer, sessionId, prompt, sourceMessageId, revisionOf) }
+        val task = withContext(Dispatchers.IO) { store.beginVideo(offer, sessionId, prompt, sourceMessageId, revisionOf,
+            credentialResolver.mediaCredentialSignature(offer.profile)
+                ?: error("当前创作账户 API Key 不可用，请重新选择账户")) }
         scope.launch {
             try {
                 val external = when (offer.provider) {
