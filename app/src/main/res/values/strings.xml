@@ -2369,5 +2369,6 @@
     <string name="skills_github_browse_official">浏览 OpenAI 官方技能库</string>
     <string name="skills_github_official_heading">官方精选技能</string>
     <string name="skills_github_official_empty">官方技能目录为空或暂时无法读取</string>
+    <string name="composer_invocation_skill_manual">仅在用户手动选中时调用</string>
 </resources>
 
