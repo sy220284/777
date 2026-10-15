@@ -15,7 +15,7 @@ class PersonaFormSimplificationRegressionTest {
     @get:Rule val compose = createComposeRule()
 
     @Test
-    fun creatingPersonaShowsOnlyIdentityUntilUserAddsAField() {
+    fun creatingPersonaShowsAllThirteenPresetFieldsInPersonalToExternalOrder() {
         compose.setContent {
             DshTheme {
                 ChatPersonaDialog(
@@ -28,23 +28,24 @@ class PersonaFormSimplificationRegressionTest {
             }
         }
 
-        compose.onNodeWithText("人物名字").assertExists()
-        compose.onNodeWithText("核心身份").assertExists()
-        compose.onNodeWithText("性格").assertDoesNotExist()
-        compose.onNodeWithText("作品来源／所属系列").assertDoesNotExist()
-
-        compose.onNodeWithText("＋ 添加人物设定").performClick()
-        compose.onNodeWithText("性格").performClick()
-        compose.onNodeWithText("性格").assertExists()
-        compose.onNodeWithText("作品来源／所属系列").assertDoesNotExist()
-        compose.onNodeWithText("＋ 添加人物设定").performClick()
-        compose.onNodeWithText("查看更多设定类别").performClick()
+        // 所有预置字段无需点击「添加」就能填写，顺序遵循自身 → 认知 → 表达 → 外部世界。
+        listOf(
+            "人物名字", "核心身份", "性格", "价值与取舍", "自我叙事",
+            "主观认知", "内外反差", "偏好与习惯", "语言风格",
+            "人生经历", "重要人物关系", "作品来源／所属系列", "自定义事实",
+        ).forEach { compose.onNodeWithText(it).assertExists() }
+        // 此前删去的六项不能因为默认展开所有字段而回来。
         listOf("命运选择", "情感烙印", "人生引力", "未竟之事", "能力与代价", "感知视角")
             .forEach { compose.onNodeWithText(it).assertDoesNotExist() }
+
+        // 扩展入口只负责添加新的资料，不是显示预置字段的前置步骤。
+        compose.onNodeWithText("＋ 添加扩展资料").performClick()
+        compose.onNodeWithText("自定义设定名称").assertExists()
+        compose.onNodeWithText("人物专属知识库").assertExists()
     }
 
     @Test
-    fun existingPersonaKeepsPopulatedOptionalFieldsButHidesUnusedCategories() {
+    fun existingPersonaKeepsPopulatedFactsAndShowsAllPresetFields() {
         val persona = PersonaProfile(
             name = "测试人物",
             coreIdentity = "肩负使命的旅人",
@@ -69,6 +70,8 @@ class PersonaFormSimplificationRegressionTest {
         compose.onNodeWithText("人生经历").assertExists()
         compose.onNodeWithText("在远方长大").assertExists()
         compose.onNodeWithText("作品来源／所属系列").assertExists()
+        compose.onNodeWithText("性格").assertExists()
+        compose.onNodeWithText("语言风格").assertExists()
         compose.onNodeWithText("情感烙印").assertDoesNotExist()
     }
 }
