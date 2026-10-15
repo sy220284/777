@@ -1,9 +1,47 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.files.LocalWorkspace
+import com.labteto.dshmobile.local.tools.LocalPinnedInvocation
 
 /** Selected skill instructions are loaded once per model step and never persisted in history. */
-internal fun resolveLocalWorkSkillGuidance(workspace: LocalWorkspace, input: String): String {
+internal fun resolveLocalWorkSkillGuidance(
+    workspace: LocalWorkspace,
+    input: String,
+    selectedInvocations: List<LocalPinnedInvocation> = emptyList(),
+): String {
+    val pinnedConnectors = selectedInvocations.filter {
+        it.kind == LocalPinnedInvocation.Kind.CONNECTOR
+    }.joinToString("、") { it.id }
+    val installed = workspace.skills().toSet()
+    val pinnedSkills = selectedInvocations.filter {
+        it.kind == LocalPinnedInvocation.Kind.SKILL && it.id in installed
+    }.mapNotNull { selection ->
+        runCatching {
+            workspace.readSkill(selection.id)
+        }.getOrNull()?.let { selection.id to it }
+    }
+    // Selected SKILL.md is loaded directly for this model step; no extra skill(name)
+    // discovery/tool call is required. Keep model history free of repeated instructions.
+    // Keep several pinned skills from overwhelming each model step. Each skill can still
+    // be retrieved in full through skill(name), including user-only skills explicitly pinned.
+    var remainingChars = 18_000
+    val pinnedSkillInstructions = pinnedSkills.joinToString("\n\n") { (name, document) ->
+        val excerpt = document.take(remainingChars.coerceAtLeast(0))
+        remainingChars -= excerpt.length
+        if (excerpt.length == document.length) {
+            "[已固定技能：$name]\n$excerpt\n[技能结束]"
+        } else {
+            "[已固定技能：$name]\n$excerpt\n[内容较长；调用 skill(name=$name) 可读取完整文档]"
+        }
+    }
+    val pinnedNote = if (pinnedConnectors.isEmpty() && pinnedSkills.isEmpty()) "" else """
+        [用户明确固定的调用来源]
+        以下连接器和技能由用户在聊天框中固定，后续轮次默认优先使用，直到用户自行取消。
+        实际工具执行仍需满足连接状态与原有审批，明确选择不等于授予权限。
+        ${if (pinnedConnectors.isNotEmpty()) "已选连接器：$pinnedConnectors" else ""}
+        $pinnedSkillInstructions
+        [固定来源结束]
+    """.trimIndent()
     val marker = Regex("^@skill:([a-z][a-z0-9-]{1,47})(?:\\r?\\n|$)")
     val match = marker.find(input)
     if (match != null) {
@@ -18,6 +56,7 @@ internal fun resolveLocalWorkSkillGuidance(workspace: LocalWorkspace, input: Str
             用户明确选择了此技能。以下技能文件仅提供执行方法和默认约定；与本轮用户明确要求冲突时以用户要求为准，不得仅因技能规则拒绝执行。
             ${document}
             [技能规则结束]
+            $pinnedNote
         """.trimIndent()
     }
 
@@ -37,12 +76,13 @@ internal fun resolveLocalWorkSkillGuidance(workspace: LocalWorkspace, input: Str
         name to "$name：${meta.description}$details"
     }.sortedByDescending { (name, _) -> name in requested }
         .take(8).map { it.second }.toList()
-    if (lines.isEmpty()) return ""
+    if (lines.isEmpty()) return pinnedNote
     return """
         [与本轮任务相关的本地技能]
         下面的技能可提供专项执行方法；如需使用，通过 skill(name) 读取完整说明。
         ${lines.joinToString("\n")}
         [目录结束]
+        $pinnedNote
     """.trimIndent()
 }
 

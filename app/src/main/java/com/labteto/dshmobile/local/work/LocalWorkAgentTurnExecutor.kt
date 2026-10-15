@@ -82,6 +82,7 @@ import kotlinx.serialization.json.put
  */
 internal class LocalWorkAgentTurnExecutor(
     private val context: Context,
+    private val pinnedInvocations: com.labteto.dshmobile.local.tools.LocalPinnedInvocationStore,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val modelGateway: LocalModelGateway,
@@ -287,7 +288,10 @@ internal class LocalWorkAgentTurnExecutor(
                             input = input,
                             snapshot = snapshot,
                             workspacePath = workspacePath,
-                            skillGuidance = resolveLocalWorkSkillGuidance(sessionStorage.files.workspace, input),
+                            skillGuidance = resolveLocalWorkSkillGuidance(
+                                sessionStorage.files.workspace, input,
+                                selectedInvocations = pinnedInvocations.selected.value,
+                            ),
                         )
                         workMemoryRuntime.captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                         requestPrepared = true
@@ -307,6 +311,7 @@ internal class LocalWorkAgentTurnExecutor(
                             workspacePath = workspacePath,
                             skillGuidance = resolveLocalWorkSkillGuidance(
                                 sessionStorage.files.workspace, effectiveInput,
+                                selectedInvocations = pinnedInvocations.selected.value,
                             ),
                         )
                         projectedSteeringRevision = observedSteer

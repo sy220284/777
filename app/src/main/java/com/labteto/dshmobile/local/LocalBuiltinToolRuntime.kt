@@ -63,6 +63,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
     private val tools: Provider<LocalToolCompositionRoot>,
     private val work: Provider<LocalWorkComposition>,
     private val diagnostics: Provider<LocalDiagnosticsRuntime>,
+    private val pinnedInvocations: com.labteto.dshmobile.local.tools.LocalPinnedInvocationStore,
 ) {
     private val jobs get() = runtimeStateStore.jobManager
     private val workspace get() = sessionStorage.files.workspace
@@ -103,6 +104,12 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
             eventLogFor = sessionStorage.eventLogs::get,
         )
     }
+
+    private fun readAuthorizedSkill(name: String): String =
+        if (pinnedInvocations.selected.value.any {
+                it.kind == LocalPinnedInvocation.Kind.SKILL && it.id == name
+            }) workspace.readSkill(name)
+        else workspace.readModelSkill(name)
 
     internal suspend fun executeResult(call: LocalToolCall, allowMutation: Boolean, executionSessionId: String?): com.labteto.dshmobile.harness.tools.ToolResult {
         val captured = executionSessionId?.let(workRuns::get)?.aggregateSnapshot() ?: runtimeStateStore.state.value
@@ -303,10 +310,10 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                     root.execution.searchCapabilities(args.string("query"), target)
                 }
             }
-            "skill" -> args.optionalString("name")?.takeIf(String::isNotBlank)?.let(workspace::readModelSkill)
+            "skill" -> args.optionalString("name")?.takeIf(String::isNotBlank)?.let(::readAuthorizedSkill)
                 ?: workspace.modelSkillCatalog(offset = args.int("offset", 0), query = args.optionalString("query").orEmpty())
             "list_skills" -> workspace.modelSkillCatalog(offset = args.int("offset", 0), query = args.optionalString("query").orEmpty())
-            "read_skill" -> workspace.readModelSkill(args.string("name"))
+            "read_skill" -> readAuthorizedSkill(args.string("name"))
             "session_search" -> sessionAccess.search(args.string("query"), boundSessionId)
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->
                 memoryTools(binding).execute(call.name, args, allowMutation)
