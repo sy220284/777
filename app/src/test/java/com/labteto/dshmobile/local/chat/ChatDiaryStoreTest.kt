@@ -735,6 +735,40 @@ class ChatDiaryStoreTest {
     }
 
     @Test
+    fun briefCreativeVoicesAreNotDiscardedForLackOfWordCount() {
+        val event = "周末约好一起去散步"
+        val reflections = listOf(
+            "我的鞋子已经开始期待了。",
+            "约定已确认。要提前十分钟出门。",
+            "要是路灯今晚也想散步呢？",
+        )
+        reflections.forEachIndexed { index, voice ->
+            val raw = request(
+                delta = ChatDiaryDelta(
+                    event = event,
+                    privateReflection = voice,
+                    importance = 2,
+                ),
+                userId = "u-brief-$index",
+                assistantId = "a-brief-$index",
+                evidence = event,
+            ).copy(turnSignificance = "MINOR")
+            val saved = ChatDiaryEntryPolicy.sanitizeDelta(raw)
+            assertNotNull(saved)
+            assertEquals(voice, saved!!.privateReflection)
+        }
+        val shortEventWithoutContext = request(
+            delta = ChatDiaryDelta(
+                event = "散步",
+                privateReflection = "好。",
+                importance = 2,
+            ),
+            evidence = "散步",
+        ).copy(turnSignificance = "MINOR")
+        assertNull(ChatDiaryEntryPolicy.sanitizeDelta(shortEventWithoutContext))
+    }
+
+    @Test
     fun groundedMajorEventWithoutSubjectiveFeelingStillBecomesSharedExperience() {
         val memory = store()
 
