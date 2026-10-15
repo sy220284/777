@@ -17,8 +17,10 @@ fun UiApplicationPackAdmission.Admitted.validateHostedTransition(
     capturedEncoded: String,
     proposal: UiSceneNavigationResult,
     navigation: UiHostSceneNavigation,
+    capturedEpoch: Long = 0L,
+    currentEpoch: Long = 0L,
 ): UiSceneNavigationResult {
-    if (currentEncoded != capturedEncoded) {
+    if (currentEpoch != capturedEpoch || currentEncoded != capturedEncoded) {
         return UiSceneNavigationResult.Rejected(UiSceneNavigationRejection.INVALID_HISTORY)
     }
     val current = navigation.restoreEncodedSnapshot(currentEncoded)
@@ -54,6 +56,9 @@ fun UiApplicationPackAdmission.Admitted.RenderHostedScene(
     var encoded by rememberSaveable(pack.manifest.id) {
         mutableStateOf(UiSceneNavigationSnapshotCodec.encode(navigation.initial))
     }
+    // A->B->A restores the same encoded stack: track a monotonic transition epoch
+    // as well so an asynchronous callback from the first A cannot act in the new A.
+    var transitionEpoch by rememberSaveable(pack.manifest.id) { mutableStateOf(0L) }
     val restored = navigation.restoreEncodedSnapshot(encoded)
     if (restored !is UiSceneNavigationResult.Changed) {
         return UiSceneRenderAccess.Rejected(UiSceneRenderRejection.INVALID_HISTORY)
@@ -61,12 +66,22 @@ fun UiApplicationPackAdmission.Admitted.RenderHostedScene(
     val access = resolve(restored.state, navigation)
     if (access is UiSceneRenderAccess.Ready) {
         val captured = encoded
+        val capturedEpoch = transitionEpoch
         fun commit(proposal: UiSceneNavigationResult): UiSceneNavigationResult {
-            val checked = validateHostedTransition(encoded, captured, proposal, navigation)
+            val checked = validateHostedTransition(encoded, captured, proposal, navigation,
+                capturedEpoch = capturedEpoch, currentEpoch = transitionEpoch)
             when (checked) {
-                is UiSceneNavigationResult.Changed ->
-                    encoded = UiSceneNavigationSnapshotCodec.encode(checked.state)
-                UiSceneNavigationResult.AtRoot -> onAtRootBack()
+                is UiSceneNavigationResult.Changed -> {
+                    val replacement = UiSceneNavigationSnapshotCodec.encode(checked.state)
+                    if (replacement != encoded) {
+                        encoded = replacement
+                        transitionEpoch++
+                    }
+                }
+                UiSceneNavigationResult.AtRoot -> {
+                    transitionEpoch++
+                    onAtRootBack()
+                }
                 is UiSceneNavigationResult.Rejected -> Unit
             }
             return checked

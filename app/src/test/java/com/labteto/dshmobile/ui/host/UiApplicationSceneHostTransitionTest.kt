@@ -62,6 +62,24 @@ class UiApplicationSceneHostTransitionTest {
             admitted.validateHostedTransition(current, old, nav.back(nav.initial), nav))
     }
 
+    @Test fun oldCallbackRejectedWhenNavigationReturnsToIdenticalStack() {
+        val original = UiSceneNavigationSnapshotCodec.encode(nav.initial)
+        val settingsState = (nav.navigate(nav.initial, settings) as UiSceneNavigationResult.Changed).state
+        val returned = (nav.back(settingsState) as UiSceneNavigationResult.Changed).state
+        assertEquals(original, UiSceneNavigationSnapshotCodec.encode(returned))
+        val staleProposal = nav.navigate(nav.initial, settings)
+        assertEquals(
+            UiSceneNavigationResult.Rejected(UiSceneNavigationRejection.INVALID_HISTORY),
+            admitted.validateHostedTransition(original, original, staleProposal, nav,
+                capturedEpoch = 0L, currentEpoch = 2L),
+        )
+        assertEquals(
+            staleProposal,
+            admitted.validateHostedTransition(original, original, staleProposal, nav,
+                capturedEpoch = 2L, currentEpoch = 2L),
+        )
+    }
+
     @Test fun rejectsUnrestorableOrWrongPackAndHostService() {
         val encoded = UiSceneNavigationSnapshotCodec.encode(nav.initial)
         assertEquals(UiSceneNavigationResult.Rejected(UiSceneNavigationRejection.INVALID_HISTORY),
