@@ -167,32 +167,49 @@ internal fun groupCharacterDiaryDays(entries: List<ChatDiaryEntry>): List<Charac
  * Do not invent any emotion or rewrite the persisted facts / source references.
  */
 internal fun characterDiaryReadingLine(entry: ChatDiaryEntry): String {
-    fun clean(text: String): String = text.trim().replace(ChatDiaryReadingVocabulary.TECHNICAL_USER, ChatDiaryReadingVocabulary.OTHER_PERSON).trimEnd('。', '，', '；', ' ', '\n')
-    val anchor = clean(entry.event).take(90)
-    val opening = if (anchor.startsWith(ChatDiaryReadingVocabulary.FIRST_PERSON) ||
-        anchor.startsWith(ChatDiaryReadingVocabulary.TODAY) ||
-        anchor.startsWith(ChatDiaryReadingVocabulary.YESTERDAY_PREFIX)) {
-        anchor
-    } else if (anchor.isNotBlank()) {
-        ChatDiaryReadingVocabulary.DAY_NOTE_PREFIX + anchor
-    } else ""
-    val reflections = listOf(entry.feeling, entry.innerThought, entry.unresolvedEcho)
-        .map(::clean)
-        .filter { it.isNotBlank() && it != opening && it != anchor }
-        .distinct()
-        .take(2)
-    return (listOf(opening) + reflections).filter(String::isNotBlank)
-        .joinToString("。") { it.take(110) }
-        .let { if (it.isBlank()) "" else it + "。" }
+    // Older records are evidence, not fiction to be rewritten: never fabricate a speaker
+    // or prepend "today" to a dated entry that may describe an earlier encounter.
+    fun clean(text: String): String = text.trim()
+        .replace(ChatDiaryReadingVocabulary.TECHNICAL_USER, ChatDiaryReadingVocabulary.OTHER_PERSON)
+        .trimEnd('。', '，', '；', ' ', '\n')
+    val event = clean(entry.event)
+    val thoughts = listOf(
+        entry.feeling,
+        entry.innerThought,
+        entry.relationshipMeaning,
+        entry.unresolvedEcho,
+    ).map(::clean).filter(String::isNotBlank).distinct().filterNot { it == event }
+    val parts = mutableListOf<String>()
+    // A very long factual anchor can crowd out the part that makes this a diary.
+    // Keep the event only when it fits naturally alongside a subjective thought.
+    if (event.isNotBlank() && (thoughts.isEmpty() || event.length <= 90)) parts += event
+    thoughts.forEach { thought ->
+        if (parts.size < 3 && parts.sumOf(String::length) + thought.length +
+            parts.size * 2 <= 320
+        ) parts += thought
+    }
+    if (parts.isEmpty() && event.isNotBlank()) parts += event
+    return parts.joinToString("。") { it.trimEnd('。', '！', '？', '；') }
+        .let { if (it.isBlank()) "" else it.trimEnd('。') + "。" }
 }
 
 internal fun characterDiaryDayNarrative(entries: List<ChatDiaryEntry>): String {
-    val selected = entries.sortedWith(compareByDescending<ChatDiaryEntry> { it.importance }
-        .thenByDescending(ChatDiaryEntry::createdAt))
-        .take(3).sortedBy(ChatDiaryEntry::createdAt)
-    val prose = selected.map(::characterDiaryReadingLine)
-        .filter(String::isNotBlank).distinct().joinToString("\n\n")
-    return if (prose.length > 360) prose.take(357).trimEnd('。', '，', '\n', ' ') + "……" else prose
+    // Mental and emotional observations deserve a place before routine event-only notes.
+    // Keep complete thoughts. Never chop a diary sentence at an arbitrary character index.
+    val selected = entries.sortedWith(
+        compareByDescending<ChatDiaryEntry> {
+            listOf(it.feeling, it.innerThought, it.relationshipMeaning, it.unresolvedEcho)
+                .count(String::isNotBlank)
+        }.thenByDescending { it.importance }.thenByDescending(ChatDiaryEntry::createdAt),
+    ).take(3).sortedBy(ChatDiaryEntry::createdAt)
+    val paragraphs = mutableListOf<String>()
+    selected.map(::characterDiaryReadingLine).filter(String::isNotBlank).distinct()
+        .forEach { text ->
+            val nextLength = paragraphs.sumOf(String::length) + text.length +
+                paragraphs.size * 2
+            if (nextLength <= 360) paragraphs += text
+        }
+    return paragraphs.joinToString("\n\n")
 }
 
 @Composable
@@ -228,6 +245,7 @@ internal fun CharacterDiaryScreen(
     var mutationError by remember { mutableStateOf(false) }
     var sourceError by remember { mutableStateOf(false) }
     var expandedDayKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var browseExpanded by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(selectedSubjectKey) {
         editingEntry = null
         deactivatingEntry = null
@@ -324,40 +342,64 @@ internal fun CharacterDiaryScreen(
                         }
                     }
                 }
-                item(key = "diary-search") {
-                    SyTextField(
-                        value = query,
-                        onValueChange = { query = it },
+                item(key = "diary-browse-toggle") {
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text(stringResource(R.string.chat_diary_search_hint)) },
-                        leadingIcon = {
-                            Icon(
-                                FeatherIcons.Search,
-                                contentDescription = null,
-                                tint = colors.textTertiary,
-                            )
-                        },
-                        singleLine = true,
-                        shape = DsShapes.block,
-                    )
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        SyButton(
+                            text = stringResource(
+                                if (browseExpanded) R.string.chat_diary_finish_browse
+                                else R.string.chat_diary_start_browse,
+                            ),
+                            onClick = {
+                                if (browseExpanded) {
+                                    query = ""
+                                    selectedFilterIndex = 0
+                                }
+                                browseExpanded = !browseExpanded
+                            },
+                            variant = SyButtonVariant.Ghost,
+                            modifier = Modifier.testTag("diary_browse_toggle"),
+                        )
+                    }
+                }
+                if (browseExpanded) {
+                    item(key = "diary-search") {
+                        SyTextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text(stringResource(R.string.chat_diary_search_hint)) },
+                            leadingIcon = {
+                                Icon(
+                                    FeatherIcons.Search,
+                                    contentDescription = null,
+                                    tint = colors.textTertiary,
+                                )
+                            },
+                            singleLine = true,
+                            shape = DsShapes.block,
+                        )
+                    }
+                    item(key = "diary-filters") {
+                        SySegmentedTabs(
+                            labels = listOf(
+                                stringResource(R.string.chat_diary_filter_all),
+                                stringResource(R.string.chat_diary_filter_direct),
+                                stringResource(R.string.chat_diary_filter_group),
+                                stringResource(R.string.chat_diary_filter_private),
+                            ),
+                            selectedIndex = selectedFilterIndex,
+                            onSelect = { selectedFilterIndex = it },
+                        )
+                    }
                 }
                 if (sourceError) {
                     item(key = "diary-source-error") {
                         Text(stringResource(R.string.chat_diary_source_unavailable),
                             color = colors.dangerInk, style = DsType.small13.withReadingWeight())
                     }
-                }
-                item(key = "diary-filters") {
-                    SySegmentedTabs(
-                        labels = listOf(
-                            stringResource(R.string.chat_diary_filter_all),
-                            stringResource(R.string.chat_diary_filter_direct),
-                            stringResource(R.string.chat_diary_filter_group),
-                            stringResource(R.string.chat_diary_filter_private),
-                        ),
-                        selectedIndex = selectedFilterIndex,
-                        onSelect = { selectedFilterIndex = it },
-                    )
                 }
 
                 when {
