@@ -100,6 +100,7 @@ internal fun LocalConversationSliceHost(
             galleryDeletion = viewModel.personaGalleryDeletionUiPort,
             gallerySave = viewModel.personaGallerySaveUiPort,
             portraits = viewModel.personaPortraitUiPort,
+            invocations = viewModel.composerInvocationUiPort,
         )
         is UiPackAdmission.Rejected, is UiPackAdmission.UnknownPack -> MaterialTheme {
             Surface(modifier = Modifier.fillMaxSize()) {

@@ -44,6 +44,7 @@ data class NextApplicationFeaturePorts(
     val gallerySave: PersonaGallerySaveUiPort? = null,
     val portraits: PersonaPortraitUiPort? = null,
     val tools: ToolsUiPort? = null,
+    val invocations: ComposerInvocationUiPort? = null,
     val authoring: PersonaAuthoringUiPort? = null,
 )
 
@@ -131,7 +132,7 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
                     gallery = ports.gallery, personas = ports.selection,
                     personaTransfer = ports.personaTransfer, stories = ports.stories,
                     galleryDeletion = ports.galleryDeletion, gallerySave = ports.gallerySave,
-                    portraits = ports.portraits,
+                    portraits = ports.portraits, invocations = ports.invocations,
                 )
             }
         }

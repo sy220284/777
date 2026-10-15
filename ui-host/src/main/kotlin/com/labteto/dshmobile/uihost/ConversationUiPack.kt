@@ -36,5 +36,6 @@ interface ConversationUiPack {
         galleryDeletion: com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort? = null,
         gallerySave: com.labteto.dshmobile.uicontract.PersonaGallerySaveUiPort? = null,
         portraits: com.labteto.dshmobile.uicontract.PersonaPortraitUiPort? = null,
+        invocations: com.labteto.dshmobile.uicontract.ComposerInvocationUiPort? = null,
     )
 }

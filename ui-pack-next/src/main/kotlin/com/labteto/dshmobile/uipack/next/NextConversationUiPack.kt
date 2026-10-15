@@ -108,10 +108,16 @@ object NextConversationUiPack : ConversationUiPack {
         galleryDeletion: com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort?,
         gallerySave: com.labteto.dshmobile.uicontract.PersonaGallerySaveUiPort?,
         portraits: com.labteto.dshmobile.uicontract.PersonaPortraitUiPort?,
+        invocations: com.labteto.dshmobile.uicontract.ComposerInvocationUiPort?,
     ) {
         val policySnapshot = policy?.snapshots?.collectAsStateWithLifecycle(initialValue = policy.snapshot())?.value
         val sessionSnapshot = sessions?.snapshots?.collectAsStateWithLifecycle(initialValue = sessions.snapshot())?.value
         val pinnedSessions = shell?.pinnedSessionIds?.collectAsStateWithLifecycle()?.value.orEmpty()
+        val pinnedInvocations = invocations?.pinned?.collectAsStateWithLifecycle(initialValue = emptyList())?.value.orEmpty()
+        var invocationOptions by remember { mutableStateOf<List<com.labteto.dshmobile.uicontract.UiInvocationOption>>(emptyList()) }
+        LaunchedEffect(invocations, pinnedInvocations) {
+            invocationOptions = runCatching { invocations?.options().orEmpty() }.getOrDefault(emptyList())
+        }
         val titleOverrides = shell?.sessionTitleOverrides?.collectAsStateWithLifecycle()?.value.orEmpty()
         var renamingSession by remember { mutableStateOf<String?>(null) }
         var sessionTitle by remember { mutableStateOf("") }
@@ -717,6 +723,7 @@ object NextConversationUiPack : ConversationUiPack {
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     if (!send.available) send.reason?.let { Text(rejectionLabels.getValue(it)) }
                     receipt?.let { Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
+                    if (workMode && invocations != null) NextInvocationPicker(invocations, invocationOptions, pinnedInvocations)
                     if (attachments != null) TextButton(onClick = {
                         pickerIdentity = identity; importing = true; pickAttachment()
                     }, enabled = identity != null && !importing) { Text(stringResource(R.string.next_attach)) }

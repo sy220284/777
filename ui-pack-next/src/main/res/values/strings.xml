@@ -243,4 +243,7 @@
     <string name="next_persona_discard">放弃未保存的人物草稿？</string>
     <string name="next_persona_discard_confirm">放弃并返回</string>
     <string name="next_persona_keep_editing">继续编辑</string>
+    <string name="next_invocations_select">连接器与技能</string>
+    <string name="next_invocations_empty">请先在工具页安装技能或连接服务</string>
+    <string name="next_invocations_hint">手动选择后持续生效，直到再次点击移除；工具权限仍需审批。</string>
 </resources>

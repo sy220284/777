@@ -65,7 +65,7 @@ internal object LocalApplicationPackInstallations {
             workReads = owner.workReadUiPort, files = owner.filesUiPort,
             evidence = owner.workEvidenceUiPort, shell = owner.conversationShellUiPort,
             team = owner.workTeamUiPort, groups = owner.chatGroupUiPort,
-            tools = owner.toolsUiPort,
+            tools = owner.toolsUiPort, invocations = owner.composerInvocationUiPort,
             authoring = owner.personaAuthoringUiPort,
             personaTransfer = owner.personaTransferUiPort,
             stories = owner.personaStoryUiPort, galleryDeletion = owner.personaGalleryDeletionUiPort,
