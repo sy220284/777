@@ -100,6 +100,7 @@ internal fun PluginInventoryBrowser(
     onInstallPreset: ((String) -> Unit)? = null,
     onCreateSkill: ((String, String, String, String) -> Unit)? = null,
     onImportSkill: (() -> Unit)? = null,
+    onInstallFromGitHub: ((String) -> Unit)? = null,
     onRemoveSkill: ((String) -> Unit)? = null,
     onOpenSkillEditor: ((String) -> Unit)? = null,
     onCloseSkillEditor: (() -> Unit)? = null,
@@ -109,6 +110,7 @@ internal fun PluginInventoryBrowser(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val skillCreationPrompt = stringResource(R.string.skills_create_in_chat_prompt)
     var query by rememberSaveable { mutableStateOf("") }
+    var gitHubSkillUrl by rememberSaveable { mutableStateOf("") }
     var selectedCategory by rememberSaveable { mutableIntStateOf(0) }
     var transportFilter by rememberSaveable { mutableStateOf(PluginTransportFilter.ALL) }
     var selectedRow by remember { mutableStateOf<InventoryRow?>(null) }
@@ -233,6 +235,27 @@ internal fun PluginInventoryBrowser(
                                 enabled = !loading,
                                 variant = SyButtonVariant.Info,
                                 modifier = Modifier.weight(1f).testTag("skill-create-in-chat"),
+                            )
+                        }
+                    }
+                    if (onInstallFromGitHub != null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                        ) {
+                            com.shenyan.designsystem.components.SyTextField(
+                                value = gitHubSkillUrl,
+                                onValueChange = { gitHubSkillUrl = it },
+                                placeholder = "GitHub 技能目录地址",
+                                modifier = Modifier.weight(1f).testTag("skill-github-url"),
+                            )
+                            SyButton(
+                                text = "安装",
+                                onClick = { onInstallFromGitHub(gitHubSkillUrl.trim()) },
+                                enabled = !loading && gitHubSkillUrl.trim().startsWith("https://github.com/"),
+                                size = SyButtonSize.Small,
+                                modifier = Modifier.testTag("skill-github-install"),
                             )
                         }
                     }
