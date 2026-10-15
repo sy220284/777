@@ -500,7 +500,12 @@ internal fun ChatPersonaDialog(
     var runtimeProfile by remember(profile.id, profile.updatedAt) { mutableStateOf(profile) }
     var name by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.name) }
     var coreIdentity by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.coreIdentity) }
-    var factDrafts by remember(profile.id, profile.updatedAt) { mutableStateOf(profile.facts) }
+    var factDrafts by remember(profile.id, profile.updatedAt) {
+        mutableStateOf(profile.facts.filter { it.category !in setOf(
+            "definingChoices", "emotionalImprints", "lifeGravity",
+            "unfinishedBusiness", "limitsAndCosts", "sensorySignature",
+        ) })
+    }
     var customCategory by rememberSaveable(profile.id) { mutableStateOf("") }
     var franchise by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.franchise) }
     var loreEntries by remember(profile.id, profile.updatedAt) { mutableStateOf(profile.loreEntries) }
@@ -627,15 +632,7 @@ internal fun ChatPersonaDialog(
             .forEach { category ->
                 PersonaFactCategoryEditor(
                     category = category,
-                    title = when (category) {
-                        "definingChoices" -> stringResource(R.string.persona_v4_defining_choices)
-                        "emotionalImprints" -> stringResource(R.string.persona_v4_emotional_imprints)
-                        "lifeGravity" -> stringResource(R.string.persona_v4_life_gravity)
-                        "unfinishedBusiness" -> stringResource(R.string.persona_v4_unfinished_business)
-                        "limitsAndCosts" -> stringResource(R.string.persona_v4_limits_costs)
-                        "sensorySignature" -> stringResource(R.string.persona_v4_sensory_signature)
-                        else -> category
-                    },
+                    title = category,
                     facts = factDrafts,
                     onChange = { factDrafts = it },
                 )
