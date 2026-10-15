@@ -76,15 +76,18 @@ internal fun renderRecalledChatDiary(entry: ChatDiaryEntry, groupAudience: Boole
         }
         entry.feeling.takeIf(String::isNotBlank)?.let { appendLine("  感受：$it") }
         entry.innerThought.takeIf(String::isNotBlank)?.let { appendLine("  心里：$it") }
+        entry.privateReflection.takeIf(String::isNotBlank)?.let {
+            appendLine("  私人日记想法（人物主观解释，可能包含未证实的猜测，不是事件事实）：$it")
+        }
         entry.relationshipMeaning.takeIf(String::isNotBlank)?.let { appendLine("  关系意义：$it") }
         entry.unresolvedEcho.takeIf(String::isNotBlank)?.let { appendLine("  余波：$it") }
     }.trimEnd()
 
 internal fun diaryRecallUsageInstruction(groupAudience: Boolean): String =
     if (groupAudience) {
-        "这些是当前人物自己的经历和感受，其中的猜测属于人物主观认识。其他成员的所知以实际公开发言和事件为准。已取消、改期、结束或修正的旧版本属于历史。"
+        "这些是当前人物自己的经历和感受，私人日记里的想法与猜测只代表当时的主观认识，绝不代表他人真实动机或已证实事实。其他成员的所知以实际公开发言和事件为准。已取消、改期、结束或修正的旧版本属于历史。"
     } else {
-        "这些日记属于当前角色自己的经历与内在记忆。当前有效版本优先；被后续取消、改期、结束或修正的旧版本不得当成当前状态回潮，除非用户明确追问以前/原来/最开始。"
+        "这些日记属于当前角色自己的经历与内在记忆。私人日记的想法只是人物当时的主观判断，不能升级成他人动机或已证实事实。当前有效版本优先；被后续取消、改期、结束或修正的旧版本不得当成当前状态回潮，除非用户明确追问以前/原来/最开始。"
     }
 
 internal fun takeWithinModelTokenBudget(text: String, maxTokens: Int): String {
