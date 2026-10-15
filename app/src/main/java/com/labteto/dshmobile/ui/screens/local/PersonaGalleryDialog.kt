@@ -735,6 +735,7 @@ internal fun PersonaGalleryScreen(
             title = stringResource(R.string.persona_gallery_view_profile),
             onDismiss = { showPersonaDetails = false },
             scrollable = true,
+            seamlessBackground = true,
         ) {
             PersonaDetails(selected.persona)
         }
@@ -940,13 +941,12 @@ internal fun PersonaGalleryScreen(
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                     )
                     if (selected.stories.isEmpty()) {
-                        SyGlassCard {
-                            Text(
-                                stringResource(R.string.persona_gallery_storylines_empty),
-                                style = DsType.small13.withReadingWeight(),
-                                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
-                            )
-                        }
+                        Text(
+                            stringResource(R.string.persona_gallery_storylines_empty),
+                            style = DsType.small13.withReadingWeight(),
+                            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
+                            modifier = Modifier.padding(vertical = SyMetric.gapMd),
+                        )
                     } else {
                         Column(
                             modifier = Modifier.fillMaxWidth(),
@@ -1137,11 +1137,12 @@ internal fun PersonaGalleryScreen(
                 }
             }
             selected?.let { entry ->
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(SyMetric.gapLg),
-                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
-                    ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(
+                        horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                ) {
                         selectedStory?.let { story ->
                             SyButton(
                                 text = stringResource(R.string.persona_gallery_continue_story),
@@ -1158,7 +1159,6 @@ internal fun PersonaGalleryScreen(
                             variant = if (selectedStory == null) SyButtonVariant.Primary else SyButtonVariant.Ghost,
                             enabled = canSave && !busy && !inspecting && !hasLocalStoryEdits,
                         )
-                    }
                 }
             }
         }

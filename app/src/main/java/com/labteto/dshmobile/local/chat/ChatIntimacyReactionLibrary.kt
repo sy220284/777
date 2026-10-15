@@ -204,8 +204,9 @@ internal object ChatIntimacyReactionLibrary {
 
     private fun personaTone(persona: PersonaProfile?): String {
         if (persona == null) return ""
-        val traits = listOf(persona.coreIdentity, persona.portrait, persona.stableTraits.joinToString("、"),
-            persona.trustedFactText(CharacterFactCategories.PERSONALITY))
+        val traits = listOf(persona.coreIdentity,
+            persona.trustedFactText(CharacterFactCategories.PERSONALITY),
+            persona.trustedFactText(CharacterFactCategories.VOICE_STYLE))
             .joinToString(" ").take(600)
         return when {
             listOf("害羞", "内敛", "慢热", "腼腆").any { traits.contains(it) } ->

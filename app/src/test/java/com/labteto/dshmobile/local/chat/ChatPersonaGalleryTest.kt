@@ -76,7 +76,7 @@ class ChatPersonaGalleryTest {
                 CharacterFact("early", CharacterFactCategories.BIOGRAPHY,
                     "第一幕在旧书店认识阿宁", temporalScope = "opening",
                     provenance = CharacterFactProvenance.CANON),
-                CharacterFact("later", CharacterFactCategories.LIFE_GRAVITY,
+                CharacterFact("later", CharacterFactCategories.BIOGRAPHY,
                     "第二幕需要看守红伞中的密信", temporalScope = "reveal",
                     provenance = CharacterFactProvenance.CANON),
             ),
@@ -84,7 +84,6 @@ class ChatPersonaGalleryTest {
                 id = "secret", title = "密信背景", content = "密信藏在红伞底部",
                 temporalScope = "reveal", alwaysOn = true,
             )),
-            portrait = "旧字段称她已经知道全部密信秘密",
         )
         val created = gallery.save(
             persona = person, sourceSessionId = "journey",
@@ -199,7 +198,7 @@ class ChatPersonaGalleryTest {
         assertEquals("经营街角花店的店主", merged.factText(CharacterFactCategories.BIOGRAPHY))
         assertEquals(listOf("嘴硬心软", "遇到重要的人会主动解释"),
             merged.facts.filter { it.category == CharacterFactCategories.PERSONALITY }.map { it.content })
-        assertTrue(merged.portrait.isEmpty() && merged.stableTraits.isEmpty())
+        assertEquals("花店店主", merged.coreIdentity)
         assertEquals(
             listOf("不会无故失约", "不拿感情问题开恶意玩笑"),
             merged.hardConstraints,
@@ -220,12 +219,10 @@ class ChatPersonaGalleryTest {
     fun sameNameSameWorldDifferentFranchisesStaySeparate() {
         val first = PersonaProfile(
             name = "阿岚",
-            worldSetting = "现代都市",
             franchise = "作品甲",
         )
         val second = PersonaProfile(
             name = "阿岚",
-            worldSetting = "现代都市",
             franchise = "作品乙",
         )
 
@@ -459,7 +456,7 @@ class ChatPersonaGalleryTest {
         val fresh = LocalHarnessMessage("m2", "assistant", "早上好。", createdAt = 2L)
         val entry = PersonaGalleryEntry(
             id = "gallery-1",
-            persona = PersonaProfile(id = "gallery-1", name = "阿青", portrait = "剑客"),
+            persona = PersonaProfile(id = "gallery-1", name = "阿青", coreIdentity = "剑客"),
             stories = listOf(PersonaGalleryStory(id = "story-1", history = listOf(saved))),
         )
 
@@ -486,24 +483,28 @@ class ChatPersonaGalleryTest {
     @Test
     fun selectedInspectionSuggestionAppendsOnceAndKeepsExistingPersona() {
         val profile = PersonaProfile(
-            name = "小岚",
-            initialUserImpression = "和用户是多年好友",
-            voiceSamples = listOf("少来"),
+            name = "小岚", coreIdentity = "设计师",
+            facts = listOf(
+                CharacterFact("belief", CharacterFactCategories.SUBJECTIVE_BELIEFS,
+                    "和用户是多年好友", provenance = CharacterFactProvenance.USER_CREATED),
+                CharacterFact("voice", CharacterFactCategories.VOICE_STYLE,
+                    "少来", provenance = CharacterFactProvenance.USER_CREATED),
+            ),
         )
         val suggestion = PersonaAppendSuggestion(
-            field = "initialUserImpression",
+            field = "subjectiveBeliefs",
             value = "私下会叫用户小名",
             evidence = "对话里多次使用小名",
         )
         val phrase = PersonaAppendSuggestion(
-            field = "voiceSamples",
+            field = "voiceStyle",
             value = "少来",
             evidence = "已有内容，不应重复",
         )
 
         val merged = applyPersonaSuggestions(profile, listOf(suggestion, phrase, phrase))
 
-        assertEquals("", merged.initialUserImpression)
+        assertTrue(merged.coreIdentity.isNotBlank())
         assertTrue(merged.factText(CharacterFactCategories.SUBJECTIVE_BELIEFS)
             .contains("和用户是多年好友"))
         assertTrue(merged.factText(CharacterFactCategories.SUBJECTIVE_BELIEFS)
@@ -515,24 +516,20 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
-    fun legacySuggestionNamesAppendToV4FactsWithoutOverwritingExistingUserFacts() {
+    fun removedLegacySuggestionNamesAreIgnoredWhileNewFactsRemainEditable() {
         val current = PersonaProfile(name = "小岚", coreIdentity = "设计师",
             facts = listOf(CharacterFact("authored", CharacterFactCategories.PERSONALITY,
                 "平日沉稳", provenance = CharacterFactProvenance.USER_CREATED)))
         val suggestions = listOf(
-            PersonaAppendSuggestion("stableTraits", "遇到朋友时会开玩笑", "用户直接修正"),
-            PersonaAppendSuggestion("attentionBiases", "很在意钟表声音", "人物自己的观察"),
-            PersonaAppendSuggestion("lifeContext", "在独立工作室上班", "用户补充"),
-            PersonaAppendSuggestion("stableTraits", "遇到朋友时会开玩笑", "重复建议"),
+            PersonaAppendSuggestion("stableTraits", "旧版自动性格", "旧资料"),
+            PersonaAppendSuggestion("lifeContext", "旧版生活描述", "旧资料"),
+            PersonaAppendSuggestion("personality", "熟人面前会开玩笑", "用户确认"),
         )
         val result = applyPersonaSuggestions(current, suggestions)
         assertEquals(current.facts.first(), result.facts.first())
-        assertTrue(result.factText(CharacterFactCategories.PERSONALITY).contains("遇到朋友时会开玩笑"))
-        assertTrue(result.factText(CharacterFactCategories.SENSORY_SIGNATURE).contains("钟表声音"))
-        assertTrue(result.factText(CharacterFactCategories.LIFE_GRAVITY).contains("独立工作室"))
-        assertEquals(1, result.facts.count { it.content == "遇到朋友时会开玩笑" })
-        assertEquals("", result.lifeContext)
-        assertEquals("", result.attentionBiases.joinToString())
+        assertEquals(1, result.facts.count { it.content == "熟人面前会开玩笑" })
+        assertTrue(result.facts.none { it.content.startsWith("旧版") })
+        assertTrue(result.facts.none { it.category == "lifeContext" })
     }
 
     @Test
@@ -541,8 +538,9 @@ class ChatPersonaGalleryTest {
         val saved = source.save(
             persona = PersonaProfile(
                 name = "小岚",
-                portrait = "花店店主",
-                stableTraits = listOf("嘴硬心软"),
+                coreIdentity = "花店店主",
+                facts = listOf(CharacterFact("personality", CharacterFactCategories.PERSONALITY,
+                    "嘴硬心软", provenance = CharacterFactProvenance.USER_CREATED)),
                 bannedPhrases = listOf("客服腔"),
             ),
             sourceSessionId = "session-a",
@@ -556,9 +554,9 @@ class ChatPersonaGalleryTest {
         val imported = importedStore.importPersona(payload)
 
         assertEquals("小岚", imported.persona.name)
-        assertEquals("花店店主", imported.persona.factText(CharacterFactCategories.BIOGRAPHY))
+        assertEquals("花店店主", imported.persona.coreIdentity)
         assertEquals("嘴硬心软", imported.persona.factText(CharacterFactCategories.PERSONALITY))
-        assertTrue(imported.persona.portrait.isEmpty())
+        assertTrue(imported.persona.coreIdentity.isNotBlank())
         assertEquals(listOf("客服腔"), imported.persona.bannedPhrases)
         assertTrue(imported.stories.isEmpty())
         assertFalse(imported.id == saved.id)
@@ -569,7 +567,7 @@ class ChatPersonaGalleryTest {
         val file = File(temporary.root, "portrait-gallery.json")
         val store = ChatPersonaGalleryStore(file, Json)
         val saved = store.save(
-            persona = PersonaProfile(name = "阿青", portrait = "剑客"),
+            persona = PersonaProfile(name = "阿青", coreIdentity = "剑客"),
             sourceSessionId = "",
             history = emptyList(),
             chatState = ChatCharacterState(),
@@ -600,7 +598,7 @@ class ChatPersonaGalleryTest {
         val file = File(temporary.root, "group-state-gallery.json")
         val store = ChatPersonaGalleryStore(file, Json)
         val saved = store.save(
-            persona = PersonaProfile(name = "阿青", portrait = "剑客"),
+            persona = PersonaProfile(name = "阿青", coreIdentity = "剑客"),
             sourceSessionId = "single-session",
             history = listOf(LocalHarnessMessage("m1", "user", "单聊故事", createdAt = 1L)),
             chatState = ChatCharacterState(
@@ -634,9 +632,16 @@ class ChatPersonaGalleryTest {
                 name = "神里绫华",
                 franchise = "原神",
                 timelinePosition = "无剧透阶段",
-                coreValues = listOf("兼顾责任与真诚关系", "家族责任"),
-                attentionBiases = listOf("先观察再表达"),
-                coreTension = "责任与普通生活的拉扯",
+                coreIdentity = "神里家大小姐",
+                facts = listOf(
+                    CharacterFact("values", CharacterFactCategories.VALUES_AND_TRADEOFFS,
+                        "兼顾责任与真诚关系；家族责任",
+                        provenance = CharacterFactProvenance.USER_CREATED),
+                    CharacterFact("perception", CharacterFactCategories.SUBJECTIVE_BELIEFS,
+                        "先观察再表达", provenance = CharacterFactProvenance.USER_CREATED),
+                    CharacterFact("contrast", CharacterFactCategories.IDENTITY_GAP,
+                        "责任与普通生活的拉扯", provenance = CharacterFactProvenance.USER_CREATED),
+                ),
                 knowledgeBoundary = listOf("不知道未经历的后续剧情"),
                 loreEntries = listOf(
                     PersonaLoreEntry(
@@ -663,8 +668,9 @@ class ChatPersonaGalleryTest {
         assertEquals("原神", imported.persona.franchise)
         assertEquals("无剧透阶段", imported.persona.timelinePosition)
         assertEquals("兼顾责任与真诚关系；家族责任", imported.persona.factText(CharacterFactCategories.VALUES_AND_TRADEOFFS))
-        assertEquals("先观察再表达", imported.persona.factText(CharacterFactCategories.SENSORY_SIGNATURE))
-        assertTrue(imported.persona.coreValues.isEmpty() && imported.persona.attentionBiases.isEmpty())
+        assertEquals("先观察再表达",
+            imported.persona.factText(CharacterFactCategories.SUBJECTIVE_BELIEFS))
+        assertEquals("神里家大小姐", imported.persona.coreIdentity)
         assertEquals(listOf("不知道未经历的后续剧情"), imported.persona.knowledgeBoundary)
         assertEquals("genshin-kamisato-ayaka", imported.persona.presetId)
         assertEquals("thoma", imported.persona.loreEntries.single().id)
@@ -676,7 +682,9 @@ class ChatPersonaGalleryTest {
         val base = PersonaProfile(
             name = "卡芙卡",
             franchise = "崩坏：星穹铁道",
-            coreValues = listOf("保持选择权"),
+            coreIdentity = "星核猎手的成员",
+            facts = listOf(CharacterFact("first", CharacterFactCategories.VALUES_AND_TRADEOFFS,
+                "保持选择权", provenance = CharacterFactProvenance.USER_CREATED)),
             loreEntries = listOf(
                 PersonaLoreEntry(
                     id = "hunters",
@@ -690,7 +698,9 @@ class ChatPersonaGalleryTest {
         val incoming = PersonaProfile(
             name = "卡芙卡",
             franchise = "崩坏：星穹铁道",
-            coreValues = listOf("推动长期计划"),
+            coreIdentity = "星核猎手的成员",
+            facts = listOf(CharacterFact("second", CharacterFactCategories.VALUES_AND_TRADEOFFS,
+                "推动长期计划", provenance = CharacterFactProvenance.USER_CREATED)),
             loreEntries = listOf(
                 PersonaLoreEntry(
                     id = "hunters",
@@ -714,7 +724,7 @@ class ChatPersonaGalleryTest {
         assertEquals(setOf("保持选择权", "推动长期计划"),
             merged.facts.filter { it.category == CharacterFactCategories.VALUES_AND_TRADEOFFS }
                 .map { it.content }.toSet())
-        assertTrue(merged.coreValues.isEmpty())
+        assertEquals("星核猎手的成员", merged.coreIdentity)
         assertEquals(2, merged.loreEntries.size)
         val hunters = merged.loreEntries.first { it.id == "hunters" }
         assertEquals(90, hunters.priority)
@@ -729,9 +739,14 @@ class ChatPersonaGalleryTest {
         val saved = source.save(
             persona = PersonaProfile(
                 name = "阿青",
-                portrait = "剑客".repeat(600),
-                lifeContext = "很长的背景".repeat(600),
-                stableTraits = listOf("克制".repeat(300)),
+                coreIdentity = "剑客".repeat(600),
+                facts = listOf(
+                    CharacterFact("bio", CharacterFactCategories.BIOGRAPHY,
+                        "剑客生活，背景悠长".repeat(100),
+                        provenance = CharacterFactProvenance.USER_CREATED),
+                    CharacterFact("trait", CharacterFactCategories.PERSONALITY,
+                        "克制".repeat(300), provenance = CharacterFactProvenance.USER_CREATED),
+                ),
             ),
             sourceSessionId = "session-a",
             history = emptyList(),
@@ -745,8 +760,9 @@ class ChatPersonaGalleryTest {
             .importPersona(payload)
         assertEquals("阿青", imported.persona.name)
         assertTrue(imported.persona.factText(CharacterFactCategories.BIOGRAPHY).startsWith("剑客"))
+        assertTrue(imported.persona.coreIdentity.startsWith("剑客"))
         assertTrue(imported.persona.factText(CharacterFactCategories.PERSONALITY).startsWith("克制"))
-        assertTrue(imported.persona.portrait.isEmpty())
+        assertTrue(imported.persona.coreIdentity.isNotBlank())
     }
 
     @Test
@@ -754,7 +770,7 @@ class ChatPersonaGalleryTest {
         assertFalse(isMeaningfulGalleryPersona(PersonaProfile()))
         assertTrue(
             isMeaningfulGalleryPersona(
-                PersonaProfile(name = "小岚", portrait = "花店店主"),
+                PersonaProfile(name = "小岚", coreIdentity = "花店店主"),
             ),
         )
     }
@@ -766,7 +782,7 @@ class ChatPersonaGalleryTest {
         val discardedReply = LocalHarnessMessage("m2", "assistant", "旧回答", createdAt = 2L)
         val discardedFuture = LocalHarnessMessage("m3", "user", "旧未来", createdAt = 3L)
         val saved = store.save(
-            persona = PersonaProfile(name = "阿青", portrait = "剑客"),
+            persona = PersonaProfile(name = "阿青", coreIdentity = "剑客"),
             sourceSessionId = "session-a",
             history = listOf(first, discardedReply, discardedFuture),
             chatState = ChatCharacterState(mood = "旧未来状态", updatedAt = 3L),

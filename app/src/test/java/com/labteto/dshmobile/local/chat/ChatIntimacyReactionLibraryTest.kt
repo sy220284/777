@@ -71,7 +71,9 @@ class ChatIntimacyReactionLibraryTest {
 
     @Test
     fun personaMoodAndSettingActuallyAffectGuidance() {
-        val persona = PersonaProfile(name = "阿青", portrait = "性格慢热，外冷内热")
+        val persona = PersonaProfile(name = "阿青", coreIdentity = "剑客", facts = listOf(
+            CharacterFact("personality", CharacterFactCategories.PERSONALITY,
+                "慢热，外冷内热", provenance = CharacterFactProvenance.USER_CREATED)))
         val state = ChatCharacterState(mood = "紧张")
         val context = ChatContextState(scene = ChatSceneState(location = "厨房", sceneTime = "晚上"))
         val guidance = library.select("她抱住我", state, context, persona).guidance
@@ -96,7 +98,7 @@ class ChatIntimacyReactionLibraryTest {
     @Test
     fun fullReactionGuidanceOnlyAppearsInFiveOfFiveMode() {
         val plain = mode.prompt("今天有点累", ChatCharacterState(), ChatContextState(),
-            PersonaProfile(name = "阿青", portrait = "害羞"))
+            PersonaProfile(name = "阿青", coreIdentity = "害羞的旅人"))
         assertEquals("", plain)
         val flirting = mode.prompt("今晚撩我一下", ChatCharacterState())
         assertFalse(flirting.contains("【本轮反应素材"))
@@ -109,7 +111,9 @@ class ChatIntimacyReactionLibraryTest {
     @Test
     fun runtimeProjectionPassesStoryScopedPersonaAndScene() {
         val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
-        val persona = PersonaProfile(name = "阿青", portrait = "慢热而温柔")
+        val persona = PersonaProfile(name = "阿青", coreIdentity = "旅人", facts = listOf(
+            CharacterFact("personality", CharacterFactCategories.PERSONALITY,
+                "慢热而温柔", provenance = CharacterFactProvenance.USER_CREATED)))
         val context = ChatContextState(scene = ChatSceneState(location = "沙发", sceneTime = "夜晚"))
         val projection = projector.project(persona, ChatCharacterState(mood = "开心"),
             context, "她轻轻抱住了我", null)

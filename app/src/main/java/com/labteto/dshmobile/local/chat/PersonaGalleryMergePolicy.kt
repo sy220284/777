@@ -14,23 +14,14 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 internal fun isMeaningfulGalleryPersona(persona: PersonaProfile): Boolean {
-    val name = normalizePersonaText(persona.name)
+    val normalized = persona.canonicalV4()
+    val name = normalizePersonaText(normalized.name)
     if (name.isBlank() || name in DEFAULT_PERSONA_NAMES) return false
-    return persona.coreIdentity.isNotBlank() ||
-        persona.facts.isNotEmpty() ||
-        persona.portrait.isNotBlank() ||
-        persona.lifeContext.isNotBlank() ||
-        persona.attentionBiases.isNotEmpty() ||
-        persona.attentionKeywords.isNotEmpty() ||
-        persona.coreValues.isNotEmpty() ||
-        persona.stableTraits.isNotEmpty() ||
-        persona.worldSetting.isNotBlank() ||
-        persona.franchise.isNotBlank() ||
-        persona.timelinePosition.isNotBlank() ||
-        persona.knowledgeBoundary.isNotEmpty() ||
-        persona.loreEntries.isNotEmpty() ||
-        persona.hardConstraints.isNotEmpty() ||
-        persona.corrections.isNotEmpty()
+    // Retired prose/facts cannot turn an otherwise empty card into a meaningful profile.
+    return normalized.coreIdentity.isNotBlank() ||
+        normalized.facts.any { it.content.isNotBlank() } ||
+        normalized.franchise.isNotBlank() ||
+        normalized.loreEntries.any { it.content.isNotBlank() }
 }
 
 /**
@@ -84,20 +75,6 @@ private fun mergeCanonicalPersonaProfiles(base: PersonaProfile, incoming: Person
         name = chooseDisplayName(base.name, incoming.name),
         coreIdentity = mergePersonaText(base.coreIdentity, incoming.coreIdentity, 4_000),
         facts = mergeCharacterFacts(base.facts, incoming.facts),
-        portrait = mergePersonaText(base.portrait, incoming.portrait, 4_000),
-        lifeContext = mergePersonaText(base.lifeContext, incoming.lifeContext, 4_000),
-        attentionBiases = mergePersonaLines(base.attentionBiases, incoming.attentionBiases, 8),
-        attentionKeywords = mergePersonaLines(base.attentionKeywords, incoming.attentionKeywords, 12),
-        perceptionBlindSpots = mergePersonaLines(base.perceptionBlindSpots, incoming.perceptionBlindSpots, 8),
-        quirks = mergePersonaLines(base.quirks, incoming.quirks, 12),
-        limitations = mergePersonaLines(base.limitations, incoming.limitations, 8),
-        coreValues = mergePersonaLines(base.coreValues, incoming.coreValues, 6),
-        coreTension = mergePersonaText(base.coreTension, incoming.coreTension, 2_000),
-        stableTraits = mergePersonaLines(base.stableTraits, incoming.stableTraits, 8),
-        mutableTraits = mergePersonaLines(base.mutableTraits, incoming.mutableTraits, 8),
-        initialUserImpression = mergePersonaText(base.initialUserImpression, incoming.initialUserImpression, 2_000),
-        voiceSamples = mergePersonaLines(base.voiceSamples, incoming.voiceSamples, 20),
-        worldSetting = mergePersonaText(base.worldSetting, incoming.worldSetting, 4_000),
         franchise = mergePersonaText(base.franchise, incoming.franchise, 120),
         timelinePosition = mergePersonaText(base.timelinePosition, incoming.timelinePosition, 2_000),
         knowledgeBoundary = mergePersonaLines(base.knowledgeBoundary, incoming.knowledgeBoundary, 20),
@@ -122,35 +99,9 @@ internal fun applyPersonaSuggestions(
             "coreIdentity" -> result.copy(
                 coreIdentity = mergePersonaText(result.coreIdentity, value, 4_000),
             )
-            in CharacterFactCategories.canonical -> result.copy(facts = result.facts + CharacterFact(
-                id = java.util.UUID.randomUUID().toString(),
-                category = suggestion.field,
-                content = value,
-                provenance = CharacterFactProvenance.USER_CREATED,
-            ))
-            "portrait" -> result.appendV4Suggestion(CharacterFactCategories.BIOGRAPHY, value)
-            "lifeContext" -> result.appendV4Suggestion(CharacterFactCategories.LIFE_GRAVITY, value)
-            "attentionBiases", "attentionKeywords", "perceptionBlindSpots" ->
-                result.appendV4Suggestion(CharacterFactCategories.SENSORY_SIGNATURE, value)
-            "quirks" -> result.appendV4Suggestion(CharacterFactCategories.PREFERENCES_AND_HABITS, value)
-            "limitations" -> result.appendV4Suggestion(CharacterFactCategories.LIMITS_AND_COSTS, value)
-            "coreValues" -> result.appendV4Suggestion(CharacterFactCategories.VALUES_AND_TRADEOFFS, value)
-            "coreTension" -> result.appendV4Suggestion(CharacterFactCategories.IDENTITY_GAP, value)
-            "stableTraits", "mutableTraits" ->
-                result.appendV4Suggestion(CharacterFactCategories.PERSONALITY, value)
-            "initialUserImpression" ->
-                result.appendV4Suggestion(CharacterFactCategories.SUBJECTIVE_BELIEFS, value)
-            "voiceSamples" -> result.appendV4Suggestion(CharacterFactCategories.VOICE_STYLE, value)
-            "worldSetting" -> result.copy(loreEntries = mergeLoreEntries(
-                result.loreEntries,
-                listOf(PersonaLoreEntry(id = "v4-world-suggestion", title = "世界背景",
-                    content = value, alwaysOn = true)), 80))
+            in CharacterFactCategories.canonical ->
+                result.appendV4Suggestion(suggestion.field, value)
             "franchise" -> result.copy(franchise = mergePersonaText(result.franchise, value, 120))
-            "timelinePosition" -> result.copy(timelinePosition = mergePersonaText(result.timelinePosition, value, 2_000))
-            "knowledgeBoundary" -> result.copy(knowledgeBoundary = mergePersonaLines(result.knowledgeBoundary, listOf(value), 20))
-            "hardConstraints" -> result.copy(hardConstraints = mergePersonaLines(result.hardConstraints, listOf(value), 20))
-            "bannedPhrases" -> result.copy(bannedPhrases = mergePersonaLines(result.bannedPhrases, listOf(value), 30))
-            "corrections" -> result.copy(corrections = mergePersonaLines(result.corrections, listOf(value), 20))
             else -> result
         }
     }
@@ -309,20 +260,6 @@ private fun personaContentSignature(persona: PersonaProfile): String = listOf(
             fact.sourceReference,
         ).joinToString("~")
     },
-    persona.portrait,
-    persona.lifeContext,
-    persona.attentionBiases.joinToString("\u0000"),
-    persona.attentionKeywords.joinToString("\u0000"),
-    persona.perceptionBlindSpots.joinToString("\u0000"),
-    persona.quirks.joinToString("\u0000"),
-    persona.limitations.joinToString("\u0000"),
-    persona.coreValues.joinToString("\u0000"),
-    persona.coreTension,
-    persona.stableTraits.joinToString("\u0000"),
-    persona.mutableTraits.joinToString("\u0000"),
-    persona.initialUserImpression,
-    persona.voiceSamples.joinToString("\u0000"),
-    persona.worldSetting,
     persona.franchise,
     persona.timelinePosition,
     persona.knowledgeBoundary.joinToString("\u0000"),

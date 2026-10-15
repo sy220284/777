@@ -118,7 +118,7 @@ internal fun PersonaGalleryDetailHeaderV3(
             imageHeight = portrait?.height ?: 0,
         )
     }
-    val subtitle = entry.persona.portrait.ifBlank { relationSummary }
+    val subtitle = entry.persona.coreIdentity.ifBlank { relationSummary }
 
 
     Column(
@@ -200,7 +200,7 @@ internal fun PersonaGalleryDetailHeaderV3(
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
         )
-        if (entry.persona.portrait.isNotBlank()) {
+        if (entry.persona.coreIdentity.isNotBlank()) {
             Text(
                 subtitle,
                 style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
@@ -463,7 +463,7 @@ internal fun CompactPersonaRow(
                     }
                 }
                 Text(
-                    entry.persona.portrait.ifBlank {
+                    entry.persona.coreIdentity.ifBlank {
                         stringResource(
                             R.string.persona_gallery_compact_meta,
                             entry.stories.size,

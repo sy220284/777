@@ -912,7 +912,7 @@ fun LocalHarnessScreen(
                 currentGalleryId = shell.galleryId,
                 currentGalleryStoryId = shell.galleryStoryId,
                 currentPersonaName = shell.chatPersona.name,
-                currentPersonaIdentity = shell.chatPersona.portrait,
+                currentPersonaIdentity = shell.chatPersona.coreIdentity,
                 workModelLabel = activeModelProfile?.displayName
                     ?: activeModelProfile?.model
                     ?: stringResource(R.string.local_model_setup),

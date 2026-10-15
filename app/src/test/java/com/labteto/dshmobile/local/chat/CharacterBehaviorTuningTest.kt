@@ -171,7 +171,7 @@ class CharacterBehaviorTuningTest {
     @Test
     fun oldTuningCannotOverwriteCharacterContext() {
         val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
-        val persona = PersonaProfile(name = "阿青", portrait = "内向寡言，重视自由")
+        val persona = PersonaProfile(name = "阿青", coreIdentity = "内向寡言，重视自由")
         val base = ChatCharacterState()
         val tuned = base.copy(behaviorTuning = CharacterBehaviorTuning(
             intimacy = 100, initiative = 100, loreAdherence = 0, relationshipPace = 100))
