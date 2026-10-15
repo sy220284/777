@@ -8,6 +8,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.platform.app.InstrumentationRegistry
@@ -28,6 +30,21 @@ class CharacterBehaviorTuningDialogTest {
     @get:Rule val compose = createComposeRule()
 
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
+
+    @Test
+    fun tuningDialogUsesUnifiedSceneBackground() {
+        compose.setContent {
+            DshTheme {
+                CharacterBehaviorTuningDialog(
+                    personaName = "角色", portraitPath = "", relationshipState = "熟悉", mood = "平静",
+                    evolution = CharacterEvolutionState(), initial = CharacterBehaviorTuning(),
+                    onSave = { Result.success(Unit) }, onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("sySceneBackgroundSurface").assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.local_character_tuning_done)).assertIsDisplayed()
+    }
 
     @Test
     fun globalCeilingUpdatesFineTuningDisplayAndRestoresSavedSelection() {

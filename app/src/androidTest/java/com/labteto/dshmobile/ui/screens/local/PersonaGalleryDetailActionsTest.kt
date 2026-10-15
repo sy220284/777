@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -21,6 +22,7 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.ui.pressDeviceBack
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -80,6 +82,26 @@ class PersonaGalleryDetailActionsTest {
             compose.onNodeWithTag("personaGalleryEntry_${entry.id}").performClick()
         }
         compose.onNodeWithText("继续这条故事").assertIsDisplayed()
+    }
+
+    @Test
+    fun galleryDefaultRowIsCompactAndOpensSelectedPersona() {
+        var opened: String? = null
+        compose.setContent {
+            DshTheme {
+                FluidPersonaGalleryGrid(
+                    entries = listOf(entry),
+                    onSelect = { opened = it },
+                    onLongClick = {},
+                    animateOnEntrance = false,
+                )
+            }
+        }
+        val row = compose.onNodeWithTag("personaGalleryEntry_${entry.id}").assertIsDisplayed()
+        assertTrue("V6 gallery must use compact rows, not large artwork cards",
+            row.getUnclippedBoundsInRoot().height.value < 110f)
+        row.performClick()
+        compose.runOnIdle { assertEquals(entry.id, opened) }
     }
 
     @Test
