@@ -424,7 +424,9 @@ internal object ChatReplyContinuityGuard {
         )
         if (!retryCheck.accepted) {
             onEvent("${mode.actionPrefix}accepted-with-warning", retryCheck)
-            return if (contentOf(retried).isNotBlank()) retried else initial
+            // Two uncertain location heuristics must not replace an otherwise usable
+            // original reply with a second, equally questionable generation.
+            return initial
         }
 
         onEvent("${mode.actionPrefix}repaired", retryCheck)
