@@ -94,19 +94,16 @@ internal fun FirstLaunchOnboarding(
                 }
             }
             Spacer(Modifier.height(SyMetric.gapPage))
+            val fadeDuration = com.shenyan.designsystem.foundation.SyMotion.duration(
+                com.shenyan.designsystem.foundation.SyMotion.fadeMs,
+                com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
+                com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
+            )
             AnimatedContent(
                 targetState = step,
                 modifier = Modifier.widthIn(max = 380.dp),
                 transitionSpec = {
-                    fadeIn(tween(com.shenyan.designsystem.foundation.SyMotion.duration(
-                    com.shenyan.designsystem.foundation.SyMotion.fadeMs,
-                    com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
-                    com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
-                ))) togetherWith fadeOut(tween(com.shenyan.designsystem.foundation.SyMotion.duration(
-                    com.shenyan.designsystem.foundation.SyMotion.fadeMs,
-                    com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
-                    com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
-                )))
+                    fadeIn(tween(fadeDuration)) togetherWith fadeOut(tween(fadeDuration))
                 },
                 label = "onboardingStep",
             ) { current ->

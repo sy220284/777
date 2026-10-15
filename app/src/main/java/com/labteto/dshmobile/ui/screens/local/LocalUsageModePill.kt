@@ -44,6 +44,7 @@ internal fun LocalUsageModePill(
     onSelect: (LocalUsageMode) -> Unit,
 ) {
     val sy = LocalSyPalette.current
+    val pulse = com.labteto.dshmobile.ui.components.rememberHapticPulse()
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -91,7 +92,7 @@ internal fun LocalUsageModePill(
                                 selected = selected == mode,
                                 enabled = enabled,
                                 role = Role.Tab,
-                                onClick = { onSelect(mode) },
+                                onClick = { if (selected != mode) pulse(); onSelect(mode) },
                             ),
                         contentAlignment = Alignment.Center,
                     ) {

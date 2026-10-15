@@ -8,6 +8,7 @@ import com.shenyan.designsystem.components.SyMaterialSurface
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -70,6 +71,21 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
+/** Shared compact team disclosure, respecting device reduced motion and user tempo. */
+@Composable
+private fun teamFadeSpec() = com.shenyan.designsystem.foundation.SyMotion.run {
+    tween<Float>(duration(composerFadeMs,
+        com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
+        com.shenyan.designsystem.foundation.LocalSyMotionTempo.current), easing = ease)
+}
+
+@Composable
+private fun teamRevealSpec() = com.shenyan.designsystem.foundation.SyMotion.run {
+    tween<IntSize>(duration(composerRevealMs,
+        com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
+        com.shenyan.designsystem.foundation.LocalSyMotionTempo.current), easing = ease)
+}
+
 @Composable
 internal fun LocalAgentSwarmLaunchEntry(
     selected: Boolean,
@@ -131,26 +147,10 @@ internal fun LocalAgentTeamStatusBar(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     AnimatedVisibility(
         visible = !dismissed && (launchPending || team.visible),
-        enter = fadeIn(tween<Float>(com.shenyan.designsystem.foundation.SyMotion.duration(
-                com.shenyan.designsystem.foundation.SyMotion.composerFadeMs,
-                com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
-                com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
-            ))) +
-            expandVertically(animationSpec = tween<androidx.compose.ui.unit.IntSize>(com.shenyan.designsystem.foundation.SyMotion.duration(
-                com.shenyan.designsystem.foundation.SyMotion.composerRevealMs,
-                com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
-                com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
-            ))),
-        exit = fadeOut(tween<Float>(com.shenyan.designsystem.foundation.SyMotion.duration(
-                com.shenyan.designsystem.foundation.SyMotion.composerFadeMs,
-                com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
-                com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
-            ))) +
-            shrinkVertically(animationSpec = tween<androidx.compose.ui.unit.IntSize>(com.shenyan.designsystem.foundation.SyMotion.duration(
-                com.shenyan.designsystem.foundation.SyMotion.composerRevealMs,
-                com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
-                com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
-            ))),
+        enter = fadeIn(teamFadeSpec()) +
+            expandVertically(animationSpec = teamRevealSpec()),
+        exit = fadeOut(teamFadeSpec()) +
+            shrinkVertically(animationSpec = teamRevealSpec()),
     ) {
         SyMaterialSurface(
             onClick = onClick,
@@ -358,26 +358,10 @@ internal fun LocalAgentTeamSheet(
                         )
                         AnimatedVisibility(
                             visible = member.id == selectedMemberId,
-                            enter = fadeIn(tween<Float>(com.shenyan.designsystem.foundation.SyMotion.duration(
-                com.shenyan.designsystem.foundation.SyMotion.composerFadeMs,
-                com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
-                com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
-            ))) +
-                                expandVertically(animationSpec = tween<androidx.compose.ui.unit.IntSize>(com.shenyan.designsystem.foundation.SyMotion.duration(
-                com.shenyan.designsystem.foundation.SyMotion.composerRevealMs,
-                com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
-                com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
-            ))),
-                            exit = fadeOut(tween<Float>(com.shenyan.designsystem.foundation.SyMotion.duration(
-                com.shenyan.designsystem.foundation.SyMotion.composerFadeMs,
-                com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
-                com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
-            ))) +
-                                shrinkVertically(animationSpec = tween<androidx.compose.ui.unit.IntSize>(com.shenyan.designsystem.foundation.SyMotion.duration(
-                com.shenyan.designsystem.foundation.SyMotion.composerRevealMs,
-                com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
-                com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
-            ))),
+                            enter = fadeIn(teamFadeSpec()) +
+                                expandVertically(animationSpec = teamRevealSpec()),
+                            exit = fadeOut(teamFadeSpec()) +
+                                shrinkVertically(animationSpec = teamRevealSpec()),
                         ) {
                             TeamMemberDetail(
                                 member = member,
