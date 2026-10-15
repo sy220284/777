@@ -121,8 +121,8 @@ MiniMax 原始视频状态 Preparing、Queueing、Processing、Success、Fail �
 
 ## 2026-10-15 · PR #727 GPT 套餐聊天生图补修
 
-- 原生 Responses \`image_generation\` 与独立 Images/TTS/ASR 创作 API 为两条不同链路：前者在已接线的 GPT 聊天型号上作为工具提供，后者仍仅接受独立 API Key，不扩大套餐 OAuth 权限。
+- 原生 Responses `image_generation` 与独立 Images/TTS/ASR 创作 API 为两条不同链路：前者在已接线的 GPT 聊天型号上作为工具提供，后者仍仅接受独立 API Key，不扩大套餐 OAuth 权限。
 - 对 777 已知的 GPT-6 Astra、GPT-6.1 Sol、GPT-6 Sol、GPT-6 Luna、GPT-5.6 / 5.6 Sol 补齐原生生图工具模型识别；账户须已授予对应套餐/工具权限，实际是否可执行仍由官方接口响应确认，不能把本地名单视为额度或权限证明。
-- 直接聊天收到明确生图命令时优先选择原生图像工具（\`tool_choice=image_generation\`）；咨询、否定和普通文字不强制生图。未识别的套餐型号明确提示切换受支持型号，避免模型声称“这里不能生图”却又返回无效的粘贴提示词。
+- 直接聊天收到明确生图命令时优先选择原生图像工具（`tool_choice=image_generation`）；咨询、否定和普通文字不强制生图。未识别的套餐型号明确提示切换受支持型号，避免模型声称“这里不能生图”却又返回无效的粘贴提示词。
 - 将流式单行限制提高到可承接有界的图片 Base64 响应，保留整体 64 MiB/单行 32 MiB 上限；图片仍落地为本地附件而不是把 Base64 进入聊天历史。
 - 添加生成指令、非生成语境、图片输入、授权路线/代理隔离和新 GPT 型号的请求契约回归；修正旧版 GPT-5.6 测试与生产名单相矛盾的断言。未在真实 ChatGPT 套餐账户上成功调用前，不标注“真实生图验收通过”。
