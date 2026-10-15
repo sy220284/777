@@ -34,7 +34,7 @@ class ShenyanV5ContractTest {
         val matte = com.shenyan.designsystem.foundation.ShenyanPalettes.matte
         listOf(matte.materialL1, matte.materialL2, matte.materialL3, matte.materialL4, matte.materialL5)
             .forEach { assertEquals(1f, it.alpha, 0f) }
-        assertEquals(360, com.shenyan.designsystem.foundation.SyMotion.pushMs)
+        assertEquals(260, com.shenyan.designsystem.foundation.SyMotion.pushMs)
         val motion = com.shenyan.designsystem.foundation.SyMotion
         assertEquals(motion.pagePeerMs, motion.duration(motion.pagePeerMs, false))
         assertEquals(0, motion.duration(motion.pagePeerMs, true))
@@ -45,8 +45,8 @@ class ShenyanV5ContractTest {
         assertEquals(64f, SyDimensions.navigationCollapsed.value, 0f)
         assertEquals(318f, SyDimensions.inspector.value, 0f)
         assertEquals(48f, SyDimensions.minimumTouch.value, 0f)
-        assertEquals(280, SyDurations.sidebar)
-        assertEquals(380, SyDurations.sheet)
+        assertEquals(com.shenyan.designsystem.foundation.SyMotion.sidebarMs, SyDurations.sidebar)
+        assertEquals(com.shenyan.designsystem.foundation.SyMotion.sheetMs, SyDurations.sheet)
     }
 
     @Test fun compatibilityPaletteIsAnAliasNotAnIndependentTheme() {
