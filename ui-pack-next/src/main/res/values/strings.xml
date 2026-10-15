@@ -215,4 +215,7 @@
     <string name="next_tools_skill">技能：%1$s</string>
     <string name="next_tools_plugin">插件：%1$s</string>
     <string name="next_tools_summary">已登记 %1$d 台 MCP 服务器 · %2$d 项技能</string>
+    <string name="next_evidence_inspect">检查当前版本</string>
+    <string name="next_evidence_confirm">关联该文件版本</string>
+    <string name="next_evidence_version">已核对 SHA-256：%1$s…</string>
 </resources>

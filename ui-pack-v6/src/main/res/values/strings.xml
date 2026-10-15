@@ -8,4 +8,7 @@
     <string name="v6_artifact_changed">文件内容已发生变化</string>
     <string name="v6_evidence_refresh">刷新来源</string>
     <string name="v6_close">关闭</string>
+    <string name="v6_evidence_inspect">检查当前版本</string>
+    <string name="v6_evidence_confirm">关联该文件版本</string>
+    <string name="v6_evidence_version">已核对 SHA-256：%1$s…</string>
 </resources>

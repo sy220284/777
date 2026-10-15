@@ -18,6 +18,10 @@ class LocalWorkEvidenceControllerTest {
             override suspend fun read(identity: com.labteto.dshmobile.uicontract.UiSessionIdentity) =
                 com.labteto.dshmobile.uicontract.UiWorkEvidenceReadReceipt.Rejected(
                     com.labteto.dshmobile.uicontract.UiCommandRejection.STALE_IDENTITY)
+            override suspend fun inspect(
+                identity: com.labteto.dshmobile.uicontract.UiSessionIdentity,
+                artifact: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem,
+            ) = com.labteto.dshmobile.uicontract.UiWorkArtifactInspectionReceipt.Failed(null)
             override suspend fun submit(command: com.labteto.dshmobile.uicontract.LinkWorkEvidenceReferenceCommand) =
                 com.labteto.dshmobile.uicontract.UiCommandReceipt.NotAdmitted
         },

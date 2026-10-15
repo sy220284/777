@@ -22,6 +22,7 @@ internal fun NextWorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSession
     var open by remember(identity) { mutableStateOf(false) }
     var snapshot by remember(identity) { mutableStateOf<UiWorkEvidenceSnapshot?>(null) }
     var selected by remember(identity) { mutableStateOf<UiWorkRequirement?>(null) }
+    var inspected by remember(identity) { mutableStateOf<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem?>(null) }
     var feedback by remember(identity) { mutableStateOf<String?>(null) }
     var pending by remember(identity) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -36,7 +37,9 @@ internal fun NextWorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSession
                 val result = port.read(identity)
                 if (request != generation) return@launch
                 when (result) {
-                    is UiWorkEvidenceReadReceipt.Available -> { snapshot = result.snapshot; open = true }
+                    is UiWorkEvidenceReadReceipt.Available -> {
+                        snapshot = result.snapshot; selected = null; inspected = null; open = true
+                    }
                     is UiWorkEvidenceReadReceipt.Failed -> feedback = result.message ?: unavailable
                     is UiWorkEvidenceReadReceipt.Rejected -> feedback = unavailable
                 }
@@ -44,13 +47,13 @@ internal fun NextWorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSession
             finally { if (request == generation) pending = false }
         }
     }
-    fun close() { generation++; open = false; pending = false }
+    fun close() { generation++; open = false; pending = false; selected = null; inspected = null }
     TextButton(onClick = { open = true; refresh() }, enabled = !pending) { Text(stringResource(R.string.next_evidence)) }
     if (open) AlertDialog(onDismissRequest = { close() }, title = { Text(stringResource(R.string.next_evidence)) },
         text = { LazyColumn(Modifier.heightIn(max = 360.dp)) {
             item { Text(stringResource(R.string.next_evidence_not_verified)) }
             items(snapshot?.requirements.orEmpty(), key = { it.index }) { requirement ->
-                TextButton(onClick = { selected = requirement }, enabled = !pending) { Text("${requirement.text} · ${requirement.reportedStatus}") }
+                TextButton(onClick = { selected = requirement; inspected = null }, enabled = !pending) { Text("${requirement.text} · ${requirement.reportedStatus}") }
                 snapshot?.references?.filter { it.requirementIndex == requirement.index && it.requirement == requirement.text }?.forEach { reference ->
                     Text(reference.artifactPath)
                     Text(stringResource(when {
@@ -64,23 +67,61 @@ internal fun NextWorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSession
                 item { Text(requirement.text) }
                 items(snapshot?.artifacts.orEmpty().filter { it.category == "file" }, key = { "${it.asOfSequence}:${it.reference}" }) { artifact ->
                     TextButton(onClick = {
-                        if (!pending) { val request = ++generation; pending = true; scope.launch {
-                            try {
-                                val result = port.submit(LinkWorkEvidenceReferenceCommand(identity, requirement.index, requirement.text, artifact))
-                                if (request != generation) return@launch
-                                feedback = when (result) {
-                                    UiCommandReceipt.Accepted -> linked
-                                    is UiCommandReceipt.Failed -> result.message
-                                    else -> unavailable
+                        if (!pending) {
+                            val request = ++generation
+                            pending = true
+                            inspected = null
+                            scope.launch {
+                                try {
+                                    val result = port.inspect(identity, artifact)
+                                    if (request != generation) return@launch
+                                    when (result) {
+                                        is UiWorkArtifactInspectionReceipt.Ready -> {
+                                            inspected = result.artifact
+                                            feedback = null
+                                        }
+                                        is UiWorkArtifactInspectionReceipt.Failed -> feedback = result.message ?: unavailable
+                                        is UiWorkArtifactInspectionReceipt.Rejected -> feedback = unavailable
+                                    }
+                                } catch (cancelled: CancellationException) { throw cancelled }
+                                finally { if (request == generation) pending = false }
+                            }
+                        }
+                    }, enabled = !pending && artifact.currentlyAvailable != false && artifact.sourceCallId != null) {
+                        Text(artifact.reference + " · " + stringResource(R.string.next_evidence_inspect))
+                    }
+                }
+                inspected?.let { verified ->
+                    item {
+                        Text(stringResource(R.string.next_evidence_version, verified.versionNow.orEmpty().take(16)))
+                        TextButton(onClick = {
+                            if (!pending && verified.versionNow != null) {
+                                val request = ++generation
+                                pending = true
+                                scope.launch {
+                                    try {
+                                        val result = port.submit(LinkWorkEvidenceReferenceCommand(
+                                            identity, requirement.index, requirement.text, verified,
+                                            expectedGoalId = snapshot?.goalId, verifyGoalId = true))
+                                        if (request != generation) return@launch
+                                        feedback = when (result) {
+                                            UiCommandReceipt.Accepted -> linked
+                                            is UiCommandReceipt.Failed -> result.message ?: unavailable
+                                            else -> unavailable
+                                        }
+                                        if (result == UiCommandReceipt.Accepted) {
+                                            inspected = null
+                                            val reread = port.read(identity)
+                                            if (request == generation && reread is UiWorkEvidenceReadReceipt.Available) snapshot = reread.snapshot
+                                        }
+                                    } catch (cancelled: CancellationException) { throw cancelled }
+                                    finally { if (request == generation) pending = false }
                                 }
-                                if (result == UiCommandReceipt.Accepted) {
-                                    val reread = port.read(identity)
-                                    if (request == generation && reread is UiWorkEvidenceReadReceipt.Available) snapshot = reread.snapshot
-                                }
-                            } catch (cancelled: CancellationException) { throw cancelled }
-                            finally { if (request == generation) pending = false }
-                        } }
-                    }, enabled = !pending && artifact.currentlyAvailable != false && artifact.sourceCallId != null) { Text(artifact.reference) }
+                            }
+                        }, enabled = !pending && verified.versionNow != null) {
+                            Text(stringResource(R.string.next_evidence_confirm))
+                        }
+                    }
                 }
             }
             feedback?.let { item { Text(it) } }

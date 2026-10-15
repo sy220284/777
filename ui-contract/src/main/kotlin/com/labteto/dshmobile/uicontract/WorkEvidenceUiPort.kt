@@ -6,11 +6,17 @@ import com.labteto.dshmobile.local.work.LocalRequirementEvidenceLink
 /** Status is reported by Work; a selected reference never turns it into a verified pass. */
 data class UiWorkRequirement(val index: Int, val text: String, val reportedStatus: String)
 data class UiWorkEvidenceSnapshot(val identity: UiSessionIdentity, val requirements: List<UiWorkRequirement>,
-    val artifacts: List<LocalArtifactUiItem>, val references: List<LocalRequirementEvidenceLink>)
+    val artifacts: List<LocalArtifactUiItem>, val references: List<LocalRequirementEvidenceLink>,
+    val goalId: String? = null)
 sealed interface UiWorkEvidenceReadReceipt {
     data class Available(val snapshot: UiWorkEvidenceSnapshot) : UiWorkEvidenceReadReceipt
     data class Rejected(val reason: UiCommandRejection) : UiWorkEvidenceReadReceipt
     data class Failed(val message: String?) : UiWorkEvidenceReadReceipt
+}
+sealed interface UiWorkArtifactInspectionReceipt {
+    data class Ready(val artifact: LocalArtifactUiItem) : UiWorkArtifactInspectionReceipt
+    data class Rejected(val reason: UiCommandRejection) : UiWorkArtifactInspectionReceipt
+    data class Failed(val message: String?) : UiWorkArtifactInspectionReceipt
 }
 data class LinkWorkEvidenceReferenceCommand(val identity: UiSessionIdentity, val requirementIndex: Int,
     val expectedRequirement: String, val artifact: LocalArtifactUiItem,
@@ -19,5 +25,6 @@ data class LinkWorkEvidenceReferenceCommand(val identity: UiSessionIdentity, val
     val verifyGoalId: Boolean = false)
 interface WorkEvidenceUiPort {
     suspend fun read(identity: UiSessionIdentity): UiWorkEvidenceReadReceipt
+    suspend fun inspect(identity: UiSessionIdentity, artifact: LocalArtifactUiItem): UiWorkArtifactInspectionReceipt
     suspend fun submit(command: LinkWorkEvidenceReferenceCommand): UiCommandReceipt
 }
