@@ -520,6 +520,19 @@ internal fun ChatPersonaDialog(
     val coroutineScope = rememberCoroutineScope()
     val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
 
+    fun addFactField(category: String) {
+        if (factDrafts.none { it.category == category }) {
+            factDrafts = factDrafts + CharacterFact(
+                id = UUID.randomUUID().toString(),
+                category = category,
+                content = "",
+                provenance = CharacterFactProvenance.USER_CREATED,
+            )
+        }
+        visibleFields = visibleFields + category
+        addFieldsOpen = false
+    }
+
     fun applyGenerated(generated: PersonaProfile) {
         runtimeProfile = generated
         name = generated.name
@@ -660,7 +673,7 @@ internal fun ChatPersonaDialog(
                 }.forEach { (category, label) ->
                     SySheetChoiceRow(
                         title = stringResource(label),
-                        onClick = { visibleFields = visibleFields + category; addFieldsOpen = false },
+                        onClick = { addFactField(category) },
                     )
                 }
                 SySheetChoiceRow(
@@ -678,9 +691,8 @@ internal fun ChatPersonaDialog(
                     onClick = {
                         val category = customCategory.trim()
                         if (category.isNotEmpty()) {
-                            visibleFields = visibleFields + category
+                            addFactField(category)
                             customCategory = ""
-                            addFieldsOpen = false
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -778,9 +790,16 @@ internal fun ChatPersonaDialog(
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                     )
                 }
-                aiError?.let {
+                aiError?.let { error ->
+                    val message = when (error) {
+                        "persona_autofill_busy" -> stringResource(R.string.local_persona_ai_busy)
+                        "persona_autofill_unconfigured" -> stringResource(R.string.local_persona_ai_unconfigured)
+                        "persona_autofill_stale" -> stringResource(R.string.local_persona_ai_stale)
+                        "persona_autofill_failed" -> stringResource(R.string.local_persona_ai_failed)
+                        else -> error
+                    }
                     Text(
-                        it,
+                        message,
                         style = DsType.caption11.withReadingWeight(),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk,
                     )
@@ -813,14 +832,14 @@ private fun PersonaFactCategoryEditor(
             val label = if (index == 0) title
                 else stringResource(R.string.persona_v4_fact_number, title, index + 1)
             PersonaTextField(label, entry.content, { content ->
-                onChange(if (content.isBlank()) facts.filterNot { it.id == entry.id }
-                    else facts.map { fact ->
-                        if (fact.id == entry.id) fact.copy(
-                            content = content,
-                            provenance = CharacterFactProvenance.USER_CREATED,
-                            sourceReference = "",
-                        ) else fact
-                    })
+                // Keep the same input node while clearing/retyping; blank drafts are dropped on save.
+                onChange(facts.map { fact ->
+                    if (fact.id == entry.id) fact.copy(
+                        content = content,
+                        provenance = CharacterFactProvenance.USER_CREATED,
+                        sourceReference = "",
+                    ) else fact
+                })
             })
             if (showMetadata) {
                 PersonaTextField(
