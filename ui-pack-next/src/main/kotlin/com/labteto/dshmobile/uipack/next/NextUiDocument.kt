@@ -31,6 +31,9 @@ import com.labteto.dshmobile.uicontract.UiExecutionPhase
 import com.labteto.dshmobile.uicontract.UiDocumentActionRequest
 import com.labteto.dshmobile.uicontract.UiDocumentUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentReceipt
+import com.labteto.dshmobile.uicontract.UiCommandReceipt
+import com.labteto.dshmobile.uicontract.UiCommandRejection
+import com.labteto.dshmobile.uicontract.UiMessageEditOutcome
 import com.labteto.dshmobile.uicontract.UiSessionIdentity
 import com.labteto.dshmobile.uicontract.initialFields
 
@@ -61,18 +64,7 @@ internal fun NextUiDocument(snapshot: UiDocumentSnapshot, identity: UiSessionIde
                             document.source, action, values))
                     } })
             }
-            receipt?.let { result ->
-                if (result is UiDocumentReceipt.InvalidFields) {
-                    Text(stringResource(R.string.next_document_invalid_fields, result.fieldIds.joinToString()))
-                } else {
-                    Text(stringResource(when (result) {
-                        UiDocumentReceipt.DraftPrepared -> R.string.next_document_draft_prepared
-                        UiDocumentReceipt.NavigationRequested -> R.string.next_document_navigated
-                        is UiDocumentReceipt.OwnerReceipt -> R.string.next_document_owner_receipt
-                        else -> R.string.next_document_unavailable
-                    }))
-                }
-            }
+            receipt?.let { result -> NextDocumentActionFeedback(result) }
         }
     }
 }
@@ -134,3 +126,48 @@ private fun NextDocumentNode(node: UiDocumentNode, values: Map<String, String>, 
         }
     }
 }
+
+/** Preserve the Owner receipt. Rejection or unknown side effects must never look like success. */
+@Composable
+private fun NextDocumentActionFeedback(result: UiDocumentReceipt) {
+    val label = when (result) {
+        UiDocumentReceipt.DraftPrepared -> stringResource(R.string.next_document_draft_prepared)
+        UiDocumentReceipt.NavigationRequested -> stringResource(R.string.next_document_navigated)
+        UiDocumentReceipt.AdditionalRequestConsentRequired -> stringResource(R.string.next_document_extra_request_consent)
+        is UiDocumentReceipt.InvalidFields ->
+            stringResource(R.string.next_document_invalid_fields, result.fieldIds.joinToString())
+        is UiDocumentReceipt.Failed -> result.message?.takeIf(String::isNotBlank)
+            ?: stringResource(R.string.next_document_unavailable)
+        is UiDocumentReceipt.Rejected -> nextDocumentRejectionText(result.reason)
+        is UiDocumentReceipt.OwnerReceipt -> when (val owner = result.receipt) {
+            UiCommandReceipt.Accepted -> stringResource(R.string.next_document_owner_receipt)
+            UiCommandReceipt.Queued -> stringResource(R.string.next_enqueued)
+            is UiCommandReceipt.Rejected -> nextDocumentRejectionText(owner.reason)
+            is UiCommandReceipt.Failed -> owner.message
+            UiCommandReceipt.NotAdmitted -> stringResource(R.string.next_document_unavailable)
+            UiCommandReceipt.OutcomeUnknown -> stringResource(R.string.next_unknown)
+            is UiCommandReceipt.MessageEdited -> when (owner.result) {
+                UiMessageEditOutcome.SENT -> stringResource(R.string.next_accepted)
+                UiMessageEditOutcome.COMMITTED_NOT_STARTED -> stringResource(R.string.next_edit_committed)
+                else -> stringResource(R.string.next_edit_unavailable)
+            }
+        }
+        is UiDocumentReceipt.Published -> stringResource(R.string.next_document_owner_receipt)
+        is UiDocumentReceipt.Fallback -> stringResource(R.string.next_document_unavailable)
+    }
+    Text(label)
+}
+
+@Composable
+private fun nextDocumentRejectionText(reason: UiCommandRejection): String = stringResource(when (reason) {
+    UiCommandRejection.EMPTY_INPUT -> R.string.next_reject_empty
+    UiCommandRejection.LOADING -> R.string.next_reject_loading
+    UiCommandRejection.UNCONFIGURED -> R.string.next_reject_config
+    UiCommandRejection.STALE_IDENTITY -> R.string.next_stale
+    UiCommandRejection.SESSION_TRANSITION -> R.string.next_reject_transition
+    UiCommandRejection.QUEUE_FULL -> R.string.next_reject_queue_full
+    UiCommandRejection.QUEUE_UNAVAILABLE -> R.string.next_reject_queue_unavailable
+    UiCommandRejection.APPROVAL_EXPIRED -> R.string.next_reject_approval
+    UiCommandRejection.QUESTION_EXPIRED -> R.string.next_reject_question
+    UiCommandRejection.UNSUPPORTED -> R.string.next_reject_unsupported
+})
