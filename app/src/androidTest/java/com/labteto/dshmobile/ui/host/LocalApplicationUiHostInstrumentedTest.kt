@@ -31,11 +31,17 @@ class LocalApplicationUiHostInstrumentedTest {
     private val preference get() = context.getSharedPreferences("ui_application_pack", Context.MODE_PRIVATE)
 
     @Before fun clearSelection() {
-        preference.edit().remove("selected_pack").commit()
+        clearHostPreferences()
     }
 
     @After fun resetSelection() {
-        preference.edit().remove("selected_pack").commit()
+        clearHostPreferences()
+    }
+
+    private fun clearHostPreferences() {
+        preference.edit().remove("selected_pack")
+            .remove("navigation_snapshot.fixture-next")
+            .remove("navigation_snapshot.fixture-v6").commit()
     }
 
     private fun fullFixture(id: String, title: String): UiApplicationScenePack {
@@ -75,7 +81,54 @@ class LocalApplicationUiHostInstrumentedTest {
             }
         }
         compose.onNodeWithText("settings.models").assertExists()
-        compose.runOnIdle { assertEquals(listOf("settings.models"), acknowledgements) }
+        compose.runOnIdle {
+            assertEquals(listOf("settings.models"), acknowledgements)
+            val saved = preference.getString("navigation_snapshot.fixture-next", null)
+            assertEquals(UiSceneId("settings.models"),
+                com.labteto.dshmobile.uihost.UiSceneNavigationSnapshotCodec
+                    .decodeOrNull(saved)?.stack?.last())
+        }
+    }
+
+    @Test fun coldStartRestoresOnlyValidatedPackOwnedNavigationState() {
+        val next = fullFixture("fixture-next", "Next full-pack home")
+        val snapshot = com.labteto.dshmobile.uihost.UiSceneNavigationSnapshotCodec.encode(
+            com.labteto.dshmobile.uihost.UiSceneNavigationState(
+                next.manifest.id, listOf(UiSceneId("route.home"), UiSceneId("settings.models"))))
+        preference.edit().putString("selected_pack", next.manifest.id)
+            .putString("navigation_snapshot.fixture-next", snapshot).commit()
+        compose.setContent {
+            MaterialTheme {
+                LocalApplicationUiHost(
+                    installedPacks = listOf(next), availableCapabilities = emptySet(),
+                ) { Text("Explicit legacy screen") }
+            }
+        }
+        compose.onNodeWithText("settings.models").assertExists()
+        compose.onNodeWithText("Next full-pack home").assertDoesNotExist()
+    }
+
+    @Test fun corruptSavedPackHistoryRequiresExplicitRecovery() {
+        val next = fullFixture("fixture-next", "Next full-pack home")
+        val foreign = com.labteto.dshmobile.uihost.UiSceneNavigationSnapshotCodec.encode(
+            com.labteto.dshmobile.uihost.UiSceneNavigationState(
+                "old-pack", listOf(UiSceneId("route.home"))))
+        preference.edit().putString("selected_pack", next.manifest.id)
+            .putString("navigation_snapshot.fixture-next", foreign).commit()
+        compose.setContent {
+            MaterialTheme {
+                LocalApplicationUiHost(
+                    installedPacks = listOf(next), availableCapabilities = emptySet(),
+                ) { Text("Explicit legacy screen") }
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.ui_pack_incompatible)).assertExists()
+        compose.onNodeWithText("Next full-pack home").assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.ui_pack_back_to_stable)).performClick()
+        compose.onNodeWithText("Explicit legacy screen").assertExists()
+        compose.runOnIdle {
+            assertEquals(null, preference.getString("navigation_snapshot.fixture-next", null))
+        }
     }
 
     @Test fun changingDurableSelectionActuallySwapsTwoWholeApplicationRenderers() {

@@ -151,7 +151,12 @@ internal fun LocalApplicationUiHost(
     when (decision) {
         LocalApplicationUiDecision.Legacy -> legacyContent()
         is LocalApplicationUiDecision.Hosted -> {
-            val nav = remember(decision.admission.pack.manifest.id) {
+            val packId = decision.admission.pack.manifest.id
+            val snapshotKey = "navigation_snapshot.$packId"
+            val persistedSnapshot = remember(preference, packId) {
+                preference.getString(snapshotKey, null)
+            }
+            val nav = remember(packId) {
                 UiHostSceneNavigation(LocalUiSceneCatalog.requirements,
                     decision.admission.pack.manifest, UiSceneId("route.home"),
                     deepLinks = LocalApplicationSceneDeepLinks.targets)
@@ -160,11 +165,17 @@ internal fun LocalApplicationUiHost(
                 nav, onAtRootBack = { activity?.finish() },
                 requestedDeepLinkKey = requestedSceneKey,
                 onDeepLinkProcessed = onSceneRequestProcessed,
+                persistedNavigationSnapshot = persistedSnapshot,
+                onNavigationSnapshotUpdated = { encoded ->
+                    preference.edit().putString(snapshotKey, encoded).commit()
+                },
             )
             // An invalid restored history must not turn the application into an empty screen.
             if (result is UiSceneRenderAccess.Rejected) {
                 UnavailablePackNotice {
-                    preference.edit().putString("selected_pack", LEGACY_V6_APP_UI).commit()
+                    // Explicit recovery must clear the rejected pack's saved history.
+                    preference.edit().remove(snapshotKey)
+                        .putString("selected_pack", LEGACY_V6_APP_UI).commit()
                 }
             }
         }

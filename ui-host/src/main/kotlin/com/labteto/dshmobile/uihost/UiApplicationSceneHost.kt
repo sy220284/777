@@ -55,9 +55,12 @@ fun UiApplicationPackAdmission.Admitted.RenderHostedScene(
     onAtRootBack: () -> Unit,
     requestedDeepLinkKey: String? = null,
     onDeepLinkProcessed: (String, UiSceneNavigationResult) -> Unit = { _, _ -> },
+    persistedNavigationSnapshot: String? = null,
+    onNavigationSnapshotUpdated: (String) -> Unit = {},
 ): UiSceneRenderAccess {
     var encoded by rememberSaveable(pack.manifest.id) {
-        mutableStateOf(UiSceneNavigationSnapshotCodec.encode(navigation.initial))
+        mutableStateOf(persistedNavigationSnapshot ?:
+            UiSceneNavigationSnapshotCodec.encode(navigation.initial))
     }
     // A->B->A restores the same encoded stack: track a monotonic transition epoch
     // as well so an asynchronous callback from the first A cannot act in the new A.
@@ -68,6 +71,8 @@ fun UiApplicationPackAdmission.Admitted.RenderHostedScene(
     }
     val access = resolve(restored.state, navigation)
     if (access is UiSceneRenderAccess.Ready) {
+        // Persist only a validated, renderable Host stack, never corrupt or foreign state.
+        LaunchedEffect(encoded, navigation) { onNavigationSnapshotUpdated(encoded) }
         // External route requests enter through the same Host-owned whitelist and
         // navigation CAS as renderer proposals; V6 does not silently handle rejects.
         LaunchedEffect(requestedDeepLinkKey, navigation) {
