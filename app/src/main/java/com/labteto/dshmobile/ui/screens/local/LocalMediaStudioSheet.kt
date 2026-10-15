@@ -173,7 +173,7 @@ internal fun LocalMediaStudioSheetContent(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = if (chosenId.isBlank()) "自动选择 · ${selected.label}" else "手动选择 · ${selected.label}",
+                    text = stringResource(if (chosenId.isBlank()) R.string.media_route_current_auto else R.string.media_route_current_manual, selected.label),
                     modifier = Modifier.weight(1f),
                     style = DsType.small13Strong.withReadingWeight(),
                     color = colors.textSecondary,
@@ -193,7 +193,7 @@ internal fun LocalMediaStudioSheetContent(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     item(key = "auto") {
-                        SyButton(text = "自动选择支持的模型",
+                        SyButton(text = stringResource(R.string.media_route_auto),
                             onClick = { chosenId = ""; showModelChoices = false },
                             size = SyButtonSize.Small,
                             variant = if (chosenId.isBlank()) SyButtonVariant.Primary else SyButtonVariant.Ghost,
@@ -318,8 +318,8 @@ internal fun LocalMediaStudioSheetContent(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            text = if (voiceId.isBlank()) "请选择角色音色"
-                                else "当前音色：${voices.firstOrNull { it.id == voiceId }?.name ?: LocalMediaVoiceLabels.label(selected.provider, voiceId)}",
+                            text = if (voiceId.isBlank()) stringResource(R.string.media_voice_required)
+                                else stringResource(R.string.media_voice_current, voices.firstOrNull { it.id == voiceId }?.name ?: LocalMediaVoiceLabels.label(selected.provider, voiceId)),
                             modifier = Modifier.weight(1f),
                             style = DsType.small13Strong.withReadingWeight(),
                             color = colors.textSecondary, maxLines = 1,
