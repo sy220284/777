@@ -201,8 +201,7 @@ class PersonaInspectionService @Inject constructor(
              "suggestions":[{"field":"","value":"","evidence":""}]}
             field仅允许coreIdentity及以下资料类别：
             personality,selfNarrative,identityGap,valuesAndTradeoffs,subjectiveBeliefs,biography,
-            definingChoices,emotionalImprints,lifeGravity,unfinishedBusiness,relationships,
-            limitsAndCosts,sensorySignature,preferencesAndHabits,voiceStyle,customFacts。
+            relationships,preferencesAndHabits,voiceStyle,customFacts。
             只能根据稳定且明确的证据提出事实补充。原作身份和能力要区分可靠事实与推断。
             当前情绪、互动频率、关系进度、临时关注和未来成长属于运行时；
             不可写入人物卡，也不应将模型限制描述成人物设定。
