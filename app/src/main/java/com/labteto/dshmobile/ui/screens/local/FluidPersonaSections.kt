@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaGalleryStory
-import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
@@ -41,7 +40,12 @@ internal fun FluidPersonaIdentity(entry: PersonaGalleryEntry, subtitle: String,
     val portrait by produceState<ImageBitmap?>(null, entry.portraitPath) {
         value = withContext(Dispatchers.IO) { decodePersonaPortraitBitmap(entry.portraitPath, maxEdgePx = 320) }
     }
-    SyGlassCard {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(
+            horizontal = SyMetric.gapSm, vertical = SyMetric.gapSm,
+        ),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
             Surface(color = colors.lilac.copy(alpha = .18f), shape = RoundedCornerShape(20.dp),
@@ -67,7 +71,12 @@ internal fun FluidPersonaIdentity(entry: PersonaGalleryEntry, subtitle: String,
 internal fun FluidPersonaStorySection(story: PersonaGalleryStory?, section: Int) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val state = story?.chatState
-    SyGlassCard {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(
+            horizontal = SyMetric.gapSm, vertical = SyMetric.gapSm,
+        ),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+    ) {
         when (section) {
             0 -> {
                 FluidPersonaFactRow(stringResource(R.string.fluid_persona_stage), state?.relationshipState.orEmpty())
