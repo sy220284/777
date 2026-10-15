@@ -50,9 +50,8 @@ internal object PersonaImmersionPolicy {
     private fun personaHasAuthoredAIIdentity(persona: PersonaProfile): Boolean {
         val source = buildString {
             appendLine(persona.name)
-            appendLine(persona.coreIdentity.ifBlank { persona.portrait })
+            appendLine(persona.coreIdentity)
             appendLine(persona.trustedFactText(CharacterFactCategories.SELF_NARRATIVE))
-            appendLine(persona.trustedFactText(CharacterFactCategories.LIMITS_AND_COSTS))
         }
         return source.lineSequence().any { line ->
             AUTHORED_AI_IDENTITY.findAll(line).any { match ->
