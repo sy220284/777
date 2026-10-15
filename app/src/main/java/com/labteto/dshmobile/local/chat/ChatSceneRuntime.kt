@@ -266,7 +266,7 @@ internal object ChatSceneRuntime {
      * Only confidently asserted present-location statements trigger a scene repair.
      */
     private fun isAssertedPresence(text: String, offset: Int): Boolean {
-        val inQuotedSpan = Regex("""“[^”]*”|‘[^’]*’|\\x22[^\\x22]*\\x22""")
+        val inQuotedSpan = Regex("""“[^”]*”|‘[^’]*’|\x22[^\x22]*\x22""")
             .findAll(text).any { offset in it.range }
         if (inQuotedSpan) return false
         val precedingClause = text.substring(0, offset).takeLast(80)
