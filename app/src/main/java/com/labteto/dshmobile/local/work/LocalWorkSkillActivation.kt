@@ -96,6 +96,7 @@ internal fun relevantSkillIdsForTask(input: String): Set<String> {
         "bug-investigation" to "故障|报错|异常|崩溃|排查|bug|crash|debug|error",
         "data-insights" to "数据分析|数据统计|报表|趋势分析|指标|统计口径|analytics|data.insight",
         "translation-localization" to "翻译|本地化|译文|术语统一|translate|translation|localization",
+        "imagegen" to "生成图片|图片生成|修图|编辑图片|参考图|绘制图片|图像创作|image.gen|image.edit",
         "minimax-media" to "图片生成|生成图片|生成视频|视频生成|配音|生成语音|媒体生成|image.gen|video.gen",
         "minimax-music-gen" to "生成音乐|生成歌曲|伴奏|作曲|音乐创作|music.gen",
         "minimax-playlist" to "歌单|播放列表|playlist",
