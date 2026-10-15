@@ -28,7 +28,7 @@ import kotlinx.coroutines.CancellationException
 
 /** Read-only archive facts and explicit story launch, both from the actual Chat Owner. */
 @Composable
-internal fun NextPersonaGalleryScene(
+fun NextPersonaGalleryScene(
     gallery: PersonaGalleryUiPort,
     selection: PersonaSelectionUiPort,
     onBack: () -> Unit,
