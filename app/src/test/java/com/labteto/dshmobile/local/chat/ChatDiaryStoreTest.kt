@@ -167,6 +167,23 @@ class ChatDiaryStoreTest {
     }
 
     @Test
+    fun longPersonalVoiceRetainsCompleteSentencesAndOrdinaryHobbyVocabulary() {
+        val content = "我终于把模型飞机修好了！" + "今天还在思考自己要去哪里。".repeat(45)
+        val sanitized = ChatDiaryEntryPolicy.sanitizeDelta(request(
+            delta = ChatDiaryDelta(
+                event = "我把模型飞机修好了",
+                privateReflection = content,
+                importance = 4,
+            ),
+            evidence = "我把模型飞机修好了",
+        ))!!
+        assertTrue(sanitized.privateReflection.startsWith("我终于把模型飞机修好了！"))
+        assertTrue(sanitized.privateReflection.length <= ChatDiaryBounds.MAX_PRIVATE_REFLECTION_CHARS)
+        assertTrue(sanitized.privateReflection.last() in "。！？!？；")
+        assertTrue(sanitized.privateReflection.length > 20)
+    }
+
+    @Test
     fun diaryVoiceCannotInsertUnboundedOrProductRoleNarration() {
         val diary = store()
         val saved = diary.record(request(
