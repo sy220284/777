@@ -23,10 +23,10 @@ class LocalSkillStoreTest {
     fun bundledSkillsAreRealInvocableInstructions() = inWorkspace { store, workspace, _ ->
         store.seedOnce()
         val all = store.presets().filterNot { it.id in LocalMiniMaxSkillCatalog.entries.map { item -> item.id } }
-        assertEquals(8, all.size)
+        assertEquals(9, all.size)
         assertTrue(all.all { it.installed })
-        assertEquals(8, all.map { it.id }.distinct().size)
-        assertEquals(8, store.installed().size)
+        assertEquals(9, all.map { it.id }.distinct().size)
+        assertEquals(9, store.installed().size)
         for (preset in all) {
             val content = workspace.readModelSkill(preset.id)
             assertTrue(content.contains("description:"))
