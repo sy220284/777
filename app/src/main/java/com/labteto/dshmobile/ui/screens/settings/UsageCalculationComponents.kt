@@ -2,9 +2,7 @@ package com.labteto.dshmobile.ui.screens.settings
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -78,11 +76,7 @@ internal fun DeviceUsageHero(usage: DeepSeekUsageSnapshot, showEstimatedCost: Bo
     } else {
         stringResource(R.string.usage_calculation_no_data)
     }
-    com.shenyan.designsystem.components.SyMaterialFrame(
-        modifier = Modifier.fillMaxWidth(),
-        tier = SyMaterialTier.L1_SECTION,
-        horizontalPadding = 0.dp, verticalPadding = 0.dp,
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(SyMetric.gapSection),
             verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
@@ -428,11 +422,7 @@ internal fun UsageAggregateHero(
     badge: String? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    com.shenyan.designsystem.components.SyMaterialFrame(
-        modifier = Modifier.fillMaxWidth(),
-        tier = SyMaterialTier.L1_SECTION,
-        horizontalPadding = 0.dp, verticalPadding = 0.dp,
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(SyMetric.gapSection),
             verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
@@ -491,18 +481,12 @@ internal fun SectionHeading(text: String) {
 internal fun EmptyUsageDetail(message: String? = null) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val resolvedMessage = message ?: stringResource(R.string.usage_empty_detail)
-    SyMaterialSurface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.row,
-        tier = SyMaterialTier.L3_CARD,
-    ) {
-        Text(
-            resolvedMessage,
-            modifier = Modifier.padding(SyMetric.gapLg),
-            style = DsType.small13.withReadingWeight(),
-            color = colors.textSecondary,
-        )
-    }
+    Text(
+        resolvedMessage,
+        modifier = Modifier.fillMaxWidth().padding(SyMetric.gapLg),
+        style = DsType.small13.withReadingWeight(),
+        color = colors.textSecondary,
+    )
 }
 
 @Composable
