@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1681,
-  "production_source_count": 990,
-  "test_code_file_count": 545,
+  "repository_code_file_count": 1684,
+  "production_source_count": 992,
+  "test_code_file_count": 546,
   "workflow_files": [
     ".github/workflows/capture-readme-ui.yml",
     ".github/workflows/ci.yml",
@@ -1603,7 +1603,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalReplySuggestionsUiAdapter.kt",
-      "sha256": "333e9de378ea8ab5"
+      "sha256": "22f72851dd0b12f2"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSessionUiFacade.kt",
@@ -2559,7 +2559,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/Markdown.kt",
-      "sha256": "c82ac04b7e536d04"
+      "sha256": "064e7b870115030d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/NavigationEntryState.kt",
@@ -3738,6 +3738,10 @@
       "sha256": "742f2d7650abf96b"
     },
     {
+      "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiMarkdown.kt",
+      "sha256": "7bb634b68ba4053e"
+    },
+    {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiPackManifest.kt",
       "sha256": "8a00e1d44543370d"
     },
@@ -3827,7 +3831,7 @@
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationUiPack.kt",
-      "sha256": "f411bf69ea03fcc4"
+      "sha256": "3e3ea67b30912e47"
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextCurrentPersonaScene.kt",
@@ -3908,6 +3912,10 @@
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextReplySuggestionsScene.kt",
       "sha256": "b97aeb1c2fd01a19"
+    },
+    {
+      "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextRichMessage.kt",
+      "sha256": "486ecc34b17c1e46"
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextSessionChooser.kt",
@@ -4023,69 +4031,18 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "2bcfea1ec89d",
+  "source_snapshot": "903884f3b61b",
   "observed_delta": {
-    "baseline": "cef5d923f8d7",
+    "baseline": "2bcfea1ec89d",
     "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalDiaryUiFacade.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalReplySuggestionsUiAdapter.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkUiDocumentPublisher.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalHostPreferencesUiAdapter.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalDocumentMediaNode.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/DiaryUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/HostPreferencesUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ReplySuggestionsUiPort.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextAccountScene.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextAutomationScene.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationSubScenes.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextDiaryScene.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextErrorScene.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextGlobalSearchScene.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextGroupTeamScenes.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextHostPreferencesScene.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextMediaScene.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextReplySuggestionsScene.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextSettingsScene.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextUpdateScene.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextWorkActionsScenes.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextWorkPlanScene.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextWorldBookScene.kt"
+      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiMarkdown.kt",
+      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextRichMessage.kt"
     ],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/MainActivity.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatAutomationExecutionCoordinator.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalUiDocumentGeneration.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalMediaCreationRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiDocumentUiAdapter.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/document/LocalUiDocumentCodec.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionTranscriptPager.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionTranscriptProjection.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/session/LocalUiDocumentSessionStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkComposition.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalApplicationSceneDeepLinks.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalApplicationUiHost.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiConnectedCapabilities.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalDynamicDocument.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowser.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilder.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/MediaUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiDocument.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/WorkReadUiPort.kt",
-      "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiApplicationSceneHost.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextApplicationScenePack.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextDocumentGenerateButton.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextToolsScene.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextUiDocument.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalReplySuggestionsUiAdapter.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/components/Markdown.kt",
+      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationUiPack.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
