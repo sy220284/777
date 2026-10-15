@@ -2,9 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 
 import android.content.Context
@@ -131,10 +129,7 @@ internal fun PersonaGalleryDetailHeaderV3(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
     ) {
-        SyMaterialSurface(
-            shape = RoundedCornerShape(24.dp),
-            tier = SyMaterialTier.L3_CARD,
-            shadowElevation = 0.dp,
+        Column(
             modifier = Modifier
                 .fillMaxWidth(frameLayout.widthFraction)
                 .combinedClickable(
