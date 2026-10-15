@@ -90,6 +90,69 @@ class ChatDiaryStoreTest {
     }
 
     @Test
+    fun subjectiveDiaryVoiceSurvivesReloadWithoutChangingFactualRecall() {
+        val diary = store()
+        val note = diary.record(request(
+            delta = ChatDiaryDelta(
+                event = "我们约好周末去海边",
+                feeling = "我有点期待",
+                privateReflection = "我原本以为不会在意，结果听见他答应的那刻竟有点高兴。",
+                importance = 4,
+            ),
+            evidence = "我们约好周末去海边",
+        ))!!
+        val reloaded = store().listActive("gallery:a").single { it.id == note.id }
+        assertEquals(note.privateReflection, reloaded.privateReflection)
+        assertEquals(note.privateReflection, reloaded.revisions.last().privateReflection)
+        // Reading prose is not part of the factual recall source block.
+        assertTrue(renderRecalledChatDiary(reloaded, false).contains("周末去海边"))
+        assertTrue(!renderRecalledChatDiary(reloaded, false).contains(reloaded.privateReflection))
+    }
+
+    @Test
+    fun correctingTheSourceEventInvalidatesUnchangedGeneratedVoice() {
+        val diary = store()
+        val note = diary.record(request(
+            delta = ChatDiaryDelta(
+                event = "我们约好周末去海边",
+                privateReflection = "我非常期待去海边。",
+                importance = 4,
+            ),
+            evidence = "我们约好周末去海边",
+        ))!!
+        val revised = ChatDiaryDelta(
+            event = "原来的约定已经取消",
+            privateReflection = note.privateReflection,
+        )
+        assertTrue(diary.correctEntry("gallery:a", note.id, note.updatedAt, revised))
+        val current = store().listActive("gallery:a").single { it.id == note.id }
+        assertEquals("", current.privateReflection)
+        assertEquals(note.privateReflection, current.revisions.first().privateReflection)
+    }
+
+    @Test
+    fun diaryVoiceCannotInsertUnboundedOrProductRoleNarration() {
+        val diary = store()
+        val saved = diary.record(request(
+            delta = ChatDiaryDelta(
+                event = "我们约好周末去海边",
+                privateReflection = "用户说好去海边",
+                importance = 4,
+            ),
+            evidence = "我们约好周末去海边",
+        ))!!
+        assertEquals("", saved.privateReflection)
+        assertEquals("", ChatDiaryEntryPolicy.sanitizeDelta(request(
+            delta = ChatDiaryDelta(
+                event = "我们约好周末去海边",
+                privateReflection = "我".repeat(1000),
+                importance = 4,
+            ),
+            evidence = "我们约好周末去海边",
+        ))!!.privateReflection)
+    }
+
+    @Test
     fun userCorrectionIsDurableTraceableAndVisibleInNextRecall() {
         val diary = store()
         val saved = diary.record(request(
