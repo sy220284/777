@@ -24,7 +24,8 @@ class LocalMediaAutoRouteTest {
         val openai = p("oa", "gpt-6", "https://api.openai.com/v1")
         val offers = LocalMediaCatalog.offers(listOf(openai))
         assertNull(LocalMediaCatalog.selectOffer(offers, LocalMediaKind.VIDEO, "oa"))
-        assertEquals("oa", LocalMediaCatalog.selectOffer(offers, LocalMediaKind.IMAGE, "oa", "deleted-model")?.profile?.id)
+        assertNull(LocalMediaCatalog.selectOffer(offers, LocalMediaKind.IMAGE, "oa", "deleted-model"))
+        assertEquals("oa", LocalMediaCatalog.selectOffer(offers, LocalMediaKind.IMAGE, "oa")?.profile?.id)
     }
 
     @Test fun historyRecreationPreservesExactAccountAndCreatorParameters() {
