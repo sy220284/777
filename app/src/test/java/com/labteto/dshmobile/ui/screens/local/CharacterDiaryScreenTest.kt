@@ -62,6 +62,103 @@ class CharacterDiaryScreenTest {
         assertTrue(filterCharacterDiaryEntries(entries, "不存在", CharacterDiaryFilter.ALL).isEmpty())
     }
 
+
+    @Test
+    fun dailyReadingGroupsByOriginalDayAndExperienceWithoutMovingCorrectedEntries() {
+        fun at(day: Int, hour: Int): Long = java.util.Calendar.getInstance().apply {
+            set(2026, java.util.Calendar.OCTOBER, day, hour, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val first = diary(id = "first", event = "早上买了一本书")
+            .copy(createdAt = at(14, 9), updatedAt = at(15, 12), experienceId = "story-a")
+        val second = diary(id = "second", event = "下午遇见老朋友")
+            .copy(createdAt = at(14, 16), updatedAt = at(14, 16), experienceId = "story-a")
+        val independent = diary(id = "independent", event = "在另一段故事散步")
+            .copy(createdAt = at(14, 18), updatedAt = at(14, 18), experienceId = "story-b")
+        val nextDay = diary(id = "next", event = "第二天去散步")
+            .copy(createdAt = at(15, 8), updatedAt = at(15, 8), experienceId = "story-a")
+        val days = groupCharacterDiaryDays(listOf(first, second, independent, nextDay))
+        assertEquals(3, days.size)
+        assertEquals(listOf("next"), days.first().entries.map(ChatDiaryEntry::id))
+        assertEquals(listOf("first", "second"),
+            days.single { it.experienceId == "story-a" && it.entries.size == 2 }.entries.map(ChatDiaryEntry::id))
+        assertEquals(listOf("independent"),
+            days.single { it.experienceId == "story-b" }.entries.map(ChatDiaryEntry::id))
+    }
+
+    @Test
+    fun diaryReadingUsesPersonalToneAndHidesProductUserLabelWithoutInventingFeelings() {
+        val personal = diary(id = "a", event = "用户确认周末和我去海边",
+            thought = "我一直偷偷期待那天")
+        val line = characterDiaryReadingLine(personal)
+        assertTrue(line.contains("对方确认周末和我去海边"))
+        assertTrue(line.contains("我一直偷偷期待那天"))
+        org.junit.Assert.assertFalse(line.contains("用户"))
+        val eventOnly = characterDiaryReadingLine(diary(id = "b", event = "今天我把书买回来了"))
+        assertEquals("今天我把书买回来了。", eventOnly)
+        org.junit.Assert.assertFalse(eventOnly.contains("我很开心"))
+    }
+
+    @Test
+    fun oldEventDoesNotGetAnInventedTodayPrefix() {
+        assertEquals(
+            "那次一起去了海边。",
+            characterDiaryReadingLine(diary(id = "history", event = "那次一起去了海边")),
+        )
+        assertEquals(
+            "我们第一次有了属于两个人的计划。",
+            characterDiaryReadingLine(
+                diary(id = "meaning", event = "", meaning = "我们第一次有了属于两个人的计划"),
+            ),
+        )
+    }
+
+    @Test
+    fun conciseReadingKeepsWholeSentencesAndPrefersPsychologyOverRoutineEvents() {
+        val feelings = diary(id = "feelings", event = "和他聊过之后", thought = "我终于想清楚了")
+            .copy(createdAt = 3, importance = 1)
+        val longEvent = "这一天" + "做了很多日常小事".repeat(23)
+        val routine = diary(id = "routine", event = longEvent).copy(createdAt = 4, importance = 4)
+        val otherRoutine = diary(id = "routine2", event = longEvent + "另外一件事")
+            .copy(createdAt = 5, importance = 4)
+        val day = characterDiaryDayNarrative(listOf(routine, otherRoutine, feelings))
+        assertTrue(day.contains("我终于想清楚了"))
+        assertTrue(day.length <= 480)
+        assertTrue(day.endsWith("。"))
+        // Every displayed paragraph comes from a complete chosen entry, never take(357).
+        assertTrue(day.split("\n\n").all { it.endsWith("。") })
+    }
+
+    @Test
+    fun privateVoiceTakesPriorityOverFactFieldsAndIsSearchable() {
+        val reflection = "我明明答应得很平静，心里却已经开始期待。"
+        val entry = diary(id = "voice", event = "周末看电影的约定", thought = "附加心理字段")
+            .copy(privateReflection = reflection)
+        assertEquals(reflection, characterDiaryReadingLine(entry))
+        assertTrue(characterDiaryDayNarrative(listOf(entry)).contains(reflection))
+        assertEquals(listOf("voice"),
+            filterCharacterDiaryEntries(listOf(entry), "开始期待", CharacterDiaryFilter.ALL)
+                .map(ChatDiaryEntry::id))
+    }
+
+    @Test
+    fun aLongPrivateVoiceRemainsWholeWithoutDroppingTheDay() {
+        val reflection = "我还在想那天。" + "想法慢慢变得清楚。".repeat(36)
+        val entry = diary(id = "long", event = "我们聊起了重要的约定")
+            .copy(privateReflection = reflection, importance = 5)
+        assertEquals(reflection, characterDiaryDayNarrative(listOf(entry)))
+    }
+
+    @Test
+    fun dailySummaryRemainsBriefEvenWithManyLongMemories() {
+        val entries = (0 until 12).map {
+            diary(id = it.toString(), event = "今天我想了很多" + "细节".repeat(75), thought = "我还在琢磨这件事")
+                .copy(importance = it % 5)
+        }
+        assertTrue(characterDiaryDayNarrative(entries).length <= 480)
+        assertEquals(12, entries.size)
+    }
+
     private fun diary(
         id: String,
         event: String = "共同经历",

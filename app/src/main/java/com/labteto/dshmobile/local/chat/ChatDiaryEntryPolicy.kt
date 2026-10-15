@@ -9,8 +9,20 @@ internal object ChatDiaryEntryPolicy {
 
         val event = raw.event.trim().take(ChatDiaryBounds.MAX_EVENT_CHARS)
         val importance = raw.importance.coerceIn(0, 5)
-        if (event.length < MIN_EVENT_CHARS || importance < MIN_IMPORTANCE) return null
-        if (significance != "MAJOR" && importance < MINOR_IMPORTANCE) return null
+        val privateReflection = sanitizePrivateReflection(raw.privateReflection)
+        // A grounded change in someone's personal outlook can be memorable even when
+        // the triggering event is brief. Keep evidence and significance gates intact:
+        // this is an alternative inside the original diary pipeline, not a second writer.
+        // A brief private thought may be memorable. For a short event anchor we
+        // still require fuller reflection; otherwise a normal grounded event
+        // anchor is enough. Style, punctuation and prose length are not graded.
+        val hasVoice = privateReflection.isNotBlank()
+        val shortAnchorWithContext = hasVoice &&
+            (importance >= MINOR_IMPORTANCE ||
+                privateReflection.length >= MIN_SHORT_ANCHOR_CONTEXT_CHARS)
+        if (importance < MIN_IMPORTANCE) return null
+        if (event.length < (if (shortAnchorWithContext) MIN_THOUGHT_EVENT_CHARS else MIN_EVENT_CHARS)) return null
+        if (significance != "MAJOR" && importance < MINOR_IMPORTANCE && !hasVoice) return null
         if (!eventGrounded(event, request.evidenceText)) return null
 
         return ChatDiaryDelta(
@@ -19,6 +31,7 @@ internal object ChatDiaryEntryPolicy {
             innerThought = raw.innerThought.trim().take(ChatDiaryBounds.MAX_THOUGHT_CHARS),
             relationshipMeaning = raw.relationshipMeaning.trim().take(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS),
             unresolvedEcho = raw.unresolvedEcho.trim().take(ChatDiaryBounds.MAX_ECHO_CHARS),
+            privateReflection = privateReflection,
             importance = importance,
             disclosure = raw.disclosure.trim().uppercase(),
             recallAnchors = raw.recallAnchors.map { it.trim().take(80) }
@@ -26,6 +39,24 @@ internal object ChatDiaryEntryPolicy {
             subjectiveEvidence = raw.subjectiveEvidence.trim().take(400)
                 .takeIf { it.isNotBlank() && request.characterEvidenceText.contains(it) }.orEmpty(),
         )
+    }
+
+    /**
+     * A model-authored diary voice is a subjective reading of grounded events, never
+     * permission to introduce a new event or leak internal model/product terminology.
+     */
+    private fun sanitizePrivateReflection(raw: String): String {
+        val prose = raw.trim()
+        // The word "模型" may refer to an actual model airplane or a character's job.
+        // Reject explicit platform-role narration, not unrelated everyday vocabulary.
+        if (listOf("用户", "系统提示", "AI助手", "作为角色", "作为语言模型").any(prose::contains)) return ""
+        val limit = ChatDiaryBounds.MAX_PRIVATE_REFLECTION_CHARS
+        if (prose.length <= limit) return prose
+        // Keep a completed thought instead of silently throwing away an otherwise
+        // useful entry, but never store an abruptly truncated half-sentence.
+        val withinLimit = prose.take(limit)
+        val end = withinLimit.indexOfLast { it in "。！？!?；\\n" }
+        return if (end >= 20) withinLimit.take(end + 1).trim() else ""
     }
 
     fun disclosureFor(request: ChatDiaryWriteRequest, delta: ChatDiaryDelta): ChatDiaryDisclosure {
@@ -91,6 +122,7 @@ internal object ChatDiaryEntryPolicy {
                     innerThought = entry.innerThought,
                     relationshipMeaning = entry.relationshipMeaning,
                     unresolvedEcho = entry.unresolvedEcho,
+                    privateReflection = entry.privateReflection,
                     recallAnchors = entry.recallAnchors,
                     subjectiveEvidence = entry.subjectiveEvidence,
                     subjectiveInferred = entry.subjectiveInferred,
@@ -115,6 +147,7 @@ internal object ChatDiaryEntryPolicy {
             innerThought = current.innerThought.take(ChatDiaryBounds.MAX_THOUGHT_CHARS),
             relationshipMeaning = current.relationshipMeaning.take(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS),
             unresolvedEcho = current.unresolvedEcho.take(ChatDiaryBounds.MAX_ECHO_CHARS),
+            privateReflection = current.privateReflection,
             recallAnchors = current.recallAnchors,
             subjectiveEvidence = current.subjectiveEvidence,
             subjectiveInferred = current.subjectiveInferred,
@@ -169,12 +202,15 @@ internal object ChatDiaryEntryPolicy {
         queryTerms: Set<String>,
         now: Long,
     ): ChatDiaryMatchScore {
-        val lexical = terms(entry.event + " " + entry.relationshipMeaning + " " + entry.unresolvedEcho + " " + entry.recallAnchors.joinToString(" "))
-            .count(queryTerms::contains)
+        val searchable = searchText(entry)
+        val lexical = terms(searchable).count(queryTerms::contains)
         val phrase = if (queryCore.isBlank()) 0 else {
-            (similarity(queryCore, searchText(entry)) * 100).toInt()
+            (similarity(queryCore, searchable) * 100).toInt()
         }
-        val semantic = lexical * 24 + phrase
+        // Chinese bigram budgets may omit the end of a long sentence. Exact phrases
+        // in private thoughts must remain findable without indexing every bigram.
+        val exactPhrase = queryCore.length >= 2 && normalizeText(searchable).contains(queryCore)
+        val semantic = lexical * 24 + phrase + if (exactPhrase) 72 else 0
         val ageDays = ((now - entry.updatedAt).coerceAtLeast(0L) / DAY_MILLIS).toInt()
         val recency = (30 - ageDays).coerceIn(0, 30)
         return ChatDiaryMatchScore(
@@ -199,6 +235,7 @@ internal object ChatDiaryEntryPolicy {
 
     private fun searchText(entry: ChatDiaryEntry): String =
         listOf(
+            entry.privateReflection,
             entry.event,
             entry.feeling,
             entry.innerThought,
@@ -261,6 +298,8 @@ internal object ChatDiaryEntryPolicy {
         else (0 until text.length - 1).mapTo(linkedSetOf()) { text.substring(it, it + 2) }
 
     private const val MAX_SOURCE_IDS = 16
+    private const val MIN_THOUGHT_EVENT_CHARS = 3
+    private const val MIN_SHORT_ANCHOR_CONTEXT_CHARS = 36
     private const val MIN_EVENT_CHARS = 6
     private const val MIN_IMPORTANCE = 2
     private const val MINOR_IMPORTANCE = 3

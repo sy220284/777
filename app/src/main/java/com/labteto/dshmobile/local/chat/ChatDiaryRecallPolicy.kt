@@ -63,28 +63,41 @@ internal fun isHistoricalDiaryRecall(query: String): Boolean {
 @Suppress("UNUSED_PARAMETER")
 internal fun renderRecalledChatDiary(entry: ChatDiaryEntry, groupAudience: Boolean): String =
     buildString {
+        // Preserve the original evidence at rest; only the character-facing context
+        // converts old platform labels to a natural reference to the other person.
+        fun speak(text: String): String = text.replace("用户", "对方")
+        val voice = entry.privateReflection.trim()
         appendLine("- 记忆背景：${when (entry.disclosure) {
-            ChatDiaryDisclosure.PRIVATE -> "用户明确要求保密的经历"
+            ChatDiaryDisclosure.PRIVATE -> "明确要求保密的经历"
             ChatDiaryDisclosure.SHAREABLE -> "当前人物的私人经历，尚未在群聊公开"
-            ChatDiaryDisclosure.PUBLIC -> "已公开或用户已允许公开的经历"
+            ChatDiaryDisclosure.PUBLIC -> "已公开或得到明确许可公开的经历"
         }}")
-        appendLine("- 事件：${entry.event}")
-        if (entry.subjectiveInferred && (entry.feeling.isNotBlank() || entry.innerThought.isNotBlank())) {
-            appendLine("  心理记录来源：后台对当时情境的推测，尚未确认")
+        appendLine("- 事件：${speak(entry.event)}")
+        if (entry.subjectiveInferred &&
+            (voice.isNotBlank() || entry.feeling.isNotBlank() || entry.innerThought.isNotBlank())) {
+            appendLine("  心理记录来源：对当时情境的个人推测，尚未确认")
         } else if (entry.subjectiveEvidence.isNotBlank()) {
-            appendLine("  当时表达：${entry.subjectiveEvidence}")
+            appendLine("  当时表达：${speak(entry.subjectiveEvidence)}")
         }
-        entry.feeling.takeIf(String::isNotBlank)?.let { appendLine("  感受：$it") }
-        entry.innerThought.takeIf(String::isNotBlank)?.let { appendLine("  心里：$it") }
-        entry.relationshipMeaning.takeIf(String::isNotBlank)?.let { appendLine("  关系意义：$it") }
-        entry.unresolvedEcho.takeIf(String::isNotBlank)?.let { appendLine("  余波：$it") }
+        if (voice.isNotBlank()) {
+            // One subjective representation per recall: the natural first-person
+            // diary supersedes the old technical feeling/innerThought summaries.
+            appendLine("  私人日记想法（人物主观解释，可能包含未证实的猜测，不是事件事实）：${speak(voice)}")
+        } else {
+            entry.feeling.takeIf(String::isNotBlank)?.let { appendLine("  感受：${speak(it)}") }
+            entry.innerThought.takeIf(String::isNotBlank)?.let { appendLine("  心里：${speak(it)}") }
+        }
+        entry.relationshipMeaning.takeIf { it.isNotBlank() && !voice.contains(it.trim()) }
+            ?.let { appendLine("  关系理解：${speak(it)}") }
+        entry.unresolvedEcho.takeIf { it.isNotBlank() && !voice.contains(it.trim()) }
+            ?.let { appendLine("  未解心绪：${speak(it)}") }
     }.trimEnd()
 
 internal fun diaryRecallUsageInstruction(groupAudience: Boolean): String =
     if (groupAudience) {
-        "这些是当前人物自己的经历和感受，其中的猜测属于人物主观认识。其他成员的所知以实际公开发言和事件为准。已取消、改期、结束或修正的旧版本属于历史。"
+        "这些是当前人物自己的经历和感受，其中的猜测属于人物主观认识；私人日记的想法只代表当时的判断，不代表他人真实动机或已证实事实。其他成员的所知以实际公开发言和事件为准。已取消、改期、结束或修正的旧版本属于历史。"
     } else {
-        "这些日记属于当前角色自己的经历与内在记忆。当前有效版本优先；被后续取消、改期、结束或修正的旧版本不得当成当前状态回潮，除非用户明确追问以前/原来/最开始。"
+        "这些日记属于当前角色自己的经历与内在记忆。私人日记的想法只是人物当时的主观判断，不能升级成他人动机或已证实事实。当前有效版本优先；被后续取消、改期、结束或修正的旧版本不得当成当前状态回潮，除非用户明确追问以前/原来/最开始。"
     }
 
 internal fun takeWithinModelTokenBudget(text: String, maxTokens: Int): String {
