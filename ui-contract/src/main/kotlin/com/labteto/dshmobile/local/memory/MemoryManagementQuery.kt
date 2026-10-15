@@ -21,4 +21,3 @@ data class MemoryManagementPage(
     val totalMatching: Int = 0,
     val kindCounts: Map<MemoryKind, Int> = emptyMap(),
 )
-
