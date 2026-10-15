@@ -14,6 +14,13 @@ import org.junit.Test
 class LocalWorkEvidenceControllerTest {
     private fun actions(page: (String, LocalWorkHistoryCursor?) -> LocalWorkHistoryPageUi,
         linksFail: Boolean = false) = LocalWorkFeatureUiActions(
+        evidence = object : com.labteto.dshmobile.uicontract.WorkEvidenceUiPort {
+            override suspend fun read(identity: com.labteto.dshmobile.uicontract.UiSessionIdentity) =
+                com.labteto.dshmobile.uicontract.UiWorkEvidenceReadReceipt.Rejected(
+                    com.labteto.dshmobile.uicontract.UiCommandRejection.STALE_IDENTITY)
+            override suspend fun submit(command: com.labteto.dshmobile.uicontract.LinkWorkEvidenceReferenceCommand) =
+                com.labteto.dshmobile.uicontract.UiCommandReceipt.NotAdmitted
+        },
         workState = MutableStateFlow(LocalWorkUiState(sessionId = "session")),
         workspaceFiles = { emptyList() }, conversationFiles = { error("not used") }, previewWorkspaceFile = { error("not used") },
         artifactsForUi = { emptyList() }, eventSequenceForUi = { 1L }, artifactRevision = { null },
