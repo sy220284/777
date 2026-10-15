@@ -1133,6 +1133,7 @@ class ChatDiaryStoreTest {
                 innerThought = longText,
                 relationshipMeaning = longText,
                 unresolvedEcho = longText,
+                privateReflection = longText,
                 importance = 99,
                 revisions = List(20) { index ->
                     ChatDiaryRevision(
@@ -1141,6 +1142,7 @@ class ChatDiaryStoreTest {
                         innerThought = longText,
                         relationshipMeaning = longText,
                         unresolvedEcho = longText,
+                privateReflection = longText,
                         importance = 99,
                         updatedAt = index.toLong(),
                     )
@@ -1158,6 +1160,8 @@ class ChatDiaryStoreTest {
         assertEquals(ChatDiaryBounds.MAX_THOUGHT_CHARS, imported.innerThought.length)
         assertEquals(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS, imported.relationshipMeaning.length)
         assertEquals(ChatDiaryBounds.MAX_ECHO_CHARS, imported.unresolvedEcho.length)
+        assertEquals(ChatDiaryBounds.MAX_PRIVATE_REFLECTION_CHARS, imported.privateReflection.length)
+        assertTrue(imported.revisions.all { it.privateReflection.length <= ChatDiaryBounds.MAX_PRIVATE_REFLECTION_CHARS })
         assertEquals(5, imported.importance)
         assertEquals(ChatDiaryBounds.MAX_REFINEMENT_REVISIONS, imported.revisions.size)
         assertTrue(imported.revisions.all { it.sources.isEmpty() })
