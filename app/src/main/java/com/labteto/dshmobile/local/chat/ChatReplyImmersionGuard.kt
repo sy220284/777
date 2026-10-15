@@ -40,7 +40,9 @@ internal object ChatReplyImmersionGuard {
         // Record the violation; a heuristically judged style defect should not block a
         // successful model response after the one permitted repair attempt.
         onEvent("accepted-with-warning", remaining)
-        return if (contentOf(repaired).isNotBlank()) repaired else initial
+        // Style heuristics are advisory after an unsuccessful repair: keep the
+        // original character voice rather than substituting another violation.
+        return initial
     }
 
     private fun repairHint(

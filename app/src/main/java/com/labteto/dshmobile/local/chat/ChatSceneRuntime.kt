@@ -254,11 +254,27 @@ internal object ChatSceneRuntime {
             .mapNotNull { match ->
                 sanitizeLocation(match.groups["target"]?.value.orEmpty())
                     .takeIf(String::isNotBlank)
+                    ?.takeIf { isAssertedPresence(text, match.range.first) }
             }
             .filterNot(::looksLikeAbstractState)
             .distinctBy(::normalize)
             .take(4)
             .toList()
+
+    /**
+     * A character can remember, fantasize or quote a location without moving there.
+     * Only confidently asserted present-location statements trigger a scene repair.
+     */
+    private fun isAssertedPresence(text: String, offset: Int): Boolean {
+        val inQuotedSpan = Regex("""“[^”]*”|‘[^’]*’|\x22[^\x22]*\x22""")
+            .findAll(text).any { offset in it.range }
+        if (inQuotedSpan) return false
+        val precedingClause = text.substring(0, offset).takeLast(80)
+            .split('，', '。', '！', '？', '；', ',', '.', '!', '?', ';', '\n')
+            .lastOrNull().orEmpty()
+        return !Regex("""(?:如果|假如|要是|假设|设想|想象|梦见|梦里|梦中|回忆|回想|曾经|以前|仿佛|好像|似乎|假装|比如|例如|打算|希望|我以为|倘若|就像)""")
+            .containsMatchIn(precedingClause)
+    }
 
     private fun hasNarrativeCut(text: String): Boolean =
         NARRATIVE_CUT.containsMatchIn(text) ||
@@ -297,8 +313,10 @@ internal object ChatSceneRuntime {
         val prefix = text.substring(0, offset).takeLast(64)
             .split('，', '。', '！', '？', '；', ',', '.', '!', '?', ';', '\n')
             .lastOrNull().orEmpty().trim()
-        return !Regex("""(?:如果|假如|要是|等到|打算|计划|准备|想要|将要|明天|下次|以后|待会儿|待会|等你|等我)""")
-            .containsMatchIn(prefix)
+        return !Regex("""(?:如果|假如|要是|等到|打算|计划|准备|想要|将要|明天|下次|以后|待会儿|待会|等你|等我|设想|想象|梦见|梦里|梦中|回忆|回想|曾经|以前|仿佛|好像|假装|比如|例如|我以为)""")
+            .containsMatchIn(prefix) &&
+            !Regex("""“[^”]*”|‘[^’]*’|\x22[^\x22]*\x22""")
+                .findAll(text).any { offset in it.range }
     }
 
     private fun isPlausibleMovementDestination(target: String): Boolean {
@@ -408,7 +426,9 @@ internal object ChatReplyContinuityGuard {
         )
         if (!retryCheck.accepted) {
             onEvent("${mode.actionPrefix}accepted-with-warning", retryCheck)
-            return if (contentOf(retried).isNotBlank()) retried else initial
+            // Two uncertain location heuristics must not replace an otherwise usable
+            // original reply with a second, equally questionable generation.
+            return initial
         }
 
         onEvent("${mode.actionPrefix}repaired", retryCheck)

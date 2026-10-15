@@ -188,6 +188,28 @@ class ChatSceneRuntimeTest {
     }
 
     @Test
+    fun imaginedQuotedAndRememberedLocationsDoNotRewriteRealScene() {
+        val scene = ChatSceneState(location = "院子")
+        val samples = listOf(
+            "如果我现在坐在卧室床边，也许会好好想一想。",
+            "昨晚我梦见自己坐在海边的咖啡馆。",
+            "我想象自己走进一间古老的书房。",
+            "她想起纸条上写着“我现在坐在卧室床边”。",
+            "她说“我现在坐在卧室床边”，然后自己笑了。",
+        )
+        samples.forEach { reply ->
+            val inspected = ChatSceneRuntime.inspectReply(scene, "继续聊聊", reply)
+            assertTrue("Should not rewrite scene for: $reply", inspected.accepted)
+            val events = ChatSceneRuntime.extractTurnEvents(scene, "继续聊聊", reply, 17L)
+            assertFalse("Imagined movement is not a durable scene: $reply",
+                events.any { it.kind == ChatSceneEventKind.LOCATION })
+        }
+        assertFalse(ChatSceneRuntime.inspectReply(
+            scene, "继续聊聊", "她现在坐在卧室床边看着你。",
+        ).accepted)
+    }
+
+    @Test
     fun continuityGuardRetriesOnceAndReturnsRepairedReply() = runBlocking {
         var retries = 0
         val result = ChatReplyContinuityGuard.enforce(
@@ -219,7 +241,7 @@ class ChatSceneRuntimeTest {
             onEvent = { action, _ -> actions += action },
         )
 
-        assertEquals("她躺在书房沙发上继续说。", result)
+        assertEquals("她坐在卧室床边看着你。", result)
         assertTrue(actions.any { it.contains("accepted-with-warning") })
     }
 

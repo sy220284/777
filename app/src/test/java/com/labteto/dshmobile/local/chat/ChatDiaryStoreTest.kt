@@ -90,6 +90,122 @@ class ChatDiaryStoreTest {
     }
 
     @Test
+    fun subjectiveDiaryVoiceSurvivesReloadWithoutChangingFactualRecall() {
+        val diary = store()
+        val note = diary.record(request(
+            delta = ChatDiaryDelta(
+                event = "我们约好周末去海边",
+                feeling = "我有点期待",
+                privateReflection = "我原本以为不会在意，结果听见他答应的那刻竟有点高兴。",
+                importance = 4,
+            ),
+            evidence = "我们约好周末去海边",
+        ))!!
+        val reloaded = store().listActive("gallery:a").single { it.id == note.id }
+        assertEquals(note.privateReflection, reloaded.privateReflection)
+        assertEquals(note.privateReflection, reloaded.revisions.last().privateReflection)
+        // Subjective voice is recalled with an explicit non-factual label.
+        val recalledText = renderRecalledChatDiary(reloaded, false)
+        assertTrue(recalledText.contains("周末去海边"))
+        assertTrue(recalledText.contains(reloaded.privateReflection))
+        assertTrue(recalledText.contains("主观解释"))
+        assertTrue(store().search("竟有点高兴", "gallery:a", false, 6).any { it.id == note.id })
+        assertTrue(store().search("竟有点高兴", "gallery:other", false, 6).isEmpty())
+    }
+
+    @Test
+    fun correctingTheSourceEventInvalidatesUnchangedGeneratedVoice() {
+        val diary = store()
+        val note = diary.record(request(
+            delta = ChatDiaryDelta(
+                event = "我们约好周末去海边",
+                privateReflection = "我非常期待去海边。",
+                importance = 4,
+            ),
+            evidence = "我们约好周末去海边",
+        ))!!
+        val revised = ChatDiaryDelta(
+            event = "原来的约定已经取消",
+            privateReflection = note.privateReflection,
+        )
+        assertTrue(diary.correctEntry("gallery:a", note.id, note.updatedAt, revised))
+        val current = store().listActive("gallery:a").single { it.id == note.id }
+        assertEquals("", current.privateReflection)
+        assertEquals(note.privateReflection, current.revisions.first().privateReflection)
+    }
+
+    @Test
+    fun correctingInterpretationWithdrawsStaleVoiceButPreservesExplicitNewVoice() {
+        val diary = store()
+        val saved = diary.record(request(
+            delta = ChatDiaryDelta(
+                event = "我们约好周末去海边",
+                feeling = "我很期待",
+                privateReflection = "他肯定不会爽约，我很期待。",
+                importance = 4,
+            ),
+            evidence = "我们约好周末去海边",
+        ))!!
+        assertTrue(diary.correctEntry("gallery:a", saved.id, saved.updatedAt,
+            ChatDiaryDelta(
+                event = saved.event,
+                feeling = "我其实有点担忧",
+                privateReflection = saved.privateReflection,
+            )))
+        val withdrawn = store().listActive("gallery:a").single { it.id == saved.id }
+        assertEquals("", withdrawn.privateReflection)
+        assertEquals(saved.privateReflection, withdrawn.revisions.first().privateReflection)
+
+        assertTrue(store().correctEntry("gallery:a", withdrawn.id, withdrawn.updatedAt,
+            ChatDiaryDelta(
+                event = withdrawn.event,
+                feeling = "我更愿意慢慢相信他",
+                privateReflection = "我想给他一次机会，但还需要一点时间。",
+            )))
+        val revised = store().listActive("gallery:a").single { it.id == saved.id }
+        assertEquals("我想给他一次机会，但还需要一点时间。", revised.privateReflection)
+    }
+
+    @Test
+    fun longPersonalVoiceRetainsCompleteSentencesAndOrdinaryHobbyVocabulary() {
+        val content = "我终于把模型飞机修好了！" + "今天还在思考自己要去哪里。".repeat(45)
+        val sanitized = ChatDiaryEntryPolicy.sanitizeDelta(request(
+            delta = ChatDiaryDelta(
+                event = "我把模型飞机修好了",
+                privateReflection = content,
+                importance = 4,
+            ),
+            evidence = "我把模型飞机修好了",
+        ))!!
+        assertTrue(sanitized.privateReflection.startsWith("我终于把模型飞机修好了！"))
+        assertTrue(sanitized.privateReflection.length <= ChatDiaryBounds.MAX_PRIVATE_REFLECTION_CHARS)
+        assertTrue(sanitized.privateReflection.last() in "。！？!？；")
+        assertTrue(sanitized.privateReflection.length > 20)
+    }
+
+    @Test
+    fun diaryVoiceCannotInsertUnboundedOrProductRoleNarration() {
+        val diary = store()
+        val saved = diary.record(request(
+            delta = ChatDiaryDelta(
+                event = "我们约好周末去海边",
+                privateReflection = "用户说好去海边",
+                importance = 4,
+            ),
+            evidence = "我们约好周末去海边",
+        ))!!
+        assertEquals("", saved.privateReflection)
+        assertEquals("", ChatDiaryEntryPolicy.sanitizeDelta(request(
+            delta = ChatDiaryDelta(
+                event = "我们约好周末去海边",
+                privateReflection = "我".repeat(1000),
+                importance = 4,
+            ),
+            evidence = "我们约好周末去海边",
+        ))!!.privateReflection)
+    }
+
+    @Test
     fun userCorrectionIsDurableTraceableAndVisibleInNextRecall() {
         val diary = store()
         val saved = diary.record(request(
@@ -592,6 +708,79 @@ class ChatDiaryStoreTest {
     }
 
     @Test
+    fun groundedChangeOfOutlookCanBeKeptWithoutInventingAnEvent() {
+        val reflection = "我一直以为只要沉默就不会受伤。今天重新想了一遍，或许我也可以试着表达自己的期待。"
+        val request = request(
+            delta = ChatDiaryDelta(
+                event = "那次沉默", privateReflection = reflection, importance = 2,
+            ),
+            evidence = "那次沉默让我想了许久",
+        ).copy(turnSignificance = "MINOR")
+        val saved = store().record(request)
+        assertNotNull(saved)
+        assertEquals(reflection, saved!!.privateReflection)
+        assertEquals("那次沉默", saved.event)
+        // This exception only applies to an actual reflective passage about grounded
+        // experience. Small talk, a fabricated source, and NONE are still rejected.
+        val nonReflective = request.copy(
+            delta = request.delta!!.copy(privateReflection = ""),
+            sourceUserMessageIds = listOf("u-other"),
+            sourceAssistantMessageIds = listOf("a-other"),
+        )
+        assertNull(store().record(nonReflective))
+        assertNull(store().record(request.copy(
+            evidenceText = "只是天气不错", sourceUserMessageIds = listOf("u-another"),
+        )))
+        assertNull(store().record(request.copy(turnSignificance = "NONE")))
+    }
+
+    @Test
+    fun briefCreativeVoicesAreNotDiscardedForLackOfWordCount() {
+        val event = "周末约好一起去散步"
+        val reflections = listOf(
+            "我的鞋子已经开始期待了。",
+            "约定已确认。要提前十分钟出门。",
+            "要是路灯今晚也想散步呢？",
+        )
+        reflections.forEachIndexed { index, voice ->
+            val raw = request(
+                delta = ChatDiaryDelta(
+                    event = event,
+                    privateReflection = voice,
+                    importance = 2,
+                ),
+                userId = "u-brief-$index",
+                assistantId = "a-brief-$index",
+                evidence = event,
+            ).copy(turnSignificance = "MINOR")
+            val saved = ChatDiaryEntryPolicy.sanitizeDelta(raw)
+            assertNotNull(saved)
+            assertEquals(voice, saved!!.privateReflection)
+        }
+        val meaningfulShortAnchor = request(
+            delta = ChatDiaryDelta(
+                event = "说好了",
+                privateReflection = "我已经偷偷开心了一会儿。",
+                importance = 3,
+            ),
+            evidence = "说好了，周末一起去看电影",
+        ).copy(turnSignificance = "MINOR")
+        assertEquals(
+            "我已经偷偷开心了一会儿。",
+            ChatDiaryEntryPolicy.sanitizeDelta(meaningfulShortAnchor)?.privateReflection,
+        )
+        val shortEventWithoutContext = request(
+            delta = ChatDiaryDelta(
+                event = "散步",
+                privateReflection = "好。",
+                importance = 2,
+            ),
+            evidence = "散步",
+        ).copy(turnSignificance = "MINOR")
+        assertNull(ChatDiaryEntryPolicy.sanitizeDelta(shortEventWithoutContext))
+    }
+
+    @Test
     fun groundedMajorEventWithoutSubjectiveFeelingStillBecomesSharedExperience() {
         val memory = store()
 
@@ -1070,6 +1259,7 @@ class ChatDiaryStoreTest {
                 innerThought = longText,
                 relationshipMeaning = longText,
                 unresolvedEcho = longText,
+                privateReflection = longText,
                 importance = 99,
                 revisions = List(20) { index ->
                     ChatDiaryRevision(
@@ -1078,6 +1268,7 @@ class ChatDiaryStoreTest {
                         innerThought = longText,
                         relationshipMeaning = longText,
                         unresolvedEcho = longText,
+                        privateReflection = longText,
                         importance = 99,
                         updatedAt = index.toLong(),
                     )
@@ -1095,6 +1286,8 @@ class ChatDiaryStoreTest {
         assertEquals(ChatDiaryBounds.MAX_THOUGHT_CHARS, imported.innerThought.length)
         assertEquals(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS, imported.relationshipMeaning.length)
         assertEquals(ChatDiaryBounds.MAX_ECHO_CHARS, imported.unresolvedEcho.length)
+        assertEquals(ChatDiaryBounds.MAX_PRIVATE_REFLECTION_CHARS, imported.privateReflection.length)
+        assertTrue(imported.revisions.all { it.privateReflection.length <= ChatDiaryBounds.MAX_PRIVATE_REFLECTION_CHARS })
         assertEquals(5, imported.importance)
         assertEquals(ChatDiaryBounds.MAX_REFINEMENT_REVISIONS, imported.revisions.size)
         assertTrue(imported.revisions.all { it.sources.isEmpty() })

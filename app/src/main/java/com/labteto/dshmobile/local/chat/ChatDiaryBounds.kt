@@ -7,4 +7,5 @@ internal object ChatDiaryBounds {
     const val MAX_THOUGHT_CHARS = 260
     const val MAX_RELATIONSHIP_CHARS = 220
     const val MAX_ECHO_CHARS = 180
+    const val MAX_PRIVATE_REFLECTION_CHARS = 420
 }

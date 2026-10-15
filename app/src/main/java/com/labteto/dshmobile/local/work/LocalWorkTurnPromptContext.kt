@@ -34,6 +34,7 @@ internal fun ContextComposer.composeWorkTurnContext(
             snapshot.modelState.baseUrl,
             snapshot.modelState.modelSelection.activeProfile,
             snapshot.modelState.modelSelection.profiles,
+            task = input,
         ),
         dynamic = composed.dynamic,
         skill = skillGuidance,

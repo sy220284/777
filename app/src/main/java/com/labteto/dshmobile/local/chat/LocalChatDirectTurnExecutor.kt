@@ -6,6 +6,9 @@ import com.labteto.dshmobile.local.LocalModelRequestCoordinator
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalImageCapability
 import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.isExplicitImageGenerationRequest
+import com.labteto.dshmobile.local.model.resolveOpenAiImageGenerationToolEnabled
 import com.labteto.dshmobile.local.model.LocalForegroundModelHistoryRuntime
 import com.labteto.dshmobile.local.model.estimateModelTokens
 import com.labteto.dshmobile.local.model.hasLocalImageRefs
@@ -153,6 +156,18 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             }
             check(!snapshot.chat.groupChat.enabled) {
                 "Direct Chat executor 不处理群聊"
+            }
+            if (
+                snapshot.modelState.modelSelection.activeProfile?.authKind == LocalModelAuthKind.CHATGPT_PLAN &&
+                isExplicitImageGenerationRequest(input) &&
+                !resolveOpenAiImageGenerationToolEnabled(
+                    baseUrl = snapshot.modelState.baseUrl,
+                    model = snapshot.modelState.model,
+                    planSharing = true,
+                    requested = true,
+                )
+            ) {
+                error("当前 GPT 套餐模型 ${snapshot.modelState.model} 未接通聊天生图工具。请切换支持生图的 GPT 型号，或在「+」中选择已配置的图片生成服务。")
             }
 
             val branchEligible = snapshot.transcriptIndex.branchingEligible

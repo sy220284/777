@@ -54,9 +54,11 @@ import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalMediaOffer
 import com.labteto.dshmobile.local.model.LocalMediaProvider
+import com.labteto.dshmobile.local.model.LocalMediaRevisionDraft
 import com.labteto.dshmobile.local.model.LocalMediaVideoPhase
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalMediaVoice
+import com.labteto.dshmobile.local.presentation.LocalMediaVoiceLabels
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -79,7 +81,10 @@ internal fun LocalMediaStudioSheetContent(
     onDelivered: () -> Unit = {},
     viewModel: LocalMediaStudioViewModel = hiltViewModel(),
     initialPrompt: String = "",
+    personaVoiceStyle: String = "",
+    sourceMessageId: String? = null,
     initialKind: LocalMediaKind = LocalMediaKind.IMAGE,
+    revision: LocalMediaRevisionDraft? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val context = LocalContext.current
@@ -90,47 +95,88 @@ internal fun LocalMediaStudioSheetContent(
     val generatedResults = archive.results
     val storageError by viewModel.storageError.collectAsState()
     var showHistory by remember { mutableStateOf(false) }
+    var showArchive by rememberSaveable { mutableStateOf(false) }
+    var archiveRevision by rememberSaveable { mutableStateOf<LocalMediaRevisionDraft?>(null) }
+    val activeRevision = archiveRevision ?: revision
     var showVideoArchive by remember { mutableStateOf(false) }
     var videoRefreshBusy by remember { mutableStateOf<String?>(null) }
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
     var historyError by remember { mutableStateOf<String?>(null) }
-    var mode by rememberSaveable { mutableStateOf(initialKind.name) }
+    var mode by rememberSaveable(activeRevision?.originId) { mutableStateOf(activeRevision?.kind?.name ?: initialKind.name) }
     val kind = LocalMediaKind.valueOf(mode)
+    val matchingRevision = activeRevision?.forKind(kind)
     val available = models.filter { it.kind == kind }
-    var chosenId by rememberSaveable(mode) { mutableStateOf("") }
-    val selected = available.firstOrNull { it.id == chosenId }
-        ?: available.firstOrNull { it.profile.id == preferredProfileId }
-        ?: available.firstOrNull()
+    var chosenId by rememberSaveable(mode, activeRevision?.originId) { mutableStateOf("") }
+    // A revision may only inherit the same frozen provider+account route. For deleted or
+    // re-keyed accounts, require an explicit choice before any paid submission is possible.
+    val originalOffer = matchingRevision?.originalOffer(models)
+    // API-key rotation may keep the same profile ID; inspect the real key identity.
+    val originalAccountVerified by androidx.compose.runtime.produceState<Boolean?>(
+        initialValue = null, matchingRevision?.originId, originalOffer?.id
+    ) {
+        value = try {
+            matchingRevision != null && originalOffer != null &&
+                viewModel.matchesOriginalCredential(matchingRevision, originalOffer)
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { false }
+    }
+    val selected = if (matchingRevision != null) {
+        if (chosenId.isBlank()) originalOffer?.takeIf { originalAccountVerified == true }
+        else available.firstOrNull { it.id == chosenId }
+    } else LocalMediaCatalog.selectOffer(models, kind, preferredProfileId, chosenId.takeIf(String::isNotBlank))
+    val manualRouteActive = chosenId.isNotBlank() && selected?.id == chosenId
     val activeOfferId by rememberUpdatedState(selected?.id)
     var showModelChoices by remember { mutableStateOf(false) }
-    var prompt by rememberSaveable { mutableStateOf(initialPrompt) }
-    var ratio by rememberSaveable { mutableStateOf("1:1") }
-    var voiceId by rememberSaveable(selected?.id) {
-        mutableStateOf(if (selected?.provider == LocalMediaProvider.OPENAI) "alloy" else "male-qn-qingse")
+    var prompt by rememberSaveable(activeRevision?.originId) { mutableStateOf(activeRevision?.prompt ?: initialPrompt) }
+    var ratio by rememberSaveable(activeRevision?.originId) { mutableStateOf(activeRevision?.ratio ?: "1:1") }
+    var voiceId by rememberSaveable(selected?.id, personaVoiceStyle, activeRevision?.originId) {
+        // An old provider voice ID is never valid evidence for a newly selected account/provider.
+        val originalVoice = matchingRevision?.voiceId?.takeIf { selected?.id == originalOffer?.id }
+        mutableStateOf(originalVoice ?: selected?.provider?.let {
+            LocalMediaVoiceLabels.suggestedId(it, personaVoiceStyle)
+        }.orEmpty())
     }
-    var busy by remember(selected?.id) { mutableStateOf(false) }
+    // A saved local image can be used as actual image input only on a wired edit route.
+    var editOriginalImage by rememberSaveable(matchingRevision?.originId, selected?.id) {
+        mutableStateOf(
+            matchingRevision?.originFileName != null &&
+                selected?.provider == LocalMediaProvider.OPENAI &&
+                selected?.kind == LocalMediaKind.IMAGE
+        )
+    }
+    var busy by remember { mutableStateOf(false) }
     var error by remember(selected?.id) { mutableStateOf<String?>(null) }
     var viewedVideoTaskId by rememberSaveable(selected?.id) { mutableStateOf("") }
     var transcript by remember(selected?.id) { mutableStateOf<String?>(null) }
     var audioFile by remember(selected?.id) { mutableStateOf<File?>(null) }
     var voices by remember(selected?.id) { mutableStateOf<List<LocalMediaVoice>>(emptyList()) }
     var showVoices by remember(selected?.id) { mutableStateOf(false) }
+    var showCustomVoiceId by rememberSaveable(selected?.id) { mutableStateOf(false) }
     var voiceFilter by remember(selected?.id) { mutableStateOf("") }
+
+    val credentialChangedText = stringResource(R.string.media_recreate_credential_changed)
 
     fun submit(offer: LocalMediaOffer, action: suspend () -> Unit) {
         if (busy) return
+        // Reserve the UI operation synchronously so two rapid taps cannot queue two paid POSTs.
+        busy = true
+        error = null
         val originId = offer.id
         scope.launch {
-            busy = true
-            error = null
             try {
+                // Recheck at submission time: account credentials can change while the sheet is open.
+                if (matchingRevision != null && chosenId.isBlank()) {
+                    check(viewModel.matchesOriginalCredential(matchingRevision, offer)) {
+                        credentialChangedText
+                    }
+                }
                 action()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
                 if (originId == activeOfferId) error = failure.message ?: ""
             } finally {
-                if (originId == activeOfferId) busy = false
+                busy = false
             }
         }
     }
@@ -139,7 +185,7 @@ internal fun LocalMediaStudioSheetContent(
         if (uri != null && selected != null) {
             val chosen = selected
             submit(chosen) {
-                viewModel.submitTranscribe(chosen, uri, sessionId)
+                viewModel.submitTranscribe(chosen, uri, sessionId, if (matchingRevision != null) matchingRevision.sourceMessageId else sourceMessageId, matchingRevision?.originId)
                 if (chosen.id == activeOfferId) onDelivered()
             }
         }
@@ -161,7 +207,20 @@ internal fun LocalMediaStudioSheetContent(
 
         if (selected == null) {
             com.shenyan.designsystem.components.SyEmptyState(FeatherIcons.Image,
-                stringResource(R.string.media_studio_no_model), body = "")
+                if (matchingRevision != null) stringResource(R.string.media_recreate_route_missing)
+                else stringResource(R.string.media_studio_no_model), body = "")
+            if (available.isNotEmpty()) {
+                Text(stringResource(R.string.media_recreate_change_account_notice), color = colors.textSecondary,
+                    style = DsType.caption11.withReadingWeight())
+                available.forEach { option ->
+                    SyButton(
+                        text = "${option.label} · ${option.profile.displayName ?: option.profile.model}",
+                        size = SyButtonSize.Small, variant = SyButtonVariant.Ghost,
+                        onClick = { chosenId = option.id },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
         } else {
             // 模型仍可切换，但不再用整行大按钮和聊天模型名称挤占创作区。
             Row(
@@ -172,9 +231,7 @@ internal fun LocalMediaStudioSheetContent(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = if (available.count { it.label == selected.label } > 1)
-                        "${selected.label} · ${selected.profile.displayName ?: selected.profile.model}"
-                    else selected.label,
+                    text = stringResource(if (!manualRouteActive) R.string.media_route_current_auto else R.string.media_route_current_manual, selected.label),
                     modifier = Modifier.weight(1f),
                     style = DsType.small13Strong.withReadingWeight(),
                     color = colors.textSecondary,
@@ -188,11 +245,27 @@ internal fun LocalMediaStudioSheetContent(
                     tint = colors.textSecondary,
                 )
             }
+            if (!manualRouteActive && preferredProfileId != null && selected.profile.id != preferredProfileId) {
+                Text(
+                    text = stringResource(R.string.media_route_account_fallback,
+                        selected.profile.displayName ?: selected.profile.model),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.textSecondary,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             if (showModelChoices) {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().height(152.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
+                    item(key = "auto") {
+                        SyButton(text = stringResource(R.string.media_route_auto),
+                            onClick = { chosenId = ""; showModelChoices = false },
+                            size = SyButtonSize.Small,
+                            variant = if (!manualRouteActive) SyButtonVariant.Primary else SyButtonVariant.Ghost,
+                            modifier = Modifier.fillMaxWidth())
+                    }
                     items(available, key = { it.id }) { option ->
                         SyButton(
                             text = stringResource(
@@ -231,10 +304,32 @@ internal fun LocalMediaStudioSheetContent(
                         tag = "mediaRatio",
                         enabled = !busy,
                     )
+                    if (matchingRevision != null) {
+                        if (selected.provider == LocalMediaProvider.OPENAI && matchingRevision.originFileName != null) {
+                            MediaStudioFlatTabs(
+                                labels = listOf(stringResource(R.string.media_recreate_edit_pixels),
+                                    stringResource(R.string.media_recreate_redraw_only)),
+                                selected = if (editOriginalImage) 0 else 1,
+                                onSelect = { editOriginalImage = it == 0 },
+                                tag = "mediaImageRevisionMode",
+                                enabled = !busy,
+                            )
+                        } else {
+                            Text(stringResource(R.string.media_recreate_edit_not_supported),
+                                color = colors.textSecondary, style = DsType.caption11.withReadingWeight())
+                        }
+                    }
                     SyButton(text = stringResource(R.string.minimax_media_create_image),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            viewModel.submitImage(selected, prompt, ratio, sessionId)
+                            viewModel.submitImage(
+                                selected, prompt, ratio, sessionId,
+                                if (matchingRevision != null) matchingRevision.sourceMessageId else sourceMessageId,
+                                matchingRevision?.originId,
+                                if (editOriginalImage && matchingRevision != null &&
+                                    selected.provider == LocalMediaProvider.OPENAI)
+                                    matchingRevision.originId else null,
+                            )
                             if (selected.id == activeOfferId) onDelivered()
                         } })
                 }
@@ -242,7 +337,7 @@ internal fun LocalMediaStudioSheetContent(
                     SyButton(text = stringResource(R.string.minimax_media_start_video),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            val task = viewModel.createVideo(selected, prompt, sessionId)
+                            val task = viewModel.createVideo(selected, prompt, sessionId, if (matchingRevision != null) matchingRevision.sourceMessageId else sourceMessageId, matchingRevision?.originId)
                             viewedVideoTaskId = task.id
                             onDelivered()
                         } })
@@ -311,10 +406,13 @@ internal fun LocalMediaStudioSheetContent(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        SyTextField(
-                            value = voiceId, onValueChange = { voiceId = it },
-                            label = { Text(stringResource(R.string.minimax_media_voice_id)) },
-                            singleLine = true, enabled = !busy, modifier = Modifier.weight(1f),
+                        Text(
+                            text = if (voiceId.isBlank()) stringResource(R.string.media_voice_required)
+                                else stringResource(R.string.media_voice_current, voices.firstOrNull { it.id == voiceId }?.name ?: LocalMediaVoiceLabels.label(selected.provider, voiceId)),
+                            modifier = Modifier.weight(1f),
+                            style = DsType.small13Strong.withReadingWeight(),
+                            color = colors.textSecondary, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                         SyButton(text = stringResource(R.string.minimax_media_select_voice),
                             onClick = { submit(selected) {
@@ -342,11 +440,19 @@ internal fun LocalMediaStudioSheetContent(
                             }
                         }
                     }
+                    SyButton(text = stringResource(R.string.media_voice_custom_toggle),
+                        size = SyButtonSize.Small, variant = SyButtonVariant.Ghost,
+                        onClick = { showCustomVoiceId = !showCustomVoiceId })
+                    if (showCustomVoiceId) {
+                        SyTextField(value = voiceId, onValueChange = { voiceId = it },
+                            label = { Text(stringResource(R.string.media_voice_custom_field)) },
+                            singleLine = true, enabled = !busy, modifier = Modifier.fillMaxWidth())
+                    }
                     SyButton(text = stringResource(R.string.minimax_media_create_speech),
                         enabled = !busy && prompt.isNotBlank() && voiceId.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            viewModel.submitSpeech(selected, prompt, voiceId, sessionId)
+                            viewModel.submitSpeech(selected, prompt, voiceId, sessionId, if (matchingRevision != null) matchingRevision.sourceMessageId else sourceMessageId, matchingRevision?.originId)
                             if (selected.id == activeOfferId) onDelivered()
                         } })
                     audioFile?.let { file ->
@@ -385,6 +491,19 @@ internal fun LocalMediaStudioSheetContent(
         if (archive.hasMore) {
             SyButton(text = stringResource(R.string.media_load_older), onClick = viewModel::loadOlderArchive)
         }
+        if (videoTasks.isNotEmpty() || generatedResults.isNotEmpty()) {
+            SyButton(
+                text = stringResource(R.string.media_studio_archive_compact,
+                    videoTasks.size + generatedResults.size),
+                onClick = {
+                    showArchive = !showArchive
+                    if (!showArchive) { showHistory = false; showVideoArchive = false }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                variant = SyButtonVariant.Ghost,
+            )
+        }
+        if (showArchive) {
         if (videoTasks.isNotEmpty()) {
             SyButton(
                 text = stringResource(R.string.media_studio_video_archive, videoTasks.size),
@@ -471,6 +590,13 @@ internal fun LocalMediaStudioSheetContent(
                                         onClick = { pendingDeleteId = null })
                                 }
                             }
+                            if (task.phase in setOf(LocalMediaVideoPhase.SUCCEEDED, LocalMediaVideoPhase.FAILED)) {
+                                SyButton(text = stringResource(R.string.media_recreate_edit_and_generate), size = SyButtonSize.Small,
+                                    variant = SyButtonVariant.Ghost, onClick = {
+                                        archiveRevision = LocalMediaRevisionDraft.from(task)
+                                        showVideoArchive = false
+                                    })
+                            }
                             task.downloadUrl?.let { url ->
                                 SyButton(
                                     text = stringResource(R.string.minimax_media_open_video),
@@ -556,6 +682,16 @@ internal fun LocalMediaStudioSheetContent(
                                         style = DsType.caption11.withReadingWeight(),
                                         color = colors.textSecondary)
                                 }
+                                LocalMediaRevisionDraft.from(asset)?.let { draft ->
+                                    SyButton(text = if (draft.kind == LocalMediaKind.TRANSCRIBE)
+                                        stringResource(R.string.media_recreate_transcribe_select_audio) else stringResource(R.string.media_recreate_edit_and_generate),
+                                        size = SyButtonSize.Small,
+                                        variant = SyButtonVariant.Ghost,
+                                        onClick = {
+                                            archiveRevision = draft
+                                            showHistory = false
+                                        })
+                                }
                                 SyButton(
                                     text = stringResource(R.string.media_studio_delete_record),
                                     size = SyButtonSize.Small,
@@ -589,6 +725,7 @@ internal fun LocalMediaStudioSheetContent(
                     }
                 }
             }
+        }
         }
         historyError?.let { Text(it, color = colors.text,
             style = DsType.caption11.withReadingWeight()) }

@@ -90,11 +90,11 @@ internal class ChatInteractionPromptBuilder {
         appendLine("dynamics.facts/hypotheses 必须是对象数组，每项含 text(字符串)、confidence(整数)、source(字符串)；没有可核实的新证据就省略这些字段，禁止用字符串数组替代。")
         appendLine("规则：")
         appendLine("- 以真实对话和用户明确纠正为准；事实、推测、未知分开，不虚构人物生活、心理或用户动机。")
-        appendLine("- 状态记录描述已经发生的互动与人物实际表达，不给下一轮预设反应或行为要求。")
+        appendLine("- 只记已经发生的互动与人物实际表达；主观印象可存在但不等于客观事实，也不为下一轮预设反应。")
         appendLine("- physicalState 只在对话确有证据时更新，例如困、饿、刚醒、头疼、手上正忙；没有证据不要编。")
         appendLine("- currentUserImpression 是人物长期主观印象，只在有新证据时修正；允许不完整和犯错，但不能把猜测升级为用户事实，也不按轮数自动消失。")
         appendLine("- sharedObjects 只保存双方真实建立、未来可能自然回调的小物件、共同梗、未完成小约定；普通名词不写入。")
-        appendLine("- 生活状态记录已经发生的事情；人物的习惯资料不等于此刻已经做过的事。")
+        appendLine("- 生活习惯与本轮实际行动分开，不能把习惯视为已发生事件。")
         appendLine("- stage 只描述有明确证据的实际关系事件，取 NEW/FAMILIAR/AMBIGUOUS/DATING/COMMITTED/CONFLICT/COOLING/SEPARATED/REPAIRING。")
         appendLine("- 重大关系变化只通过 dynamics.stage 及其本轮真实对话证据确认，relationshipState 不可独立写入结婚、分手、恋爱等阶段结论。")
         appendLine("- 发生关系阶段变化时必须在 stateEvidence 的 dynamics.stage 填写本轮真实对话原文片段；非阶段性的相处描述更新须提供 stateEvidence.relationshipState 的真实关系语句。不能引用假设、第三人或否定句，也不能凭单个关键词猜测。")
@@ -107,9 +107,9 @@ internal class ChatInteractionPromptBuilder {
         appendLine("- 用户说不再讨论某话题，不等于该事件从历史中删除；应停止把它当成本轮目标，后续明确重新提起时仍可回忆。")
         appendLine("- resolvedContinuityIds 只填写本轮已完成/撤销的已定事项或待续事件编号；每个编号必须由本批用户真实原话支持且已从连续性活动列表退出，不能猜编号、不能只因语义相似就删除。")
         appendLine("- continuity 只保留当前有效的关键事件、决定和待续事项，合并重复，不复制旧台词。")
-        appendLine("- NONE=无需记录显著长期事件，但仍必须更新本轮有证据的短期状态、结清与纠正；MINOR=有短期或连续性事件；MAJOR=重大关系事件、共同经历或稳定事实。")
+        appendLine("- NONE=无值得长期记住的经历或人物思想变化，但仍须更新有依据的短期状态、结清与纠正；MINOR=有值得延续的小事件或角色因真实经历形成持续的个人思想变化；MAJOR=重大关系事件、共同经历或稳定事实。普通寒暄无需日记，思想变化也不得虚构触发它的经历。")
         appendLine("- NONE 下新增非空状态时须在 stateEvidence 提供本轮双方真实原话。显式空字段清理不受重要程度阻止；不能编造新状态。")
-        appendLine("- suggestions 固定为空；不得替用户作重大决定。现实关系建议禁止跟踪、胁迫、欺骗操控或绕过明确拒绝。")
+        appendLine("- suggestions 固定为空。")
     }.trim()
 
     fun suggestionsPrompt(
@@ -147,13 +147,12 @@ internal class ChatInteractionPromptBuilder {
             "输出：{\"suggestions\":[{\"label\":\"2到6字短标签\",\"style\":\"自然|俏皮|直球|放飞\",\"text\":\"用户可直接发送的下一句\",\"bold\":false}]}",
         )
         appendLine("规则：")
-        appendLine("- 给4条明显不同的建议，明确覆盖自然、俏皮、直球、放飞；至少1条 bold=true。")
+        appendLine("- 给1至4条真正不同、自然可发送的建议；style仅从自然、俏皮、直球、放飞中选择最贴切的标签，不强制覆盖所有风格，也不为凑数重复改写。bold仅在确实值得突出时为true。")
         appendLine("- 最新1～2轮和当前状态优先；已结束、拒绝或被纠正的话题不得复活。")
         appendLine("- 建议服务于用户自己的表达，不照搬人物语言风格资料，也不替用户表演对方性格。")
         appendLine("- 用户明确纠正和当前上下文决定承接节奏；模糊表达要结合前后行为与关系语境理解，不把单个模糊推辞自动解释为关系拒绝；针对当前行为的清晰明确停止、退出或拒绝继续一次即生效。")
         appendLine("- 直接承接人物最后一句，按最近对话中真实的用户表达和当前关系自然写作，不使用旧画像评分。")
         appendLine("- 不用同义改写凑数，不虚构事实，不替用户作重大决定。")
-        appendLine("- 现实关系建议不得包含跟踪、胁迫、欺骗操控或绕过明确拒绝。")
     }.trim()
 
     private companion object {

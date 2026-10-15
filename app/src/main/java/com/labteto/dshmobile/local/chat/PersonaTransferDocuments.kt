@@ -272,6 +272,7 @@ internal object PersonaTransferDocuments {
                         add(DocLine("日记 ${index + 1}$status", 3))
                         addField("经历", diary.event)
                         addField("感受", diary.feeling)
+                        addField("私人心声", diary.privateReflection)
                         addField("心里没说出口的话", diary.innerThought)
                         addField("关系意义", diary.relationshipMeaning)
                         addField("未散余波", diary.unresolvedEcho)

@@ -205,8 +205,8 @@ class LocalHarnessViewModel @Inject constructor(
         personaGalleryController.selectGalleryPersonaForCurrentChat(id, expected)
     suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGalleryEntry> =
         personaGalleryController.createGalleryPersona(profile)
-    suspend fun autoFillNewPersona(description: String): Result<PersonaProfile> =
-        personaGalleryController.autoFillNewPersona(description)
+    suspend fun autoFillNewPersona(current: PersonaProfile, description: String): Result<PersonaProfile> =
+        personaGalleryController.autoFillNewPersona(current, description)
     suspend fun inspectGalleryPersona(id: String, storyId: String?): Result<PersonaInspectionResult> =
         personaGalleryController.inspectGalleryPersona(id, storyId)
     suspend fun applyGallerySuggestions(
@@ -440,8 +440,8 @@ class LocalHarnessViewModel @Inject constructor(
         }
     }
 
-    suspend fun autoFillChatPersona(description: String): Result<PersonaProfile> =
-        chatModelAssistController.autoFillCurrentPersona(description)
+    suspend fun autoFillChatPersona(current: PersonaProfile, description: String): Result<PersonaProfile> =
+        chatModelAssistController.autoFillCurrentPersona(current, description)
     fun switchSession(sessionId: String): Boolean = sessionUiPort.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.Open(sessionId)) == com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued
     fun clearCredential() = runtime.model.clearCredential()
 }

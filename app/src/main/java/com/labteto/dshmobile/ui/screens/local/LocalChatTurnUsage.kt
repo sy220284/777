@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -111,7 +112,8 @@ internal fun LocalChatTurnUsageController(
             loading = false
         }
     }
-    if (enabled && ui.selectedTurn != null) SyResponsiveSheet(
+    if (enabled && ui.selectedTurn != null) key(sessionId) {
+        SyResponsiveSheet(
         title = stringResource(R.string.local_chat_turn_usage_title),
         onDismiss = { ui.selectedTurn = null }, scrollable = true,
     ) {
@@ -128,6 +130,7 @@ internal fun LocalChatTurnUsageController(
                 }
                 UsageGroupDetailPage(detail, onOpenRequest = { requestId = it })
             }
+        }
         }
     }
     return ui

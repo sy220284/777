@@ -137,6 +137,23 @@ class LocalGroupChatTest {
     }
 
     @Test
+    fun collectiveConversationContinuesLastSpeakerAndRotatesTheOtherSlot() {
+        val first = groupChatResponders(
+            "大家都来说说", listOf(zhao, ayaka, kafka), activeSpeakerId = "kafka")
+        val next = groupChatResponders(
+            "大家都来说说", listOf(ayaka, kafka, zhao), activeSpeakerId = "kafka")
+        assertEquals(listOf("kafka", "zhao"), first.map { it.galleryId })
+        assertEquals(listOf("kafka", "ayaka"), next.map { it.galleryId })
+        assertEquals(MAX_GROUP_CHAT_RESPONDERS_PER_TURN, first.size)
+        assertEquals(listOf("ayaka", "kafka", "zhao"),
+            groupChatResponders("每个人都回答", listOf(ayaka, kafka, zhao), "kafka")
+                .map { it.galleryId })
+        assertEquals(listOf("ayaka"),
+            groupChatResponders("@神里绫华 你来回答", listOf(zhao, ayaka, kafka), "kafka")
+                .map { it.galleryId })
+    }
+
+    @Test
     fun ordinaryMessageUsesOneRotatedPrimarySpeaker() {
         val responders = groupChatResponders(
             input = "今天怎么这么安静",

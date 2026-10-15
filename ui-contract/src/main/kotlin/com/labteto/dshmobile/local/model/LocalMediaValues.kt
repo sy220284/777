@@ -30,6 +30,13 @@ data class LocalMediaResult(
     val sessionId: String? = null,
     val description: String? = null,
     val textOutput: String? = null,
+    val sourceMessageId: String? = null,
+    val profileId: String? = null,
+    val routeFingerprint: String? = null,
+    val imageRatio: String? = null,
+    val voiceId: String? = null,
+    val revisionOf: String? = null,
+    val credentialSignature: String? = null,
 ) {
     init { require(listOf(fileName, remoteUrl, textOutput).count { it != null } == 1) }
 }
@@ -59,6 +66,9 @@ data class LocalMediaVideoTask(
     val description: String? = null,
     val fileName: String? = null,
     val deliveryPhase: LocalMediaDeliveryPhase = LocalMediaDeliveryPhase.PENDING,
+    val sourceMessageId: String? = null,
+    val revisionOf: String? = null,
+    val credentialSignature: String? = null,
 )
 
 
@@ -79,6 +89,9 @@ data class LocalMediaCreationJob(
     val profileId: String? = null,
     val routeFingerprint: String? = null,
     val errorCode: String? = null,
+    val sourceMessageId: String? = null,
+    val revisionOf: String? = null,
+    val credentialSignature: String? = null,
 )
 
 

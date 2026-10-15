@@ -46,7 +46,7 @@ internal data class LocalShellFeatureUiActions(
     val configureChatPersona: suspend (PersonaProfile) -> Result<Unit>,
     val configureGroupMembers: (List<String>) -> Boolean,
     val selectGalleryPersona: (String) -> Boolean,
-    val autoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
+    val autoFillChatPersona: suspend (PersonaProfile, String) -> Result<PersonaProfile>,
     val saveGroupAnnouncement: suspend (String) -> Result<Unit>,
     val undoPersonaCorrection: (Long, String, String) -> Unit,
     val setPlanMode: (Boolean) -> Unit,

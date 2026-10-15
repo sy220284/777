@@ -271,8 +271,9 @@ private fun planningSystemPrompt(nowMillis: Long): String {
         - SILENCE：用户沉默一段时间后触发，给 silenceMinutes（至少 60）。
         - WINDOW：每天在一个时间窗内择机主动互动，给 windowStartMinuteOfDay / windowEndMinuteOfDay（0～1439）。
 
-        prompt 要写成给角色执行时看的自然指令，延续已有聊天事实，不编造双方未发生的经历或约定。
-        用户没有给精确时间时，根据语义选择一个自然且保守的未来时间；不得安排到过去。
+        prompt 只写角色届时要表达的意图，不要复述计划字段或假装用户刚发来新消息；延续真实聊天，不编造经历、许可和约定。
+        严格遵守用户指定的日期、时刻与重复频率，按上述本地时区计算毫秒时间戳；没有精确时刻才选自然且保守的未来时间，不安排到过去。
+        不要把一次性事件猜成循环任务，也不要因已有相似约定而创建额外任务。
         只返回 JSON，不解释：
         {"task":{"prompt":"...","scheduleType":"ONCE","firstRunAtMillis":0,"recurringMinutes":null,"silenceMinutes":null,"windowStartMinuteOfDay":null,"windowEndMinuteOfDay":null}}
     """.trimIndent()

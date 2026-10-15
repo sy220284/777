@@ -166,10 +166,15 @@ internal fun groupChatResponders(
     val explicitlyMentioned = groupChatMentionedMembers(input, distinct)
     if (explicitlyMentioned.isNotEmpty()) return explicitlyMentioned
 
+    val active = distinct.firstOrNull { it.galleryId == activeSpeakerId }
     return if (groupChatWantsMultipleReplies(input)) {
-        distinct.take(MAX_GROUP_CHAT_RESPONDERS_PER_TURN)
+        // In an open group question the current conversational speaker can respond
+        // first; give the other slot to a different rotated participant. No scripted
+        // personality ranking or additional model calls are introduced.
+        (listOfNotNull(active) + distinct.filterNot { it.galleryId == active?.galleryId })
+            .take(MAX_GROUP_CHAT_RESPONDERS_PER_TURN)
     } else {
-        listOfNotNull(distinct.firstOrNull { it.galleryId == activeSpeakerId } ?: distinct.first())
+        listOfNotNull(active ?: distinct.first())
     }
 }
 

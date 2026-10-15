@@ -313,12 +313,54 @@ class OpenAiResponsesClient @Inject constructor(
                 if (enableImageGenerationTool) {
                     add(buildJsonObject {
                         put("type", "image_generation")
+                        if (explicitImageEditRequested(messages)) put("action", "edit")
                     })
                 }
             })
         }
+        // Explicit image commands must invoke the actual built-in tool, not return a text-only workaround.
+        // Only force when the current Responses request already passed native-tool eligibility.
+        if (enableImageGenerationTool && explicitImageGenerationRequested(messages)) {
+            put("tool_choice", buildJsonObject { put("type", LOCAL_NATIVE_TOOL_IMAGE_GENERATION) })
+        }
         if (!planSharing) temperature?.let { put("temperature", it) }
         // ChatGPT plan sharing rejects sampling controls; API-key Responses keeps its own contract.
+    }
+
+    /** Force edits only when the latest turn includes an image and an explicit editing command. */
+    private fun explicitImageEditRequested(messages: List<JsonObject>): Boolean {
+        if (!explicitImageGenerationRequested(messages)) return false
+        val user = messages.lastOrNull { it["role"]?.jsonPrimitive?.contentOrNull == "user" }
+            ?: return false
+        val parts = user["content"] as? JsonArray ?: return false
+        val hasImage = parts.any { part ->
+            (part as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull in
+                setOf("image_url", "input_image")
+        }
+        val text = parts.mapNotNull { part ->
+            val obj = part as? JsonObject ?: return@mapNotNull null
+            if (obj["type"]?.jsonPrimitive?.contentOrNull in setOf("text", "input_text"))
+                obj["text"]?.jsonPrimitive?.contentOrNull else null
+        }.joinToString(" ")
+        return hasImage && Regex("""修改|编辑|重绘|改成|edit|modify|retouch|redraw""",
+            RegexOption.IGNORE_CASE).containsMatchIn(text)
+    }
+
+    private fun explicitImageGenerationRequested(messages: List<JsonObject>): Boolean {
+        val user = messages.lastOrNull {
+            it["role"]?.jsonPrimitive?.contentOrNull == "user"
+        } ?: return false
+        val text = when (val content = user["content"]) {
+            is JsonPrimitive -> content.contentOrNull.orEmpty()
+            is JsonArray -> content.mapNotNull { part ->
+                val obj = part as? JsonObject ?: return@mapNotNull null
+                if (obj["type"]?.jsonPrimitive?.contentOrNull in setOf("text", "input_text")) {
+                    obj["text"]?.jsonPrimitive?.contentOrNull
+                } else null
+            }.joinToString("\n")
+            else -> ""
+        }
+        return isExplicitImageGenerationRequest(text)
     }
 
     private fun responseInstructions(messages: List<JsonObject>): String =
@@ -892,8 +934,10 @@ class OpenAiResponsesClient @Inject constructor(
     companion object {
         const val RESPONSES_OUTPUT_KEY = "_dsh_responses_output"
         private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
-        private const val MAX_STREAM_BYTES = 32 * 1024 * 1024
-        private const val MAX_SSE_LINE_CHARS = 4 * 1024 * 1024
+        // Image tool result is inline base64 on response.completed; a single SSE line can exceed 4 MiB.
+        // Keep the bounded payload above the 20 MiB image limit without removing stream guards.
+        private const val MAX_STREAM_BYTES = 64 * 1024 * 1024
+        private const val MAX_SSE_LINE_CHARS = 32 * 1024 * 1024
         private const val ERROR_BODY_LIMIT = 8_000
         private const val MAX_PROMPT_CACHE_KEY_CHARS = 64
         private val SUPPORTED_PROMPT_CACHE_TTLS = setOf("30m")

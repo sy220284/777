@@ -12,10 +12,14 @@ import kotlinx.coroutines.flow.StateFlow
 /** Paths are readonly native-decoder references. Removal is an explicit Owner command. */
 data class UiMediaAsset(val id: String, val localPath: String?, val remoteUrl: String?, val textOutput: String?)
 sealed interface MediaUiCommand {
-    data class Image(val offer: LocalMediaOffer, val prompt: String, val ratio: String, val sessionId: String) : MediaUiCommand
-    data class Speech(val offer: LocalMediaOffer, val text: String, val voice: String, val sessionId: String) : MediaUiCommand
-    data class Transcribe(val offer: LocalMediaOffer, val contentUri: String, val sessionId: String) : MediaUiCommand
-    data class Video(val offer: LocalMediaOffer, val prompt: String, val sessionId: String?) : MediaUiCommand
+    data class Image(val offer: LocalMediaOffer, val prompt: String, val ratio: String, val sessionId: String,
+        val sourceMessageId: String? = null, val revisionOf: String? = null, val editSourceImageId: String? = null) : MediaUiCommand
+    data class Speech(val offer: LocalMediaOffer, val text: String, val voice: String, val sessionId: String,
+        val sourceMessageId: String? = null, val revisionOf: String? = null) : MediaUiCommand
+    data class Transcribe(val offer: LocalMediaOffer, val contentUri: String, val sessionId: String,
+        val sourceMessageId: String? = null, val revisionOf: String? = null) : MediaUiCommand
+    data class Video(val offer: LocalMediaOffer, val prompt: String, val sessionId: String?,
+        val sourceMessageId: String? = null, val revisionOf: String? = null) : MediaUiCommand
     data class PollVideo(val offer: LocalMediaOffer, val taskId: String) : MediaUiCommand
     data class RetryLocalVideoSave(val id: String) : MediaUiCommand
     data class RemoveResult(val id: String) : MediaUiCommand
@@ -36,6 +40,8 @@ interface MediaUiPort {
     fun observe(sessionId: String?, limit: Int): Flow<LocalMediaPage>
     fun offers(profiles: List<LocalModelProfile>): List<LocalMediaOffer>
     fun canRefresh(task: LocalMediaVideoTask, offer: LocalMediaOffer): Boolean
+    /** Compare credential at the Owner; never claim a past paid route is safe from a display ID alone. */
+    suspend fun hasMatchingCredential(offer: LocalMediaOffer, expectedSignature: String?): Boolean = false
     fun asset(id: String): UiMediaAsset?
     suspend fun voices(offer: LocalMediaOffer): List<LocalMediaVoice>
     suspend fun submit(command: MediaUiCommand): MediaUiReceipt

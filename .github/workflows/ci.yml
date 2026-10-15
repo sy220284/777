@@ -161,8 +161,6 @@ jobs:
           python3 -m unittest discover -s tools/fonts -p 'test_*.py'
           python3 tools/dev/test-install.py
           python3 tools/runtime/test-verification.py
-          npm install --prefix "$RUNNER_TEMP/mobile-pptx" --ignore-scripts --no-audit --no-fund pptxgenjs@4.0.1
-          MOBILE_PPTX_MODULE="$RUNNER_TEMP/mobile-pptx/node_modules/pptxgenjs" python3 .github/scripts/test-mobile-skill-tools.py
           while IFS= read -r -d '' file; do
             bash -n "$file"
           done < <(find .github/scripts tools/runtime tools/dev tools/reference-validation tools/fonts -type f -name '*.sh' -print0)

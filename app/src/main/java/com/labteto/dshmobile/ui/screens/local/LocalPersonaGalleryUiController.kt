@@ -148,13 +148,13 @@ suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGallery
     selectGalleryPersonaForCurrentChat(entry.id, originalIdentity)
     entry
 }
-suspend fun autoFillNewPersona(description: String): Result<PersonaProfile> = runSuspendResult {
+suspend fun autoFillNewPersona(current: PersonaProfile, description: String): Result<PersonaProfile> = runSuspendResult {
     val snapshot = state.value
     check(!snapshot.loading && !snapshot.kernel.running && snapshot.modelState.configured) { appContext.getString(R.string.ui_r4_gallery_model_not_ready) }
     chatUi.autoFillPersona(
         model = snapshot.modelState.model, baseUrl = snapshot.modelState.baseUrl,
         profileId = snapshot.modelState.modelSelection.activeProfileId,
-        current = PersonaProfile(name = ""),
+        current = current,
         recentMessages = emptyList(),
         description = description,
     )
