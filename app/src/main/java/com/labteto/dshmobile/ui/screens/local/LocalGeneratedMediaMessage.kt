@@ -57,6 +57,7 @@ import com.labteto.dshmobile.local.model.LocalMediaCreationPhase
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalMediaOffer
 import com.labteto.dshmobile.local.model.LocalMediaResult
+import com.labteto.dshmobile.local.model.LocalMediaRevisionDraft
 import com.labteto.dshmobile.local.model.LocalMediaVideoPhase
 import com.labteto.dshmobile.local.model.LocalMediaVideoTask
 import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
@@ -138,6 +139,7 @@ internal fun LocalGeneratedMediaResultRow(
     result: LocalMediaResult,
     viewModel: LocalMediaStudioViewModel,
     onInsertText: (String) -> Unit,
+    onRevise: (LocalMediaRevisionDraft) -> Unit = {},
 ) {
     val resources = LocalResources.current
     val context = LocalContext.current
@@ -203,6 +205,11 @@ internal fun LocalGeneratedMediaResultRow(
                 }
             }
         }
+        LocalMediaRevisionDraft.from(result)?.let { draft ->
+            SyButton(text = if (draft.kind == LocalMediaKind.TRANSCRIBE) "重新选择音频转写" else "修改并重新生成",
+                size = SyButtonSize.Small, variant = SyButtonVariant.Ghost,
+                onClick = { onRevise(draft) })
+        }
         error?.let { Text(it, style = DsType.caption11, color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary) }
     }
 }
@@ -218,6 +225,7 @@ internal fun LocalGeneratedVideoTaskRow(
     task: LocalMediaVideoTask,
     offers: List<LocalMediaOffer>,
     viewModel: LocalMediaStudioViewModel,
+    onRevise: (LocalMediaRevisionDraft) -> Unit = {},
 ) {
     val resources = LocalResources.current
     val context = LocalContext.current
@@ -340,6 +348,12 @@ internal fun LocalGeneratedVideoTaskRow(
                     catch (cancelled: CancellationException) { throw cancelled }
                     catch (failure: Exception) { error = failure.message }
                 } })
+        }
+        // Create a new task with an explicit confirmation; querying the old task remains read-only.
+        if (task.phase in setOf(LocalMediaVideoPhase.SUCCEEDED, LocalMediaVideoPhase.FAILED)) {
+            SyButton(text = "修改并重新生成", size = SyButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+                onClick = { onRevise(LocalMediaRevisionDraft.from(task)) })
         }
         task.lastError?.takeIf { task.phase == LocalMediaVideoPhase.SUCCEEDED }?.let {
             Text(it, style = DsType.caption11.withReadingWeight(),
