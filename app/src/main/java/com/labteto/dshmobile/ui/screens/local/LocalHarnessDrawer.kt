@@ -134,7 +134,10 @@ internal fun LocalModeDrawer(
     var syRailCollapsed by rememberSaveable { mutableStateOf(false) }
     if (docked && syRailCollapsed) {
         // Compact rail shares the exact scene without drawing a solid vertical strip.
-        SySceneBackgroundSurface(Modifier.width(SyDimensions.navigationCollapsed).fillMaxHeight()) {
+        SySceneBackgroundSurface(
+            modifier = Modifier.width(SyDimensions.navigationCollapsed).fillMaxHeight(),
+            shape = androidx.compose.ui.graphics.RectangleShape,
+        ) {
         Column(
             Modifier.fillMaxHeight().safeDrawingPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -304,7 +307,10 @@ internal fun LocalModeDrawer(
         ),
     ) {
         // The drawer continues the original background without a full-screen slab.
-        SySceneBackgroundSurface(Modifier.fillMaxHeight()) {
+        SySceneBackgroundSurface(
+            modifier = Modifier.fillMaxHeight(),
+            shape = androidx.compose.ui.graphics.RectangleShape,
+        ) {
         Column(Modifier.fillMaxHeight().safeDrawingPadding()) {
             Column(
                 modifier = Modifier
