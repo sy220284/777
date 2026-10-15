@@ -32,6 +32,13 @@ class LocalWorkEvidenceSheetTest {
         goal = LocalGoal("deliver", id = "goal"), todos = listOf(LocalTodoItem("交付报告", "pending"))))
     private fun actions(history: (String, LocalWorkHistoryCursor?) -> LocalWorkHistoryPageUi,
         onLink: (LocalRequirementUiTarget) -> Boolean = { false }) = LocalWorkFeatureUiActions(
+        evidence = object : com.labteto.dshmobile.uicontract.WorkEvidenceUiPort {
+            override suspend fun read(identity: com.labteto.dshmobile.uicontract.UiSessionIdentity) =
+                com.labteto.dshmobile.uicontract.UiWorkEvidenceReadReceipt.Rejected(
+                    com.labteto.dshmobile.uicontract.UiCommandRejection.STALE_IDENTITY)
+            override suspend fun submit(command: com.labteto.dshmobile.uicontract.LinkWorkEvidenceReferenceCommand) =
+                com.labteto.dshmobile.uicontract.UiCommandReceipt.NotAdmitted
+        },
         workState = work, workspaceFiles = { emptyList() }, conversationFiles = { error("unused") },
         previewWorkspaceFile = { error("no preview") }, artifactsForUi = { emptyList() }, eventSequenceForUi = { 1L },
         artifactRevision = { null }, refreshArtifactFiles = { _, items -> items },
