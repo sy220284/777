@@ -1,7 +1,7 @@
 {
   "schema": "777.ui-r4.code-tasks/1",
   "asOf": "2026-10-15",
-  "baseline": "2026-10-15 through ef6b35a4; production root host admission integration, full packs still absent, CI pending",
+  "baseline": "2026-10-15 through 8706e228; Next 5 real scenes, production full-pack admission remains blocked, CI pending",
   "scope": "整个 R4，非单一功能",
   "verificationPolicy": "当前 HEAD 基础 CI 可通过不代表 R4 交付验收；新增提交需自身 CI，真实双包使用/进程恢复/设备矩阵按 S2/S5 单独验证。",
   "sceneCount": 78,
@@ -50,8 +50,8 @@
       "task": "图库/故事/立绘/导入导出/删除完整 Owner 端口",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "读取/重命名/归档消息删除、人物选择/开始故事、原人物导入导出事务及双包文档传输；本批故事详情/阶段编辑和人物/故事删除经实际 Chat Owner 端口，双包确认及部分同步回执。 本批会话保存/新故事归档与立绘导入/移除迁入 Owner 端口，V6/Next 接通。原会话维护租约保护历史读取，保存与绑定分立回执；真实 Store 捕获替换前立绘路径，保护已提交或共享图片。",
-      "remaining": "人物完整资料/AI 建议编辑与新建、预置人物安装仍需迁移；Next 完整图库页面/立绘预览仍属于 S3 场景移包。"
+      "implemented": "读取/重命名/归档消息删除、人物选择/开始故事、原人物导入导出事务及双包文档传输；本批故事详情/阶段编辑和人物/故事删除经实际 Chat Owner 端口，双包确认及部分同步回执。 本批会话保存/新故事归档与立绘导入/移除迁入 Owner 端口，V6/Next 接通。原会话维护租约保护历史读取，保存与绑定分立回执；真实 Store 捕获替换前立绘路径，保护已提交或共享图片。 Next 独立图库页面首次实际使用 GalleryUiPort.read 与 PersonaSelectionUiPort.StartStory，保持原 Chat Owner 的人物/故事身份校验及业务归属。",
+      "remaining": "Next 人物图库首页已能读取档案和选择故事，但独立图库详情编辑、新建/AI补全、立绘预览/变更、角色/故事删除和导入导出完整 UI 尚未迁移；原业务 Owner 功能仍保留。"
     },
     {
       "id": "S1-03",
@@ -118,15 +118,15 @@
       "task": "双包真实发送/编辑/审批/恢复与独立替换证明",
       "codeStatus": "VERIFICATION_DEFERRED",
       "verification": "DEFERRED",
-      "implemented": " 补 Next Compose 实际点击拒绝审批按钮→应用 Work Port→模拟 Owner 当前 nonce，确认审批一次性拒绝与防重放仪器化测试源码；仍非真实模型/网络/两套 UI 全链路验收。 2026-10-15 新增在真实生产 Host 组件中切换两套独立且全场景覆盖的合成 Renderer 测试包、持久选择变更、不合法选择拒绝与显式恢复的 Android Compose 仪器化测试源码；该测试为 Host/UI 框架证明，绝不等同 V6/Next 两套真实业务页面完成。"
+      "implemented": " 补 Next Compose 实际点击拒绝审批按钮→应用 Work Port→模拟 Owner 当前 nonce，确认审批一次性拒绝与防重放仪器化测试源码；仍非真实模型/网络/两套 UI 全链路验收。 2026-10-15 新增在真实生产 Host 组件中切换两套独立且全场景覆盖的合成 Renderer 测试包、持久选择变更、不合法选择拒绝与显式恢复的 Android Compose 仪器化测试源码；该测试为 Host/UI 框架证明，绝不等同 V6/Next 两套真实业务页面完成。 Next 增量独立包的 Gallery UI 设备测试源码新增 Owner 接受/拒绝/无身份/Host 导航拒绝四类案例；JVM 测试确认五个真实 Renderer 覆盖和剩余页面严格不可准入，未宣称 CI 或真实模型已通过。"
     },
     {
       "id": "S3-01",
       "task": "全应用 UiPack Scene Renderer API",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "新增独立 :ui-host 全应用 UiApplicationScenePack 逐 Scene Compose Renderer 契约、实际 renderer 覆盖与 manifest 双门禁、Host 历史/包身份准入的场景调度与 JVM 测试源码。 AppRoot 现接入真实全应用 UiApplicationScenePack 准入/Compose Renderer 路径，拒绝缺失 Scene/实际 Renderer 的包；当前注册表有意为空，不能宣称整包完工。",
-      "remaining": "仍需独立 :ui-pack-v6 / :ui-pack-next 为 78 Scene 建立完整可执行 Renderer 和真实强类型业务 Port，当前生产整包安装列表为空；已有 Host 生产入口但未交付整包替换。"
+      "implemented": "新增独立 :ui-host 全应用 UiApplicationScenePack 逐 Scene Compose Renderer 契约、实际 renderer 覆盖与 manifest 双门禁、Host 历史/包身份准入的场景调度与 JVM 测试源码。 AppRoot 现接入真实全应用 UiApplicationScenePack 准入/Compose Renderer 路径，拒绝缺失 Scene/实际 Renderer 的包；当前注册表有意为空，不能宣称整包完工。 Next 独立 ui-pack-next 模块新增 NextApplicationScenePack：5 个真实 Compose Renderer（route.home、conversation.chat、conversation.work、route.persona_gallery、chat.gallery），包含实际 Chat/Work/图库选择 Port 调用。",
+      "remaining": "仍缺其余全应用 Scene Renderer 和独立 V6 完整包；Next 5 个仅部分场景，任何缺页都被生产 Host 拒绝，不能提前切为完整应用。"
     },
     {
       "id": "S3-02",
@@ -148,15 +148,16 @@
       "task": "Next 全应用必要场景原生实现",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": " Next 的历史读取现只依赖中立消息快照（独立角色映射单测）；完整 Next 全场景仍待完成。"
+      "implemented": " Next 的历史读取现只依赖中立消息快照（独立角色映射单测）；完整 Next 全场景仍待完成。 Next 独立包新增人物图库真正的 Owner 归档读取、按 Gallery/Story 身份启动故事、拒绝回执/缺身份不导航；页面避免在 UI 自建人物/故事状态。",
+      "remaining": "已实现会话相关/图库初步场景 Renderer；其余 78 个场景的原生 Next 页面（如日记、完整图库编辑/立绘、设置、工具、任务、Work 全页等）尚未完成，现有新增测试仍待 CI。"
     },
     {
       "id": "S3-05",
       "task": "生产级包选择/注册/持久恢复",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "新增 Host 持久选择协调器：只有通过全应用真实 renderer 与 manifest 双门禁的包才能写入选择；过期/缺失选择仅返回显式稳定包选项，不暗中回退 V6；持久写失败拒绝报成功。含 JVM 回归源码。 AppRoot 使用本地 SharedPreferences 持久选包，实时观察其变更，只有通过 Host manifest+Renderer+已接 Feature Owner 能力校验的已登记整包可渲染，非法/缺失选择显式失败且必须点击恢复 Legacy；新增合成完整双包 Compose 切换 instrumentation 测试源码。",
-      "remaining": "生产已装整包列表目前为空（仅保留原 V6 为明确稳定模式），完整 V6/Next Renderer 注册、设置内可用选包入口、跨包真实会话/设置恢复、Android 真机验收尚未完成。"
+      "implemented": "新增 Host 持久选择协调器：只有通过全应用真实 renderer 与 manifest 双门禁的包才能写入选择；过期/缺失选择仅返回显式稳定包选项，不暗中回退 V6；持久写失败拒绝报成功。含 JVM 回归源码。 AppRoot 使用本地 SharedPreferences 持久选包，实时观察其变更，只有通过 Host manifest+Renderer+已接 Feature Owner 能力校验的已登记整包可渲染，非法/缺失选择显式失败且必须点击恢复 Legacy；新增合成完整双包 Compose 切换 instrumentation 测试源码。 将 AppRoot 真实 Feature Owner 依赖注入 NextApplicationScenePack 增量候选包；保留完整全应用 Scene Renderer 双门禁，缺页候选即使安装也不得替换 V6。",
+      "remaining": "现在安装候选仅有一个包含5 Scene 的 Next 增量包，尚无 78 Scene 完整包；可用的全应用包切换选择器/持久恢复和真机 E2E 仍未交付。"
     },
     {
       "id": "S3-06",
@@ -246,7 +247,7 @@
       "task": "最终 SHA CI 与 Android16/17 全场景/无障碍/弱网/收费矩阵",
       "codeStatus": "VERIFICATION_DEFERRED",
       "verification": "DEFERRED",
-      "remaining": "对最新 PR SHA 执行 UI Host JVM/Android Compose 路由与选包测试、已有 Chat/Work Port 真实回执测试、Android16/17、ARM64、静态/架构/无障碍和弱网/用量场景检查；最终完整 V6/Next 包及其恢复测试仍待独立交付证据。",
+      "remaining": "以当前 SHA 验证增量 Next Renderer 的 Kotlin/JVM/Android16/17 编译与图库四项设备测试、ARM64、架构/静态门禁；仍需完整 V6/Next 双包业务、弱网、审批、收费、TalkBack、恢复/E2E 等最终验收。",
       "implemented": " 2026-10-15 CI #38696536117 真实失败已定位 LocalHarnessViewModel.kt:325 编辑结果接口类型变化未兼容旧 V6；b4eb3bfb 完整映射11种结果后，旧 CI #38697453814 的 unit-tests 作业通过（其他 Job 状态需以对应最终 SHA 查证）。 另由 CI #38697453814 x86 Job 日志定位 NextConversationOwnerPortIntegrationTest 的无效 assertExists import 和错误 App R.string.next_deny；提交 238b1c02 更正模块资源归属。"
     }
   ],

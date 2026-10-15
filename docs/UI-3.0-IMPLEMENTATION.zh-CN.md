@@ -1,5 +1,8 @@
 # UI 3.0-R4 实施台账
 
+> **2026-10-15 S3 独立 Next 包开始实际移页（PR #705）**：`436ccb07` 在独立 `:ui-pack-next` 新增 5 个真正可执行的 `UiSceneRenderer`：会话首页、Chat、Work、人物图库路由/页面，全部经 Feature Port 获取事实；人物归档读取和启动故事由 Chat Owner 管理，拒绝/无身份时不得擅自跳转。`1f82b98a` 在 AppRoot 使用原 `LocalHarnessViewModel` Owner 将这些功能注入独立 Next 增量候选包，不复制业务/会话存储。`bbf8f8a8` + `a15dd9b2` 新增四条图库 Compose AndroidTest，覆盖真实归档显示、精确故事 ID/Owner 调用、无活动身份与 Owner 拒绝、Owner 已提交但 Host 导航拒绝时不重复执行业务。`8706e228` 新增三条 JVM 测试，检查五个 Renderer 真实覆盖、生产 78 场景准入严格拒绝和五场景局部准入。**目前只是 5/78 场景的 Next 增量交付，独立 V6 整包和余下 Next 场景仍缺，生产 Host 必须继续拒绝不完整包；新增测试源码未等同 CI 已通过。** S0 源码动作映射维持 **75/173**，173 项端到端恢复签收仍为 0。
+
+
 > **2026-10-15 S3 优先推进：AppRoot 全应用 Host 真实入口（PR #705）**：`041ee4c9` 在生产 AppRoot 中接入全应用 UiApplicationPackRegistry 准入/真实 Compose Host，原 V6 Shell 保留为显式稳定模式，完整 Pack 未安装时不让会话切片冒充整包；`cf58a9d1` + `41cb87cd` + `04d7d94b` 增加全量场景包准入、缺 Renderer、过时包选择、跨包导航历史隔离以及路由白名单 JVM 测试源码；`b0d2c8f0` 加入导航快照恢复错误可见处理和根返回行为；`9caf00b0` 从实际 Feature Owner 接线生成宿主可用能力，不信任 UI Pack 自报；`71b63c93` 从 AppRoot 将 7 路由和全部现行 SettingsDestination 白名单内部场景请求接入 Host 状态机；`5b5f5d3c` 本地偏好变更实时切换；`ef6b35a4` 新增 Compose Instrumented 测试源码，在同一 Host 渲染两套**合成完整 Pack 夹具**并测试切包、非法持久选择与显式恢复。**注意：production `LocalApplicationPackInstallations.all` 目前仍是空列表，真实 V6/Next 全 78 场景 Renderer 尚未注册，因此只算 S3 生产入口和隔离基础进展，S2 业务双包证明仍未完成；CI 需要使用本轮最新 SHA，测试源码并不等于已通过验收。** S0 维持 75/173，E2E 恢复证据仍待签收。
 
 
