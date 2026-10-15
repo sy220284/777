@@ -2305,5 +2305,7 @@
     <string name="media_action_share">分享</string>
     <string name="media_action_saved">已保存到设备</string>
     <string name="media_action_save_failed">保存失败，请重试</string>
+    <string name="media_user_created">由你创建 · 媒体成果</string>
+    <string name="media_based_on_reply">由你创建 · 基于角色回复</string>
 </resources>
 
