@@ -55,6 +55,7 @@ class LocalMediaPersistenceRulesTest {
             description = "保留完整的原图提示词", sessionId = "session-1",
             sourceMessageId = "message-1", profileId = "openai-account-2",
             routeFingerprint = "frozen-route", imageRatio = "9:16",
+            credentialSignature = localMediaCredentialSignature("openai-account-2", "test-secret"),
         )
         val later = previous.copy(
             id = "second", fileName = "second.png",
@@ -68,6 +69,7 @@ class LocalMediaPersistenceRulesTest {
         assertEquals(previous.id, restored.last().revisionOf)
         assertEquals("9:16", LocalMediaRevisionDraft.from(restored.first())?.ratio)
         assertEquals("openai-account-2", restored.first().profileId)
+        assertEquals(previous.credentialSignature, LocalMediaRevisionDraft.from(restored.first())?.credentialSignature)
         assertEquals("first.png", restored.first().fileName)
         assertEquals("second.png", restored.last().fileName)
 
