@@ -57,11 +57,15 @@ internal object ChatDiaryRecallEngine {
                 .filter { it.id !in selectedIds }
                 .mapNotNull { entry ->
                     val searchable = listOf(
-                        entry.event, entry.feeling, entry.innerThought,
-                        entry.relationshipMeaning, entry.unresolvedEcho, entry.privateReflection,
+                        entry.privateReflection, entry.event, entry.feeling, entry.innerThought,
+                        entry.relationshipMeaning, entry.unresolvedEcho,
                         entry.recallAnchors.joinToString(" "),
                     ).joinToString(" ")
-                    if (ChatDiaryEntryPolicy.queryTerms(searchable).none(queryTerms::contains)) {
+                    val exactPhrase = queryCore.length >= 2 &&
+                        ChatDiaryEntryPolicy.normalizeQuery(searchable).contains(queryCore)
+                    if (!exactPhrase &&
+                        ChatDiaryEntryPolicy.queryTerms(searchable).none(queryTerms::contains)
+                    ) {
                         null
                     } else {
                         val score = ChatDiaryEntryPolicy.matchScore(
