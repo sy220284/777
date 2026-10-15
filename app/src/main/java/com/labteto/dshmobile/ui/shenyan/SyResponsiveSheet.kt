@@ -150,7 +150,7 @@ fun SyResponsiveSheet(
                     if (seamlessBackground) {
                         // Paint the root scene at the same screen coordinates, not a white plate
                         // and not transparency that reveals chat bubbles underneath the menu.
-                        SySceneBackgroundSurface(panelModifier) { SheetBody() }
+                        SySceneBackgroundSurface(panelModifier, opticalGlass = floating) { SheetBody() }
                     } else {
                         SyMaterialSurface(
                             modifier = panelModifier,
