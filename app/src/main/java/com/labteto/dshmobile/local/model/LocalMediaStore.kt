@@ -98,7 +98,7 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
     fun beginCreation(offer: LocalMediaOffer, sessionId: String, prompt: String?, sourceMessageId: String? = null, revisionOf: String? = null): LocalMediaCreationJob = operation {
         initialize(); LocalMediaCatalog.requireValid(offer); require(sessionId.isNotBlank())
         val job = LocalMediaCreationJob(UUID.randomUUID().toString(), sessionId, offer.kind.name, offer.provider.name, offer.model,
-            prompt?.take(600), System.currentTimeMillis(), LocalMediaCreationPhase.PREPARING,
+            prompt, System.currentTimeMillis(), LocalMediaCreationPhase.PREPARING,
             profileId = offer.profile.id, routeFingerprint = offer.profile.routeFingerprint(), sourceMessageId = sourceMessageId, revisionOf = revisionOf)
         commit(LocalMediaRecord(job.id, job = job)); job
     }
@@ -133,7 +133,7 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
         file?.let { require(it.isFile && it.canonicalFile.parentFile == directory.canonicalFile) }
         link?.let { val uri = URI(it); require(uri.scheme.equals("https", true) && uri.userInfo == null && !uri.host.isNullOrBlank() && uri.port == -1) }
         val result = LocalMediaResult(operationId ?: UUID.randomUUID().toString(), offer.model, offer.provider.name, kind.name,
-            System.currentTimeMillis(), fileName = file?.name, remoteUrl = link, sessionId = sessionId, description = description?.take(600), textOutput = text, sourceMessageId = sourceMessageId,
+            System.currentTimeMillis(), fileName = file?.name, remoteUrl = link, sessionId = sessionId, description = description, textOutput = text, sourceMessageId = sourceMessageId,
             profileId = offer.profile.id, routeFingerprint = offer.profile.routeFingerprint(),
             imageRatio = imageRatio, voiceId = voiceId, revisionOf = revisionOf)
         database.transaction {
@@ -148,7 +148,7 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
         initialize(); LocalMediaCatalog.requireValid(offer)
         val now = System.currentTimeMillis()
         val task = LocalMediaVideoTask(UUID.randomUUID().toString(), offer.id, offer.profile.routeFingerprint(), offer.provider.name,
-            offer.model, offer.profile.id, now, now, LocalMediaVideoPhase.SUBMITTING, sessionId = sessionId, description = prompt.take(600), sourceMessageId = sourceMessageId, revisionOf = revisionOf)
+            offer.model, offer.profile.id, now, now, LocalMediaVideoPhase.SUBMITTING, sessionId = sessionId, description = prompt, sourceMessageId = sourceMessageId, revisionOf = revisionOf)
         commit(LocalMediaRecord(task.id, video = task)); task
     }
     @Synchronized
