@@ -1966,7 +1966,7 @@
     <string name="work_capability_readiness_device_missing">当前未激活，请检查系统授权</string>
     <string name="work_capability_configure_device">前往设备权限设置</string>
     <string name="chat_diary_edit_title">纠正日记</string>
-    <string name="chat_diary_edit_hint">保留原对话，纠正这段经历的记录，并清除由错误记录形成的当前误解和待续事项。人物后续反应仍由人设与当前交流决定。</string>
+    <string name="chat_diary_edit_hint">可纠正经历与人物想法，原始对话及旧版本仍保留。修改经历、感受或关系理解后，请一起核对私人心声；若仍沿用旧正文，保存时会清除不再可靠的心声。</string>
     <string name="chat_diary_edit_event">实际发生的事</string>
     <string name="chat_diary_deactivate">停用这条记忆</string>
     <string name="chat_diary_deactivate_hint">确认停用？今后的日记召回将不再使用它，原始对话和历史修改记录会保留。</string>
