@@ -25,7 +25,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.ImageBitmap
@@ -43,6 +42,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Surface
@@ -64,7 +64,7 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.CharacterFact
 import com.labteto.dshmobile.local.chat.CharacterFactProvenance
-import com.labteto.dshmobile.local.chat.CharacterFactCategories
+import com.labteto.dshmobile.local.presentation.personaEditableFactCategories
 import com.labteto.dshmobile.local.presentation.PersonaPresetCatalog
 import com.labteto.dshmobile.local.chat.PersonaLoreEntry
 import com.labteto.dshmobile.local.interaction.LocalApproval
@@ -669,8 +669,8 @@ internal fun ChatPersonaDialog(
                     )
                     val covered = factDrafts.asSequence().filter { it.content.isNotBlank() }
                         .map(CharacterFact::category).toSet()
-                        .count { it != CharacterFactCategories.CUSTOM_FACTS &&
-                            it in CharacterFactCategories.canonical }
+                        .count { it != "customFacts" &&
+                            it in personaEditableFactCategories }
                     Text(
                         stringResource(R.string.persona_v4_ai_coverage, covered),
                         style = DsType.caption11.withReadingWeight(),
@@ -844,31 +844,33 @@ internal fun ChatPersonaDialog(
 
     }
     if (confirmDiscard) {
-        AlertDialog(
-            onDismissRequest = { confirmDiscard = false },
-            title = { Text(stringResource(R.string.persona_v4_discard_title)) },
-            text = { Text(stringResource(R.string.persona_v4_discard_body)) },
-            confirmButton = {
-                SyButton(
-                    text = stringResource(R.string.persona_v4_discard_confirm),
-                    onClick = { confirmDiscard = false; onDismiss() },
-                    variant = SyButtonVariant.Ghost,
-                )
-            },
-            dismissButton = {
+        com.labteto.dshmobile.ui.shenyan.SyDialog(
+            title = stringResource(R.string.persona_v4_discard_title),
+            onDismiss = { confirmDiscard = false },
+        ) {
+            Text(stringResource(R.string.persona_v4_discard_body))
+            Row(modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
                 SyButton(
                     text = stringResource(R.string.persona_v4_discard_cancel),
                     onClick = { confirmDiscard = false },
+                    modifier = Modifier.weight(1f),
                     variant = SyButtonVariant.Ghost,
                 )
-            },
-        )
+                SyButton(
+                    text = stringResource(R.string.persona_v4_discard_confirm),
+                    onClick = { confirmDiscard = false; onDismiss() },
+                    modifier = Modifier.weight(1f),
+                    variant = SyButtonVariant.Danger,
+                )
+            }
+        }
     }
 }
 
 /** Stable empty records make each field immediately writable without a focus-changing node swap. */
 private fun withBlankPersonaFacts(input: List<CharacterFact>): List<CharacterFact> {
-    val categories = (CharacterFactCategories.canonical + input.map(CharacterFact::category)).distinct()
+    val categories = (personaEditableFactCategories + input.map(CharacterFact::category)).distinct()
     return input + categories.filterNot { category ->
         input.any { it.category == category && it.content.isBlank() }
     }.map { category ->
