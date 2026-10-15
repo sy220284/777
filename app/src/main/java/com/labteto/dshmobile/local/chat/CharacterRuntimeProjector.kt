@@ -103,41 +103,25 @@ internal class CharacterRuntimeProjector(
     }
 
     private fun stablePrompt(persona: PersonaProfile): String {
-        val legacy = persona.facts.isEmpty() && persona.coreIdentity.isBlank()
         val sections = listOf(
-            "稳定身份" to persona.coreIdentity.ifBlank { persona.portrait },
-            "稳定性格" to persona.trustedFactText(CharacterFactCategories.PERSONALITY)
-                .ifBlank { if (legacy) persona.stableTraits.joinToString("；") else "" },
-            "价值与取舍" to persona.trustedFactText(CharacterFactCategories.VALUES_AND_TRADEOFFS)
-                .ifBlank { if (legacy) persona.coreValues.joinToString("；") else "" },
+            "稳定身份" to persona.coreIdentity,
+            "性格" to persona.trustedFactText(CharacterFactCategories.PERSONALITY),
+            "价值与取舍" to persona.trustedFactText(CharacterFactCategories.VALUES_AND_TRADEOFFS),
+            "自我叙事" to persona.trustedFactText(CharacterFactCategories.SELF_NARRATIVE),
+            "主观认知" to persona.trustedFactText(CharacterFactCategories.SUBJECTIVE_BELIEFS),
+            "内外反差" to persona.trustedFactText(CharacterFactCategories.IDENTITY_GAP),
+            "偏好与习惯" to persona.trustedFactText(CharacterFactCategories.PREFERENCES_AND_HABITS),
+            "语言风格" to persona.trustedFactText(CharacterFactCategories.VOICE_STYLE),
+            "人生经历" to persona.trustedFactText(CharacterFactCategories.BIOGRAPHY),
+            "重要人物关系" to persona.trustedFactText(CharacterFactCategories.RELATIONSHIPS),
+            "自定义事实" to persona.trustedFactText(CharacterFactCategories.CUSTOM_FACTS),
+            "原作来源" to persona.franchise,
             "人物自身限制" to persona.hardConstraints.filterNot(::isCommonCharacterBoundary).joinToString("；"),
             "人物所知范围" to persona.knowledgeBoundary.filterNot(::isCommonCharacterBoundary).joinToString("；"),
             "人物修订资料" to persona.corrections.joinToString("；"),
             "作者填写的表达偏好" to persona.bannedPhrases.takeIf(List<String>::isNotEmpty)
-                ?.let { "避用表达：${it.joinToString("；")}" }.orEmpty(),
-            "语言风格资料" to persona.trustedFactText(CharacterFactCategories.VOICE_STYLE)
-                .ifBlank { if (legacy) persona.voiceSamples.joinToString("\n") else "" },
-            "自身认知与矛盾" to persona.trustedFactText(CharacterFactCategories.IDENTITY_GAP)
-                .ifBlank { if (legacy) persona.coreTension else "" },
-            "主观认识" to persona.trustedFactText(CharacterFactCategories.SUBJECTIVE_BELIEFS)
-                .ifBlank { if (legacy) persona.perceptionBlindSpots.joinToString("；") else "" },
-            "感知特点" to persona.trustedFactText(CharacterFactCategories.SENSORY_SIGNATURE)
-                .ifBlank { if (legacy) persona.attentionBiases.joinToString("；") else "" },
-            "偏好与习惯" to persona.trustedFactText(CharacterFactCategories.PREFERENCES_AND_HABITS)
-                .ifBlank { if (legacy) persona.quirks.joinToString("；") else "" },
-            "人物经历" to persona.trustedFactText(CharacterFactCategories.BIOGRAPHY)
-                .ifBlank { if (legacy) persona.lifeContext else "" },
-            "自我叙述" to persona.trustedFactText(CharacterFactCategories.SELF_NARRATIVE),
-            "关键选择" to persona.trustedFactText(CharacterFactCategories.DEFINING_CHOICES),
-            "情感经历" to persona.trustedFactText(CharacterFactCategories.EMOTIONAL_IMPRINTS),
-            "生活与责任" to persona.trustedFactText(CharacterFactCategories.LIFE_GRAVITY),
-            "未竟事项" to persona.trustedFactText(CharacterFactCategories.UNFINISHED_BUSINESS),
-            "既有关系" to persona.trustedFactText(CharacterFactCategories.RELATIONSHIPS),
-            "局限与代价" to persona.trustedFactText(CharacterFactCategories.LIMITS_AND_COSTS),
-            "补充人物资料" to persona.trustedFactText(CharacterFactCategories.CUSTOM_FACTS),
-            "原作来源" to persona.franchise,
+                ?.let { "避用表达：" + it.joinToString("；") }.orEmpty(),
             "当前剧情阶段" to persona.timelinePosition,
-            "世界背景" to persona.worldSetting,
         ).filter { it.second.isNotBlank() }.distinctBy { it.second.trim() }
         val heading = "【人物】${persona.name}\n你是这个人物，身处当前聊天的人设与故事背景中。"
         val complete = listOf(heading) + sections.map { (title, text) -> "【$title】\n${text.trim()}" }
