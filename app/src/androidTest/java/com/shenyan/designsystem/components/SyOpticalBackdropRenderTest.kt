@@ -5,6 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -37,7 +38,8 @@ class SyOpticalBackdropRenderTest {
         val enabled = mutableStateOf(false)
         compose.setContent {
             Box(Modifier.size(240.dp, 110.dp).testTag("optical-fixture")) {
-                SyOpticalBackdrop(Modifier.fillMaxSize(), enabled = enabled.value) {
+                SyOpticalBackdrop(Modifier.fillMaxSize(), enabled = enabled.value,
+                    opticalShape = RoundedCornerShape(20.dp)) {
                     Canvas(Modifier.fillMaxSize()) {
                         val stripe = 6.dp.toPx()
                         repeat((size.width / stripe).toInt() + 2) { i ->

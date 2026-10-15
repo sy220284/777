@@ -152,7 +152,7 @@ fun SyMaterialSurface(
                     )
                     // Distort only the aligned background layer; text, controls and click targets
                     // stay sharp and independent of the platform AGSL capability.
-                    SyOpticalBackdrop(Modifier.matchParentSize(), enabled = refract) {
+                    SyOpticalBackdrop(Modifier.matchParentSize(), enabled = refract, opticalShape = shape) {
                         Box(Modifier.matchParentSize().blur(blurRadius, BlurredEdgeTreatment.Unbounded)) {
                             sampled()
                         }
@@ -252,7 +252,7 @@ fun SySceneBackgroundSurface(
         // Show the theme canvas immediately while root coordinates are being measured.
         Box(Modifier.matchParentSize().background(canvas))
         if (scene != null) {
-            SyOpticalBackdrop(Modifier.matchParentSize(), enabled = refractScene) {
+            SyOpticalBackdrop(Modifier.matchParentSize(), enabled = refractScene, opticalShape = shape) {
                 SyPaintAlignedScene(scene, origin, Modifier.matchParentSize())
             }
         }

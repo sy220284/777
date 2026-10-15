@@ -13,6 +13,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -30,14 +35,29 @@ uniform shader scene;
 uniform float2 bounds;
 uniform float edgeWidth;
 uniform float displacement;
+uniform float cornerRadius;
 
 half4 main(float2 xy) {
     float2 safeBounds = max(bounds, float2(1.0, 1.0));
-    float2 margin = max(float2(0.0, 0.0), min(xy, safeBounds - xy));
-    float edgeDistance = min(margin.x, margin.y);
+    // Rounded-rectangle signed distance keeps the optical band tied to the
+    // actual clipped contour instead of a rectangular edge under a round mask.
+    float2 halfBounds = safeBounds * 0.5;
+    float radius = clamp(cornerRadius, 0.0, min(halfBounds.x, halfBounds.y));
+    float2 fromCenter = xy - halfBounds;
+    float2 q = abs(fromCenter) - (halfBounds - float2(radius, radius));
+    float signedDistance = length(max(q, float2(0.0, 0.0))) +
+        min(max(q.x, q.y), 0.0) - radius;
+    float edgeDistance = max(-signedDistance, 0.0);
     float weight = 1.0 - smoothstep(0.0, max(edgeWidth, 1.0), edgeDistance);
-    float2 direction = xy - safeBounds * 0.5;
-    direction /= max(length(direction), 1.0);
+    float2 nearestEdge = min(xy, safeBounds - xy);
+    float2 straightNormal = nearestEdge.x < nearestEdge.y
+        ? float2(fromCenter.x < 0.0 ? -1.0 : 1.0, 0.0)
+        : float2(0.0, fromCenter.y < 0.0 ? -1.0 : 1.0);
+    float2 roundNormal = max(q, float2(0.0, 0.0)) *
+        float2(fromCenter.x < 0.0 ? -1.0 : 1.0,
+               fromCenter.y < 0.0 ? -1.0 : 1.0);
+    float normalLength = length(roundNormal);
+    float2 direction = normalLength > 0.001 ? roundNormal / normalLength : straightNormal;
     float2 sampleAt = clamp(
         xy + direction * displacement * weight,
         float2(0.5, 0.5),
@@ -64,12 +84,14 @@ internal fun sySupportsOpticalRefraction(
 internal fun SyOpticalBackdrop(
     modifier: Modifier = Modifier,
     enabled: Boolean,
+    opticalShape: Shape = RectangleShape,
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
     val accelerated = LocalView.current.isHardwareAccelerated
     var measured by remember { mutableStateOf(IntSize.Zero) }
-    val effect = remember(enabled, measured, density.density, accelerated) {
+    val effect = remember(enabled, measured, density.density, accelerated, opticalShape, layoutDirection) {
         if (!enabled || !accelerated ||
             Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             measured.width <= 0 || measured.height <= 0) null
@@ -78,6 +100,14 @@ internal fun SyOpticalBackdrop(
             shader.setFloatUniform("bounds", measured.width.toFloat(), measured.height.toFloat())
             shader.setFloatUniform("edgeWidth", with(density) { SyMaterialPolicy.opticalEdgeWidthDp.dp.toPx() })
             shader.setFloatUniform("displacement", with(density) { SyMaterialPolicy.opticalDisplacementDp.dp.toPx() })
+            val outline = opticalShape.createOutline(
+                Size(measured.width.toFloat(), measured.height.toFloat()), layoutDirection, density,
+            )
+            val radius = when (outline) {
+                is Outline.Rounded -> outline.roundRect.topLeftCornerRadius.x
+                else -> 0f
+            }
+            shader.setFloatUniform("cornerRadius", radius)
             AndroidRenderEffect.createRuntimeShaderEffect(shader, "scene").asComposeRenderEffect()
         } catch (failure: RuntimeException) {
             AppLog.warn("SyOpticalBackdrop", "failure=true operation=create_optical_shader fallback=scene cause_type=${failure.javaClass.simpleName}")

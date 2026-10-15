@@ -34,6 +34,8 @@ class SyOpticalBackdropPolicyTest {
         assertTrue(SY_OPTICAL_REFRACTION_AGSL.contains("uniform shader scene"))
         assertTrue(SY_OPTICAL_REFRACTION_AGSL.contains("scene.eval(sampleAt)"))
         assertTrue(SY_OPTICAL_REFRACTION_AGSL.contains("smoothstep"))
+        assertTrue(SY_OPTICAL_REFRACTION_AGSL.contains("uniform float cornerRadius"))
+        assertTrue(SY_OPTICAL_REFRACTION_AGSL.contains("signedDistance"))
         assertTrue(SY_OPTICAL_REFRACTION_AGSL.contains("clamp("))
     }
 }
