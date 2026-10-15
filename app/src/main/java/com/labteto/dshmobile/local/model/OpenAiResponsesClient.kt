@@ -81,7 +81,7 @@ class OpenAiResponsesClient @Inject constructor(
                 requested = allowImageGeneration,
             ),
         )
-        validateRequestPayload(payload)
+        validateRequestPayload(payload, planSharing)
         val admissionTracker = LocalModelAdmissionTracker()
         val request = Request.Builder()
             .url(responsesEndpoint(baseUrl, planSharing))
@@ -224,7 +224,7 @@ class OpenAiResponsesClient @Inject constructor(
     internal fun supportsOpenAiImageGenerationTool(model: String): Boolean =
         supportsOpenAiImageGenerationModel(model)
 
-    internal fun validateRequestPayload(payload: JsonObject) {
+    internal fun validateRequestPayload(payload: JsonObject, planSharing: Boolean = false) {
         val input = payload["input"] as? JsonArray
         if (input.isNullOrEmpty()) {
             throw LocalModelException(
@@ -233,6 +233,28 @@ class OpenAiResponsesClient @Inject constructor(
                 retryable = false,
             )
         }
+        if (!planSharing) return
+        val unsupportedTools = setOf(
+            "image_generation", "file_search", "code_interpreter", "computer",
+            "mcp", "tool_search", "programmatic_tool_calling",
+        )
+        val unsupported = (payload["tools"] as? JsonArray).orEmpty()
+            .mapNotNull { it as? JsonObject }
+            .firstOrNull { it["type"]?.jsonPrimitive?.contentOrNull in unsupportedTools }
+        if (unsupported != null) throw LocalModelException(
+            code = "CHATGPT_PLAN_UNSUPPORTED_CAPABILITY",
+            message = "ChatGPT 套餐授权不支持请求的 OpenAI 托管工具，请使用已配置的本地工具或其他服务。",
+            retryable = false,
+        )
+        val hasFileId = input.mapNotNull { it as? JsonObject }
+            .flatMap { (it["content"] as? JsonArray).orEmpty() }
+            .mapNotNull { it as? JsonObject }
+            .any { it["type"]?.jsonPrimitive?.contentOrNull == "input_file" && "file_id" in it }
+        if (hasFileId) throw LocalModelException(
+            code = "CHATGPT_PLAN_UNSUPPORTED_CAPABILITY",
+            message = "ChatGPT 套餐授权不支持 Files 上传接口的 file_id，请直接附加本地文件。",
+            retryable = false,
+        )
     }
 
     internal fun streamInterruptedAfterAdmission(
@@ -291,6 +313,7 @@ class OpenAiResponsesClient @Inject constructor(
             }
         }
         val cacheComparison = promptCacheComparisonResponseId
+            ?.takeIf { !planSharing }
             ?.trim()
             ?.takeIf(String::isNotBlank)
         val cacheTtl = promptCacheTtl
