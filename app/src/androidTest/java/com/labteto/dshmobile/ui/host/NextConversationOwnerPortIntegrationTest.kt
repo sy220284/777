@@ -4,6 +4,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import com.labteto.dshmobile.local.LocalConversationUiPortComposition
@@ -17,6 +18,12 @@ import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.interaction.LocalApproval
 import com.labteto.dshmobile.local.interaction.LocalQuestion
 import com.labteto.dshmobile.local.model.LocalModelState
+import com.labteto.dshmobile.R
+import com.labteto.dshmobile.local.work.LocalWorkState
+import androidx.test.platform.app.InstrumentationRegistry
+import com.labteto.dshmobile.uicontract.UiCommandReceipt
+import com.labteto.dshmobile.uicontract.UiCommandRejection
+import com.labteto.dshmobile.uicontract.WorkConversationUiCommand
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalUserMessageEditResult
@@ -77,6 +84,46 @@ class NextConversationOwnerPortIntegrationTest {
         override fun answerQuestion(pendingId: String, answer: String?): Boolean = false
         override fun pendingApproval(): LocalApproval? = null
         override fun answerApproval(pendingId: String, approved: Boolean): Boolean = false
+    }
+
+    @Test fun nextApprovalControlsSubmitOnlyTheCurrentWorkWaiterToOwner() {
+        // This exercises real application port admission and Next rendering, but not a provider call.
+        val store = LocalRuntimeStateStore()
+        val pending = LocalApproval("call-1", "write_file", "真实审批", "{}", "write", requestId = "owner-nonce-1")
+        val state = store.initialize(LocalHarnessState(
+            sessionId = "approval-session", usageMode = LocalUsageMode.WORK, loading = false,
+            modelState = LocalModelState(configured = true),
+            work = LocalWorkState(pendingApproval = pending),
+        ))
+        val approvals = mutableListOf<Pair<String, Boolean>>()
+        val approvalOwner = object : LocalWorkApprovalUiPort {
+            override fun pendingQuestion(): LocalQuestion? = null
+            override fun answerQuestion(pendingId: String, answer: String?): Boolean = false
+            override fun pendingApproval(): LocalApproval? = state.value.work.pendingApproval
+            override fun answerApproval(pendingId: String, approved: Boolean): Boolean {
+                if (pendingId != state.value.work.pendingApproval?.requestId) return false
+                approvals += pendingId to approved
+                state.value = state.value.copy(work = state.value.work.copy(pendingApproval = null))
+                return true
+            }
+        }
+        val ports = LocalConversationUiPortComposition(store, ChatOwner(), WorkOwner(), approvalOwner)
+        val target = requireNotNull(ports.work.snapshot().identity)
+        val reading = LocalConversationReadingState()
+        val drafts = LocalSessionDraftCache()
+        compose.setContent {
+            NextConversationUiPack.Render(null, null, reading, drafts, ports.chat, ports.work,
+                workMode = true, onClose = {})
+        }
+        compose.onNodeWithText("真实审批").assertExists()
+        val deny = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.next_deny)
+        compose.onNodeWithText(deny).performClick()
+        compose.runOnIdle {
+            assertEquals(listOf("owner-nonce-1" to false), approvals)
+            assertEquals(UiCommandReceipt.Rejected(UiCommandRejection.APPROVAL_EXPIRED),
+                ports.work.submit(WorkConversationUiCommand.AnswerApproval(target, "owner-nonce-1", true)))
+            assertEquals(listOf("owner-nonce-1" to false), approvals)
+        }
     }
 
     @Test fun sameNextPackUsesActualOwnerPortsAndNeverReusesOldModeIdentity() {
