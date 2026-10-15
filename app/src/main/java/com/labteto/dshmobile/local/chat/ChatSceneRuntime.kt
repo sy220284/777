@@ -254,11 +254,27 @@ internal object ChatSceneRuntime {
             .mapNotNull { match ->
                 sanitizeLocation(match.groups["target"]?.value.orEmpty())
                     .takeIf(String::isNotBlank)
+                    ?.takeIf { isAssertedPresence(text, match.range.first) }
             }
             .filterNot(::looksLikeAbstractState)
             .distinctBy(::normalize)
             .take(4)
             .toList()
+
+    /**
+     * A character can remember, fantasize or quote a location without moving there.
+     * Only confidently asserted present-location statements trigger a scene repair.
+     */
+    private fun isAssertedPresence(text: String, offset: Int): Boolean {
+        val inQuotedSpan = Regex("""“[^”]*”|‘[^’]*’|\\x22[^\\x22]*\\x22""")
+            .findAll(text).any { offset in it.range }
+        if (inQuotedSpan) return false
+        val precedingClause = text.substring(0, offset).takeLast(80)
+            .split('，', '。', '！', '？', '；', ',', '.', '!', '?', ';', '\n')
+            .lastOrNull().orEmpty()
+        return !Regex("""(?:如果|假如|要是|假设|设想|想象|梦见|梦里|梦中|回忆|回想|曾经|以前|仿佛|好像|似乎|假装|比如|例如|打算|希望|我以为|倘若|就像)""")
+            .containsMatchIn(precedingClause)
+    }
 
     private fun hasNarrativeCut(text: String): Boolean =
         NARRATIVE_CUT.containsMatchIn(text) ||
