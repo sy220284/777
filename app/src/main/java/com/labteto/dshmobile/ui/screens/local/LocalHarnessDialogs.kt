@@ -667,6 +667,15 @@ internal fun ChatPersonaDialog(
                         style = DsType.caption11.withReadingWeight(),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                     )
+                    val covered = factDrafts.asSequence().filter { it.content.isNotBlank() }
+                        .map(CharacterFact::category).toSet()
+                        .count { it != CharacterFactCategories.CUSTOM_FACTS &&
+                            it in CharacterFactCategories.canonical }
+                    Text(
+                        stringResource(R.string.persona_v4_ai_coverage, covered),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
+                    )
                 }
                 aiError?.let { error ->
                     val message = when (error) {
