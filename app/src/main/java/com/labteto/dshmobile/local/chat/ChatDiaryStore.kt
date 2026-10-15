@@ -155,7 +155,12 @@ internal class ChatDiaryStore(
             innerThought = correction.innerThought.trim().take(ChatDiaryBounds.MAX_THOUGHT_CHARS),
             relationshipMeaning = correction.relationshipMeaning.trim().take(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS),
             unresolvedEcho = correction.unresolvedEcho.trim().take(ChatDiaryBounds.MAX_ECHO_CHARS),
-            privateReflection = correction.privateReflection.trim().take(ChatDiaryBounds.MAX_PRIVATE_REFLECTION_CHARS),
+            // Changing the event invalidates unchanged auto-generated interior narration.
+            // An explicitly revised reflection is retained as an author correction.
+            privateReflection = correction.privateReflection.trim()
+                .takeIf { correction.event.trim() == previous.event ||
+                    it != previous.privateReflection }
+                ?.take(ChatDiaryBounds.MAX_PRIVATE_REFLECTION_CHARS).orEmpty(),
             recallAnchors = previous.recallAnchors,
             subjectiveEvidence = "",
             subjectiveInferred = false,
