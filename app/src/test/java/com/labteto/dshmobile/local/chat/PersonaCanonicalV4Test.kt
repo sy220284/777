@@ -19,8 +19,14 @@ class PersonaCanonicalV4Test {
         assertTrue(normalized.loreEntries.isEmpty())
         assertTrue(normalized.coreIdentity.isEmpty())
         val exported = json.encodeToString(PersonaProfile.serializer(), normalized)
-        listOf("portrait", "lifeContext", "quirks", "worldSetting", "coreValues")
-            .forEach { assertFalse(exported.contains("\"$it\"")) }
+        val removedFields = listOf(
+            "portrait", "lifeContext", "attentionBiases", "attentionKeywords",
+            "perceptionBlindSpots", "quirks", "limitations", "coreValues",
+            "coreTension", "stableTraits", "mutableTraits",
+            "initialUserImpression", "voiceSamples", "worldSetting",
+        )
+        // encodeDefaults=true: even forgotten empty schema properties would be serialized.
+        removedFields.forEach { assertFalse(exported.contains("\"$it\"")) }
         assertEquals(normalized, normalized.canonicalV4())
     }
 
