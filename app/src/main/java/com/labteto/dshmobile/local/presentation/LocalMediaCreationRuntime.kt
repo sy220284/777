@@ -171,11 +171,13 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         validate(offer, LocalMediaKind.VIDEO)
         val task = store.video(taskId) ?: error("视频任务不存在或已删除")
         require(task.belongsTo(offer)) { "请恢复任务原账户配置后查询" }
-        // The same saved profile can point at a replaced key; never query old provider task
-        // IDs under a different account with matching endpoint/model metadata.
-        require(task.credentialSignature != null &&
-            task.credentialSignature == credentialResolver.mediaCredentialSignature(offer.profile)) {
-            "视频任务原账户凭据已变化，不能用新账户查询旧服务商任务"
+        // New tasks carry a key identity; read-only polling must not cross accounts.
+        // Legacy tasks lack this field: preserve explicit user-initiated GET polling
+        // on the matching original route rather than disabling historical tasks.
+        if (task.credentialSignature != null) {
+            require(task.credentialSignature == credentialResolver.mediaCredentialSignature(offer.profile)) {
+                "视频任务原账户凭据已变化，不能用新账户查询旧服务商任务"
+            }
         }
         require(task.phase in setOf(LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING, LocalMediaVideoPhase.SUCCEEDED)) { "任务没有可查询的服务商编号" }
         val id = task.providerTaskId ?: error("服务商尚未确认任务编号")
