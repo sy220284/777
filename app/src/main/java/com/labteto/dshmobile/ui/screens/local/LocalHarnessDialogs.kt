@@ -231,22 +231,25 @@ private fun PersonaPickerAvatarTile(
             decodePersonaPortraitBitmap(entry.portraitPath, maxEdgePx = 256)
         }
     }
+    val reduced = com.shenyan.designsystem.foundation.LocalSyReduceMotion.current
+    val tempo = com.shenyan.designsystem.foundation.LocalSyMotionTempo.current
+    val motion = com.shenyan.designsystem.foundation.SyMotion
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (pressed && enabled) DsAnimations.Scale.pressed else DsAnimations.Scale.normal,
-        animationSpec = DsAnimations.pressScale,
+        targetValue = if (pressed && enabled && !reduced) motion.pressedScale else 1f,
+        animationSpec = tween(motion.duration(motion.pressMs, reduced, tempo), easing = motion.ease),
         label = "personaAvatarPress",
     )
     val background by animateColorAsState(
         targetValue = if (selected) colors.selected
         else colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-        animationSpec = DsAnimations.interactionColor,
+        animationSpec = tween(motion.duration(motion.interactionColorMs, reduced, tempo), easing = motion.ease),
         label = "personaAvatarBackground",
     )
     val outline by animateColorAsState(
         targetValue = if (selected) colors.primary else colors.border,
-        animationSpec = DsAnimations.interactionColor,
+        animationSpec = tween(motion.duration(motion.interactionColorMs, reduced, tempo), easing = motion.ease),
         label = "personaAvatarOutline",
     )
     Surface(
@@ -272,7 +275,7 @@ private fun PersonaPickerAvatarTile(
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Crossfade(
                 targetState = portrait,
-                animationSpec = tween(durationMillis = 180),
+                animationSpec = tween(durationMillis = motion.duration(motion.fadeMs, reduced, tempo)),
                 label = "personaAvatarReveal",
                 modifier = Modifier.fillMaxSize(),
             ) { image ->
