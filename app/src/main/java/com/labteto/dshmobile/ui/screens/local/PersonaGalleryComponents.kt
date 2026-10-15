@@ -232,7 +232,10 @@ internal fun StoryDetailSection(
     onDeleteHistoryMessage: (String) -> Unit,
 ) {
     if (story.chatState.updatedAt > 0L) {
-        SyGlassCard {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapSm),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+        ) {
             Text(
                 stringResource(R.string.persona_gallery_story_relation),
                 style = DsType.std14Strong.withReadingWeight(),
@@ -289,7 +292,10 @@ internal fun StoryDetailSection(
     }
 
     if (showHistory) {
-        SyGlassCard {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapSm),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     FeatherIcons.Clock,
@@ -369,7 +375,10 @@ internal fun StoryDetailSection(
     }
 
     var editingNotes by rememberSaveable(entry.id, story.id) { mutableStateOf(false) }
-    SyGlassCard {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapSm),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -468,27 +477,17 @@ internal fun GalleryStoryCard(
 }
 
 @Composable
-private fun ArchivedDialogueRow(
-    text: String,
-    onLongClick: () -> Unit,
-) {
-    SyMaterialSurface(
+private fun ArchivedDialogueRow(text: String, onLongClick: () -> Unit) {
+    Text(
+        text,
+        style = DsType.std14.withReadingWeight(),
+        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(
-                onClick = onLongClick,
-                onLongClick = onLongClick,
-            ),
-        shape = DsShapes.row,
-        tier = SyMaterialTier.L3_CARD,
-    ) {
-        Text(
-            text,
-            style = DsType.small13.withReadingWeight(),
-            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
-            modifier = Modifier.padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapMd),
-        )
-    }
+            .clip(DsShapes.row)
+            .combinedClickable(onClick = onLongClick, onLongClick = onLongClick)
+            .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapMd),
+    )
 }
 
 @Composable
