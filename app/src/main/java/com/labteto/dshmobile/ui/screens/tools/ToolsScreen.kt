@@ -102,6 +102,7 @@ data class ToolsUiState(
     val githubConfigured: Boolean = false,
     val localPlugins: List<String> = emptyList(),
     val skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
+    val curatedSkills: List<String> = emptyList(),
     val presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
     val createdSkillId: String? = null,
     val skillEditor: com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry? = null,
@@ -223,6 +224,21 @@ class ToolsViewModel @Inject constructor(
     fun installPreset(id: String) = changeSkills { localTools.installPreset(id) }
     fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         changeSkills(createdId = id) { localTools.createSkill(id, displayName, description, instructions) }
+    fun browseCuratedSkills() {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null)
+            try {
+                val names = gitHubSkillImporter.curatedSkills()
+                _state.value = _state.value.copy(loading = false, curatedSkills = names,
+                    feedbackRes = if (names.isEmpty()) R.string.skills_github_official_empty else null)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false, feedback = error.message)
+            }
+        }
+    }
+
     fun importGitHubSkill(url: String) {
         launchOperation {
             _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
@@ -592,6 +608,8 @@ fun ToolsScreen(
             onCreateSkill = viewModel::createSkill,
             onImportSkill = { skillFilePicker.launch(arrayOf("*/*")) },
             onInstallFromGitHub = viewModel::importGitHubSkill,
+            curatedSkills = state.curatedSkills,
+            onBrowseCuratedSkills = viewModel::browseCuratedSkills,
             onRemoveSkill = viewModel::removeSkill,
             onOpenSkillEditor = viewModel::openSkillEditor,
             onCloseSkillEditor = viewModel::closeSkillEditor,
