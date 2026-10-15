@@ -3,13 +3,13 @@
     <string name="local_persona_ai_generate_new">AI 生成人设草稿</string>
     <string name="local_persona_ai_title">让 AI 帮你写人设</string>
     <string name="local_persona_ai_hint">描述一下这个人物，也可以留空，让 AI 根据最近的聊天补充设定。生成后你还能修改。</string>
-    <string name="local_persona_ai_description">角色描述（可留空）</string>
+    <string name="local_persona_ai_description">告诉 AI 人物特点或补充要求（已有设定可留空）</string>
     <string name="local_persona_ai_generate">AI 帮我完善人设</string>
     <string name="local_persona_ai_generating">正在生成人设…</string>
     <string name="local_persona_ai_working_hint">正在整理人物设定，请稍候…</string>
     <string name="local_persona_ai_synced">已生成当前人物的人设草稿。请检查原作资料和世界书，确认后再点击「保存人物设定」。</string>
-    <string name="local_persona_ai_new_hint">告诉 AI 人物身份与重要经历，优先生成精炼的人物内核。原作细节可以按需查询，确认草稿后再保存。</string>
-    <string name="local_persona_ai_new_draft">人物草稿已经生成。可以先改名字和简介，也可以展开详细设定，满意后再保存。</string>
+    <string name="local_persona_ai_new_hint">提供人物身份、经历或创作方向，AI 会按全部人物字段整理；你可以逐项修改。</string>
+    <string name="local_persona_ai_new_draft">已生成可编辑的人物草稿。所有字段都在下方，检查后点击保存即可。</string>
     <string name="local_persona_ai_busy">当前还在回复消息，完成后就能生成人设。</string>
     <string name="local_persona_ai_unconfigured">还没有可用的 AI 模型，请先去设置里连接一个。</string>
     <string name="local_persona_ai_stale">刚才切换了对话或人物，为避免覆盖你的修改，请重新生成。</string>
@@ -21,4 +21,5 @@
     <string name="persona_v4_fact_stage">适用剧情阶段 ID（空白为基础事实）</string>
     <string name="persona_v4_fact_perspective">事实陈述视角（可选）</string>
     <string name="persona_v4_fact_source">来源依据（可选）</string>
+    <string name="persona_v4_ai_coverage">主要人物设定已填写 %1$d/9 项；缺少依据的内容仍可在下方补充。</string>
 </resources>
