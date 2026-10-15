@@ -30,7 +30,7 @@ class LocalWorkSkillActivationTest {
     }
 
     @Test
-    fun removedOrDisabledPinnedSkillCannotSilentlyBecomeActive() {
+    fun explicitOnlySkillRunsWhenPinnedButRemovedSkillDoesNot() {
         val root = Files.createTempDirectory("skill-pin-disabled").toFile()
         try {
             val workspace = LocalWorkspace(root)
@@ -41,7 +41,7 @@ class LocalWorkSkillActivationTest {
                 LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "missing-skill"),
             )
             val guidance = resolveLocalWorkSkillGuidance(workspace, "继续", pinned)
-            assertFalse(guidance.contains("Secret policy."))
+            assertTrue(guidance.contains("Secret policy."))
             assertFalse(guidance.contains("missing-skill"))
         } finally { root.deleteRecursively() }
     }
