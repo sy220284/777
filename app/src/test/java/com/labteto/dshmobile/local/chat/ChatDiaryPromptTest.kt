@@ -24,21 +24,28 @@ class ChatDiaryPromptTest {
             .first()["content"]!!.jsonPrimitive.content
         assertTrue(system.contains("不写流水账"))
         assertTrue(system.contains("精炼成稿"))
-        assertTrue(system.contains("完整的当前版本"))
-        assertTrue(system.contains("心理活动"))
-        assertTrue(system.contains("可以只记录 event"))
-        assertTrue(system.contains("subjectiveEvidence"))
         assertTrue(system.contains("privateReflection"))
         assertTrue(system.contains("个人判断"))
-        assertTrue(system.contains("保留不确定性"))
+        assertTrue(system.contains("主观联想"))
+        assertTrue(system.contains("第一人称"))
+        assertTrue(system.contains("长短、节奏"))
+        assertTrue(system.contains("角色说话方式取决于自身性格"))
+        assertTrue(system.contains("天马行空"))
+        assertTrue(system.contains("有趣"))
+        // The prompt is a creative direction, not an aesthetic form to fill out.
+        assertFalse(system.contains("60～200"))
+        assertFalse(system.contains("每篇必须"))
+        assertFalse(system.contains("必须使用“我觉得"))
         assertFalse(system.contains("至少一项非空"))
+        assertTrue(system.contains("只记录 event"))
+        assertTrue(system.contains("subjectiveEvidence"))
         assertTrue(system.contains("PRIVATE"))
         assertTrue(system.contains("该信息只属于当前人物"))
         assertTrue(system.contains("其他人物的所知以实际公开事件为准"))
         assertTrue(system.contains("SHAREABLE"))
         assertTrue(system.contains("尚未在群聊公开"))
         assertTrue(system.contains("PUBLIC"))
-        assertTrue(system.contains("明确说"))
+        assertTrue(system.contains("明确"))
         assertTrue(prompt.contains("diaryDelta"))
 
         val suggestionSystem = chatReplySuggestionModelMessages("生成回复建议")
@@ -72,6 +79,28 @@ class ChatDiaryPromptTest {
             assertTrue(instruction.contains("privateReflection"))
             assertTrue(instruction.contains("角色说话方式取决于自身性格"))
         }
+    }
+
+    @Test
+    fun creativeWritingGuidanceHasNoRequiredMoodStructureOrFixedDiaryLength() {
+        val instruction = CHAT_DIARY_SYSTEM_INSTRUCTION
+        assertTrue(instruction.contains("灵感方向"))
+        assertTrue(instruction.contains("俏皮"))
+        assertTrue(instruction.contains("理智冷静"))
+        assertTrue(instruction.contains("天马行空"))
+        assertTrue(instruction.contains("碎碎念"))
+        assertTrue(instruction.contains("寥寥数语").not() ||
+            instruction.contains("轻轻一句"))
+        assertTrue(instruction.contains("不要求情绪转折"))
+        assertFalse(instruction.contains("约60～200"))
+        assertFalse(instruction.contains("只能以"))
+        assertFalse(instruction.contains("三段式"))
+        // Memory safeguards stay separate from prose style.
+        assertTrue(instruction.contains("不能把想象中的新事件"))
+        assertTrue(instruction.contains("subjectiveEvidence"))
+        assertTrue(instruction.contains("PRIVATE"))
+        assertTrue(instruction.contains("PUBLIC"))
+        assertTrue(instruction.contains("NONE 一律 diaryDelta=null"))
     }
 
     @Test
