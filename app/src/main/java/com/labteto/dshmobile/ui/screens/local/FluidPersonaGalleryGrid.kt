@@ -7,6 +7,7 @@ import com.shenyan.designsystem.components.SyMaterialTier
 import com.shenyan.designsystem.components.SyMaterialSurface
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
@@ -52,6 +53,8 @@ internal fun FluidPersonaGalleryGrid(entries: List<PersonaGalleryEntry>, onSelec
     animateOnEntrance: Boolean = true) {
     val reduced = com.labteto.dshmobile.ui.shenyan.LocalSyReducedMotion.current
     val animateEntrance = animateOnEntrance && !reduced
+    val tempo = com.shenyan.designsystem.foundation.LocalSyMotionTempo.current
+    val motion = com.shenyan.designsystem.foundation.SyMotion
     LazyVerticalGrid(GridCells.Fixed(2), modifier,
         horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
@@ -66,13 +69,13 @@ internal fun FluidPersonaGalleryGrid(entries: List<PersonaGalleryEntry>, onSelec
             LaunchedEffect(entry.id, animateEntrance) {
                 if (!appeared) {
                     delay(index.coerceAtMost(DsAnimations.cascadeMaxItems - 1) *
-                        DsAnimations.cascadeStaggerMs)
+                        motion.duration(motion.cascadeStaggerMs, reduced, tempo).toLong())
                     appeared = true
                 }
             }
             val reveal by animateFloatAsState(
                 targetValue = if (appeared) 1f else 0f,
-                animationSpec = DsAnimations.cascade,
+                animationSpec = tween(motion.duration(motion.pushMs, reduced, tempo), easing = motion.ease),
                 label = "personaGalleryCascade",
             )
             val enterOffset = with(LocalDensity.current) { 12.dp.toPx() }
