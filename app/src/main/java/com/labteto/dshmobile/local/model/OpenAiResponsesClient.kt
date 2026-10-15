@@ -385,7 +385,7 @@ class OpenAiResponsesClient @Inject constructor(
         if (text.isEmpty() || text.length > 2_048 ||
             text.startsWith("不要") || text.startsWith("别")) return false
         val command = text.replaceFirst(
-            Regex("""^(?:请|帮我|帮忙|麻烦|现在|先|给我)\\s*"""), "",
+            Regex("""^(?:请|帮我|帮忙|麻烦|现在|先|给我)\s*"""), "",
         )
         return Regex(
             """^(?:联网搜索|上网搜索|网上搜索|网络搜索|联网查|上网查|网上查|搜索一下|搜一下|查一下最新|查找最新|search the web|browse the web)""",
@@ -624,9 +624,9 @@ class OpenAiResponsesClient @Inject constructor(
         val rawContent = content.toString().takeIf(String::isNotBlank)
             ?: streamedContent.takeIf(String::isNotBlank)
         val settledContent = if (webSources.isEmpty()) rawContent else buildString {
-            rawContent?.let { append(it).append("\\n\\n") }
-            append("参考来源：\\n")
-            webSources.keys.take(8).forEach { append(it).append('\\n') }
+            rawContent?.let { append(it).append("\n\n") }
+            append("参考来源：\n")
+            webSources.keys.take(8).forEach { append(it).append('\n') }
         }.trimEnd()
         val settledReasoning = reasoning.toString().takeIf(String::isNotBlank)
             ?: streamedReasoning.takeIf(String::isNotBlank)
