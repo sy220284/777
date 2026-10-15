@@ -70,6 +70,9 @@ internal class LocalWorkTurnToolRuntime(
         if (!activeTask.isNullOrBlank()) {
             execution.enableTaskRelevantOptionalTools(activeTask, binding.enabledOptionalTools)
         }
+        // Task relevance may change on later tool steps; pinned user selections must not
+        // be silently displaced by a model-driven discovery pass.
+        execution.prioritizePinnedForModelStep(binding.enabledOptionalTools)
         val enabled = synchronized(binding.enabledOptionalTools) {
             if (teamMode) {
                 val priority = listOf(
