@@ -47,18 +47,22 @@ class TasksViewModel @Inject constructor(private val automation: AutomationUiPor
         _state.update { it.copy(busyIds = it.busyIds + id, notice = null) }
         viewModelScope.launch {
             try {
-                val (receipt, latest) = withContext(Dispatchers.IO) {
-                    val accepted = automation.submit(command)
-                    val facts = runCatching { automation.snapshot().tasks }.getOrNull()
-                    accepted to facts
-                }
+                // Reuse the receipt/read-back path from #730; never replay an uncertain mutation.
+                var receipt: AutomationUiReceipt? = null
+                val checked = runTaskManagementOperation(
+                    operation = {
+                        automation.submit(command).also { receipt = it } is AutomationUiReceipt.Applied
+                    },
+                    readTasks = { automation.snapshot().tasks },
+                )
                 _state.update { old -> old.copy(
-                    tasks = latest ?: old.tasks,
-                    managementFailed = receipt is AutomationUiReceipt.Failed,
-                    notice = when (receipt) {
-                        is AutomationUiReceipt.Applied -> success
-                        is AutomationUiReceipt.Rejected -> TasksNotice.OPERATION_REJECTED
-                        is AutomationUiReceipt.Failed -> TasksNotice.OPERATION_FAILED
+                    tasks = checked.tasks ?: old.tasks,
+                    managementFailed = checked.failed || receipt is AutomationUiReceipt.Failed,
+                    notice = when {
+                        checked.failed || receipt is AutomationUiReceipt.Failed -> TasksNotice.OPERATION_FAILED
+                        receipt is AutomationUiReceipt.Rejected -> TasksNotice.OPERATION_REJECTED
+                        checked.accepted -> success
+                        else -> TasksNotice.OPERATION_FAILED
                     },
                 ) }
             } catch (cancelled: CancellationException) { throw cancelled }
