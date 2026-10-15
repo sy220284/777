@@ -110,11 +110,13 @@ class UiHostSceneNavigation(
         var overlaySeen = false
         for ((index, id) in stack.withIndex()) {
             val entry = scenes[id] ?: return false
-            if (!isNavigable(id) || id !in pack.scenes || (index > 0 && id == root))
+            if (!isNavigable(id) || id !in pack.scenes ||
+                (index > 0 && (id == root || stack[index - 1] == id)))
                 return false
-            // navigate(PAGE) always dismisses overlays; reject histories it cannot produce.
+            // navigate() never stacks the same PAGE or OVERLAY twice, and PAGE
+            // navigation always dismisses overlays. Persisted histories must match.
             if (entry.kind == UiSceneKind.OVERLAY) overlaySeen = true
-            else if (overlaySeen || (index > 0 && stack[index - 1] == id)) return false
+            else if (overlaySeen) return false
         }
         return true
     }

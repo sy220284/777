@@ -105,6 +105,21 @@ class UiHostSceneNavigationTest {
         )
     }
 
+    @Test fun restoreRejectsDuplicatedOverlayThatNavigateCannotProduce() {
+        val overlay = id("work.approval")
+        val first = state(nav.navigate(nav.initial, overlay))
+        assertEquals(first, state(nav.navigate(first, overlay)))
+        val forged = nav.initial.copy(stack = listOf(id("conversation.chat"), overlay, overlay))
+        assertEquals(
+            UiSceneNavigationResult.Rejected(UiSceneNavigationRejection.INVALID_HISTORY),
+            nav.restore(forged),
+        )
+        assertEquals(
+            UiSceneNavigationResult.Rejected(UiSceneNavigationRejection.INVALID_HISTORY),
+            nav.back(forged),
+        )
+    }
+
     @Test fun navigationBudgetRejectsOverflowWithoutDroppingPreviousState() {
         var snapshot = state(nav.navigate(nav.initial, id("conversation.work")))
         var rejected: UiSceneNavigationResult? = null
