@@ -1,8 +1,8 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1636,
-  "production_source_count": 952,
+  "repository_code_file_count": 1639,
+  "production_source_count": 955,
   "test_code_file_count": 542,
   "workflow_files": [
     ".github/workflows/capture-readme-ui.yml",
@@ -170,7 +170,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt",
-      "sha256": "b35fa5d77b6898a6"
+      "sha256": "71f68eab5d2fdbf4"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalChatGroupUiAdapter.kt",
@@ -258,11 +258,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt",
-      "sha256": "601dc806bce46a8e"
+      "sha256": "f0bb65c09e9edc7c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
-      "sha256": "18f02f7d9ef4f57c"
+      "sha256": "17a068ab11588152"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
@@ -1598,7 +1598,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
-      "sha256": "a8f7bfa1d5713289"
+      "sha256": "d3a6ddcfd2753f2d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiDocumentUiAdapter.kt",
@@ -2194,7 +2194,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
-      "sha256": "449af81cac42f168"
+      "sha256": "90dfd5143cd2244d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkApprovalCoordinator.kt",
@@ -2250,7 +2250,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkComposition.kt",
-      "sha256": "712a5b1dc71c17e6"
+      "sha256": "d4bb2fb4f295b698"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkContinuation.kt",
@@ -2390,7 +2390,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivation.kt",
-      "sha256": "88cf7f3e5058275e"
+      "sha256": "093b7810cc470c2e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkState.kt",
@@ -2442,7 +2442,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnToolRuntime.kt",
-      "sha256": "441a7697bd6236a2"
+      "sha256": "a8e72c6c3903a53e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkUserMessageEditor.kt",
@@ -2490,7 +2490,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt",
-      "sha256": "28c5b6486a2c4c75"
+      "sha256": "d5466fb20b431427"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/AppViewModel.kt",
@@ -2562,7 +2562,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalApplicationUiHost.kt",
-      "sha256": "72881c1fa18ae372"
+      "sha256": "dac59b61c55b402f"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalConversationPackGate.kt",
@@ -2574,7 +2574,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiConnectedCapabilities.kt",
-      "sha256": "a712efb7e5fa3a77"
+      "sha256": "bd939ad17e0026df"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiDocumentFormState.kt",
@@ -2661,12 +2661,16 @@
       "sha256": "fbb465110b5d5195"
     },
     {
+      "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalComposerInvocationPicker.kt",
+      "sha256": "466a8c3a6d884646"
+    },
+    {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationActionsMenu.kt",
       "sha256": "086e71c0db814753"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt",
-      "sha256": "d66039567200a790"
+      "sha256": "3ded36f2ad30975e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposerActions.kt",
@@ -2690,7 +2694,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "sha256": "6a419b4d2c31e999"
+      "sha256": "7e5dbdd48b79e475"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationTemperatureUi.kt",
@@ -2754,7 +2758,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "sha256": "55f57b00036fc48c"
+      "sha256": "07d67b0ca4b60972"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStreamingComponents.kt",
@@ -2762,7 +2766,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "sha256": "61dcc6b03acfdbaf"
+      "sha256": "fb120aa4dec89c20"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModelDefaults.kt",
@@ -2798,7 +2802,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalShellUiContribution.kt",
-      "sha256": "514e6d381bef44d5"
+      "sha256": "52704cea4a8e18d3"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalSkillCallDisplay.kt",
@@ -3050,11 +3054,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowser.kt",
-      "sha256": "50febd3f3b5a539a"
+      "sha256": "2c30208a4e7c36c5"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
-      "sha256": "38f7757936e656d7"
+      "sha256": "0e4817e2a960f7e2"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/shenyan/ShenyanTheme.kt",
@@ -3658,7 +3662,7 @@
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ToolsUiPort.kt",
-      "sha256": "f8f572c242fd47e7"
+      "sha256": "a46e7b8b2c596abd"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/TranscriptUiPort.kt",
@@ -3750,7 +3754,7 @@
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextApplicationScenePack.kt",
-      "sha256": "6858cad5c37b915c"
+      "sha256": "7a78bbfaf959d330"
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextChatGroupManager.kt",
@@ -3763,6 +3767,10 @@
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextDocumentGenerateButton.kt",
       "sha256": "5727ec38a510b344"
+    },
+    {
+      "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextMemoryScene.kt",
+      "sha256": "22e2978efef58f8f"
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextPersonaAuthoringScene.kt",
@@ -3799,6 +3807,10 @@
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextWorkTeamPanel.kt",
       "sha256": "b49c1d1b97408599"
+    },
+    {
+      "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextWorkspaceScene.kt",
+      "sha256": "c2f0470f3af0b59a"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6WorkEvidencePanel.kt",
@@ -3870,219 +3882,36 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "e31c31193edd",
+  "source_snapshot": "79fc061afd9b",
   "observed_delta": {
-    "baseline": "880f05bced61",
+    "baseline": "e31c31193edd",
     "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalPersonaAuthoringOwner.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryManagementQuery.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/ChatDiaryReadingVocabulary.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalComposerInvocationUiAdapter.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalMediaCreativeDraft.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalMediaVoiceLabels.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalGitHubSkillImporter.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPinnedInvocationStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkMediaToolRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalApplicationSceneDeepLinks.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalComposerInvocationPicker.kt",
+      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextMemoryScene.kt",
+      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextWorkspaceScene.kt"
+    ],
+    "removed_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkComposition.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivation.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnToolRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt",
       "app/src/main/java/com/labteto/dshmobile/ui/host/LocalApplicationUiHost.kt",
       "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiConnectedCapabilities.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceController.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheet.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementFeedback.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementOperation.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/memory/MemoryManagementQuery.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ComposerInvocationUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/PersonaAuthoringUiPort.kt",
-      "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiApplicationPackSelection.kt",
-      "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiApplicationSceneHost.kt",
-      "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiApplicationScenePack.kt",
-      "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiHostSceneNavigation.kt",
-      "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiHostSceneNavigationRecovery.kt",
-      "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiSceneNavigationSnapshotCodec.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextApplicationScenePack.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextPersonaAuthoringScene.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextPersonaGalleryScene.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextToolsScene.kt"
-    ],
-    "removed_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/FluidMessageReader.kt"
-    ],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/LocalAutomationUiPortComposition.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/LocalWorkEvidenceUiAdapter.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/automation/AutomationPlanningService.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterProactivePrompt.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterRuntimeProjector.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryBounds.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryEntryPolicy.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryModels.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryPrompt.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryRecallEngine.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryRecallPolicy.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryTransferSanitizer.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatInteractionPersonaPrompt.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatInteractionPlanParser.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatInteractionPromptBuilder.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatIntimacyReactionLibrary.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaGalleryStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPostTurnModelMessages.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPostTurnPatchNormalizer.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatReplyImmersionGuard.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatSceneRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDirectTurnExecutor.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatHistorySummaryStrategy.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatReplyCoordinator.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTurnCoordinator.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChat.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalPersonaPortraitOwner.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalPersonaTransferOwner.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaAutoFillService.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaCanonicalV4.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaGalleryMergePolicy.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaGallerySharePolicy.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaImmersionPolicy.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaInspectionService.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaPresetCatalog.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaTransferDocuments.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaApiClient.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaCatalog.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelCredentialResolver.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMultimodal.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalNativeModelTools.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptContext.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalWorkRuntimeContext.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/OpenAiResponsesClient.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthCoordinator.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptModels.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptPlanConnectionTester.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptSessionManager.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalMediaCreationRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalPersonaUiDisplay.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSessionUiFacade.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsDataFacade.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiDocumentUiAdapter.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalMiniMaxSkillCatalog.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPolicy.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/usage/PromptTokenEstimateCache.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/vision/VisionClient.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalRequirementEvidence.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunnerFactory.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkArtifactVersion.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkComposition.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjection.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistorySummaryStrategy.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivation.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnPromptContext.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkerModelRouter.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/components/FeatherIcons.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/components/SyEntryIcons.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalConversationPackGate.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalConversationSliceHost.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterBehaviorTuningDialog.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/ChatGptPlanUsageUi.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/FirstLaunchOnboarding.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/FluidMessageActionSheet.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/FluidPersonaGalleryGrid.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/FluidPersonaSections.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/GroupAnnouncementSheet.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/GroupChatMemberPicker.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalChatModelAssistController.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalChatTurnUsage.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationActionsMenu.kt",
       "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposerActions.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationHeaders.kt",
       "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureAnimatedHost.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureUiActions.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalGeneratedMediaMessage.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessConfigurationComponents.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDialogs.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawerComponents.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt",
       "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
       "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioSheet.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioViewModel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalModeIntroBanner.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalModelPickerSheet.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaGalleryUiController.kt",
       "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalShellUiContribution.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalUsageModePill.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkProcessComponents.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryComponents.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryDialog.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryOverviewComponentsV3.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryOverviewV3.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaPresetArtworkInstaller.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaWorldBookEditor.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AppSettingsComponents.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AppearanceSettingsComponents.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/ChatGptAccountPanel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalModelSettingsSections.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsController.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsSections.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/ModelPerformanceSettings.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationComponents.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationPage.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/AutomationPlannerUiController.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/ChatAutomationScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskCardComponents.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksViewModel.kt",
       "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowser.kt",
       "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/shenyan/SyConversation.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/shenyan/SyOverlays.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/shenyan/SyResponsiveSheet.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/theme/Animation.kt",
-      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/model/LocalMediaValues.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/presentation/LocalArtifactUiItem.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/local/presentation/LocalWorkHistoryPageUi.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/AutomationUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ConversationUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/MediaUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/MemoryUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/PersonaPortraitUiPort.kt",
       "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ToolsUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/TranscriptUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/WorkEvidenceUiPort.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/WorkReadUiPort.kt",
-      "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/ConversationUiPack.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationUiPack.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextUiDocument.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextWorkEvidencePanel.kt",
-      "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6WorkEvidencePanel.kt",
-      "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanBasics.kt",
-      "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanDataViews.kt",
-      "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanEntrance.kt",
-      "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanFormControls.kt",
-      "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanSections.kt",
-      "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/foundation/ShenyanFoundation.kt"
+      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextApplicationScenePack.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

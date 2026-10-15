@@ -46,10 +46,12 @@ data class NextApplicationFeaturePorts(
     val tools: ToolsUiPort? = null,
     val invocations: ComposerInvocationUiPort? = null,
     val authoring: PersonaAuthoringUiPort? = null,
+    val memory: MemoryUiPort? = null,
+    val settings: SettingsUiPort? = null,
 )
 
 /**
- * Eight independently rendered scenes when Tools Owner is connected, NOT a full R4 application pack.
+ * Ten independently rendered scenes when Tools, Files and Memory Owners are connected; still incomplete.
  * The production Host must reject this incomplete manifest for 78-scene admission.
  */
 class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) : UiApplicationScenePack {
@@ -61,17 +63,25 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
     private val toolsRoute = UiSceneId("route.tools")
     private val toolsMcp = UiSceneId("tools.mcp")
     private val toolsPlugins = UiSceneId("tools.plugins")
+    private val workspace = UiSceneId("route.workspace")
+    private val memories = UiSceneId("settings.memory_management")
     private val implementedScenes = buildSet {
         addAll(setOf(home, galleryRoute, chat, work, galleryPage))
         if (ports.tools != null) addAll(setOf(toolsRoute, toolsMcp, toolsPlugins))
+        if (ports.files != null) add(workspace)
+        if (ports.memory != null && ports.settings != null) add(memories)
     }
 
     override val manifest = UiPackManifest(
         id = "next-application-incremental", version = 1,
         minContractVersion = UI_CONTRACT_VERSION, maxContractVersion = UI_CONTRACT_VERSION,
         scenes = implementedScenes,
-        requiredCapabilities = setOf("chat.send_text", "work.send_text",
-            "chat.gallery_archive", "chat.persona_selection").map(::UiCapabilityId).toSet(),
+        requiredCapabilities = buildSet {
+            addAll(setOf("chat.send_text", "work.send_text", "chat.gallery_archive", "chat.persona_selection"))
+            if (ports.files != null) add("files.read")
+            if (ports.memory != null && ports.settings != null) add("memory.manage")
+            if (ports.authoring != null) add("chat.persona_authoring")
+        }.map(::UiCapabilityId).toSet(),
         windowClasses = UiWindowClass.entries.toSet(),
         accessibility = UiAccessibility.entries.toSet(),
         supportsDark = true,
@@ -82,6 +92,14 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
         put(work, UiSceneRenderer { scope -> ConversationRoute(scope, true) })
         put(galleryRoute, UiSceneRenderer { scope -> GalleryRoute(scope) })
         put(galleryPage, UiSceneRenderer { scope -> GalleryRoute(scope) })
+        ports.files?.let { owner ->
+            put(workspace, UiSceneRenderer { scope -> NextWorkspaceScene(owner, onBack = { scope.onBack() }) })
+        }
+        val memoryOwner = ports.memory
+        val settingsOwner = ports.settings
+        if (memoryOwner != null && settingsOwner != null) put(memories, UiSceneRenderer { scope ->
+            NextMemoryScene(memoryOwner, settingsOwner, onBack = { scope.onBack() })
+        })
         ports.tools?.let { owner ->
             put(toolsRoute, UiSceneRenderer { scope ->
                 NextToolsScene(owner, NextToolsPage.OVERVIEW, onBack = { scope.onBack() },
@@ -118,6 +136,12 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
                 TextButton(onClick = { scope.onNavigate(toolsRoute) }) {
                     Text(stringResource(R.string.next_tools_title))
                 }
+            }
+            if (ports.files != null) TextButton(onClick = { scope.onNavigate(workspace) }) {
+                Text(stringResource(R.string.next_workspace_title))
+            }
+            if (ports.memory != null && ports.settings != null) TextButton(onClick = { scope.onNavigate(memories) }) {
+                Text(stringResource(R.string.next_memory_title))
             }
             Box(Modifier.weight(1f)) {
                 NextConversationUiPack.Render(

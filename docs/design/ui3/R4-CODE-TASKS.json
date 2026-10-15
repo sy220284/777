@@ -1,7 +1,7 @@
 {
   "schema": "777.ui-r4.code-tasks/1",
   "asOf": "2026-10-15",
-  "baseline": "2026-10-15 代码实现批次：任务/记忆审计修复、人物档案端口及Next历史证据；按用户要求暂不测试编译",
+  "baseline": "2026-10-15 功能代码批次：审计修复、人物端口/编辑、Next工作区和记忆管理；按用户要求不测试编译",
   "scope": "整个 R4，非单一功能",
   "verificationPolicy": "当前 HEAD 基础 CI 可通过不代表 R4 交付验收；新增提交需自身 CI，真实双包使用/进程恢复/设备矩阵按 S2/S5 单独验证。",
   "sceneCount": 78,
@@ -126,8 +126,8 @@
       "task": "全应用 UiPack Scene Renderer API",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "新增独立 :ui-host 全应用 UiApplicationScenePack 逐 Scene Compose Renderer 契约、实际 renderer 覆盖与 manifest 双门禁、Host 历史/包身份准入的场景调度与 JVM 测试源码。 AppRoot 现接入真实全应用 UiApplicationScenePack 准入/Compose Renderer 路径，拒绝缺失 Scene/实际 Renderer 的包；当前注册表有意为空，不能宣称整包完工。 Next 独立 ui-pack-next 模块新增 NextApplicationScenePack：8 个真实 Compose Renderer（route.home、conversation.chat、conversation.work、route.persona_gallery、chat.gallery），包含实际 Chat/Work/图库选择 Port 调用。",
-      "remaining": "仍缺其余全应用 Scene Renderer 和独立 V6 完整包；Next 8 个仅部分场景，任何缺页都被生产 Host 拒绝，不能提前切为完整应用。"
+      "implemented": "新增独立 :ui-host 全应用 UiApplicationScenePack 逐 Scene Compose Renderer 契约、实际 renderer 覆盖与 manifest 双门禁、Host 历史/包身份准入的场景调度与 JVM 测试源码。 AppRoot 现接入真实全应用 UiApplicationScenePack 准入/Compose Renderer 路径，拒绝缺失 Scene/实际 Renderer 的包；当前注册表有意为空，不能宣称整包完工。 Next 独立 ui-pack-next 模块新增 NextApplicationScenePack：8 个真实 Compose Renderer（route.home、conversation.chat、conversation.work、route.persona_gallery、chat.gallery），包含实际 Chat/Work/图库选择 Port 调用。 本批Next增加route.workspace与settings.memory_management两个实际Owner驱动Renderer；全量接线时共10场景，工作区预览在本页实际弹层呈现，未重复登记为独立完成Scene。",
+      "remaining": "当前只有Next 10个真实Renderer，完整V6包及其他68个Scene尚未完成，缺页时整包仍拒绝启用。"
     },
     {
       "id": "S3-02",
@@ -149,8 +149,8 @@
       "task": "Next 全应用必要场景原生实现",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": " Next 的历史读取现只依赖中立消息快照（独立角色映射单测）；完整 Next 全场景仍待完成。 Next 独立包新增人物图库真正的 Owner 归档读取、按 Gallery/Story 身份启动故事、拒绝回执/缺身份不导航；页面避免在 UI 自建人物/故事状态。 Next图库接入13字段独立档案编辑/创建及AI补全，既有8场景清单未冒增为完整78场景。",
-      "remaining": "已实现会话相关/图库初步场景 Renderer；其余 78 个场景的原生 Next 页面（如日记、完整图库编辑/立绘、设置、工具、任务、Work 全页等）尚未完成，现有新增测试仍待 CI。"
+      "implemented": " Next 的历史读取现只依赖中立消息快照（独立角色映射单测）；完整 Next 全场景仍待完成。 Next 独立包新增人物图库真正的 Owner 归档读取、按 Gallery/Story 身份启动故事、拒绝回执/缺身份不导航；页面避免在 UI 自建人物/故事状态。 Next图库接入13字段独立档案编辑/创建及AI补全，既有8场景清单未冒增为完整78场景。 Next工作区支持真实文件列表、筛选和有界文本/二进制预览；记忆管理支持原Owner搜索/类型筛选/游标分页、精确版本编辑/置顶/停用确认、部分成功提醒及上下文切换拒绝。",
+      "remaining": "日记、任务、设置其余页面和完整媒体等仍未迁完；完整双包覆盖未交付。"
     },
     {
       "id": "S3-05",
@@ -158,7 +158,7 @@
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
       "implemented": "新增 Host 持久选择协调器：只有通过全应用真实 renderer 与 manifest 双门禁的包才能写入选择；过期/缺失选择仅返回显式稳定包选项，不暗中回退 V6；持久写失败拒绝报成功。含 JVM 回归源码。 AppRoot 使用本地 SharedPreferences 持久选包，实时观察其变更，只有通过 Host manifest+Renderer+已接 Feature Owner 能力校验的已登记整包可渲染，非法/缺失选择显式失败且必须点击恢复 Legacy；新增合成完整双包 Compose 切换 instrumentation 测试源码。 将 AppRoot 真实 Feature Owner 依赖注入 NextApplicationScenePack 增量候选包；保留完整全应用 Scene Renderer 双门禁，缺页候选即使安装也不得替换 V6。",
-      "remaining": "现在安装候选仅有一个包含8 Scene 的 Next 增量包，尚无 78 Scene 完整包；可用的全应用包切换选择器/持久恢复和真机 E2E 仍未交付。"
+      "remaining": "安装候选为10个实际Renderer的Next增量包，仍未达到78 Scene完整准入；生产选包设置、完整恢复及双包验证待完成。"
     },
     {
       "id": "S3-06",

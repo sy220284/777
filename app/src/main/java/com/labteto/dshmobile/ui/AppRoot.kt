@@ -67,6 +67,10 @@ fun AppRoot(
         galleryDeletion = features.personaGalleryDeletionUiPort,
         gallerySave = features.personaGallerySaveUiPort,
         portraits = features.personaPortraitUiPort,
+        authoring = features.personaAuthoringUiPort,
+        files = features.filesUiPort,
+        memory = features.memoryUiPort,
+        settings = features.settingsUiPort,
     )
 
     DshTheme(

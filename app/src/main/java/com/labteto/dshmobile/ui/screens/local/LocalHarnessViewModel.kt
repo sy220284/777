@@ -55,6 +55,8 @@ class LocalHarnessViewModel @Inject constructor(
     val personaStoryUiPort: com.labteto.dshmobile.uicontract.PersonaStoryUiPort,
     val personaGalleryDeletionUiPort: com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort,
     val personaGallerySaveUiPort: com.labteto.dshmobile.uicontract.PersonaGallerySaveUiPort,
+    val memoryUiPort: com.labteto.dshmobile.uicontract.MemoryUiPort,
+    val settingsUiPort: com.labteto.dshmobile.uicontract.SettingsUiPort,
     val personaAuthoringUiPort: com.labteto.dshmobile.uicontract.PersonaAuthoringUiPort,
     val personaPortraitUiPort: com.labteto.dshmobile.uicontract.PersonaPortraitUiPort,
     private val uiPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
