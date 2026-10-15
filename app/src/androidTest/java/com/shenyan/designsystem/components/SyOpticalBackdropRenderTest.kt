@@ -17,7 +17,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import kotlin.math.abs
@@ -27,7 +26,14 @@ class SyOpticalBackdropRenderTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun alignedBackgroundPixelsShiftNearEdgesWhenOpticalPassEnabled() {
-        assumeTrue(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            // Below API 33, the deliberate no-shader fallback is the behavior under test.
+            org.junit.Assert.assertFalse(sySupportsOpticalRefraction(
+                sdk = Build.VERSION.SDK_INT, transparent = true, hasScene = true,
+                enabled = true, surfaceWidth = 240, surfaceHeight = 110,
+            ))
+            return
+        }
         val enabled = mutableStateOf(false)
         compose.setContent {
             Box(Modifier.size(240.dp, 110.dp).testTag("optical-fixture")) {
