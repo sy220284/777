@@ -35,6 +35,10 @@ class PersonaFormSimplificationRegressionTest {
             "眼中的世界", "表里反差", "日常喜好与习惯", "说话方式",
             "重要经历", "在意的人与关系", "出自哪部作品", "补充设定",
         ).forEach { compose.onNodeWithText(it).assertExists() }
+        // AI入口直接位于表单顶部，不必滚动到底部找生成能力。
+        compose.onNodeWithText("AI 帮我完善人物").assertIsDisplayed()
+        compose.onNodeWithText("添加一条事实").assertDoesNotExist()
+
         // 此前删去的六项不能因为默认展开所有字段而回来。
         listOf("命运选择", "情感烙印", "人生引力", "未竟之事", "能力与代价", "感知视角")
             .forEach { compose.onNodeWithText(it).assertDoesNotExist() }
@@ -74,11 +78,13 @@ class PersonaFormSimplificationRegressionTest {
             }
         }
 
-        compose.onNodeWithText("人生经历").assertExists()
+        compose.onNodeWithText("重要经历").assertExists()
         compose.onNodeWithText("在远方长大").assertExists()
         compose.onNodeWithText("出自哪部作品").assertExists()
         compose.onNodeWithText("性格特点").assertExists()
         compose.onNodeWithText("说话方式").assertExists()
+        compose.onNodeWithText("再补充一段").assertExists()
+        compose.onNodeWithText("添加一条事实").assertDoesNotExist()
         compose.onNodeWithText("情感烙印").assertDoesNotExist()
     }
 }
