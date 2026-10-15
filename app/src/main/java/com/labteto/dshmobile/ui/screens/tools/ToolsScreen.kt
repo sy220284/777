@@ -737,7 +737,7 @@ fun ToolsScreen(
                         color = colors.textTertiary,
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                        val builtinAvailable = "local-builtin" in state.localPlugins
+                        val builtinAvailable = "android-local-builtins" in state.localPlugins
                         ToolCapabilityRow(
                             iconPainter = painterResource(R.drawable.ic_ui_plugin),
                             title = stringResource(R.string.skills_title),

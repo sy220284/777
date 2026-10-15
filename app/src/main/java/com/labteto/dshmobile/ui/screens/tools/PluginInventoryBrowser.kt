@@ -143,7 +143,7 @@ internal fun PluginInventoryBrowser(
     val connectionStatus = stringResource(R.string.tools_catalog_connections)
     val local = localIds.sorted().map { id ->
         val label = when (id) {
-            "local-builtin" -> stringResource(R.string.skills_title)
+            "android-local-builtins" -> stringResource(R.string.skills_title)
             "android-runtime" -> stringResource(R.string.tools_capability_terminal)
             "local-language-server" -> stringResource(R.string.tools_capability_code)
             "android-device" -> stringResource(R.string.tools_capability_device)
@@ -152,7 +152,7 @@ internal fun PluginInventoryBrowser(
             else -> id
         }
         val (hint, icon) = when (id) {
-            "local-builtin" -> R.string.plugin_skills_hint to FeatherIcons.BookOpen
+            "android-local-builtins" -> R.string.plugin_skills_hint to FeatherIcons.BookOpen
             "android-runtime" -> R.string.plugin_terminal_hint to FeatherIcons.Terminal
             "local-language-server" -> R.string.plugin_code_hint to FeatherIcons.Code
             "android-device" -> R.string.plugin_device_hint to FeatherIcons.Device
@@ -196,7 +196,7 @@ internal fun PluginInventoryBrowser(
     }
     val list = (if (skillsOnly) installedSkills + availablePresets else when (selectedCategory) {
         1 -> filteredConnections
-        2 -> local.filter { it.id in setOf("local:android-runtime", "local:local-language-server", "local:local-builtin") }
+        2 -> local.filter { it.id in setOf("local:android-runtime", "local:local-language-server", "local:android-local-builtins") }
         3 -> local.filter { it.id in setOf("local:android-device", "local:android-automation", "local:android-webhook") }
         4 -> local.filter { it.id == "local:local-vision" }
         else -> local

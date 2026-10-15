@@ -107,6 +107,19 @@ SHARED_BOUNDARY_FILES = (
 )
 
 RUNTIME_PROJECTION_UPDATE_OWNER = "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeProjection.kt"
+RUNTIME_AGGREGATE_WRITE_ADAPTERS = {
+    RUNTIME_PROJECTION_UPDATE_OWNER,
+    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeKernel.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/LocalForegroundSessionLoader.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/LocalRuntimeBootstrapComposition.kt",
+}
+
+def writes_runtime_aggregate(source: str) -> bool:
+    # Match Kotlin's trailing lambda and parenthesized calls, ignoring comments.
+    return re.search(
+        r"\bruntimeStateStore\s*\.\s*projection\s*\.\s*update\s*(?:\(|\{)",
+        strip_comments(source),
+    ) is not None
 
 NARROW_PORT_PATHS = (
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatExecutionPort.kt",
@@ -272,6 +285,9 @@ def self_test() -> None:
               "localShellFeatureUiContribution(), localToolsFeatureUiContribution())")
     factories = {"localShellFeatureUiContribution", "localToolsFeatureUiContribution"}
     assert assembled_feature_factories(sample, factories) == factories
+    assert writes_runtime_aggregate("runtimeStateStore.projection.update { it }")
+    assert writes_runtime_aggregate("runtimeStateStore.projection.update({ it })")
+    assert not writes_runtime_aggregate("// runtimeStateStore.projection.update { it }")
     for invalid in (
         sample.replace(", localToolsFeatureUiContribution()", ""),
         sample.replace("localToolsFeatureUiContribution()", "localShellFeatureUiContribution()"),
@@ -736,7 +752,7 @@ for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT):
     relative = path.relative_to(ROOT).as_posix()
     if "runtimeStateStore.mutableState" in source or "runtime.mutableState" in source:
         die(f"{relative} bypasses the Runtime projection with writable aggregate state")
-    if "runtimeStateStore.projection.update(" in source and relative != RUNTIME_PROJECTION_UPDATE_OWNER:
+    if writes_runtime_aggregate(source) and relative not in RUNTIME_AGGREGATE_WRITE_ADAPTERS:
         die(
             f"{relative} introduces a new aggregate write seam; "
             "use a domain StatePort or explicit Runtime projection command"

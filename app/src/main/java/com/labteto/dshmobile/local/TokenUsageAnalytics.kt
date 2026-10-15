@@ -194,17 +194,34 @@ internal fun DeepSeekUsageTracker.recordForeground(
     taskRunId = taskRunId,
 )
 
+internal fun buildAutomationTokenUsageContext(
+    snapshot: LocalHarnessState,
+    action: TokenUsageAction,
+    taskLabel: String,
+    runId: String,
+): TokenUsageContext {
+    require(runId.isNotBlank()) { "自动化用量必须关联真实运行身份" }
+    return buildTokenUsageContext(
+        snapshot = snapshot,
+        action = action,
+        turnId = runId,
+        runId = runId,
+        taskRunId = runId,
+        runKind = LocalAgentRunKind.AUTOMATION,
+        taskLabel = taskLabel,
+    )
+}
+
 internal fun DeepSeekUsageTracker.recordAutomation(
     snapshot: LocalHarnessState,
     reply: LocalModelReply,
     action: TokenUsageAction,
     taskLabel: String,
+    runId: String,
 ) = record(
     snapshot = snapshot,
     reply = reply,
-    action = action,
-    runKind = LocalAgentRunKind.AUTOMATION,
-    taskLabel = taskLabel,
+    context = buildAutomationTokenUsageContext(snapshot, action, taskLabel, runId),
 )
 
 internal fun estimatePromptBreakdown(

@@ -20,6 +20,12 @@ class MemoryStore internal constructor(
     private val documents = MemoryDocumentStore(root, json)
     private var lastConsolidatedAt: Long = 0L
 
+    /** Monotonic memory revision, independent of wall-clock corrections. */
+    private fun nextUpdatedAt(records: List<MemoryRecord>): Long {
+        val latest = records.maxOfOrNull(MemoryRecord::updatedAt) ?: 0L
+        return maxOf(System.currentTimeMillis(), latest + 1L)
+    }
+
     @Synchronized
     fun remember(
         content: String,
@@ -42,11 +48,12 @@ class MemoryStore internal constructor(
         require(scope != MemoryScope.PROJECT || !projectId.isNullOrBlank()) { "项目记忆缺少项目编号" }
         require(scope != MemoryScope.LINEAGE || !lineageId.isNullOrBlank()) { "对话链记忆缺少对话链编号" }
 
-        val now = System.currentTimeMillis()
         val records = documents.read().records.toMutableList()
+        val now = nextUpdatedAt(records)
         val duplicateIndex = records.indexOfFirst {
             it.active &&
                 it.scope == scope &&
+                it.kind == kind &&
                 it.projectId == projectId &&
                 it.lineageId == lineageId &&
                 it.subjectKey == subjectKey &&
@@ -158,7 +165,7 @@ class MemoryStore internal constructor(
             kind = kind ?: current.kind,
             importance = (importance ?: current.importance).coerceIn(0, 100),
             pinned = pinned ?: current.pinned,
-            updatedAt = maxOf(System.currentTimeMillis(), current.updatedAt + 1),
+            updatedAt = nextUpdatedAt(records),
         )
         records[index] = updated
         documents.write(MemoryDocument(records = records))
@@ -179,7 +186,7 @@ class MemoryStore internal constructor(
             pendingSourceInvalidations =
                 (current.pendingSourceInvalidations + current.sourceMessages).distinct(),
             supersededBy = null,
-            updatedAt = maxOf(System.currentTimeMillis(), current.updatedAt + 1),
+            updatedAt = nextUpdatedAt(records),
         )
         documents.write(MemoryDocument(records = records))
         return true
@@ -220,7 +227,7 @@ class MemoryStore internal constructor(
         if (sourceSessionId.isBlank()) return 0
         val records = documents.read().records.toMutableList()
         val invalidIds = linkedSetOf<String>()
-        val now = System.currentTimeMillis()
+        val now = nextUpdatedAt(records)
         var changed = false
 
         records.indices.forEach { index ->
@@ -298,7 +305,7 @@ class MemoryStore internal constructor(
     fun detachSourceSessions(sessionIds: Set<String>): Int {
         if (sessionIds.isEmpty()) return 0
         val records = documents.read().records.toMutableList()
-        val now = System.currentTimeMillis()
+        val now = nextUpdatedAt(records)
         var changed = 0
         records.indices.forEach { index ->
             val current = records[index]

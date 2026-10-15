@@ -210,10 +210,7 @@ LocalFeatureCatalog
 │  ├─ PersonaGallery
 │  └─ Diary
 ├─ Work
-│  ├─ Workspace
-│  └─ RunCenter
-├─ Project
-│  └─ Project
+│  └─ Workspace
 ├─ Automation
 │  └─ Tasks
 ├─ Tools
@@ -222,7 +219,7 @@ LocalFeatureCatalog
    └─ Settings
 ```
 
-当前 Catalog 已成为本机功能导航解析和功能页面状态枚举的事实源；页面内容、Back policy、Drawer entry 与 restore policy 均由各 Feature contribution 持有，Shell 只保留导航宿主执行。
+当前 Catalog 已成为七条产品顶层路由的归属事实源；设置二级目的地和抽屉快捷操作由所属 Feature contribution 管理，不等同于独立产品路由；页面内容、Back policy、Drawer entry 与 restore policy 均由各 Feature contribution 持有，Shell 只保留导航宿主执行。
 
 ## 6. Shared Capability 层
 

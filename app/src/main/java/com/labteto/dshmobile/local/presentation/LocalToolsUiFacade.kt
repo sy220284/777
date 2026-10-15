@@ -61,7 +61,7 @@ class LocalToolsUiFacade @Inject internal constructor(
     /** Registry presence is a configuration hint, not an execution grant. */
     internal suspend fun handoffExternalReadiness(): Pair<Boolean, Boolean> {
         val hasMcpTools = tools.servers().any { it.tools.isNotEmpty() }
-        val hasThirdPartyPlugin = tools.installedPluginIds().any { it != "local-builtin" }
+        val hasThirdPartyPlugin = tools.installedPluginIds().any { it != "android-local-builtins" }
         return hasMcpTools to hasThirdPartyPlugin
     }
     override suspend fun installedSkills() = tools.installedSkills().map {

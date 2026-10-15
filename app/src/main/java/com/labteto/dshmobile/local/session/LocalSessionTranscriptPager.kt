@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.session
 
-
+import com.labteto.dshmobile.observability.AppLog
 
 /**
  * Incremental reverse pager for the user-visible transcript stored in Session Event.
@@ -54,6 +54,7 @@ internal class LocalSessionTranscriptPager(
                 .singleOrNull { it.sequence == sequence }
             if (event != null) {
                 val decoded = decodeTranscriptMessages(event.data)
+                warnUndecodableTranscript(event, decoded)
                 val startIndex = cursor.resumeMessageIndex
                     ?.coerceAtMost((decoded?.lastIndex ?: -1))
                     ?: (decoded?.lastIndex ?: -1)
@@ -106,6 +107,7 @@ internal class LocalSessionTranscriptPager(
                 }
 
                 val decoded = decodeTranscriptMessages(event.data)
+                warnUndecodableTranscript(event, decoded)
                 val activeTranscript = (
                     event.type == "chat/active-transcript" ||
                         event.type == "work/active-transcript" ||
@@ -151,6 +153,19 @@ internal class LocalSessionTranscriptPager(
         }
 
         return pageResult(collectedNewestFirst, nextCursor = null)
+    }
+
+    private fun warnUndecodableTranscript(
+        event: LocalSessionEventLog.Event,
+        decoded: List<LocalHarnessMessage>?,
+    ) {
+        if (decoded == null && event.data.containsKey("transcript")) {
+            AppLog.warn(
+                "TranscriptPager",
+                "failure=true operation=page_transcript event_seq=${event.sequence} " +
+                    "event_type=${event.type.take(64)} cause_type=InvalidTranscript",
+            )
+        }
     }
 
     private fun collectEventMessages(
