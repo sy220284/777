@@ -27,6 +27,8 @@ data class LocalMediaRevisionDraft(
     val ratio: String = "1:1",
     val voiceId: String? = null,
     val credentialSignature: String? = null,
+    /** This filename is only a hint; runtime looks up the actual saved result by originId. */
+    val originFileName: String? = null,
 ) : java.io.Serializable {
     fun matchesOriginalCredential(actualSignature: String?): Boolean =
         credentialSignature != null && actualSignature != null && credentialSignature == actualSignature
@@ -46,7 +48,8 @@ data class LocalMediaRevisionDraft(
             val id = result.profileId?.let { "${it}:${result.provider}:${result.kind}:${result.model}" }
             return LocalMediaRevisionDraft(result.id, kind, result.description.orEmpty(),
                 result.sourceMessageId, id, result.routeFingerprint,
-                result.imageRatio ?: "1:1", result.voiceId, result.credentialSignature)
+                result.imageRatio ?: "1:1", result.voiceId, result.credentialSignature,
+                result.fileName)
         }
         fun from(task: LocalMediaVideoTask): LocalMediaRevisionDraft = LocalMediaRevisionDraft(
             task.id, LocalMediaKind.VIDEO, task.description.orEmpty(),
