@@ -6,14 +6,19 @@
 
 - 核心身份：`name`、`franchise`、`coreIdentity`。
 - 人物事实：`facts: List<CharacterFact>`；每项包含稳定ID、category、content、关联事实ID、主观视角、剧情阶段、来源类型与可选出处。
-- 数据兼容分类：personality, selfNarrative, identityGap, valuesAndTradeoffs, subjectiveBeliefs, biography, definingChoices, emotionalImprints, lifeGravity, unfinishedBusiness, relationships, limitsAndCosts, sensorySignature, preferencesAndHabits, voiceStyle, customFacts（含历史字段，仅为读取已有资料和历史冲突核查保留）。新建可选事实类别仅 10 个。
+- **现行事实分类只保留 10 类**：personality、valuesAndTradeoffs、selfNarrative、subjectiveBeliefs、identityGap、preferencesAndHabits、voiceStyle、biography、relationships、customFacts。另有姓名、核心身份、作品来源，共 13 个预置字段。删除的 6 类不再生成、读取、迁移、展示或写入，也不回填到其他字段。用户自行命名的非废弃扩展类别仍可使用。
 - 人物背景与原作：已有 `PersonaLoreEntry`，继续按需召回。人物事实的 `temporalScope` 仅使用故事显式 `storyStage` 匹配，绝不借用场景钟点。图集中按故事编辑剧情阶段 ID，保存后重新进入该故事时从归档上下文装载。未设阶段时隐藏阶段限定事实；世界书继续按剧透等级、关键词及显式剧情阶段联合检索，常驻条目也不得绕过阶段限制。完整设备回归仍以CI和真实执行记录为准。
 - 当前情绪、主动性、注意、关系、记忆、人物成长：由独立 Chat 运行时持有，禁止写成预设回复脚本。
 - 保存、编辑、AI与预设在新 V4 路径消费人物事实。关键运行时的人物底色、生活、注意力和行为提示已改为优先读取 V4 事实，避免已存在事实时从旧描述恢复冲突内容。仓库仍保留部分旧结构和非关键链路引用，尚需审计并最终移除，不能宣称V4结构已完全纯化。
 
 ## 写入和检索
 
-人物编辑器默认展示全部 13 个预置字段，无需另行添加，按照人物自身向外排列：人物名字、核心身份、性格、价值与取舍、自我叙事、主观认知、内外反差、偏好与习惯、语言风格、人生经历、重要人物关系、作品来源／所属系列、自定义事实。新建、编辑与详情阅读采用同一顺序，原始事实存储顺序不变。扩展入口仅用于添加用户自定义类别、专属知识库等额外资料；空白预置字段不会产生空事实记录。已从新建选择项中移除命运选择、情感烙印、人生引力、未竟之事、能力与代价、感知视角 6 类；数据层仍认识这些旧类别，以免覆盖、丢失已有用户人物事实。用户也可以添加自定义字段、专属知识库和 AI 完善。AI仅根据依据生成相应事实，无依据字段留空。提示词稳定层放人物身份和关键价值；深度事实随当前问题和已知故事摘要按需注入。自动补全保留用户编辑过的事实。
+人物编辑器默认展示全部 13 个预置字段：人物名字、核心身份、性格、价值与取舍、自我叙事、主观认知、内外反差、偏好与习惯、语言风格、人生经历、重要人物关系、作品来源／所属系列、自定义事实。人物资料、人物详情和聊天投影统一遵守从自身向外的顺序，空白字段不会产生空事实。
+
+**21 名人物预设已重新编写**：每人单独拥有核心身份、性格、价值观、自我叙事、主观认知、内外反差、生活习惯、语言风格、人生经历与重要关系，所属世界单独进入可检索世界书，保留剧透阶段和知识边界，静态人设不包含即时情绪、亲密度或行为频率。
+
+**本轮不兼容**：不再承接 definingChoices、emotionalImprints、lifeGravity、unfinishedBusiness、limitsAndCosts、sensorySignature 六类原事实，也不会把旧版 portrait/lifeContext/stableTraits 等影子属性转成新事实。已有设备数据在新版本读取时只保留新类别内的有效内容；删除的旧类不会悄悄映射到其他类别。用户若需要保留旧资料，应在升级前导出备份，之后按新版字段自行重新填写。
+
 
 ## 数据格式与兼容政策
 
