@@ -17,8 +17,7 @@ internal fun resolveLocalWorkSkillGuidance(
         it.kind == LocalPinnedInvocation.Kind.SKILL && it.id in installed
     }.mapNotNull { selection ->
         runCatching {
-            workspace.skillMetadata(selection.id).takeIf { it.modelInvocable }
-                ?.let { workspace.readSkill(selection.id) }
+            workspace.readSkill(selection.id)
         }.getOrNull()?.let { selection.id to it }
     }
     // Selected SKILL.md is loaded directly for this model step; no extra skill(name)
