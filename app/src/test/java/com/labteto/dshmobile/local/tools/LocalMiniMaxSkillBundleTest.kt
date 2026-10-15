@@ -106,7 +106,7 @@ class LocalMiniMaxSkillBundleTest {
             store.seedOnce()
             assertEquals(editedMobile, workspace.readRaw(mobile))
             assertEquals(editedCli, workspace.readRaw(cli))
-            assertTrue(workspace.readModelSkill("minimax-media").contains("原生媒体"))
+            assertTrue(workspace.readModelSkill("minimax-media").contains("media_image_options"))
         } finally { root.deleteRecursively() }
     }
 
