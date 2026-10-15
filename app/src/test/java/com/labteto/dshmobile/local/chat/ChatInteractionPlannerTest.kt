@@ -1402,7 +1402,8 @@ class ChatInteractionPlannerTest {
                 "assistant" to "那火锅怎么样？",
             ),
         )
-        assertTrue(prompt.contains("给4条明显不同的建议"))
+        assertTrue(prompt.contains("给1至4条真正不同、自然可发送的建议"))
+        assertTrue(prompt.contains("不强制覆盖所有风格"))
         assertTrue(prompt.contains("自然|俏皮|直球|放飞"))
         assertTrue(prompt.contains("最近对话（旧→新）"))
         assertTrue(prompt.contains("算了，换个话题，今晚吃什么？"))
