@@ -26,7 +26,7 @@ internal fun PersonaProfile.authoringDraft() = UiPersonaDraft(name, coreIdentity
     loreEntries.map { UiPersonaLore(it.id, it.title, it.content, it.keywords, it.secondaryKeywords,
         it.priority, it.alwaysOn, it.spoilerLevel, it.temporalScope) },
     timelinePosition, knowledgeBoundary, hardConstraints, bannedPhrases, corrections, presetId,
-    behaviorTuning.samplingTemperaturePosition)
+    behaviorTuning.samplingTemperaturePosition, behaviorTuning.expressionVariation)
 
 /** Preserve unedited per-fact provenance, scoped facts, world book and non-editor settings. */
 internal fun UiPersonaDraft.applyTo(base: PersonaProfile = PersonaProfile()): PersonaProfile {
@@ -34,7 +34,8 @@ internal fun UiPersonaDraft.applyTo(base: PersonaProfile = PersonaProfile()): Pe
     var profile = base.copy(name = name.trim(), coreIdentity = coreIdentity, franchise = franchise,
         timelinePosition = timelinePosition, knowledgeBoundary = knowledgeBoundary, hardConstraints = hardConstraints,
         bannedPhrases = bannedPhrases, corrections = corrections, presetId = presetId,
-        behaviorTuning = base.behaviorTuning.copy(samplingTemperaturePosition = samplingTemperaturePosition).normalized(),
+        behaviorTuning = base.behaviorTuning.copy(samplingTemperaturePosition = samplingTemperaturePosition,
+            expressionVariation = legacySamplingPosition ?: base.behaviorTuning.expressionVariation).normalized(),
         facts = facts.map { CharacterFact(it.id, it.category, it.content, it.relatedIds, it.perspective,
             it.stage, CharacterFactProvenance.entries.firstOrNull { value -> value.name == it.provenance }
                 ?: CharacterFactProvenance.UNVERIFIED, it.source) },

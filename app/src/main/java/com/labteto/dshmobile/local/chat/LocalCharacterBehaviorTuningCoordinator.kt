@@ -44,19 +44,22 @@ internal class LocalCharacterBehaviorTuningCoordinator internal constructor(
         enqueueSnapshot = sessionStorage::enqueueCurrentSnapshot,
     )
 
-    suspend fun configure(profile: PersonaProfile): Result<Unit> = try {
+    suspend fun configure(profile: PersonaProfile, withinBinding: (() -> Unit) -> Unit = { it() }): Result<Unit> = try {
         val admission = state.value
         val lease = acquireLease(admission.sessionId)
             ?: return Result.failure(IllegalStateException("当前会话正在运行，请稍后再保存角色设置"))
         try {
-            val snapshot = state.value
-            check(
-                snapshot.sessionId == admission.sessionId &&
-                    !snapshot.kernel.running &&
-                    !snapshot.loading &&
-                    snapshot.usageMode == LocalUsageMode.CHAT &&
-                    !snapshot.chat.groupChat.enabled
-            ) { "请在单人聊天空闲时保存角色设置" }
+            lateinit var snapshot: LocalChatProjectionState
+            withinBinding {
+                snapshot = state.value
+                check(
+                    snapshot.sessionId == admission.sessionId &&
+                        !snapshot.kernel.running &&
+                        !snapshot.loading &&
+                        snapshot.usageMode == LocalUsageMode.CHAT &&
+                        !snapshot.chat.groupChat.enabled
+                ) { "请在单人聊天空闲时保存角色设置" }
+            }
 
             val personaId = snapshot.chat.personaId.takeUnless {
                 it == PersonaProfile.DEFAULT_PERSONA_ID
@@ -83,6 +86,8 @@ internal class LocalCharacterBehaviorTuningCoordinator internal constructor(
                 ),
             )
             var committed = false
+            val writtenPersonas = mutableListOf<PersonaProfile>()
+            var writtenGalleryTuning: CharacterBehaviorTuning? = null
             try {
                 val persisted = withContext(Dispatchers.IO) {
                     persistCharacterBehaviorTuning(
@@ -92,59 +97,63 @@ internal class LocalCharacterBehaviorTuningCoordinator internal constructor(
                         personaId,
                         snapshot.chat.galleryId,
                         editedProfile,
+                        onPersonaWrite = { writtenPersonas += it },
+                        onGalleryWrite = { writtenGalleryTuning = it },
                     )
                 }
-                val current = state.value
-                check(
-                    current.sessionId == snapshot.sessionId &&
-                        current.usageMode == LocalUsageMode.CHAT &&
-                        !current.loading &&
-                        !current.kernel.running &&
-                        !current.chat.groupChat.enabled &&
-                        current.chat.personaId == snapshot.chat.personaId &&
-                        current.chat.galleryId == snapshot.chat.galleryId &&
-                        current.chat.galleryStoryId == snapshot.chat.galleryStoryId &&
-                        current.chat.chatContext.generation == snapshot.chat.chatContext.generation &&
-                        current.transcriptIndex.latestDialogueMessageId ==
-                            snapshot.transcriptIndex.latestDialogueMessageId
-                ) { "会话已切换，请重新保存角色设置" }
+                withinBinding {
+                    val current = state.value
+                    check(
+                        current.sessionId == snapshot.sessionId &&
+                            current.usageMode == LocalUsageMode.CHAT &&
+                            !current.loading &&
+                            !current.kernel.running &&
+                            !current.chat.groupChat.enabled &&
+                            current.chat.personaId == snapshot.chat.personaId &&
+                            current.chat.galleryId == snapshot.chat.galleryId &&
+                            current.chat.galleryStoryId == snapshot.chat.galleryStoryId &&
+                            current.chat.chatContext.generation == snapshot.chat.chatContext.generation &&
+                            current.transcriptIndex.latestDialogueMessageId ==
+                                snapshot.transcriptIndex.latestDialogueMessageId
+                    ) { "会话已切换，请重新保存角色设置" }
 
-                val durablePersona = persisted.persona
-                val sameBoundCharacter = persisted.sameBoundCharacter
-                val target = current.copy(
-                    chat = current.chat.copy(
-                        personaId = durablePersona.id,
-                        galleryId = current.chat.galleryId.takeIf { sameBoundCharacter },
-                        galleryStoryId = current.chat.galleryStoryId.takeIf { sameBoundCharacter },
-                        gallerySaveSuppressedThrough =
-                            if (sameBoundCharacter) {
-                                current.chat.gallerySaveSuppressedThrough
+                    val durablePersona = persisted.persona
+                    val sameBoundCharacter = persisted.sameBoundCharacter
+                    val target = current.copy(
+                        chat = current.chat.copy(
+                            personaId = durablePersona.id,
+                            galleryId = current.chat.galleryId.takeIf { sameBoundCharacter },
+                            galleryStoryId = current.chat.galleryStoryId.takeIf { sameBoundCharacter },
+                            gallerySaveSuppressedThrough =
+                                if (sameBoundCharacter) {
+                                    current.chat.gallerySaveSuppressedThrough
+                                } else {
+                                    current.transcriptIndex.latestCreatedAt.takeIf { it > 0L }
+                                        ?: System.currentTimeMillis()
+                                },
+                            chatPersona = durablePersona,
+                            chatState = if (sameBoundCharacter) {
+                                current.chat.chatState.copy(
+                                    behaviorTuning = durablePersona.behaviorTuning,
+                                )
                             } else {
-                                current.transcriptIndex.latestCreatedAt.takeIf { it > 0L }
-                                    ?: System.currentTimeMillis()
+                                ChatCharacterState(behaviorTuning = durablePersona.behaviorTuning)
                             },
-                        chatPersona = durablePersona,
-                        chatState = if (sameBoundCharacter) {
-                            current.chat.chatState.copy(
-                                behaviorTuning = durablePersona.behaviorTuning,
-                            )
-                        } else {
-                            ChatCharacterState(behaviorTuning = durablePersona.behaviorTuning)
-                        },
-                        replySuggestions =
-                            if (sameBoundCharacter) current.chat.replySuggestions else emptyList(),
-                    ),
-                    handoffSummary = if (sameBoundCharacter) current.handoffSummary else null,
-                    error = null,
-                )
-                commitDomainState(target, "behavior-tuning-updated")
-                committed = true
-                state.update { latest ->
-                    if (latest.sessionId != target.sessionId) latest else latest.copy(
-                        chat = target.chat,
-                        handoffSummary = target.handoffSummary,
+                            replySuggestions =
+                                if (sameBoundCharacter) current.chat.replySuggestions else emptyList(),
+                        ),
+                        handoffSummary = if (sameBoundCharacter) current.handoffSummary else null,
                         error = null,
                     )
+                    commitDomainState(target, "behavior-tuning-updated")
+                    committed = true
+                    state.update { latest ->
+                        if (latest.sessionId != target.sessionId) latest else latest.copy(
+                            chat = target.chat,
+                            handoffSummary = target.handoffSummary,
+                            error = null,
+                        )
+                    }
                 }
                 enqueueSnapshot(snapshot.sessionId)
             } catch (error: Throwable) {
@@ -154,6 +163,8 @@ internal class LocalCharacterBehaviorTuningCoordinator internal constructor(
                         previousPersona,
                         snapshot.chat.galleryId,
                         previousGallery,
+                        writtenPersonas,
+                        writtenGalleryTuning,
                         error,
                     )
                 }
@@ -174,14 +185,15 @@ internal class LocalCharacterBehaviorTuningCoordinator internal constructor(
         previousPersona: PersonaProfile?,
         galleryId: String?,
         previousGallery: PersonaGalleryEntry?,
+        writtenPersonas: List<PersonaProfile>,
+        writtenGalleryTuning: CharacterBehaviorTuning?,
         primary: Throwable,
     ) {
         withContext(NonCancellable + Dispatchers.IO) {
-            runCatching { personaStore.restore(personaId, previousPersona) }
-                .exceptionOrNull()
-                ?.let { primary.addSuppressed(it) }
-            galleryId?.let { id ->
-                runCatching { galleryStore.restoreEntry(id, previousGallery) }
+            runCatching { personaStore.restoreIfCurrent(personaId, writtenPersonas, previousPersona) }
+                .exceptionOrNull()?.let { primary.addSuppressed(it) }
+            if (previousGallery != null && writtenGalleryTuning != null) galleryId?.let { id ->
+                runCatching { galleryStore.restoreTuningIfCurrent(id, writtenGalleryTuning, previousGallery) }
                     .exceptionOrNull()
                     ?.let { primary.addSuppressed(it) }
             }

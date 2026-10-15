@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 const val UI_CONTRACT_VERSION = 1
 
 /** Opaque owner-issued activation identity; UI cannot derive execution authority from this value. */
+@kotlinx.serialization.Serializable
 data class UiSessionIdentity(
     val sessionId: String,
     val activationId: String,

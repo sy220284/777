@@ -36,7 +36,6 @@ class LocalChatRuntime @Inject internal constructor(
     private val persistence: LocalChatPersistence,
     private val sessionRuntime: LocalSessionRuntime,
     private val personaCorrections: LocalChatPersonaCorrectionCoordinator,
-    private val behaviorTuning: LocalCharacterBehaviorTuningCoordinator,
     private val chatState: LocalChatStatePort,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
@@ -186,7 +185,6 @@ class LocalChatRuntime @Inject internal constructor(
     } catch (cancelled: CancellationException) { throw cancelled }
     catch (failure: Exception) { UiCommandReceipt.Failed(failure.message ?: "人物操作未完成，请刷新确认状态") }
 
-    internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = behaviorTuning.configure(profile)
     internal suspend fun syncDefaultChatPersona(profile: PersonaProfile): PersonaProfile =
         personaCoordinator.syncDefault(profile)
     internal fun createGroupChatSession(entries: List<PersonaGalleryEntry>): Boolean {

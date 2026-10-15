@@ -66,11 +66,7 @@ internal fun NextPersonaAuthoringScene(
         catch (failure: Exception) { feedback = failure.message ?: failed }
         finally { loading = false }
     }
-    val labels = listOf(R.string.next_persona_name, R.string.next_persona_identity, R.string.next_persona_franchise,
-        R.string.next_persona_personality, R.string.next_persona_values, R.string.next_persona_narrative,
-        R.string.next_persona_beliefs, R.string.next_persona_gap, R.string.next_persona_preferences,
-        R.string.next_persona_voice, R.string.next_persona_biography, R.string.next_persona_relationships,
-        R.string.next_persona_facts)
+    val labels = NEXT_PERSONA_FIELD_LABELS
     LazyColumn(Modifier.fillMaxSize().imePadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Text(stringResource(if (galleryId == null) R.string.next_persona_create else R.string.next_persona_edit), style = MaterialTheme.typography.titleLarge)
@@ -134,3 +130,9 @@ internal fun NextPersonaAuthoringScene(
         }
     }
 }
+
+internal val NEXT_PERSONA_FIELD_LABELS = listOf(R.string.next_persona_name, R.string.next_persona_identity, R.string.next_persona_franchise,
+    R.string.next_persona_personality, R.string.next_persona_values, R.string.next_persona_narrative,
+    R.string.next_persona_beliefs, R.string.next_persona_gap, R.string.next_persona_preferences,
+    R.string.next_persona_voice, R.string.next_persona_biography, R.string.next_persona_relationships,
+    R.string.next_persona_facts)

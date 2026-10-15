@@ -301,4 +301,11 @@
     <string name="next_persona_inspection_conflict">字段：%1$s\n档案：%2$s\n对话：%3$s\n原因：%4$s</string>
     <string name="next_persona_suggestions_apply">追加选中的建议</string>
     <string name="next_persona_suggestions_saved">人物档案已更新；重新选择人物后应用到当前故事。</string>
+    <string name="next_current_persona">当前人物与采样设置</string>
+    <string name="next_current_persona_hint">保存后应用到当前会话人物；图库档案请单独编辑，采样设置沿用原规则同步。模型补全由你主动发起，会产生模型用量。</string>
+    <string name="next_current_persona_reload">重新读取当前人物</string>
+    <string name="next_current_persona_sampling">采样位置：%1$d / 100</string>
+    <string name="next_current_persona_apply">保存并应用到当前人物</string>
+    <string name="next_current_persona_saved">当前人物已保存。</string>
+    <string name="next_current_persona_unavailable">请在单人聊天空闲时操作；会话或人物变化后，请重新读取再编辑。原草稿仍保留。</string>
 </resources>

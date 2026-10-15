@@ -46,6 +46,7 @@ data class NextApplicationFeaturePorts(
     val tools: ToolsUiPort? = null,
     val invocations: ComposerInvocationUiPort? = null,
     val authoring: PersonaAuthoringUiPort? = null,
+    val currentPersona: CurrentPersonaUiPort? = null,
     val memory: MemoryUiPort? = null,
     val settings: SettingsUiPort? = null,
 )
@@ -81,6 +82,7 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
             if (ports.files != null) add("files.read")
             if (ports.memory != null && ports.settings != null) add("memory.manage")
             if (ports.authoring != null) add("chat.persona_authoring")
+            if (ports.currentPersona != null) add("chat.current_persona")
         }.map(::UiCapabilityId).toSet(),
         windowClasses = UiWindowClass.entries.toSet(),
         accessibility = UiAccessibility.entries.toSet(),
@@ -168,7 +170,7 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
             gallery = ports.gallery, selection = ports.selection,
             onBack = { scope.onBack() },
             onStoryOpened = { scope.onNavigate(home) is UiSceneNavigationResult.Changed },
-            authoring = ports.authoring,
+            authoring = ports.authoring, currentPersona = ports.currentPersona,
             transfer = ports.personaTransfer, stories = ports.stories,
             deletion = ports.galleryDeletion, save = ports.gallerySave, portraits = ports.portraits,
         )

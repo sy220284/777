@@ -172,10 +172,10 @@ internal class LocalConversationSurfaceArgs(
     val onTogglePinSession: () -> Unit,
     val onRenameSession: (String) -> Boolean,
     val onDeleteSession: () -> Unit,
-    val onConfigureChatPersona: suspend (PersonaProfile) -> Result<Unit>,
+    val onConfigureChatPersona: suspend (PersonaProfile, com.labteto.dshmobile.uicontract.UiSessionIdentity?) -> Result<Unit>,
     val onConfigureGroupMembers: (List<String>) -> Boolean,
     val onSelectGalleryPersona: (String) -> Boolean,
-    val onAutoFillChatPersona: suspend (PersonaProfile, String) -> Result<PersonaProfile>,
+    val onAutoFillChatPersona: suspend (PersonaProfile, String, com.labteto.dshmobile.uicontract.UiSessionIdentity?) -> Result<PersonaProfile>,
     val onSaveGroupAnnouncement: suspend (String) -> Result<Unit>,
     val onUndoPersonaCorrection: (Long, String, String) -> Unit,
     val onPlanModeChange: (Boolean) -> Unit,
@@ -242,10 +242,10 @@ internal fun LocalConversationSurface(
     onTogglePinSession: () -> Unit,
     onRenameSession: (String) -> Boolean,
     onDeleteSession: () -> Unit,
-    onConfigureChatPersona: suspend (PersonaProfile) -> Result<Unit>,
+    onConfigureChatPersona: suspend (PersonaProfile, com.labteto.dshmobile.uicontract.UiSessionIdentity?) -> Result<Unit>,
     onConfigureGroupMembers: (List<String>) -> Boolean,
     onSelectGalleryPersona: (String) -> Boolean,
-    onAutoFillChatPersona: suspend (PersonaProfile, String) -> Result<PersonaProfile>,
+    onAutoFillChatPersona: suspend (PersonaProfile, String, com.labteto.dshmobile.uicontract.UiSessionIdentity?) -> Result<PersonaProfile>,
     onSaveGroupAnnouncement: suspend (String) -> Result<Unit>,
     onUndoPersonaCorrection: (Long, String, String) -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
@@ -476,7 +476,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var showGroupMemberPicker by remember(documentIdentity) { mutableStateOf(false) }
     var showGroupAnnouncement by remember(documentIdentity) { mutableStateOf(false) }
     var showPersonaEditor by rememberSaveable { mutableStateOf(false) }
-    var personaEditorDraft by remember { mutableStateOf<PersonaProfile?>(null) }
+    val personaEditor = rememberLocalPersonaEditorState()
+    val personaEditorDraft = personaEditor.profile
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
     var editingUserMessage by remember { mutableStateOf<LocalHarnessMessage?>(null) }
     var renameSessionOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
@@ -830,7 +831,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 if (state.groupChat.enabled) showGroupMemberPicker = true
                                 else showPersonaPicker = true
                             },
-                            onOpenCharacterTuning = { showCharacterTuning = true },
+                            onOpenCharacterTuning = { personaEditor.captureTuning(documentIdentity); showCharacterTuning = true },
                             onExitGroupChat = onExitGroupChat,
                             onNewSession = onNewSession,
                             sessionPinned = sessionPinned,
@@ -1431,7 +1432,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             val proposed = state.chatPersona.copy(
                                 behaviorTuning = state.chatState.behaviorTuning.withComposerTemperatureLevel(level),
                             )
-                            temperatureSaveFailed = onConfigureChatPersona(proposed).isFailure
+                            temperatureSaveFailed = onConfigureChatPersona(proposed, documentIdentity).isFailure
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (_: Exception) {
@@ -1525,7 +1526,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         state = state.chatState,
         temperatureTuningAvailable = temperatureUi.tuningAvailable,
         temperatureRange = temperatureUi.range,
-        onConfigurePersona = onConfigureChatPersona,
+        onConfigurePersona = { profile -> onConfigureChatPersona(profile, personaEditor.tuningIdentity) },
         onDismiss = { showCharacterTuning = false },
     )
     if (
@@ -1542,7 +1543,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             onSelect = onSelectGalleryPersona,
             onEditCurrent = {
                 showPersonaPicker = false
-                personaEditorDraft = state.chatPersona
+                personaEditor.open(state.chatPersona, documentIdentity)
                 showPersonaEditor = true
             },
             onDismiss = { showPersonaPicker = false },
@@ -1552,12 +1553,12 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         ChatPersonaDialog(
             profile = personaEditorDraft ?: state.chatPersona,
             onSave = { profile ->
-                onConfigureChatPersona(profile).onSuccess { personaEditorDraft = null }
+                onConfigureChatPersona(profile, personaEditor.identity).onSuccess { personaEditor.clear() }
             },
-            onAutoFill = onAutoFillChatPersona,
+            onAutoFill = { profile, description -> onAutoFillChatPersona(profile, description, personaEditor.identity) },
             onDismiss = {
                 showPersonaEditor = false
-                personaEditorDraft = null
+                personaEditor.clear()
             },
         )
     }

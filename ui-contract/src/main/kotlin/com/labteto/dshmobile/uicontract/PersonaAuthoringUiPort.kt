@@ -23,7 +23,8 @@ data class UiPersonaDraft(
     val hardConstraints: List<String> = emptyList(), val bannedPhrases: List<String> = emptyList(),
     val corrections: List<String> = emptyList(), val presetId: String = "",
     val samplingTemperaturePosition: Int? = null,
-
+    /** Compatibility position for old sampling overrides; not a new personality control. */
+    val legacySamplingPosition: Int? = null,
 )
 data class UiPersonaAuthoringSnapshot(val galleryId: String, val revision: Long, val draft: UiPersonaDraft)
 sealed interface UiPersonaAuthoringReceipt {

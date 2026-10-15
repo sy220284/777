@@ -67,7 +67,7 @@ fun AppRoot(
         galleryDeletion = features.personaGalleryDeletionUiPort,
         gallerySave = features.personaGallerySaveUiPort,
         portraits = features.personaPortraitUiPort,
-        authoring = features.personaAuthoringUiPort,
+        authoring = features.personaAuthoringUiPort, currentPersona = features.currentPersonaUiPort,
         files = features.filesUiPort,
         memory = features.memoryUiPort,
         settings = features.settingsUiPort,

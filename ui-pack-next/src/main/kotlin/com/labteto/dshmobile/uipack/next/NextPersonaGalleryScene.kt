@@ -36,18 +36,24 @@ fun NextPersonaGalleryScene(
     onBack: () -> Unit,
     onStoryOpened: () -> Boolean,
     authoring: PersonaAuthoringUiPort? = null,
+    currentPersona: CurrentPersonaUiPort? = null,
     transfer: PersonaTransferUiPort? = null,
     stories: PersonaStoryUiPort? = null,
     deletion: PersonaGalleryDeletionUiPort? = null,
     save: PersonaGallerySaveUiPort? = null,
     portraits: PersonaPortraitUiPort? = null,
 ) {
+    var currentOpen by rememberSaveable { mutableStateOf(false) }
     var presetsOpen by rememberSaveable { mutableStateOf(false) }
     var managing by rememberSaveable { mutableStateOf(false) }
     var manageTarget by rememberSaveable { mutableStateOf<String?>(null) }
     val selectionState by selection.snapshots.collectAsStateWithLifecycle(initialValue = selection.snapshot())
     var editing by rememberSaveable { mutableStateOf<String?>(null) }
     var creating by rememberSaveable { mutableStateOf(false) }
+    if (currentOpen && currentPersona != null) {
+        NextCurrentPersonaScene(currentPersona) { currentOpen = false }
+        return
+    }
     if (authoring != null && (creating || editing != null)) {
         NextPersonaAuthoringScene(authoring, selection, editing,
             onBack = { creating = false; editing = null },
@@ -88,6 +94,9 @@ fun NextPersonaGalleryScene(
         }
         if (authoring != null) TextButton(onClick = { creating = true }, enabled = !busy) {
             Text(stringResource(R.string.next_persona_create))
+        }
+        if (currentPersona != null) TextButton(onClick = { currentOpen = true }, enabled = !busy) {
+            Text(stringResource(R.string.next_current_persona))
         }
         if (authoring != null) TextButton(onClick = { presetsOpen = true }, enabled = !busy) {
             Text(stringResource(R.string.next_persona_presets))

@@ -150,6 +150,38 @@ class ChatPersonaGalleryStore internal constructor(
     }
 
     @Synchronized
+    internal fun updateBehaviorTuning(id: String, incoming: CharacterBehaviorTuning,
+        beforeWrite: (CharacterBehaviorTuning) -> Unit): CharacterBehaviorTuning? {
+        val document = readNormalized()
+        val current = document.entries.firstOrNull { it.id == id } ?: return null
+        val resolved = resolveCharacterBehaviorTuning(current.persona.behaviorTuning, incoming)
+        if (resolved == current.persona.behaviorTuning.normalized()) return resolved
+        check(current.updatedAt < Long.MAX_VALUE) { "人物版本已耗尽" }
+        val revision = maxOf(System.currentTimeMillis(), current.updatedAt + 1L)
+        val updated = current.copy(persona = current.persona.copy(behaviorTuning = resolved,
+            updatedAt = revision), updatedAt = revision)
+        beforeWrite(resolved)
+        documentStore.write(document.copy(entries = document.entries.map { if (it.id == id) updated else it }))
+        return resolved
+    }
+
+    @Synchronized
+    internal fun restoreTuningIfCurrent(id: String, expected: CharacterBehaviorTuning, previous: PersonaGalleryEntry) {
+        val document = readNormalized()
+        val current = document.entries.firstOrNull { it.id == id } ?: return
+        if (current.persona.behaviorTuning != expected) return
+        val onlyTuningChanged = current.copy(persona = previous.persona, updatedAt = previous.updatedAt) == previous &&
+            current.persona.copy(behaviorTuning = previous.persona.behaviorTuning, updatedAt = previous.persona.updatedAt) == previous.persona
+        val restored = if (onlyTuningChanged) previous else {
+            check(current.updatedAt < Long.MAX_VALUE) { "人物版本已耗尽" }
+            val revision = maxOf(System.currentTimeMillis(), current.updatedAt + 1L)
+            current.copy(persona = current.persona.copy(behaviorTuning = previous.persona.behaviorTuning,
+                updatedAt = revision), updatedAt = revision)
+        }
+        documentStore.write(document.copy(entries = document.entries.map { if (it.id == id) restored else it }))
+    }
+
+    @Synchronized
     internal fun loadStoryHistory(
         id: String,
         storyId: String,

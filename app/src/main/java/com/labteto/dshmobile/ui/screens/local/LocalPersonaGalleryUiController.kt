@@ -38,6 +38,7 @@ internal class LocalPersonaGalleryUiController(
     private val savePort: com.labteto.dshmobile.uicontract.PersonaGallerySaveUiPort,
     private val portraitPort: com.labteto.dshmobile.uicontract.PersonaPortraitUiPort,
     private val deletionPort: com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort,
+    private val currentPort: com.labteto.dshmobile.uicontract.CurrentPersonaUiPort,
     private val authoringPort: com.labteto.dshmobile.uicontract.PersonaAuthoringUiPort,
     private val transferPort: com.labteto.dshmobile.uicontract.PersonaTransferUiPort,
     private val appContext: Context,
@@ -49,8 +50,17 @@ internal class LocalPersonaGalleryUiController(
     val gallery: StateFlow<List<PersonaGalleryEntry>> = _gallery.asStateFlow()
     val personaPresets: List<PersonaPreset> = PersonaPresetCatalog.presets
     suspend fun refresh() { _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() } }
-    suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = runSuspendResult {
-        runtime.chat.configureChatPersona(profile).getOrThrow()
+    suspend fun configureChatPersona(profile: PersonaProfile, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Result<Unit> = runSuspendResult {
+        val snapshot = (currentPort.read() as? com.labteto.dshmobile.uicontract.UiCurrentPersonaReceipt.Loaded)?.snapshot
+            ?: error(appContext.getString(R.string.ui_r4_gallery_inspection_stale))
+        check(expected != null && snapshot.target.identity == expected && snapshot.target.personaId == profile.id && snapshot.target.revision == profile.updatedAt) {
+            appContext.getString(R.string.ui_r4_gallery_inspection_stale)
+        }
+        when (val result = currentPort.save(snapshot.target, profile.toUiAuthoringDraft())) {
+            com.labteto.dshmobile.uicontract.UiCurrentPersonaReceipt.Saved -> Unit
+            is com.labteto.dshmobile.uicontract.UiCurrentPersonaReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_create_incomplete))
+            else -> error(appContext.getString(R.string.ui_r4_gallery_inspection_stale))
+        }
         _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
     }
     init {

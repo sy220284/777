@@ -35,6 +35,7 @@ internal object LocalUiConnectedCapabilities {
         gallerySave: com.labteto.dshmobile.uicontract.PersonaGallerySaveUiPort? = null,
         portraits: com.labteto.dshmobile.uicontract.PersonaPortraitUiPort? = null,
         authoring: com.labteto.dshmobile.uicontract.PersonaAuthoringUiPort? = null,
+        currentPersona: com.labteto.dshmobile.uicontract.CurrentPersonaUiPort? = null,
         files: com.labteto.dshmobile.uicontract.FilesUiPort? = null,
         memory: com.labteto.dshmobile.uicontract.MemoryUiPort? = null,
         settings: com.labteto.dshmobile.uicontract.SettingsUiPort? = null,
@@ -65,6 +66,7 @@ internal object LocalUiConnectedCapabilities {
         if (gallerySave != null) add(UiCapabilityId("chat.gallery_save"))
         if (portraits != null) add(UiCapabilityId("chat.gallery_portrait"))
         if (authoring != null) add(UiCapabilityId("chat.persona_authoring"))
+        if (currentPersona != null) add(UiCapabilityId("chat.current_persona"))
         if (files != null) add(UiCapabilityId("files.read"))
         if (memory != null && settings != null) add(UiCapabilityId("memory.manage"))
     }

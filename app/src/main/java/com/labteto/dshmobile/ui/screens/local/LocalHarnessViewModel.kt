@@ -57,6 +57,7 @@ class LocalHarnessViewModel @Inject constructor(
     val personaGallerySaveUiPort: com.labteto.dshmobile.uicontract.PersonaGallerySaveUiPort,
     val memoryUiPort: com.labteto.dshmobile.uicontract.MemoryUiPort,
     val settingsUiPort: com.labteto.dshmobile.uicontract.SettingsUiPort,
+    val currentPersonaUiPort: com.labteto.dshmobile.uicontract.CurrentPersonaUiPort,
     val personaAuthoringUiPort: com.labteto.dshmobile.uicontract.PersonaAuthoringUiPort,
     val personaPortraitUiPort: com.labteto.dshmobile.uicontract.PersonaPortraitUiPort,
     private val uiPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
@@ -137,16 +138,14 @@ class LocalHarnessViewModel @Inject constructor(
         selectionPort = personaSelectionUiPort,
         transferPort = personaTransferUiPort,
         authoringPort = personaAuthoringUiPort,
+        currentPort = currentPersonaUiPort,
         savePort = personaGallerySaveUiPort,
         portraitPort = personaPortraitUiPort,
         deletionPort = personaGalleryDeletionUiPort,
         appContext = appContext,
         scope = viewModelScope,
     )
-    private val chatModelAssistController = LocalChatModelAssistController(
-        runtime = runtime,
-        chatUi = chatUi,
-    )
+    private val chatModelAssistController = LocalChatModelAssistController(currentPersonaUiPort)
     val gallery = personaGalleryController.gallery
     val personaPresets: List<PersonaPreset> = personaGalleryController.personaPresets
     private val transcriptHistoryController = LocalTranscriptHistoryController(
@@ -445,15 +444,15 @@ class LocalHarnessViewModel @Inject constructor(
     fun createSession(mode: LocalConversationMode, usageMode: LocalUsageMode, identity: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Boolean = sessionUiPort.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.Create(
         identity, mode, usageMode)) == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
     fun switchUsageMode(mode: LocalUsageMode) { sessionUiPort.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.SelectMode(mode)) }
-    suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = personaGalleryController.configureChatPersona(profile)
+    suspend fun configureChatPersona(profile: PersonaProfile, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Result<Unit> = personaGalleryController.configureChatPersona(profile, expected)
     fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) {
         viewModelScope.launch {
             runtime.chat.undoChatPersonaCorrection(noticeId, personaId, correction)
         }
     }
 
-    suspend fun autoFillChatPersona(current: PersonaProfile, description: String): Result<PersonaProfile> =
-        chatModelAssistController.autoFillCurrentPersona(current, description)
+    suspend fun autoFillChatPersona(current: PersonaProfile, description: String, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Result<PersonaProfile> =
+        chatModelAssistController.autoFillCurrentPersona(current, description, expected)
     fun switchSession(sessionId: String): Boolean = sessionUiPort.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.Open(sessionId)) == com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued
     fun clearCredential() = runtime.model.clearCredential()
 }
