@@ -4,6 +4,7 @@ import com.labteto.dshmobile.uihost.UiHostSceneNavigation
 import com.labteto.dshmobile.uihost.UiSceneNavigationRejection
 import com.labteto.dshmobile.uihost.UiSceneNavigationResult
 import com.labteto.dshmobile.uihost.UiSceneNavigationState
+import com.labteto.dshmobile.uihost.UiSceneNavigationSnapshotCodec
 import com.labteto.dshmobile.uicontract.UiSceneId
 import com.labteto.dshmobile.uipack.next.NextConversationUiPack
 import org.junit.Assert.assertEquals
@@ -82,5 +83,62 @@ class UiHostSceneNavigationTest {
                 id("conversation.chat"), mapOf("permissions" to id("system.permissions")))
         }
         assertTrue(badDeepLink.isFailure)
+    }
+
+    @Test fun rootNavigationResetsHistoryAndSamePageDismissesOverlay() {
+        val work = state(nav.navigate(nav.initial, id("conversation.work")))
+        val approval = state(nav.navigate(work, id("work.approval")))
+        assertEquals(work, state(nav.navigate(approval, id("conversation.work"))))
+        assertEquals(nav.initial, state(nav.navigate(approval, id("conversation.chat"))))
+    }
+
+    @Test fun restoreRejectsOverlayBeforePageAndRepeatedRoot() {
+        assertEquals(
+            UiSceneNavigationResult.Rejected(UiSceneNavigationRejection.INVALID_HISTORY),
+            nav.restore(nav.initial.copy(stack = listOf(id("conversation.chat"),
+                id("work.approval"), id("conversation.work")))),
+        )
+        assertEquals(
+            UiSceneNavigationResult.Rejected(UiSceneNavigationRejection.INVALID_HISTORY),
+            nav.restore(nav.initial.copy(stack = listOf(id("conversation.chat"),
+                id("conversation.work"), id("conversation.chat")))),
+        )
+    }
+
+    @Test fun navigationBudgetRejectsOverflowWithoutDroppingPreviousState() {
+        var snapshot = state(nav.navigate(nav.initial, id("conversation.work")))
+        var rejected: UiSceneNavigationResult? = null
+        for (i in 1..UiSceneNavigationSnapshotCodec.MAX_STACK_DEPTH) {
+            val overlay = id(if (i % 2 == 0) "work.question" else "work.approval")
+            val result = nav.navigate(snapshot, overlay)
+            if (result is UiSceneNavigationResult.Rejected) {
+                rejected = result
+                break
+            }
+            snapshot = state(result)
+        }
+        assertEquals(
+            UiSceneNavigationResult.Rejected(UiSceneNavigationRejection.HISTORY_LIMIT), rejected,
+        )
+        assertEquals(UiSceneNavigationSnapshotCodec.MAX_STACK_DEPTH, snapshot.stack.size)
+        assertEquals(snapshot, state(nav.restore(snapshot)))
+    }
+
+    @Test fun versionedMementoRejectsCorruptionAndChecksPackOnRestore() {
+        val work = state(nav.navigate(nav.initial, id("conversation.work")))
+        val stored = UiSceneNavigationSnapshotCodec.encode(work)
+        assertEquals(work, UiSceneNavigationSnapshotCodec.decodeOrNull(stored))
+        assertEquals(work, state(nav.restore(UiSceneNavigationSnapshotCodec.decodeOrNull(stored)!!)))
+        assertEquals(null, UiSceneNavigationSnapshotCodec.decodeOrNull("old." + stored))
+        assertEquals(null, UiSceneNavigationSnapshotCodec.decodeOrNull(stored + "."))
+        assertEquals(null, UiSceneNavigationSnapshotCodec.decodeOrNull("u1.invalid"))
+        assertEquals(null, UiSceneNavigationSnapshotCodec.decodeOrNull("x".repeat(9_000)))
+        assertEquals(null, UiSceneNavigationSnapshotCodec.decodeOrNull(null))
+        assertEquals(UiSceneNavigationResult.Rejected(UiSceneNavigationRejection.WRONG_PACK),
+            nav.restore(work.copy(packId = "another-pack")))
+        assertTrue(runCatching {
+            UiSceneNavigationSnapshotCodec.encode(work.copy(stack =
+                List(UiSceneNavigationSnapshotCodec.MAX_STACK_DEPTH + 1) { id("conversation.work") }))
+        }.isFailure)
     }
 }

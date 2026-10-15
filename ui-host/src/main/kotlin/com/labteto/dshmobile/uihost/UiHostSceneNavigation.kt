@@ -15,7 +15,7 @@ data class UiSceneNavigationState(val packId: String, val stack: List<UiSceneId>
 
 enum class UiSceneNavigationRejection {
     UNKNOWN_SCENE, HOST_SERVICE, NOT_NAVIGABLE, PACK_MISSING_SCENE,
-    WRONG_PACK, INVALID_HISTORY, UNKNOWN_DEEP_LINK,
+    WRONG_PACK, INVALID_HISTORY, UNKNOWN_DEEP_LINK, HISTORY_LIMIT,
 }
 
 sealed interface UiSceneNavigationResult {
@@ -60,11 +60,17 @@ class UiHostSceneNavigation(
             return UiSceneNavigationResult.Rejected(UiSceneNavigationRejection.NOT_NAVIGABLE)
         if (target !in pack.scenes)
             return UiSceneNavigationResult.Rejected(UiSceneNavigationRejection.PACK_MISSING_SCENE)
+        // Root is not a second page in the history; it replaces the stack.
+        if (target == root) return UiSceneNavigationResult.Changed(initial)
         if (target == state.stack.last()) return UiSceneNavigationResult.Changed(state)
 
         val stack = if (requirement.kind == UiSceneKind.PAGE)
             state.stack.dropLastWhile { scenes.getValue(it).kind == UiSceneKind.OVERLAY }
         else state.stack
+        // Opening the page under an overlay dismisses that overlay rather than duplicating it.
+        if (stack.lastOrNull() == target) return UiSceneNavigationResult.Changed(state.copy(stack = stack))
+        if (stack.size >= UiSceneNavigationSnapshotCodec.MAX_STACK_DEPTH)
+            return UiSceneNavigationResult.Rejected(UiSceneNavigationRejection.HISTORY_LIMIT)
         return UiSceneNavigationResult.Changed(state.copy(stack = stack + target))
     }
 
@@ -99,13 +105,17 @@ class UiHostSceneNavigation(
     } == true
 
     private fun validHistory(stack: List<UiSceneId>): Boolean {
-        if (stack.isEmpty() || stack.first() != root) return false
-        var hasPage = false
-        return stack.all { id ->
-            val entry = scenes[id] ?: return@all false
-            if (!isNavigable(id) || id !in pack.scenes) return@all false
-            if (entry.kind == UiSceneKind.PAGE) hasPage = true
-            hasPage
+        if (stack.isEmpty() || stack.size > UiSceneNavigationSnapshotCodec.MAX_STACK_DEPTH ||
+            stack.first() != root) return false
+        var overlaySeen = false
+        for ((index, id) in stack.withIndex()) {
+            val entry = scenes[id] ?: return false
+            if (!isNavigable(id) || id !in pack.scenes || (index > 0 && id == root))
+                return false
+            // navigate(PAGE) always dismisses overlays; reject histories it cannot produce.
+            if (entry.kind == UiSceneKind.OVERLAY) overlaySeen = true
+            else if (overlaySeen || (index > 0 && stack[index - 1] == id)) return false
         }
+        return true
     }
 }
