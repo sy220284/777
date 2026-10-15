@@ -89,14 +89,16 @@ internal class CharacterRuntimeProjector(
 
     private fun stablePrompt(persona: PersonaProfile): String {
         val sections = listOf(
+            // Context packing preserves whole authored paragraphs in section order.
+            // Give the person's own voice and values a chance before long biographies.
             "稳定身份" to persona.coreIdentity,
+            "语言风格" to persona.trustedFactText(CharacterFactCategories.VOICE_STYLE),
             "性格" to persona.trustedFactText(CharacterFactCategories.PERSONALITY),
             "价值与取舍" to persona.trustedFactText(CharacterFactCategories.VALUES_AND_TRADEOFFS),
-            "自我叙事" to persona.trustedFactText(CharacterFactCategories.SELF_NARRATIVE),
             "主观认知" to persona.trustedFactText(CharacterFactCategories.SUBJECTIVE_BELIEFS),
             "内外反差" to persona.trustedFactText(CharacterFactCategories.IDENTITY_GAP),
+            "自我叙事" to persona.trustedFactText(CharacterFactCategories.SELF_NARRATIVE),
             "偏好与习惯" to persona.trustedFactText(CharacterFactCategories.PREFERENCES_AND_HABITS),
-            "语言风格" to persona.trustedFactText(CharacterFactCategories.VOICE_STYLE),
             "人生经历" to persona.trustedFactText(CharacterFactCategories.BIOGRAPHY),
             "重要人物关系" to persona.trustedFactText(CharacterFactCategories.RELATIONSHIPS),
             "自定义事实" to persona.trustedFactText(CharacterFactCategories.CUSTOM_FACTS),
@@ -152,8 +154,11 @@ internal class CharacterRuntimeProjector(
             }
         }
         lines += selected
-        state.currentUserImpression.takeIf(String::isNotBlank)?.let {
-            lines += "你目前怎么看对方：${it.take(240)}（人物的主观看法）"
+        state.currentUserImpression.takeIf { it.isNotBlank() &&
+            !ChatTurnContextPolicy.isTopicRedirect(userInput) &&
+            ChatTurnContextPolicy.relevant(userInput, it, attention)
+        }?.let {
+            lines += "你目前怎么看对方：${it.take(240)}（人物的主观看法，不是事实或回复指令）"
         }
         val open = state.unresolvedThreads.filter {
             ChatTurnContextPolicy.relevant(userInput, it, attention) &&
