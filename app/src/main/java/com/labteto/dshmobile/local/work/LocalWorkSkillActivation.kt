@@ -100,7 +100,13 @@ internal fun relevantSkillIdsForTask(input: String): Set<String> {
         "minimax-music-gen" to "生成音乐|生成歌曲|伴奏|作曲|音乐创作|music.gen",
         "minimax-playlist" to "歌单|播放列表|playlist",
     )
-    return rules.asSequence().filter { (_, terms) ->
+    val matched = rules.asSequence().filter { (_, terms) ->
         Regex(terms, RegexOption.IGNORE_CASE).containsMatchIn(input)
     }.map { it.first }.toSet()
+    // Generic image requests belong to the multi-provider imagegen workflow.
+    // Use MiniMax's specialised media guidance only when the user names MiniMax or
+    // actually requests a video, speech or other specialised output.
+    val miniMaxExplicit = Regex("minimax|海螺|hailuo|视频|语音|配音|音乐", RegexOption.IGNORE_CASE)
+        .containsMatchIn(input)
+    return if ("imagegen" in matched && !miniMaxExplicit) matched - "minimax-media" else matched
 }
