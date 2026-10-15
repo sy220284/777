@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -136,7 +137,8 @@ class CharacterDiaryCorrectionRegressionTest {
         compose.waitUntil(timeoutMillis = 10_000) { saved.get() == 1 }
         compose.waitForIdle()
         compose.onNodeWithTag("diary_edit_event").assertDoesNotExist()
-        compose.onNodeWithText("周末改去山上", substring = true).assertIsDisplayed()
+        compose.onNodeWithTag("diary_paper_event_event-1").performScrollTo()
+            .assertIsDisplayed().assertTextContains("周末改去山上", substring = true)
         compose.runOnIdle { assertEquals(1, saved.get()) }
     }
 
