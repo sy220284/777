@@ -76,12 +76,23 @@ class LocalConversationUiPortTest {
         override fun cancel(sessionId: String) = false
         override suspend fun cancelAndJoin(sessionId: String) = false
     }
+    private class MutableProjectionFixture(private val store: LocalRuntimeStateStore) {
+        var value: LocalHarnessState
+            get() = store.state.value
+            set(next) { store.projection.update { next } }
+    }
+
     private class Fixture(mode: LocalUsageMode) {
         val store = LocalRuntimeStateStore()
         val chat = ChatOwner()
         val work = WorkOwner()
-        val state = store.initialize(LocalHarnessState(sessionId = "a", usageMode = mode,
-            loading = false, modelState = LocalModelState(configured = true)))
+        // Tests mutate the Runtime projection through its owner instead of exposing a
+        // writable aggregate StateFlow from bootstrap to production Feature code.
+        val state = MutableProjectionFixture(store)
+        init {
+            store.initialize(LocalHarnessState(sessionId = "a", usageMode = mode,
+                loading = false, modelState = LocalModelState(configured = true)))
+        }
         val port = LocalConversationUiPortComposition(store, chat, work, object : LocalWorkApprovalUiPort {
             override fun pendingQuestion(): LocalQuestion? = null
             override fun answerQuestion(pendingId: String, answer: String?) = false
