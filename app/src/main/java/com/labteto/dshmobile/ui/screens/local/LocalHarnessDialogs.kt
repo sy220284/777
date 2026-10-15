@@ -958,14 +958,15 @@ private fun PersonaTextField(
     singleLine: Boolean = false,
     hint: String = "",
 ) {
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SyTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),
-        label = { Text(label) },
-        placeholder = if (hint.isBlank()) null else ({ Text(hint) }),
+        label = { Text(label, color = colors.textSecondary) },
+        placeholder = if (hint.isBlank()) null else ({ Text(hint, color = colors.textSecondary) }),
         singleLine = singleLine,
-        minLines = if (singleLine) 1 else 2,
+        minLines = if (singleLine || value.isBlank()) 1 else 2,
         maxLines = if (singleLine) 1 else 6,
     )
 }
