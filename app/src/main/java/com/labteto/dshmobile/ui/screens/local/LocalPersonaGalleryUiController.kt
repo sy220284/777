@@ -10,8 +10,8 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.presentation.PersonaPresetCatalog
-import com.labteto.dshmobile.local.chat.authoringDraft
-import com.labteto.dshmobile.local.chat.applyTo
+import com.labteto.dshmobile.local.presentation.toUiAuthoringDraft
+import com.labteto.dshmobile.local.presentation.toDomainPersona
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
@@ -135,7 +135,7 @@ fun selectGalleryPersonaForCurrentChat(id: String, expected: com.labteto.dshmobi
 
 suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGalleryEntry> = runSuspendResult {
     val originalIdentity = selectionPort.snapshot().identity
-    val receipt = authoringPort.create(profile.authoringDraft())
+    val receipt = authoringPort.create(profile.toUiAuthoringDraft())
     val saved = receipt as? com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Saved
         ?: error((receipt as? com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Failed)?.message
             ?: appContext.getString(R.string.ui_r4_gallery_create_incomplete))
@@ -148,8 +148,8 @@ suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGallery
 suspend fun autoFillNewPersona(current: PersonaProfile, description: String): Result<PersonaProfile> = runSuspendResult {
     val identity = selectionPort.snapshot().identity
         ?: error(appContext.getString(R.string.ui_r4_gallery_session_not_ready))
-    when (val result = authoringPort.suggest(identity, current.authoringDraft(), description)) {
-        is com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Suggested -> result.draft.applyTo(current)
+    when (val result = authoringPort.suggest(identity, current.toUiAuthoringDraft(), description)) {
+        is com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Suggested -> result.draft.toDomainPersona(current)
         is com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_model_not_ready))
         else -> error(appContext.getString(R.string.ui_r4_gallery_model_not_ready))
     }
