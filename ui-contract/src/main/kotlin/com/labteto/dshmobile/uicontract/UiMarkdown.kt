@@ -257,4 +257,3 @@ fun parseUiMarkdownInline(text: String): List<UiMarkdownInline> {
     flush()
     return segments
 }
-
