@@ -30,13 +30,17 @@ class PersonaFormSimplificationRegressionTest {
 
         compose.onNodeWithText("人物名字").assertExists()
         compose.onNodeWithText("核心身份").assertExists()
-        compose.onNodeWithText("稳定性格").assertDoesNotExist()
+        compose.onNodeWithText("性格").assertDoesNotExist()
         compose.onNodeWithText("作品来源／所属系列").assertDoesNotExist()
 
         compose.onNodeWithText("＋ 添加人物设定").performClick()
-        compose.onNodeWithText("稳定性格").performClick()
-        compose.onNodeWithText("稳定性格").assertExists()
+        compose.onNodeWithText("性格").performClick()
+        compose.onNodeWithText("性格").assertExists()
         compose.onNodeWithText("作品来源／所属系列").assertDoesNotExist()
+        compose.onNodeWithText("＋ 添加人物设定").performClick()
+        compose.onNodeWithText("查看更多设定类别").performClick()
+        listOf("命运选择", "情感烙印", "人生引力", "未竟之事", "能力与代价", "感知视角")
+            .forEach { compose.onNodeWithText(it).assertDoesNotExist() }
     }
 
     @Test
