@@ -149,18 +149,24 @@ internal class ChatDiaryStore(
         if (index < 0) return false
         val previous = existing.entries[index]
         val now = maxOf(System.currentTimeMillis(), previous.updatedAt + 1)
+        // Do not let previously generated prose survive a correction that changes
+        // the event or the interpretation it was originally based on.
+        val changedBasis = event != previous.event ||
+            correction.feeling.trim() != previous.feeling ||
+            correction.innerThought.trim() != previous.innerThought ||
+            correction.relationshipMeaning.trim() != previous.relationshipMeaning ||
+            correction.unresolvedEcho.trim() != previous.unresolvedEcho
+        val proposedVoice = correction.privateReflection.trim()
+        val revisedVoice = if (changedBasis && proposedVoice == previous.privateReflection) {
+            ""
+        } else proposedVoice.take(ChatDiaryBounds.MAX_PRIVATE_REFLECTION_CHARS)
         val revision = ChatDiaryRevision(
             event = event,
             feeling = correction.feeling.trim().take(ChatDiaryBounds.MAX_FEELING_CHARS),
             innerThought = correction.innerThought.trim().take(ChatDiaryBounds.MAX_THOUGHT_CHARS),
             relationshipMeaning = correction.relationshipMeaning.trim().take(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS),
             unresolvedEcho = correction.unresolvedEcho.trim().take(ChatDiaryBounds.MAX_ECHO_CHARS),
-            // Changing the event invalidates unchanged auto-generated interior narration.
-            // An explicitly revised reflection is retained as an author correction.
-            privateReflection = correction.privateReflection.trim()
-                .takeIf { correction.event.trim() == previous.event ||
-                    it != previous.privateReflection }
-                ?.take(ChatDiaryBounds.MAX_PRIVATE_REFLECTION_CHARS).orEmpty(),
+            privateReflection = revisedVoice,
             recallAnchors = previous.recallAnchors,
             subjectiveEvidence = "",
             subjectiveInferred = false,
