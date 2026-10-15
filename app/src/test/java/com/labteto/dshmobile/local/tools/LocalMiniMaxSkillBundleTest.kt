@@ -91,6 +91,25 @@ class LocalMiniMaxSkillBundleTest {
         } finally { root.deleteRecursively() }
     }
 
+    @Test fun editedMobileAndCliReferencesSurviveSeedRefresh() {
+        val root = Files.createTempDirectory("minimax-user-references").toFile()
+        try {
+            val workspace = LocalWorkspace(root)
+            val store = LocalSkillStore(workspace, ::bundle)
+            store.seedOnce()
+            val mobile = ".dsh/skills/minimax-media/MOBILE.md"
+            val cli = ".dsh/skills/minimax-media/CLI.md"
+            val editedMobile = workspace.readRaw(mobile) + "\n用户自定安卓说明\n"
+            val editedCli = workspace.readRaw(cli) + "\n用户 CLI 备忘\n"
+            workspace.write(mobile, editedMobile)
+            workspace.write(cli, editedCli)
+            store.seedOnce()
+            assertEquals(editedMobile, workspace.readRaw(mobile))
+            assertEquals(editedCli, workspace.readRaw(cli))
+            assertTrue(workspace.readModelSkill("minimax-media").contains("原生媒体"))
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun incompleteMediaBundleDoesNotAdvertiseSkill() {
         val root = Files.createTempDirectory("minimax-media-incomplete").toFile()
         try {
