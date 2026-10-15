@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -69,9 +69,10 @@ internal fun LocalComposerInvocationPicker(
                 Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.composer_invocation_add),
                     tint = colors.textSecondary, modifier = Modifier.size(20.dp))
             }
-            DropdownMenu(
+            SyPopupMenu(
                 expanded = expanded,
-                onDismissRequest = { expanded = false; query = "" },
+                onDismiss = { expanded = false; query = "" },
+                modifier = Modifier.width(310.dp),
             ) {
                 Text(stringResource(R.string.composer_invocation_title), color = colors.text,
                     style = DsType.std14Strong.withReadingWeight(),
