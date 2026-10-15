@@ -162,7 +162,7 @@ internal fun LocalGeneratedMediaResultRow(
                 Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                     if (file != null) {
                         MediaSaveButton(file, imageMime(file))
-                        SyButton(text = "分享", size = SyButtonSize.Small,
+                        SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
                             variant = SyButtonVariant.Ghost,
                             onClick = { shareMediaFile(context, file, imageMime(file)) { error = it } })
                     } else result.remoteUrl?.let { url ->
@@ -177,7 +177,7 @@ internal fun LocalGeneratedMediaResultRow(
                     InlineSpeechPlayer(file)
                     Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                         MediaSaveButton(file, "audio/mpeg")
-                        SyButton(text = "分享", size = SyButtonSize.Small,
+                        SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
                             variant = SyButtonVariant.Ghost,
                             onClick = { shareMediaFile(context, file, "audio/mpeg") { error = it } })
                     }
@@ -285,7 +285,7 @@ internal fun LocalGeneratedVideoTaskRow(
                 )
                 if (localVideo != null) {
                     MediaSaveButton(localVideo, "video/mp4")
-                    SyButton(text = "分享", size = SyButtonSize.Small,
+                    SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
                         variant = SyButtonVariant.Ghost,
                         onClick = { shareMediaFile(context, localVideo, "video/mp4") { error = it } })
                 } else {
@@ -370,6 +370,7 @@ private fun MediaMessageCard(
 @Composable
 private fun MediaSaveButton(file: File, mime: String) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     var status by remember(file.absolutePath) { mutableStateOf<String?>(null) }
     val destination = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mime)) { uri ->
@@ -381,11 +382,11 @@ private fun MediaSaveButton(file: File, mime: String) {
                     } ?: error("无法写入选定位置")
                 }
             }
-            status = if (saved.isSuccess) "已保存到设备" else "保存失败，请重试"
+            status = resources.getString(if (saved.isSuccess) R.string.media_action_saved else R.string.media_action_save_failed)
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        SyButton(text = "保存", size = SyButtonSize.Small, onClick = {
+        SyButton(text = resources.getString(R.string.media_action_save), size = SyButtonSize.Small, onClick = {
             status = null
             destination.launch(file.name)
         })
