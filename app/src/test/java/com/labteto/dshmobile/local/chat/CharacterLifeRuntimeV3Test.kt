@@ -38,7 +38,7 @@ class CharacterLifeRuntimeV3Test {
 
     @Test
     fun aPhoneClockDoesNotSelectTheCharactersCurrentActivity() {
-        val persona = PersonaProfile(lifeContext = "白天在出版社工作；晚上整理插画；周末看外婆")
+        val persona = PersonaProfile(coreIdentity = "出版社插画师", facts = listOf(CharacterFact("habits", CharacterFactCategories.PREFERENCES_AND_HABITS, "晚上整理插画；周末看外婆")))
         val first = advanceCharacterLife(persona, ChatCharacterState(currentAgenda = "封面尚未交付"), now = 1L)
         val later = advanceCharacterLife(persona, ChatCharacterState(currentAgenda = "封面尚未交付",
             lifeState = first), now = 900_000_000L)
@@ -85,7 +85,6 @@ class CharacterLifeRuntimeV3Test {
             facts = listOf(CharacterFact("opening", CharacterFactCategories.BIOGRAPHY,
                 "正在经营书店", provenance = CharacterFactProvenance.CANON)),
             timelinePosition = "最终章揭秘：阿宁是卧底",
-            worldSetting = "未来结局：书店被毁",
         )
         val rendered = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
             .project(persona, ChatCharacterState(), ChatContextState(), "今天怎么样", null)
@@ -119,7 +118,7 @@ class CharacterLifeRuntimeV3Test {
 
     @Test
     fun repeatedMinorTurnsDoNotCreateASecondPersonality() {
-        val persona = PersonaProfile(name = "陈拾", mutableTraits = listOf("愿意求助"))
+        val persona = PersonaProfile(name = "陈拾", facts = listOf(CharacterFact("habits", CharacterFactCategories.PREFERENCES_AND_HABITS, "愿意求助")))
         var state = ChatCharacterState(initiative = 70, shareDesire = 65)
         val baseline = state.evolution
         repeat(250) {
@@ -127,12 +126,12 @@ class CharacterLifeRuntimeV3Test {
                 "MINOR", "需要帮助就说", "这次我愿意求助"))
         }
         assertEquals(baseline, state.evolution)
-        assertEquals(listOf("愿意求助"), persona.mutableTraits)
+        assertEquals("愿意求助", persona.factText(CharacterFactCategories.PREFERENCES_AND_HABITS))
     }
 
     @Test
     fun aLongMessageDoesNotManufactureAnAttentionPrescription() {
-        val persona = PersonaProfile(name = "叶澜", portrait = "插画师")
+        val persona = PersonaProfile(name = "叶澜", coreIdentity = "插画师")
         val view = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
             .project(persona, ChatCharacterState(), ChatContextState(), "整理代码和测试结果。".repeat(40), null)
         assertTrue(!view.dynamicPrompt.contains("注意力落点"))
@@ -304,7 +303,7 @@ class CharacterLifeRuntimeV3Test {
     }
     @Test
     fun aHabitDoesNotBecomeALivedEventOrProactivePretext() {
-        val persona = PersonaProfile(lifeContext = "晚上整理插画；周末看外婆")
+        val persona = PersonaProfile(facts = listOf(CharacterFact("habits", CharacterFactCategories.PREFERENCES_AND_HABITS, "晚上整理插画；周末看外婆")))
         val life = advanceCharacterLife(persona, ChatCharacterState(), now = 1000L, storyTime = "周末晚上")
         assertTrue(life.activeEvents.isEmpty())
         assertEquals("", renderCharacterLifePrompt(life))
