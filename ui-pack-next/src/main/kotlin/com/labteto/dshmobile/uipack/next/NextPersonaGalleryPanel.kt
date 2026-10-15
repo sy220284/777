@@ -32,7 +32,7 @@ internal fun NextPersonaGalleryPanel(port: PersonaGalleryUiPort, personas: Perso
 @Composable
 internal fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: PersonaSelectionUiPort?,
     selection: UiPersonaSelectionSnapshot?, transfer: PersonaTransferUiPort?, stories: PersonaStoryUiPort?, deletion: PersonaGalleryDeletionUiPort?, save: PersonaGallerySaveUiPort?, portraits: PersonaPortraitUiPort?,
-    initialGalleryId: String? = null, onSelectionAccepted: (() -> Boolean)? = null, close: () -> Unit) {
+    initialGalleryId: String? = null, onSelectionAccepted: (() -> Boolean)? = null, authoring: PersonaAuthoringUiPort? = null, close: () -> Unit) {
     var entries by remember(port) { mutableStateOf<List<UiPersonaGalleryEntry>>(emptyList()) }
     var selectedGallery by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedStory by rememberSaveable { mutableStateOf<String?>(null) }
@@ -46,6 +46,8 @@ internal fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: Pers
     var stage by rememberSaveable { mutableStateOf("") }
     var confirmDelete by remember(port) { mutableStateOf(false) }
     var deletingEntry by rememberSaveable { mutableStateOf<String?>(null) }
+    var inspectingGallery by rememberSaveable { mutableStateOf<String?>(null) }
+    var inspectingStory by rememberSaveable { mutableStateOf<String?>(null) }
     var historyGallery by rememberSaveable { mutableStateOf<String?>(null) }
     var historyStory by rememberSaveable { mutableStateOf<String?>(null) }
     var pending by remember(port) { mutableStateOf(false) }
@@ -111,6 +113,16 @@ internal fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: Pers
         }
     }
     LaunchedEffect(port) { pending = true; try { read() } finally { pending = false } }
+    if (authoring != null && personas != null && inspectingGallery != null) {
+        key(inspectingGallery, inspectingStory) {
+            NextPersonaInspectionDialog(authoring, personas, inspectingGallery!!, inspectingStory, close = {
+                inspectingGallery = null; inspectingStory = null
+                pending = true
+                scope.launch { try { read() } finally { pending = false } }
+            })
+        }
+        return
+    }
     if (historyGallery != null && historyStory != null) {
         key(historyGallery, historyStory) {
             NextPersonaHistoryDialog(port, historyGallery!!, historyStory!!, onClose = {
@@ -169,6 +181,9 @@ internal fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: Pers
                     TextButton(onClick = { selectedGallery = entry.id; selectedStory = story.id; title = story.title; notes = story.notes; stage = story.storyStage; confirmDelete = false }, enabled = !pending) {
                         Text(stringResource(R.string.next_gallery_story_summary, story.title, story.messageCount))
                     }
+                    if (authoring != null && personas != null) TextButton(
+                        onClick = { inspectingGallery = entry.id; inspectingStory = story.id }, enabled = !pending,
+                    ) { Text(stringResource(R.string.next_persona_inspection)) }
                     TextButton(onClick = { historyGallery = entry.id; historyStory = story.id }, enabled = !pending) {
                         Text(stringResource(R.string.next_gallery_history))
                     }

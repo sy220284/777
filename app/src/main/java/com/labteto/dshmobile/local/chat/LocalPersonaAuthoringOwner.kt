@@ -11,6 +11,8 @@ import com.labteto.dshmobile.uicontract.UiPersonaDraft
 import com.labteto.dshmobile.uicontract.UiPersonaFact
 import com.labteto.dshmobile.uicontract.UiPersonaLore
 import com.labteto.dshmobile.uicontract.UiSessionIdentity
+import com.labteto.dshmobile.uicontract.UiPersonaPreset
+import com.labteto.dshmobile.uicontract.UiPersonaSuggestion
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -48,7 +50,27 @@ class LocalPersonaAuthoringOwner @Inject internal constructor(
     private val gallery: ChatPersonaGalleryStore,
     private val suggestions: PersonaAutoFillService,
     private val state: LocalRuntimeStateStore,
+    private val presetInstaller: LocalPersonaPresetInstaller,
+    private val inspectionOwner: LocalPersonaInspectionOwner,
 ) : PersonaAuthoringUiPort {
+    override fun presets() = PersonaPresetCatalog.presets.map { UiPersonaPreset(it.id, it.persona.name, it.franchise, it.summary) }
+    override suspend fun installPreset(presetId: String) = guarded {
+        val preset = PersonaPresetCatalog.find(presetId) ?: error("预置人物不存在")
+        val saved = presetInstaller.install(preset)
+        UiPersonaAuthoringReceipt.Saved(saved.id, saved.updatedAt)
+    }
+    override suspend fun inspect(identity: UiSessionIdentity, galleryId: String, storyId: String?) =
+        inspectionOwner.inspect(identity, galleryId, storyId)
+    override suspend fun applySuggestions(galleryId: String, expectedRevision: Long, suggestions: List<UiPersonaSuggestion>) = guarded {
+        require(suggestions.isNotEmpty()) { "请选择需要追加的建议" }
+        require(suggestions.all { it.value.isNotBlank() && (it.field in CharacterFactCategories.canonical || it.field in setOf("coreIdentity", "franchise")) }) {
+            "人物建议包含不支持的字段"
+        }
+        val updated = gallery.editProfile(galleryId, expectedRevision) { base ->
+            applyPersonaSuggestions(base, suggestions.map { PersonaAppendSuggestion(it.field, it.value, it.evidence) })
+        } ?: return@guarded UiPersonaAuthoringReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+        UiPersonaAuthoringReceipt.Saved(updated.id, updated.updatedAt)
+    }
     override suspend fun read(galleryId: String) = guarded {
         val entry = gallery.findEntry(galleryId) ?: return@guarded UiPersonaAuthoringReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
         UiPersonaAuthoringReceipt.Loaded(UiPersonaAuthoringSnapshot(entry.id, entry.updatedAt, entry.persona.authoringDraft()))

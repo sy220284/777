@@ -42,6 +42,7 @@ fun NextPersonaGalleryScene(
     save: PersonaGallerySaveUiPort? = null,
     portraits: PersonaPortraitUiPort? = null,
 ) {
+    var presetsOpen by rememberSaveable { mutableStateOf(false) }
     var managing by rememberSaveable { mutableStateOf(false) }
     var manageTarget by rememberSaveable { mutableStateOf<String?>(null) }
     val selectionState by selection.snapshots.collectAsStateWithLifecycle(initialValue = selection.snapshot())
@@ -62,10 +63,12 @@ fun NextPersonaGalleryScene(
     val rejected = stringResource(R.string.next_gallery_action_rejected)
     val navigationFailed = stringResource(R.string.next_gallery_navigation_failed)
 
+    if (presetsOpen && authoring != null) NextPersonaPresetsDialog(authoring,
+        close = { presetsOpen = false }, installed = { presetsOpen = false; refresh++ })
     if (managing) NextPersonaGalleryDialog(
         port = gallery, personas = selection, selection = selectionState,
         transfer = transfer, stories = stories, deletion = deletion, save = save, portraits = portraits,
-        initialGalleryId = manageTarget, onSelectionAccepted = onStoryOpened,
+        initialGalleryId = manageTarget, onSelectionAccepted = onStoryOpened, authoring = authoring,
         close = { managing = false; refresh++ },
     )
     LaunchedEffect(gallery, refresh) {
@@ -85,6 +88,9 @@ fun NextPersonaGalleryScene(
         }
         if (authoring != null) TextButton(onClick = { creating = true }, enabled = !busy) {
             Text(stringResource(R.string.next_persona_create))
+        }
+        if (authoring != null) TextButton(onClick = { presetsOpen = true }, enabled = !busy) {
+            Text(stringResource(R.string.next_persona_presets))
         }
         if (transfer != null || save != null) TextButton(
             onClick = { manageTarget = null; managing = true }, enabled = !busy,

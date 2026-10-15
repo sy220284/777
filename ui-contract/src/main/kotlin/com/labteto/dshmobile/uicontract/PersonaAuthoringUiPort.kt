@@ -34,7 +34,26 @@ sealed interface UiPersonaAuthoringReceipt {
     data class Rejected(val reason: UiCommandRejection) : UiPersonaAuthoringReceipt
     data class Failed(val message: String?) : UiPersonaAuthoringReceipt
 }
+data class UiPersonaPreset(val id: String, val name: String, val franchise: String, val summary: String)
+data class UiPersonaConflict(val field: String, val fixedValue: String, val observedValue: String, val reason: String)
+data class UiPersonaSuggestion(val field: String, val value: String, val evidence: String)
+data class UiPersonaInspection(val galleryId: String, val revision: Long,
+    val conflicts: List<UiPersonaConflict>, val suggestions: List<UiPersonaSuggestion>)
+sealed interface UiPersonaInspectionReceipt {
+    data class Inspected(val inspection: UiPersonaInspection) : UiPersonaInspectionReceipt
+    data object Rejected : UiPersonaInspectionReceipt
+    data class Failed(val message: String?) : UiPersonaInspectionReceipt
+}
 interface PersonaAuthoringUiPort {
+    fun presets(): List<UiPersonaPreset> = emptyList()
+    suspend fun installPreset(presetId: String): UiPersonaAuthoringReceipt =
+        UiPersonaAuthoringReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+    suspend fun inspect(identity: UiSessionIdentity, galleryId: String, storyId: String?): UiPersonaInspectionReceipt =
+        UiPersonaInspectionReceipt.Rejected
+    /** Saves only the archive; selecting it for the current story is a separate explicit action. */
+    suspend fun applySuggestions(galleryId: String, expectedRevision: Long,
+        suggestions: List<UiPersonaSuggestion>): UiPersonaAuthoringReceipt =
+        UiPersonaAuthoringReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
     suspend fun read(galleryId: String): UiPersonaAuthoringReceipt
     suspend fun create(draft: UiPersonaDraft): UiPersonaAuthoringReceipt
     suspend fun save(galleryId: String, expectedRevision: Long, draft: UiPersonaDraft): UiPersonaAuthoringReceipt

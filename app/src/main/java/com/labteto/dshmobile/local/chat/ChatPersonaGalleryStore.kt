@@ -367,6 +367,24 @@ class ChatPersonaGalleryStore internal constructor(
     }
 
     /** Whole profile edit checks the user's captured archive version under the sole Store lock. */
+    /** Profile and optional staged artwork commit in one document write; existing stories survive. */
+    @Synchronized
+    internal fun installPresetForUi(persona: PersonaProfile, portraitPath: String?): PersonaGalleryEntry {
+        val document = readNormalized()
+        val canonical = persona.canonicalV4().let { it.copy(loreEntries = uniqueLoreEntryIds(it.loreEntries)) }
+        val matched = document.entries.filter { samePersonaIdentity(it.persona, canonical) }.singleOrNull()
+        val id = matched?.id ?: "gallery-${UUID.randomUUID()}"
+        val base = matched ?: PersonaGalleryEntry(id = id, persona = canonical.copy(id = id))
+        check(base.updatedAt < Long.MAX_VALUE) { "人物版本已耗尽" }
+        val revision = maxOf(System.currentTimeMillis(), base.updatedAt + 1L)
+        val entry = base.copy(
+            persona = mergePersonaProfiles(base.persona, canonical).copy(id = id, updatedAt = revision),
+            portraitPath = base.portraitPath.ifBlank { portraitPath.orEmpty() }, updatedAt = revision,
+        )
+        documentStore.write(document.copy(entries = document.entries.filterNot { it.id == id } + entry))
+        return entry
+    }
+
     @Synchronized
     internal fun editProfile(id: String, expectedRevision: Long, transform: (PersonaProfile) -> PersonaProfile): PersonaGalleryEntry? {
         val document = readNormalized()

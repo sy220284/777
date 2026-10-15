@@ -1012,7 +1012,7 @@
     <string name="persona_gallery_inspect">人物检查</string>
     <string name="persona_gallery_inspect_failed">人物检查失败</string>
     <string name="persona_gallery_append_selected">追加选中内容（%1$d）</string>
-    <string name="persona_gallery_append_done">已追加到固定人设，重复内容已自动忽略</string>
+    <string name="persona_gallery_append_done">已追加到人物档案，重复内容已忽略；重新选择人物后应用到当前故事</string>
     <string name="persona_gallery_append_failed">追加失败</string>
     <string name="persona_gallery_history_hide">收起故事历史</string>
     <string name="persona_gallery_history_show">查看故事历史</string>
@@ -2433,5 +2433,6 @@
     <string name="skills_github_official_heading">官方精选技能</string>
     <string name="skills_github_official_empty">官方技能目录为空或暂时无法读取</string>
     <string name="composer_invocation_skill_manual">仅在用户手动选中时调用</string>
+    <string name="ui_r4_gallery_inspection_stale">人物档案或检查上下文已变化，请重新检查后选择建议。</string>
 </resources>
 

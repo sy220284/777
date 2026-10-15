@@ -292,4 +292,13 @@
     <string name="next_gallery_portrait_missing">暂时没有可预览的立绘。</string>
     <string name="next_gallery_portrait_invalid">立绘无法解码，请重新导入图片。</string>
     <string name="next_gallery_history_system">系统记录</string>
+    <string name="next_persona_presets">预置人物</string>
+    <string name="next_persona_preset_install">安装到人物图库</string>
+    <string name="next_persona_inspection">检查人物与故事</string>
+    <string name="next_persona_inspection_hint">检查将调用当前模型并产生用量。检查发现仅供确认；选择建议后可追加到档案。</string>
+    <string name="next_persona_inspection_start">开始模型检查</string>
+    <string name="next_persona_inspection_empty">本次未发现冲突或可追加建议。</string>
+    <string name="next_persona_inspection_conflict">字段：%1$s\n档案：%2$s\n对话：%3$s\n原因：%4$s</string>
+    <string name="next_persona_suggestions_apply">追加选中的建议</string>
+    <string name="next_persona_suggestions_saved">人物档案已更新；重新选择人物后应用到当前故事。</string>
 </resources>

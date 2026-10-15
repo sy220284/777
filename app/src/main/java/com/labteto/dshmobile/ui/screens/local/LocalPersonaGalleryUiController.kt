@@ -43,6 +43,7 @@ internal class LocalPersonaGalleryUiController(
     private val appContext: Context,
     private val scope: CoroutineScope,
 ) {
+    private var lastInspection: com.labteto.dshmobile.uicontract.UiPersonaInspection? = null
     private val state = runtime.state
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
     val gallery: StateFlow<List<PersonaGalleryEntry>> = _gallery.asStateFlow()
@@ -155,58 +156,39 @@ suspend fun autoFillNewPersona(current: PersonaProfile, description: String): Re
     }
 }
 
-suspend fun inspectGalleryPersona(
-    id: String,
-    storyId: String?,
-): Result<PersonaInspectionResult> {
-    val snapshot = state.value
-    if (snapshot.loading || snapshot.kernel.running || snapshot.usageMode != LocalUsageMode.CHAT) {
-        return Result.failure(IllegalStateException(appContext.getString(R.string.ui_r4_gallery_inspect_busy)))
-    }
-    if (!snapshot.modelState.configured) {
-        return Result.failure(IllegalStateException(appContext.getString(R.string.ui_r4_gallery_model_unset)))
-    }
-    val entry = gallery.value.firstOrNull { it.id == id }
-        ?: return Result.failure(IllegalStateException(appContext.getString(R.string.ui_r4_gallery_entry_gone)))
-    val story = entry.story(storyId)
-    val archived = story?.history.orEmpty()
-    val dialogue = if (
-        snapshot.chat.galleryId == id &&
-        snapshot.chat.galleryStoryId == story?.id
-    ) {
-        val recent = withContext(Dispatchers.IO) {
-            runtime.session.transcriptTailForUi(snapshot.sessionId, PERSONA_INSPECTION_RECENT_MESSAGES)
+suspend fun inspectGalleryPersona(id: String, storyId: String?): Result<PersonaInspectionResult> = runSuspendResult {
+    lastInspection = null
+    val identity = selectionPort.snapshot().identity
+        ?: error(appContext.getString(R.string.ui_r4_gallery_session_not_ready))
+    when (val result = authoringPort.inspect(identity, id, storyId)) {
+        is com.labteto.dshmobile.uicontract.UiPersonaInspectionReceipt.Inspected -> {
+            lastInspection = result.inspection
+            PersonaInspectionResult(
+                result.inspection.conflicts.map { com.labteto.dshmobile.local.chat.PersonaConflictFinding(it.field, it.fixedValue, it.observedValue, it.reason) },
+                result.inspection.suggestions.map { PersonaAppendSuggestion(it.field, it.value, it.evidence) })
         }
-        (archived + recent)
-            .distinctBy { it.id.ifBlank { "${it.role}|${it.createdAt}|${it.content}" } }
-    } else {
-        archived
-    }
-    return runSuspendResult {
-        chatUi.inspectPersona(
-            model = snapshot.modelState.model, baseUrl = snapshot.modelState.baseUrl,
-            profileId = snapshot.modelState.modelSelection.activeProfileId,
-            persona = entry.persona,
-            messages = dialogue,
-            chatContext = story?.chatContext,
-        )
+        is com.labteto.dshmobile.uicontract.UiPersonaInspectionReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_model_not_ready))
+        else -> error(appContext.getString(R.string.ui_r4_gallery_inspection_stale))
     }
 }
 
-suspend fun applyGallerySuggestions(
-    id: String,
-    suggestions: List<PersonaAppendSuggestion>,
-): Result<PersonaGalleryEntry> = runCatching {
-    val updated = withContext(Dispatchers.IO) {
-        check(suggestions.isNotEmpty()) { appContext.getString(R.string.ui_r4_gallery_suggestions_empty) }
-        chatUi.applyGallerySuggestions(id, suggestions)
-            ?: error(appContext.getString(R.string.ui_r4_gallery_entry_gone))
+suspend fun applyGallerySuggestions(id: String, suggestions: List<PersonaAppendSuggestion>): Result<PersonaGalleryEntry> = runSuspendResult {
+    val inspection = lastInspection?.takeIf { it.galleryId == id }
+        ?: error(appContext.getString(R.string.ui_r4_gallery_inspection_stale))
+    val selected = suggestions.map { com.labteto.dshmobile.uicontract.UiPersonaSuggestion(it.field, it.value, it.evidence) }
+    check(selected.isNotEmpty() && selected.all { it in inspection.suggestions }) {
+        appContext.getString(R.string.ui_r4_gallery_inspection_stale)
     }
-    _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
-    if (state.value.chat.galleryId == id) {
-        runtime.chat.configureChatPersona(updated.persona)
+    when (val result = authoringPort.applySuggestions(id, inspection.revision, selected)) {
+        is com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Saved -> {
+            lastInspection = null
+            refresh()
+            gallery.value.firstOrNull { it.id == result.galleryId }
+                ?: error(appContext.getString(R.string.ui_r4_gallery_saved_changed))
+        }
+        is com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_create_incomplete))
+        else -> error(appContext.getString(R.string.ui_r4_gallery_inspection_stale))
     }
-    updated
 }
 
 suspend fun setGalleryPortrait(id: String, uri: Uri): Result<PersonaGalleryEntry> =
@@ -261,14 +243,16 @@ internal suspend fun importGalleryPersona(
     }
 }
 
-suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runCatching {
-    val preset = PersonaPresetCatalog.find(id) ?: error(appContext.getString(R.string.ui_r4_gallery_preset_missing))
-    val entry = withContext(Dispatchers.IO) {
-        PersonaPresetArtworkInstaller(appContext, chatUi, portraitPort.maxImportBytes, deletionPort).install(preset).also {
-            _gallery.value = runCatching { chatUi.galleryEntries() }.getOrDefault(_gallery.value)
+suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runSuspendResult {
+    when (val result = authoringPort.installPreset(id)) {
+        is com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Saved -> {
+            refresh()
+            gallery.value.firstOrNull { it.id == result.galleryId }
+                ?: error(appContext.getString(R.string.ui_r4_gallery_saved_changed))
         }
+        is com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_create_incomplete))
+        else -> error(appContext.getString(R.string.ui_r4_gallery_preset_missing))
     }
-    entry
 }
 
 suspend fun deleteGalleryHistoryMessage(
