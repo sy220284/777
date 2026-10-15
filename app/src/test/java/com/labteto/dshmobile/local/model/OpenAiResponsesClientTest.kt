@@ -1351,7 +1351,7 @@ class OpenAiResponsesClientTest {
                 requested = true,
             ),
         )
-        assertFalse(
+        assertTrue(
             resolveOpenAiImageGenerationToolEnabled(
                 baseUrl = "https://api.openai.com/v1",
                 model = "gpt-5.6",
@@ -1406,7 +1406,101 @@ class OpenAiResponsesClientTest {
         assertEquals(1, tools.size)
         assertEquals("image_generation", tools.single().jsonObject["type"]?.jsonPrimitive?.content)
         assertTrue(client.supportsOpenAiImageGenerationTool("gpt-6-astra"))
-        assertFalse(client.supportsOpenAiImageGenerationTool("gpt-5.6"))
+        assertTrue(client.supportsOpenAiImageGenerationTool("gpt-5.6"))
+    }
+
+    @Test
+    fun knownModernGptPlanModelsExposeNativeImageToolButProxyDoesNot() {
+        listOf("gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna",
+            "gpt-5.6", "gpt-5.6-sol", "gpt-5.5").forEach { model ->
+            assertTrue(resolveOpenAiImageGenerationToolEnabled(
+                baseUrl = "https://api.openai.com/v1", model = model,
+                planSharing = true, requested = true,
+            ))
+            assertFalse(resolveOpenAiImageGenerationToolEnabled(
+                baseUrl = "https://proxy.example.com/v1", model = model,
+                planSharing = false, requested = true,
+            ))
+        }
+        assertFalse(resolveOpenAiImageGenerationToolEnabled(
+            baseUrl = "https://api.openai.com/v1", model = "unverified-future-model",
+            planSharing = true, requested = true,
+        ))
+    }
+
+    @Test
+    fun explicitImageCommandsForceOnlyTheEligibleNativeTool() {
+        listOf("生图吧", "生成一张图片", "请画一只猫", "Draw a picture",
+            "请根据之前的内容，生图吧").forEach { command ->
+            val payload = client.buildPayload(
+                model = "gpt-6.1-sol",
+                messages = listOf(buildJsonObject {
+                    put("role", "user")
+                    put("content", command)
+                }),
+                tools = JsonArray(emptyList()),
+                temperature = null,
+                planSharing = true,
+                enableImageGenerationTool = true,
+            )
+            assertEquals("image_generation",
+                payload["tool_choice"]?.jsonObject?.get("type")?.jsonPrimitive?.content)
+            assertEquals(1, payload["tools"]!!.jsonArray.size)
+        }
+    }
+
+    @Test
+    fun imageToolChoiceRejectsQuestionNegationAndNormalText() {
+        listOf("普通聊天", "你能不能生图？", "不要生图", "为什么不能生图",
+            "介绍一下生图功能", "他说生图吧").forEach { message ->
+            val payload = client.buildPayload(
+                model = "gpt-6.1-sol",
+                messages = listOf(buildJsonObject {
+                    put("role", "user")
+                    put("content", message)
+                }),
+                tools = JsonArray(emptyList()),
+                temperature = null,
+                planSharing = true,
+                enableImageGenerationTool = true,
+            )
+            assertFalse("tool_choice" in payload)
+        }
+        val disabled = client.buildPayload(
+            model = "gpt-6-astra",
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", "生图吧")
+            }),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            planSharing = true,
+            enableImageGenerationTool = false,
+        )
+        assertFalse("tool_choice" in disabled)
+        assertFalse("tools" in disabled)
+    }
+
+    @Test
+    fun imageCommandInsideMultimodalTextPartCanForceNativeTool() {
+        val payload = client.buildPayload(
+            model = "gpt-6-astra",
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", buildJsonArray {
+                    add(buildJsonObject { put("type", "text"); put("text", "把上面的方案生成一张图片") })
+                    add(buildJsonObject {
+                        put("type", "image_url")
+                        put("image_url", buildJsonObject { put("url", "data:image/png;base64,AAAA") })
+                    })
+                })
+            }),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            enableImageGenerationTool = true,
+        )
+        assertEquals("image_generation",
+            payload["tool_choice"]?.jsonObject?.get("type")?.jsonPrimitive?.content)
     }
 
     @Test
