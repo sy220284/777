@@ -13,10 +13,14 @@ internal object ChatDiaryEntryPolicy {
         // A grounded change in someone's personal outlook can be memorable even when
         // the triggering event is brief. Keep evidence and significance gates intact:
         // this is an alternative inside the original diary pipeline, not a second writer.
-        val thoughtful = privateReflection.length >= MIN_SUBSTANTIVE_REFLECTION_CHARS
+        // A brief private thought may be memorable. For a short event anchor we
+        // still require fuller reflection; otherwise a normal grounded event
+        // anchor is enough. Style, punctuation and prose length are not graded.
+        val hasVoice = privateReflection.isNotBlank()
+        val shortAnchorWithContext = privateReflection.length >= MIN_SHORT_ANCHOR_CONTEXT_CHARS
         if (importance < MIN_IMPORTANCE) return null
-        if (event.length < (if (thoughtful) MIN_THOUGHT_EVENT_CHARS else MIN_EVENT_CHARS)) return null
-        if (significance != "MAJOR" && importance < MINOR_IMPORTANCE && !thoughtful) return null
+        if (event.length < (if (shortAnchorWithContext) MIN_THOUGHT_EVENT_CHARS else MIN_EVENT_CHARS)) return null
+        if (significance != "MAJOR" && importance < MINOR_IMPORTANCE && !hasVoice) return null
         if (!eventGrounded(event, request.evidenceText)) return null
 
         return ChatDiaryDelta(
@@ -293,7 +297,7 @@ internal object ChatDiaryEntryPolicy {
 
     private const val MAX_SOURCE_IDS = 16
     private const val MIN_THOUGHT_EVENT_CHARS = 3
-    private const val MIN_SUBSTANTIVE_REFLECTION_CHARS = 36
+    private const val MIN_SHORT_ANCHOR_CONTEXT_CHARS = 36
     private const val MIN_EVENT_CHARS = 6
     private const val MIN_IMPORTANCE = 2
     private const val MINOR_IMPORTANCE = 3
