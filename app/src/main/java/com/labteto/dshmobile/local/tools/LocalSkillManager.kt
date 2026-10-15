@@ -27,6 +27,7 @@ internal object LocalPresetSkillCatalog {
         "document-summary" to "文档总结、会议纪要和待办提取",
         "research-check" to "资料查询、来源核实和事实查证",
         "code-review" to "代码审查、PR 和回归风险",
+        "imagegen" to "图像生成、图片编辑、参考图及 UI 素材创作",
         "bug-investigation" to "故障排查、日志分析和崩溃定位",
         "data-insights" to "数据统计、报表和趋势分析",
         "translation-localization" to "翻译、术语统一和本地化",
