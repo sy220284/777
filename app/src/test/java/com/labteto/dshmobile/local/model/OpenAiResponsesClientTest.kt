@@ -1506,6 +1506,41 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun attachedImageWithExplicitEditSelectsEditActionNotFreshGeneration() {
+        fun payloadFor(prompt: String) = client.buildPayload(
+            model = "gpt-6.1-sol",
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", buildJsonArray {
+                    add(buildJsonObject { put("type", "text"); put("text", prompt) })
+                    add(buildJsonObject {
+                        put("type", "image_url")
+                        put("image_url", buildJsonObject { put("url", "data:image/png;base64,AAAA") })
+                    })
+                })
+            }),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            planSharing = true,
+            enableImageGenerationTool = true,
+        )
+        listOf("请根据附图重新生成一张图片，修改要求：把背景改成蓝色",
+            "Edit this image").forEach { prompt ->
+            val payload = payloadFor(prompt)
+            assertEquals("image_generation",
+                payload["tool_choice"]?.jsonObject?.get("type")?.jsonPrimitive?.content)
+            assertEquals("edit",
+                payload["tools"]?.jsonArray?.single()?.jsonObject
+                    ?.get("action")?.jsonPrimitive?.content)
+        }
+        val fresh = payloadFor("把上面的方案生成一张图片")
+        assertFalse("action" in fresh["tools"]!!.jsonArray.single().jsonObject)
+        val inquiry = payloadFor("怎么修改这张图片？")
+        assertFalse("tool_choice" in inquiry)
+        assertFalse("action" in inquiry["tools"]!!.jsonArray.single().jsonObject)
+    }
+
+    @Test
     fun interleavedResponseTextAndGeneratedImageKeepOutputOrder() {
         val response = Json.parseToJsonElement(
             """{
