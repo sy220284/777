@@ -685,7 +685,7 @@ internal fun ChatPersonaDialog(
                     "subjectiveBeliefs", "identityGap",
                 )
                 remainingFields.filter { (category, _) ->
-                    showAllFieldTypes || category in commonTypes
+                    category != "customFacts" && (showAllFieldTypes || category in commonTypes)
                 }.forEach { (category, label) ->
                     SySheetChoiceRow(
                         title = stringResource(label),
@@ -707,6 +707,12 @@ internal fun ChatPersonaDialog(
                     SySheetChoiceRow(
                         title = stringResource(R.string.local_persona_franchise),
                         onClick = { visibleFields = visibleFields + "franchise"; addFieldsOpen = false },
+                    )
+                }
+                if (showAllFieldTypes && remainingFields.any { it.first == "customFacts" }) {
+                    SySheetChoiceRow(
+                        title = stringResource(R.string.persona_v4_custom_facts),
+                        onClick = { addFactField("customFacts") },
                     )
                 }
                 SySheetChoiceRow(
