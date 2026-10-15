@@ -101,9 +101,9 @@ internal fun NextConversationSubScene(
                                         Text(if (selectedId == message.id) "当前选择" else "选择消息")
                                     }
                                 }
-                                if (id.value == "chat.branches" && message.branch != null &&
+                                val branch = message.branch
+                                if (id.value == "chat.branches" && branch != null &&
                                     !workMode && identity != null) {
-                                    val branch = message.branch
                                     Text("分支 ${branch.index + 1}/${branch.count}")
                                     Row {
                                         for (target in 0 until branch.count.coerceAtMost(32)) {
