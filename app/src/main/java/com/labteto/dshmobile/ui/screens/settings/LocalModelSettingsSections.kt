@@ -59,8 +59,6 @@ import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
-import com.labteto.dshmobile.ui.shenyan.SyMaterialFrame
-import com.labteto.dshmobile.ui.shenyan.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -236,8 +234,8 @@ internal fun LocalModelSettingsCard(
             val isSelectedProfile = local.modelSelection.isActive(profile)
             Surface(
                 shape = DsShapes.row,
-                color = if (isSelectedProfile) colors.selected
-                    else LocalSyColors.current.materialL1,
+                color = if (isSelectedProfile) colors.selected.copy(alpha = .24f)
+                    else androidx.compose.ui.graphics.Color.Transparent,
                 border = androidx.compose.foundation.BorderStroke(
                     1.dp,
                     if (isSelectedProfile) colors.primary.copy(alpha = 0.45f) else colors.border,
@@ -407,7 +405,7 @@ internal fun LocalModelSettingsCard(
                 SyMenu(
                     anchor = {
                         Surface(shape = DsShapes.row,
-                            color = LocalSyColors.current.materialL1,
+                            color = androidx.compose.ui.graphics.Color.Transparent,
                             modifier = Modifier.fillMaxWidth()) {
                             Row(Modifier.fillMaxWidth().padding(SyMetric.gapSection),
                                 verticalAlignment = Alignment.CenterVertically) {
@@ -526,7 +524,7 @@ internal fun LocalModelSettingsCard(
                     SyMenu(
                         anchor = {
                             Surface(shape = DsShapes.row,
-                                color = LocalSyColors.current.materialL1,
+                                color = androidx.compose.ui.graphics.Color.Transparent,
                                 modifier = Modifier.fillMaxWidth()) {
                                 Row(Modifier.fillMaxWidth().padding(SyMetric.gapSection),
                                     verticalAlignment = Alignment.CenterVertically) {
@@ -663,12 +661,7 @@ internal fun DeepSeekPricingCard(
         )
 
         state.models.forEach { model ->
-            SyMaterialFrame(
-                modifier = Modifier.fillMaxWidth(),
-                tier = SyMaterialTier.L3_CARD,
-                horizontalPadding = 0.dp,
-                verticalPadding = 0.dp,
-            ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(SyMetric.gapLg),
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),

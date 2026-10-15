@@ -36,8 +36,6 @@ import com.shenyan.designsystem.components.SyRadioControl
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.shenyan.SyGlassCard
-import com.shenyan.designsystem.components.SyGroupCard
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -74,7 +72,7 @@ internal fun LocalConfiguration(
             }
         }
 
-        SyGlassCard(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+        Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             Text(stringResource(R.string.local_on_device_execution_title), style = DsType.base16Strong.withReadingWeight(), color = colors.text)
             Text(
                 stringResource(R.string.local_on_device_execution_hint),
@@ -84,7 +82,7 @@ internal fun LocalConfiguration(
         }
 
         Text(stringResource(R.string.local_model_section_title), style = DsType.std14.withReadingWeight(), color = colors.textTertiary)
-        SyGroupCard {
+        Column(modifier = Modifier.fillMaxWidth()) {
             SyTextField(
                 value = apiKey,
                 onValueChange = { apiKey = it },

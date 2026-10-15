@@ -51,7 +51,6 @@ import com.labteto.dshmobile.local.presentation.chatRelationshipSubjectKey
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.shenyan.designsystem.components.SyPill
 import com.shenyan.designsystem.components.SyEmptyState
 import com.shenyan.designsystem.components.SyLoadingState
@@ -487,7 +486,7 @@ private fun CharacterDiaryEntryCard(
     // Reference screen 09: a centered reading sheet, with real recorded diary fields.
     // Never synthesize first-person thoughts or comments that do not exist in the diary store.
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-    SyGlassCard(modifier = Modifier.widthIn(max = 680.dp).fillMaxWidth(),
+    Column(modifier = Modifier.widthIn(max = 680.dp).fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
         Text(
             dateText,
