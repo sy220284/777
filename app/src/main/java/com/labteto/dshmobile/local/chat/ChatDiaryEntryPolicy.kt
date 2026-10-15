@@ -190,12 +190,15 @@ internal object ChatDiaryEntryPolicy {
         queryTerms: Set<String>,
         now: Long,
     ): ChatDiaryMatchScore {
-        val lexical = terms(entry.event + " " + entry.relationshipMeaning + " " + entry.unresolvedEcho + " " + entry.privateReflection + " " + entry.recallAnchors.joinToString(" "))
-            .count(queryTerms::contains)
+        val searchable = searchText(entry)
+        val lexical = terms(searchable).count(queryTerms::contains)
         val phrase = if (queryCore.isBlank()) 0 else {
-            (similarity(queryCore, searchText(entry)) * 100).toInt()
+            (similarity(queryCore, searchable) * 100).toInt()
         }
-        val semantic = lexical * 24 + phrase
+        // Chinese bigram budgets may omit the end of a long sentence. Exact phrases
+        // in private thoughts must remain findable without indexing every bigram.
+        val exactPhrase = queryCore.length >= 2 && normalizeText(searchable).contains(queryCore)
+        val semantic = lexical * 24 + phrase + if (exactPhrase) 72 else 0
         val ageDays = ((now - entry.updatedAt).coerceAtLeast(0L) / DAY_MILLIS).toInt()
         val recency = (30 - ageDays).coerceIn(0, 30)
         return ChatDiaryMatchScore(
@@ -220,12 +223,12 @@ internal object ChatDiaryEntryPolicy {
 
     private fun searchText(entry: ChatDiaryEntry): String =
         listOf(
+            entry.privateReflection,
             entry.event,
             entry.feeling,
             entry.innerThought,
             entry.relationshipMeaning,
             entry.unresolvedEcho,
-            entry.privateReflection,
             entry.recallAnchors.joinToString(" "),
         ).filter(String::isNotBlank).joinToString(" ")
 
