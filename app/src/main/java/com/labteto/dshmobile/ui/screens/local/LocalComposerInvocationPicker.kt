@@ -181,6 +181,9 @@ private fun LocalInvocationIcon(
         item.id.contains("figma", ignoreCase = true) ->
             Icon(painterResource(R.drawable.ic_connector_figma), null,
                 modifier = modifier, tint = Color.Unspecified)
+        item.id.equals("sites", ignoreCase = true) || item.id.startsWith("sites-", ignoreCase = true) ->
+            Icon(painterResource(R.drawable.ic_connector_sites), null,
+                modifier = modifier, tint = Color.Unspecified)
         else ->
             Icon(FeatherIcons.Globe, null, modifier = modifier, tint = colors.primary)
     }
