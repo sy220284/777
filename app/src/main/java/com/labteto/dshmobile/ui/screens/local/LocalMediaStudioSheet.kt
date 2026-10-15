@@ -105,12 +105,13 @@ internal fun LocalMediaStudioSheetContent(
     var historyError by remember { mutableStateOf<String?>(null) }
     var mode by rememberSaveable(activeRevision?.originId) { mutableStateOf(activeRevision?.kind?.name ?: initialKind.name) }
     val kind = LocalMediaKind.valueOf(mode)
+    val matchingRevision = activeRevision?.forKind(kind)
     val available = models.filter { it.kind == kind }
     var chosenId by rememberSaveable(mode, activeRevision?.originId) { mutableStateOf("") }
     // A revision may only inherit the same frozen provider+account route. For deleted or
     // re-keyed accounts, require an explicit choice before any paid submission is possible.
-    val originalOffer = activeRevision?.takeIf { it.kind == kind }?.originalOffer(models)
-    val selected = if (activeRevision != null && activeRevision.kind == kind) {
+    val originalOffer = matchingRevision?.originalOffer(models)
+    val selected = if (matchingRevision != null) {
         if (chosenId.isBlank()) originalOffer else available.firstOrNull { it.id == chosenId }
     } else LocalMediaCatalog.selectOffer(models, kind, preferredProfileId, chosenId.takeIf(String::isNotBlank))
     val manualRouteActive = chosenId.isNotBlank() && selected?.id == chosenId
@@ -120,7 +121,7 @@ internal fun LocalMediaStudioSheetContent(
     var ratio by rememberSaveable(activeRevision?.originId) { mutableStateOf(activeRevision?.ratio ?: "1:1") }
     var voiceId by rememberSaveable(selected?.id, personaVoiceStyle, activeRevision?.originId) {
         // An old provider voice ID is never valid evidence for a newly selected account/provider.
-        val originalVoice = activeRevision?.voiceId?.takeIf { selected?.id == originalOffer?.id }
+        val originalVoice = matchingRevision?.voiceId?.takeIf { selected?.id == originalOffer?.id }
         mutableStateOf(originalVoice ?: selected?.provider?.let {
             LocalMediaVoiceLabels.suggestedId(it, personaVoiceStyle)
         }.orEmpty())
@@ -158,7 +159,7 @@ internal fun LocalMediaStudioSheetContent(
         if (uri != null && selected != null) {
             val chosen = selected
             submit(chosen) {
-                viewModel.submitTranscribe(chosen, uri, sessionId, if (activeRevision != null) activeRevision.sourceMessageId else sourceMessageId, activeRevision?.originId)
+                viewModel.submitTranscribe(chosen, uri, sessionId, if (matchingRevision != null) matchingRevision.sourceMessageId else sourceMessageId, matchingRevision?.originId)
                 if (chosen.id == activeOfferId) onDelivered()
             }
         }
@@ -180,7 +181,7 @@ internal fun LocalMediaStudioSheetContent(
 
         if (selected == null) {
             com.shenyan.designsystem.components.SyEmptyState(FeatherIcons.Image,
-                if (activeRevision != null && activeRevision.kind == kind) stringResource(R.string.media_recreate_route_missing)
+                if (matchingRevision != null) stringResource(R.string.media_recreate_route_missing)
                 else stringResource(R.string.media_studio_no_model), body = "")
             if (available.isNotEmpty()) {
                 Text(stringResource(R.string.media_recreate_change_account_notice), color = colors.textSecondary,
@@ -280,7 +281,7 @@ internal fun LocalMediaStudioSheetContent(
                     SyButton(text = stringResource(R.string.minimax_media_create_image),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            viewModel.submitImage(selected, prompt, ratio, sessionId, if (activeRevision != null) activeRevision.sourceMessageId else sourceMessageId, activeRevision?.originId)
+                            viewModel.submitImage(selected, prompt, ratio, sessionId, if (matchingRevision != null) matchingRevision.sourceMessageId else sourceMessageId, matchingRevision?.originId)
                             if (selected.id == activeOfferId) onDelivered()
                         } })
                 }
@@ -288,7 +289,7 @@ internal fun LocalMediaStudioSheetContent(
                     SyButton(text = stringResource(R.string.minimax_media_start_video),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            val task = viewModel.createVideo(selected, prompt, sessionId, if (activeRevision != null) activeRevision.sourceMessageId else sourceMessageId, activeRevision?.originId)
+                            val task = viewModel.createVideo(selected, prompt, sessionId, if (matchingRevision != null) matchingRevision.sourceMessageId else sourceMessageId, matchingRevision?.originId)
                             viewedVideoTaskId = task.id
                             onDelivered()
                         } })
@@ -403,7 +404,7 @@ internal fun LocalMediaStudioSheetContent(
                         enabled = !busy && prompt.isNotBlank() && voiceId.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            viewModel.submitSpeech(selected, prompt, voiceId, sessionId, if (activeRevision != null) activeRevision.sourceMessageId else sourceMessageId, activeRevision?.originId)
+                            viewModel.submitSpeech(selected, prompt, voiceId, sessionId, if (matchingRevision != null) matchingRevision.sourceMessageId else sourceMessageId, matchingRevision?.originId)
                             if (selected.id == activeOfferId) onDelivered()
                         } })
                     audioFile?.let { file ->

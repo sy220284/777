@@ -27,6 +27,9 @@ data class LocalMediaRevisionDraft(
     val ratio: String = "1:1",
     val voiceId: String? = null,
 ) : java.io.Serializable {
+    /** Switching media type starts an independent creation, never a false revision of another kind. */
+    fun forKind(requested: LocalMediaKind): LocalMediaRevisionDraft? = takeIf { it.kind == requested }
+
     fun originalOffer(offers: List<LocalMediaOffer>): LocalMediaOffer? =
         offers.firstOrNull {
             it.kind == kind && it.id == offerId && routeFingerprint != null &&
