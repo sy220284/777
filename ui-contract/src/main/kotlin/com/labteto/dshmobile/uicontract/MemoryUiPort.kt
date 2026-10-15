@@ -14,6 +14,8 @@ sealed interface MemoryUiReceipt {
     data class Updated(val record: MemoryRecord) : MemoryUiReceipt
     data object Forgotten : MemoryUiReceipt
     data object StaleOrMissing : MemoryUiReceipt
+    /** Memory is durable; only derived diary cleanup still needs recovery. Do not replay the mutation. */
+    data class CommittedWithWarning(val message: String) : MemoryUiReceipt
     /** A derived diary cleanup failure may follow a committed memory mutation; never replay blindly. */
     data class Failed(val message: String?) : MemoryUiReceipt
 }

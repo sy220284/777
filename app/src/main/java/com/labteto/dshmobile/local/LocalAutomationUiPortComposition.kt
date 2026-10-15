@@ -23,6 +23,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.Dispatchers
 
 /** Application composition joins existing Automation ownership with the shared foreground fence. */
 @Singleton
@@ -33,13 +37,18 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
 ) : AutomationUiPort {
     private fun context(snapshot: LocalHarnessState) = UiAutomationContext(state.uiBindingIdentity(snapshot),
         snapshot.usageMode, snapshot.chat.groupChat.enabled, snapshot.chat.chatPersona.name)
-    override val snapshots = combine(state.state, scheduler.tasks) { snapshot, tasks ->
-        UiAutomationSnapshot(context(snapshot), tasks)
-    }.distinctUntilChanged()
+    override val snapshots = flow {
+        // Task storage is initialized only during collection on IO, never during Hilt creation.
+        emitAll(combine(state.state, scheduler.tasks) { snapshot, tasks ->
+            UiAutomationSnapshot(context(snapshot), tasks)
+        }.distinctUntilChanged())
+    }.flowOn(Dispatchers.IO)
+    override fun context() = synchronized(state.foregroundRunHandle.lock) { context(state.state.value) }
     override val planningChanges = planning.revisions.map { it.toString() }.distinctUntilChanged()
     override fun planningRevision() = planning.currentRevision().toString()
-    override fun snapshot() = synchronized(state.foregroundRunHandle.lock) {
-        UiAutomationSnapshot(context(state.state.value), scheduler.list())
+    override fun snapshot(): UiAutomationSnapshot {
+        val tasks = scheduler.list()
+        return UiAutomationSnapshot(context(), tasks)
     }
     override fun submit(command: AutomationUiCommand): AutomationUiReceipt = try {
         synchronized(state.foregroundRunHandle.lock) {
@@ -57,7 +66,7 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
                         ?: return AutomationUiReceipt.Rejected(UiAutomationRejection.MISSING)
                     if (task.scheduleGeneration != command.expectedGeneration || task.mode != command.schedule.mode)
                         return AutomationUiReceipt.Rejected(UiAutomationRejection.STALE_TASK)
-                    update(command.id, command.schedule)
+                    update(command.id, command.schedule, command.expectedGeneration)
                 }
                 is AutomationUiCommand.UpdatePolicy -> {
                     val task = scheduler.list().firstOrNull { it.id == command.id }
@@ -114,10 +123,10 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
             windowStartMinuteOfDay, windowEndMinuteOfDay, quietHoursEnabled, quietStartHour, quietStartMinute,
             quietEndHour, quietEndMinute, proactiveMinGapMinutes, proactiveMaxUnanswered, notify)
     }
-    private fun update(id: String, spec: UiAutomationSchedule) = with(spec) {
+    private fun update(id: String, spec: UiAutomationSchedule, expectedGeneration: Long) = with(spec) {
         updateTask(id, prompt, firstRunAt, recurringMinutes, scheduleType, silenceMinutes,
             windowStartMinuteOfDay, windowEndMinuteOfDay, quietHoursEnabled, quietStartHour, quietStartMinute,
-            quietEndHour, quietEndMinute, proactiveMinGapMinutes, proactiveMaxUnanswered, notify)
+            quietEndHour, quietEndMinute, proactiveMinGapMinutes, proactiveMaxUnanswered, notify, expectedGeneration)
     }
     private fun updateTask(
         id: String,
@@ -136,12 +145,13 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
         proactiveMinGapMinutes: Long,
         proactiveMaxUnanswered: Int,
         notify: Boolean? = null,
+        expectedGeneration: Long,
     ): Boolean = runCatching {
         scheduler.updateTask(
             id, prompt, firstRunAt, recurringMinutes, scheduleType, silenceMinutes,
             windowStartMinuteOfDay, windowEndMinuteOfDay, quietHoursEnabled,
             quietStartHour, quietStartMinute, quietEndHour, quietEndMinute,
-            proactiveMinGapMinutes, proactiveMaxUnanswered, notify,
+            proactiveMinGapMinutes, proactiveMaxUnanswered, notify, expectedGeneration,
         )
     }.onFailure { AppLog.failure("TaskScheduling", "update_scheduled_task", it) }
         .getOrDefault(false).also { if (it) Unit }
@@ -238,6 +248,7 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
             proactiveMinGapMinutes = proactiveMinGapMinutes,
             proactiveMaxUnanswered = proactiveMaxUnanswered,
             notify = notify,
+            expectedGeneration = task.scheduleGeneration,
         )
     }.onFailure { AppLog.failure("TaskScheduling", "update_chat_policy", it) }
         .getOrDefault(false).also { if (it) Unit }

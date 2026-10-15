@@ -57,6 +57,8 @@ interface AutomationUiPort {
     val snapshots: Flow<UiAutomationSnapshot>
     val planningChanges: Flow<String>
     fun planningRevision(): String
+    /** Foreground context only; implementations must not read task files here. */
+    fun context(): UiAutomationContext = snapshot().context
     fun snapshot(): UiAutomationSnapshot
     fun submit(command: AutomationUiCommand): AutomationUiReceipt
     suspend fun planAndSave(command: PlanChatAutomationCommand): AutomationUiReceipt

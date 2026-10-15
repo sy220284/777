@@ -28,7 +28,7 @@ internal class AutomationPlannerUiController(
         }
     }
     fun submitChatPlan(input: String, editingTaskId: String? = null) {
-        val context = automation.snapshot().context
+        val context = automation.context()
         val identity = context.identity ?: return
         if (!context.canPlanChat || input.isBlank() || state.value.planning) return
         val request = ++revision
@@ -37,14 +37,21 @@ internal class AutomationPlannerUiController(
             try {
                 val receipt = automation.planAndSave(PlanChatAutomationCommand(identity, input, editingTaskId))
                 if (request != revision) return@launch
+                val tasks = if (receipt is AutomationUiReceipt.Applied)
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { automation.snapshot().tasks } else null
+                if (request != revision) return@launch
                 state.update { value -> when (receipt) {
-                    is AutomationUiReceipt.Applied -> value.copy(tasks = automation.snapshot().tasks,
+                    is AutomationUiReceipt.Applied -> value.copy(tasks = tasks ?: value.tasks,
                         planning = false, plannerError = null, saveRevision = value.saveRevision + 1)
                     is AutomationUiReceipt.Rejected -> value.copy(planning = false, plannerError =
                         if (receipt.reason == UiAutomationRejection.STALE_CONTEXT) PlannerUiError.SESSION_CHANGED
                         else PlannerUiError.SAVE_FAILED)
                     is AutomationUiReceipt.Failed -> value.copy(planning = false, plannerError = PlannerUiError.PLAN_FAILED)
                 } }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                com.labteto.dshmobile.observability.AppLog.failure("TaskScheduling", "plan_task", failure)
+                if (request == revision) state.update { it.copy(planning = false, plannerError = PlannerUiError.PLAN_FAILED) }
             } finally {
                 if (request == revision) state.update { it.copy(planning = false) }
             }

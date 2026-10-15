@@ -31,6 +31,7 @@ internal data class MemoryManagementUiState(
     val loading: Boolean = false,
     val error: String? = null,
     val busyIds: Set<String> = emptySet(),
+    val notice: String? = null,
 )
 
 /** Query ownership stays in Memory. This controller owns only UI requests and stale-result rejection. */
@@ -89,18 +90,26 @@ internal class MemorySettingsController(
     }
 
     fun update(id: String, content: String, pinned: Boolean, onDone: (String?) -> Unit = {}) =
-        mutate(id, onDone) { memoryUi.submit(MemoryUiCommand.Update(it, content, pinned)) is MemoryUiReceipt.Updated }
+        mutate(id, onDone) { memoryUi.submit(MemoryUiCommand.Update(it, content, pinned)) }
 
-    fun forget(id: String, onDone: (String?) -> Unit = {}) = mutate(id, onDone) { memoryUi.submit(MemoryUiCommand.Forget(it)) is MemoryUiReceipt.Forgotten }
+    fun forget(id: String, onDone: (String?) -> Unit = {}) = mutate(id, onDone) { memoryUi.submit(MemoryUiCommand.Forget(it)) }
 
-    private fun mutate(id: String, onDone: (String?) -> Unit, write: (MemoryRecord) -> Boolean) {
+    private fun mutate(id: String, onDone: (String?) -> Unit, write: (MemoryRecord) -> MemoryUiReceipt) {
         if (id in state.value.busyIds) return
         val current = state.value.records.firstOrNull { it.id == id }
         if (current == null) { onDone("记忆已经变化，请刷新后重试"); return }
-        mutable.update { it.copy(busyIds = it.busyIds + id) }
+        mutable.update { it.copy(busyIds = it.busyIds + id, notice = null) }
         scope.launch {
             val error = try {
-                if (withContext(Dispatchers.IO) { write(current) }) null else "记忆已变化或已停用，请刷新后重试"
+                when (val receipt = withContext(Dispatchers.IO) { write(current) }) {
+                    is MemoryUiReceipt.Updated, MemoryUiReceipt.Forgotten -> null
+                    is MemoryUiReceipt.CommittedWithWarning -> {
+                        mutable.update { it.copy(notice = receipt.message) }
+                        null
+                    }
+                    MemoryUiReceipt.StaleOrMissing -> "记忆已变化或已停用，请刷新后重试"
+                    is MemoryUiReceipt.Failed -> receipt.message ?: "记忆保存失败，请重试"
+                }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { failure.message ?: "记忆保存失败，请重试" }
             finally { mutable.update { it.copy(busyIds = it.busyIds - id) } }

@@ -428,8 +428,10 @@ class HarnessAutomationScheduler @Inject constructor(
         proactiveMinGapMinutes: Long = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
         proactiveMaxUnanswered: Int = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MAX_UNANSWERED,
         notify: Boolean? = null,
+        expectedGeneration: Long? = null,
     ): Boolean {
         val current = store.get(id) ?: return false
+        if (expectedGeneration != null && current.scheduleGeneration != expectedGeneration) return false
         require(prompt.isNotBlank()) { "任务提示词不能为空" }
         validateChatPolicy(
             mode = current.mode,
@@ -542,8 +544,10 @@ class HarnessAutomationScheduler @Inject constructor(
         proactiveMinGapMinutes: Long,
         proactiveMaxUnanswered: Int,
         notify: Boolean,
+        expectedGeneration: Long? = null,
     ): Boolean {
         val current = store.get(id) ?: return false
+        if (expectedGeneration != null && current.scheduleGeneration != expectedGeneration) return false
         require(current.mode == AutomationMode.CHAT) { "互动策略仅支持聊天模式" }
         validateChatPolicy(
             mode = current.mode,

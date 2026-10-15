@@ -386,6 +386,7 @@ internal fun MemoryManagementCard(
                 }
             }
         }
+        page.notice?.let { Text(it, color = colors.textSecondary) }
         if (page.loading) Text(stringResource(R.string.common_loading), color = colors.textSecondary)
         page.error?.let { error ->
             Text(error, color = colors.dangerInk)

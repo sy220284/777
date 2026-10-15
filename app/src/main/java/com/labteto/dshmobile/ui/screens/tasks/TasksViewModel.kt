@@ -22,20 +22,34 @@ data class TasksUiState(
 )
 @HiltViewModel
 class TasksViewModel @Inject constructor(private val automation: AutomationUiPort) : ViewModel() {
-    val harnessState = automation.snapshots.map { it.context }.distinctUntilChanged().stateIn(
-        viewModelScope, SharingStarted.WhileSubscribed(5_000), automation.snapshot().context)
-    private val _state = MutableStateFlow(TasksUiState(tasks = automation.snapshot().tasks))
+    private val contextState = MutableStateFlow(automation.context())
+    val harnessState = contextState.asStateFlow()
+    private val _state = MutableStateFlow(TasksUiState(loading = true))
     val state = _state.asStateFlow()
     private val planner = AutomationPlannerUiController(viewModelScope, automation, _state)
-    init { viewModelScope.launch { automation.snapshots.collect { snapshot ->
-        _state.update { it.copy(tasks = snapshot.tasks) }
-    } } }
+    private var observation: kotlinx.coroutines.Job? = null
+    init { refresh() }
     fun acknowledgeNotice(notice: TasksNotice) {
         if (_state.value.notice == notice) _state.update { it.copy(notice = null) }
     }
     fun refresh() {
-        try { _state.update { it.copy(tasks = automation.snapshot().tasks, notice = null, managementFailed = false) } }
-        catch (_: Exception) { _state.update { it.copy(managementFailed = true) } }
+        observation?.cancel()
+        _state.update { it.copy(loading = true, managementFailed = false) }
+        observation = viewModelScope.launch {
+            try {
+                val initial = withContext(Dispatchers.IO) { automation.snapshot() }
+                contextState.value = initial.context
+                _state.update { it.copy(tasks = initial.tasks, loading = false) }
+                automation.snapshots.collect { snapshot ->
+                    contextState.value = snapshot.context
+                    _state.update { it.copy(tasks = snapshot.tasks, loading = false, managementFailed = false) }
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                com.labteto.dshmobile.observability.AppLog.failure("TaskScheduling", "observe_tasks", failure)
+                _state.update { it.copy(loading = false, managementFailed = true) }
+            }
+        }
     }
     private fun applied(command: AutomationUiCommand): Boolean {
         val result = automation.submit(command)

@@ -38,6 +38,8 @@ class LocalSettingsDataFacade @Inject internal constructor(
                 if (forgetMemory(command.expected)) com.labteto.dshmobile.uicontract.MemoryUiReceipt.Forgotten
                 else com.labteto.dshmobile.uicontract.MemoryUiReceipt.StaleOrMissing
         }
+    } catch (pending: MemoryCleanupPendingException) {
+        com.labteto.dshmobile.uicontract.MemoryUiReceipt.CommittedWithWarning(requireNotNull(pending.message))
     } catch (failure: Exception) { com.labteto.dshmobile.uicontract.MemoryUiReceipt.Failed(failure.message) }
     internal fun updateMemory(existing: MemoryRecord, content: String, pinned: Boolean): MemoryRecord {
         val updated = memoryManager.update(existing = existing, content = content, pinned = pinned)
@@ -54,7 +56,7 @@ class LocalSettingsDataFacade @Inject internal constructor(
         try {
             chatMemoryProjection.recoverPendingDiaryInvalidations()
         } catch (error: Exception) {
-            throw IllegalStateException("$savedMessage，关联日记清理待恢复；重开或下次召回时会重试", error)
+            throw MemoryCleanupPendingException("$savedMessage，关联日记清理待恢复；重开或下次召回时会重试", error)
         }
     }
     override fun memoriesFromSourceMessage(sessionId: String, messageId: String): List<MemoryRecord> =
@@ -67,3 +69,5 @@ abstract class LocalMemoryUiBindings {
     @dagger.Binds @Singleton
     abstract fun memory(implementation: LocalSettingsDataFacade): com.labteto.dshmobile.uicontract.MemoryUiPort
 }
+
+private class MemoryCleanupPendingException(message: String, cause: Throwable) : IllegalStateException(message, cause)
