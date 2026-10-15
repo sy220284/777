@@ -82,7 +82,9 @@ fun AppRoot(
         motionDurationScale = settings.motionDurationScale,
     ) {
         com.labteto.dshmobile.ui.host.LocalApplicationUiHost(
-            installedPacks = com.labteto.dshmobile.ui.host.LocalApplicationPackInstallations.all,
+            installedPacks = remember(features) {
+                com.labteto.dshmobile.ui.host.LocalApplicationPackInstallations.fromOwners(features)
+            },
             availableCapabilities = hostCapabilities,
             requestedSceneKey = requestedHostScene,
             onSceneRequestProcessed = { key, _ -> features.consumeUiSceneRequest(key) },

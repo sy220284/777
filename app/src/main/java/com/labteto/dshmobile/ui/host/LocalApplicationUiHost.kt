@@ -37,17 +37,36 @@ import com.labteto.dshmobile.uihost.UiHostSceneNavigation
 import com.labteto.dshmobile.uihost.UiPackAdmissionRequirements
 import com.labteto.dshmobile.uihost.RenderHostedScene
 import com.labteto.dshmobile.uihost.UiSceneRenderAccess
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.ui.screens.local.LocalHarnessViewModel
+import com.labteto.dshmobile.uipack.next.NextApplicationFeaturePorts
+import com.labteto.dshmobile.uipack.next.NextApplicationScenePack
 
 /** The original shipped screen is an explicit compatibility mode, never a fake complete UiPack. */
 internal const val LEGACY_V6_APP_UI = "legacy-v6-shell"
 
 /**
- * The only production list of fully implemented application packs.
- * Do not register NextConversationUiPack or component-only V6 design libraries here:
- * neither currently owns the 78 real, executable application scene renderers.
+ * Installed packages are candidates, not admitted packages. The production Host
+ * checks the COMPLETE scene catalog and real renderers before executing a package.
+ * The incremental Next pack is intentionally incomplete and cannot replace V6 yet.
  */
 internal object LocalApplicationPackInstallations {
-    val all: List<UiApplicationScenePack> = emptyList()
+    fun fromOwners(owner: LocalHarnessViewModel): List<UiApplicationScenePack> =
+        listOf(NextApplicationScenePack(NextApplicationFeaturePorts(
+            chat = owner.chatUiPort, work = owner.workConversationUiPort,
+            drafts = owner.conversationDraftUiPort, reading = owner.conversationReadingUiPort,
+            gallery = owner.personaGalleryUiPort, selection = owner.personaSelectionUiPort,
+            workMode = { owner.shellState.value.usageMode == LocalUsageMode.WORK },
+            documents = owner.nextUiDocumentUiPort, forms = owner.uiDocumentFormPort,
+            attachments = owner.attachmentUiPort, sessions = owner.sessionUiPort,
+            transcript = owner.messageHistoryUiPort, policy = owner.workPolicyUiPort,
+            workReads = owner.workReadUiPort, files = owner.filesUiPort,
+            evidence = owner.workEvidenceUiPort, shell = owner.conversationShellUiPort,
+            team = owner.workTeamUiPort, groups = owner.chatGroupUiPort,
+            personaTransfer = owner.personaTransferUiPort,
+            stories = owner.personaStoryUiPort, galleryDeletion = owner.personaGalleryDeletionUiPort,
+            gallerySave = owner.personaGallerySaveUiPort, portraits = owner.personaPortraitUiPort,
+        )))
 }
 
 internal sealed interface LocalApplicationUiDecision {
