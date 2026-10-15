@@ -555,16 +555,24 @@ internal fun PersonaDetails(persona: PersonaProfile) {
         stringResource(R.string.persona_v4_core_identity) to persona.coreIdentity,
         stringResource(R.string.persona_field_franchise) to persona.franchise,
     ).filter { it.second.isNotBlank() }
-    val details = persona.facts.filter { it.content.isNotBlank() }
-    if (scalars.isEmpty() && details.isEmpty() && persona.loreEntries.isEmpty()) return
-    SyGlassCard {
+    val facts = persona.facts.filter { it.content.isNotBlank() }
+    if (scalars.isEmpty() && facts.isEmpty() && persona.loreEntries.isEmpty()) return
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+
+    // A readable character profile, not a transcript packed inside a second glass card.
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+    ) {
         Text(
             stringResource(R.string.persona_gallery_fixed_persona),
-            style = DsType.std14Strong.withReadingWeight(),
-            color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
+            style = DsType.base16Strong.withReadingWeight(),
+            color = colors.text,
         )
-        scalars.forEach { (title, value) -> PersonaDetailRow(title, value) }
-        details.forEach { fact ->
+        scalars.forEach { (label, value) ->
+            PersonaDetailRow(label, value)
+        }
+        facts.forEach { fact ->
             val labelRes = when (fact.category) {
                 "personality" -> R.string.persona_v4_personality
                 "selfNarrative" -> R.string.persona_v4_self_narrative
@@ -584,27 +592,25 @@ internal fun PersonaDetails(persona: PersonaProfile) {
                 "customFacts" -> R.string.persona_v4_custom_facts
                 else -> null
             }
-            val provenanceLabel = when (fact.provenance) {
-                com.labteto.dshmobile.local.chat.CharacterFactProvenance.INFERRED ->
-                    stringResource(R.string.persona_v4_provenance_inferred)
-                com.labteto.dshmobile.local.chat.CharacterFactProvenance.UNVERIFIED ->
-                    stringResource(R.string.persona_v4_provenance_unverified)
-                com.labteto.dshmobile.local.chat.CharacterFactProvenance.CANON ->
-                    stringResource(R.string.persona_v4_provenance_canon)
-                com.labteto.dshmobile.local.chat.CharacterFactProvenance.USER_CREATED ->
-                    stringResource(R.string.persona_v4_provenance_user)
+            val extra = buildList {
+                when (fact.provenance) {
+                    com.labteto.dshmobile.local.chat.CharacterFactProvenance.INFERRED ->
+                        add(stringResource(R.string.persona_v4_provenance_inferred))
+                    com.labteto.dshmobile.local.chat.CharacterFactProvenance.UNVERIFIED ->
+                        add(stringResource(R.string.persona_v4_provenance_unverified))
+                    else -> Unit
+                }
+                fact.temporalScope.takeIf(String::isNotBlank)?.let {
+                    add(stringResource(R.string.persona_v4_story_stage_label) + "：" + it)
+                }
+                fact.sourceReference.takeIf(String::isNotBlank)?.let {
+                    add(stringResource(R.string.persona_v4_fact_source) + "：" + it)
+                }
             }
-            val storyStageLabel = stringResource(R.string.persona_v4_story_stage_label)
-            val sourceLabel = stringResource(R.string.persona_v4_fact_source)
-            val metadata = buildList {
-                add(provenanceLabel)
-                fact.temporalScope.takeIf(String::isNotBlank)?.let { add("$storyStageLabel：$it") }
-            }
-            val label = labelRes?.let { stringResource(it) } ?: fact.category
             PersonaDetailRow(
-                "$label · ${metadata.joinToString(" · ")}",
-                fact.content + fact.sourceReference.takeIf(String::isNotBlank)
-                    ?.let { "\n$sourceLabel：$it" }.orEmpty(),
+                title = labelRes?.let { stringResource(it) } ?: fact.category,
+                value = fact.content,
+                annotation = extra.joinToString(" · "),
             )
         }
         if (persona.loreEntries.isNotEmpty()) {
@@ -617,10 +623,21 @@ internal fun PersonaDetails(persona: PersonaProfile) {
 }
 
 @Composable
-private fun PersonaDetailRow(title: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(title, style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary)
-        Text(value, style = DsType.small13.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+private fun PersonaDetailRow(title: String, value: String, annotation: String = "") {
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapSm),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
+    ) {
+        Text(title, style = DsType.std14Strong.withReadingWeight(), color = colors.text)
+        Text(
+            value,
+            style = DsType.base16.copy(fontFamily = DsType.contentFont).withReadingWeight(),
+            color = colors.textSecondary,
+        )
+        if (annotation.isNotBlank()) {
+            Text(annotation, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+        }
     }
 }
 
