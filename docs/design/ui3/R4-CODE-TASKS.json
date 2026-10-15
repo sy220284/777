@@ -102,7 +102,7 @@
       "task": "全量旧 UI 回调退场",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "持续移除群聊、团队、图库故事/删除/保存/立绘的 UI 业务编排；现行大型 UI 回调与其他设置/人物业务尚待迁出。"
+      "implemented": "持续移除群聊、团队、图库故事/删除/保存/立绘的 UI 业务编排；现行大型 UI 回调与其他设置/人物业务尚待迁出。 Next 历史分页已改用中立 UiMessageHistoryPort/UiMessageSnapshot，由同一 Session Owner 投影；旧 V6 的 TranscriptUiPort 保留兼容、未宣称退场。"
     },
     {
       "id": "S1-10",
@@ -143,7 +143,8 @@
       "id": "S3-04",
       "task": "Next 全应用必要场景原生实现",
       "codeStatus": "CODE_PARTIAL",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "implemented": " Next 的历史读取现只依赖中立消息快照（独立角色映射单测）；完整 Next 全场景仍待完成。"
     },
     {
       "id": "S3-05",

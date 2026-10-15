@@ -141,8 +141,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "load_older": {
-          "ownerPort": "TranscriptUiPort.transcriptPage(sessionId, cursor, limit)",
-          "receiptType": "UiTranscriptPage",
+          "ownerPort": "UiMessageHistoryPort.messagePage(sessionId, cursor, limit) [Next] / TranscriptUiPort.transcriptPage(sessionId, cursor, limit) [legacy V6]",
+          "receiptType": "UiMessagePage / UiTranscriptPage (owner-issued UiTranscriptCursor)",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
