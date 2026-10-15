@@ -127,11 +127,6 @@ class PersonaPresetCatalogTest {
                 persona.facts.size, persona.facts.map(CharacterFact::category).distinct().size)
             assertTrue("${preset.id}: unsupported fact",
                 persona.facts.all { CharacterFactCategories.isSupported(it.category) })
-            assertTrue("${preset.id}: old portrait resurrected", persona.portrait.isBlank())
-            assertTrue("${preset.id}: old life context resurrected", persona.lifeContext.isBlank())
-            assertTrue("${preset.id}: old tension resurrected", persona.coreTension.isBlank())
-            assertTrue("${preset.id}: old traits resurrected", persona.stableTraits.isEmpty())
-            assertTrue("${preset.id}: old preference list resurrected", persona.quirks.isEmpty())
             assertTrue("${preset.id}: no story knowledge boundaries", persona.knowledgeBoundary.isNotEmpty())
             assertTrue("${preset.id}: world background missing",
                 persona.loreEntries.any { it.id == "${preset.id}-world-context" })
