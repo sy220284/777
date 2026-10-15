@@ -17,7 +17,9 @@ internal object ChatDiaryEntryPolicy {
         // still require fuller reflection; otherwise a normal grounded event
         // anchor is enough. Style, punctuation and prose length are not graded.
         val hasVoice = privateReflection.isNotBlank()
-        val shortAnchorWithContext = privateReflection.length >= MIN_SHORT_ANCHOR_CONTEXT_CHARS
+        val shortAnchorWithContext = hasVoice &&
+            (importance >= MINOR_IMPORTANCE ||
+                privateReflection.length >= MIN_SHORT_ANCHOR_CONTEXT_CHARS)
         if (importance < MIN_IMPORTANCE) return null
         if (event.length < (if (shortAnchorWithContext) MIN_THOUGHT_EVENT_CHARS else MIN_EVENT_CHARS)) return null
         if (significance != "MAJOR" && importance < MINOR_IMPORTANCE && !hasVoice) return null
