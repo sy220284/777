@@ -59,7 +59,7 @@ internal fun FluidPersonaIdentity(entry: PersonaGalleryEntry, subtitle: String,
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                 Text(entry.persona.name, style = DsType.title22.withReadingWeight(), color = colors.text)
-                Text(entry.persona.portrait.takeIf(String::isNotBlank) ?: subtitle,
+                Text(entry.persona.coreIdentity.takeIf(String::isNotBlank)?.take(110) ?: subtitle,
                     style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
             }
         }
