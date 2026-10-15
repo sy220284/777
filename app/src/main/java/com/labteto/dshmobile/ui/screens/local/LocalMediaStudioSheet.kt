@@ -175,10 +175,10 @@ internal fun LocalMediaStudioSheetContent(
 
         if (selected == null) {
             com.shenyan.designsystem.components.SyEmptyState(FeatherIcons.Image,
-                if (activeRevision != null && activeRevision.kind == kind) "原模型配置已变化，请重新选择生成账户"
+                if (activeRevision != null && activeRevision.kind == kind) stringResource(R.string.media_recreate_route_missing)
                 else stringResource(R.string.media_studio_no_model), body = "")
             if (available.isNotEmpty()) {
-                Text("重新选择会使用新账户的额度，旧成果保留。", color = colors.textSecondary,
+                Text(stringResource(R.string.media_recreate_change_account_notice), color = colors.textSecondary,
                     style = DsType.caption11.withReadingWeight())
                 available.forEach { option ->
                     SyButton(
@@ -537,7 +537,7 @@ internal fun LocalMediaStudioSheetContent(
                                 }
                             }
                             if (task.phase in setOf(LocalMediaVideoPhase.SUCCEEDED, LocalMediaVideoPhase.FAILED)) {
-                                SyButton(text = "修改并重新生成", size = SyButtonSize.Small,
+                                SyButton(text = stringResource(R.string.media_recreate_edit_and_generate), size = SyButtonSize.Small,
                                     variant = SyButtonVariant.Ghost, onClick = {
                                         archiveRevision = LocalMediaRevisionDraft.from(task)
                                         showVideoArchive = false
@@ -630,7 +630,7 @@ internal fun LocalMediaStudioSheetContent(
                                 }
                                 LocalMediaRevisionDraft.from(asset)?.let { draft ->
                                     SyButton(text = if (draft.kind == LocalMediaKind.TRANSCRIBE)
-                                        "重新选择音频转写" else "修改并重新生成",
+                                        stringResource(R.string.media_recreate_transcribe_select_audio) else stringResource(R.string.media_recreate_edit_and_generate),
                                         size = SyButtonSize.Small,
                                         variant = SyButtonVariant.Ghost,
                                         onClick = {

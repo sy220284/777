@@ -2312,5 +2312,9 @@
     <string name="media_image_zoom_hint">双指可放大、移动图片</string>
     <string name="media_studio_archive_compact">历史成果 · %1$d 项</string>
     <string name="media_route_account_fallback">当前账户不支持，已自动选用：%1$s</string>
+    <string name="media_recreate_edit_and_generate">修改提示词并重新生成</string>
+    <string name="media_recreate_transcribe_select_audio">重新选择音频转写</string>
+    <string name="media_recreate_route_missing">原模型配置已变化，请重新选择生成账户</string>
+    <string name="media_recreate_change_account_notice">重新选择会使用新账户的额度，旧成果保留。</string>
 </resources>
 

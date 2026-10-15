@@ -216,7 +216,7 @@ internal fun LocalGeneratedMediaResultRow(
             }
         }
         LocalMediaRevisionDraft.from(result)?.let { draft ->
-            SyButton(text = if (draft.kind == LocalMediaKind.TRANSCRIBE) "重新选择音频转写" else "修改并重新生成",
+            SyButton(text = if (draft.kind == LocalMediaKind.TRANSCRIBE) resources.getString(R.string.media_recreate_transcribe_select_audio) else resources.getString(R.string.media_recreate_edit_and_generate),
                 size = SyButtonSize.Small, variant = SyButtonVariant.Ghost,
                 onClick = { onRevise(draft) })
         }
@@ -355,7 +355,7 @@ internal fun LocalGeneratedVideoTaskRow(
         }
         // Create a new task with an explicit confirmation; querying the old task remains read-only.
         if (task.phase in setOf(LocalMediaVideoPhase.SUCCEEDED, LocalMediaVideoPhase.FAILED)) {
-            SyButton(text = "修改并重新生成", size = SyButtonSize.Small,
+            SyButton(text = resources.getString(R.string.media_recreate_edit_and_generate), size = SyButtonSize.Small,
                 variant = SyButtonVariant.Ghost,
                 onClick = { onRevise(LocalMediaRevisionDraft.from(task)) })
         }
