@@ -75,6 +75,38 @@ class ChatDiaryPromptTest {
     }
 
     @Test
+    fun standaloneThoughtfulDiaryPatchIsParsedButNoneIsNot() {
+        val reflection = "我一直以为沉默能让我更安全。今天想起来，原来我也很在乎自己的感受和决定。"
+        fun payload(significance: String, voice: String): String = """
+            {
+              "state": {},
+              "turnSignificance": "$significance",
+              "suggestions": [],
+              "diaryDelta": {
+                "event": "那次沉默",
+                "privateReflection": "$voice",
+                "importance": 2,
+                "disclosure": "PRIVATE"
+              }
+            }
+        """.trimIndent()
+        val valid = planner.parse(
+            payload("MINOR", reflection), ChatCharacterState(),
+            "那次沉默让我想了很久", "我也许该学着说出自己的想法",
+        )
+        assertNotNull(valid)
+        assertEquals(reflection, valid!!.diaryDelta?.privateReflection)
+        assertEquals(null, planner.parse(
+            payload("NONE", reflection), ChatCharacterState(),
+            "那次沉默让我想了很久", "好",
+        ))
+        assertEquals(null, planner.parse(
+            payload("MINOR", "好"), ChatCharacterState(),
+            "那次沉默让我想了很久", "好",
+        ))
+    }
+
+    @Test
     fun plannerPreservesStructuredDiaryDeltaForDurableProjection() {
         val plan = planner.parse(
             """
