@@ -241,6 +241,7 @@ fun SyPopupMenu(
                     modifier = Modifier,
                     shape = RoundedCornerShape(SyMetric.radiusControl),
                     tag = "sySeamlessPopupScene",
+                    opticalGlass = true,
                 ) {
                     Column(content = content)
                 }
