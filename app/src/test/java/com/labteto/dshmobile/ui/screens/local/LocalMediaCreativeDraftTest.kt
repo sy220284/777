@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.model.LocalMediaKind
+import com.labteto.dshmobile.local.presentation.mediaCreativeDraft
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
