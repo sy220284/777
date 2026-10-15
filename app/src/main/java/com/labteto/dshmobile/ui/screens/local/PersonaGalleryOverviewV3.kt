@@ -2,9 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 
 import android.content.Context
@@ -272,11 +270,7 @@ internal fun PersonaGalleryOverviewV3(
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         if (currentGalleryId == null || currentHasUnsavedChanges) {
-            SyMaterialSurface(
-                shape = DsShapes.block,
-                tier = SyMaterialTier.L1_SECTION,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier.padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
                     verticalAlignment = Alignment.CenterVertically,
