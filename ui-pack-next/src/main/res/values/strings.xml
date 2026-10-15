@@ -274,4 +274,6 @@
     <string name="next_workspace_truncated">当前为有界预览，完整文件未被截断</string>
     <string name="next_memory_save">保存记忆</string>
     <string name="next_invocations_search">搜索连接器和技能</string>
+    <string name="next_gallery_manage">导入与管理档案</string>
+    <string name="next_gallery_manage_persona">故事、立绘与档案管理</string>
 </resources>

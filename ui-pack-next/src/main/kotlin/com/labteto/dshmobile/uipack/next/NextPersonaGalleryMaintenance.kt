@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.uicontract.*
@@ -34,6 +35,7 @@ internal fun NextPersonaGallerySaveActions(port: PersonaGallerySaveUiPort, selec
                 }
                 onChanged()
             } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { onFeedback(error.message ?: unavailable); onChanged() }
             finally { pending = false }
         }
     }
@@ -47,12 +49,13 @@ internal fun NextPersonaGallerySaveActions(port: PersonaGallerySaveUiPort, selec
 internal fun NextPersonaPortraitActions(port: PersonaPortraitUiPort, galleryId: String?,
     onChanged: suspend () -> Unit, onFeedback: (String) -> Unit) {
     var pending by remember { mutableStateOf(false) }
-    var pickingTarget by remember { mutableStateOf<String?>(null) }
+    var pickingTarget by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmRemove by remember(galleryId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val updated = stringResource(R.string.next_gallery_portrait_updated)
     val unavailable = stringResource(R.string.next_gallery_unavailable)
     fun submit(command: PersonaPortraitUiCommand) {
+        if (pending) return
         pending = true
         scope.launch {
             try {
@@ -63,19 +66,26 @@ internal fun NextPersonaPortraitActions(port: PersonaPortraitUiPort, galleryId: 
                 }
                 onChanged()
             } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { onFeedback(error.message ?: unavailable); onChanged() }
             finally { pending = false }
         }
     }
     val pick = rememberUiAttachmentPicker { uri ->
         val captured = pickingTarget
         pickingTarget = null
-        if (uri == null) pending = false
+        pending = false
+        if (uri == null) Unit
         else if (captured == null) { pending = false; onFeedback(unavailable) }
         else submit(PersonaPortraitUiCommand.Import(captured, uri))
     }
     Row(Modifier.horizontalScroll(rememberScrollState())) {
-        TextButton(onClick = { pickingTarget = galleryId; pending = true; pick() }, enabled = !pending && galleryId != null) { Text(stringResource(R.string.next_gallery_import_portrait)) }
-        TextButton(onClick = { confirmRemove = true }, enabled = !pending && galleryId != null) { Text(stringResource(R.string.next_gallery_remove_portrait)) }
+        TextButton(onClick = {
+            pickingTarget = galleryId
+            try { pick() }
+            catch (cancelled: CancellationException) { pickingTarget = null; throw cancelled }
+            catch (error: Exception) { pickingTarget = null; onFeedback(error.message ?: unavailable) }
+        }, enabled = !pending && pickingTarget == null && galleryId != null) { Text(stringResource(R.string.next_gallery_import_portrait)) }
+        TextButton(onClick = { confirmRemove = true }, enabled = !pending && pickingTarget == null && galleryId != null) { Text(stringResource(R.string.next_gallery_remove_portrait)) }
         if (confirmRemove && galleryId != null) {
             TextButton(onClick = { confirmRemove = false; submit(PersonaPortraitUiCommand.Remove(galleryId)) }, enabled = !pending) { Text(stringResource(R.string.next_gallery_confirm_remove_portrait)) }
             TextButton(onClick = { confirmRemove = false }, enabled = !pending) { Text(stringResource(R.string.next_gallery_cancel_delete_story)) }

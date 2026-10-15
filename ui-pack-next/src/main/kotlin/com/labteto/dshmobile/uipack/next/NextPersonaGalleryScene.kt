@@ -26,8 +26,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.uicontract.*
 import kotlinx.coroutines.CancellationException
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
-/** Read-only archive facts and explicit story launch, both from the actual Chat Owner. */
+/** Archive navigation and maintenance use the same Chat Owners as the conversation entry. */
 @Composable
 fun NextPersonaGalleryScene(
     gallery: PersonaGalleryUiPort,
@@ -35,7 +36,15 @@ fun NextPersonaGalleryScene(
     onBack: () -> Unit,
     onStoryOpened: () -> Boolean,
     authoring: PersonaAuthoringUiPort? = null,
+    transfer: PersonaTransferUiPort? = null,
+    stories: PersonaStoryUiPort? = null,
+    deletion: PersonaGalleryDeletionUiPort? = null,
+    save: PersonaGallerySaveUiPort? = null,
+    portraits: PersonaPortraitUiPort? = null,
 ) {
+    var managing by rememberSaveable { mutableStateOf(false) }
+    var manageTarget by rememberSaveable { mutableStateOf<String?>(null) }
+    val selectionState by selection.snapshots.collectAsStateWithLifecycle(initialValue = selection.snapshot())
     var editing by rememberSaveable { mutableStateOf<String?>(null) }
     var creating by rememberSaveable { mutableStateOf(false) }
     if (authoring != null && (creating || editing != null)) {
@@ -53,6 +62,12 @@ fun NextPersonaGalleryScene(
     val rejected = stringResource(R.string.next_gallery_action_rejected)
     val navigationFailed = stringResource(R.string.next_gallery_navigation_failed)
 
+    if (managing) NextPersonaGalleryDialog(
+        port = gallery, personas = selection, selection = selectionState,
+        transfer = transfer, stories = stories, deletion = deletion, save = save, portraits = portraits,
+        initialGalleryId = manageTarget, onSelectionAccepted = onStoryOpened,
+        close = { managing = false; refresh++ },
+    )
     LaunchedEffect(gallery, refresh) {
         receipt = null
         try { receipt = gallery.read() }
@@ -71,6 +86,9 @@ fun NextPersonaGalleryScene(
         if (authoring != null) TextButton(onClick = { creating = true }, enabled = !busy) {
             Text(stringResource(R.string.next_persona_create))
         }
+        if (transfer != null || save != null) TextButton(
+            onClick = { manageTarget = null; managing = true }, enabled = !busy,
+        ) { Text(stringResource(R.string.next_gallery_manage)) }
         feedback?.let { Text(it) }
         when (val data = receipt) {
             null -> Text(stringResource(R.string.next_loading))
@@ -84,6 +102,11 @@ fun NextPersonaGalleryScene(
                             Text(persona.name, style = MaterialTheme.typography.titleMedium)
                             if (authoring != null) TextButton(onClick = { editing = persona.id }, enabled = !busy) {
                                 Text(stringResource(R.string.next_persona_edit))
+                            }
+                            if (stories != null || deletion != null || portraits != null || transfer != null) {
+                                TextButton(onClick = { manageTarget = persona.id; managing = true }, enabled = !busy) {
+                                    Text(stringResource(R.string.next_gallery_manage_persona))
+                                }
                             }
                             if (persona.stories.isEmpty()) {
                                 Text(stringResource(R.string.next_gallery_no_stories))

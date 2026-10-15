@@ -169,6 +169,8 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
             onBack = { scope.onBack() },
             onStoryOpened = { scope.onNavigate(home) is UiSceneNavigationResult.Changed },
             authoring = ports.authoring,
+            transfer = ports.personaTransfer, stories = ports.stories,
+            deletion = ports.galleryDeletion, save = ports.gallerySave, portraits = ports.portraits,
         )
     }
 }

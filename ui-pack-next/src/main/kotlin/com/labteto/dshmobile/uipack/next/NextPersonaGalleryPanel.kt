@@ -8,6 +8,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -20,7 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 internal fun NextPersonaGalleryPanel(port: PersonaGalleryUiPort, personas: PersonaSelectionUiPort?, transfer: PersonaTransferUiPort?, stories: PersonaStoryUiPort?, deletion: PersonaGalleryDeletionUiPort?, save: PersonaGallerySaveUiPort?, portraits: PersonaPortraitUiPort?) {
     val selection = personas?.snapshots?.collectAsStateWithLifecycle(initialValue = personas.snapshot())?.value
-    var open by remember(selection?.identity) { mutableStateOf(false) }
+    var open by rememberSaveable(selection?.identity) { mutableStateOf(false) }
     if (open) {
         // Leaving the dialog disposes its scope, so late reads cannot reopen or rewrite the editor.
         key(selection?.identity) { NextPersonaGalleryDialog(port, personas, selection, transfer, stories, deletion, save, portraits) { open = false } }
@@ -29,16 +30,22 @@ internal fun NextPersonaGalleryPanel(port: PersonaGalleryUiPort, personas: Perso
 }
 
 @Composable
-private fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: PersonaSelectionUiPort?,
-    selection: UiPersonaSelectionSnapshot?, transfer: PersonaTransferUiPort?, stories: PersonaStoryUiPort?, deletion: PersonaGalleryDeletionUiPort?, save: PersonaGallerySaveUiPort?, portraits: PersonaPortraitUiPort?, close: () -> Unit) {
+internal fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: PersonaSelectionUiPort?,
+    selection: UiPersonaSelectionSnapshot?, transfer: PersonaTransferUiPort?, stories: PersonaStoryUiPort?, deletion: PersonaGalleryDeletionUiPort?, save: PersonaGallerySaveUiPort?, portraits: PersonaPortraitUiPort?,
+    initialGalleryId: String? = null, onSelectionAccepted: (() -> Boolean)? = null, close: () -> Unit) {
     var entries by remember(port) { mutableStateOf<List<UiPersonaGalleryEntry>>(emptyList()) }
-    var selected by remember(port) { mutableStateOf<Pair<String, UiPersonaGalleryStory>?>(null) }
-    var exportId by remember(port) { mutableStateOf<String?>(null) }
-    var title by remember(port) { mutableStateOf("") }
-    var notes by remember(port) { mutableStateOf("") }
-    var stage by remember(port) { mutableStateOf("") }
+    var selectedGallery by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedStory by rememberSaveable { mutableStateOf<String?>(null) }
+    val selected = entries.firstOrNull { it.id == selectedGallery }?.let { entry ->
+        entry.stories.firstOrNull { it.id == selectedStory }?.let { entry.id to it }
+    }
+    fun clearSelection() { selectedGallery = null; selectedStory = null }
+    var exportId by rememberSaveable { mutableStateOf(initialGalleryId) }
+    var title by rememberSaveable { mutableStateOf("") }
+    var notes by rememberSaveable { mutableStateOf("") }
+    var stage by rememberSaveable { mutableStateOf("") }
     var confirmDelete by remember(port) { mutableStateOf(false) }
-    var deletingEntry by remember(port) { mutableStateOf<String?>(null) }
+    var deletingEntry by rememberSaveable { mutableStateOf<String?>(null) }
     var pending by remember(port) { mutableStateOf(false) }
     var feedback by remember(port) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -46,19 +53,41 @@ private fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: Perso
     val saved = stringResource(R.string.next_gallery_saved)
     val queued = stringResource(R.string.next_gallery_selection_queued)
     val syncPending = stringResource(R.string.next_gallery_story_saved_sync_pending)
+    val navigationFailed = stringResource(R.string.next_gallery_navigation_failed)
+    val unknown = stringResource(R.string.next_unknown)
     fun submitSelection(command: PersonaSelectionUiCommand) {
-        when (val result = personas?.submit(command)) {
-            UiCommandReceipt.Accepted -> close()
-            UiCommandReceipt.Queued -> feedback = queued
-            is UiCommandReceipt.Failed -> feedback = result.message
-            else -> feedback = selection?.unavailableReason ?: unavailable
-        }
+        if (pending) return
+        try {
+            when (val result = personas?.submit(command)) {
+                UiCommandReceipt.Accepted -> {
+                    // The Owner has committed. A navigation failure must never replay the command.
+                    if (onSelectionAccepted?.invoke() != false) close() else feedback = navigationFailed
+                }
+                UiCommandReceipt.Queued -> feedback = queued
+                UiCommandReceipt.OutcomeUnknown -> feedback = unknown
+                is UiCommandReceipt.Failed -> feedback = result.message
+                else -> feedback = selection?.unavailableReason ?: unavailable
+            }
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (error: Exception) { feedback = error.message ?: unavailable }
     }
     suspend fun read() {
-        when (val result = port.read()) {
-            is UiPersonaGalleryReadReceipt.Available -> entries = result.entries
-            is UiPersonaGalleryReadReceipt.Failed -> feedback = result.message ?: unavailable
-        }
+        try {
+            when (val result = port.read()) {
+                is UiPersonaGalleryReadReceipt.Available -> {
+                    entries = result.entries
+                    val storyStillExists = result.entries.any { entry ->
+                        entry.id == selectedGallery && entry.stories.any { it.id == selectedStory }
+                    }
+                    if (selectedGallery != null && !storyStillExists) {
+                        clearSelection(); confirmDelete = false; feedback = unavailable
+                    }
+                    if (exportId != null && entries.none { it.id == exportId }) exportId = null
+                }
+                is UiPersonaGalleryReadReceipt.Failed -> feedback = result.message ?: unavailable
+            }
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (error: Exception) { feedback = error.message ?: unavailable }
     }
     fun updateStory(command: PersonaStoryUiCommand) {
         if (pending || stories == null) return
@@ -68,23 +97,24 @@ private fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: Perso
                 when (val result = stories.submit(command)) {
                     is UiPersonaStoryReceipt.Saved -> {
                         feedback = if (result.sessionSync == UiStorySessionSync.DEFERRED) syncPending else saved
-                        selected = null; confirmDelete = false
+                        clearSelection(); confirmDelete = false
                     }
-                    UiPersonaStoryReceipt.Missing -> { feedback = unavailable; selected = null; confirmDelete = false }
+                    UiPersonaStoryReceipt.Missing -> { feedback = unavailable; clearSelection(); confirmDelete = false }
                     is UiPersonaStoryReceipt.Failed -> feedback = result.message ?: unavailable
                 }
                 read()
             } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { feedback = error.message ?: unavailable; read() }
             finally { pending = false }
         }
     }
     LaunchedEffect(port) { pending = true; try { read() } finally { pending = false } }
-    AlertDialog(onDismissRequest = close, title = { Text(stringResource(R.string.next_gallery_archive)) },
+    AlertDialog(onDismissRequest = { if (!pending) close() }, title = { Text(stringResource(R.string.next_gallery_archive)) },
         text = { LazyColumn(Modifier.heightIn(max = 360.dp)) {
             item { feedback?.let { Text(it) }; selection?.unavailableReason?.let { Text(it) } }
-            entries.forEach { entry ->
+            entries.filter { initialGalleryId == null || it.id == initialGalleryId }.forEach { entry ->
                 item(key = "entry:${entry.id}") {
-                    TextButton(onClick = { exportId = entry.id }) { Text(entry.name) }
+                    TextButton(onClick = { exportId = entry.id }, enabled = !pending) { Text(entry.name) }
                     if (deletion != null) {
                         TextButton(onClick = { deletingEntry = entry.id }, enabled = !pending) { Text(stringResource(R.string.next_gallery_delete_character)) }
                         if (deletingEntry == entry.id) {
@@ -98,7 +128,7 @@ private fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: Perso
                                                     add(if (result.sessionSync == UiStorySessionSync.DEFERRED) syncPending else saved)
                                                     result.portraitCleanupWarning?.let { add(it) }
                                                 }.joinToString("\n")
-                                                if (selected?.first == entry.id) selected = null
+                                                if (selectedGallery == entry.id) clearSelection()
                                                 if (exportId == entry.id) exportId = null
                                                 deletingEntry = null
                                             }
@@ -107,6 +137,7 @@ private fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: Perso
                                         }
                                         read()
                                     } catch (cancelled: CancellationException) { throw cancelled }
+                                    catch (error: Exception) { feedback = error.message ?: unavailable; read() }
                                     finally { pending = false }
                                 } }
                             }, enabled = !pending) { Text(stringResource(R.string.next_gallery_confirm_delete_character)) }
@@ -123,7 +154,7 @@ private fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: Perso
                     }
                 }
                 items(entry.stories, key = { "story:${entry.id}:${it.id}" }) { story ->
-                    TextButton(onClick = { selected = entry.id to story; title = story.title; notes = story.notes; stage = story.storyStage; confirmDelete = false }, enabled = !pending) {
+                    TextButton(onClick = { selectedGallery = entry.id; selectedStory = story.id; title = story.title; notes = story.notes; stage = story.storyStage; confirmDelete = false }, enabled = !pending) {
                         Text(stringResource(R.string.next_gallery_story_summary, story.title, story.messageCount))
                     }
                     selection?.identity?.let { identity ->
@@ -143,13 +174,14 @@ private fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: Perso
                             scope.launch {
                                 try {
                                     when (val result = port.submit(PersonaGalleryUiCommand.RenameStory(galleryId, story.id, capturedTitle))) {
-                                        UiCommandReceipt.Accepted -> { feedback = saved; selected = null }
+                                        UiCommandReceipt.Accepted -> { feedback = saved; clearSelection() }
                                         is UiCommandReceipt.Failed -> feedback = result.message
                                         else -> feedback = unavailable
                                     }
                                     // Read again after failed IO too: an archive mutation may have committed.
                                     read()
                                 } catch (cancelled: CancellationException) { throw cancelled }
+                                catch (error: Exception) { feedback = error.message ?: unavailable; read() }
                                 finally { pending = false }
                             }
                         }
@@ -184,7 +216,7 @@ private fun NextPersonaGalleryDialog(port: PersonaGalleryUiPort, personas: Perso
                         entries.firstOrNull { it.id == exportId }?.name ?: stringResource(R.string.next_gallery_select_export)))
                     NextPersonaTransferActions(owner, exportId, ::read) { feedback = it }
                 }
-                TextButton(onClick = close) { Text(stringResource(R.string.next_gallery_close)) }
+                TextButton(onClick = close, enabled = !pending) { Text(stringResource(R.string.next_gallery_close)) }
             }
         },
         dismissButton = { TextButton(onClick = {

@@ -28,16 +28,20 @@ internal fun NextPersonaTransferActions(port: PersonaTransferUiPort, galleryId: 
             UiDocumentPickReceipt.Reading -> pending = true
             UiDocumentPickReceipt.Cancelled -> pending = false
             is UiDocumentPickReceipt.Failed -> { pending = false; onFeedback(result.message ?: failed) }
-            is UiDocumentPickReceipt.Picked -> scope.launch {
-                try {
-                    when (val receipt = port.import(ImportPersonaDocumentCommand(result.document.bytes,
-                        result.document.name, result.document.mimeType))) {
-                        is UiPersonaImportReceipt.Imported -> onFeedback(imported)
-                        is UiPersonaImportReceipt.Failed -> onFeedback(receipt.message ?: failed)
-                    }
-                    onChanged()
-                } catch (cancelled: CancellationException) { throw cancelled }
-                finally { pending = false }
+            is UiDocumentPickReceipt.Picked -> {
+                pending = true
+                scope.launch {
+                    try {
+                        when (val receipt = port.import(ImportPersonaDocumentCommand(result.document.bytes,
+                            result.document.name, result.document.mimeType))) {
+                            is UiPersonaImportReceipt.Imported -> onFeedback(imported)
+                            is UiPersonaImportReceipt.Failed -> onFeedback(receipt.message ?: failed)
+                        }
+                        onChanged()
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (error: Exception) { onFeedback(error.message ?: failed); onChanged() }
+                    finally { pending = false }
+                }
             }
         }
     }
@@ -64,6 +68,7 @@ internal fun NextPersonaTransferActions(port: PersonaTransferUiPort, galleryId: 
                                     is UiPersonaExportReceipt.Failed -> { pending = false; onFeedback(receipt.message ?: failed) }
                                 }
                             } catch (cancelled: CancellationException) { pending = false; throw cancelled }
+                            catch (error: Exception) { pending = false; onFeedback(error.message ?: failed) }
                         }
                     }
                 }, enabled = !pending && galleryId != null) { Text(stringResource(R.string.next_gallery_export_format, format.extension)) }
