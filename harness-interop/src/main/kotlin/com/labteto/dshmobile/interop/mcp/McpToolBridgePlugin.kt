@@ -80,11 +80,13 @@ internal fun mcpExtensionFailure(serverId: String, error: Exception, connecting:
 
 internal const val MAX_MCP_TOOL_RESULT_CHARS = 256 * 1024
 
+enum class McpServerLifecycle { CONNECTING, REGISTERED, RECONNECTING, DISCONNECTING }
 data class McpServerSnapshot(
     val id: String,
     val transport: String,
     val target: String,
     val tools: List<String>,
+    val lifecycle: McpServerLifecycle = McpServerLifecycle.REGISTERED,
 )
 
 /**
@@ -150,6 +152,8 @@ class McpToolBridgePlugin(
             }
             completion?.complete(Unit)
         }
+
+        fun isAcceptingCalls(): Boolean = synchronized(this) { acceptingCalls }
 
         fun beginDisconnect(): DisconnectTicket = synchronized(this) {
             if (!acceptingCalls) {
@@ -402,6 +406,31 @@ class McpToolBridgePlugin(
                 tools = binding.toolNames.toList(),
             )
         }
+    }
+
+    /**
+     * Actual in-process MCP lifecycle state, including reservations not yet registered.
+     * This is not a health probe, transport authorization, nor evidence of a tool call.
+     * The existing serverSnapshots() contract intentionally remains registry-only.
+     */
+    suspend fun lifecycleSnapshots(): List<McpServerSnapshot> = mutex.withLock {
+        val registered = servers.values.map { binding ->
+            val lifecycle = when {
+                binding.id in reconnectingIds -> McpServerLifecycle.RECONNECTING
+                !binding.isAcceptingCalls() -> McpServerLifecycle.DISCONNECTING
+                else -> McpServerLifecycle.REGISTERED
+            }
+            McpServerSnapshot(binding.id, binding.transport, binding.displayTarget,
+                binding.toolNames.toList(), lifecycle)
+        }
+        val pending = (connectingIds + reconnectingIds)
+            .filterNot(servers::containsKey)
+            .map { id ->
+                McpServerSnapshot(id, "", "", emptyList(),
+                    if (id in reconnectingIds) McpServerLifecycle.RECONNECTING
+                    else McpServerLifecycle.CONNECTING)
+            }
+        registered + pending
     }
 
     private suspend fun connectHttp(context: HarnessContext, rawId: String, rawEndpoint: String): String {

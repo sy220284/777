@@ -573,7 +573,7 @@ fun ToolsScreen(
     } else if (capabilityCatalogueVisible) {
         FluidCapabilityCatalogue(
             entries = state.capabilities, loading = state.loading, failed = catalogueFailure,
-            connections = state.servers.size, onRefresh = viewModel::refresh, onBack = onClose,
+            connections = state.servers.count { it.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED }, onRefresh = viewModel::refresh, onBack = onClose,
             onManage = { capabilityCatalogueVisible = false },
             onPlugins = { skillsOnly = false; showPluginBrowser = true },
             onSkills = { skillsOnly = true; showPluginBrowser = true },
@@ -696,7 +696,7 @@ fun ToolsScreen(
                         ToolCapabilityRow(
                             iconPainter = painterResource(R.drawable.ic_ui_plugin),
                             title = stringResource(R.string.tools_external_services),
-                            status = stringResource(R.string.tools_external_registration_summary, state.servers.size),
+                            status = stringResource(R.string.tools_external_registration_summary, state.servers.count { it.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED }),
                             state = StateDotState.Idle,
                             onClick = { showExternalConfig = true },
                         )
@@ -784,7 +784,16 @@ fun ToolsScreen(
                         // The registry snapshot carries discovered tools, not a current health probe.
                         com.shenyan.designsystem.components.SyStateDot(
                             phase = com.shenyan.designsystem.foundation.SyPhase.IDLE,
-                            label = stringResource(R.string.tools_server_health_unchecked),
+                            label = stringResource(when (server.connection) {
+                                com.labteto.dshmobile.uicontract.UiToolConnection.HEALTH_UNCHECKED ->
+                                    R.string.tools_server_health_unchecked
+                                com.labteto.dshmobile.uicontract.UiToolConnection.CONNECTING ->
+                                    R.string.tools_server_connecting
+                                com.labteto.dshmobile.uicontract.UiToolConnection.RECONNECTING ->
+                                    R.string.tools_server_reconnecting
+                                com.labteto.dshmobile.uicontract.UiToolConnection.DISCONNECTING ->
+                                    R.string.tools_server_disconnecting
+                            }),
                         )
                         Column(Modifier.weight(1f)) {
                             Text(
@@ -805,14 +814,14 @@ fun ToolsScreen(
                         SyButton(
                             text = stringResource(R.string.cap_center_view_tools),
                             onClick = { expandedMcpServer = if (expandedMcpServer == server.id) null else server.id },
-                            enabled = server.tools.isNotEmpty(),
+                            enabled = server.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED && server.tools.isNotEmpty(),
                             size = SyButtonSize.Small,
                             variant = SyButtonVariant.Ghost,
                         )
                         SyButton(
                             text = stringResource(R.string.tools_disconnect),
                             onClick = { viewModel.disconnect(server.id) },
-                            enabled = !state.loading,
+                            enabled = !state.loading && server.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED,
                             size = SyButtonSize.Small,
                             variant = SyButtonVariant.Ghost,
                         )

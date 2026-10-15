@@ -597,6 +597,9 @@
     <string name="tools_external_services">外部工具服务</string>
     <string name="tools_no_services">暂无已注册服务</string>
     <string name="tools_external_registration_summary">%1$d 已注册 · 健康未检测</string>
+    <string name="tools_server_connecting">正在建立连接 · 尚未注册工具</string>
+    <string name="tools_server_reconnecting">正在重连 · 工具可能暂不可用</string>
+    <string name="tools_server_disconnecting">正在断开 · 等待在途调用结束</string>
     <string name="tools_server_health_unchecked">连接健康未检测</string>
     <string name="local_ui_approval_expired">这项审批已结束，请查看最新待处理操作</string>
     <string name="local_ui_result_unknown">操作结果未知，请核实原任务</string>

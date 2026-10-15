@@ -373,6 +373,10 @@ class McpToolBridgePluginTest {
 
         val snapshots = plugin.serverSnapshots()
         assertEquals(listOf("fast"), snapshots.map(McpServerSnapshot::id))
+        assertEquals(
+            listOf("fast" to McpServerLifecycle.REGISTERED, "slow" to McpServerLifecycle.CONNECTING),
+            plugin.lifecycleSnapshots().map { it.id to it.lifecycle },
+        )
         assertFalse(slow.isCompleted)
 
         slowRelease.complete(Unit)

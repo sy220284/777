@@ -11,7 +11,28 @@ class LocalToolsUiFacade @Inject constructor(
     private val tools: LocalToolsRuntime,
 ) : com.labteto.dshmobile.uicontract.ToolsUiPort {
     override suspend fun servers() = tools.servers().map {
-        com.labteto.dshmobile.uicontract.UiMcpServerSnapshot(it.id, it.transport, it.target, it.tools)
+        val lifecycle = it.lifecycle
+        val registration = when (lifecycle) {
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.REGISTERED ->
+                com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.DISCONNECTING ->
+                com.labteto.dshmobile.uicontract.UiToolRegistration.REMOVING
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.CONNECTING,
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.RECONNECTING ->
+                com.labteto.dshmobile.uicontract.UiToolRegistration.PENDING
+        }
+        val connection = when (lifecycle) {
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.REGISTERED ->
+                com.labteto.dshmobile.uicontract.UiToolConnection.HEALTH_UNCHECKED
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.CONNECTING ->
+                com.labteto.dshmobile.uicontract.UiToolConnection.CONNECTING
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.RECONNECTING ->
+                com.labteto.dshmobile.uicontract.UiToolConnection.RECONNECTING
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.DISCONNECTING ->
+                com.labteto.dshmobile.uicontract.UiToolConnection.DISCONNECTING
+        }
+        com.labteto.dshmobile.uicontract.UiMcpServerSnapshot(it.id, it.transport, it.target, it.tools,
+            registration = registration, connection = connection)
     }
     override suspend fun githubConfigured() = tools.githubConfigured()
     /** Work handoff UI projection; capability hints do not grant execution permissions. */

@@ -1,8 +1,8 @@
 package com.labteto.dshmobile.uicontract
 
-enum class UiToolRegistration { REGISTERED }
+enum class UiToolRegistration { REGISTERED, PENDING, REMOVING }
 enum class UiToolSelection { UNKNOWN }
-enum class UiToolConnection { HEALTH_UNCHECKED }
+enum class UiToolConnection { HEALTH_UNCHECKED, CONNECTING, RECONNECTING, DISCONNECTING }
 enum class UiToolAuthorization { REQUIRED_PER_CALL }
 data class UiMcpServerSnapshot(
     val id: String, val transport: String, val target: String, val tools: List<String>,

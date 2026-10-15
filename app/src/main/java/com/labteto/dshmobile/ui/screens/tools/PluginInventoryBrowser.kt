@@ -162,8 +162,15 @@ internal fun PluginInventoryBrowser(
         InventoryRow(
             id = "service:${server.id}",
             name = server.id,
-            detail = stringResource(R.string.tools_server_summary, server.transport, server.tools.size),
-            connectedService = true,
+            detail = if (server.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED)
+                stringResource(R.string.tools_server_summary, server.transport, server.tools.size)
+                else stringResource(when (server.connection) {
+                    com.labteto.dshmobile.uicontract.UiToolConnection.CONNECTING -> R.string.tools_server_connecting
+                    com.labteto.dshmobile.uicontract.UiToolConnection.RECONNECTING -> R.string.tools_server_reconnecting
+                    com.labteto.dshmobile.uicontract.UiToolConnection.DISCONNECTING -> R.string.tools_server_disconnecting
+                    com.labteto.dshmobile.uicontract.UiToolConnection.HEALTH_UNCHECKED -> R.string.tools_server_health_unchecked
+                }),
+            connectedService = server.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED,
             available = false,
             icon = FeatherIcons.Globe,
         )
@@ -260,7 +267,7 @@ internal fun PluginInventoryBrowser(
                 items(5) { category ->
                     SyFilterChip(
                         text = when (category) {
-                            1 -> "${connectionStatus} · ${connectedServices.size}"
+                            1 -> "${connectionStatus} · ${connectedServices.count { it.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED }}"
                             2 -> stringResource(R.string.plugin_category_work)
                             3 -> stringResource(R.string.plugin_category_device)
                             4 -> stringResource(R.string.plugin_category_design)
