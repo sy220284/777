@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.model.estimateModelTokens
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -62,6 +63,33 @@ class ChatDiaryRecallPolicyTest {
             entries = distractors + old, query = "那片海",
             subjectKey = "gallery:b", groupAudience = true, maxItems = 4,
         ).isEmpty())
+    }
+
+    @Test
+    fun privateVoiceReplacesDuplicatePsychologyAndLegacyUserLabelOnlyInRecall() {
+        val entry = ChatDiaryEntry(
+            id = "one", subjectKey = "gallery:a", personaName = "阿青",
+            event = "用户约定和我周末一起出门",
+            feeling = "我很开心",
+            innerThought = "我开始期待",
+            relationshipMeaning = "我开始期待",
+            unresolvedEcho = "还想再商量时间",
+            privateReflection = "我开始期待。只是希望这次约定能成真。",
+            createdAt = 1L, updatedAt = 1L,
+        )
+        val rendered = renderRecalledChatDiary(entry, groupAudience = false)
+        assertTrue(rendered.contains("对方约定和我"))
+        assertFalse(rendered.contains("用户"))
+        assertTrue(rendered.contains("私人日记想法"))
+        assertFalse(rendered.contains("  感受："))
+        assertFalse(rendered.contains("  心里："))
+        assertFalse(rendered.contains("  关系理解：我开始期待"))
+        assertTrue(rendered.contains("  未解心绪：还想再商量时间"))
+        // Raw memory stays untouched for traceability and corrections.
+        assertTrue(entry.event.startsWith("用户"))
+        val old = renderRecalledChatDiary(entry.copy(privateReflection = ""), false)
+        assertTrue(old.contains("  感受：我很开心"))
+        assertTrue(old.contains("  心里：我开始期待"))
     }
 
     @Test
