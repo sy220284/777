@@ -737,6 +737,7 @@ internal fun PersonaGalleryScreen(
             title = stringResource(R.string.persona_gallery_view_profile),
             onDismiss = { showPersonaDetails = false },
             scrollable = true,
+            seamlessBackground = true,
         ) {
             PersonaDetails(selected.persona)
         }
