@@ -2,7 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import java.text.SimpleDateFormat
+import java.text.DateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -47,6 +47,7 @@ import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.local.chat.ChatDiaryDisclosure
 import com.labteto.dshmobile.local.chat.ChatDiaryDelta
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
+import com.labteto.dshmobile.local.chat.ChatDiaryReadingVocabulary
 import com.labteto.dshmobile.local.chat.ChatDiarySourceMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -166,12 +167,14 @@ internal fun groupCharacterDiaryDays(entries: List<ChatDiaryEntry>): List<Charac
  * Do not invent any emotion or rewrite the persisted facts / source references.
  */
 internal fun characterDiaryReadingLine(entry: ChatDiaryEntry): String {
-    fun clean(text: String): String = text.trim().replace("用户", "对方").trimEnd('。', '，', '；', ' ', '\n')
+    fun clean(text: String): String = text.trim().replace(ChatDiaryReadingVocabulary.TECHNICAL_USER, ChatDiaryReadingVocabulary.OTHER_PERSON).trimEnd('。', '，', '；', ' ', '\n')
     val anchor = clean(entry.event).take(90)
-    val opening = if (anchor.startsWith("我") || anchor.startsWith("今天") || anchor.startsWith("昨")) {
+    val opening = if (anchor.startsWith(ChatDiaryReadingVocabulary.FIRST_PERSON) ||
+        anchor.startsWith(ChatDiaryReadingVocabulary.TODAY) ||
+        anchor.startsWith(ChatDiaryReadingVocabulary.YESTERDAY_PREFIX)) {
         anchor
     } else if (anchor.isNotBlank()) {
-        "今天，" + anchor
+        ChatDiaryReadingVocabulary.DAY_NOTE_PREFIX + anchor
     } else ""
     val reflections = listOf(entry.feeling, entry.innerThought, entry.unresolvedEcho)
         .map(::clean)
@@ -554,7 +557,7 @@ private fun CharacterDiaryDayCard(
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val dateText = remember(day.dayStart) {
-        SimpleDateFormat("M月d日 · EEEE", Locale.CHINA).format(Date(day.dayStart))
+        DateFormat.getDateInstance(DateFormat.FULL, Locale.CHINA).format(Date(day.dayStart))
     }
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Column(
@@ -594,7 +597,10 @@ private fun CharacterDiaryDayCard(
                         verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                     ) {
                         Text(
-                            text = entry.event,
+                            text = entry.event.replace(
+                                ChatDiaryReadingVocabulary.TECHNICAL_USER,
+                                ChatDiaryReadingVocabulary.OTHER_PERSON,
+                            ),
                             style = DsType.std14.withReadingWeight(),
                             color = colors.textSecondary,
                             modifier = Modifier.testTag("diary_raw_event_" + entry.id),
