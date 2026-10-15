@@ -71,14 +71,32 @@ class LocalMiniMaxSkillBundleTest {
         } finally { root.deleteRecursively() }
     }
 
+    @Test fun untouchedMediaGuideUpgradesButUserEditedGuideIsPreserved() {
+        val root = Files.createTempDirectory("minimax-guides-v3").toFile()
+        try {
+            val workspace = LocalWorkspace(root)
+            LocalSkillStore(workspace).seedOnce()
+            val oldMedia = requireNotNull(LocalMiniMaxSkillCatalog.previousMediaDocument("minimax-media"))
+            val editedMusic = requireNotNull(LocalMiniMaxSkillCatalog.previousMediaDocument("minimax-music-gen")) +
+                "\n用户自己的做法\n"
+            workspace.write(".dsh/skills/minimax-media/SKILL.md", oldMedia)
+            workspace.write(".dsh/skills/minimax-music-gen/SKILL.md", editedMusic)
+            val store = LocalSkillStore(workspace, ::bundle)
+            store.seedOnce()
+            assertTrue(store.readDocument("minimax-media").contains("用途："))
+            assertEquals(editedMusic, store.readDocument("minimax-music-gen"))
+            store.seedOnce()
+            assertEquals(editedMusic, store.readDocument("minimax-music-gen"))
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun incompleteMediaBundleDoesNotAdvertiseSkill() {
         val root = Files.createTempDirectory("minimax-media-incomplete").toFile()
         try {
             val store = LocalSkillStore(LocalWorkspace(root)) { mapOf("LICENSE" to "MIT") }
             assertThrows(IllegalArgumentException::class.java) { store.seedOnce() }
             assertFalse(File(root, ".dsh/skills/minimax-media/SKILL.md").isFile)
-            assertFalse(File(root, ".dsh/skills/.minimax-seed-v1").exists() &&
-                File(root, ".dsh/skills/.minimax-seed-v1").length() == 0L)
+            assertFalse(File(root, ".dsh/skills/.minimax-seed-v1").exists())
         } finally { root.deleteRecursively() }
     }
 }

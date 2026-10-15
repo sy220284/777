@@ -231,6 +231,7 @@ internal class LocalSkillStore(
         }
         migrateMiniMaxMobileSkills()
         archiveRetiredMiniMaxAdaptations()
+        upgradeExistingMediaSkillGuides()
     }
 
     /** Retire unavailable hosts and upgrade only untouched bundled instructions. */
@@ -267,6 +268,7 @@ internal class LocalSkillStore(
 
     /** Retire six desktop-adapted presets while preserving every user file and edit. */
     private fun archiveRetiredMiniMaxAdaptations() {
+        if (bundleFiles == null) return
         val marker = File(skillsDir, ".minimax-retired-desktop-v3")
         if (marker.exists()) return
         val archivePath = ".dsh/retired-skills/minimax-desktop-v3"
@@ -280,7 +282,24 @@ internal class LocalSkillStore(
             destination.parentFile?.mkdirs()
             Files.move(File(skillsDir, id).toPath(), destination.toPath())
         }
-        workspace.write(".dsh/skills/.minimax-retired-desktop-v3", "done\\n")
+        workspace.write(".dsh/skills/.minimax-retired-desktop-v3", "done\n")
+    }
+
+    /** Upgrade only unedited shipped media SKILL.md; all user edits remain authoritative. */
+    private fun upgradeExistingMediaSkillGuides() {
+        if (bundleFiles == null || File(skillsDir, ".minimax-media-guide-v3").exists()) return
+        for (preset in LocalMiniMaxSkillCatalog.entries) {
+            if (!workspace.skills().contains(preset.id)) continue
+            requireInstalled(preset.id)
+            val current = workspace.readSkill(preset.id)
+            val previous = LocalMiniMaxSkillCatalog.previousMediaDocument(preset.id)
+            val legacy = LocalMiniMaxSkillCatalog.previousLegacyDocument(preset.id)
+            if (current == previous || current == legacy) {
+                workspace.write(".dsh/skills/${preset.id}/SKILL.md",
+                    buildLocalSkillDocument(preset.id, preset.description, preset.instructions, preset.whenToUse, preset.title))
+            }
+        }
+        workspace.write(".dsh/skills/.minimax-media-guide-v3", "seeded\\n")
     }
 
     private val bundledIds = LocalMiniMaxSkillCatalog.entries.map { it.id }.toSet()

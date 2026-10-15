@@ -16,6 +16,33 @@ Python 和 Node 的脚本按实际依赖执行；Word 的 .NET 流程需可用�
 字体和图片采用现有素材或核实许可后获取；不虚构本包拥有未附带的素材。所有交付应区分已执行结果与仍待设备、浏览器或外部 API 验证的部分。
     """.trimIndent()
 
+    /** Fingerprint of shipped pre-v3 media instructions, used only for safe upgrades. */
+    fun previousMediaDocument(id: String): String? {
+        val previous = when (id) {
+            "minimax-media" -> Triple("MiniMax 多媒体工具", "MiniMax 图片、视频、语音与音乐 API。", "MiniMax 图片、视频、语音与音乐 API")
+            "minimax-music-gen" -> Triple("MiniMax 音乐创作", "歌曲、伴奏与音乐生成。", "歌曲、伴奏与音乐生成")
+            "minimax-playlist" -> Triple("MiniMax 歌单创作", "歌单、曲风与封面创作。", "歌单、曲风与封面创作")
+            else -> return null
+        }
+        val content = """
+来源：MiniMax-AI/skills，基于固定版本 60aaae52 的设计资料，由 777 改造成手机执行流程。
+先读取 .dsh/skills/$id/MOBILE.md，按照其中手机端实际可用的文件、Python、Node 和预览流程执行；详细资料按该文档链接读取。
+先核实手机端环境，不假定桌面工具可用；未执行的构建或渲染不得声称完成。
+${if (id == "minimax-media") "产物必须实际写入工作区并验证。用户可自行通过受控配置方式提供 MiniMax 媒体 CLI 凭据；明确授权且凭据及媒体 API 权限实际可用时直接按要求执行，不得仅因技能默认建议拒绝；缺少配置时说明具体配置方式。聊天套餐不自动具备媒体 API 权限；不把密钥写入公开仓库、提示、日志或生成文件。" else "实际写入并验证产物；外部 API 权限须核实，聊天套餐不等于媒体 API 权限，密钥不得泄露。"}
+        """.trimIndent()
+        return buildLocalSkillDocument(id, previous.second, content, previous.third, previous.first)
+    }
+
+    fun previousLegacyDocument(id: String): String? {
+        val previous = when (id) {
+            "minimax-media" -> Triple("MiniMax 多媒体工具", "MiniMax 图片、视频、语音与音乐 API。", "MiniMax 图片、视频、语音与音乐 API")
+            "minimax-music-gen" -> Triple("MiniMax 音乐创作", "歌曲、伴奏与音乐生成。", "歌曲、伴奏与音乐生成")
+            "minimax-playlist" -> Triple("MiniMax 歌单创作", "歌单、曲风与封面创作。", "歌单、曲风与封面创作")
+            else -> return null
+        }
+        return buildLocalSkillDocument(id, previous.second, legacyInstructions(id), previous.third, previous.first)
+    }
+
     val entries = listOf(
         LocalPresetSkill("minimax-media", "MiniMax 媒体创作", "利用已配置的 MiniMax 媒体 API 生成图片、视频、语音与音乐。", """
             用途：按用户描述创作图片、短视频、语音配音或音乐，并取得真实媒体文件。
