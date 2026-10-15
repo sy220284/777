@@ -211,9 +211,25 @@ def audit():
         raise ValueError("矩阵中有测试方法映射的功能数不一致")
     if len(identities["bindings"]) != review["tracked_legacy_identities"]:
         raise ValueError("静态功能ID数量不一致")
+    # A missing legacy path is a *reported* migration/retirement question, not a
+    # valid active identity. The independent tree verifier separately recomputes the
+    # precise stale reasons. Never suppress or silently "repair" these stable IDs.
+    recorded_stale = {item["id"]: item for item in review["stale_legacy_identities"]}
+    if len(recorded_stale) != len(review["stale_legacy_identities"]):
+        raise ValueError("过期功能身份出现重复编号")
+    stale_identifiers = []
     for item in identities["bindings"]:
-        if item["path"] not in leaves or item["source"] not in sources or not declares(sources[item["source"]], item["entry"]):
-            raise ValueError("只读功能ID失效：" + item["id"])
+        valid = (item["path"] in leaves and item["source"] in sources
+                 and declares(sources[item["source"]], item["entry"]))
+        if valid and item["id"] in recorded_stale:
+            raise ValueError("已恢复的功能身份仍被标为过期：" + item["id"])
+        if not valid:
+            stale = recorded_stale.get(item["id"])
+            if stale is None or any(stale.get(k) != item[k] for k in ("path", "source", "entry")):
+                raise ValueError("只读功能ID失效却未完整登记待核迁移：" + item["id"])
+            stale_identifiers.append(item["id"])
+    if set(stale_identifiers) != set(recorded_stale):
+        raise ValueError("过期身份报告包含未在真实源码失效的记录")
     layers = Counter(v.split(" / ", 1)[0] for v in leaves)
     if not set(layers).issubset({"第一层｜产品功能与界面", "第二层｜共享运行能力", "第三层｜平台与工程保障"}):
         raise ValueError("功能树架构层级无效")
@@ -254,6 +270,8 @@ def audit():
                        "weak_file_only_evidence": weak, "no_confirmed_entry": len(unproven),
                        "pending_source_migration": pending_migration,
                        "stable_static_identities": len(identities["bindings"]),
+                       "stale_legacy_identity_count": len(stale_identifiers),
+                       "stale_legacy_identity_ids": stale_identifiers,
                        "unproven_paths": unproven, "all_paths_crosschecked": True,
                        "runtime_verified_independent_feature_count": None,
                        "runtime_count_limitation": "未逐功能证明调用可达、真实设备行为和模型效果；其中有工程及共享服务条目"},
@@ -286,6 +304,9 @@ def render_md(data):
         f"只有生产文件存在线索：{comp['weak_file_only_evidence']}项；"
         f"缺少可确认入口：{comp['no_confirmed_entry']}项；"
         f"源码迁移或退役待复核：{comp['pending_source_migration']}项。四类相加覆盖全部功能树叶节点。",
+        "",
+        f"历史静态身份中有{comp['stale_legacy_identity_count']}项因原路径或代码变动待核迁移/退役；"
+        "它们仍保留原始编号，不据此删除或伪造现行能力。",
         "",
         "## 精确证据分层",
         "",
