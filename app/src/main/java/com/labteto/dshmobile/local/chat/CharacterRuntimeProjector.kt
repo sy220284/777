@@ -7,12 +7,11 @@ import com.labteto.dshmobile.local.model.estimateModelTokens
  * Stored character facts remain authoritative; this projection owns no personality of its own.
  */
 internal fun PersonaProfile.forRuntimeStoryStage(context: ChatContextState): PersonaProfile {
-    // A new V4 identity is authoritative even before the first fact is filled in.
-    // Legacy-only profiles still retain their old runtime fallback until converted.
-    if (facts.isEmpty() && coreIdentity.isBlank()) return this
-    // A request-local projection preserves the stored sources and stage IDs. Even if
-    // all facts are future-gated, obsolete legacy prose must not be restored.
-    return copy(
+    // Every projection uses the current persona contract, including a card without an
+    // identity or facts. Legacy-only profiles must never bypass normalization.
+    val current = canonicalV4()
+    // Request-local projection retains stage visibility without rewriting stored facts.
+    return current.copy(
         facts = characterKnownFacts(context.storyStage, context.visibleStoryStages())
             .map { it.copy(temporalScope = "") },
         portrait = "",
