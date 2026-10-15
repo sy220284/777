@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.host
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.SharedPreferences
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,10 +14,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -91,9 +92,18 @@ internal fun LocalApplicationUiHost(
     val preference = remember(context) {
         context.getSharedPreferences("ui_application_pack", Context.MODE_PRIVATE)
     }
-    var selectionEpoch by rememberSaveable { mutableIntStateOf(0) }
-    val selectedId = remember(preference, selectionEpoch) {
-        preference.getString("selected_pack", LEGACY_V6_APP_UI)
+    var selectedId by remember(preference) {
+        mutableStateOf(preference.getString("selected_pack", LEGACY_V6_APP_UI))
+    }
+    // An admitted pack selection persisted by Settings must swap the live Host too.
+    // This listener watches a local preference only: no cloud/network UI-state coupling.
+    DisposableEffect(preference) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+            if (key == "selected_pack")
+                selectedId = prefs.getString(key, LEGACY_V6_APP_UI)
+        }
+        preference.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { preference.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     val width = LocalConfiguration.current.screenWidthDp
     val window = when {
@@ -130,15 +140,13 @@ internal fun LocalApplicationUiHost(
             // An invalid restored history must not turn the application into an empty screen.
             if (result is UiSceneRenderAccess.Rejected) {
                 UnavailablePackNotice {
-                    if (preference.edit().putString("selected_pack", LEGACY_V6_APP_UI).commit())
-                        selectionEpoch++
+                    preference.edit().putString("selected_pack", LEGACY_V6_APP_UI).commit()
                 }
             }
         }
         is LocalApplicationUiDecision.Unavailable -> {
             UnavailablePackNotice {
-                if (preference.edit().putString("selected_pack", LEGACY_V6_APP_UI).commit())
-                    selectionEpoch++
+                preference.edit().putString("selected_pack", LEGACY_V6_APP_UI).commit()
             }
         }
     }
