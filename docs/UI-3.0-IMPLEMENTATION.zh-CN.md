@@ -1,5 +1,8 @@
 # UI 3.0-R4 实施台账
 
+> **2026-10-15 CI 阻断修复及 S-1 MCP 生命周期增量（PR #705）**：`#38696536117` 真实编译失败原因是 UI 编辑回执已经改为 `UiMessageEditOutcome`，旧 V6 的 `LocalHarnessViewModel.editAndResendUserMessage` 仍要求旧 `LocalUserMessageEditResult`；`b4eb3bfb` 增加 11/11 穷举反向兼容映射，随后 `#38697453814` 的 `unit-tests` 作业成功，其他设备/构建任务不可据此认定通过。`dd10d5bb` + `1ea41356` + `476f89f6` 将 MCP 注册/连接过渡阶段原位透传至工具页，区分建立连接、已登记但未探测健康、重连、在途工具排空断开；新旧工具列表分开“已注册”数量，过渡中不误报在线/可调用，增加慢连接、重连和断开测试断言。**S-1-01 从 `CODE_PENDING` 改为 `CODE_PARTIAL`，真实工具选择、认证状态、主动健康检查、完整实时订阅仍缺**。S0 动作映射仍 **75/173**，恢复验收仍 **0/173**；整个 R4 UI 包替换仍未完成。最新 SHA 的 CI 必须独立验证。
+
+
 > **2026-10-15 第二批 S1/S2/S4 推进（PR #705，仍待最新 SHA CI）**：`e8e5cf06` 将编辑消息的 Owner 11 种结果完整投影为独立 `UiMessageEditOutcome`，同时调整 Chat/Work Port/Next 消费路径并加映射单测，避免 Next 在回执层直接依赖旧 Session 枚举；`1dbb0d87` 增补 Next Compose 审批按钮→真实 Work Port→模拟 Owner nonce 的拒绝/不可重复操作回归测试，但**非真实供应商或 V6+Next 完整端到端证明**；`eaf7c4a8` 修复 Next 动态卡片把 Owner 拒绝和失败错误展示成“已提交”的误导反馈，改为区分受理、排队、拒绝、失败、未知结果。当前 **75/173** 动作有源码映射，**173/173** 仍待完整恢复验收，尚缺正式全应用两包 Renderer/Host、动态媒体、Work 自动发布。此前 `#192a4ceb` 的失败已经在历史 CI 中被后续通过覆盖，当前 SHA 不沿用历史通过回执。
 
 

@@ -1,7 +1,7 @@
 {
   "schema": "777.ui-r4.code-tasks/1",
   "asOf": "2026-10-15",
-  "baseline": "PR #705 implementation snapshot through eaf7c4a8; tests not yet certified",
+  "baseline": "2026-10-15 through 476f89f6; latest CI pending, R4 not completed",
   "scope": "整个 R4，非单一功能",
   "verificationPolicy": "当前 HEAD 基础 CI 可通过不代表 R4 交付验收；新增提交需自身 CI，真实双包使用/进程恢复/设备矩阵按 S2/S5 单独验证。",
   "sceneCount": 78,
@@ -11,8 +11,10 @@
     {
       "id": "S-1-01",
       "task": "实时 MCP 注册/选中/连接/授权观测",
-      "codeStatus": "CODE_PENDING",
-      "verification": "DEFERRED"
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED",
+      "implemented": "MCP 原 Harness 连接租约/工具 Registry 返回连接中、注册完成（不代表健康在线）、重连中、排空断开中事实；LocalPluginComposition → LocalToolsUiFacade → Tools 页面及插件列表透传生命周期，过渡期不计作已注册服务、不准触发断开/调用入口；McpToolBridgePluginTest 增加慢连接、重连、排空断开的异步断言。无工具健康探测，显示健康未检查。",
+      "remaining": "仍缺真实选中工具状态、调用准入与授权事实观察、错误/掉线后的在线诊断和自动可见状态刷新；当前只是拉取时点/操作刷新下的生命周期快照，不具备主动健康探针或完整实时订阅，不能称四维全闭环。"
     },
     {
       "id": "S-1-02",
@@ -244,7 +246,8 @@
       "task": "最终 SHA CI 与 Android16/17 全场景/无障碍/弱网/收费矩阵",
       "codeStatus": "VERIFICATION_DEFERRED",
       "verification": "DEFERRED",
-      "remaining": "后续 CI #38687374480 已取得基础构建、单测、Android16/17 通过的历史证据，旧提交 #192a4ceb 的 x86 AndroidTest 编译失败不应继续当作当前阻断；最新本轮功能改动必须取得自己 SHA 的构建/单测/Android16/17/合并门禁回执；最终还需双包切换、进程恢复、V6.3 触控/弹层、主题、IME、TalkBack、弱网/收费验收。"
+      "remaining": "以当前最终 SHA 验证 :app Kotlin、harness-interop MCP 生命周期 JVM 测试、Next Compose 审批 instrumented、Android16/17 与ARM64；验证后仍需全应用 Host 双包/弱网/审批/恢复/辅助功能验收。",
+      "implemented": " 2026-10-15 CI #38696536117 真实失败已定位 LocalHarnessViewModel.kt:325 编辑结果接口类型变化未兼容旧 V6；b4eb3bfb 完整映射11种结果后，旧 CI #38697453814 的 unit-tests 作业通过（其他 Job 状态需以对应最终 SHA 查证）。"
     }
   ],
   "limitations": {
