@@ -136,8 +136,8 @@
       "task": "7 路由/二级场景/深链/返回的通用 Host",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "新增 :ui-host 的 UiHostSceneNavigation 纯导航约定：基于 Host 场景目录与当前包 manifest 区分 PAGE/OVERLAY/SLOT/SYSTEM，支持包身份校验、返回、有限的显式深链键及严格状态恢复；App JVM 回归测试覆盖拒绝旧包/无实现页面/系统服务/伪造历史。仅是独立导航内核，不是现网 Host 接线或 renderer 的完成证明。 本批增加 32 层历史上限、root 导航清栈、页面覆盖弹层去重和非法覆盖/回到 root 历史拒绝；增加有版本/长度预算的编码快照及 Host 恢复入口，严格重新核验场景和包身份；补 JVM 回归源码，本轮新增 UiApplicationSceneHost 中间层：仅接收完整 Pack admission 的真实 Compose renderer，使用 SaveableState 中立快照接收导航与系统返回，实时重新验证 pack/历史/renderer 并拒绝迟到画面回调；修正向上返回的 scope 也使用实际 Host 回调，新增 JVM 回归源码。仍未接入 AppRoot，最新 CI 待回执。 生产 AppRoot 经 LocalApplicationUiHost 进入 UiHostSceneNavigation/RenderHostedScene；以 FeatureCatalog 7 一级路由与 SettingsDestination 构建可信内部跳转键；原 Work/Chat UI 场景请求经 Host 白名单状态机处理，并消费对应 VM 请求；错误持久历史可见提示、根返回 Activity 退出；支持 A→B→A 代次保护。",
-      "remaining": "仍需完整实际 Renderer、显式 Android DeepLink intent 注入、跨版本 Host 状态迁移/系统焦点/IME 和真实设备全场景测试；现有 Legacy Shell 内部导航仍保留，尚未全量退场。"
+      "implemented": "新增 :ui-host 的 UiHostSceneNavigation 纯导航约定：基于 Host 场景目录与当前包 manifest 区分 PAGE/OVERLAY/SLOT/SYSTEM，支持包身份校验、返回、有限的显式深链键及严格状态恢复；App JVM 回归测试覆盖拒绝旧包/无实现页面/系统服务/伪造历史。仅是独立导航内核，不是现网 Host 接线或 renderer 的完成证明。 本批增加 32 层历史上限、root 导航清栈、页面覆盖弹层去重和非法覆盖/回到 root 历史拒绝；增加有版本/长度预算的编码快照及 Host 恢复入口，严格重新核验场景和包身份；补 JVM 回归源码，本轮新增 UiApplicationSceneHost 中间层：仅接收完整 Pack admission 的真实 Compose renderer，使用 SaveableState 中立快照接收导航与系统返回，实时重新验证 pack/历史/renderer 并拒绝迟到画面回调；修正向上返回的 scope 也使用实际 Host 回调，新增 JVM 回归源码。仍未接入 AppRoot，最新 CI 待回执。 生产 AppRoot 经 LocalApplicationUiHost 进入 UiHostSceneNavigation/RenderHostedScene；以 FeatureCatalog 7 一级路由与 SettingsDestination 构建可信内部跳转键；原 Work/Chat UI 场景请求经 Host 白名单状态机处理，并消费对应 VM 请求；错误持久历史可见提示、根返回 Activity 退出；支持 A→B→A 代次保护。 2026-10-15 增量：生产 MainActivity 已注册 dsh777://scene/{key} Android VIEW 入口，精确 Host 既有 Scene 白名单并拒绝未知/编码路径/参数/片段；onNewIntent 和已消费状态不重复发起请求，AppRoot 将外部请求送至真实 Host。补 URI JVM 检查与整包渲染夹具仪器化测试源码。",
+      "remaining": "独立 V6/Next 全部实际 Renderer、完整 Legacy Shell 退场、跨版本 Host 状态迁移/系统焦点/IME、全部真实设备导航/外部深链验证仍未完成；目前默认稳定模式并不声称外部链接能打开 Next 未实现页面。"
     },
     {
       "id": "S3-03",
@@ -159,8 +159,8 @@
       "task": "生产级包选择/注册/持久恢复",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "新增 Host 持久选择协调器：只有通过全应用真实 renderer 与 manifest 双门禁的包才能写入选择；过期/缺失选择仅返回显式稳定包选项，不暗中回退 V6；持久写失败拒绝报成功。含 JVM 回归源码。 AppRoot 使用本地 SharedPreferences 持久选包，实时观察其变更，只有通过 Host manifest+Renderer+已接 Feature Owner 能力校验的已登记整包可渲染，非法/缺失选择显式失败且必须点击恢复 Legacy；新增合成完整双包 Compose 切换 instrumentation 测试源码。 将 AppRoot 真实 Feature Owner 依赖注入 NextApplicationScenePack 增量候选包；保留完整全应用 Scene Renderer 双门禁，缺页候选即使安装也不得替换 V6。",
-      "remaining": "安装候选为10个实际Renderer的Next增量包，仍未达到75项包内Scene及Host 3项系统服务的完整准入；生产选包设置、完整恢复及双包验证待完成。"
+      "implemented": "新增 Host 持久选择协调器：只有通过全应用真实 renderer 与 manifest 双门禁的包才能写入选择；过期/缺失选择仅返回显式稳定包选项，不暗中回退 V6；持久写失败拒绝报成功。含 JVM 回归源码。 AppRoot 使用本地 SharedPreferences 持久选包，实时观察其变更，只有通过 Host manifest+Renderer+已接 Feature Owner 能力校验的已登记整包可渲染，非法/缺失选择显式失败且必须点击恢复 Legacy；新增合成完整双包 Compose 切换 instrumentation 测试源码。 将 AppRoot 真实 Feature Owner 依赖注入 NextApplicationScenePack 增量候选包；保留完整全应用 Scene Renderer 双门禁，缺页候选即使安装也不得替换 V6。 2026-10-15 增量：整包 Host 导航栈现按 UI 包 ID 独立写 SharedPreferences，冷启动从保存的版本化快照恢复；保存前验证本包目录和真实 Renderer，不合法的异包/损坏历史显式拒绝，用户明确选回稳定模式时清除该包坏历史；补真实 Host Compose 仪器化测试源码。",
+      "remaining": "安装候选仍仅10/75个实际 Renderer，无法作为全应用独立包启用；生产选包设置、跨版本迁移、多包/冷启动/系统杀进程的真机验证尚缺。按包保存导航快照不等于业务数据或草稿完整恢复。"
     },
     {
       "id": "S3-06",
