@@ -238,6 +238,28 @@ object NextConversationUiPack : ConversationUiPack {
                 finally { if (generation == workFactsGeneration) workFactsLoading = false }
             }
         }
+        val detailUnavailable = stringResource(R.string.next_file_read_failed)
+        var toolDetail by remember(identity) { mutableStateOf<Pair<String, String?>?>(null) }
+        var toolDetailGeneration by remember(identity) { mutableStateOf(0L) }
+        fun readToolDetail(callId: String, sequence: Long) {
+            val target = identity ?: return
+            val owner = workReads ?: return
+            val request = ++toolDetailGeneration
+            toolDetail = callId to null
+            importScope.launch {
+                try {
+                    val detail = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        owner.toolEvidenceForUi(target.sessionId, callId, sequence)
+                    }
+                    if (request == toolDetailGeneration && work.snapshot().identity == target)
+                        toolDetail = callId to (detail ?: detailUnavailable)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (failure: Exception) {
+                    if (request == toolDetailGeneration && work.snapshot().identity == target)
+                        toolDetail = callId to failure.message.orEmpty()
+                }
+            }
+        }
         fun closeWorkFacts() { workFactsGeneration++; workFactsOpen = false; workFactsLoading = false }
         val importFailed = stringResource(R.string.next_attachment_failed)
         val fileReadFailed = stringResource(R.string.next_file_read_failed)
@@ -342,6 +364,18 @@ object NextConversationUiPack : ConversationUiPack {
             }
         }
         MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
+        toolDetail?.let { detail -> AlertDialog(
+            onDismissRequest = { toolDetailGeneration++; toolDetail = null },
+            title = { Text(detail.first) },
+            text = { androidx.compose.foundation.text.selection.SelectionContainer {
+                LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                    item { Text(detail.second ?: stringResource(R.string.next_loading)) }
+                }
+            } },
+            confirmButton = { TextButton(onClick = { toolDetailGeneration++; toolDetail = null }) {
+                Text(stringResource(R.string.next_close))
+            } },
+        ) }
         if (workFactsOpen) AlertDialog(onDismissRequest = { closeWorkFacts() },
             title = { Text(stringResource(R.string.next_work_facts)) },
             text = { LazyColumn(Modifier.heightIn(max = 360.dp)) {
@@ -371,6 +405,9 @@ object NextConversationUiPack : ConversationUiPack {
                 items(workHistory?.records ?: emptyList(), key = { it.sequence }) { record ->
                     Text("#${record.sequence} ${record.name}")
                     Text(record.content)
+                    record.callId?.let { callId -> TextButton(onClick = { readToolDetail(callId, record.sequence) }) {
+                        Text(stringResource(R.string.next_tool_details))
+                    } }
                 }
                 if (workHistory?.older != null) item { TextButton(onClick = { loadWorkFacts(true) }, enabled = !workFactsLoading) {
                     Text(stringResource(R.string.next_load_older))
@@ -537,7 +574,7 @@ object NextConversationUiPack : ConversationUiPack {
                             Text(stringResource(R.string.next_continue_session))
                         }
                     }
-                    if (workMode && identity != null && evidence != null) NextWorkEvidencePanel(evidence, identity)
+                    if (workMode && identity != null && evidence != null) NextWorkEvidencePanel(evidence, identity, workReads)
                     if (workMode && identity != null && team != null) NextWorkTeamPanel(team, identity)
                     if (workMode && workReads != null) TextButton(onClick = { loadWorkFacts(false) }, enabled = identity != null && !workFactsLoading) {
                         Text(stringResource(R.string.next_work_facts))

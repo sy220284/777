@@ -655,7 +655,8 @@
         {
           "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt",
           "symbols": [
-            "linkRequirementEvidenceForUi"
+            "prepareRequirementEvidenceForUi",
+            "commitRequirementEvidenceForUi"
           ]
         }
       ],

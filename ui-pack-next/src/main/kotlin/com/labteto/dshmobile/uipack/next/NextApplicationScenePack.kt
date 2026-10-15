@@ -44,6 +44,7 @@ data class NextApplicationFeaturePorts(
     val gallerySave: PersonaGallerySaveUiPort? = null,
     val portraits: PersonaPortraitUiPort? = null,
     val tools: ToolsUiPort? = null,
+    val authoring: PersonaAuthoringUiPort? = null,
 )
 
 /**
@@ -142,6 +143,7 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
             gallery = ports.gallery, selection = ports.selection,
             onBack = { scope.onBack() },
             onStoryOpened = { scope.onNavigate(home) is UiSceneNavigationResult.Changed },
+            authoring = ports.authoring,
         )
     }
 }

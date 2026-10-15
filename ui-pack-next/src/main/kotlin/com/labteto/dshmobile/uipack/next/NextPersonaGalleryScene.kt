@@ -18,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -33,7 +34,16 @@ fun NextPersonaGalleryScene(
     selection: PersonaSelectionUiPort,
     onBack: () -> Unit,
     onStoryOpened: () -> Boolean,
+    authoring: PersonaAuthoringUiPort? = null,
 ) {
+    var editing by rememberSaveable { mutableStateOf<String?>(null) }
+    var creating by rememberSaveable { mutableStateOf(false) }
+    if (authoring != null && (creating || editing != null)) {
+        NextPersonaAuthoringScene(authoring, selection, editing,
+            onBack = { creating = false; editing = null },
+            onSaved = { creating = false; editing = null })
+        return
+    }
     var refresh by remember { mutableIntStateOf(0) }
     var receipt by remember(gallery) { mutableStateOf<UiPersonaGalleryReadReceipt?>(null) }
     var feedback by remember { mutableStateOf<String?>(null) }
@@ -58,6 +68,9 @@ fun NextPersonaGalleryScene(
         TextButton(onClick = { refresh++ }, enabled = !busy) {
             Text(stringResource(R.string.next_gallery_refresh))
         }
+        if (authoring != null) TextButton(onClick = { creating = true }, enabled = !busy) {
+            Text(stringResource(R.string.next_persona_create))
+        }
         feedback?.let { Text(it) }
         when (val data = receipt) {
             null -> Text(stringResource(R.string.next_loading))
@@ -69,6 +82,9 @@ fun NextPersonaGalleryScene(
                     items(data.entries, key = { it.id }) { persona ->
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(persona.name, style = MaterialTheme.typography.titleMedium)
+                            if (authoring != null) TextButton(onClick = { editing = persona.id }, enabled = !busy) {
+                                Text(stringResource(R.string.next_persona_edit))
+                            }
                             if (persona.stories.isEmpty()) {
                                 Text(stringResource(R.string.next_gallery_no_stories))
                             }

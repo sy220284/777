@@ -319,6 +319,20 @@ class ChatPersonaGalleryStore internal constructor(
         return PersonaGallerySaveOutcome(entry = entry, storyId = storyId)
     }
 
+    /** Whole profile edit checks the user's captured archive version under the sole Store lock. */
+    @Synchronized
+    internal fun editProfile(id: String, expectedRevision: Long, transform: (PersonaProfile) -> PersonaProfile): PersonaGalleryEntry? {
+        val document = readNormalized()
+        val current = document.entries.firstOrNull { it.id == id && it.updatedAt == expectedRevision } ?: return null
+        val profile = transform(current.persona).canonicalV4()
+        require(isMeaningfulGalleryPersona(profile)) { "人物设定内容不足，无法保存" }
+        check(current.updatedAt < Long.MAX_VALUE) { "人物版本已耗尽" }
+        val revision = maxOf(System.currentTimeMillis(), current.updatedAt + 1L)
+        val updated = current.copy(persona = profile.copy(id = current.persona.id, updatedAt = revision), updatedAt = revision)
+        documentStore.write(document.copy(entries = document.entries.map { if (it.id == id) updated else it }))
+        return updated
+    }
+
     @Synchronized
     fun applySuggestions(id: String, suggestions: List<PersonaAppendSuggestion>): PersonaGalleryEntry? {
         if (suggestions.isEmpty()) return readNormalized().entries.firstOrNull { it.id == id }

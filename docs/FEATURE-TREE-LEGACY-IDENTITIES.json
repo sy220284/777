@@ -581,8 +581,8 @@
     {
       "id": "existing.0073",
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4自由与深度编辑、事实核验和AI补全",
-      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaStore.kt",
-      "entry": "captureExplicitCorrection",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalPersonaAuthoringOwner.kt",
+      "entry": "LocalPersonaAuthoringOwner",
       "owner": "CHAT",
       "evidence": "static_declaration_only"
     },

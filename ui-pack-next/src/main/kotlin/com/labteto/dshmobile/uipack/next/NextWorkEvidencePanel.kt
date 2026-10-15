@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 
 /** File versions and origin validity are returned by Work, never inferred from model text. */
 @Composable
-internal fun NextWorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSessionIdentity) {
+internal fun NextWorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSessionIdentity, history: WorkReadUiPort? = null) {
     var generation by remember(identity) { mutableStateOf(0L) }
     var open by remember(identity) { mutableStateOf(false) }
     var snapshot by remember(identity) { mutableStateOf<UiWorkEvidenceSnapshot?>(null) }
@@ -25,7 +25,28 @@ internal fun NextWorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSession
     var inspected by remember(identity) { mutableStateOf<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem?>(null) }
     var feedback by remember(identity) { mutableStateOf<String?>(null) }
     var pending by remember(identity) { mutableStateOf(false) }
+    var historyPage by remember(identity) { mutableStateOf<com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi?>(null) }
+    var historyLoaded by remember(identity) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    fun loadHistory() {
+        val reader = history ?: return
+        if (pending || historyLoaded && historyPage?.older == null) return
+        val cursor = if (historyLoaded) historyPage?.older else null
+        val request = ++generation
+        pending = true
+        scope.launch {
+            try {
+                val page = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    reader.historyPageForUi(identity.sessionId, cursor)
+                }
+                if (request != generation) return@launch
+                historyPage = page
+                historyLoaded = !page.invalidated
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { if (request == generation) feedback = failure.message }
+            finally { if (request == generation) pending = false }
+        }
+    }
     val unavailable = stringResource(R.string.next_evidence_unavailable)
     val linked = stringResource(R.string.next_evidence_linked)
     fun refresh() {
@@ -38,12 +59,13 @@ internal fun NextWorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSession
                 if (request != generation) return@launch
                 when (result) {
                     is UiWorkEvidenceReadReceipt.Available -> {
-                        snapshot = result.snapshot; selected = null; inspected = null; open = true
+                        snapshot = result.snapshot; selected = null; inspected = null; historyPage = null; historyLoaded = false; open = true
                     }
                     is UiWorkEvidenceReadReceipt.Failed -> feedback = result.message ?: unavailable
                     is UiWorkEvidenceReadReceipt.Rejected -> feedback = unavailable
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { if (request == generation) feedback = failure.message ?: unavailable }
             finally { if (request == generation) pending = false }
         }
     }
@@ -65,7 +87,14 @@ internal fun NextWorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSession
             }
             selected?.let { requirement ->
                 item { Text(requirement.text) }
-                items(snapshot?.artifacts.orEmpty().filter { it.category == "file" }, key = { "${it.asOfSequence}:${it.reference}" }) { artifact ->
+                item {
+                    if (history != null && (!historyLoaded || historyPage?.older != null)) TextButton(
+                        onClick = { loadHistory() }, enabled = !pending,
+                    ) { Text(stringResource(R.string.next_load_older)) }
+                    if (historyPage?.invalidated == true) Text(stringResource(R.string.next_work_history_expired))
+                }
+                items((snapshot?.artifacts.orEmpty() + historyPage?.records.orEmpty().flatMap { it.artifacts })
+                    .filter { it.category == "file" }.distinctBy { it.asOfSequence to it.reference }, key = { "${it.asOfSequence}:${it.reference}" }) { artifact ->
                     TextButton(onClick = {
                         if (!pending) {
                             val request = ++generation

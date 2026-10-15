@@ -13,7 +13,7 @@
 
 | 功能描述 | 独立产品入口 | 代码层判断 |
 |---|---|---|
-| 16类人物资料按完整事实取用 | 未发现单独入口 | integrated_character_profile；code_and_tests_present_execution_unverified |
+| 13项人物资料按完整事实取用 | 未发现单独入口 | integrated_character_profile；code_and_tests_present_execution_unverified |
 | 模型温度独立采样 | 未发现单独入口 | active_sampling_subfeature；code_and_tests_present_execution_unverified |
 | 历史调参兼容读取，退出反应控制 | 未发现单独入口 | retired_controller_compatibility；legacy_fields_decodable_active_controls_retired |
 | 共同经历与采样设置分离 | 未发现单独入口 | cross_component_invariant；code_and_tests_present_execution_unverified |

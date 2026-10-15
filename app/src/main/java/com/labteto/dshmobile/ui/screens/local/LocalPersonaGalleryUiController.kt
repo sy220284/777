@@ -10,6 +10,8 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.presentation.PersonaPresetCatalog
+import com.labteto.dshmobile.local.chat.authoringDraft
+import com.labteto.dshmobile.local.chat.applyTo
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
@@ -36,6 +38,7 @@ internal class LocalPersonaGalleryUiController(
     private val savePort: com.labteto.dshmobile.uicontract.PersonaGallerySaveUiPort,
     private val portraitPort: com.labteto.dshmobile.uicontract.PersonaPortraitUiPort,
     private val deletionPort: com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort,
+    private val authoringPort: com.labteto.dshmobile.uicontract.PersonaAuthoringUiPort,
     private val transferPort: com.labteto.dshmobile.uicontract.PersonaTransferUiPort,
     private val appContext: Context,
     private val scope: CoroutineScope,
@@ -130,34 +133,26 @@ fun selectGalleryPersonaForCurrentChat(id: String, expected: com.labteto.dshmobi
         com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued
 }
 
-suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGalleryEntry> = runCatching {
+suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGalleryEntry> = runSuspendResult {
     val originalIdentity = selectionPort.snapshot().identity
-    check(!state.value.loading && !state.value.kernel.running) { appContext.getString(R.string.ui_r4_gallery_create_idle) }
-    require(isMeaningfulGalleryPersona(profile)) { appContext.getString(R.string.ui_r4_gallery_create_incomplete) }
-    val entry = withContext(Dispatchers.IO) {
-        chatUi.saveGallery(
-            persona = profile,
-            sourceSessionId = "",
-            history = emptyList(),
-            chatState = ChatCharacterState(),
-            notes = "",
-        ).entry.also { _gallery.value = chatUi.galleryEntries() }
-    }
-    // Preserve the old create-and-use flow for an empty one-to-one chat.
-    // In an existing conversation or a group, creating a gallery card must not replace the cast.
+    val receipt = authoringPort.create(profile.authoringDraft())
+    val saved = receipt as? com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Saved
+        ?: error((receipt as? com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Failed)?.message
+            ?: appContext.getString(R.string.ui_r4_gallery_create_incomplete))
+    refresh()
+    val entry = gallery.value.firstOrNull { it.id == saved.galleryId }
+        ?: error(appContext.getString(R.string.ui_r4_gallery_entry_gone))
     selectGalleryPersonaForCurrentChat(entry.id, originalIdentity)
     entry
 }
 suspend fun autoFillNewPersona(current: PersonaProfile, description: String): Result<PersonaProfile> = runSuspendResult {
-    val snapshot = state.value
-    check(!snapshot.loading && !snapshot.kernel.running && snapshot.modelState.configured) { appContext.getString(R.string.ui_r4_gallery_model_not_ready) }
-    chatUi.autoFillPersona(
-        model = snapshot.modelState.model, baseUrl = snapshot.modelState.baseUrl,
-        profileId = snapshot.modelState.modelSelection.activeProfileId,
-        current = current,
-        recentMessages = emptyList(),
-        description = description,
-    )
+    val identity = selectionPort.snapshot().identity
+        ?: error(appContext.getString(R.string.ui_r4_gallery_session_not_ready))
+    when (val result = authoringPort.suggest(identity, current.authoringDraft(), description)) {
+        is com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Suggested -> result.draft.applyTo(current)
+        is com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_model_not_ready))
+        else -> error(appContext.getString(R.string.ui_r4_gallery_model_not_ready))
+    }
 }
 
 suspend fun inspectGalleryPersona(
