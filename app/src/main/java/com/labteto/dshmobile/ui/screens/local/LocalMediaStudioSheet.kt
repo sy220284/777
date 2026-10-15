@@ -116,6 +116,7 @@ internal fun LocalMediaStudioSheetContent(
     var audioFile by remember(selected?.id) { mutableStateOf<File?>(null) }
     var voices by remember(selected?.id) { mutableStateOf<List<LocalMediaVoice>>(emptyList()) }
     var showVoices by remember(selected?.id) { mutableStateOf(false) }
+    var showCustomVoiceId by rememberSaveable(selected?.id) { mutableStateOf(false) }
     var voiceFilter by remember(selected?.id) { mutableStateOf("") }
 
     fun submit(offer: LocalMediaOffer, action: suspend () -> Unit) {
@@ -350,6 +351,14 @@ internal fun LocalMediaStudioSheetContent(
                                     variant = SyButtonVariant.Ghost)
                             }
                         }
+                    }
+                    SyButton(text = stringResource(R.string.media_voice_custom_toggle),
+                        size = SyButtonSize.Small, variant = SyButtonVariant.Ghost,
+                        onClick = { showCustomVoiceId = !showCustomVoiceId })
+                    if (showCustomVoiceId) {
+                        SyTextField(value = voiceId, onValueChange = { voiceId = it },
+                            label = { Text(stringResource(R.string.media_voice_custom_field)) },
+                            singleLine = true, enabled = !busy, modifier = Modifier.fillMaxWidth())
                     }
                     SyButton(text = stringResource(R.string.minimax_media_create_speech),
                         enabled = !busy && prompt.isNotBlank() && voiceId.isNotBlank(),
