@@ -7,7 +7,6 @@ import com.shenyan.designsystem.components.SyMaterialTier
 import com.shenyan.designsystem.components.SyMaterialSurface
 
 
-import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.labteto.dshmobile.ui.shenyan.SyProgressBar
 
 import androidx.compose.foundation.background
@@ -192,7 +191,10 @@ internal fun UsageCalculationPage(
     }
 
     if (selectedModel == null && analytics.byModel.isNotEmpty()) {
-        SyGlassCard {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+        ) {
             Text(stringResource(R.string.fluid_model_composition), style = DsType.std14Strong,
                 color = colors.text)
             val total = analytics.byModel.values.sumOf { it.tracked.totalTokens.toDouble() }.coerceAtLeast(1.0)
@@ -209,7 +211,7 @@ internal fun UsageCalculationPage(
                             modifier = Modifier.fillMaxWidth()
                                 .testTag("usage-model-select:" + entry.key),
                             shape = DsShapes.row,
-                            tier = SyMaterialTier.L3_CARD,
+                            tier = SyMaterialTier.L1_SECTION,
                         ) {
                             Column(
                                 modifier = Modifier.padding(SyMetric.gapMd),
@@ -242,7 +244,7 @@ internal fun UsageCalculationPage(
     SyMaterialSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        tier = SyMaterialTier.L3_CARD,
+        tier = SyMaterialTier.L1_SECTION,
     ) {
         Column(
             modifier = Modifier.padding(SyMetric.gapLg),
@@ -300,7 +302,7 @@ internal fun UsageCalculationPage(
         SyMaterialSurface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.block,
-            tier = SyMaterialTier.L3_CARD,
+            tier = SyMaterialTier.L1_SECTION,
         ) {
             Column {
                 val visibleGroups = if (showAllGroups) groups else groups.take(12)
@@ -428,7 +430,7 @@ internal fun UsageLogPage(
     SyMaterialSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        tier = SyMaterialTier.L3_CARD,
+        tier = SyMaterialTier.L1_SECTION,
     ) {
         Column {
             val records = visibleAnalytics.recentRecords.take(120)
@@ -460,7 +462,7 @@ internal fun UsageGroupDetailPage(
         SyMaterialSurface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.block,
-            tier = SyMaterialTier.L3_CARD,
+            tier = SyMaterialTier.L1_SECTION,
         ) {
             Column {
                 detail.agents.forEachIndexed { index, agent ->
@@ -476,7 +478,7 @@ internal fun UsageGroupDetailPage(
         SyMaterialSurface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.block,
-            tier = SyMaterialTier.L3_CARD,
+            tier = SyMaterialTier.L1_SECTION,
         ) {
             Column {
                 detail.actions.forEachIndexed { index, item ->
@@ -491,7 +493,7 @@ internal fun UsageGroupDetailPage(
     SyMaterialSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        tier = SyMaterialTier.L3_CARD,
+        tier = SyMaterialTier.L1_SECTION,
     ) {
         Column {
             val records = detail.records.take(120)
@@ -528,7 +530,7 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
     SyMaterialSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        tier = SyMaterialTier.L3_CARD,
+        tier = SyMaterialTier.L1_SECTION,
     ) {
         Column(
             modifier = Modifier.padding(SyMetric.gapLg),

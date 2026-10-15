@@ -79,6 +79,7 @@ internal fun DeviceUsageHero(usage: DeepSeekUsageSnapshot, showEstimatedCost: Bo
     }
     com.shenyan.designsystem.components.SyMaterialFrame(
         modifier = Modifier.fillMaxWidth(),
+        tier = SyMaterialTier.L1_SECTION,
         horizontalPadding = 0.dp, verticalPadding = 0.dp,
     ) {
         Column(
@@ -428,6 +429,7 @@ internal fun UsageAggregateHero(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     com.shenyan.designsystem.components.SyMaterialFrame(
         modifier = Modifier.fillMaxWidth(),
+        tier = SyMaterialTier.L1_SECTION,
         horizontalPadding = 0.dp, verticalPadding = 0.dp,
     ) {
         Column(
@@ -462,24 +464,19 @@ internal fun UsageAggregateHero(
 @Composable
 internal fun CompactMetric(label: String, value: String, modifier: Modifier = Modifier) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    com.shenyan.designsystem.components.SyMaterialFrame(
-        modifier = modifier,
-        tier = com.shenyan.designsystem.components.SyMaterialTier.L1_SECTION,
-        shape = DsShapes.row, horizontalPadding = 0.dp, verticalPadding = 0.dp,
+    // Metric columns share their parent section instead of nesting another glass tile.
+    Column(
+        modifier = modifier.padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
     ) {
-        Column(
-            modifier = Modifier.padding(SyMetric.gapLg),
-            verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
-        ) {
-            Text(label, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
-            Text(
-                value,
-                style = DsType.large20.withReadingWeight().copy(fontFeatureSettings = "tnum"),
-                color = colors.text,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        Text(label, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+        Text(
+            value,
+            style = DsType.large20.withReadingWeight().copy(fontFeatureSettings = "tnum"),
+            color = colors.text,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
