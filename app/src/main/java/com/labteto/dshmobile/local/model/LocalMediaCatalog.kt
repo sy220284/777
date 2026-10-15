@@ -26,7 +26,11 @@ data class LocalMediaRevisionDraft(
     val routeFingerprint: String? = null,
     val ratio: String = "1:1",
     val voiceId: String? = null,
+    val credentialSignature: String? = null,
 ) : java.io.Serializable {
+    fun matchesOriginalCredential(actualSignature: String?): Boolean =
+        credentialSignature != null && actualSignature != null && credentialSignature == actualSignature
+
     /** Switching media type starts an independent creation, never a false revision of another kind. */
     fun forKind(requested: LocalMediaKind): LocalMediaRevisionDraft? = takeIf { it.kind == requested }
 
@@ -42,17 +46,19 @@ data class LocalMediaRevisionDraft(
             val id = result.profileId?.let { "${it}:${result.provider}:${result.kind}:${result.model}" }
             return LocalMediaRevisionDraft(result.id, kind, result.description.orEmpty(),
                 result.sourceMessageId, id, result.routeFingerprint,
-                result.imageRatio ?: "1:1", result.voiceId)
+                result.imageRatio ?: "1:1", result.voiceId, result.credentialSignature)
         }
         fun from(task: LocalMediaVideoTask): LocalMediaRevisionDraft = LocalMediaRevisionDraft(
             task.id, LocalMediaKind.VIDEO, task.description.orEmpty(),
             task.sourceMessageId, task.offerId, task.routeFingerprint,
+            credentialSignature = task.credentialSignature,
         )
         fun from(receipt: LocalMediaCreationJob): LocalMediaRevisionDraft? {
             val kind = runCatching { LocalMediaKind.valueOf(receipt.kind) }.getOrNull() ?: return null
             val id = receipt.profileId?.let { "${it}:${receipt.provider}:${receipt.kind}:${receipt.model}" }
             return LocalMediaRevisionDraft(receipt.id, kind, receipt.prompt.orEmpty(),
-                receipt.sourceMessageId, id, receipt.routeFingerprint)
+                receipt.sourceMessageId, id, receipt.routeFingerprint,
+                credentialSignature = receipt.credentialSignature)
         }
     }
 }
