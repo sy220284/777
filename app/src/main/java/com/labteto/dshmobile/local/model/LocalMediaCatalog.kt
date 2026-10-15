@@ -16,6 +16,44 @@ data class LocalMediaOffer(
     val id: String get() = "${profile.id}:${provider.name}:${kind.name}:$model"
 }
 
+/** Revision reopens the existing creator. Opening a draft never submits a paid request. */
+data class LocalMediaRevisionDraft(
+    val originId: String,
+    val kind: LocalMediaKind,
+    val prompt: String,
+    val sourceMessageId: String? = null,
+    val offerId: String? = null,
+    val routeFingerprint: String? = null,
+    val ratio: String = "1:1",
+    val voiceId: String? = null,
+) {
+    fun originalOffer(offers: List<LocalMediaOffer>): LocalMediaOffer? =
+        offers.firstOrNull {
+            it.kind == kind && it.id == offerId && routeFingerprint != null &&
+                it.profile.routeFingerprint() == routeFingerprint
+        }
+
+    companion object {
+        fun from(result: LocalMediaResult): LocalMediaRevisionDraft? {
+            val kind = runCatching { LocalMediaKind.valueOf(result.kind) }.getOrNull() ?: return null
+            val id = result.profileId?.let { "${it}:${result.provider}:${result.kind}:${result.model}" }
+            return LocalMediaRevisionDraft(result.id, kind, result.description.orEmpty(),
+                result.sourceMessageId, id, result.routeFingerprint,
+                result.imageRatio ?: "1:1", result.voiceId)
+        }
+        fun from(task: LocalMediaVideoTask): LocalMediaRevisionDraft = LocalMediaRevisionDraft(
+            task.id, LocalMediaKind.VIDEO, task.description.orEmpty(),
+            task.sourceMessageId, task.offerId, task.routeFingerprint,
+        )
+        fun from(receipt: LocalMediaCreationJob): LocalMediaRevisionDraft? {
+            val kind = runCatching { LocalMediaKind.valueOf(receipt.kind) }.getOrNull() ?: return null
+            val id = receipt.profileId?.let { "${it}:${receipt.provider}:${receipt.kind}:${receipt.model}" }
+            return LocalMediaRevisionDraft(receipt.id, kind, receipt.prompt.orEmpty(),
+                receipt.sourceMessageId, id, receipt.routeFingerprint)
+        }
+    }
+}
+
 /**
  * Documented, wired media API routes. "Model has IMAGE input" is not enough to advertise creation.
  * Only explicitly implemented API/credential/host combinations enter this catalog.

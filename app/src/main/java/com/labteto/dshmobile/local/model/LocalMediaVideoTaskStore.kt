@@ -32,6 +32,7 @@ data class LocalMediaVideoTask(
     val fileName: String? = null,
     val deliveryPhase: LocalMediaDeliveryPhase = LocalMediaDeliveryPhase.PENDING,
     val sourceMessageId: String? = null,
+    val revisionOf: String? = null,
 ) {
     /** A removed, replaced or re-keyed account must not be used to poll an old task. */
     fun belongsTo(offer: LocalMediaOffer): Boolean =

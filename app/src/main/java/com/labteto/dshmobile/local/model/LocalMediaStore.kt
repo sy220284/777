@@ -95,11 +95,11 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
         LocalMediaPage(selected.mapNotNull { it.result }, selected.mapNotNull { it.job }, selected.mapNotNull { it.video }, rows.size > limit)
     }
     @Synchronized
-    fun beginCreation(offer: LocalMediaOffer, sessionId: String, prompt: String?, sourceMessageId: String? = null): LocalMediaCreationJob = operation {
+    fun beginCreation(offer: LocalMediaOffer, sessionId: String, prompt: String?, sourceMessageId: String? = null, revisionOf: String? = null): LocalMediaCreationJob = operation {
         initialize(); LocalMediaCatalog.requireValid(offer); require(sessionId.isNotBlank())
         val job = LocalMediaCreationJob(UUID.randomUUID().toString(), sessionId, offer.kind.name, offer.provider.name, offer.model,
             prompt?.take(600), System.currentTimeMillis(), LocalMediaCreationPhase.PREPARING,
-            profileId = offer.profile.id, routeFingerprint = offer.profile.routeFingerprint(), sourceMessageId = sourceMessageId)
+            profileId = offer.profile.id, routeFingerprint = offer.profile.routeFingerprint(), sourceMessageId = sourceMessageId, revisionOf = revisionOf)
         commit(LocalMediaRecord(job.id, job = job)); job
     }
     @Synchronized
@@ -128,12 +128,14 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
     @Synchronized
     fun addResult(offer: LocalMediaOffer, kind: LocalMediaKind, sessionId: String?, description: String? = null,
         operationId: String? = null, file: File? = null, link: String? = null, text: String? = null,
-        sourceMessageId: String? = null): LocalMediaResult = operation {
+        sourceMessageId: String? = null, imageRatio: String? = null, voiceId: String? = null, revisionOf: String? = null): LocalMediaResult = operation {
         initialize(); LocalMediaCatalog.requireValid(offer)
         file?.let { require(it.isFile && it.canonicalFile.parentFile == directory.canonicalFile) }
         link?.let { val uri = URI(it); require(uri.scheme.equals("https", true) && uri.userInfo == null && !uri.host.isNullOrBlank() && uri.port == -1) }
         val result = LocalMediaResult(operationId ?: UUID.randomUUID().toString(), offer.model, offer.provider.name, kind.name,
-            System.currentTimeMillis(), fileName = file?.name, remoteUrl = link, sessionId = sessionId, description = description?.take(600), textOutput = text, sourceMessageId = sourceMessageId)
+            System.currentTimeMillis(), fileName = file?.name, remoteUrl = link, sessionId = sessionId, description = description?.take(600), textOutput = text, sourceMessageId = sourceMessageId,
+            profileId = offer.profile.id, routeFingerprint = offer.profile.routeFingerprint(),
+            imageRatio = imageRatio, voiceId = voiceId, revisionOf = revisionOf)
         database.transaction {
             val previous = if (operationId != null) database.get(operationId)?.takeUnless { it.deleted } ?: error("创作回执已失效") else LocalMediaRecord(result.id)
             val job = previous.job?.copy(phase = LocalMediaCreationPhase.SUCCEEDED, error = null, errorCode = null)
@@ -142,11 +144,11 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
         changed(); result
     }
     @Synchronized
-    fun beginVideo(offer: LocalMediaOffer, sessionId: String?, prompt: String, sourceMessageId: String? = null): LocalMediaVideoTask = operation {
+    fun beginVideo(offer: LocalMediaOffer, sessionId: String?, prompt: String, sourceMessageId: String? = null, revisionOf: String? = null): LocalMediaVideoTask = operation {
         initialize(); LocalMediaCatalog.requireValid(offer)
         val now = System.currentTimeMillis()
         val task = LocalMediaVideoTask(UUID.randomUUID().toString(), offer.id, offer.profile.routeFingerprint(), offer.provider.name,
-            offer.model, offer.profile.id, now, now, LocalMediaVideoPhase.SUBMITTING, sessionId = sessionId, description = prompt.take(600), sourceMessageId = sourceMessageId)
+            offer.model, offer.profile.id, now, now, LocalMediaVideoPhase.SUBMITTING, sessionId = sessionId, description = prompt.take(600), sourceMessageId = sourceMessageId, revisionOf = revisionOf)
         commit(LocalMediaRecord(task.id, video = task)); task
     }
     @Synchronized

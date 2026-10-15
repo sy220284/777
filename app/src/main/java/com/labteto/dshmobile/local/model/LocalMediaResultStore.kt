@@ -18,6 +18,12 @@ data class LocalMediaResult(
     val textOutput: String? = null,
     /** Originating chat message, not a fabricated assistant turn. */
     val sourceMessageId: String? = null,
+    /** Original frozen creator identity and parameters; old results may have no such evidence. */
+    val profileId: String? = null,
+    val routeFingerprint: String? = null,
+    val imageRatio: String? = null,
+    val voiceId: String? = null,
+    val revisionOf: String? = null,
 ) {
     init { require(listOf(fileName, remoteUrl, textOutput).count { it != null } == 1) }
 }
