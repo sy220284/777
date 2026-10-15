@@ -5,6 +5,8 @@ import com.shenyan.designsystem.foundation.SyMetric
 
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -67,6 +69,21 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
+/** Shared team transitions respect reduced motion and custom tempo. */
+@Composable
+private fun teamFadeSpec() = com.shenyan.designsystem.foundation.SyMotion.run {
+    tween<Float>(duration(composerFadeMs,
+        com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
+        com.shenyan.designsystem.foundation.LocalSyMotionTempo.current), easing = ease)
+}
+
+@Composable
+private fun teamRevealSpec() = com.shenyan.designsystem.foundation.SyMotion.run {
+    tween<IntSize>(duration(composerRevealMs,
+        com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
+        com.shenyan.designsystem.foundation.LocalSyMotionTempo.current), easing = ease)
+}
+
 @Composable
 internal fun LocalAgentSwarmLaunchEntry(
     selected: Boolean,
@@ -128,10 +145,10 @@ internal fun LocalAgentTeamStatusBar(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     AnimatedVisibility(
         visible = !dismissed && (launchPending || team.visible),
-        enter = fadeIn(DsAnimations.composerFade) +
-            expandVertically(animationSpec = DsAnimations.composerReveal),
-        exit = fadeOut(DsAnimations.composerFade) +
-            shrinkVertically(animationSpec = DsAnimations.composerReveal),
+        enter = fadeIn(teamFadeSpec()) +
+            expandVertically(animationSpec = teamRevealSpec()),
+        exit = fadeOut(teamFadeSpec()) +
+            shrinkVertically(animationSpec = teamRevealSpec()),
     ) {
         androidx.compose.material3.Surface(
             onClick = onClick,
@@ -338,10 +355,10 @@ internal fun LocalAgentTeamSheet(
                         )
                         AnimatedVisibility(
                             visible = member.id == selectedMemberId,
-                            enter = fadeIn(DsAnimations.composerFade) +
-                                expandVertically(animationSpec = DsAnimations.composerReveal),
-                            exit = fadeOut(DsAnimations.composerFade) +
-                                shrinkVertically(animationSpec = DsAnimations.composerReveal),
+                            enter = fadeIn(teamFadeSpec()) +
+                                expandVertically(animationSpec = teamRevealSpec()),
+                            exit = fadeOut(teamFadeSpec()) +
+                                shrinkVertically(animationSpec = teamRevealSpec()),
                         ) {
                             TeamMemberDetail(
                                 member = member,
