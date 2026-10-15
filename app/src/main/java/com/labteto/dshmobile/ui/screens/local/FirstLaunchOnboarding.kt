@@ -129,9 +129,7 @@ internal fun FirstLaunchOnboarding(
                         textAlign = TextAlign.Center,
                     )
                     if (current == 1) {
-                        com.shenyan.designsystem.components.SyMaterialFrame(
-                            horizontalPadding = 0.dp, verticalPadding = 0.dp,
-                        ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(SyMetric.gapMd)) {
                                 SyCategoryRow(
                                     icon = FeatherIcons.MessageCircle,

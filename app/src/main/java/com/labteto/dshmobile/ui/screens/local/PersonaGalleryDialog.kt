@@ -2,9 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 import android.graphics.BitmapFactory
 import android.provider.OpenableColumns
@@ -1139,7 +1137,7 @@ internal fun PersonaGalleryScreen(
                 }
             }
             selected?.let { entry ->
-                SyMaterialSurface(tier = SyMaterialTier.L3_CARD,) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(SyMetric.gapLg),
                         verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),

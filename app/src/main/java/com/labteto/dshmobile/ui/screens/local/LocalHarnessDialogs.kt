@@ -2,9 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 
 import androidx.compose.animation.Crossfade
@@ -352,11 +350,7 @@ internal fun ApprovalDialog(
             },
         )
 
-        SyMaterialSurface(
-            shape = DsShapes.block,
-            tier = SyMaterialTier.L3_CARD,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Column(
                 Modifier.padding(SyMetric.gapLg),
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
@@ -567,11 +561,7 @@ internal fun ChatPersonaDialog(
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         )
 
-        SyMaterialSurface(
-            shape = DsShapes.block,
-            tier = SyMaterialTier.L3_CARD,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier.padding(SyMetric.gapLg),
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),

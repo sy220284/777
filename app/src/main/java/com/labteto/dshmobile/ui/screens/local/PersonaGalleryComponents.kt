@@ -17,6 +17,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -418,10 +419,11 @@ internal fun GalleryStoryCard(
     unsaved: Boolean,
     onClick: () -> Unit,
 ) {
-    SyMaterialSurface(
+    androidx.compose.material3.Surface(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
-        tint = if (selected) com.shenyan.designsystem.foundation.LocalSyColors.current.selected else androidx.compose.ui.graphics.Color.Transparent,
+        color = if (selected) com.shenyan.designsystem.foundation.LocalSyColors.current.selected.copy(alpha=.22f)
+            else androidx.compose.ui.graphics.Color.Transparent,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -468,7 +470,7 @@ private fun ArchivedDialogueRow(
     text: String,
     onLongClick: () -> Unit,
 ) {
-    SyMaterialSurface(
+    androidx.compose.material3.Surface(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
@@ -476,7 +478,7 @@ private fun ArchivedDialogueRow(
                 onLongClick = onLongClick,
             ),
         shape = DsShapes.row,
-        tier = SyMaterialTier.L3_CARD,
+        color = androidx.compose.ui.graphics.Color.Transparent,
     ) {
         Text(
             text,
@@ -489,7 +491,7 @@ private fun ArchivedDialogueRow(
 
 @Composable
 internal fun PersonaHero(persona: PersonaProfile, subtitle: String) {
-    SyGlassCard {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PersonaAvatar(persona.name, large = true)
             Spacer(Modifier.width(SyMetric.gapLg))
@@ -694,7 +696,7 @@ internal fun PersonaInspectionPanel(
         )
         result.suggestions.forEach { suggestion ->
             val key = suggestionKey(suggestion)
-            SyGlassCard(onClick = { onToggle(suggestion) }) {
+            Column(modifier = Modifier.fillMaxWidth().clickable { onToggle(suggestion) }) {
                 Row(verticalAlignment = Alignment.Top) {
                     SyCheckboxControl(
                         checked = key in selectedKeys,
