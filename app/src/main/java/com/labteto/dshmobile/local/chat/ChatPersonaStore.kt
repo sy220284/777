@@ -133,33 +133,6 @@ data class PersonaProfile(
     val coreIdentity: String = "",
     /** V4 facts are the single editable source; legacy shape is retired in the V4 path. */
     val facts: List<CharacterFact> = emptyList(),
-    /** Friend-like whole-person description. This is the stable identity anchor, not a trait checklist. */
-    val portrait: String = "",
-    /** Independent daily life, work, responsibilities and ongoing concerns outside the user. */
-    val lifeContext: String = "",
-    /** What this person naturally notices first. */
-    val attentionBiases: List<String> = emptyList(),
-    /** Concrete nouns/topics that should reliably trigger character-specific attention. */
-    val attentionKeywords: List<String> = emptyList(),
-    /** What this person often misses, misreads or understands imperfectly. */
-    val perceptionBlindSpots: List<String> = emptyList(),
-    /** Stable mundane preferences and irrational little insistences; no trauma explanation required. */
-    val quirks: List<String> = emptyList(),
-    /** Things this person is genuinely not good at. */
-    val limitations: List<String> = emptyList(),
-    /** A small set of values that matter when choices become meaningful. */
-    val coreValues: List<String> = emptyList(),
-    /** One long-running inner tension; it may influence choices but must not dominate every turn. */
-    val coreTension: String = "",
-    /** Parts that should not flip merely because the relationship becomes warmer. */
-    val stableTraits: List<String> = emptyList(),
-    /** Parts allowed to change slowly through lived interaction. */
-    val mutableTraits: List<String> = emptyList(),
-    /** The character's subjective starting impression of the user; allowed to be incomplete or wrong. */
-    val initialUserImpression: String = "",
-    /** Natural voice samples. They teach rhythm only and are never periodic catchphrases. */
-    val voiceSamples: List<String> = emptyList(),
-    val worldSetting: String = "",
     val franchise: String = "",
     val timelinePosition: String = "",
     val knowledgeBoundary: List<String> = emptyList(),
@@ -316,20 +289,6 @@ class ChatPersonaStore internal constructor(
                 sourceReference = fact.sourceReference.trim().take(500),
             )
         }.distinctBy(CharacterFact::id),
-        portrait = profile.portrait.trim().take(MAX_LONG_FIELD_CHARS),
-        lifeContext = profile.lifeContext.trim().take(MAX_LONG_FIELD_CHARS),
-        attentionBiases = cleanLines(profile.attentionBiases, 8),
-        attentionKeywords = cleanLines(profile.attentionKeywords, 12),
-        perceptionBlindSpots = cleanLines(profile.perceptionBlindSpots, 8),
-        quirks = cleanLines(profile.quirks, 12),
-        limitations = cleanLines(profile.limitations, 8),
-        coreValues = cleanLines(profile.coreValues, 6),
-        coreTension = profile.coreTension.trim().take(MAX_FIELD_CHARS),
-        stableTraits = cleanLines(profile.stableTraits, 8),
-        mutableTraits = cleanLines(profile.mutableTraits, 8),
-        initialUserImpression = profile.initialUserImpression.trim().take(MAX_FIELD_CHARS),
-        voiceSamples = cleanLines(profile.voiceSamples, 20),
-        worldSetting = profile.worldSetting.trim().take(MAX_LONG_FIELD_CHARS),
         franchise = profile.franchise.trim().take(120),
         timelinePosition = profile.timelinePosition.trim().take(MAX_FIELD_CHARS),
         knowledgeBoundary = cleanLines(profile.knowledgeBoundary, 20),

@@ -14,22 +14,8 @@ internal fun PersonaProfile.forRuntimeStoryStage(context: ChatContextState): Per
     return current.copy(
         facts = characterKnownFacts(context.storyStage, context.visibleStoryStages())
             .map { it.copy(temporalScope = "") },
-        portrait = "",
-        lifeContext = "",
-        attentionBiases = emptyList(),
-        attentionKeywords = emptyList(),
-        perceptionBlindSpots = emptyList(),
-        quirks = emptyList(),
-        limitations = emptyList(),
-        coreValues = emptyList(),
-        coreTension = "",
-        stableTraits = emptyList(),
-        mutableTraits = emptyList(),
-        initialUserImpression = "",
-        voiceSamples = emptyList(),
         // Old prose must not bypass V4 stage-gated facts or world-book disclosure.
         timelinePosition = "",
-        worldSetting = "",
     )
 }
 
@@ -168,8 +154,7 @@ internal class CharacterRuntimeProjector(
         lines += selected
         state.currentUserImpression.takeIf(String::isNotBlank)?.let {
             lines += "你目前怎么看对方：${it.take(240)}（人物的主观看法）"
-        } ?: persona.initialUserImpression.takeIf { persona.facts.isEmpty() && it.isNotBlank() }
-            ?.let { lines += "你目前怎么看对方：${it.take(240)}" }
+        }
         val open = state.unresolvedThreads.filter {
             ChatTurnContextPolicy.relevant(userInput, it, attention) &&
                 selected.none { selectedLine ->

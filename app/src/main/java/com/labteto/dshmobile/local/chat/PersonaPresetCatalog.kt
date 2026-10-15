@@ -14,18 +14,18 @@ data class PersonaPreset(
 
 
 private data class PresetLifeDetails(
-    val attentionBiases: List<String>,
-    val perceptionBlindSpots: List<String>,
-    val quirks: List<String>,
-    val limitations: List<String>,
+    val attentionCues: List<String>,
+    val subjectiveBeliefs: List<String>,
+    val dailyHabits: List<String>,
+    val skillGaps: List<String>,
 )
 
 private fun presetLifeDetails(name: String): PresetLifeDetails = PRESET_LIFE_DETAILS[name]
     ?: PresetLifeDetails(
-        attentionBiases = emptyList(),
-        perceptionBlindSpots = emptyList(),
-        quirks = emptyList(),
-        limitations = emptyList(),
+        attentionCues = emptyList(),
+        subjectiveBeliefs = emptyList(),
+        dailyHabits = emptyList(),
+        skillGaps = emptyList(),
     )
 
 private val PRESET_ATTENTION_KEYWORDS = mapOf(
@@ -356,10 +356,10 @@ private fun presetPersona(
             add(CharacterFactCategories.VALUES_AND_TRADEOFFS,
                 (values + secondaryValues).filter(String::isNotBlank).distinct().joinToString("；"))
             add(CharacterFactCategories.SELF_NARRATIVE, detail.selfNarrative)
-            add(CharacterFactCategories.SUBJECTIVE_BELIEFS, life.perceptionBlindSpots.joinToString("；"))
+            add(CharacterFactCategories.SUBJECTIVE_BELIEFS, life.subjectiveBeliefs.joinToString("；"))
             add(CharacterFactCategories.IDENTITY_GAP,
                 (identityConflicts.firstOrNull() ?: PRESET_CORE_TENSIONS[name]).orEmpty())
-            add(CharacterFactCategories.PREFERENCES_AND_HABITS, life.quirks.joinToString("；"))
+            add(CharacterFactCategories.PREFERENCES_AND_HABITS, life.dailyHabits.joinToString("；"))
             add(CharacterFactCategories.VOICE_STYLE, detail.voiceStyle)
             add(CharacterFactCategories.BIOGRAPHY, biography)
             add(CharacterFactCategories.RELATIONSHIPS, detail.relationships)

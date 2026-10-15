@@ -9,18 +9,4 @@ package com.labteto.dshmobile.local.chat
  */
 internal fun PersonaProfile.canonicalV4(): PersonaProfile = copy(
     facts = facts.filter { CharacterFactCategories.isSupported(it.category.trim()) },
-    portrait = "",
-    lifeContext = "",
-    attentionBiases = emptyList(),
-    attentionKeywords = emptyList(),
-    perceptionBlindSpots = emptyList(),
-    quirks = emptyList(),
-    limitations = emptyList(),
-    coreValues = emptyList(),
-    coreTension = "",
-    stableTraits = emptyList(),
-    mutableTraits = emptyList(),
-    initialUserImpression = "",
-    voiceSamples = emptyList(),
-    worldSetting = "",
 )
