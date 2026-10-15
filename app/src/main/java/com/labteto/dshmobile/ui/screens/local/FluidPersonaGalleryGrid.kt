@@ -28,9 +28,9 @@ internal fun FluidPersonaGalleryGrid(
     entries: List<PersonaGalleryEntry>,
     onSelect: (String) -> Unit,
     onLongClick: (String) -> Unit,
-    pinnedIds: Set<String> = emptySet(),
     modifier: Modifier = Modifier,
     animateOnEntrance: Boolean = true,
+    pinnedIds: Set<String> = emptySet(),
 ) {
     val animateEntrance = animateOnEntrance && !LocalSyReducedMotion.current
     val enterOffset = with(LocalDensity.current) { 12.dp.toPx() }
