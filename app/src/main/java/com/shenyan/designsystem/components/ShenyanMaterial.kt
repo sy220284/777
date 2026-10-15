@@ -143,7 +143,7 @@ fun SyMaterialSurface(
                 if (sampled != null) {
                     val refract = sySupportsOpticalRefraction(
                         sdk = Build.VERSION.SDK_INT,
-                        transparent = !LocalSyReduceTransparency.current && c.materialL3.alpha < 1f,
+                        transparent = !LocalSyReduceTransparency.current && fill.alpha < 1f,
                         hasScene = true,
                         enabled = opticalGlass &&
                             (resolved == SyMaterialTier.L2_BAR || resolved == SyMaterialTier.L4_OVERLAY),
