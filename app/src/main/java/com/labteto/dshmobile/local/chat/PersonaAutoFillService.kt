@@ -580,6 +580,7 @@ class PersonaAutoFillService @Inject constructor(
                             appendLine("核心身份：${draft.coreIdentity.ifBlank { current.coreIdentity }}")
                             appendLine("原作/来源：${draft.franchise.ifBlank { current.franchise }}")
                             appendLine("原始创作要求：${request.take(MAX_DESCRIPTION_CHARS)}")
+                            if (recentContext.isNotBlank()) appendLine("已发生的对话：${recentContext.take(MAX_REPAIR_CHARS)}")
                             appendLine("已有事实（勿重复）：")
                             (current.facts + draft.facts).forEach { appendLine("${it.category}：${it.content}") }
                         })
