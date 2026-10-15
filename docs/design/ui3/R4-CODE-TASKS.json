@@ -1,7 +1,7 @@
 {
   "schema": "777.ui-r4.code-tasks/1",
   "asOf": "2026-10-15",
-  "baseline": "73a9abdc / R4 review addendum 2026-10-15",
+  "baseline": "PR #705 implementation snapshot through eaf7c4a8; tests not yet certified",
   "scope": "整个 R4，非单一功能",
   "verificationPolicy": "当前 HEAD 基础 CI 可通过不代表 R4 交付验收；新增提交需自身 CI，真实双包使用/进程恢复/设备矩阵按 S2/S5 单独验证。",
   "sceneCount": 78,
@@ -102,19 +102,21 @@
       "task": "全量旧 UI 回调退场",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "持续移除群聊、团队、图库故事/删除/保存/立绘的 UI 业务编排；现行大型 UI 回调与其他设置/人物业务尚待迁出。 Next 历史分页已改用中立 UiMessageHistoryPort/UiMessageSnapshot，由同一 Session Owner 投影；旧 V6 的 TranscriptUiPort 保留兼容、未宣称退场。"
+      "implemented": "持续移除群聊、团队、图库故事/删除/保存/立绘的 UI 业务编排；现行大型 UI 回调与其他设置/人物业务尚待迁出。 Next 历史分页已改用中立 UiMessageHistoryPort/UiMessageSnapshot，由同一 Session Owner 投影；旧 V6 的 TranscriptUiPort 保留兼容、未宣称退场。 将编辑/重发结果从旧 LocalUserMessageEditResult 改为完整的中立 UiMessageEditOutcome，Next 无需读取该 Session 枚举；补保留全部 11 类结果的回归测试。"
     },
     {
       "id": "S1-10",
       "task": "统一 Port 行为与失败/撤权/晚到业务验证",
       "codeStatus": "VERIFICATION_DEFERRED",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "implemented": " UiMessageEditOutcome 映射 JVM 单测覆盖 11/11 枚举分支；全量双包行为/失败/晚到设备测试仍未验收。"
     },
     {
       "id": "S2-01",
       "task": "双包真实发送/编辑/审批/恢复与独立替换证明",
       "codeStatus": "VERIFICATION_DEFERRED",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "implemented": " 补 Next Compose 实际点击拒绝审批按钮→应用 Work Port→模拟 Owner 当前 nonce，确认审批一次性拒绝与防重放仪器化测试源码；仍非真实模型/网络/两套 UI 全链路验收。"
     },
     {
       "id": "S3-01",
@@ -178,7 +180,7 @@
       "task": "设计入口与 Scene/组件/Owner 映射",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "remaining": "将 #718 新交互入口与 7 路由/21 设置目的地映射到既有 Scene/Action/Owner，避免视觉重排导致重复 Action；缺口 108/173 动作需持续映射并形成回执/恢复证明。"
+      "remaining": "将现行 7 路由/21 设置目的地与 #718 入口对应到 Scene/Action/Owner，新增动作映射仍为 75/173，尚余 98 项，必须逐项补回执与恢复证据。"
     },
     {
       "id": "S4-01",
@@ -234,14 +236,15 @@
       "id": "S4-09",
       "task": "同文档双包恢复/提交/拒绝验证",
       "codeStatus": "VERIFICATION_DEFERRED",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "implemented": " 修正 NextUiDocument 对 OwnerReceipt 的视觉回执分类：受理/排队/拒绝/执行失败/未准入/结果未知分别展示，审批失效不再误报已提交。需要真实动态卡测试。"
     },
     {
       "id": "S5-01",
       "task": "最终 SHA CI 与 Android16/17 全场景/无障碍/弱网/收费矩阵",
       "codeStatus": "VERIFICATION_DEFERRED",
       "verification": "DEFERRED",
-      "remaining": "基于最终 SHA 重新运行必要 CI：192a4ceb 的 x86 AndroidTest 编译失败（onNode/旧 Skill 类型）必须修复并验证；Android16/17 当次因共享制品未通过，不应误判为真实设备行为失败；另验收 V6.3/#718 触控、无缝弹层、三主题、IME、TalkBack、字号、弱网/收费/恢复。"
+      "remaining": "后续 CI #38687374480 已取得基础构建、单测、Android16/17 通过的历史证据，旧提交 #192a4ceb 的 x86 AndroidTest 编译失败不应继续当作当前阻断；最新本轮功能改动必须取得自己 SHA 的构建/单测/Android16/17/合并门禁回执；最终还需双包切换、进程恢复、V6.3 触控/弹层、主题、IME、TalkBack、弱网/收费验收。"
     }
   ],
   "limitations": {

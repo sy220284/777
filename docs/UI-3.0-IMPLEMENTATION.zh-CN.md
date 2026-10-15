@@ -1,5 +1,8 @@
 # UI 3.0-R4 实施台账
 
+> **2026-10-15 第二批 S1/S2/S4 推进（PR #705，仍待最新 SHA CI）**：`e8e5cf06` 将编辑消息的 Owner 11 种结果完整投影为独立 `UiMessageEditOutcome`，同时调整 Chat/Work Port/Next 消费路径并加映射单测，避免 Next 在回执层直接依赖旧 Session 枚举；`1dbb0d87` 增补 Next Compose 审批按钮→真实 Work Port→模拟 Owner nonce 的拒绝/不可重复操作回归测试，但**非真实供应商或 V6+Next 完整端到端证明**；`eaf7c4a8` 修复 Next 动态卡片把 Owner 拒绝和失败错误展示成“已提交”的误导反馈，改为区分受理、排队、拒绝、失败、未知结果。当前 **75/173** 动作有源码映射，**173/173** 仍待完整恢复验收，尚缺正式全应用两包 Renderer/Host、动态媒体、Work 自动发布。此前 `#192a4ceb` 的失败已经在历史 CI 中被后续通过覆盖，当前 SHA 不沿用历史通过回执。
+
+
 > **2026-10-15 S1/S3 继续解耦与 Host 竞态修复（PR #705）**：`976f8e02` 修正 Host 的 A→B→A ABA 迟到回调问题：增加保存的导航提交代次，对同快照不同代次的旧页面导航提案拒绝，增加 JVM 回归测试；`8565f9a3` 将 Next 历史分页接入 `UiMessageHistoryPort`，仅输出 `UiMessageSnapshot`，在 Session Owner 内将旧消息投影为中立角色/身份/时间/内容；V6 仍使用兼容的 `TranscriptUiPort`，不损坏原始历史修复元数据；`805a1740` 增加 5 种角色投影单测。此批不是完整全应用 Host/双包验收，旧类型仍出现在 V6 兼容接口、`UiCommandReceipt.MessageEdited` 等迁移边界，不能宣称全部已隔离。S0 源码映射维持 **75/173**，E2E 恢复证据仍 **0/173**，CI 必须以最新 SHA 独立验证。
 
 
