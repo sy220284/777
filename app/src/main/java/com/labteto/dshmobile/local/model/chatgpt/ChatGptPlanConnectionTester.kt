@@ -19,7 +19,8 @@ class ChatGptPlanConnectionTester @Inject constructor(
             activeProfileId = gateway.activeProfile()?.id,
             accountId = accountId,
         ) ?: return "连接失败：当前 ChatGPT 授权没有可测试的套餐模型"
-        return tester.testProfile(profile)
+        val result = tester.testProfile(profile)
+        return "${profile.displayName ?: profile.model}：$result"
     }
 }
 

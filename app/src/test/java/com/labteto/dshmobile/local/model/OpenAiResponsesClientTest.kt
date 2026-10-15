@@ -768,6 +768,33 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun explicitSearchGetsNativeWebSearchOnlyWithoutLocalToolsAndOnlyWithPlan() {
+        val prompt = listOf(buildJsonObject { put("role", "user"); put("content", "联网搜索今天的新闻") })
+        val plan = client.buildPayload("gpt-6-astra", prompt, JsonArray(emptyList()),
+            temperature = null, planSharing = true)
+        assertEquals("web_search", plan["tools"]!!.jsonArray.single().jsonObject["type"]?.jsonPrimitive?.content)
+        val api = client.buildPayload("gpt-6-astra", prompt, JsonArray(emptyList()),
+            temperature = null, planSharing = false)
+        assertFalse("tools" in api)
+        val noSearch = client.buildPayload("gpt-6-astra",
+            listOf(buildJsonObject { put("role", "user"); put("content", "介绍一下联网搜索功能") }),
+            JsonArray(emptyList()), temperature = null, planSharing = true)
+        assertFalse("tools" in noSearch)
+    }
+
+    @Test
+    fun officialWebSearchResponsePreservesSourcesInVisibleMessage() {
+        val reply = client.parseCompleted(
+            Json.parseToJsonElement("""{"id":"resp-web","output":[{"type":"message","role":"assistant",
+                "content":[{"type":"output_text","text":"结果参考资料。",
+                    "annotations":[{"type":"url_citation","url":"https://example.org/article","title":"例子"}]}]}]}""").jsonObject,
+            promptBreakdown = TokenPromptBreakdown(),
+        )
+        assertTrue(reply.content.orEmpty().contains("https://example.org/article"))
+        assertTrue(reply.content.orEmpty().contains("结果参考资料"))
+    }
+
+    @Test
     fun chatGptPlanWrapsFunctionToolsInNamespace() {
         val tools = JsonArray(
             listOf(

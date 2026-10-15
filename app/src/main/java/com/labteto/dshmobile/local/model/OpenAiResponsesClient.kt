@@ -309,9 +309,14 @@ class OpenAiResponsesClient @Inject constructor(
             put("include", buildJsonArray { add(JsonPrimitive("reasoning.encrypted_content")) })
         }
         val adaptedTools = responseTools(tools, planSharing, enforceOpenAiToolSchema)
-        if (adaptedTools.isNotEmpty() || nativeImageToolEnabled) {
+        // Native search is opt-in per explicit user request and only when no local tool
+        // already owns search. Model/workspace policy is decided by the official route.
+        val nativeWebSearchEnabled = planSharing &&
+            adaptedTools.isEmpty() && explicitNativeWebSearchRequested(messages)
+        if (adaptedTools.isNotEmpty() || nativeImageToolEnabled || nativeWebSearchEnabled) {
             put("tools", buildJsonArray {
                 adaptedTools.forEach(::add)
+                if (nativeWebSearchEnabled) add(buildJsonObject { put("type", "web_search") })
                 if (nativeImageToolEnabled) {
                     add(buildJsonObject {
                         put("type", "image_generation")
@@ -363,6 +368,29 @@ class OpenAiResponsesClient @Inject constructor(
             else -> ""
         }
         return isExplicitImageGenerationRequest(text)
+    }
+
+    private fun explicitNativeWebSearchRequested(messages: List<JsonObject>): Boolean {
+        val latest = messages.lastOrNull() ?: return false
+        if (latest["role"]?.jsonPrimitive?.contentOrNull != "user") return false
+        val text = when (val content = latest["content"]) {
+            is JsonPrimitive -> content.contentOrNull.orEmpty()
+            is JsonArray -> content.mapNotNull { part ->
+                val obj = part as? JsonObject ?: return@mapNotNull null
+                if (obj["type"]?.jsonPrimitive?.contentOrNull in setOf("text", "input_text"))
+                    obj["text"]?.jsonPrimitive?.contentOrNull else null
+            }.joinToString(" ")
+            else -> ""
+        }.trim()
+        if (text.isEmpty() || text.length > 2_048 ||
+            text.startsWith("不要") || text.startsWith("别")) return false
+        val command = text.replaceFirst(
+            Regex("""^(?:请|帮我|帮忙|麻烦|现在|先|给我)\\s*"""), "",
+        )
+        return Regex(
+            """^(?:联网搜索|上网搜索|网上搜索|网络搜索|联网查|上网查|网上查|搜索一下|搜一下|查一下最新|查找最新|search the web|browse the web)""",
+            RegexOption.IGNORE_CASE,
+        ).containsMatchIn(command)
     }
 
     private fun responseInstructions(messages: List<JsonObject>): String =
@@ -521,6 +549,7 @@ class OpenAiResponsesClient @Inject constructor(
         val reasoning = StringBuilder()
         val toolCalls = mutableListOf<LocalToolCall>()
         val visibleParts = mutableListOf<JsonObject>()
+        val webSources = linkedMapOf<String, String>()
         var generatedImageCount = 0
         output.forEach { item ->
             val obj = item as? JsonObject ?: return@forEach
@@ -538,6 +567,17 @@ class OpenAiResponsesClient @Inject constructor(
                             visibleParts += buildJsonObject {
                                 put("type", "output_text")
                                 put("text", text)
+                            }
+                        }
+                        (visible["annotations"] as? JsonArray).orEmpty().forEach { item ->
+                            val annotation = item as? JsonObject ?: return@forEach
+                            if (annotation["type"]?.jsonPrimitive?.contentOrNull != "url_citation") return@forEach
+                            val url = annotation["url"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                            if (url.length in 12..2048 && runCatching {
+                                val parsed = java.net.URI(url)
+                                parsed.scheme in setOf("http", "https") && !parsed.host.isNullOrBlank()
+                            }.getOrDefault(false)) {
+                                webSources[url] = annotation["title"]?.jsonPrimitive?.contentOrNull.orEmpty()
                             }
                         }
                     }
@@ -581,8 +621,13 @@ class OpenAiResponsesClient @Inject constructor(
                 }
             }
         }
-        val settledContent = content.toString().takeIf(String::isNotBlank)
+        val rawContent = content.toString().takeIf(String::isNotBlank)
             ?: streamedContent.takeIf(String::isNotBlank)
+        val settledContent = if (webSources.isEmpty()) rawContent else buildString {
+            rawContent?.let { append(it).append("\\n\\n") }
+            append("参考来源：\\n")
+            webSources.keys.take(8).forEach { append(it).append('\\n') }
+        }.trimEnd()
         val settledReasoning = reasoning.toString().takeIf(String::isNotBlank)
             ?: streamedReasoning.takeIf(String::isNotBlank)
         val message = buildJsonObject {
