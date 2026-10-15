@@ -19,6 +19,21 @@ class CharacterFactsV4Test {
             .none { it in CharacterFactCategories.selectable })
         assertTrue(CharacterFactCategories.canonical
             .containsAll(CharacterFactCategories.removedFromNewProfiles))
+        assertEquals(
+            listOf(
+                CharacterFactCategories.PERSONALITY,
+                CharacterFactCategories.VALUES_AND_TRADEOFFS,
+                CharacterFactCategories.SELF_NARRATIVE,
+                CharacterFactCategories.SUBJECTIVE_BELIEFS,
+                CharacterFactCategories.IDENTITY_GAP,
+                CharacterFactCategories.PREFERENCES_AND_HABITS,
+                CharacterFactCategories.VOICE_STYLE,
+                CharacterFactCategories.BIOGRAPHY,
+                CharacterFactCategories.RELATIONSHIPS,
+                CharacterFactCategories.CUSTOM_FACTS,
+            ),
+            CharacterFactCategories.selectable,
+        )
     }
 
     @Test fun v4IdentityFactsAndSourcesRoundTrip() {
