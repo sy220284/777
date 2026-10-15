@@ -117,8 +117,10 @@
     {
       "id": "S3-01",
       "task": "全应用 UiPack Scene Renderer API",
-      "codeStatus": "CODE_PENDING",
-      "verification": "DEFERRED"
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED",
+      "implemented": "新增独立 :ui-host 全应用 UiApplicationScenePack 逐 Scene Compose Renderer 契约、实际 renderer 覆盖与 manifest 双门禁、Host 历史/包身份准入的场景调度与 JVM 测试源码。",
+      "remaining": "需要在 V6/Next 独立整包真正实现所有 78 Scene 的 renderer、注入真实强类型 Feature Port，并用生产 Host 接线和设备 CI 证明；不能凭接口声称可更换整套 UI。"
     },
     {
       "id": "S3-02",
