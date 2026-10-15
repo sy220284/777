@@ -136,7 +136,9 @@ fun SyConversationComposer(
         modifier = modifier.testTag("ds-conversation-composer")
             .fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)
             .then(if (animateSize)
-                Modifier.animateContentSize(tween(if (reduceMotion) 0 else SyMotion.toolExpandMs))
+                Modifier.animateContentSize(tween(SyMotion.duration(
+                    SyMotion.toolExpandMs, reduceMotion, LocalSyMotionTempo.current
+                ), easing = SyMotion.ease))
                 else Modifier),
         shape = shape,
         tint = surfaceColor.copy(alpha = surfaceColor.alpha.coerceAtMost(.06f)),

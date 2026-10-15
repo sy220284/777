@@ -68,13 +68,13 @@ object DsAnimations {
     /** Tab and content swaps. Short — a long swap on a large list costs a full relayout. */
     val tabSwap: FiniteAnimationSpec<Float> = tween(SyMotion.sheetMs, easing = fluidEase)
 
-    /** Reference component spec: glass tab thumb and 18dp underline settle in 200ms. */
+    /** Reference component spec: tab selection and underline settle in 150ms. */
     val tabBackground: FiniteAnimationSpec<Color> = tween(SyMotion.selectMs, easing = fluidEase)
     val tabIndicator: FiniteAnimationSpec<Dp> = tween(SyMotion.selectMs, easing = fluidEase)
 
-    /** Reference list entry: 360ms reveal; 80ms between items, capped at ten cards. */
+    /** Reference list entry: 260ms reveal; 55ms between items, capped at ten cards. */
     val cascade: FiniteAnimationSpec<Float> = tween(SyMotion.pushMs, easing = fluidEase)
-    const val cascadeStaggerMs = 80L
+    const val cascadeStaggerMs = 55L
     const val cascadeMaxItems = 10
 
     /** Sliding indicator used by compact segmented controls. It settles instead of gliding mechanically. */
@@ -113,7 +113,7 @@ object DsAnimations {
 
     /** Feature hierarchy pop mirrors push but settles a touch faster. */
     val featurePageBackward: FiniteAnimationSpec<IntOffset> =
-        tween(SyMotion.sheetMs, easing = fluidEase)
+        tween(SyMotion.pagePopMs, easing = fluidEase)
 
     /** Switching between drawer peers is mostly a cross-fade with only a tiny positional cue. */
     val featurePagePeer: FiniteAnimationSpec<IntOffset> =
@@ -151,6 +151,6 @@ object DsAnimations {
     /** Scale values for interactive elements */
     object Scale {
         const val normal = 1f
-        const val pressed = 0.975f
+        const val pressed = SyMotion.pressedScale
     }
 }
