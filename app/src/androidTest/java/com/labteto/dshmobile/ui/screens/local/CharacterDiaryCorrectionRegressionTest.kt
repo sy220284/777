@@ -63,16 +63,16 @@ class CharacterDiaryCorrectionRegressionTest {
                 )
             }
         }
-        compose.onNodeWithText("甲的私密日记").assertIsDisplayed()
+        compose.onNodeWithText("甲的私密日记", substring = true).assertIsDisplayed()
         compose.onNodeWithText("乙").performClick()
-        compose.onNodeWithText("甲的私密日记").assertDoesNotExist()
+        compose.onNodeWithText("甲的私密日记", substring = true).assertDoesNotExist()
         compose.runOnIdle {
             secondReady.complete(listOf(entry().copy(
                 id = "event-2", subjectKey = "gallery:second",
                 personaName = "乙", event = "乙自己的日记")))
         }
-        compose.onNodeWithText("乙自己的日记").assertIsDisplayed()
-        compose.onNodeWithText("甲的私密日记").assertDoesNotExist()
+        compose.onNodeWithText("乙自己的日记", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("甲的私密日记", substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -99,8 +99,9 @@ class CharacterDiaryCorrectionRegressionTest {
                 )
             }
         }
-        // The recorded event is presented as a readable diary heading, not generated content.
+        // The recorded event remains visible in the concise daily reading surface.
         compose.onNodeWithTag("diary_paper_event_event-1").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("diary_expand_event-1").performScrollTo().performClick()
         compose.onNodeWithTag("diary_edit_event-1").performScrollTo().performClick()
         compose.runOnIdle { assertEquals(0, saved.get()) }
         compose.onNodeWithTag("diary_edit_event").performTextReplacement("周末改去山上")
@@ -111,7 +112,7 @@ class CharacterDiaryCorrectionRegressionTest {
         compose.waitUntil(timeoutMillis = 10_000) { saved.get() == 1 }
         compose.waitForIdle()
         compose.onNodeWithTag("diary_edit_event").assertDoesNotExist()
-        compose.onNodeWithText("周末改去山上").assertIsDisplayed()
+        compose.onNodeWithText("周末改去山上", substring = true).assertIsDisplayed()
         compose.runOnIdle { assertEquals(1, saved.get()) }
     }
 
@@ -139,6 +140,7 @@ class CharacterDiaryCorrectionRegressionTest {
                 )
             }
         }
+        compose.onNodeWithTag("diary_expand_event-1").performScrollTo().performClick()
         compose.onNodeWithTag("diary_source_event-1").performScrollTo().performClick()
         compose.runOnIdle { assertEquals(1, opened) }
         compose.onNodeWithTag("diary_deactivate_event-1").performScrollTo().performClick()
