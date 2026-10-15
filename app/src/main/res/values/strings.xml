@@ -1909,7 +1909,7 @@
     <string name="local_persona_lore_remove">删除此条目</string>
     <string name="local_persona_lore_empty">还没有世界书条目。可以补充原作事实，也可以先留空。</string>
     <string name="local_persona_lore_entry_number">原作条目 %1$d</string>
-    <string name="persona_v4_personality">稳定性格</string>
+    <string name="persona_v4_personality">性格</string>
     <string name="persona_v4_values_tradeoffs">价值与取舍</string>
     <string name="persona_v4_biography">人生经历</string>
     <string name="persona_v4_relationships">重要人物关系</string>
