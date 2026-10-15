@@ -207,13 +207,15 @@ internal fun characterDiaryDayNarrative(entries: List<ChatDiaryEntry>): String {
     // Keep original evidence accessible in the expandable record section.
     val selected = entries.sortedWith(
         compareByDescending<ChatDiaryEntry> { it.privateReflection.isNotBlank() }
+            .thenByDescending { it.feeling.isNotBlank() || it.innerThought.isNotBlank() ||
+                it.relationshipMeaning.isNotBlank() || it.unresolvedEcho.isNotBlank() }
             .thenByDescending { it.importance }
             .thenByDescending(ChatDiaryEntry::createdAt),
-    ).take(3).sortedBy(ChatDiaryEntry::createdAt)
+    ).take(2).sortedBy(ChatDiaryEntry::createdAt)
     val paragraphs = mutableListOf<String>()
     selected.map(::characterDiaryReadingLine).filter(String::isNotBlank).distinct()
         .forEach { paragraph ->
-            if (paragraphs.sumOf(String::length) + paragraph.length + paragraphs.size * 2 <= 630) {
+            if (paragraphs.sumOf(String::length) + paragraph.length + paragraphs.size * 2 <= 480) {
                 paragraphs += paragraph
             }
         }
