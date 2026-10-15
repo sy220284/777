@@ -103,6 +103,35 @@ class ChatDiaryPromptTest {
     }
 
     @Test
+    fun samePersonCanCarryDifferentDailyMoodsIntoCreativeDiaryContext() {
+        val persona = PersonaProfile(
+            name = "阿青",
+            coreIdentity = "细心又独立，偶尔会在心里开些荒唐的小玩笑",
+        )
+        val sunny = planner.prompt(
+            persona = persona,
+            state = ChatCharacterState(mood = "轻松兴奋"),
+            userMessage = "今天终于把作业交了",
+            assistantMessage = "总算能休息一下。",
+        )
+        val quiet = planner.prompt(
+            persona = persona,
+            state = ChatCharacterState(mood = "安静疲惫"),
+            userMessage = "今天终于把作业交了",
+            assistantMessage = "总算能休息一下。",
+        )
+        assertTrue(sunny.contains("轻松兴奋"))
+        assertTrue(quiet.contains("安静疲惫"))
+        assertTrue(sunny.contains(persona.coreIdentity))
+        assertTrue(quiet.contains(persona.coreIdentity))
+        assertFalse(sunny == quiet)
+        val diaryInstruction = chatPostTurnModelMessages(sunny)
+            .first()["content"]!!.jsonPrimitive.content
+        assertTrue(diaryInstruction.contains("同一人物"))
+        assertTrue(diaryInstruction.contains("当天的处境"))
+    }
+
+    @Test
     fun standaloneThoughtfulDiaryPatchIsParsedButNoneIsNot() {
         val reflection = "我一直以为沉默能让我更安全。今天想起来，原来我也很在乎自己的感受和决定。"
         fun payload(significance: String, voice: String): String = """
