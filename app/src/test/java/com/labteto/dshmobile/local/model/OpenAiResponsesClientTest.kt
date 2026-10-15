@@ -1454,7 +1454,7 @@ class OpenAiResponsesClientTest {
     @Test
     fun imageToolChoiceRejectsQuestionNegationAndNormalText() {
         listOf("普通聊天", "你能不能生图？", "不要生图", "为什么不能生图",
-            "介绍一下生图功能", "他说生图吧").forEach { message ->
+            "介绍一下生图功能", "他说生图吧", "怎么修改这张图片？").forEach { message ->
             val payload = client.buildPayload(
                 model = "gpt-6.1-sol",
                 messages = listOf(buildJsonObject {
