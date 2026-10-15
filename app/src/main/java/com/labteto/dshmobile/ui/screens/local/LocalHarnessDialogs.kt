@@ -2,9 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 
 import androidx.compose.animation.Crossfade
@@ -338,7 +336,8 @@ internal fun ApprovalDialog(
             LocalApprovalImpact.CRITICAL -> R.string.local_approval_impact_critical
         },
     )
-    SyResponsiveSheet(title = stringResource(R.string.local_approval_title), onDismiss = onDeny, scrollable = true) {
+    SyResponsiveSheet(title = stringResource(R.string.local_approval_title), onDismiss = onDeny,
+        scrollable = true, seamlessBackground = false) {
         Text(
             stringResource(agentOperationLabelRes(approval.toolName)),
             style = DsType.base16Strong.withReadingWeight(),
@@ -355,11 +354,7 @@ internal fun ApprovalDialog(
             },
         )
 
-        SyMaterialSurface(
-            shape = DsShapes.block,
-            tier = SyMaterialTier.L3_CARD,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Column(
                 Modifier.padding(SyMetric.gapLg),
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
@@ -570,11 +565,7 @@ internal fun ChatPersonaDialog(
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         )
 
-        SyMaterialSurface(
-            shape = DsShapes.block,
-            tier = SyMaterialTier.L3_CARD,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier.padding(SyMetric.gapLg),
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),

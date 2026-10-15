@@ -981,12 +981,12 @@ private fun ToolCapabilityRow(
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    com.shenyan.designsystem.components.SyMaterialFrame(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        onClick = onClick,
+        onClick = { onClick?.invoke() },
+        enabled = onClick != null,
         shape = DsShapes.block,
-        horizontalPadding = 0.dp,
-        verticalPadding = 0.dp,
+        color = androidx.compose.ui.graphics.Color.Transparent,
     ) {
         Row(
             modifier = Modifier

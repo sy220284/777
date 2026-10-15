@@ -208,11 +208,13 @@ internal fun DrawerQuickAction(
             hovered -> sy.l3
             else -> Color.Transparent
         },
-        animationSpec = tween(com.shenyan.designsystem.foundation.SyMotion.duration(
-            com.shenyan.designsystem.foundation.SyMotion.interactionColorMs,
-            com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
-            com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
-        ), easing = com.shenyan.designsystem.foundation.SyMotion.ease),
+        animationSpec = tween(
+                            com.shenyan.designsystem.foundation.SyMotion.duration(
+                                com.shenyan.designsystem.foundation.SyMotion.interactionColorMs,
+                                com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
+                                com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
+                            ), easing = com.shenyan.designsystem.foundation.SyMotion.ease,
+                        ),
         label = "drawerQuickActionFeedback",
     )
     Row(
@@ -299,15 +301,17 @@ internal fun LocalSessionDrawerRow(
                 .background(
                     animateColorAsState(
                         targetValue = when {
-                            selected -> colors.selected
-                            current -> colors.materialL3
-                            else -> colors.materialL2
+                            selected -> colors.selected.copy(alpha = .32f)
+                            current -> colors.selected.copy(alpha = .18f)
+                            else -> Color.Transparent
                         },
-                        animationSpec = tween(com.shenyan.designsystem.foundation.SyMotion.duration(
-            com.shenyan.designsystem.foundation.SyMotion.interactionColorMs,
-            com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
-            com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
-        ), easing = com.shenyan.designsystem.foundation.SyMotion.ease),
+                        animationSpec = tween(
+                            com.shenyan.designsystem.foundation.SyMotion.duration(
+                                com.shenyan.designsystem.foundation.SyMotion.interactionColorMs,
+                                com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
+                                com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
+                            ), easing = com.shenyan.designsystem.foundation.SyMotion.ease,
+                        ),
                         label = "sessionRowBackground",
                     ).value,
                 )

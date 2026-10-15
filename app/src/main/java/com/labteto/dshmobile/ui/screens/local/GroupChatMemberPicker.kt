@@ -3,8 +3,6 @@ package com.labteto.dshmobile.ui.screens.local
 import com.shenyan.designsystem.foundation.SyMetric
 
 
-import com.shenyan.designsystem.components.SyMaterialSurface
-import com.shenyan.designsystem.components.SyMaterialTier
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -147,7 +145,10 @@ internal fun GroupChatMemberPickerSheet(
                     items(filteredEntries, key = PersonaGalleryEntry::id) { entry ->
                         val checked = entry.id in selected
                         val canAdd = checked || selected.size < MAX_GROUP_CHAT_MEMBERS
-                        SyMaterialSurface(
+                        Surface(
+                            shape = DsShapes.row,
+                            color = if (checked) com.shenyan.designsystem.foundation.LocalSyColors.current.selected.copy(alpha = .32f)
+                                else androidx.compose.ui.graphics.Color.Transparent,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .toggleable(
@@ -162,9 +163,6 @@ internal fun GroupChatMemberPickerSheet(
                                         }
                                     },
                                 ),
-                            tier = SyMaterialTier.L1_SECTION,
-                            tint = if (checked) com.shenyan.designsystem.foundation.LocalSyColors.current.selected.copy(alpha = .18f)
-                                else androidx.compose.ui.graphics.Color.Transparent,
                         ) {
                             Row(
                                 modifier = Modifier

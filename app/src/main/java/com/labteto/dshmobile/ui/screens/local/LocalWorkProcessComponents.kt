@@ -209,20 +209,9 @@ internal fun WorkProcessRow(
         return
     }
 
-    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    val backgroundState = LocalAppBackgroundState.current
-    val processSurface = if (backgroundState.hasImage || backgroundState.fluidGlass) {
-        colors.wallpaperSurface(
-            level = WallpaperSurfaceLevel.CARD,
-            region = BackgroundRegion.MIDDLE,
-        )
-    } else Color.Transparent
-
     Column(
         modifier = Modifier.fillMaxWidth()
             .padding(horizontal = SyMetric.gapMd)
-            .clip(DsShapes.block)
-            .background(processSurface)
             .padding(horizontal = SyMetric.gapSm),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
     ) {

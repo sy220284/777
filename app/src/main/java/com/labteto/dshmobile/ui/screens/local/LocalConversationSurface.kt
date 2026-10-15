@@ -862,11 +862,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         state.personaCorrectionNotice?.takeIf {
             state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled
         }?.let { notice ->
-            SyMaterialSurface(
-                tier = SyMaterialTier.L3_CARD,
-                shape = DsShapes.block,
-                modifier = Modifier
-                    .fillMaxWidth()
+            Column(
+                modifier = Modifier.fillMaxWidth()
                     .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs),
             ) {
                 Row(
@@ -1195,13 +1192,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         }
 
         if (!state.configured && !state.loading && transcriptItems.isEmpty()) {
-            SyMaterialSurface(
+            Column(
                 modifier = Modifier.fillMaxWidth().padding(
                     horizontal = SyMetric.gapLg,
                     vertical = SyMetric.gapMd,
                 ),
-                shape = DsShapes.row,
-                tier = SyMaterialTier.L3_CARD,
             ) {
                 Row(
                     modifier = Modifier.padding(SyMetric.gapLg),
@@ -1525,7 +1520,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 color = colors.textSecondary,
             )
             state.replySuggestions.filter { it.text.isNotBlank() }.forEach { suggestion ->
-                SyMaterialSurface(
+                Surface(
                     onClick = {
                         drafts.updateDraft(state.sessionId, suggestion.text)
                         showReplySuggestions = false
@@ -1533,7 +1528,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !state.running,
                     shape = DsShapes.row,
-                    tier = SyMaterialTier.L1_SECTION,
+                    color = Color.Transparent,
                 ) {
                     Column(
                         Modifier.heightIn(min = SyMetric.touch)

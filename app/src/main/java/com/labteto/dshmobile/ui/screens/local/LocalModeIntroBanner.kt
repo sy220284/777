@@ -1,14 +1,12 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import androidx.compose.foundation.shape.RoundedCornerShape
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
-import com.shenyan.designsystem.components.SyMaterialSurface
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,9 +23,7 @@ internal fun LocalModeIntroBanner(intro: LocalModeIntro?) {
     if (intro == null) return
     val mode = intro.usageMode
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    SyMaterialSurface(
-        tier = SyMaterialTier.L3_CARD,
-        shape = RoundedCornerShape(SyMetric.radiusCard),
+    Box(
         modifier = Modifier.fillMaxWidth()
             .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs),
     ) {

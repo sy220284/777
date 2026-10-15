@@ -610,7 +610,7 @@ private fun LocalDirectoryRow(
             .fillMaxWidth()
             .padding(horizontal = SyMetric.gapLg),
         shape = DsShapes.row,
-        color = colors.canvas,
+        color = androidx.compose.ui.graphics.Color.Transparent,
     ) {
         Row(
             modifier = Modifier
@@ -676,7 +676,8 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
                 onLongClick = if (canShare) ({ controls?.begin?.invoke(file.path) }) else null,
             ),
         shape = DsShapes.row,
-        color = colors.canvas,
+        color = if (selected) colors.selected.copy(alpha = .20f)
+            else androidx.compose.ui.graphics.Color.Transparent,
     ) {
         Row(
             modifier = Modifier
