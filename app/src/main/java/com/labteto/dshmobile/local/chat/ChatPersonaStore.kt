@@ -72,7 +72,20 @@ object CharacterFactCategories {
         DEFINING_CHOICES, EMOTIONAL_IMPRINTS, LIFE_GRAVITY,
         UNFINISHED_BUSINESS, LIMITS_AND_COSTS, SENSORY_SIGNATURE,
     )
-    val selectable: List<String> = canonical.filterNot { it in removedFromNewProfiles }
+    // 编辑器和人物详情使用同一条「自身 → 内在 → 表达 → 经历 → 关系」顺序。
+    // 旧数据的 canonical 保持原样，不改变序列化和兼容路径。
+    val selectable: List<String> = listOf(
+        PERSONALITY,
+        VALUES_AND_TRADEOFFS,
+        SELF_NARRATIVE,
+        SUBJECTIVE_BELIEFS,
+        IDENTITY_GAP,
+        PREFERENCES_AND_HABITS,
+        VOICE_STYLE,
+        BIOGRAPHY,
+        RELATIONSHIPS,
+        CUSTOM_FACTS,
+    )
 }
 
 /** Actual source of character facts; unrelated chat state is owned by its runtime. */
