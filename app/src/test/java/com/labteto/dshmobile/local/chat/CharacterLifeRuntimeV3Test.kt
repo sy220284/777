@@ -64,7 +64,7 @@ class CharacterLifeRuntimeV3Test {
         val persona = PersonaProfile(name = "叶澜", coreIdentity = "书店店主", facts = listOf(
             CharacterFact("values", CharacterFactCategories.VALUES_AND_TRADEOFFS,
                 "看重对员工的承诺", provenance = CharacterFactProvenance.USER_CREATED),
-            CharacterFact("duty", CharacterFactCategories.LIFE_GRAVITY,
+            CharacterFact("duty", CharacterFactCategories.BIOGRAPHY,
                 "周末负责书店开门", provenance = CharacterFactProvenance.CANON)))
         val view = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
             .project(persona, ChatCharacterState(), ChatContextState(), "陪我远足好吗", null)
