@@ -285,6 +285,44 @@ internal class LocalMediaApiClient @Inject constructor(
         }
     }
 
+    /** Image edits send actual original pixels; revised text alone is not an image edit. */
+    suspend fun editImage(
+        offer: LocalMediaOffer, prompt: String, ratio: String, source: File,
+    ): LocalMediaImageResult {
+        require(offer.provider == LocalMediaProvider.OPENAI && offer.kind == LocalMediaKind.IMAGE) {
+            "当前图像服务尚未接入原图编辑，请选择 OpenAI 图片模型或改用重画"
+        }
+        require(prompt.isNotBlank() && ratio in setOf("1:1", "16:9", "9:16", "4:3", "3:4"))
+        val mediaFolder = File(context.filesDir, "media-studio").canonicalFile
+        require(source.isFile && source.canonicalFile.parentFile == mediaFolder &&
+            source.length() in 1L..20_000_000L) { "原图不存在或超过 20 MB，请改用重新画图" }
+        val mime = when (source.extension.lowercase()) {
+            "png" -> "image/png"
+            "jpg", "jpeg" -> "image/jpeg"
+            "webp" -> "image/webp"
+            else -> error("原图格式暂不支持编辑，请改用 PNG、JPEG 或 WEBP")
+        }
+        val size = when (ratio) {
+            "1:1" -> "1024x1024"
+            "16:9" -> "1536x864"
+            "9:16" -> "864x1536"
+            "4:3" -> "1536x1152"
+            else -> "1152x1536"
+        }
+        val body = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("model", offer.model)
+            .addFormDataPart("prompt", prompt)
+            .addFormDataPart("size", size)
+            .addFormDataPart("image", "original.${source.extension.lowercase()}",
+                source.asRequestBody(mime.toMediaType()))
+            .build()
+        val root = sendJson(offer, "https://api.openai.com/v1/images/edits", body)
+        val encoded = root["data"]?.jsonArray?.firstOrNull()?.jsonObject
+            ?.get("b64_json")?.jsonPrimitive?.contentOrNull
+            ?: error("图像编辑服务未返回图片数据")
+        return LocalMediaImageResult(file = saveEncodedImage(encoded))
+    }
+
     suspend fun speech(offer: LocalMediaOffer, input: String, voice: String): File {
         require(offer.provider == LocalMediaProvider.OPENAI && offer.kind == LocalMediaKind.SPEECH)
         require(input.isNotBlank() && input.length <= 4096) { "OpenAI 单次配音输入最多 4096 字符" }

@@ -24,6 +24,9 @@ data class LocalMediaCreationJob(
     val profileId: String? = null,
     val routeFingerprint: String? = null,
     val errorCode: String? = null,
+    val sourceMessageId: String? = null,
+    val revisionOf: String? = null,
+    val credentialSignature: String? = null,
 )
 
 @Serializable

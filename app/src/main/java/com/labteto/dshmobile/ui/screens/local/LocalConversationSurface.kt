@@ -72,6 +72,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.labteto.dshmobile.local.presentation.mediaCreativeDraft
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
@@ -81,6 +82,7 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.presentation.chatBranchInfo
 import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
+import com.labteto.dshmobile.local.model.LocalMediaRevisionDraft
 import com.labteto.dshmobile.local.model.visibleAssistantText
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelPresets
@@ -94,6 +96,8 @@ import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalMessageBlock
+import com.labteto.dshmobile.local.session.visibleBlocks
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
@@ -424,7 +428,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
     var showMediaStudio by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var mediaRevision by rememberSaveable(state.sessionId) { mutableStateOf<LocalMediaRevisionDraft?>(null) }
     var mediaInitialPrompt by rememberSaveable(state.sessionId) { mutableStateOf("") }
+    var mediaSourceMessageId by rememberSaveable(state.sessionId) { mutableStateOf<String?>(null) }
     var mediaInitialKind by rememberSaveable(state.sessionId) {
         mutableStateOf(com.labteto.dshmobile.local.model.LocalMediaKind.IMAGE.name)
     }
@@ -584,6 +590,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     }
 
     val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
+    val generatedImageEditPrompt = stringResource(R.string.media_chat_edit_generated_image_prompt)
+    val generatedImageMissingMessage = stringResource(R.string.media_chat_edit_generated_image_missing)
     val imageImportFailedMessage = stringResource(R.string.local_image_import_failed)
     val fileImportFailedMessage = stringResource(R.string.local_file_import_failed)
     val cameraFailedMessage = stringResource(R.string.composer_camera_failed)
@@ -999,8 +1007,46 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                     null
                                 },
                                 onEdit = { message -> editingUserMessage = message },
+                                onEditGeneratedImage = { message ->
+                                    val generated = editableGeneratedImage(message.visibleBlocks())
+                                    val reusable = generated?.let { candidate ->
+                                        // Reuse the already saved local attachment; never re-download
+                                        // an untrusted URL or copy the image bytes into prompt/history.
+                                        val original = resolveLocalTranscriptFile(state.workspacePath, candidate.relativePath)
+                                        if (original?.isFile == true && original.length() > 0L) {
+                                            LocalImportedAttachment(
+                                                name = candidate.name, relativePath = candidate.relativePath,
+                                                mediaType = candidate.mediaType, bytes = original.length(),
+                                                attachmentId = candidate.attachmentId,
+                                                width = candidate.width, height = candidate.height,
+                                            )
+                                        } else null
+                                    }
+                                    if (reusable == null) {
+                                        attachmentError = generatedImageMissingMessage
+                                    } else {
+                                        attachmentError = when (localComposerAttachmentDecision(attachments, reusable)) {
+                                            LocalComposerAttachmentDecision.ACCEPT -> {
+                                                attachments += reusable
+                                                val current = drafts[state.sessionId].orEmpty()
+                                                drafts.putBoundedLocalDraft(state.sessionId,
+                                                    listOf(generatedImageEditPrompt, current)
+                                                        .filter(String::isNotBlank).joinToString("\n\n"))
+                                                null
+                                            }
+                                            LocalComposerAttachmentDecision.DUPLICATE -> null
+                                            LocalComposerAttachmentDecision.IMAGE_LIMIT -> imageLimitMessage
+                                        }
+                                    }
+                                },
                                 onCreateMedia = { message, kind ->
-                                    mediaInitialPrompt = message.content
+                                    mediaRevision = null
+                                    mediaSourceMessageId = message.id
+                                    mediaInitialPrompt = mediaCreativeDraft(
+                                        kind, message.content,
+                                        if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) state.chatPersona.name else "",
+                                        if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) state.chatPersona.coreIdentity else "",
+                                    )
                                     mediaInitialKind = kind.name
                                     showMediaStudio = true
                                 },
@@ -1020,6 +1066,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         is LocalTranscriptItem.MediaResult -> LocalGeneratedMediaResultRow(
                             result = transcriptItem.result,
                             viewModel = mediaStudioViewModel,
+                            onRevise = { draft ->
+                                mediaRevision = draft
+                                mediaInitialPrompt = draft.prompt
+                                mediaSourceMessageId = draft.sourceMessageId
+                                mediaInitialKind = draft.kind.name
+                                showMediaStudio = true
+                            },
                             onInsertText = { text ->
                                 val previous = drafts[state.sessionId].orEmpty()
                                 drafts.putBoundedLocalDraft(
@@ -1036,6 +1089,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             task = transcriptItem.task,
                             offers = com.labteto.dshmobile.local.model.LocalMediaCatalog.offers(state.modelProfiles),
                             viewModel = mediaStudioViewModel,
+                            onRevise = { draft ->
+                                mediaRevision = draft
+                                mediaInitialPrompt = draft.prompt
+                                mediaSourceMessageId = draft.sourceMessageId
+                                mediaInitialKind = draft.kind.name
+                                showMediaStudio = true
+                            },
                         )
                         is LocalTranscriptItem.WorkArtifact -> LocalWorkArtifactMessageRow(
                             artifact = transcriptItem.artifact,
@@ -1554,7 +1614,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     modifier = Modifier.weight(1f),
                     onClick = {
                         showAttachmentPicker = false
+                        mediaRevision = null
                         mediaInitialPrompt = ""
+                        mediaSourceMessageId = null
                         mediaInitialKind = com.labteto.dshmobile.local.model.LocalMediaKind.IMAGE.name
                         showMediaStudio = true
                     },
@@ -1607,6 +1669,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 viewModel = mediaStudioViewModel,
                 onDelivered = { showMediaStudio = false },
                 initialPrompt = mediaInitialPrompt,
+                sourceMessageId = mediaSourceMessageId,
+                revision = mediaRevision,
+                personaVoiceStyle = if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled)
+                    state.chatPersona.facts.filter { it.category == "voiceStyle" }.joinToString("；") { it.content }
+                else "",
                 initialKind = com.labteto.dshmobile.local.model.LocalMediaKind.valueOf(mediaInitialKind),
                 onInsertTranscript = { transcription ->
                     val previous = drafts[state.sessionId].orEmpty()
