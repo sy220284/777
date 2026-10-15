@@ -83,7 +83,7 @@ class UsageCalculationPageTest {
     @Test
     fun compactMetricsRemainReadableWithoutNestedMaterialTiles() {
         show(DeepSeekUsageSnapshot(inputTokens = 200, outputTokens = 25))
-        compose.onAllNodesWithTag("usageCompactMetric").assertCountEquals(2)
+        compose.onAllNodesWithTag("usagePrimaryMetric").assertCountEquals(2)
         compose.onNodeWithText("225").assertExists()
     }
 
