@@ -512,7 +512,7 @@ internal fun ChatPersonaDialog(
     val bundledPreset = remember(profile.presetId) { PersonaPresetCatalog.find(profile.presetId) }
     var aiDescription by rememberSaveable(profile.id) { mutableStateOf("") }
     var visibleFields by remember(profile.id, profile.updatedAt) {
-        mutableStateOf(profile.facts.map(CharacterFact::category).toSet())
+        mutableStateOf(factDrafts.map(CharacterFact::category).toSet())
     }
     var addFieldsOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
     var customFieldOpen by rememberSaveable(profile.id) { mutableStateOf(false) }
@@ -543,8 +543,13 @@ internal fun ChatPersonaDialog(
         runtimeProfile = generated
         name = generated.name
         coreIdentity = generated.coreIdentity
-        factDrafts = generated.facts
-        visibleFields = generated.facts.map(CharacterFact::category).toSet()
+        factDrafts = generated.facts.filter { fact ->
+            fact.category !in setOf(
+                "definingChoices", "emotionalImprints", "lifeGravity",
+                "unfinishedBusiness", "limitsAndCosts", "sensorySignature",
+            )
+        }
+        visibleFields = factDrafts.map(CharacterFact::category).toSet()
         franchise = generated.franchise
         loreEntries = generated.loreEntries
     }
