@@ -616,15 +616,25 @@ class PersonaAutoFillService @Inject constructor(
             }
         }
 
+        // An explicit draft already in the editor is the source of truth.
+        // AI adds missing information; it cannot quietly rewrite authored core fields.
+        val authoredCategories = current.facts.filter {
+            it.content.isNotBlank() && it.provenance in setOf(
+                CharacterFactProvenance.USER_CREATED, CharacterFactProvenance.CANON)
+        }.map(CharacterFact::category).toSet()
         current.copy(
             id = current.id,
-            name = draft.name.ifBlank { current.name.ifBlank { "默认角色" } },
-            coreIdentity = draft.coreIdentity.ifBlank { current.coreIdentity },
+            name = current.name.takeIf { it.isNotBlank() && it != "默认角色" }
+                ?: draft.name.ifBlank { "默认角色" },
+            coreIdentity = current.coreIdentity.ifBlank { draft.coreIdentity },
             facts = mergeGeneratedCharacterFacts(
                 current.facts,
-                draft.facts.filter { CharacterFactCategories.isSupported(it.category) },
+                draft.facts.filter {
+                    CharacterFactCategories.isSupported(it.category) &&
+                        it.category !in authoredCategories
+                },
             ),
-            franchise = draft.franchise.ifBlank { current.franchise },
+            franchise = current.franchise.ifBlank { draft.franchise },
             // V4 AI only writes canonical identity, facts and world-book; no new
             // legacy trait copies or runtime/correction overrides are generated here.
             loreEntries = mergeGeneratedLoreEntries(current.loreEntries, draft.loreEntries),
