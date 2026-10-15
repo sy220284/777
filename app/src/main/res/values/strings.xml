@@ -2352,5 +2352,19 @@
     <string name="persona_v4_discard_body">人物设定有未保存的内容。离开后这些修改不会保留。</string>
     <string name="persona_v4_discard_confirm">放弃修改</string>
     <string name="persona_v4_discard_cancel">继续编辑</string>
+    <string name="composer_invocation_add">添加或切换连接器与技能</string>
+    <string name="composer_invocation_title">连接器与技能</string>
+    <string name="composer_invocation_search">搜索已连接服务或技能</string>
+    <string name="composer_invocation_empty">暂无匹配项目，请先在工具页连接或安装</string>
+    <string name="composer_invocation_connected">已连接的服务</string>
+    <string name="composer_invocation_installed">已安装技能</string>
+    <string name="composer_invocation_hint">勾选后持续用于后续任务；再次点击取消固定</string>
+    <string name="composer_invocation_select">选择连接器或技能</string>
+    <string name="composer_invocation_remove">取消固定 %1$s</string>
+    <string name="composer_invocation_github_ready">已连接 · 仓库与 PR</string>
+    <string name="composer_invocation_mcp_tools">MCP · %1$d 项工具</string>
+    <string name="composer_invocation_unavailable">已离线或已移除 · 点击取消固定</string>
+    <string name="skills_github_url_hint">GitHub 技能目录地址</string>
+    <string name="skills_github_install">安装</string>
 </resources>
 
