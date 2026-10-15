@@ -518,7 +518,7 @@ class PersonaAutoFillService @Inject constructor(
             coreIdentity = draft.coreIdentity.ifBlank { current.coreIdentity },
             facts = mergeGeneratedCharacterFacts(
                 current.facts,
-                draft.facts.filterNot { it.category in CharacterFactCategories.removedFromNewProfiles },
+                draft.facts.filter { CharacterFactCategories.isSupported(it.category) },
             ),
             franchise = draft.franchise.ifBlank { current.franchise },
             // V4 AI only writes canonical identity, facts and world-book; no new
