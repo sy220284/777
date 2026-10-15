@@ -146,8 +146,10 @@
     {
       "id": "S3-05",
       "task": "生产级包选择/注册/持久恢复",
-      "codeStatus": "CODE_PENDING",
-      "verification": "DEFERRED"
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED",
+      "implemented": "新增 Host 持久选择协调器：只有通过全应用真实 renderer 与 manifest 双门禁的包才能写入选择；过期/缺失选择仅返回显式稳定包选项，不暗中回退 V6；持久写失败拒绝报成功。含 JVM 回归源码。",
+      "remaining": "正式 App 偏好存储接线、完整 V6/Next 可登记 renderer、包切换恢复与 Android 真机验收未完成，生产开关不可开放。"
     },
     {
       "id": "S3-06",
