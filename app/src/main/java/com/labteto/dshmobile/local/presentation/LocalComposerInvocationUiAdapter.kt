@@ -19,7 +19,7 @@ internal class LocalComposerInvocationUiAdapter @Inject constructor(
     private val store: LocalPinnedInvocationStore,
     private val tools: ToolsUiPort,
 ) : ComposerInvocationUiPort {
-    override val pinned = store.selected.map { it.map(LocalPinnedInvocation::asUi) }
+    override val pinned = store.selected.map { it.map { item -> item.asUi() } }
 
     override suspend fun options(): List<UiInvocationOption> {
         val available = mutableListOf<UiInvocationOption>()
@@ -40,7 +40,7 @@ internal class LocalComposerInvocationUiAdapter @Inject constructor(
         }
         val availableRefs = available.map { it.ref }.toSet()
         // Do not silently remove a selection when its provider is temporarily offline.
-        return available + store.selected.value.map(LocalPinnedInvocation::asUi)
+        return available + store.selected.value.map { item -> item.asUi() }
             .filterNot { it in availableRefs }
             .map { UiInvocationOption(it, it.id, "已断开或已卸载 · 可取消固定", false) }
     }
