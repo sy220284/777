@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.Flow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.uicontract.*
@@ -23,6 +25,7 @@ data class NextApplicationFeaturePorts(
     val gallery: PersonaGalleryUiPort,
     val selection: PersonaSelectionUiPort,
     val workMode: () -> Boolean,
+    val workModeUpdates: Flow<Boolean>? = null,
     val documents: UiDocumentUiPort? = null,
     val forms: UiDocumentFormUiPort? = null,
     val attachments: AttachmentUiPort? = null,
@@ -64,12 +67,19 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
         supportsDark = true,
     )
     override val renderers: Map<UiSceneId, UiSceneRenderer> = mapOf(
-        home to UiSceneRenderer { scope -> ConversationRoute(scope, ports.workMode()) },
+        home to UiSceneRenderer { scope -> HomeRoute(scope) },
         chat to UiSceneRenderer { scope -> ConversationRoute(scope, false) },
         work to UiSceneRenderer { scope -> ConversationRoute(scope, true) },
         galleryRoute to UiSceneRenderer { scope -> GalleryRoute(scope) },
         galleryPage to UiSceneRenderer { scope -> GalleryRoute(scope) },
     )
+
+    @Composable
+    private fun HomeRoute(scope: UiSceneRenderScope) {
+        val liveMode = ports.workModeUpdates
+            ?.collectAsStateWithLifecycle(initialValue = ports.workMode())?.value ?: ports.workMode()
+        ConversationRoute(scope, liveMode)
+    }
 
     @Composable
     private fun ConversationRoute(scope: UiSceneRenderScope, isWork: Boolean) {

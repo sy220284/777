@@ -41,6 +41,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.ui.screens.local.LocalHarnessViewModel
 import com.labteto.dshmobile.uipack.next.NextApplicationFeaturePorts
 import com.labteto.dshmobile.uipack.next.NextApplicationScenePack
+import kotlinx.coroutines.flow.map
 
 /** The original shipped screen is an explicit compatibility mode, never a fake complete UiPack. */
 internal const val LEGACY_V6_APP_UI = "legacy-v6-shell"
@@ -57,6 +58,7 @@ internal object LocalApplicationPackInstallations {
             drafts = owner.conversationDraftUiPort, reading = owner.conversationReadingUiPort,
             gallery = owner.personaGalleryUiPort, selection = owner.personaSelectionUiPort,
             workMode = { owner.shellState.value.usageMode == LocalUsageMode.WORK },
+            workModeUpdates = owner.shellState.map { it.usageMode == LocalUsageMode.WORK },
             documents = owner.nextUiDocumentUiPort, forms = owner.uiDocumentFormPort,
             attachments = owner.attachmentUiPort, sessions = owner.sessionUiPort,
             transcript = owner.messageHistoryUiPort, policy = owner.workPolicyUiPort,
