@@ -1,17 +1,16 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.espresso.Espresso
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.tools.LocalComposerInvocationOption
 import com.labteto.dshmobile.local.tools.LocalPinnedInvocation
@@ -48,6 +47,7 @@ class LocalComposerInvocationPickerRegressionTest {
             .performClick()
         compose.onNodeWithText("Figma").performClick()
         compose.runOnIdle { assertEquals(listOf(github, figma), selected) }
+        Espresso.pressBack() // Dismiss the multi-select popup before tapping its chips.
         compose.onNodeWithContentDescription(context.getString(R.string.composer_invocation_remove, "Figma"))
             .performClick()
         compose.runOnIdle { assertEquals(listOf(github), selected) }
