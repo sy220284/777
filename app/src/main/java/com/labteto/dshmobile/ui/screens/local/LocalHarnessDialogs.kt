@@ -907,6 +907,13 @@ private fun PersonaFactCategoryEditor(
             }
             if (entry.content.isBlank() && content.isNotBlank()) {
                 onChange(withBlankPersonaFacts(updated))
+            } else if (entry.content.isNotBlank() && content.isBlank()) {
+                // Clearing a populated entry leaves this focused box as the one empty slot.
+                // Drop the old spare blank instead of showing two empty boxes.
+                val spare = updated.lastOrNull {
+                    it.category == category && it.content.isBlank() && it.id != entry.id
+                }
+                onChange(if (spare == null) updated else updated.filterNot { it.id == spare.id })
             } else onChange(updated)
         }, hint = if (entry.content.isBlank() && index > 0)
             stringResource(R.string.persona_v4_free_append_hint) else hint)
