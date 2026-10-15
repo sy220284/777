@@ -136,7 +136,7 @@ internal class ToolsOperationGate {
 }
 
 @HiltViewModel
-class ToolsViewModel @Inject constructor(
+class ToolsViewModel @Inject internal constructor(
     private val localTools: LocalToolsUiFacade,
     private val gitHubSkillImporter: com.labteto.dshmobile.local.tools.LocalGitHubSkillImporter,
     @ApplicationContext private val appContext: Context,
