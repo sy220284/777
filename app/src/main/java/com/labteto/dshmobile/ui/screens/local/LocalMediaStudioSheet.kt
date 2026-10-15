@@ -58,6 +58,7 @@ import com.labteto.dshmobile.local.model.LocalMediaProvider
 import com.labteto.dshmobile.local.model.LocalMediaVideoPhase
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.presentation.LocalMediaVoice
+import com.labteto.dshmobile.local.presentation.LocalMediaVoiceLabels
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -80,6 +81,7 @@ internal fun LocalMediaStudioSheetContent(
     onDelivered: () -> Unit = {},
     viewModel: LocalMediaStudioViewModel = hiltViewModel(),
     initialPrompt: String = "",
+    personaVoiceStyle: String = "",
     initialKind: LocalMediaKind = LocalMediaKind.IMAGE,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
@@ -99,15 +101,13 @@ internal fun LocalMediaStudioSheetContent(
     val kind = LocalMediaKind.valueOf(mode)
     val available = models.filter { it.kind == kind }
     var chosenId by rememberSaveable(mode) { mutableStateOf("") }
-    val selected = available.firstOrNull { it.id == chosenId }
-        ?: available.firstOrNull { it.profile.id == preferredProfileId }
-        ?: available.firstOrNull()
+    val selected = LocalMediaCatalog.selectOffer(models, kind, preferredProfileId, chosenId.takeIf(String::isNotBlank))
     val activeOfferId by rememberUpdatedState(selected?.id)
     var showModelChoices by remember { mutableStateOf(false) }
     var prompt by rememberSaveable { mutableStateOf(initialPrompt) }
     var ratio by rememberSaveable { mutableStateOf("1:1") }
-    var voiceId by rememberSaveable(selected?.id) {
-        mutableStateOf(if (selected?.provider == LocalMediaProvider.OPENAI) "alloy" else "male-qn-qingse")
+    var voiceId by rememberSaveable(selected?.id, personaVoiceStyle) {
+        mutableStateOf(selected?.provider?.let { LocalMediaVoiceLabels.suggestedId(it, personaVoiceStyle) }.orEmpty())
     }
     var busy by remember(selected?.id) { mutableStateOf(false) }
     var error by remember(selected?.id) { mutableStateOf<String?>(null) }
@@ -173,9 +173,7 @@ internal fun LocalMediaStudioSheetContent(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = if (available.count { it.label == selected.label } > 1)
-                        "${selected.label} · ${selected.profile.displayName ?: selected.profile.model}"
-                    else selected.label,
+                    text = if (chosenId.isBlank()) "自动选择 · ${selected.label}" else "手动选择 · ${selected.label}",
                     modifier = Modifier.weight(1f),
                     style = DsType.small13Strong.withReadingWeight(),
                     color = colors.textSecondary,
@@ -194,6 +192,13 @@ internal fun LocalMediaStudioSheetContent(
                     modifier = Modifier.fillMaxWidth().height(152.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
+                    item(key = "auto") {
+                        SyButton(text = "自动选择支持的模型",
+                            onClick = { chosenId = ""; showModelChoices = false },
+                            size = SyButtonSize.Small,
+                            variant = if (chosenId.isBlank()) SyButtonVariant.Primary else SyButtonVariant.Ghost,
+                            modifier = Modifier.fillMaxWidth())
+                    }
                     items(available, key = { it.id }) { option ->
                         SyButton(
                             text = stringResource(
@@ -312,10 +317,13 @@ internal fun LocalMediaStudioSheetContent(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        SyTextField(
-                            value = voiceId, onValueChange = { voiceId = it },
-                            label = { Text(stringResource(R.string.minimax_media_voice_id)) },
-                            singleLine = true, enabled = !busy, modifier = Modifier.weight(1f),
+                        Text(
+                            text = if (voiceId.isBlank()) "请选择角色音色"
+                                else "当前音色：${voices.firstOrNull { it.id == voiceId }?.name ?: LocalMediaVoiceLabels.label(selected.provider, voiceId)}",
+                            modifier = Modifier.weight(1f),
+                            style = DsType.small13Strong.withReadingWeight(),
+                            color = colors.textSecondary, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                         SyButton(text = stringResource(R.string.minimax_media_select_voice),
                             onClick = { submit(selected) {

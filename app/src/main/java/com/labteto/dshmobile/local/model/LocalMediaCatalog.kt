@@ -22,6 +22,19 @@ data class LocalMediaOffer(
  * A creative model is distinct from the conversation model bound to the same account key.
  */
 object LocalMediaCatalog {
+    /** Only offers with an implemented API route qualify; never silently retry paid tasks. */
+    fun selectOffer(
+        offers: List<LocalMediaOffer>,
+        kind: LocalMediaKind,
+        preferredProfileId: String?,
+        manualOfferId: String? = null,
+    ): LocalMediaOffer? {
+        val available = offers.filter { it.kind == kind }
+        return available.firstOrNull { manualOfferId != null && it.id == manualOfferId }
+            ?: available.firstOrNull { preferredProfileId != null && it.profile.id == preferredProfileId }
+            ?: available.firstOrNull()
+    }
+
     fun offers(profiles: List<LocalModelProfile>): List<LocalMediaOffer> =
         profiles.distinctBy(LocalModelProfile::id).flatMap { profile ->
             val provider = providerFor(profile) ?: return@flatMap emptyList()

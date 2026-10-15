@@ -76,12 +76,12 @@ class LocalMediaCreationRuntime @Inject internal constructor(
 
     suspend fun voices(offer: LocalMediaOffer): List<LocalMediaVoice> {
         validate(offer, LocalMediaKind.SPEECH)
-        return when (offer.provider) {
+        return LocalMediaVoiceLabels.localize(offer, when (offer.provider) {
             LocalMediaProvider.MINIMAX -> miniMax.systemVoices(offer.profile).map { LocalMediaVoice(it.id, it.name) }
             LocalMediaProvider.OPENAI -> listOf("alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova",
                 "sage", "shimmer", "verse", "marin", "cedar").map { LocalMediaVoice(it, it) }
             else -> error("此服务商未接入配音")
-        }
+        })
     }
 
     suspend fun submitImage(offer: LocalMediaOffer, prompt: String, ratio: String, sessionId: String): LocalMediaCreationJob {
