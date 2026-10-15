@@ -21,7 +21,7 @@ interface ConversationUiPack {
         onClose: () -> Unit,
         attachments: com.labteto.dshmobile.uicontract.AttachmentUiPort? = null,
         sessions: com.labteto.dshmobile.uicontract.SessionUiPort? = null,
-        transcript: com.labteto.dshmobile.uicontract.TranscriptUiPort? = null,
+        transcript: com.labteto.dshmobile.uicontract.UiMessageHistoryPort? = null,
         policy: com.labteto.dshmobile.uicontract.WorkPolicyUiPort? = null,
         workReads: com.labteto.dshmobile.uicontract.WorkReadUiPort? = null,
         files: com.labteto.dshmobile.uicontract.FilesUiPort? = null,

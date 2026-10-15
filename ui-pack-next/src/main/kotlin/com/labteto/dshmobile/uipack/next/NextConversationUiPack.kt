@@ -92,7 +92,7 @@ object NextConversationUiPack : ConversationUiPack {
         onClose: () -> Unit,
         attachments: com.labteto.dshmobile.uicontract.AttachmentUiPort?,
         sessions: com.labteto.dshmobile.uicontract.SessionUiPort?,
-        transcript: com.labteto.dshmobile.uicontract.TranscriptUiPort?,
+        transcript: com.labteto.dshmobile.uicontract.UiMessageHistoryPort?,
         policy: com.labteto.dshmobile.uicontract.WorkPolicyUiPort?,
         workReads: com.labteto.dshmobile.uicontract.WorkReadUiPort?,
         files: com.labteto.dshmobile.uicontract.FilesUiPort?,
@@ -589,14 +589,10 @@ object NextConversationUiPack : ConversationUiPack {
                                 historyLoading = true
                                 importScope.launch {
                                     try {
-                                        val page = transcript.transcriptPage(target.sessionId, historyCursor, 200)
+                                        val page = transcript.messagePage(target.sessionId, historyCursor, 200)
                                         val current = if (workMode) work.snapshot().identity else chat.snapshot().identity
                                         if (current == target) {
-                                            val rows = page.messages.map { row -> UiMessageSnapshot(row.id, when (row.role) {
-                                                "user" -> UiMessageRole.USER; "assistant" -> UiMessageRole.ASSISTANT
-                                                "tool" -> UiMessageRole.TOOL; else -> UiMessageRole.SYSTEM
-                                            }, row.content, row.createdAt, proactive = row.proactive) }
-                                            olderMessages = (rows + olderMessages).distinctBy { it.id }
+                                            olderMessages = (page.messages + olderMessages).distinctBy { it.id }
                                             historyCursor = page.nextCursor
                                             historyAvailable = page.nextCursor != null
                                         }

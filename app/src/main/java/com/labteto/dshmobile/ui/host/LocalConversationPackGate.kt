@@ -3,7 +3,7 @@ package com.labteto.dshmobile.ui.host
 import com.labteto.dshmobile.uicontract.AttachmentUiPort
 import com.labteto.dshmobile.uicontract.ChatUiPort
 import com.labteto.dshmobile.uicontract.ConversationDraftUiPort
-import com.labteto.dshmobile.uicontract.TranscriptUiPort
+import com.labteto.dshmobile.uicontract.UiMessageHistoryPort
 import com.labteto.dshmobile.uicontract.UI_CONTRACT_VERSION
 import com.labteto.dshmobile.uicontract.UiAccessibility
 import com.labteto.dshmobile.uicontract.UiCapabilityId
@@ -49,7 +49,7 @@ internal object LocalConversationPackGate {
         documents: UiDocumentUiPort?,
         forms: UiDocumentFormUiPort?,
         attachments: AttachmentUiPort?,
-        transcript: TranscriptUiPort?,
+        transcript: UiMessageHistoryPort?,
         groups: com.labteto.dshmobile.uicontract.ChatGroupUiPort? = null,
         team: com.labteto.dshmobile.uicontract.WorkTeamUiPort? = null,
         shell: com.labteto.dshmobile.uicontract.ConversationShellUiPort? = null,

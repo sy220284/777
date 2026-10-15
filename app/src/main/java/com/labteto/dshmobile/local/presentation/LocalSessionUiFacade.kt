@@ -5,6 +5,10 @@ import com.labteto.dshmobile.local.session.LocalTranscriptPageCursor
 import com.labteto.dshmobile.uicontract.TranscriptUiPort
 import com.labteto.dshmobile.uicontract.UiTranscriptCursor
 import com.labteto.dshmobile.uicontract.UiTranscriptPage
+import com.labteto.dshmobile.uicontract.UiMessagePage
+import com.labteto.dshmobile.uicontract.UiMessageSnapshot
+import com.labteto.dshmobile.uicontract.UiMessageRole
+import com.labteto.dshmobile.uicontract.UiMessageHistoryPort
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -14,7 +18,7 @@ import kotlinx.coroutines.withContext
 @Singleton
 class LocalSessionUiFacade @Inject constructor(
     private val session: LocalSessionReadRuntime,
-) : TranscriptUiPort {
+) : TranscriptUiPort, UiMessageHistoryPort {
     private data class Cursor(val sessionId: String, val instance: String, val reset: Long,
         val ownerCursor: LocalTranscriptPageCursor) : UiTranscriptCursor
 
@@ -29,6 +33,17 @@ class LocalSessionUiFacade @Inject constructor(
         }
         UiTranscriptPage(page.messages, page.nextCursor?.let { Cursor(sessionId, frame.instance, frame.reset, it) })
     }
+    override suspend fun messagePage(sessionId: String, cursor: UiTranscriptCursor?, limit: Int): UiMessagePage {
+        val page = transcriptPage(sessionId, cursor, limit)
+        return UiMessagePage(page.messages.map { message ->
+            UiMessageSnapshot(message.id, when (message.role) {
+                "user" -> UiMessageRole.USER
+                "assistant" -> UiMessageRole.ASSISTANT
+                "tool" -> UiMessageRole.TOOL
+                else -> UiMessageRole.SYSTEM
+            }, message.content, message.createdAt, proactive = message.proactive)
+        }, page.nextCursor)
+    }
 }
 
 @dagger.Module
@@ -36,4 +51,6 @@ class LocalSessionUiFacade @Inject constructor(
 internal abstract class LocalTranscriptUiPortBindings {
     @dagger.Binds @Singleton
     abstract fun transcript(implementation: LocalSessionUiFacade): TranscriptUiPort
+    @dagger.Binds @Singleton
+    abstract fun messageHistory(implementation: LocalSessionUiFacade): UiMessageHistoryPort
 }
