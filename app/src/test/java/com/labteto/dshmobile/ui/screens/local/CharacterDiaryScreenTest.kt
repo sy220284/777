@@ -123,7 +123,7 @@ class CharacterDiaryScreenTest {
             .copy(createdAt = 5, importance = 4)
         val day = characterDiaryDayNarrative(listOf(routine, otherRoutine, feelings))
         assertTrue(day.contains("我终于想清楚了"))
-        assertTrue(day.length <= 630)
+        assertTrue(day.length <= 480)
         assertTrue(day.endsWith("。"))
         // Every displayed paragraph comes from a complete chosen entry, never take(357).
         assertTrue(day.split("\n\n").all { it.endsWith("。") })
@@ -155,7 +155,7 @@ class CharacterDiaryScreenTest {
             diary(id = it.toString(), event = "今天我想了很多" + "细节".repeat(75), thought = "我还在琢磨这件事")
                 .copy(importance = it % 5)
         }
-        assertTrue(characterDiaryDayNarrative(entries).length <= 630)
+        assertTrue(characterDiaryDayNarrative(entries).length <= 480)
         assertEquals(12, entries.size)
     }
 
