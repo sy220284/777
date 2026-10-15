@@ -97,73 +97,88 @@ internal class LocalUiDocumentUiAdapter(
     override suspend fun generateLocal(command: com.labteto.dshmobile.uicontract.GenerateLocalUiDocumentCommand): UiDocumentReceipt =
         kotlinx.coroutines.withContext(Dispatchers.IO) {
             try {
-                synchronized(state.foregroundRunHandle.lock) {
+                // Capture just the foreground identity and message under the shared lock.
+                // Work EventLog queries, document decoding and layout assembly can do disk IO:
+                // they must not keep session switching or message sending blocked.
+                val (source, messageText, approval) = synchronized(state.foregroundRunHandle.lock) {
                     val current = state.state.value
                     if (state.sessionTransitioning || state.uiBindingIdentity(current) != command.identity ||
                         (current.usageMode == LocalUsageMode.WORK) != command.workMode)
-                        return@synchronized UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                        return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
                     val message = current.messages.firstOrNull { it.id == command.messageId }
-                        ?: return@synchronized UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
-                    val source = UiDocumentSource(command.identity.sessionId, message.id, command.identity.contextGeneration,
-                        command.identity.profileId, command.identity.projectId, command.workMode)
-                    val approval = conversations.work.snapshot().approval.takeIf { command.workMode }
-                    val data = when (command.template) {
-                        com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.STATUS -> com.labteto.dshmobile.uicontract.UiLocalDocumentData.Status(approval)
-                        com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.MESSAGE -> com.labteto.dshmobile.uicontract.UiLocalDocumentData.ListItems(listOf(message.content))
-                        com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.REPLY_FORM -> com.labteto.dshmobile.uicontract.UiLocalDocumentData.ReplyForm("")
-                        com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.WORK_TOOL_ACTIVITY -> {
-                            if (!command.workMode) return@synchronized UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
-                            // The existing Work Owner projects a bounded event-log view. This is a
-                            // frozen snapshot, not a verified requirement or resumable tool action.
-                            val tools = workReads.toolActivitiesForUi(source.sessionId).takeLast(8)
-                            com.labteto.dshmobile.uicontract.UiLocalDocumentData.TableData(
-                                title = "工具事件（制作时快照；完成不等于核验）",
-                                headers = listOf("工具", "真实阶段", "错误码"),
-                                rows = tools.map { activity ->
-                                    listOf(activity.name, activity.phase.name, activity.errorCode.orEmpty())
-                                },
-                            )
-                        }
-                        com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.FACTS_TABLE -> {
-                            // A point-in-time Owner snapshot; not an automatically updating task status.
-                            val chatSnapshot = conversations.chat.snapshot()
-                            val workSnapshot = conversations.work.snapshot()
-                            val activePhase = if (command.workMode) workSnapshot.phase.name else chatSnapshot.phase.name
-                            val activeStatus = if (command.workMode) workSnapshot.status.name else chatSnapshot.status.name
-                            val activeQueued = if (command.workMode) workSnapshot.queuedInputCount else chatSnapshot.queuedInputCount
-                            com.labteto.dshmobile.uicontract.UiLocalDocumentData.TableData(
-                                title = "会话事实（制作时快照）",
-                                headers = listOf("字段", "Owner 读取值"),
-                                rows = listOf(
-                                    listOf("会话状态", activeStatus),
-                                    listOf("执行阶段", activePhase),
-                                    listOf("排队输入", activeQueued.toString()),
-                                ),
-                            )
-                        }
-                        com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.WORK_TOOL_RESULT -> {
-                            if (!command.workMode) return@synchronized UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
-                            val activity = workReads.toolActivitiesForUi(source.sessionId)
-                                .filter { it.finishedSequence != null }.maxByOrNull { it.finishedSequence!! }
-                                ?: return@synchronized UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
-                            val result = workReads.toolEvidenceForUi(source.sessionId, activity.callId, activity.finishedSequence!!)
-                                ?: return@synchronized UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
-                            com.labteto.dshmobile.uicontract.UiLocalDocumentData.StructuredResult(
-                                "${activity.name} · ${activity.phase.name} · 事件 ${activity.finishedSequence} · ${activity.callId} · 返回数据快照（未核验）", result,
-                            )
-                        }
+                        ?: return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                    Triple(
+                        UiDocumentSource(command.identity.sessionId, message.id, command.identity.contextGeneration,
+                            command.identity.profileId, command.identity.projectId, command.workMode),
+                        message.content,
+                        conversations.work.snapshot().approval.takeIf { command.workMode },
+                    )
+                }
+                val data = when (command.template) {
+                    com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.STATUS ->
+                        com.labteto.dshmobile.uicontract.UiLocalDocumentData.Status(approval)
+                    com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.MESSAGE ->
+                        com.labteto.dshmobile.uicontract.UiLocalDocumentData.ListItems(listOf(messageText))
+                    com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.REPLY_FORM ->
+                        com.labteto.dshmobile.uicontract.UiLocalDocumentData.ReplyForm("")
+                    com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.WORK_TOOL_ACTIVITY -> {
+                        if (!command.workMode) return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+                        val activities = workReads.toolActivitiesForUi(source.sessionId).takeLast(8)
+                        com.labteto.dshmobile.uicontract.UiLocalDocumentData.TableData(
+                            title = "工具事件（制作时快照；完成不等于核验）",
+                            headers = listOf("工具", "真实阶段", "错误码"),
+                            rows = activities.map { listOf(it.name, it.phase.name, it.errorCode.orEmpty()) },
+                        )
                     }
-                    val previous = store.read(source.sessionId, setOf(source.messageId), generation.budget, knownScenes)
-                        .firstOrNull { it.recoveryNotice == null && it.document.source == source }?.document
-                    val result = com.labteto.dshmobile.uicontract.LocalUiDocumentBuilder.build(
-                        previous?.documentId ?: java.util.UUID.randomUUID().toString(), source,
-                        previous?.revision?.let { Math.addExact(it, 1) } ?: 0, data, generation.budget, knownScenes)
-                    val document = result.getOrNull() ?: return@synchronized UiDocumentReceipt.Fallback(message.content, "ui_document_unavailable")
-                    val definition = com.labteto.dshmobile.local.presentation.document.LocalUiDocumentCodec.encode(document)
-                    com.labteto.dshmobile.local.presentation.document.LocalUiDocumentCodec.decode(definition.toString(), source,
-                        generation.budget, knownScenes, approval?.pendingId).getOrThrow()
-                    if (store.publish(document, com.labteto.dshmobile.uicontract.UiDocumentProvenance(null, "", false,
-                        com.labteto.dshmobile.uicontract.UiDocumentOrigin.LOCAL), approval?.pendingId, previous, generation.budget, knownScenes))
+                    com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.FACTS_TABLE -> {
+                        val chatSnapshot = conversations.chat.snapshot()
+                        val workSnapshot = conversations.work.snapshot()
+                        val active = if (command.workMode) workSnapshot else null
+                        com.labteto.dshmobile.uicontract.UiLocalDocumentData.TableData(
+                            title = "会话事实（制作时快照）",
+                            headers = listOf("字段", "Owner 读取值"),
+                            rows = listOf(
+                                listOf("会话状态", (active?.status ?: chatSnapshot.status).name),
+                                listOf("执行阶段", (active?.phase ?: chatSnapshot.phase).name),
+                                listOf("排队输入", (active?.queuedInputCount ?: chatSnapshot.queuedInputCount).toString()),
+                            ),
+                        )
+                    }
+                    com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.WORK_TOOL_RESULT -> {
+                        if (!command.workMode) return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+                        val activity = workReads.toolActivitiesForUi(source.sessionId)
+                            .filter { it.finishedSequence != null }.maxByOrNull { it.finishedSequence!! }
+                            ?: return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+                        val evidence = workReads.toolEvidenceForUi(source.sessionId, activity.callId, activity.finishedSequence!!)
+                            ?: return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                        com.labteto.dshmobile.uicontract.UiLocalDocumentData.StructuredResult(
+                            "${activity.name} · ${activity.phase.name} · 事件 ${activity.finishedSequence} · ${activity.callId} · 返回数据快照（未核验）", evidence,
+                        )
+                    }
+                }
+                val previous = store.read(source.sessionId, setOf(source.messageId), generation.budget, knownScenes)
+                    .firstOrNull { it.recoveryNotice == null && it.document.source == source }?.document
+                val built = com.labteto.dshmobile.uicontract.LocalUiDocumentBuilder.build(
+                    previous?.documentId ?: java.util.UUID.randomUUID().toString(), source,
+                    previous?.revision?.let { Math.addExact(it, 1L) } ?: 0L, data, generation.budget, knownScenes)
+                val document = built.getOrNull()
+                    ?: return@withContext UiDocumentReceipt.Fallback(messageText, "ui_document_unavailable")
+                val definition = com.labteto.dshmobile.local.presentation.document.LocalUiDocumentCodec.encode(document)
+                com.labteto.dshmobile.local.presentation.document.LocalUiDocumentCodec.decode(
+                    definition.toString(), source, generation.budget, knownScenes, approval?.pendingId).getOrThrow()
+
+                // The slow preparation may outlive the originating screen or message.
+                // Revalidate the foreground under the same lock as the final Owner write;
+                // the Session store independently CAS-checks the document revision.
+                synchronized(state.foregroundRunHandle.lock) {
+                    val current = state.state.value
+                    if (state.sessionTransitioning || state.uiBindingIdentity(current) != command.identity ||
+                        (current.usageMode == LocalUsageMode.WORK) != command.workMode ||
+                        current.messages.none { it.id == source.messageId && it.content == messageText }
+                    ) return@synchronized UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                    if (store.publish(document, com.labteto.dshmobile.uicontract.UiDocumentProvenance(
+                            null, "", false, com.labteto.dshmobile.uicontract.UiDocumentOrigin.LOCAL),
+                            approval?.pendingId, previous, generation.budget, knownScenes))
                         UiDocumentReceipt.Published(document.documentId)
                     else UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
                 }
