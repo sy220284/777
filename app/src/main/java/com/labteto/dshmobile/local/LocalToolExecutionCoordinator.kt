@@ -138,9 +138,9 @@ internal class LocalToolExecutionCoordinator(
         if (enableGitHub) enableGitHubConnectorTools(resolvedTarget)
         enableTaskRelevantOptionalTools(taskContext, resolvedTarget, prioritize = prioritizeTask)
         if (networkSearchEnabled()) enableOptionalTools(DEFAULT_NETWORK_TOOLS, resolvedTarget)
-        // Explicit, persistent selections must survive per-turn schema resets and outrank
-        // heuristic discovery; registry, approval and model budgets still govern execution.
-        enablePinnedMcpConnectorTools(resolvedTarget)
+        // Preserve explicit user choices after ALL heuristic re-ranking, not before it.
+        // The credential gate above determines whether GitHub is admitted.
+        prioritizePinnedConnectorTools(resolvedTarget, enableGitHub)
     }
 
     fun enableGitHubConnectorTools(target: MutableSet<String> = enabledOptionalTools) {
@@ -152,17 +152,25 @@ internal class LocalToolExecutionCoordinator(
         enableOptionalTools(githubTools, target)
     }
 
-    private fun enablePinnedMcpConnectorTools(target: MutableSet<String>) {
-        val prefixes = pinnedConnectorIds().asSequence()
-            .filter { it != "github" && Regex("[A-Za-z0-9_-]{1,48}").matches(it) }
-            .map { "mcp_${it}_" }.toList()
-        if (prefixes.isEmpty()) return
-        val matching = registry.names().filter { name -> prefixes.any(name::startsWith) }
-        enableOptionalTools(matching, target)
+    private fun prioritizePinnedConnectorTools(target: MutableSet<String>, enableGitHub: Boolean) {
+        val pins = pinnedConnectorIds().distinct()
+        if (pins.isEmpty()) return
+        val registered = registry.names().mapNotNull(registry::get)
+        val preferred = pins.flatMap { id ->
+            if (id == "github") {
+                if (enableGitHub) registered.filter(::isGitHubConnectorTool).map(HarnessTool::name)
+                else emptyList()
+            } else if (Regex("[A-Za-z0-9_-]{1,48}").matches(id)) {
+                registered.filter { it.metadata.family.equals("MCP", ignoreCase = true) &&
+                    it.name.startsWith("mcp_${id}_") }.map(HarnessTool::name)
+            } else emptyList()
+        }
+        // Registration, network policy and approval are still the single execution authority.
+        enableOptionalTools(preferred, target)
         synchronized(target) {
             val previous = target.toList()
             target.clear()
-            target.addAll(matching.filter { it in previous })
+            target.addAll(preferred.filter { it in previous })
             target.addAll(previous)
         }
     }
