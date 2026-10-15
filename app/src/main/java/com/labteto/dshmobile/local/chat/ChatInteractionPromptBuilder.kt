@@ -109,7 +109,7 @@ internal class ChatInteractionPromptBuilder {
         appendLine("- continuity 只保留当前有效的关键事件、决定和待续事项，合并重复，不复制旧台词。")
         appendLine("- NONE=无需记录显著长期事件，但仍必须更新本轮有证据的短期状态、结清与纠正；MINOR=有短期或连续性事件；MAJOR=重大关系事件、共同经历或稳定事实。")
         appendLine("- NONE 下新增非空状态时须在 stateEvidence 提供本轮双方真实原话。显式空字段清理不受重要程度阻止；不能编造新状态。")
-        appendLine("- suggestions 固定为空；不得替用户作重大决定。")
+        appendLine("- suggestions 固定为空。")
     }.trim()
 
     fun suggestionsPrompt(

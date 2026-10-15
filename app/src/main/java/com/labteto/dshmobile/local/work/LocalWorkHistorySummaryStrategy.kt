@@ -26,9 +26,7 @@ internal object LocalWorkHistorySummaryStrategy : com.labteto.dshmobile.local.mo
                     val sections = requireNotNull(checkpoint) {
                         "WORK 摘要必须携带结构化检查点"
                     }
-                    append("较早工作检查点，共折叠 ")
-                    append(messages.size)
-                    append(" 条模型消息；内容均提取自原会话，实时目标、计划、任务和工作区状态优先。")
+                    append("【较早工作检查点】当前有效目标、计划、任务和工作区状态优先。")
                     appendSummarySection("目标与需求", sections.goals)
                     appendSummarySection("当前计划", sections.plan)
                     appendSummarySection("约束与边界", sections.constraints)

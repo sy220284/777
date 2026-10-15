@@ -194,7 +194,7 @@ internal class LocalChatTurnCoordinator @Inject constructor(
             assistantMessage = assistantMessage,
             recentDialogue = recentDialogue,
             context = context,
-        ).let(::enhanceReplySuggestionPromptForScheduling)
+        ).let { enhanceReplySuggestionPromptForScheduling(it, recentDialogue.joinToString(" ") { item -> item.second }) }
     }
 
     internal fun parseReplySuggestions(text: String): List<ChatReplySuggestion>? =
@@ -249,7 +249,12 @@ internal fun recentReplySuggestionDialogue(
 
 
 /** Scheduling ideas share the existing user-invoked next-reply request; no background model call. */
-internal fun enhanceReplySuggestionPromptForScheduling(prompt: String): String = prompt + """
+internal fun enhanceReplySuggestionPromptForScheduling(prompt: String, dialogue: String = ""): String {
+    val relevant = Regex("提醒|约定|计划|明天|后天|周末|下次|下周|下个月|再见|见面|联系|预约|定时|之后|晚点|几点|时候|明晚|未来|schedule|remind|tomorrow|next week", RegexOption.IGNORE_CASE)
+        .containsMatchIn(dialogue)
+    if (!relevant) return prompt
+    return prompt + """
 
-如果最近双方真实谈到未来的共同计划、提醒、下次互动或待续约定，可以在原有下一句建议中自然加入一条关于后续时间或主动联系的用户表达；没有相关语境则保持普通接话建议。建议仍必须是用户可以直接发给当前人物的文字，不要虚构约定的时间或事件，不要把角色的反应写死，也不要宣称已经创建自动任务。实际定时执行需用户明确进入自动任务并确认。
+如果最近双方真实谈到未来的共同计划、提醒、下次互动或待续约定，可以自然加入一条相关的用户下一句建议；没有明确时间或约定就不补写。这里只生成可发送的话，不创建自动任务。
 """.trimIndent()
+}

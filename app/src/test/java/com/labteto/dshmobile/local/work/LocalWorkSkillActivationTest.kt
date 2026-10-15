@@ -52,6 +52,7 @@ class LocalWorkSkillActivationTest {
             assertTrue(context.contains("code-review：Review code"))
             assertTrue(context.contains("适用：PR analysis"))
             assertFalse(context.contains("Inspect call chains."))
+            assertFalse(resolveLocalWorkSkillGuidance(workspace, "今天天气不错").contains("本地技能"))
         } finally {
             root.deleteRecursively()
         }

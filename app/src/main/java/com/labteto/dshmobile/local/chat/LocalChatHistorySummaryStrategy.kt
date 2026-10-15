@@ -27,9 +27,7 @@ internal object LocalChatHistorySummaryStrategy {
             .take(8)
             .toList().asReversed()
         val text = buildString {
-            append("较早聊天连续性检查点，共折叠 ")
-            append(messages.size)
-            append(" 条模型消息，仅用于承接，不主动复述。")
+            append("【较早聊天连续性】仅用于承接，不主动复述。")
             if (dialogue.isNotEmpty()) {
                 append("\n\n较早用户表达与事件及人物当时回应：")
                 dialogue.forEach { append("\n- ").append(it) }
