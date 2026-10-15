@@ -1,22 +1,11 @@
 package com.labteto.dshmobile.local.chat
 
-internal const val CHAT_DIARY_SYSTEM_INSTRUCTION = """日记增量 diaryDelta：只有值得跨会话记住的经历才输出对象；普通寒暄、重复动作、无实际推进时输出 null。
-字段：event, feeling, innerThought, relationshipMeaning, unresolvedEcho, importance(0-5), disclosure(PRIVATE|SHAREABLE|PUBLIC), recallAnchors(事件的检索线索字符串数组), subjectiveEvidence(支持心理记录的原文引句，可空)。
-要求：
-- event 是精炼的记忆锚点，合并同一事件的关键动作、人物、时间/地点、物品和明确数值，不逐句复述，不写流水账。
-- diaryDelta 必须是可独立理解的精炼成稿；同一经历出现补充、确认或修正时，输出完整的当前版本，避免只写“又提到、继续、还是”这类依赖旧条目的碎片。
-- 有意义的共同事件、约定、拒绝和决定可以只记录 event；心理字段均可留空。
-- feeling 写真实情绪体验与变化，体现触发原因、强弱或矛盾感，避免只有“开心/难过”标签。
-- feeling、innerThought、relationshipMeaning 只整理人物实际表达或有依据的主观看法，不填统一感想；不确定时留空或明确标为推测。
-- innerThought 可以记录有情境依据的猜测；未表达的心理活动保留不确定性，不能当作已发生的内心事实。subjectiveEvidence 仅填原始人物表达的逐字引句；没有引句留空。
-- relationshipMeaning 记录这件事实际带来的关系变化；没有依据留空，不从固定关系菜单选结论。
-- unresolvedEcho 只记录仍会影响后续互动的担忧、期待或未说完的念头；已经结束留空。
-- 保留能让未来角色自然想起“发生了什么、为什么在意、当时心里怎么想”的关键细节；禁止用“然后、接着、之后又”串成时间流水账。
-- 只填写真实存在的心理与关系变化，不为了凑字段虚构感受；能用一两句写清就不要扩成事件清单。
-- PRIVATE 记录用户明确要求保密或不应公开的私人经历；该信息只属于当前人物，其他人物的所知以实际公开事件为准。
-- SHAREABLE 表示当前人物的普通私人经历，尚未在群聊公开。
-- PUBLIC 只用于群聊中已经公开发生的经历，或单聊里用户明确说“可以告诉大家/群里可以提/不用保密/可以公开”等已授权公开的经历。没有明确公开许可时，单聊不得写 PUBLIC。
-- 同一件事的公开权限可以被用户后来明确改变：后来明确允许公开时可从 PRIVATE/SHAREABLE 升为 PUBLIC；后来重新要求保密时必须立即收紧为 PRIVATE，旧 PUBLIC 不得回潮。
-- 事件被取消、改期、结束、替换或明确修正时，要输出完整的新当前版本；旧版本只保留为历史，不得继续写成仍然有效的关系余波或当前计划。
-- recallAnchors 只提供实际事件的同义表达、主题和可能的自然提法，帮助换一种说法时找到这段经历；不新增事件、人物动机或回应策略。
-- NONE 一律 diaryDelta=null；MINOR 仅在 importance>=3 且确有持续影响时记录；MAJOR 应优先记录，但无需补心理活动。"""
+internal const val CHAT_DIARY_SYSTEM_INSTRUCTION = """日记增量 diaryDelta：仅为值得跨会话记住的真实经历、决定或有依据的个人想法输出对象；普通寒暄、重复内容写 null。
+字段：event, feeling, innerThought, relationshipMeaning, unresolvedEcho, importance(0-5), disclosure(PRIVATE|SHAREABLE|PUBLIC), recallAnchors(真实事件检索线索数组), subjectiveEvidence(人物实际表达的原文引句，可空)。
+写作与事实：
+- event 用人物自己的视角简练记录可独立理解的经历，保留必要人物、时间、地点和约定。补充、撤销、改期或纠正须给出当前完整版本，不复活过期决定。
+- 情绪、思考、关系意义与余波仅在有真实依据时填；把已发生的事件与人物猜测分开，不为填字段编造心理、他人动机或关系变化。
+- 表达长短和语气随人物和事件自然变化，不套用统一情绪、感悟结尾或流水账模板。重要事件可只填 event。subjectiveEvidence 仅为人物实际原话，没有则留空。
+- PRIVATE 为明确保密或不宜公开的信息，只归相应人物；SHAREABLE 为未公开的普通私人经历；PUBLIC 仅用于群聊已公开或得到明确许可的信息。权限变化按最新明确要求处理，旧公开权限不得回潮。
+- recallAnchors 只写真实事件的自然检索表达，不新增事实、动机或回应策略。
+- NONE 一律 diaryDelta=null；MINOR 仅在 importance>=3 且确有持续意义时记录；MAJOR 优先记重要经历，不必编造心理。"""
