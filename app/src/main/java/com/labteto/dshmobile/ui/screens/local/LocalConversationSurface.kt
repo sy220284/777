@@ -228,7 +228,7 @@ internal fun LocalConversationSurface(
     onConfigureChatPersona: suspend (PersonaProfile) -> Result<Unit>,
     onConfigureGroupMembers: (List<String>) -> Boolean,
     onSelectGalleryPersona: (String) -> Boolean,
-    onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
+    onAutoFillChatPersona: suspend (PersonaProfile, String) -> Result<PersonaProfile>,
     onSaveGroupAnnouncement: suspend (String) -> Result<Unit>,
     onUndoPersonaCorrection: (Long, String, String) -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
