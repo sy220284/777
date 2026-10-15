@@ -63,6 +63,7 @@ class LocalHarnessViewModel @Inject constructor(
     val transcriptUiPort: com.labteto.dshmobile.uicontract.TranscriptUiPort,
     val messageHistoryUiPort: com.labteto.dshmobile.uicontract.UiMessageHistoryPort,
     private val toolsUi: LocalToolsUiFacade,
+    val composerInvocationUiPort: com.labteto.dshmobile.uicontract.ComposerInvocationUiPort,
     private val usageUi: com.labteto.dshmobile.uicontract.UsageUiPort,
     val workPolicyUiPort: com.labteto.dshmobile.uicontract.WorkPolicyUiPort,
     private val networkSearchSettings: LocalNetworkSearchSettings,

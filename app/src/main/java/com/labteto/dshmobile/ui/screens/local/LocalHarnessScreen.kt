@@ -211,6 +211,8 @@ fun LocalHarnessScreen(
     var taskEntryRequest by rememberSaveable { mutableIntStateOf(0) }
     var composerHandoff by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var installedSkillDisplayNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    val pinnedInvocations by viewModel.composerInvocationUiPort.pinned.collectAsStateWithLifecycle(initialValue = emptyList())
+    var invocationOptions by remember { mutableStateOf<List<com.labteto.dshmobile.uicontract.UiInvocationOption>>(emptyList()) }
     var pendingWorkCapability by rememberSaveable { mutableStateOf<String?>(null) }
     var workHandoffSourceIdentity by remember { mutableStateOf<com.labteto.dshmobile.uicontract.UiSessionIdentity?>(null) }
     var workHandoffSourceSessionId by rememberSaveable { mutableStateOf("") }
@@ -255,6 +257,8 @@ fun LocalHarnessScreen(
         if (featurePage == LocalFeaturePage.HOME) {
             installedSkillDisplayNames = runCatching { viewModel.installedSkillDisplayNames() }
                 .getOrDefault(emptyMap())
+            invocationOptions = runCatching { viewModel.composerInvocationUiPort.options() }
+                .getOrDefault(emptyList())
         }
     }
     val featureStateHolder = rememberSaveableStateHolder()
@@ -666,6 +670,14 @@ fun LocalHarnessScreen(
             },
             composerHandoff = composerHandoff,
             skillDisplayNames = installedSkillDisplayNames,
+            invocationOptions = invocationOptions,
+            pinnedInvocations = pinnedInvocations,
+            onToggleInvocation = { selection ->
+                when (val receipt = viewModel.composerInvocationUiPort.toggle(selection)) {
+                    is com.labteto.dshmobile.uicontract.UiCommandReceipt.Failed -> android.widget.Toast.makeText(context, receipt.message, android.widget.Toast.LENGTH_SHORT).show()
+                    else -> Unit
+                }
+            },
             onConsumeComposerHandoff = { composerHandoff = emptyList() },
         ),
         localChatFeatureUiContribution(

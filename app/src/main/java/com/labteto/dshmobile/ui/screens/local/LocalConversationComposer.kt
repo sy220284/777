@@ -86,6 +86,9 @@ internal fun v6ConversationComposerSurface(background: AppBackgroundState, palet
 internal fun LocalConversationComposer(
     state: LocalConversationSurfaceState,
     skillDisplayNames: Map<String, String> = emptyMap(),
+    invocationOptions: List<com.labteto.dshmobile.uicontract.UiInvocationOption> = emptyList(),
+    pinnedInvocations: List<com.labteto.dshmobile.uicontract.UiInvocationRef> = emptyList(),
+    onToggleInvocation: (com.labteto.dshmobile.uicontract.UiInvocationRef) -> Unit = {},
     activeModelProfile: LocalModelProfile?,
     input: String,
     attachments: List<LocalImportedAttachment>,
@@ -289,6 +292,9 @@ internal fun LocalConversationComposer(
         // the IME is already animating the whole surface.
         animateSize = false,
     ) {
+        if (state.usageMode == LocalUsageMode.WORK) {
+            LocalComposerInvocationPicker(invocationOptions, pinnedInvocations, onToggleInvocation)
+        }
         if (state.usageMode == LocalUsageMode.WORK && teamDispatchSelected) {
             // A compact icon-only indicator keeps team dispatch reversible without
             // repeating its name or squeezing the adjacent text into vertical glyphs.

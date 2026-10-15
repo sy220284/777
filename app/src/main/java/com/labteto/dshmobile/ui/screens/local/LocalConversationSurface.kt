@@ -188,6 +188,9 @@ internal class LocalConversationSurfaceArgs(
     val onCancelQuestion: (String) -> Unit,
     val composerHandoff: List<String>,
     val skillDisplayNames: Map<String, String>,
+    val invocationOptions: List<com.labteto.dshmobile.uicontract.UiInvocationOption>,
+    val pinnedInvocations: List<com.labteto.dshmobile.uicontract.UiInvocationRef>,
+    val onToggleInvocation: (com.labteto.dshmobile.uicontract.UiInvocationRef) -> Unit,
     val onConsumeComposerHandoff: () -> Unit,
     val onOpenDrawer: (() -> Unit)?,
     val onOpenGlobalSearch: () -> Unit,
@@ -255,6 +258,9 @@ internal fun LocalConversationSurface(
     onCancelQuestion: (String) -> Unit,
     composerHandoff: List<String> = emptyList(),
     skillDisplayNames: Map<String, String> = emptyMap(),
+    invocationOptions: List<com.labteto.dshmobile.uicontract.UiInvocationOption> = emptyList(),
+    pinnedInvocations: List<com.labteto.dshmobile.uicontract.UiInvocationRef> = emptyList(),
+    onToggleInvocation: (com.labteto.dshmobile.uicontract.UiInvocationRef) -> Unit = {},
     onConsumeComposerHandoff: () -> Unit = {},
     onOpenDrawer: (() -> Unit)? = null,
     onOpenGlobalSearch: () -> Unit = {},
@@ -320,6 +326,9 @@ internal fun LocalConversationSurface(
         onCancelQuestion = onCancelQuestion,
         composerHandoff = composerHandoff,
         skillDisplayNames = skillDisplayNames,
+        invocationOptions = invocationOptions,
+        pinnedInvocations = pinnedInvocations,
+        onToggleInvocation = onToggleInvocation,
         onConsumeComposerHandoff = onConsumeComposerHandoff,
         onOpenDrawer = onOpenDrawer,
         onOpenGlobalSearch = onOpenGlobalSearch,
@@ -389,6 +398,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val onCancelQuestion = args.onCancelQuestion
     val composerHandoff = args.composerHandoff
     val skillDisplayNames = args.skillDisplayNames
+    val invocationOptions = args.invocationOptions
+    val pinnedInvocations = args.pinnedInvocations
+    val onToggleInvocation = args.onToggleInvocation
     val onConsumeComposerHandoff = args.onConsumeComposerHandoff
     val onOpenDrawer = args.onOpenDrawer
     val onOpenGlobalSearch = args.onOpenGlobalSearch
@@ -1365,6 +1377,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         LocalConversationComposer(
             state = state,
             skillDisplayNames = skillDisplayNames,
+            invocationOptions = invocationOptions,
+            pinnedInvocations = pinnedInvocations,
+            onToggleInvocation = onToggleInvocation,
             activeModelProfile = activeModelProfile,
             input = input,
             attachments = attachments,
