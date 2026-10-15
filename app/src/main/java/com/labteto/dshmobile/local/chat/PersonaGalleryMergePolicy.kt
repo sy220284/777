@@ -113,12 +113,8 @@ internal fun applyPersonaSuggestions(
             "coreIdentity" -> result.copy(
                 coreIdentity = mergePersonaText(result.coreIdentity, value, 4_000),
             )
-            in CharacterFactCategories.canonical -> result.copy(facts = result.facts + CharacterFact(
-                id = java.util.UUID.randomUUID().toString(),
-                category = suggestion.field,
-                content = value,
-                provenance = CharacterFactProvenance.USER_CREATED,
-            ))
+            in CharacterFactCategories.canonical ->
+                result.appendV4Suggestion(suggestion.field, value)
             "franchise" -> result.copy(franchise = mergePersonaText(result.franchise, value, 120))
             else -> result
         }
