@@ -757,6 +757,18 @@ class ChatDiaryStoreTest {
             assertNotNull(saved)
             assertEquals(voice, saved!!.privateReflection)
         }
+        val meaningfulShortAnchor = request(
+            delta = ChatDiaryDelta(
+                event = "说好了",
+                privateReflection = "我已经偷偷开心了一会儿。",
+                importance = 3,
+            ),
+            evidence = "说好了，周末一起去看电影",
+        ).copy(turnSignificance = "MINOR")
+        assertEquals(
+            "我已经偷偷开心了一会儿。",
+            ChatDiaryEntryPolicy.sanitizeDelta(meaningfulShortAnchor)?.privateReflection,
+        )
         val shortEventWithoutContext = request(
             delta = ChatDiaryDelta(
                 event = "散步",
