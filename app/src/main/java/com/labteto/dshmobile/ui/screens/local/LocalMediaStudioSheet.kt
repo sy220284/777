@@ -158,7 +158,7 @@ internal fun LocalMediaStudioSheetContent(
                 // Recheck at submission time: account credentials can change while the sheet is open.
                 if (matchingRevision != null && chosenId.isBlank()) {
                     check(viewModel.matchesOriginalCredential(matchingRevision, offer)) {
-                        "原创作账户凭据已变化，请重新选择创作账户"
+                        context.getString(R.string.media_recreate_credential_changed)
                     }
                 }
                 action()
