@@ -26,6 +26,9 @@ class LocalMediaStudioViewModel @Inject constructor(private val creation: LocalM
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LocalMediaPage())
     fun loadOlderArchive() { archiveLimit.value = Math.addExact(archiveLimit.value, LocalMediaCreationRuntime.PAGE_SIZE) }
     fun sessionPage(sessionId: String, limit: Int): Flow<LocalMediaPage> = creation.observe(sessionId, limit)
+    suspend fun matchesOriginalCredential(draft: com.labteto.dshmobile.local.model.LocalMediaRevisionDraft, route: LocalMediaOffer): Boolean =
+        creation.matchesOriginalCredential(draft, route)
+
     suspend fun retryStorage() {
         try { creation.retryStorage() }
         catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
