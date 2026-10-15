@@ -12,7 +12,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.BuildConfig
 import com.labteto.dshmobile.ui.screens.local.LocalHarnessScreen
 import com.labteto.dshmobile.ui.screens.local.LocalHarnessViewModel
-import com.labteto.dshmobile.ui.host.LocalConversationPackGate
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.ui.theme.ThemePreference
 
@@ -49,7 +48,7 @@ fun AppRoot(
     // never from claims advertised by an installed UI pack.
     val features: LocalHarnessViewModel = hiltViewModel()
     val requestedHostScene by features.uiSceneRequest.collectAsStateWithLifecycle()
-    val hostCapabilities = LocalConversationPackGate.capabilities(
+    val hostCapabilities = com.labteto.dshmobile.ui.host.LocalUiConnectedCapabilities.from(
         chat = features.chatUiPort,
         work = features.workConversationUiPort,
         drafts = features.conversationDraftUiPort,

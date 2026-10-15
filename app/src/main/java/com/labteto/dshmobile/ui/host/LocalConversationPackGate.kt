@@ -61,34 +61,26 @@ internal object LocalConversationPackGate {
         galleryDeletion: com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort? = null,
         gallerySave: com.labteto.dshmobile.uicontract.PersonaGallerySaveUiPort? = null,
         portraits: com.labteto.dshmobile.uicontract.PersonaPortraitUiPort? = null,
-    ): Set<UiCapabilityId> = buildSet {
-        if (chat != null && drafts != null) {
-            listOf("chat.send_text", "chat.edit", "chat.regenerate",
-                "chat.select_variant", "chat.stop").forEach { add(UiCapabilityId(it)) }
-        }
-        if (work != null && drafts != null) {
-            listOf("work.send_text", "work.edit", "work.regenerate", "work.stop",
-                "work.answer_approval", "work.answer_question").forEach { add(UiCapabilityId(it)) }
-        }
-        if (documents != null && forms != null && drafts != null) {
-            listOf("ui_document.generate", "ui_document.generate_local",
-                "ui_document.prepare_input").forEach { add(UiCapabilityId(it)) }
-        }
-        if (attachments != null) add(UiCapabilityId("attachment.import"))
-        if (transcript != null) add(UiCapabilityId("session.transcript_read"))
-        if (groups != null) add(UiCapabilityId("chat.group_members"))
-        if (team != null) add(UiCapabilityId("work.team_control"))
-        if (shell != null) add(UiCapabilityId("shell.session_preferences"))
-        if (evidence != null) add(UiCapabilityId("work.evidence_reference"))
-        if (gallery != null) add(UiCapabilityId("chat.gallery_archive"))
-        if (personas != null) add(UiCapabilityId("chat.persona_selection"))
-        if (personaTransfer != null) add(UiCapabilityId("chat.persona_transfer"))
-        if (stories != null) add(UiCapabilityId("chat.gallery_story"))
-        if (galleryDeletion != null) add(UiCapabilityId("chat.gallery_delete"))
-        if (gallerySave != null) add(UiCapabilityId("chat.gallery_save"))
-        if (portraits != null) add(UiCapabilityId("chat.gallery_portrait"))
-    }
-
+        ): Set<UiCapabilityId> = LocalUiConnectedCapabilities.from(
+        chat = chat,
+        work = work,
+        drafts = drafts,
+        documents = documents,
+        forms = forms,
+        attachments = attachments,
+        transcript = transcript,
+        groups = groups,
+        team = team,
+        shell = shell,
+        evidence = evidence,
+        gallery = gallery,
+        personas = personas,
+        personaTransfer = personaTransfer,
+        stories = stories,
+        galleryDeletion = galleryDeletion,
+        gallerySave = gallerySave,
+        portraits = portraits,
+    )
     fun admit(
         packId: String,
         availableCapabilities: Set<UiCapabilityId>,
