@@ -63,9 +63,6 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -422,12 +419,7 @@ internal fun CompactPersonaRow(
     var dragDistance by remember(entry.id) { mutableFloatStateOf(0f) }
     val tick = rememberHapticPulse(minIntervalMillis = 65L)
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    val backgroundState = LocalAppBackgroundState.current
-    val rowColor = when {
-        selected -> colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, base = colors.selected)
-        backgroundState.hasImage -> colors.wallpaperSurface(WallpaperSurfaceLevel.CARD)
-        else -> Color.Transparent
-    }
+    val rowColor = if (selected) colors.selected.copy(alpha = .24f) else Color.Transparent
     Surface(
         shape = DsShapes.row,
         color = rowColor,
