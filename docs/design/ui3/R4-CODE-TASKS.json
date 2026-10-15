@@ -3,7 +3,7 @@
   "asOf": "2026-10-15",
   "baseline": "828b5434",
   "scope": "整个 R4，非单一功能",
-  "verificationPolicy": "用户要求延后测试、编译、设备和 CI 跟进；代码状态不代表验收通过",
+  "verificationPolicy": "当前 HEAD 基础 CI 可通过不代表 R4 交付验收；新增提交需自身 CI，真实双包使用/进程恢复/设备矩阵按 S2/S5 单独验证。",
   "sceneCount": 78,
   "actionCount": 173,
   "sourceMappedActions": 65,
@@ -123,8 +123,10 @@
     {
       "id": "S3-02",
       "task": "7 路由/二级场景/深链/返回的通用 Host",
-      "codeStatus": "CODE_PENDING",
-      "verification": "DEFERRED"
+      "codeStatus": "CODE_PARTIAL",
+      "verification": "DEFERRED",
+      "implemented": "新增 :ui-host 的 UiHostSceneNavigation 纯导航约定：基于 Host 场景目录与当前包 manifest 区分 PAGE/OVERLAY/SLOT/SYSTEM，支持包身份校验、返回、有限的显式深链键及严格状态恢复；App JVM 回归测试覆盖拒绝旧包/无实现页面/系统服务/伪造历史。仅是独立导航内核，不是现网 Host 接线或 renderer 的完成证明。",
+      "remaining": "全应用 7 一级路由与二级场景的真实 Host 接线、用户导航栈持久化/DeepLink intent 绑定、Feature Owner 准入、系统返回/IME、包切换恢复、Scene Renderer 具体页面实现及设备回归仍未完成。"
     },
     {
       "id": "S3-03",

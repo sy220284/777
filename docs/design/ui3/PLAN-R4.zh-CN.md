@@ -829,3 +829,6 @@ LocalTranscriptItem.UiDocument → V6 Sy* 原生可交互控件
 **最终实施建议：先做结构化 UI 校验与纯本地可编辑卡 → 打通一项真实 Feature 动作 → 合入渐进事件和媒体现有卡 → 最后扩大多功能/跨会话范围。** 不要第一批同时大改导航、38 屏视觉和后台执行内核，避免回归定位失焦。
 
 > R2 复核结论：方案通过 **方向与架构适配审查（有修订条件）**；**尚未通过实现验收、代码合并和真机验收**。实现前仍需在目标 PR 的最新 head 复核 #680 调度更新与所有权接口签名；方案和基线 SHA 不得被当作未来主线的永久事实。
+
+
+**S3-02 导航核心增量（2026-10-15）：** 引入中立 `UiHostSceneNavigation` 状态机，作为后续 Host 路由栈的决策内核：Host 提供真实 Scene 目录与显式深链键，包 manifest 仅限制可声明 Scene；PAGE/OVERLAY 可进入栈，SLOT/SYSTEM/hostProvided 和缺失页面必须明确拒绝，旧包的保存栈及被移除场景恢复失败时不可偷偷落回 V6。此 API **尚未接管 AppRoot/LocalHarnessScreen 或生产导航**，也不能单凭 manifest 声明证明 Renderer 真实实现。后续按 S3-01 定义和实现全应用 Renderer，按 S3-02 接入实际 7 路由、二级页、DeepLink intent 与系统返回；再做 S2/S5 双包真机验证。

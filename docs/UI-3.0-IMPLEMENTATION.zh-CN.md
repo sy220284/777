@@ -1,5 +1,7 @@
 # UI 3.0-R4 实施台账
 
+> **2026-10-15 S3 导航契约增量（待本提交 CI）**：新增 `ui-host/UiHostSceneNavigation.kt` 的 Host 所有权路由状态机及 App 单测，按当前 Pack manifest 和 Host 的 Scene 目录校验导航、返回、显式深链及恢复，不允许将 hostProvided 系统服务、SLOT、未覆盖页面或上一 UI 包的历史栈伪装成可渲染页面。S3-02 从 CODE_PENDING 调整为 CODE_PARTIAL；**全应用 UI Host、正式 Renderer、真实页面导航接线、跨包持久恢复仍未实现**。上一提交 `53e77262` 的 [CI #38668711715](https://github.com/sy220284/777/actions/runs/38668711715) 基础构建/单测/Android 16/17 通过，但不是 R4 双包交付验收，新增提交另行验证。
+
 > **2026-10-15 主线与 CI 复核（未验收）**：`main@cd0edcff` 的 V6.3 组件/图标与 #718 菜单、弹层、设置触控改动已经合入 #705 的 `192a4ceb`；无待合入的主线祖先提交。依据 [R4 第 13.7 节](design/ui3/PLAN-R4.zh-CN.md#137-2026-10-15按最新主线修订-r4-交付基线pr-705) 更新后续工作及视觉基线，旧 9 路由/38 屏非当前验收。**CI #38589559423 已失败**：x86 AndroidTest 编译有无效 `onNode` 导入、旧 `LocalSkillUiEntry` 类型；ARM64、JVM、静态与架构门禁通过；Android16/17 被共享测试制品阻断。修复源码与重新取得最终 SHA 回执前不能进入完成验收。
 
 > **主线同步后 S0 增量（2026-10-14，PR #705）**：根据真实 Chat/Work/Automation/Media/UiDocument Port 源码补充 21 个已存在命令的静态映射，现为 **65/173**；其余 **108** 项待映射。全部动作的恢复测试和端到端验收仍标 `PENDING_EVIDENCE`，本次不凭接口名称宣称用户旅程已经闭环。
