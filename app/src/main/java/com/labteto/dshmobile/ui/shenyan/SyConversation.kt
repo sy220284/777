@@ -133,6 +133,7 @@ fun SyConversationComposer(
     val shape = RoundedCornerShape(SyMetric.radiusCard)
     SyMaterialSurface(
         tier = SyMaterialTier.L2_BAR,
+        opticalGlass = true,
         modifier = modifier.testTag("ds-conversation-composer")
             .fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)
             .then(if (animateSize)
