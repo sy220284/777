@@ -116,9 +116,9 @@ internal class PersonaGalleryHistoryStore(
         return tailInternal(file, limit.coerceIn(1, MAX_HISTORY_PAGE))
     }
 
-    /** A byte boundary issued by the previous reverse read; no full-history materialization. */
+    /** A byte boundary issued by the previous reverse read; results remain oldest-first. */
     @Synchronized
-    fun pageBefore(entryId: String, storyId: String, before: Long?,
+    fun pageBeforeChronological(entryId: String, storyId: String, before: Long?,
         expectedLength: Long?, expectedModified: Long?, checkActive: () -> Unit): PersonaGalleryHistoryPage? {
         val file = archiveFile(entryId, storyId)
         repairTornTail(file)

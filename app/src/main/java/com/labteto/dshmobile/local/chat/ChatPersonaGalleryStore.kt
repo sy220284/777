@@ -83,7 +83,7 @@ class ChatPersonaGalleryStore internal constructor(
                 return UiPersonaGalleryHistoryReceipt.Stale
             decoded
         }
-        val page = history.pageBefore(entry, storyId, before?.offset, before?.length, before?.modified, checkActive)
+        val page = history.pageBeforeChronological(entry, storyId, before?.offset, before?.length, before?.modified, checkActive)
             ?: return UiPersonaGalleryHistoryReceipt.Stale
         val next = page.nextOffset?.let {
             json.encodeToString(HistoryCursor.serializer(), HistoryCursor(galleryId, storyId, story.updatedAt, it, page.archiveLength, page.archiveModified))

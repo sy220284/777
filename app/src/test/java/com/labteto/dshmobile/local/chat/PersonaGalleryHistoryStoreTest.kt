@@ -32,6 +32,32 @@ class PersonaGalleryHistoryStoreTest {
     }
 
     @Test
+    fun chronologicalHistoryPagesRemainOrderedWithoutOverlapAndRejectStaleCursor() {
+        val root = temporary.newFolder("paged-history")
+        val store = PersonaGalleryHistoryStore(root, json)
+        store.merge("entry", "story", (1L..75L).map { message("m$it", it) })
+
+        val newest = checkNotNull(store.pageBeforeChronological(
+            "entry", "story", null, null, null, {},
+        ))
+        assertEquals((44L..75L).map { "m$it" }, newest.messages.map { it.id })
+        val middle = checkNotNull(store.pageBeforeChronological(
+            "entry", "story", newest.nextOffset, newest.archiveLength, newest.archiveModified, {},
+        ))
+        assertEquals((12L..43L).map { "m$it" }, middle.messages.map { it.id })
+        val oldest = checkNotNull(store.pageBeforeChronological(
+            "entry", "story", middle.nextOffset, middle.archiveLength, middle.archiveModified, {},
+        ))
+        assertEquals((1L..11L).map { "m$it" }, oldest.messages.map { it.id })
+        assertEquals(null, oldest.nextOffset)
+
+        store.merge("entry", "story", listOf(message("m76", 76L)))
+        assertEquals(null, store.pageBeforeChronological(
+            "entry", "story", newest.nextOffset, newest.archiveLength, newest.archiveModified, {},
+        ))
+    }
+
+    @Test
     fun malformedArchiveRowIsSkippedWithDiagnosticEvidence() {
         val root = temporary.newFolder("malformed")
         val store = PersonaGalleryHistoryStore(root, json)
