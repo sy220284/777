@@ -22,7 +22,9 @@ internal fun resolveLocalWorkSkillGuidance(
     }
     // Selected SKILL.md is loaded directly for this model step; no extra skill(name)
     // discovery/tool call is required. Keep model history free of repeated instructions.
-    var remainingChars = 60_000
+    // Keep several pinned skills from overwhelming each model step. Each skill can still
+    // be retrieved in full through skill(name), including user-only skills explicitly pinned.
+    var remainingChars = 18_000
     val pinnedSkillInstructions = pinnedSkills.joinToString("\n\n") { (name, document) ->
         val excerpt = document.take(remainingChars.coerceAtLeast(0))
         remainingChars -= excerpt.length
