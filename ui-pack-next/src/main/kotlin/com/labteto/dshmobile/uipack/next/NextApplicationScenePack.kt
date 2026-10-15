@@ -12,6 +12,7 @@ import com.labteto.dshmobile.uicontract.*
 import com.labteto.dshmobile.uihost.UiApplicationScenePack
 import com.labteto.dshmobile.uihost.UiSceneRenderer
 import com.labteto.dshmobile.uihost.UiSceneRenderScope
+import com.labteto.dshmobile.uihost.UiSceneNavigationResult
 
 /** Feature Owners are injected by the App, never recreated inside the UI bundle. */
 data class NextApplicationFeaturePorts(
@@ -99,7 +100,8 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
     private fun GalleryRoute(scope: UiSceneRenderScope) {
         NextPersonaGalleryScene(
             gallery = ports.gallery, selection = ports.selection,
-            onBack = { scope.onBack() }, onStoryOpened = { scope.onNavigate(home) },
+            onBack = { scope.onBack() },
+            onStoryOpened = { scope.onNavigate(home) is UiSceneNavigationResult.Changed },
         )
     }
 }

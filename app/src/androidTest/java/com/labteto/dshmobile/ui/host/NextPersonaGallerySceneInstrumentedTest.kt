@@ -51,7 +51,7 @@ class NextPersonaGallerySceneInstrumentedTest {
         }
     }
 
-    private fun render(archive: Archive, selection: Selection, onStoryOpened: () -> Unit) {
+    private fun render(archive: Archive, selection: Selection, onStoryOpened: () -> Boolean) {
         compose.setContent {
             MaterialTheme {
                 NextPersonaGalleryScene(
@@ -66,7 +66,7 @@ class NextPersonaGallerySceneInstrumentedTest {
         val archive = Archive()
         val selection = Selection()
         var opened = 0
-        render(archive, selection) { opened++ }
+        render(archive, selection) { opened++; true }
         compose.onNodeWithText(title).assertExists()
         compose.onNodeWithText(story).assertExists()
         compose.onNodeWithText(context.getString(R.string.next_gallery_continue_story)).performClick()
@@ -84,7 +84,7 @@ class NextPersonaGallerySceneInstrumentedTest {
     @Test fun unboundSessionCannotStartArchivedStory() {
         val selection = Selection(canStart = false, identity = null)
         var opened = 0
-        render(Archive(), selection) { opened++ }
+        render(Archive(), selection) { opened++; true }
         compose.onNodeWithText(story).assertExists()
         compose.onNodeWithText(context.getString(R.string.next_gallery_continue_story)).performClick()
         compose.runOnIdle {
@@ -93,10 +93,23 @@ class NextPersonaGallerySceneInstrumentedTest {
         }
     }
 
+    @Test fun acceptedOwnerButRejectedHostNavigationDoesNotReplayStory() {
+        val selection = Selection()
+        var navigationCalls = 0
+        render(Archive(), selection) { navigationCalls++; false }
+        compose.onNodeWithText(story).assertExists()
+        compose.onNodeWithText(context.getString(R.string.next_gallery_continue_story)).performClick()
+        compose.onNodeWithText(context.getString(R.string.next_gallery_navigation_failed)).assertExists()
+        compose.runOnIdle {
+            assertEquals(1, selection.requests.size)
+            assertEquals(1, navigationCalls)
+        }
+    }
+
     @Test fun rejectedOwnerReceiptCannotNavigateAsIfStoryStarted() {
         val selection = Selection(outcome = UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY))
         var opened = 0
-        render(Archive(), selection) { opened++ }
+        render(Archive(), selection) { opened++; true }
         compose.onNodeWithText(story).assertExists()
         compose.onNodeWithText(context.getString(R.string.next_gallery_continue_story)).performClick()
         compose.onNodeWithText(context.getString(R.string.next_gallery_action_rejected)).assertExists()

@@ -32,7 +32,7 @@ fun NextPersonaGalleryScene(
     gallery: PersonaGalleryUiPort,
     selection: PersonaSelectionUiPort,
     onBack: () -> Unit,
-    onStoryOpened: () -> Unit,
+    onStoryOpened: () -> Boolean,
 ) {
     var refresh by remember { mutableIntStateOf(0) }
     var receipt by remember(gallery) { mutableStateOf<UiPersonaGalleryReadReceipt?>(null) }
@@ -41,6 +41,7 @@ fun NextPersonaGalleryScene(
     val unavailable = stringResource(R.string.next_gallery_unavailable)
     val unknown = stringResource(R.string.next_unknown)
     val rejected = stringResource(R.string.next_gallery_action_rejected)
+    val navigationFailed = stringResource(R.string.next_gallery_navigation_failed)
 
     LaunchedEffect(gallery, refresh) {
         receipt = null
@@ -92,8 +93,9 @@ fun NextPersonaGalleryScene(
                                                         PersonaSelectionUiCommand.StartStory(
                                                             id, persona.id, story.id, freshStory = false))) {
                                                         UiCommandReceipt.Accepted -> {
-                                                            feedback = null
-                                                            onStoryOpened()
+                                                            // The Owner has committed the story switch. A failed Host
+                                                            // transition must not repeat that irreversible operation.
+                                                            feedback = if (onStoryOpened()) null else navigationFailed
                                                         }
                                                         UiCommandReceipt.Queued,
                                                         UiCommandReceipt.OutcomeUnknown -> feedback = unknown
