@@ -158,7 +158,7 @@ internal fun LocalMediaStudioSheetContent(
         if (uri != null && selected != null) {
             val chosen = selected
             submit(chosen) {
-                viewModel.submitTranscribe(chosen, uri, sessionId, activeRevision?.sourceMessageId ?: sourceMessageId, activeRevision?.originId)
+                viewModel.submitTranscribe(chosen, uri, sessionId, if (activeRevision != null) activeRevision.sourceMessageId else sourceMessageId, activeRevision?.originId)
                 if (chosen.id == activeOfferId) onDelivered()
             }
         }
@@ -280,7 +280,7 @@ internal fun LocalMediaStudioSheetContent(
                     SyButton(text = stringResource(R.string.minimax_media_create_image),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            viewModel.submitImage(selected, prompt, ratio, sessionId, activeRevision?.sourceMessageId ?: sourceMessageId, activeRevision?.originId)
+                            viewModel.submitImage(selected, prompt, ratio, sessionId, if (activeRevision != null) activeRevision.sourceMessageId else sourceMessageId, activeRevision?.originId)
                             if (selected.id == activeOfferId) onDelivered()
                         } })
                 }
@@ -288,7 +288,7 @@ internal fun LocalMediaStudioSheetContent(
                     SyButton(text = stringResource(R.string.minimax_media_start_video),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            val task = viewModel.createVideo(selected, prompt, sessionId, activeRevision?.sourceMessageId ?: sourceMessageId, activeRevision?.originId)
+                            val task = viewModel.createVideo(selected, prompt, sessionId, if (activeRevision != null) activeRevision.sourceMessageId else sourceMessageId, activeRevision?.originId)
                             viewedVideoTaskId = task.id
                             onDelivered()
                         } })
@@ -403,7 +403,7 @@ internal fun LocalMediaStudioSheetContent(
                         enabled = !busy && prompt.isNotBlank() && voiceId.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            viewModel.submitSpeech(selected, prompt, voiceId, sessionId, activeRevision?.sourceMessageId ?: sourceMessageId, activeRevision?.originId)
+                            viewModel.submitSpeech(selected, prompt, voiceId, sessionId, if (activeRevision != null) activeRevision.sourceMessageId else sourceMessageId, activeRevision?.originId)
                             if (selected.id == activeOfferId) onDelivered()
                         } })
                     audioFile?.let { file ->
