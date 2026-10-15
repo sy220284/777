@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.model.LocalMediaKind
+import com.labteto.dshmobile.local.session.LocalMessageBlock
+import com.labteto.dshmobile.local.session.LocalMessageMediaSource
 import com.labteto.dshmobile.local.presentation.mediaCreativeDraft
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
@@ -22,6 +24,16 @@ class LocalMediaCreativeDraftTest {
         assertTrue(prompt.contains("微笑"))
         assertFalse(prompt.contains("今天很开心。"))
         assertFalse(prompt.contains("姓名不详"))
+    }
+
+    @Test fun editGeneratedImageActionExcludesUploadsAndToolImages() {
+        val modelImage = LocalMessageBlock.Image("image.png", "image/png", "生成图", 100L,
+            source = LocalMessageMediaSource.MODEL)
+        val uploaded = modelImage.copy(source = LocalMessageMediaSource.USER)
+        val toolImage = modelImage.copy(source = LocalMessageMediaSource.TOOL)
+        assertEquals(modelImage, editableGeneratedImage(listOf(uploaded, modelImage)))
+        assertEquals(null, editableGeneratedImage(listOf(uploaded, toolImage)))
+        assertEquals(null, editableGeneratedImage(listOf(LocalMessageBlock.Text("hello"))))
     }
 
     @Test fun transcriptionDoesNotReceiveChatText() {
