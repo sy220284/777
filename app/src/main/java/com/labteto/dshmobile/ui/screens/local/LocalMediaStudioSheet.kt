@@ -111,8 +111,19 @@ internal fun LocalMediaStudioSheetContent(
     // A revision may only inherit the same frozen provider+account route. For deleted or
     // re-keyed accounts, require an explicit choice before any paid submission is possible.
     val originalOffer = matchingRevision?.originalOffer(models)
+    // API-key rotation may keep the same profile ID; inspect the real key identity.
+    val originalAccountVerified by androidx.compose.runtime.produceState<Boolean?>(
+        initialValue = null, matchingRevision?.originId, originalOffer?.id
+    ) {
+        value = try {
+            matchingRevision != null && originalOffer != null &&
+                viewModel.matchesOriginalCredential(matchingRevision, originalOffer)
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { false }
+    }
     val selected = if (matchingRevision != null) {
-        if (chosenId.isBlank()) originalOffer else available.firstOrNull { it.id == chosenId }
+        if (chosenId.isBlank()) originalOffer?.takeIf { originalAccountVerified == true }
+        else available.firstOrNull { it.id == chosenId }
     } else LocalMediaCatalog.selectOffer(models, kind, preferredProfileId, chosenId.takeIf(String::isNotBlank))
     val manualRouteActive = chosenId.isNotBlank() && selected?.id == chosenId
     val activeOfferId by rememberUpdatedState(selected?.id)
@@ -144,6 +155,12 @@ internal fun LocalMediaStudioSheetContent(
         val originId = offer.id
         scope.launch {
             try {
+                // Recheck at submission time: account credentials can change while the sheet is open.
+                if (matchingRevision != null && chosenId.isBlank()) {
+                    check(viewModel.matchesOriginalCredential(matchingRevision, offer)) {
+                        "原创作账户凭据已变化，请重新选择创作账户"
+                    }
+                }
                 action()
             } catch (cancelled: CancellationException) {
                 throw cancelled
