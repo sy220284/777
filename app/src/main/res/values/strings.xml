@@ -1259,10 +1259,10 @@
     <string name="tasks_chat_hours_value">%1$d 小时</string>
     <string name="tasks_chat_times_value">%1$d 次</string>
     <string name="tasks_waiting_user_timing">等待你下一次回复后恢复</string>
-    <string name="chat_diary_title">人物日记</string>
-    <string name="chat_diary_subtitle">那些没有说出口的日常心绪</string>
-    <string name="chat_diary_expand_records">查看原始记录（%1$d）</string>
-    <string name="chat_diary_collapse_records">收起原始记录（%1$d）</string>
+    <string name="chat_diary_title">人物手记</string>
+    <string name="chat_diary_subtitle">写给自己的一点心里话</string>
+    <string name="chat_diary_expand_records">查看经历依据（%1$d）</string>
+    <string name="chat_diary_collapse_records">收起经历依据（%1$d）</string>
     <string name="chat_diary_start_browse">查找与筛选</string>
     <string name="chat_diary_finish_browse">返回日记</string>
     <string name="chat_diary_search_hint">搜索事件、感受或未说出口的念头</string>
@@ -1270,8 +1270,8 @@
     <string name="chat_diary_filter_direct">单聊</string>
     <string name="chat_diary_filter_group">群聊</string>
     <string name="chat_diary_filter_private">私密</string>
-    <string name="chat_diary_empty_title">还没有值得记下的经历</string>
-    <string name="chat_diary_empty_body">重要共同经历、关系变化与持续心绪会被精炼后写入这里。</string>
+    <string name="chat_diary_empty_title">还没有写下的心事</string>
+    <string name="chat_diary_empty_body">遇到真正留在心里的事，人物才会写下自己的想法。不是每天都必须有一篇。</string>
     <string name="chat_diary_no_character_title">还没有可查看的人物日记</string>
     <string name="chat_diary_no_character_body">先从人物库选择人物并开始聊天；有跨会话价值的经历会出现在这里。</string>
     <string name="chat_diary_no_match_title">没有匹配的日记</string>
@@ -1279,6 +1279,9 @@
     <string name="chat_diary_load_failed_title">日记暂时读取失败</string>
     <string name="chat_diary_load_failed_body">本机日记文件暂时无法读取。可以重试；原聊天与事件日志不会因此被删除。</string>
     <string name="chat_diary_feeling">当时的感受</string>
+    <string name="chat_diary_private_reflection">人物自己的日记正文</string>
+    <string name="chat_diary_private_voice">私密心声</string>
+    <string name="chat_diary_legacy_excerpt">经历摘记 · 旧记录</string>
     <string name="chat_diary_inner_thought">未说出口的心理活动</string>
     <string name="chat_diary_relationship_meaning">这件事对关系意味着什么</string>
     <string name="chat_diary_unresolved_echo">仍留着的余波</string>
