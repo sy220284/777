@@ -155,7 +155,7 @@ class ChatTurnRunnerPromptPartitionTest {
             userInput = "你还在生气吗？")
         assertTrue(ordinary.dynamicPrompt.contains("你目前怎么看对方"))
         val redirected = runner.prepareProfile(persona, state = state,
-            userInput = "先换个话题，聊聊天文吧")
+            userInput = "先换个话题")
         assertFalse(redirected.dynamicPrompt.contains("你目前怎么看对方"))
         assertTrue(redirected.stablePrompt.contains("喜欢研究天文"))
     }
