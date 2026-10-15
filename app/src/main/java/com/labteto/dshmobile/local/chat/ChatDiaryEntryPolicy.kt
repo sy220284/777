@@ -35,9 +35,16 @@ internal object ChatDiaryEntryPolicy {
      */
     private fun sanitizePrivateReflection(raw: String): String {
         val prose = raw.trim()
-        if (prose.length > ChatDiaryBounds.MAX_PRIVATE_REFLECTION_CHARS) return ""
-        if (listOf("用户", "模型", "系统提示", "AI助手", "作为角色").any(prose::contains)) return ""
-        return prose
+        // The word "模型" may refer to an actual model airplane or a character's job.
+        // Reject explicit platform-role narration, not unrelated everyday vocabulary.
+        if (listOf("用户", "系统提示", "AI助手", "作为角色", "作为语言模型").any(prose::contains)) return ""
+        val limit = ChatDiaryBounds.MAX_PRIVATE_REFLECTION_CHARS
+        if (prose.length <= limit) return prose
+        // Keep a completed thought instead of silently throwing away an otherwise
+        // useful entry, but never store an abruptly truncated half-sentence.
+        val withinLimit = prose.take(limit)
+        val end = withinLimit.indexOfLast { it in "。！？!?；\\n" }
+        return if (end >= 20) withinLimit.take(end + 1).trim() else ""
     }
 
     fun disclosureFor(request: ChatDiaryWriteRequest, delta: ChatDiaryDelta): ChatDiaryDisclosure {
