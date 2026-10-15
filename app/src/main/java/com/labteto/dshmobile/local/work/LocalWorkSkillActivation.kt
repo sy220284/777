@@ -15,7 +15,7 @@ internal fun resolveLocalWorkSkillGuidance(
             LocalPinnedInvocation.Kind.SKILL -> selection.id.takeIf { it in workspace.skills() }
                 ?.let { "技能：$it（先调用 skill(name) 加载完整规则）" }
         }
-    }.take(12).toList().takeIf(List<String>::isNotEmpty)?.joinToString("\n")?.let { choices ->
+    }.take(12).toList().takeIf { it.isNotEmpty() }?.joinToString("\n")?.let { choices ->
         """
             [用户明确固定的调用来源]
             下列连接器或技能由用户在聊天框中主动选择，后续轮次默认优先使用，直至用户移除；不必重新让模型猜测和搜索。只有当前已连接、已注册且获授权的工具才能实际执行，不要假装调用成功。
