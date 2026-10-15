@@ -601,13 +601,9 @@ internal fun PersonaDetails(persona: PersonaProfile) {
                 "valuesAndTradeoffs" -> R.string.persona_v4_values_tradeoffs
                 "subjectiveBeliefs" -> R.string.persona_v4_subjective_beliefs
                 "biography" -> R.string.persona_v4_biography
-                "definingChoices" -> R.string.persona_v4_defining_choices
-                "emotionalImprints" -> R.string.persona_v4_emotional_imprints
-                "lifeGravity" -> R.string.persona_v4_life_gravity
-                "unfinishedBusiness" -> R.string.persona_v4_unfinished_business
+
                 "relationships" -> R.string.persona_v4_relationships
-                "limitsAndCosts" -> R.string.persona_v4_limits_costs
-                "sensorySignature" -> R.string.persona_v4_sensory_signature
+
                 "preferencesAndHabits" -> R.string.persona_v4_preferences_habits
                 "voiceStyle" -> R.string.persona_v4_voice_style
                 "customFacts" -> R.string.persona_v4_custom_facts
