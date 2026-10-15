@@ -40,14 +40,14 @@ class ChatGptSessionManager @Inject constructor(
         val current = accounts.get(accountId) ?: error("ChatGPT 账户凭据不可用")
         requirePlanAccess(current)
         val now = System.currentTimeMillis() / 1_000L
-        if (current.accessTokenExpiresAtEpochSeconds > now + REFRESH_EARLY_SECONDS) {
+        if (!shouldRefreshChatGptToken(current, now)) {
             return current.accessToken
         }
         return refreshMutex.withLock {
             val latest = accounts.get(accountId) ?: error("ChatGPT 账户凭据不可用")
             requirePlanAccess(latest)
             val secondNow = System.currentTimeMillis() / 1_000L
-            if (latest.accessTokenExpiresAtEpochSeconds > secondNow + REFRESH_EARLY_SECONDS) {
+            if (!shouldRefreshChatGptToken(latest, secondNow)) {
                 return@withLock latest.accessToken
             }
             val refreshed = try {
@@ -171,6 +171,7 @@ class ChatGptSessionManager @Inject constructor(
                 scopes = grantedScopes,
                 accessTokenExpiresAtEpochSeconds = now + token.expiresInSeconds,
                 savedAtEpochSeconds = now,
+                earliestRefreshAtEpochSeconds = token.earliestRefreshAtEpochSeconds,
             )
             // Once a rotated token has been received, finish this local CAS even if the caller
             // cancels. The HTTP read remains cancellable; cancellation still reaches the caller.
@@ -221,6 +222,7 @@ class ChatGptSessionManager @Inject constructor(
                 idToken = root["id_token"]?.jsonPrimitive?.contentOrNull,
                 tokenType = root["token_type"]?.jsonPrimitive?.contentOrNull ?: "Bearer",
                 expiresInSeconds = expires.coerceAtLeast(60L),
+                earliestRefreshAtEpochSeconds = parseEarliestRefreshAt(root),
                 scopes = root["scope"]?.jsonPrimitive?.contentOrNull
                     .orEmpty()
                     .split(' ')
@@ -233,6 +235,15 @@ class ChatGptSessionManager @Inject constructor(
         }
     }
 
+    private fun parseEarliestRefreshAt(root: JsonObject): Long? {
+        val raw = root["earliest_refresh_at"]?.jsonPrimitive?.contentOrNull ?: return null
+        val parsed = raw.toLongOrNull()
+            ?: runCatching { java.time.Instant.parse(raw).epochSecond }.getOrNull()
+            ?: return null
+        val seconds = if (parsed > 1_000_000_000_000L) parsed / 1_000L else parsed
+        return seconds.takeIf { it > 0L }
+    }
+
     private fun requirePlanAccess(record: ChatGptAccountRecord) {
         require(record.sharingEnabled) {
             "ChatGPT 已登录，但套餐用量未启用或已失效，请重新启用套餐"
@@ -241,7 +252,6 @@ class ChatGptSessionManager @Inject constructor(
 
     private companion object {
         const val MAX_AUTH_RESPONSE_BYTES = 4 * 1024 * 1024
-        const val REFRESH_EARLY_SECONDS = 90L
         const val REVOKE_ATTEMPTS = 3
         const val REVOKE_RETRY_BASE_MILLIS = 300L
     }

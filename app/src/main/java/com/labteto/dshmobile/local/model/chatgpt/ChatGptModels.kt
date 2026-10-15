@@ -18,6 +18,7 @@ data class ChatGptAccountRecord(
     val scopes: Set<String> = emptySet(),
     val accessTokenExpiresAtEpochSeconds: Long,
     val savedAtEpochSeconds: Long,
+    val earliestRefreshAtEpochSeconds: Long? = null,
 ) {
     val sharingEnabled: Boolean
         get() = CHATGPT_PLAN_SCOPE in scopes && CHATGPT_RESOURCE_INVOKE_SCOPE in scopes
@@ -56,7 +57,17 @@ internal data class ChatGptTokenResponse(
     val tokenType: String,
     val expiresInSeconds: Long,
     val scopes: Set<String>,
+    val earliestRefreshAtEpochSeconds: Long? = null,
 )
+
+/** Preserve a still-valid token until the server's earliest permitted refresh time. */
+internal fun shouldRefreshChatGptToken(record: ChatGptAccountRecord, now: Long): Boolean {
+    if (record.accessTokenExpiresAtEpochSeconds > now + 90L) return false
+    val earliest = record.earliestRefreshAtEpochSeconds
+    if (earliest != null && now < earliest &&
+        record.accessTokenExpiresAtEpochSeconds > now + 5L) return false
+    return true
+}
 
 internal data class VerifiedChatGptIdentity(
     val issuer: String,

@@ -271,6 +271,7 @@ class ChatGptAuthCoordinator @Inject constructor(
                 scopes = token.scopes,
                 accessTokenExpiresAtEpochSeconds = now + token.expiresInSeconds,
                 savedAtEpochSeconds = now,
+                earliestRefreshAtEpochSeconds = token.earliestRefreshAtEpochSeconds,
             )
             accounts.put(record, select = true)
             hostIdentity.clearPendingClientId(issuedClientId)

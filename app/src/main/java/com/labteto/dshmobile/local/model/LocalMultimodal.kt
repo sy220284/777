@@ -543,7 +543,7 @@ internal fun redactModelImages(messages: List<JsonObject>): List<JsonObject> =
                 if (type == "input_file") {
                     add(buildJsonObject {
                         put("type", "input_file")
-                        obj["filename"]?.let { put("filename", it) }
+                        obj?.get("filename")?.let { put("filename", it) }
                         put("file_data", "[inline file bytes omitted]")
                     })
                 } else if (type == "image_url" || type == "video_url") {
