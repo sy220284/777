@@ -4,7 +4,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import com.labteto.dshmobile.local.LocalConversationUiPortComposition
@@ -18,7 +17,6 @@ import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.interaction.LocalApproval
 import com.labteto.dshmobile.local.interaction.LocalQuestion
 import com.labteto.dshmobile.local.model.LocalModelState
-import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.work.LocalWorkState
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.uicontract.UiCommandReceipt
@@ -116,7 +114,7 @@ class NextConversationOwnerPortIntegrationTest {
                 workMode = true, onClose = {})
         }
         compose.onNodeWithText("真实审批").assertExists()
-        val deny = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.next_deny)
+        val deny = InstrumentationRegistry.getInstrumentation().targetContext.getString(com.labteto.dshmobile.uipack.next.R.string.next_deny)
         compose.onNodeWithText(deny).performClick()
         compose.runOnIdle {
             assertEquals(listOf("owner-nonce-1" to false), approvals)
