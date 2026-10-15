@@ -15,7 +15,7 @@ import com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot
 import com.labteto.dshmobile.uicontract.UiSkillEditorSnapshot
 import com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot
 import com.labteto.dshmobile.uicontract.UiToolConnection
-import com.labteto.dshmobile.uicontract.UiSceneNavigationResult
+import com.labteto.dshmobile.uihost.UiSceneNavigationResult
 import com.labteto.dshmobile.uipack.next.NextToolsScene
 import com.labteto.dshmobile.uipack.next.NextToolsPage
 import com.labteto.dshmobile.uipack.next.R
