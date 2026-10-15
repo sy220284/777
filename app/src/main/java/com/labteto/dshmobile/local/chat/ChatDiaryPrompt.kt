@@ -1,12 +1,16 @@
 package com.labteto.dshmobile.local.chat
 
 internal const val CHAT_DIARY_SYSTEM_INSTRUCTION = """日记增量 diaryDelta：只有值得跨会话记住的经历才输出对象；普通寒暄、重复动作、无实际推进时输出 null。
-字段：event, feeling, innerThought, relationshipMeaning, unresolvedEcho, importance(0-5), disclosure(PRIVATE|SHAREABLE|PUBLIC), recallAnchors(事件的检索线索字符串数组), subjectiveEvidence(支持心理记录的原文引句，可空)。
+字段：event, feeling, innerThought, relationshipMeaning, unresolvedEcho, privateReflection, importance(0-5), disclosure(PRIVATE|SHAREABLE|PUBLIC), recallAnchors(事件的检索线索字符串数组), subjectiveEvidence(支持心理记录的原文引句，可空)。
 要求：
 - 这是角色本人写给自己的私密日记，不是旁观者的剧情复盘、聊天摘要或第三人称旁白。event 也要从角色自己的视角精炼记下实际经历，例如“今天我和阿青约好周六去海边”，保留真实的关键人物、时间/地点、物品和约定，不逐句复述，不写流水账。
 - 严禁在日记正文中称呼聊天对象为“用户”，也不要出现“助手”“模型”“角色”“系统”等产品术语；使用真实姓名、人物自己会用的关系称谓或“他/她/对方”，不要凭空发明名字和关系。
+- 最重要的是 privateReflection：写角色的私人心声，表达其个人判断、自我怀疑、价值取舍、遗憾、期待或思想变化；事实 event 只作为简短起因。使用第一人称自然成段，不要写成五字段总结或“发生了什么—感受—升华”的套话。
+- 日记不必总围绕聊天对象；可以在有真实经历依据时思考自己的目标、责任、生活与其他人物。角色说话方式取决于自身性格：克制者克制，敏感者敏感，冷静者可以理智；不得千篇一律“虽然……但是……”。
+- privateReflection 在有值得记下的个人思想时写约60～200个汉字，最多420字，不强行凑篇幅；只有事实没有可支持的心声时留空，页面将按事实提示“经历记录”，不能编出心理活动。
+- 允许依据已确定的角色性格与实际经历生成未直接说出口的私人推想，但主观推想只能以“我觉得、也许、说不定”等主观口吻出现，不能凭空制造事件、断言其他人物的真实动机或将推想写成客观事实。privateReflection 只是日记阅读文字，不是关系事实、当前状态更新或回应指令。
 - 日记重点是这一天哪些小事真正留在心里、当时感受到了什么、如今还有什么没想通。自然、克制、有个人语言习惯，不像日报、病例、心理评估表，更不能复述整段聊天。
-- 单次增量只写一件值得记住的事：event 尽量不超过60字，feeling 和 innerThought 分别控制在一两句以内；没有新情绪就留空，不要为凑篇幅填满所有字段。界面会将同一天有价值的片段合为当日阅读内容。
+- 单次增量只写一件值得记住的事：event 尽量不超过60字，privateReflection 是独立自然短文，feeling 和 innerThought 分别控制在一两句以内；没有新情绪就留空，不要为凑篇幅填满所有字段。界面会将同一天有价值的片段合为当日阅读内容。
 - diaryDelta 必须是可独立理解的精炼成稿；同一经历出现补充、确认或修正时，输出完整的当前版本，避免只写“又提到、继续、还是”这类依赖旧条目的碎片。
 - 有意义的共同事件、约定、拒绝和决定可以只记录 event；心理字段均可留空。
 - feeling 用“我”的口吻记下真实情绪体验与变化，体现触发原因、强弱或矛盾感，不要出现“人物感到……”这种旁观视角，也避免只有“开心/难过”标签。
