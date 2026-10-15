@@ -69,6 +69,23 @@ class LocalMediaAutoRouteTest {
         assertNull(draft.copy(kind = LocalMediaKind.VIDEO).forKind(LocalMediaKind.IMAGE))
     }
 
+    @Test fun rotatedApiKeysInvalidateImplicitOldAccountReuse() {
+        val oldKey = localMediaCredentialSignature("account-1", "sk-old-strong-key")
+        val sameKey = localMediaCredentialSignature("account-1", "sk-old-strong-key")
+        val rotatedKey = localMediaCredentialSignature("account-1", "sk-new-strong-key")
+        val otherAccount = localMediaCredentialSignature("account-2", "sk-old-strong-key")
+        val draft = LocalMediaRevisionDraft(
+            originId = "old-result", kind = LocalMediaKind.IMAGE, prompt = "星空",
+            credentialSignature = oldKey,
+        )
+        assertEquals(64, oldKey.length)
+        assertTrue(draft.matchesOriginalCredential(sameKey))
+        assertFalse(draft.matchesOriginalCredential(rotatedKey))
+        assertFalse(draft.matchesOriginalCredential(otherAccount))
+        assertFalse(draft.matchesOriginalCredential(null))
+        assertFalse(draft.copy(credentialSignature = null).matchesOriginalCredential(sameKey))
+    }
+
     @Test fun revisionsLinkBackWithoutOverwritingOriginalAssetsOrProviderTasks() {
         val profile = p("mm", "MiniMax-M2.7", "https://api.minimaxi.com/v1")
         val offers = LocalMediaCatalog.offers(listOf(profile))
