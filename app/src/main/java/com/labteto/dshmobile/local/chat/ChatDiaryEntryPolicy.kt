@@ -183,7 +183,7 @@ internal object ChatDiaryEntryPolicy {
         queryTerms: Set<String>,
         now: Long,
     ): ChatDiaryMatchScore {
-        val lexical = terms(entry.event + " " + entry.relationshipMeaning + " " + entry.unresolvedEcho + " " + entry.recallAnchors.joinToString(" "))
+        val lexical = terms(entry.event + " " + entry.relationshipMeaning + " " + entry.unresolvedEcho + " " + entry.privateReflection + " " + entry.recallAnchors.joinToString(" "))
             .count(queryTerms::contains)
         val phrase = if (queryCore.isBlank()) 0 else {
             (similarity(queryCore, searchText(entry)) * 100).toInt()
@@ -218,6 +218,7 @@ internal object ChatDiaryEntryPolicy {
             entry.innerThought,
             entry.relationshipMeaning,
             entry.unresolvedEcho,
+            entry.privateReflection,
             entry.recallAnchors.joinToString(" "),
         ).filter(String::isNotBlank).joinToString(" ")
 
