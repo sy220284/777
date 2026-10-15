@@ -661,7 +661,7 @@ internal fun ChatPersonaDialog(
             text = stringResource(if (addFieldsOpen) R.string.persona_v4_hide_field_picker
                 else R.string.persona_v4_add_field_picker),
             onClick = { addFieldsOpen = !addFieldsOpen },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag("personaAddFieldPicker"),
             variant = SyButtonVariant.Ghost,
         )
         if (addFieldsOpen) {
