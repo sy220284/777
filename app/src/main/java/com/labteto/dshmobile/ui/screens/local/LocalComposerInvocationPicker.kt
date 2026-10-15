@@ -31,6 +31,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.tools.LocalComposerInvocationOption
 import com.labteto.dshmobile.local.tools.LocalPinnedInvocation
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -64,32 +66,32 @@ internal fun LocalComposerInvocationPicker(
     ) {
         Box {
             IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(40.dp)) {
-                Icon(FeatherIcons.Plus, contentDescription = "添加或切换连接器与技能",
+                Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.composer_invocation_add),
                     tint = colors.textSecondary, modifier = Modifier.size(20.dp))
             }
             DropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { expanded = false; query = "" },
             ) {
-                Text("连接器与技能", color = colors.text,
+                Text(stringResource(R.string.composer_invocation_title), color = colors.text,
                     style = DsType.std14Strong.withReadingWeight(),
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text("搜索已连接服务或技能") },
+                    placeholder = { Text(stringResource(R.string.composer_invocation_search)) },
                     singleLine = true,
                     modifier = Modifier.width(286.dp).padding(horizontal = 8.dp),
                 )
                 if (entries.isEmpty()) {
-                    Text("暂无匹配项目，请先在工具页连接或安装", color = colors.textSecondary,
+                    Text(stringResource(R.string.composer_invocation_empty), color = colors.textSecondary,
                         style = DsType.small13.withReadingWeight(),
                         modifier = Modifier.padding(16.dp))
                 }
                 for (kind in listOf(LocalPinnedInvocation.Kind.CONNECTOR, LocalPinnedInvocation.Kind.SKILL)) {
                     val section = entries.filter { it.invocation.kind == kind }
                     if (section.isNotEmpty()) {
-                        Text(if (kind == LocalPinnedInvocation.Kind.CONNECTOR) "已连接的服务" else "已安装技能",
+                        Text(if (kind == LocalPinnedInvocation.Kind.CONNECTOR) stringResource(R.string.composer_invocation_connected) else stringResource(R.string.composer_invocation_installed),
                             color = colors.textSecondary, style = DsType.small13.withReadingWeight(),
                             modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp))
                         section.forEach { option ->
@@ -124,13 +126,13 @@ internal fun LocalComposerInvocationPicker(
                         }
                     }
                 }
-                Text("勾选后持续用于后续任务；再次点击取消固定",
+                Text(stringResource(R.string.composer_invocation_hint),
                     style = DsType.caption11.withReadingWeight(), color = colors.textSecondary,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
             }
         }
         if (pinned.isEmpty()) {
-            Text("选择连接器或技能", color = colors.textSecondary,
+            Text(stringResource(R.string.composer_invocation_select), color = colors.textSecondary,
                 style = DsType.caption11.withReadingWeight(),
                 modifier = Modifier.weight(1f))
         } else {
@@ -146,7 +148,7 @@ internal fun LocalComposerInvocationPicker(
                         color = if (option?.available == false) colors.selected else colors.primary.copy(alpha = 0.10f),
                         shape = RoundedCornerShape(16.dp),
                         border = BorderStroke(1.dp, colors.border),
-                        modifier = Modifier.semantics { contentDescription = "取消固定 $name" },
+                        modifier = Modifier.semantics { contentDescription = stringResource(R.string.composer_invocation_remove, name) },
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
