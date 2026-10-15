@@ -89,6 +89,10 @@ class McpToolBridgePluginTest {
         assertEquals("MCP_CONNECTION_BUSY", duplicate.errorCode)
         assertEquals("MCP_CONNECTION_BUSY", disconnect.errorCode)
         assertEquals(2, connections)
+        assertEquals(
+            listOf("guarded" to McpServerLifecycle.RECONNECTING),
+            plugin.lifecycleSnapshots().map { it.id to it.lifecycle },
+        )
         release.complete(Unit)
         assertFalse(running.await().isError)
         assertEquals(listOf("guarded"), plugin.serverSnapshots().map { it.id })
@@ -328,6 +332,10 @@ class McpToolBridgePluginTest {
 
         assertFalse(disconnect.isCompleted)
         assertFalse(closed)
+        assertEquals(
+            listOf("slow-server" to McpServerLifecycle.DISCONNECTING),
+            plugin.lifecycleSnapshots().map { it.id to it.lifecycle },
+        )
 
         release.complete(Unit)
         assertFalse(call.await().isError)
