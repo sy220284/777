@@ -190,8 +190,14 @@ class CharacterLifeRuntimeV3Test {
             storyContext = null,
         )
         assertTrue(projection.stablePrompt.contains("【原作来源】\n原神"))
-        assertTrue(projection.stablePrompt.contains("【当前剧情阶段】\n稻妻已与旅行者相识"))
+        // 未明确进入的故事阶段不能从人物静态描述旁路泄漏。
+        assertTrue(!projection.stablePrompt.contains("稻妻已与旅行者相识"))
+        assertTrue(!projection.dynamicPrompt.contains("稻妻已与旅行者相识"))
         assertTrue(!projection.stablePrompt.contains("【世界背景】"))
+        val entered = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+            .project(persona, ChatCharacterState(),
+                ChatContextState(storyStage = "稻妻已与旅行者相识"), "早上好", null)
+        assertTrue(entered.dynamicPrompt.contains("【当前剧情阶段】稻妻已与旅行者相识"))
         assertTrue(estimateModelTokens(projection.stablePrompt) <= 1_040)
     }
 
