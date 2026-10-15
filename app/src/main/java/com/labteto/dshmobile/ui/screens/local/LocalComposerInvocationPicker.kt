@@ -16,6 +16,7 @@ import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -107,13 +108,7 @@ internal fun LocalComposerInvocationPicker(
                                     }
                                 },
                                 leadingIcon = {
-                                    Icon(
-                                        if (kind == LocalPinnedInvocation.Kind.SKILL) FeatherIcons.BookOpen
-                                        else if (option.invocation.id == "github") FeatherIcons.GitBranch
-                                        else FeatherIcons.Globe,
-                                        contentDescription = null, tint = colors.primary,
-                                        modifier = Modifier.size(20.dp),
-                                    )
+                                    LocalInvocationIcon(option.invocation, Modifier.size(20.dp))
                                 },
                                 trailingIcon = {
                                     if (checked) Icon(FeatherIcons.CheckSquare, null,
@@ -156,13 +151,7 @@ internal fun LocalComposerInvocationPicker(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(5.dp),
                         ) {
-                            Icon(
-                                if (item.kind == LocalPinnedInvocation.Kind.SKILL) FeatherIcons.BookOpen
-                                else if (item.id == "github") FeatherIcons.GitBranch
-                                else FeatherIcons.Globe,
-                                contentDescription = null, tint = colors.primary,
-                                modifier = Modifier.size(15.dp),
-                            )
+                            LocalInvocationIcon(item, Modifier.size(15.dp))
                             Text(name, style = DsType.small13.withReadingWeight(),
                                 color = colors.text, maxLines = 1)
                             Icon(FeatherIcons.X, contentDescription = null,
@@ -172,5 +161,25 @@ internal fun LocalComposerInvocationPicker(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LocalInvocationIcon(
+    item: LocalPinnedInvocation,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalSyColors.current
+    when {
+        item.kind == LocalPinnedInvocation.Kind.SKILL ->
+            Icon(FeatherIcons.BookOpen, null, modifier = modifier, tint = colors.primary)
+        item.id.equals("github", ignoreCase = true) ->
+            Icon(painterResource(R.drawable.ic_connector_github), null,
+                modifier = modifier, tint = colors.text)
+        item.id.contains("figma", ignoreCase = true) ->
+            Icon(painterResource(R.drawable.ic_connector_figma), null,
+                modifier = modifier, tint = Color.Unspecified)
+        else ->
+            Icon(FeatherIcons.Globe, null, modifier = modifier, tint = colors.primary)
     }
 }
