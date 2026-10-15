@@ -110,7 +110,7 @@ private fun NextInvocationIcon(item: UiInvocationRef) {
     }
     if (painter != null) {
         Icon(painterResource(painter), contentDescription = null, modifier = Modifier.size(18.dp),
-            tint = if (item.id.equals("github", ignoreCase = true)) Color.Unspecified else Color.Unspecified)
+            tint = if (item.id.equals("github", ignoreCase = true)) androidx.compose.material3.MaterialTheme.colorScheme.onSurface else Color.Unspecified)
     } else {
         Icon(if (item.kind == UiInvocationKind.SKILL) Icons.Outlined.AutoStories
             else Icons.Outlined.Extension, contentDescription = null, modifier = Modifier.size(18.dp))
