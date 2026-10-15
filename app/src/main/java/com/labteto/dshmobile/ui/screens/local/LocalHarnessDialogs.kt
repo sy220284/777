@@ -709,7 +709,7 @@ internal fun ChatPersonaDialog(
         }
         // 社会关系之后才补充所属世界，自定义设定始终放在最后。
         PersonaTextField(
-            stringResource(R.string.local_persona_franchise),
+            stringResource(R.string.persona_v4_franchise_simple),
             franchise,
             { franchise = it },
             singleLine = true,
