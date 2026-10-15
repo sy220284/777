@@ -113,6 +113,29 @@ class LocalApplicationUiHostDecisionTest {
         assertTrue("settings.__unregistered" !in targets)
     }
 
+    @Test fun internalSceneRequestsUseHostWhitelistAndCanNavigateSettings() {
+        val full = pack("next", renderableScenes, renderableScenes)
+        val navigation = com.labteto.dshmobile.uihost.UiHostSceneNavigation(
+            required, full.manifest, UiSceneId("route.home"),
+            deepLinks = LocalApplicationSceneDeepLinks.targets,
+        )
+        val result = navigation.openDeepLink(navigation.initial, "settings.models")
+        assertTrue(result is com.labteto.dshmobile.uihost.UiSceneNavigationResult.Changed)
+        val page = (result as com.labteto.dshmobile.uihost.UiSceneNavigationResult.Changed)
+            .state.stack.last()
+        assertEquals(UiSceneId("settings.models"), page)
+        assertEquals(
+            com.labteto.dshmobile.uihost.UiSceneNavigationResult.Rejected(
+                com.labteto.dshmobile.uihost.UiSceneNavigationRejection.UNKNOWN_DEEP_LINK),
+            navigation.openDeepLink(navigation.initial, "system.permissions"),
+        )
+        assertEquals(
+            com.labteto.dshmobile.uihost.UiSceneNavigationResult.Rejected(
+                com.labteto.dshmobile.uihost.UiSceneNavigationRejection.UNKNOWN_DEEP_LINK),
+            navigation.openDeepLink(navigation.initial, "https://external.example"),
+        )
+    }
+
     @Test fun staleSelectionMustNotSilentlyRenderOldV6() {
         val decision = decideApplicationUi("uninstalled", emptyList(), requirements)
         assertTrue(decision is LocalApplicationUiDecision.Unavailable)
