@@ -47,7 +47,7 @@ class ChatModeVNextPresetSmokeTest {
             val view = projector.project(
                 preset.persona, ChatCharacterState(), ChatContextState(), "嗯", null,
             )
-            assertTrue("Missing personality for ${preset.id}", view.stablePrompt.contains("【稳定性格】"))
+            assertTrue("Missing personality for ${preset.id}", view.stablePrompt.contains("【性格】"))
             assertTrue("Missing values for ${preset.id}", view.stablePrompt.contains("【价值与取舍】"))
             val combined = view.stablePrompt + view.dynamicPrompt
             listOf("【本轮模式】", "【人物决策】", "先接住", "每轮都", "高分析").forEach {
