@@ -15,3 +15,7 @@ internal fun personaMemberSearchText(persona: PersonaProfile): String =
 internal fun personaMemberDescription(persona: PersonaProfile): String =
     persona.coreIdentity.takeIf(String::isNotBlank)
         ?: persona.factText(CharacterFactCategories.BIOGRAPHY)
+
+/** UI-facing read-only set of current editable fact categories; Chat owns the schema. */
+internal val personaEditableFactCategories: List<String>
+    get() = CharacterFactCategories.canonical

@@ -5,44 +5,6 @@ internal object LocalMiniMaxSkillCatalog {
     val retiredIds = setOf("minimax-android", "minimax-ios", "minimax-react-native", "minimax-flutter", "minimax-pdf", "minimax-gif")
     val retiredDesktopAdaptations = setOf("minimax-frontend", "minimax-fullstack", "minimax-shader", "minimax-pptx", "minimax-xlsx", "minimax-docx")
 
-    // Needed only to identify untouched historical SKILL.md files during migration.
-    fun legacyInstructions(id: String): String = """
-来源：MiniMax-AI/skills 官方开源技能（MIT），固定版本 60aaae52。
-使用时先读取工作区 .dsh/skills/${id}/upstream/SKILL.md，并按需读取其相邻 references、scripts 和模板；原文相对路径以 upstream 目录为基准。
-777 手机端通过现有文件、终端和模型工具执行。先核实当前工具和运行环境，再选择原文中可执行的流程；不得将 Claude Code、桌面浏览器、Xcode、Android Studio、.NET 或 LibreOffice 视为已经安装。
-本包提供方法、源码和配套文本资料；构建、渲染、安装依赖或调用外部 API 必须有实际执行结果。没有对应环境时，可完成源码或文档修改并清楚说明尚未运行的验证，不能宣称已构建或已渲染。
-Python 和 Node 的脚本按实际依赖执行；Word 的 .NET 流程需可用环境，可按 OOXML 资料使用现有 Python 工具生成或编辑，但须另行检查文件结构和内容。
-媒体调用需用户配置有效凭据及适用 API 权限。不将密钥上传到公开仓库；M Plan 凭据不代表图片、语音或音乐 API 权限。使用可用的凭据注入方式；缺少时明确告知配置需求。
-字体和图片采用现有素材或核实许可后获取；不虚构本包拥有未附带的素材。所有交付应区分已执行结果与仍待设备、浏览器或外部 API 验证的部分。
-    """.trimIndent()
-
-    /** Fingerprint of shipped pre-v3 media instructions, used only for safe upgrades. */
-    fun previousMediaDocument(id: String): String? {
-        val previous = when (id) {
-            "minimax-media" -> Triple("MiniMax 多媒体工具", "MiniMax 图片、视频、语音与音乐 API。", "MiniMax 图片、视频、语音与音乐 API")
-            "minimax-music-gen" -> Triple("MiniMax 音乐创作", "歌曲、伴奏与音乐生成。", "歌曲、伴奏与音乐生成")
-            "minimax-playlist" -> Triple("MiniMax 歌单创作", "歌单、曲风与封面创作。", "歌单、曲风与封面创作")
-            else -> return null
-        }
-        val content = """
-来源：MiniMax-AI/skills，基于固定版本 60aaae52 的设计资料，由 777 改造成手机执行流程。
-先读取 .dsh/skills/$id/MOBILE.md，按照其中手机端实际可用的文件、Python、Node 和预览流程执行；详细资料按该文档链接读取。
-先核实手机端环境，不假定桌面工具可用；未执行的构建或渲染不得声称完成。
-${if (id == "minimax-media") "产物必须实际写入工作区并验证。用户可自行通过受控配置方式提供 MiniMax 媒体 CLI 凭据；明确授权且凭据及媒体 API 权限实际可用时直接按要求执行，不得仅因技能默认建议拒绝；缺少配置时说明具体配置方式。聊天套餐不自动具备媒体 API 权限；不把密钥写入公开仓库、提示、日志或生成文件。" else "实际写入并验证产物；外部 API 权限须核实，聊天套餐不等于媒体 API 权限，密钥不得泄露。"}
-        """.trimIndent()
-        return buildLocalSkillDocument(id, previous.second, content, previous.third, previous.first)
-    }
-
-    fun previousLegacyDocument(id: String): String? {
-        val previous = when (id) {
-            "minimax-media" -> Triple("MiniMax 多媒体工具", "MiniMax 图片、视频、语音与音乐 API。", "MiniMax 图片、视频、语音与音乐 API")
-            "minimax-music-gen" -> Triple("MiniMax 音乐创作", "歌曲、伴奏与音乐生成。", "歌曲、伴奏与音乐生成")
-            "minimax-playlist" -> Triple("MiniMax 歌单创作", "歌单、曲风与封面创作。", "歌单、曲风与封面创作")
-            else -> return null
-        }
-        return buildLocalSkillDocument(id, previous.second, legacyInstructions(id), previous.third, previous.first)
-    }
-
     val entries = listOf(
         LocalPresetSkill("minimax-media", "MiniMax 媒体创作", "利用已配置的 MiniMax 媒体 API 生成图片、视频、语音与音乐。", """
             用途：按用户描述创作图片、短视频、语音配音或音乐，并取得真实媒体文件。

@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local.presentation
 
 import android.net.Uri
 import com.labteto.dshmobile.local.model.LocalMediaApiClient
+import com.labteto.dshmobile.local.model.LocalModelCredentialResolver
+import com.labteto.dshmobile.local.model.LocalMediaRevisionDraft
 import com.labteto.dshmobile.local.model.LocalMediaCatalog
 import com.labteto.dshmobile.local.model.LocalMediaCreationJob
 import com.labteto.dshmobile.local.model.LocalMediaDeliveryPhase
@@ -45,6 +47,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     private val miniMax: MiniMaxNativeMediaClient,
     private val api: LocalMediaApiClient,
     private val store: LocalMediaStore,
+    private val credentialResolver: LocalModelCredentialResolver,
 ) {
     companion object { const val PAGE_SIZE = LocalMediaStore.PAGE_SIZE }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO +
@@ -74,20 +77,34 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         }
     }
 
+    suspend fun matchesOriginalCredential(draft: LocalMediaRevisionDraft, offer: LocalMediaOffer): Boolean =
+        draft.originalOffer(listOf(offer)) != null &&
+            draft.matchesOriginalCredential(credentialResolver.mediaCredentialSignature(offer.profile))
+
     suspend fun voices(offer: LocalMediaOffer): List<LocalMediaVoice> {
         validate(offer, LocalMediaKind.SPEECH)
-        return when (offer.provider) {
+        return LocalMediaVoiceLabels.localize(offer, when (offer.provider) {
             LocalMediaProvider.MINIMAX -> miniMax.systemVoices(offer.profile).map { LocalMediaVoice(it.id, it.name) }
             LocalMediaProvider.OPENAI -> listOf("alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova",
                 "sage", "shimmer", "verse", "marin", "cedar").map { LocalMediaVoice(it, it) }
             else -> error("此服务商未接入配音")
-        }
+        })
     }
 
-    suspend fun submitImage(offer: LocalMediaOffer, prompt: String, ratio: String, sessionId: String): LocalMediaCreationJob {
+    suspend fun submitImage(offer: LocalMediaOffer, prompt: String, ratio: String, sessionId: String, sourceMessageId: String? = null, revisionOf: String? = null, editSourceImageId: String? = null): LocalMediaCreationJob {
         validate(offer, LocalMediaKind.IMAGE); require(prompt.isNotBlank())
-        return submit(offer, sessionId, prompt) { id ->
-            val result = when (offer.provider) {
+        // Resolve the source before creating the paid receipt. Missing images must never
+        // silently fall back to text-to-image and spend credits on the wrong operation.
+        val sourceImage = editSourceImageId?.let { id -> withContext(Dispatchers.IO) {
+            require(offer.provider == LocalMediaProvider.OPENAI) { "当前模型不支持原图编辑，请选择支持的图片模型" }
+            val previous = store.result(id) ?: error("原图片已删除，无法以原图编辑")
+            require(previous.kind == LocalMediaKind.IMAGE.name) { "原记录不是图片" }
+            store.file(previous.fileName) ?: error("本地原图已不可用，请切换为重新画图")
+        } }
+        return submit(offer, sessionId, prompt, sourceMessageId, revisionOf) { id ->
+            val result = if (sourceImage != null) {
+                api.editImage(offer, prompt, ratio, sourceImage)
+            } else when (offer.provider) {
                 LocalMediaProvider.MINIMAX -> com.labteto.dshmobile.local.model.LocalMediaImageResult(url = miniMax.generateImage(offer.profile, prompt, ratio))
                 else -> api.image(offer, prompt, ratio)
             }
@@ -97,35 +114,39 @@ class LocalMediaCreationRuntime @Inject internal constructor(
                 catch (cancelled: CancellationException) { throw cancelled }
                 catch (failure: Exception) { AppLog.warn("MediaCreation", "save_generated_image", failure); null }
             }
-            store.addResult(offer, LocalMediaKind.IMAGE, sessionId, prompt, id, file = file, link = result.url.takeIf { file == null })
+            store.addResult(offer, LocalMediaKind.IMAGE, sessionId, prompt, id, file = file, link = result.url.takeIf { file == null }, sourceMessageId = sourceMessageId, imageRatio = ratio, revisionOf = revisionOf)
         }
     }
-    suspend fun submitSpeech(offer: LocalMediaOffer, text: String, voice: String, sessionId: String): LocalMediaCreationJob {
+    suspend fun submitSpeech(offer: LocalMediaOffer, text: String, voice: String, sessionId: String, sourceMessageId: String? = null, revisionOf: String? = null): LocalMediaCreationJob {
         validate(offer, LocalMediaKind.SPEECH); require(text.isNotBlank() && voice.isNotBlank())
-        return submit(offer, sessionId, text) { id ->
+        return submit(offer, sessionId, text, sourceMessageId, revisionOf) { id ->
             val file = when (offer.provider) {
                 LocalMediaProvider.MINIMAX -> miniMax.synthesizeSpeech(offer.profile, text, voice)
                 LocalMediaProvider.OPENAI -> api.speech(offer, text, voice)
                 else -> error("此服务商未接入配音")
             }
             markMediaProviderSucceeded()
-            store.addResult(offer, LocalMediaKind.SPEECH, sessionId, text, id, file = file)
+            store.addResult(offer, LocalMediaKind.SPEECH, sessionId, text, id, file = file, sourceMessageId = sourceMessageId, voiceId = voice, revisionOf = revisionOf)
         }
     }
-    suspend fun submitTranscribe(offer: LocalMediaOffer, uri: Uri, sessionId: String): LocalMediaCreationJob {
+    suspend fun submitTranscribe(offer: LocalMediaOffer, uri: Uri, sessionId: String, sourceMessageId: String? = null, revisionOf: String? = null): LocalMediaCreationJob {
         validate(offer, LocalMediaKind.TRANSCRIBE)
-        return submit(offer, sessionId, null) { id ->
+        return submit(offer, sessionId, null, sourceMessageId, revisionOf) { id ->
             val text = when (offer.provider) {
                 LocalMediaProvider.MINIMAX -> miniMax.transcribe(offer.profile, uri)
                 LocalMediaProvider.OPENAI -> api.transcription(offer, uri)
                 else -> error("此服务商未接入语音转写")
             }
             markMediaProviderSucceeded()
-            store.addResult(offer, LocalMediaKind.TRANSCRIBE, sessionId, operationId = id, text = text)
+            store.addResult(offer, LocalMediaKind.TRANSCRIBE, sessionId, operationId = id, text = text, sourceMessageId = sourceMessageId, revisionOf = revisionOf)
         }
     }
-    private suspend fun submit(offer: LocalMediaOffer, sessionId: String, prompt: String?, execute: suspend (String) -> Unit): LocalMediaCreationJob {
-        val job = withContext(Dispatchers.IO) { store.beginCreation(offer, sessionId, prompt) }
+    private suspend fun submit(offer: LocalMediaOffer, sessionId: String, prompt: String?, sourceMessageId: String?, revisionOf: String? = null, execute: suspend (String) -> Unit): LocalMediaCreationJob {
+        val signature = credentialResolver.mediaCredentialSignature(offer.profile)
+            ?: error("当前创作账户 API Key 不可用，请重新选择账户")
+        val job = withContext(Dispatchers.IO) {
+            store.beginCreation(offer, sessionId, prompt, sourceMessageId, revisionOf, signature)
+        }
         scope.launch(LocalMediaRequestAdmission({ store.requestStarted(job.id) }, { store.providerSucceeded(job.id) })) {
             try { execute(job.id) }
             catch (cancelled: CancellationException) { store.creationFailure(job.id, cancelled); throw cancelled }
@@ -133,9 +154,11 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         }
         return job
     }
-    suspend fun createVideo(offer: LocalMediaOffer, prompt: String, sessionId: String? = null): LocalMediaVideoTask {
+    suspend fun createVideo(offer: LocalMediaOffer, prompt: String, sessionId: String? = null, sourceMessageId: String? = null, revisionOf: String? = null): LocalMediaVideoTask {
         validate(offer, LocalMediaKind.VIDEO); require(prompt.isNotBlank())
-        val task = withContext(Dispatchers.IO) { store.beginVideo(offer, sessionId, prompt) }
+        val task = withContext(Dispatchers.IO) { store.beginVideo(offer, sessionId, prompt, sourceMessageId, revisionOf,
+            credentialResolver.mediaCredentialSignature(offer.profile)
+                ?: error("当前创作账户 API Key 不可用，请重新选择账户")) }
         scope.launch {
             try {
                 val external = when (offer.provider) {
@@ -158,6 +181,14 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         validate(offer, LocalMediaKind.VIDEO)
         val task = store.video(taskId) ?: error("视频任务不存在或已删除")
         require(task.belongsTo(offer)) { "请恢复任务原账户配置后查询" }
+        // New tasks carry a key identity; read-only polling must not cross accounts.
+        // Legacy tasks lack this field: preserve explicit user-initiated GET polling
+        // on the matching original route rather than disabling historical tasks.
+        if (task.credentialSignature != null) {
+            require(task.credentialSignature == credentialResolver.mediaCredentialSignature(offer.profile)) {
+                "视频任务原账户凭据已变化，不能用新账户查询旧服务商任务"
+            }
+        }
         require(task.phase in setOf(LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING, LocalMediaVideoPhase.SUCCEEDED)) { "任务没有可查询的服务商编号" }
         val id = task.providerTaskId ?: error("服务商尚未确认任务编号")
         try {

@@ -50,6 +50,7 @@ class PromptQualityContractTest {
     fun diaryKeepsEvidenceAndDisclosureBounds() {
         assertTrue(CHAT_DIARY_SYSTEM_INSTRUCTION.contains("subjectiveEvidence"))
         assertTrue(CHAT_DIARY_SYSTEM_INSTRUCTION.contains("PRIVATE"))
-        assertTrue(CHAT_DIARY_SYSTEM_INSTRUCTION.contains("不套用统一情绪"))
+        assertTrue(CHAT_DIARY_SYSTEM_INSTRUCTION.contains("privateReflection"))
+        assertTrue(CHAT_DIARY_SYSTEM_INSTRUCTION.contains("第一人称"))
     }
 }

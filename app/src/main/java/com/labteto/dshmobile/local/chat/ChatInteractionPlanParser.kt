@@ -54,14 +54,21 @@ internal class ChatInteractionPlanParser(
             ?.takeIf { it.isString }?.content.orEmpty()
         val diaryImportance = (diary?.get("importance") as? kotlinx.serialization.json.JsonPrimitive)
             ?.intOrNull ?: 0
-        val diaryHasPerspective = listOf("feeling", "innerThought").any { name ->
+        val diaryHasPerspective = listOf("feeling", "innerThought", "privateReflection").any { name ->
             (diary?.get(name) as? kotlinx.serialization.json.JsonPrimitive)
                 ?.takeIf { it.isString }?.content?.isNotBlank() == true
         }
-        // Only a substantive diary can independently justify processing a pending turn.
-        // Reply suggestions are generated in a separate flow and cannot mask a bad patch.
-        val hasDiary = diaryEvent.trim().length >= 6 && diaryImportance >= 2 &&
-            diaryHasPerspective
+        val diaryReflection = (diary?.get("privateReflection") as? kotlinx.serialization.json.JsonPrimitive)
+            ?.takeIf { it.isString }?.content.orEmpty()
+        val shortAnchorWithContext = diaryReflection.isNotBlank() &&
+            (diaryImportance >= 3 || diaryReflection.trim().length >= 36)
+        val diarySignificance = (normalized["turnSignificance"]
+            as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty().uppercase()
+        // Keep standalone diary-only patches viable for a grounded change of outlook,
+        // while rejecting NONE and a short event without substantive reflection.
+        val hasDiary = diaryImportance >= 2 && diaryHasPerspective &&
+            diarySignificance != "NONE" &&
+            diaryEvent.trim().length >= (if (shortAnchorWithContext) 3 else 6)
         // A model can include system-owned fields (scene, evolution, lifeState) as
         // decoration. Those fields are intentionally ignored and must not turn a
         // valid no-op result into a retry loop. Reject only an unusable requested

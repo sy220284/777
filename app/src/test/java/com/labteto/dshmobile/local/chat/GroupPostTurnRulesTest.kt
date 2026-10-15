@@ -20,4 +20,16 @@ class GroupPostTurnRulesTest {
         assertTrue(shared.isBlank())
         assertEquals(source, compact)
     }
+    @Test fun actualPersonaPromptsShareTailRulesWithoutLeakingCharacterState() {
+        val builder = ChatInteractionPromptBuilder()
+        val first = builder.prompt(PersonaProfile(name = "甲"), ChatCharacterState(mood = "开心"), "问候", "你好")
+        val second = builder.prompt(PersonaProfile(name = "乙"), ChatCharacterState(mood = "疲倦"), "问候", "晚上好")
+        val (shared, contexts) = compactGroupPostTurnRules(listOf(first, second))
+        assertTrue(shared.contains("stateEvidence"))
+        assertTrue(contexts[0].contains("开心"))
+        assertTrue(contexts[1].contains("疲倦"))
+        assertFalse(contexts[0].contains("疲倦"))
+        assertFalse(contexts[1].contains("开心"))
+    }
+
 }

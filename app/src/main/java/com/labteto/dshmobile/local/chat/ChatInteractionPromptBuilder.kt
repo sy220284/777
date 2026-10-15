@@ -107,7 +107,7 @@ internal class ChatInteractionPromptBuilder {
         appendLine("- 用户说不再讨论某话题，不等于该事件从历史中删除；应停止把它当成本轮目标，后续明确重新提起时仍可回忆。")
         appendLine("- resolvedContinuityIds 只填写本轮已完成/撤销的已定事项或待续事件编号；每个编号必须由本批用户真实原话支持且已从连续性活动列表退出，不能猜编号、不能只因语义相似就删除。")
         appendLine("- continuity 只保留当前有效的关键事件、决定和待续事项，合并重复，不复制旧台词。")
-        appendLine("- NONE=无需记录显著长期事件，但仍必须更新本轮有证据的短期状态、结清与纠正；MINOR=有短期或连续性事件；MAJOR=重大关系事件、共同经历或稳定事实。")
+        appendLine("- NONE=无值得长期记住的经历或人物思想变化，但仍须更新有依据的短期状态、结清与纠正；MINOR=有值得延续的小事件或角色因真实经历形成持续的个人思想变化；MAJOR=重大关系事件、共同经历或稳定事实。普通寒暄无需日记，思想变化也不得虚构触发它的经历。")
         appendLine("- NONE 下新增非空状态时须在 stateEvidence 提供本轮双方真实原话。显式空字段清理不受重要程度阻止；不能编造新状态。")
         appendLine("- suggestions 固定为空。")
     }.trim()

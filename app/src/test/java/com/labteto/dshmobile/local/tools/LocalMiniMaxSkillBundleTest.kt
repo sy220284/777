@@ -15,7 +15,7 @@ class LocalMiniMaxSkillBundleTest {
         }
     }
 
-    @Test fun installsOnlyMobileMediaSkillsAndPreservesUserEdits() {
+    @Test fun installsOnlyMobileMediaSkillsAndUpdatesBuiltIns() {
         val root = Files.createTempDirectory("minimax-media-skills").toFile()
         try {
             val workspace = LocalWorkspace(root)
@@ -40,7 +40,8 @@ class LocalMiniMaxSkillBundleTest {
             store.remove("minimax-playlist")
             store.seedOnce()
             assertFalse(workspace.skills().contains("minimax-playlist"))
-            assertTrue(store.readDocument("minimax-music-gen").contains("用户补充"))
+            assertFalse(store.readDocument("minimax-music-gen").contains("用户补充"))
+            assertTrue(store.readDocument("minimax-music-gen").contains("用途："))
             store.install("minimax-playlist")
             assertTrue(workspace.readModelSkill("minimax-playlist").contains("歌单"))
         } finally { root.deleteRecursively() }
@@ -71,22 +72,22 @@ class LocalMiniMaxSkillBundleTest {
         } finally { root.deleteRecursively() }
     }
 
-    @Test fun untouchedMediaGuideUpgradesButUserEditedGuideIsPreserved() {
-        val root = Files.createTempDirectory("minimax-guides-v3").toFile()
+    @Test fun existingMediaSkillAlwaysUpgradesToBundledVersion() {
+        val root = Files.createTempDirectory("minimax-guides-current").toFile()
         try {
             val workspace = LocalWorkspace(root)
             LocalSkillStore(workspace).seedOnce()
-            val oldMedia = requireNotNull(LocalMiniMaxSkillCatalog.previousMediaDocument("minimax-media"))
-            val editedMusic = requireNotNull(LocalMiniMaxSkillCatalog.previousMediaDocument("minimax-music-gen")) +
-                "\n用户自己的做法\n"
-            workspace.write(".dsh/skills/minimax-media/SKILL.md", oldMedia)
-            workspace.write(".dsh/skills/minimax-music-gen/SKILL.md", editedMusic)
+            workspace.write(".dsh/skills/minimax-media/SKILL.md", "旧版本说明或个人改写")
+            workspace.write(".dsh/skills/minimax-music-gen/SKILL.md", "旧版音乐说明")
+            workspace.write(".dsh/skills/my-owned/SKILL.md", "---\\ndescription: owned\\n---\\n私有技能")
             val store = LocalSkillStore(workspace, ::bundle)
             store.seedOnce()
             assertTrue(store.readDocument("minimax-media").contains("用途："))
-            assertEquals(editedMusic, store.readDocument("minimax-music-gen"))
+            assertTrue(store.readDocument("minimax-music-gen").contains("用途："))
+            assertTrue(workspace.readSkill("my-owned").contains("私有技能"))
+            workspace.write(".dsh/skills/minimax-media/SKILL.md", "任意旧内容")
             store.seedOnce()
-            assertEquals(editedMusic, store.readDocument("minimax-music-gen"))
+            assertTrue(store.readDocument("minimax-media").contains("用途："))
         } finally { root.deleteRecursively() }
     }
 

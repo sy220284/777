@@ -22,7 +22,7 @@ internal fun withWorkRuntimeContext(
         .containsMatchIn(task)
     val asksHistory = Regex("历史|之前|上次|过去|恢复|追溯|session|checkpoint|history", RegexOption.IGNORE_CASE)
         .containsMatchIn(task)
-    val asksUsage = Regex("token|消耗|用量|账单|统计|usage|预算", RegexOption.IGNORE_CASE)
+    val asksUsage = Regex("token|模型.{0,10}(消耗|用量|账单|统计|预算)|(?:消耗|用量|账单|统计|预算).{0,10}(模型|token|上下文)|上下文.{0,8}(用量|窗口|预算)|usage", RegexOption.IGNORE_CASE)
         .containsMatchIn(task)
     val asksCode = Regex("代码|工作区|文件|仓库|脚本|终端|构建|测试|github|git|npm|python|node|shell|bash|code|build", RegexOption.IGNORE_CASE)
         .containsMatchIn(task)

@@ -53,7 +53,7 @@ internal fun relevantSkillIdsForTask(input: String): Set<String> {
         "longform-outline" to "大纲|小说|章节|故事规划|剧本|长篇|伏笔|outline|novel",
         "document-summary" to "总结文档|总结文件|摘要|会议纪要|提炼|总结材料|summarize|summary",
         "research-check" to "调研|核实资料|资料研究|事实查证|来源|文献|research|fact.check",
-        "code-review" to "代码审查|审计代码|审计一遍|检查代码|检查PR|审查PR|评审|PR|review|pull.request",
+        "code-review" to "代码审查|审计代码|审计一遍|检查代码|检查PR|审查PR|评审|\\bPR\\b|review|pull[\\s-]*request",
         "bug-investigation" to "故障|报错|异常|崩溃|排查|bug|crash|debug|error",
         "data-insights" to "数据分析|数据统计|报表|趋势分析|指标|统计口径|analytics|data.insight",
         "translation-localization" to "翻译|本地化|译文|术语统一|translate|translation|localization",

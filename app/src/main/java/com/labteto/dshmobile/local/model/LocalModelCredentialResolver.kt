@@ -9,6 +9,8 @@ import com.labteto.dshmobile.local.model.chatgpt.ChatGptSessionManager
 import com.labteto.dshmobile.local.model.chatgpt.isUsableChatGptPlanBinding
 import javax.inject.Inject
 import javax.inject.Singleton
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,6 +29,15 @@ data class LocalCredentialDiagnostic(
     val planScopeGranted: Boolean? = null,
     val resourceInvokeGranted: Boolean? = null,
 )
+
+/** Non-reversible identity of an API key, never a stored token or OAuth access token. */
+internal fun localMediaCredentialSignature(profileId: String, apiKey: String): String {
+    val algorithm = "HmacSHA256"
+    val mac = Mac.getInstance(algorithm)
+    mac.init(SecretKeySpec(apiKey.toByteArray(Charsets.UTF_8), algorithm))
+    return mac.doFinal("media-credential:${profileId}".toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+}
 
 @Singleton
 class LocalModelCredentialResolver @Inject constructor(
@@ -48,6 +59,11 @@ class LocalModelCredentialResolver @Inject constructor(
 
     fun clearActive() { _activeProfile.value = null }
     fun active(): LocalModelProfile? = _activeProfile.value
+
+    suspend fun mediaCredentialSignature(profile: LocalModelProfile): String? =
+        if (profile.authKind != LocalModelAuthKind.API_KEY) null
+        else apiKeys.getFor(profile.id)?.takeIf(String::isNotBlank)
+            ?.let { localMediaCredentialSignature(profile.id, it) }
 
     suspend fun hasCredential(profile: LocalModelProfile): Boolean =
         when (profile.authKind) {

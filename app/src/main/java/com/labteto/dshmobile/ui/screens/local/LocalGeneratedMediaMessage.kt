@@ -12,10 +12,17 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.media.MediaPlayer
+import android.media.MediaMetadataRetriever
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
 import android.widget.MediaController
 import android.widget.VideoView
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,6 +32,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,15 +42,19 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
@@ -54,11 +66,13 @@ import com.labteto.dshmobile.local.model.LocalMediaCreationPhase
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalMediaOffer
 import com.labteto.dshmobile.local.model.LocalMediaResult
+import com.labteto.dshmobile.local.model.LocalMediaRevisionDraft
 import com.labteto.dshmobile.local.model.LocalMediaVideoPhase
 import com.labteto.dshmobile.local.model.LocalMediaVideoTask
 import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -99,7 +113,7 @@ internal fun LocalCreationJobMessageRow(
     }
     MediaMessageCard(
         title = resources.getString(phase),
-        subtitle = "${job.provider} · ${job.model}",
+        subtitle = resources.getString(if (job.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
     ) {
         job.prompt?.let { prompt ->
             Text(prompt, style = DsType.small13.withReadingWeight(),
@@ -135,42 +149,37 @@ internal fun LocalGeneratedMediaResultRow(
     result: LocalMediaResult,
     viewModel: LocalMediaStudioViewModel,
     onInsertText: (String) -> Unit,
+    onRevise: (LocalMediaRevisionDraft) -> Unit = {},
 ) {
     val resources = LocalResources.current
     val context = LocalContext.current
     val file = remember(result.id, result.fileName) { viewModel.resultFile(result) }
     var error by remember(result.id) { mutableStateOf<String?>(null) }
+    var showImageDetail by remember(result.id) { mutableStateOf(false) }
     val label = when (result.kind) {
         LocalMediaKind.IMAGE.name -> resources.getString(R.string.media_chat_image_done)
         LocalMediaKind.SPEECH.name -> resources.getString(R.string.media_chat_speech_done)
         LocalMediaKind.TRANSCRIBE.name -> resources.getString(R.string.media_chat_transcript_done)
         else -> resources.getString(R.string.media_chat_generic_result)
     }
-    MediaMessageCard(title = label, subtitle = "${result.provider} · ${result.model}") {
-        result.description?.takeIf(String::isNotBlank)?.let {
-            Text(it, style = DsType.small13.withReadingWeight(),
-                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, maxLines = 3,
-                overflow = TextOverflow.Ellipsis)
-        }
+    MediaMessageCard(title = label,
+        subtitle = resources.getString(if (result.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply)) {
         when (result.kind) {
             LocalMediaKind.IMAGE.name -> {
                 MediaInlinePicture(
                     file = file, remoteUrl = result.remoteUrl,
-                    onOpen = {
-                        if (file != null) viewMediaFile(context, file, imageMime(file)) { error = it }
-                        else result.remoteUrl?.let { url -> openMediaUrl(context, url) { error = it } }
-                    },
+                    onOpen = { showImageDetail = true },
                 )
+                if (showImageDetail) {
+                    MediaImageDetailDialog(file, result.remoteUrl, onDismiss = { showImageDetail = false })
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                     if (file != null) {
-                        SyButton(text = resources.getString(R.string.media_chat_view_image), size = SyButtonSize.Small,
-                            onClick = { viewMediaFile(context, file, imageMime(file)) { error = it } })
-                        SyButton(text = resources.getString(R.string.media_chat_share_save), size = SyButtonSize.Small,
+                        MediaSaveButton(file, imageMime(file))
+                        SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
                             variant = SyButtonVariant.Ghost,
                             onClick = { shareMediaFile(context, file, imageMime(file)) { error = it } })
                     } else result.remoteUrl?.let { url ->
-                        SyButton(text = resources.getString(R.string.media_chat_view_image), size = SyButtonSize.Small,
-                            onClick = { openMediaUrl(context, url) { error = it } })
                         SyButton(text = resources.getString(R.string.media_chat_share_url), size = SyButtonSize.Small,
                             variant = SyButtonVariant.Ghost,
                             onClick = { shareMediaUrl(context, url) { error = it } })
@@ -180,9 +189,12 @@ internal fun LocalGeneratedMediaResultRow(
             LocalMediaKind.SPEECH.name -> {
                 if (file != null) {
                     InlineSpeechPlayer(file)
-                    SyButton(text = resources.getString(R.string.media_chat_share_audio), size = SyButtonSize.Small,
-                        variant = SyButtonVariant.Ghost,
-                        onClick = { shareMediaFile(context, file, "audio/mpeg") { error = it } })
+                    Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+                        MediaSaveButton(file, "audio/mpeg")
+                        SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
+                            onClick = { shareMediaFile(context, file, "audio/mpeg") { error = it } })
+                    }
                 } else Text(resources.getString(R.string.media_chat_audio_missing), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
             LocalMediaKind.TRANSCRIBE.name -> {
@@ -204,6 +216,11 @@ internal fun LocalGeneratedMediaResultRow(
                 }
             }
         }
+        LocalMediaRevisionDraft.from(result)?.let { draft ->
+            SyButton(text = if (draft.kind == LocalMediaKind.TRANSCRIBE) resources.getString(R.string.media_recreate_transcribe_select_audio) else resources.getString(R.string.media_recreate_edit_and_generate),
+                size = SyButtonSize.Small, variant = SyButtonVariant.Ghost,
+                onClick = { onRevise(draft) })
+        }
         error?.let { Text(it, style = DsType.caption11, color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary) }
     }
 }
@@ -219,6 +236,7 @@ internal fun LocalGeneratedVideoTaskRow(
     task: LocalMediaVideoTask,
     offers: List<LocalMediaOffer>,
     viewModel: LocalMediaStudioViewModel,
+    onRevise: (LocalMediaRevisionDraft) -> Unit = {},
 ) {
     val resources = LocalResources.current
     val context = LocalContext.current
@@ -261,7 +279,8 @@ internal fun LocalGeneratedVideoTaskRow(
         LocalMediaVideoPhase.SUCCEEDED -> resources.getString(R.string.media_chat_video_done)
         LocalMediaVideoPhase.FAILED -> resources.getString(R.string.media_chat_generation_failed)
     }
-    MediaMessageCard(title = phase, subtitle = "${task.provider} · ${task.model}") {
+    MediaMessageCard(title = phase,
+        subtitle = resources.getString(if (task.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply)) {
         task.description?.let {
             Text(it, style = DsType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, maxLines = 3,
@@ -271,13 +290,7 @@ internal fun LocalGeneratedVideoTaskRow(
             if (showingPlayer) {
                 InlineVideoPlayer(task.downloadUrl.orEmpty(), localVideo, onError = { error = it })
             } else {
-                SyMaterialSurface(shape = DsShapes.block, tier = SyMaterialTier.L3_CARD,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
-                    androidx.compose.foundation.layout.Box(
-                        contentAlignment = androidx.compose.ui.Alignment.Center) {
-                        SyButton(resources.getString(R.string.media_chat_play_video), onClick = { showingPlayer = true })
-                    }
-                }
+                MediaVideoPoster(localVideo, onPlay = { showingPlayer = true })
             }
             Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 if (showingPlayer) SyButton(
@@ -286,7 +299,8 @@ internal fun LocalGeneratedVideoTaskRow(
                     onClick = { showingPlayer = false },
                 )
                 if (localVideo != null) {
-                    SyButton(text = resources.getString(R.string.media_chat_share_video), size = SyButtonSize.Small,
+                    MediaSaveButton(localVideo, "video/mp4")
+                    SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
                         variant = SyButtonVariant.Ghost,
                         onClick = { shareMediaFile(context, localVideo, "video/mp4") { error = it } })
                 } else {
@@ -340,6 +354,12 @@ internal fun LocalGeneratedVideoTaskRow(
                     catch (failure: Exception) { error = failure.message }
                 } })
         }
+        // Create a new task with an explicit confirmation; querying the old task remains read-only.
+        if (task.phase in setOf(LocalMediaVideoPhase.SUCCEEDED, LocalMediaVideoPhase.FAILED)) {
+            SyButton(text = resources.getString(R.string.media_recreate_edit_and_generate), size = SyButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+                onClick = { onRevise(LocalMediaRevisionDraft.from(task)) })
+        }
         task.lastError?.takeIf { task.phase == LocalMediaVideoPhase.SUCCEEDED }?.let {
             Text(it, style = DsType.caption11.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
@@ -355,19 +375,43 @@ private fun MediaMessageCard(
     content: @Composable () -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    SyMaterialSurface(
-        modifier = modifier.fillMaxWidth(0.90f).widthIn(max = 470.dp),
-        shape = DsShapes.block,
-        tier = SyMaterialTier.L3_CARD,
-        border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
+    Column(
+        modifier = modifier.fillMaxWidth(0.90f).widthIn(max = 470.dp)
+            .padding(vertical = SyMetric.gapMd),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
     ) {
-        Column(Modifier.padding(SyMetric.gapLg),
-            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-            Text(title, style = DsType.small13Strong.withReadingWeight(), color = colors.text)
-            Text(subtitle, style = DsType.caption11.withReadingWeight(),
-                color = colors.textTertiary)
-            content()
+        Text(title, style = DsType.small13Strong.withReadingWeight(), color = colors.textSecondary)
+        if (subtitle.isNotBlank()) Text(subtitle, style = DsType.caption11.withReadingWeight(),
+            color = colors.textTertiary)
+        content()
+    }
+}
+
+/** Explicit user-selected device destination; sharing never masquerades as a save. */
+@Composable
+private fun MediaSaveButton(file: File, mime: String) {
+    val context = LocalContext.current
+    val resources = LocalResources.current
+    val scope = rememberCoroutineScope()
+    var status by remember(file.absolutePath) { mutableStateOf<String?>(null) }
+    val destination = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mime)) { uri ->
+        if (uri != null) scope.launch {
+            val saved = runCatching {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        file.inputStream().use { input -> input.copyTo(output) }
+                    } ?: error("无法写入选定位置")
+                }
+            }
+            status = resources.getString(if (saved.isSuccess) R.string.media_action_saved else R.string.media_action_save_failed)
         }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        SyButton(text = resources.getString(R.string.media_action_save), size = SyButtonSize.Small, onClick = {
+            status = null
+            destination.launch(file.name)
+        })
+        status?.let { Text(it, style = DsType.caption11.withReadingWeight()) }
     }
 }
 
@@ -413,14 +457,14 @@ private fun imageMime(file: File): String = when (file.extension.lowercase()) {
     else -> "image/jpeg"
 }
 
-private fun decodeMediaPreview(file: File?, remoteUrl: String?): ImageBitmap? = runCatching {
+private fun decodeMediaPreview(file: File?, remoteUrl: String?, maxEdge: Int = 1200): ImageBitmap? = runCatching {
     val bytes = when {
         file?.isFile == true -> {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(file.absolutePath, bounds)
             require(bounds.outWidth > 0 && bounds.outHeight > 0)
             var sample = 1
-            while (bounds.outWidth / sample > 1200 || bounds.outHeight / sample > 1200) sample *= 2
+            while (bounds.outWidth / sample > maxEdge || bounds.outHeight / sample > maxEdge) sample *= 2
             return@runCatching BitmapFactory.decodeFile(
                 file.absolutePath,
                 BitmapFactory.Options().apply { inSampleSize = sample },
@@ -455,10 +499,115 @@ private fun decodeMediaPreview(file: File?, remoteUrl: String?): ImageBitmap? = 
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
     require(bounds.outWidth > 0 && bounds.outHeight > 0)
     var sample = 1
-    while (bounds.outWidth / sample > 1200 || bounds.outHeight / sample > 1200) sample *= 2
+    while (bounds.outWidth / sample > maxEdge || bounds.outHeight / sample > maxEdge) sample *= 2
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size,
         BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
 }.getOrNull()
+
+/** In-chat picture inspection without sending the user to an external file viewer. */
+@Composable
+private fun MediaImageDetailDialog(file: File?, remoteUrl: String?, onDismiss: () -> Unit) {
+    val resources = LocalResources.current
+    val imageHeight = (LocalConfiguration.current.screenHeightDp.dp * 0.62f).coerceIn(190.dp, 580.dp)
+    var detail by remember(file?.absolutePath, remoteUrl) { mutableStateOf<ImageBitmap?>(null) }
+    var loading by remember(file?.absolutePath, remoteUrl) { mutableStateOf(true) }
+    var zoom by remember(file?.absolutePath, remoteUrl) { mutableFloatStateOf(1f) }
+    var offsetX by remember(file?.absolutePath, remoteUrl) { mutableFloatStateOf(0f) }
+    var offsetY by remember(file?.absolutePath, remoteUrl) { mutableFloatStateOf(0f) }
+    LaunchedEffect(file?.absolutePath, remoteUrl) {
+        loading = true
+        detail = withContext(Dispatchers.IO) { decodeMediaPreview(file, remoteUrl, maxEdge = 4096) }
+        loading = false
+    }
+    val gesture = rememberTransformableState { zoomChange, panChange, _ ->
+        val next = (zoom * zoomChange).coerceIn(1f, 5f)
+        zoom = next
+        offsetX = if (next <= 1f) 0f else (offsetX + panChange.x).coerceIn(-1100f, 1100f)
+        offsetY = if (next <= 1f) 0f else (offsetY + panChange.y).coerceIn(-1100f, 1100f)
+    }
+    SyResponsiveSheet(
+        title = null,
+        onDismiss = onDismiss,
+        scrollable = false,
+        showDragHandle = false,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+                .background(Color.Black)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End) {
+                SyButton(text = resources.getString(R.string.media_image_zoom_reset),
+                    variant = SyButtonVariant.Ghost, size = SyButtonSize.Small,
+                    onClick = { zoom = 1f; offsetX = 0f; offsetY = 0f })
+                SyButton(text = resources.getString(R.string.media_image_zoom_close),
+                    size = SyButtonSize.Small, onClick = onDismiss)
+            }
+            Box(
+                modifier = Modifier.fillMaxWidth().height(imageHeight)
+                    .transformable(state = gesture),
+                contentAlignment = androidx.compose.ui.Alignment.Center,
+            ) {
+                if (detail != null) {
+                    Image(
+                        bitmap = detail!!,
+                        contentDescription = resources.getString(R.string.media_chat_generated_image),
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxWidth().height(imageHeight)
+                            .graphicsLayer {
+                                scaleX = zoom
+                                scaleY = zoom
+                                translationX = offsetX
+                                translationY = offsetY
+                            },
+                    )
+                } else {
+                    Text(
+                        resources.getString(if (loading) R.string.media_chat_preview_pending
+                            else R.string.media_chat_preview_unavailable),
+                        color = Color.White,
+                    )
+                }
+            }
+            Text(resources.getString(R.string.media_image_zoom_hint),
+                color = Color.White.copy(alpha = 0.78f), style = DsType.caption11.withReadingWeight())
+        }
+    }
+}
+
+/** The first saved video frame replaces the empty playback slab; preparation is off the UI thread. */
+@Composable
+private fun MediaVideoPoster(file: File?, onPlay: () -> Unit) {
+    val resources = LocalResources.current
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    var poster by remember(file?.absolutePath) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(file?.absolutePath) {
+        poster = withContext(Dispatchers.IO) {
+            if (file?.isFile != true) null else runCatching {
+                val retriever = MediaMetadataRetriever()
+                try {
+                    retriever.setDataSource(file.absolutePath)
+                    retriever.getScaledFrameAtTime(0L,
+                        MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 1024, 576)?.asImageBitmap()
+                } finally { retriever.release() }
+            }.getOrNull()
+        }
+    }
+    Box(
+        modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+            .clip(DsShapes.block).background(colors.materialL3)
+            .clickable(onClick = onPlay),
+        contentAlignment = androidx.compose.ui.Alignment.Center,
+    ) {
+        poster?.let {
+            Image(bitmap = it, contentDescription = null,
+                contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        }
+        SyButton(text = resources.getString(R.string.media_chat_play_video), onClick = onPlay)
+    }
+}
 
 @Composable
 private fun InlineSpeechPlayer(file: File) {
@@ -471,6 +620,18 @@ private fun InlineSpeechPlayer(file: File) {
     var positionMs by remember(file.absolutePath) { mutableStateOf(0) }
     DisposableEffect(file.absolutePath) {
         onDispose { player?.release(); player = null }
+    }
+    LaunchedEffect(file.absolutePath) {
+        durationMs = withContext(Dispatchers.IO) {
+            runCatching {
+                val metadata = MediaMetadataRetriever()
+                try {
+                    metadata.setDataSource(file.absolutePath)
+                    metadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                        ?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+                } finally { metadata.release() }
+            }.getOrDefault(0)
+        }
     }
     LaunchedEffect(playing, file.absolutePath) {
         while (playing) {

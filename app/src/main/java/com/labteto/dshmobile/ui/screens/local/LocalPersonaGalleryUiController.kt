@@ -173,13 +173,13 @@ suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGallery
     if (!state.value.chat.groupChat.enabled) selectGalleryPersonaForCurrentChat(entry.id)
     entry
 }
-suspend fun autoFillNewPersona(description: String): Result<PersonaProfile> = runSuspendResult {
+suspend fun autoFillNewPersona(current: PersonaProfile, description: String): Result<PersonaProfile> = runSuspendResult {
     val snapshot = state.value
     check(!snapshot.loading && !snapshot.kernel.running && snapshot.modelState.configured) { "请先配置模型并等待当前回复结束" }
     chatUi.autoFillPersona(
         model = snapshot.modelState.model, baseUrl = snapshot.modelState.baseUrl,
         profileId = snapshot.modelState.modelSelection.activeProfileId,
-        current = PersonaProfile(name = ""),
+        current = current,
         recentMessages = emptyList(),
         description = description,
     )

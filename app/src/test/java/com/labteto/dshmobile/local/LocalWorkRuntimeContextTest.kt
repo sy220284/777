@@ -51,6 +51,16 @@ class LocalWorkRuntimeContextTest {
         assertFalse(context.contains("account-private-reference"))
     }
     @Test
+    fun businessBudgetAndSalesStatsDoNotLoadModelTokenLedger() {
+        for (task in listOf("写一份预算表", "统计销售额")) {
+            val prompt = withWorkRuntimeContext("", "/workspace", "model", "", null, task = task)
+            assertFalse(prompt.contains("TokenUsageAnalyticsStore"))
+        }
+        val modelUsage = withWorkRuntimeContext("", "/workspace", "model", "", null, task = "检查模型用量")
+        assertTrue(modelUsage.contains("TokenUsageAnalyticsStore"))
+    }
+
+    @Test
     fun ordinaryRequestSkipsIrrelevantCapabilityAndUsageGuides() {
         val context = withWorkRuntimeContext(
             context = "当前需求", workspacePath = "/workspace", model = "test-model",
