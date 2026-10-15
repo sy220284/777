@@ -76,7 +76,7 @@ class ChatPersonaGalleryTest {
                 CharacterFact("early", CharacterFactCategories.BIOGRAPHY,
                     "第一幕在旧书店认识阿宁", temporalScope = "opening",
                     provenance = CharacterFactProvenance.CANON),
-                CharacterFact("later", CharacterFactCategories.LIFE_GRAVITY,
+                CharacterFact("later", CharacterFactCategories.BIOGRAPHY,
                     "第二幕需要看守红伞中的密信", temporalScope = "reveal",
                     provenance = CharacterFactProvenance.CANON),
             ),
@@ -515,24 +515,20 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
-    fun legacySuggestionNamesAppendToV4FactsWithoutOverwritingExistingUserFacts() {
+    fun removedLegacySuggestionNamesAreIgnoredWhileNewFactsRemainEditable() {
         val current = PersonaProfile(name = "小岚", coreIdentity = "设计师",
             facts = listOf(CharacterFact("authored", CharacterFactCategories.PERSONALITY,
                 "平日沉稳", provenance = CharacterFactProvenance.USER_CREATED)))
         val suggestions = listOf(
-            PersonaAppendSuggestion("stableTraits", "遇到朋友时会开玩笑", "用户直接修正"),
-            PersonaAppendSuggestion("attentionBiases", "很在意钟表声音", "人物自己的观察"),
-            PersonaAppendSuggestion("lifeContext", "在独立工作室上班", "用户补充"),
-            PersonaAppendSuggestion("stableTraits", "遇到朋友时会开玩笑", "重复建议"),
+            PersonaAppendSuggestion("stableTraits", "旧版自动性格", "旧资料"),
+            PersonaAppendSuggestion("lifeContext", "旧版生活描述", "旧资料"),
+            PersonaAppendSuggestion("personality", "熟人面前会开玩笑", "用户确认"),
         )
         val result = applyPersonaSuggestions(current, suggestions)
         assertEquals(current.facts.first(), result.facts.first())
-        assertTrue(result.factText(CharacterFactCategories.PERSONALITY).contains("遇到朋友时会开玩笑"))
-        assertTrue(result.factText(CharacterFactCategories.SENSORY_SIGNATURE).contains("钟表声音"))
-        assertTrue(result.factText(CharacterFactCategories.LIFE_GRAVITY).contains("独立工作室"))
-        assertEquals(1, result.facts.count { it.content == "遇到朋友时会开玩笑" })
-        assertEquals("", result.lifeContext)
-        assertEquals("", result.attentionBiases.joinToString())
+        assertEquals(1, result.facts.count { it.content == "熟人面前会开玩笑" })
+        assertTrue(result.facts.none { it.content.startsWith("旧版") })
+        assertTrue(result.lifeContext.isBlank())
     }
 
     @Test
@@ -663,7 +659,7 @@ class ChatPersonaGalleryTest {
         assertEquals("原神", imported.persona.franchise)
         assertEquals("无剧透阶段", imported.persona.timelinePosition)
         assertEquals("兼顾责任与真诚关系；家族责任", imported.persona.factText(CharacterFactCategories.VALUES_AND_TRADEOFFS))
-        assertEquals("先观察再表达", imported.persona.factText(CharacterFactCategories.SENSORY_SIGNATURE))
+        assertTrue(imported.persona.facts.none { it.category == "sensorySignature" })
         assertTrue(imported.persona.coreValues.isEmpty() && imported.persona.attentionBiases.isEmpty())
         assertEquals(listOf("不知道未经历的后续剧情"), imported.persona.knowledgeBoundary)
         assertEquals("genshin-kamisato-ayaka", imported.persona.presetId)
