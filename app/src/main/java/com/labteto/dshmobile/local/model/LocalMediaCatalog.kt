@@ -68,8 +68,9 @@ object LocalMediaCatalog {
         manualOfferId: String? = null,
     ): LocalMediaOffer? {
         val available = offers.filter { it.kind == kind }
-        return available.firstOrNull { manualOfferId != null && it.id == manualOfferId }
-            ?: available.firstOrNull { preferredProfileId != null && it.profile.id == preferredProfileId }
+        // Manual selection is strict. Removing an account must never silently charge another.
+        if (manualOfferId != null) return available.firstOrNull { it.id == manualOfferId }
+        return available.firstOrNull { preferredProfileId != null && it.profile.id == preferredProfileId }
             ?: available.firstOrNull()
     }
 
