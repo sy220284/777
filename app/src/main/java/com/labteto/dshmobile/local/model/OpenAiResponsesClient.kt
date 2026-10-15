@@ -484,7 +484,7 @@ class OpenAiResponsesClient @Inject constructor(
                         if (source is JsonObject) source["detail"]?.let { put("detail", it) }
                     })
                 }
-                "input_text", "input_image" -> add(obj)
+                "input_text", "input_image", "input_file" -> add(obj)
                 else -> throw responseProtocolError("不支持的输入内容类型：${obj["type"]}")
             }
         }

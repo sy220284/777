@@ -744,6 +744,30 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun inlineFileInputPassesResponsesAdapterWithoutConversionToImages() {
+        val payload = client.buildPayload(
+            model = "gpt-6-astra",
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", buildJsonArray {
+                    add(buildJsonObject {
+                        put("type", "input_file")
+                        put("filename", "manual.pdf")
+                        put("file_data", "data:application/pdf;base64,AAAA")
+                    })
+                })
+            }),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            planSharing = true,
+        )
+        val input = payload["input"]!!.jsonArray
+        val content = input.single().jsonObject["content"]!!.jsonArray
+        assertEquals("input_file", content.single().jsonObject["type"]?.jsonPrimitive?.content)
+        assertFalse("tools" in payload)
+    }
+
+    @Test
     fun chatGptPlanWrapsFunctionToolsInNamespace() {
         val tools = JsonArray(
             listOf(
