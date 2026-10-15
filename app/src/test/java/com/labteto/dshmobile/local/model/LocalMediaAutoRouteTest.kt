@@ -57,6 +57,18 @@ class LocalMediaAutoRouteTest {
         assertNull(LocalMediaRevisionDraft.from(old)!!.originalOffer(offers))
     }
 
+    @Test fun changingMediaKindNeverCarriesPreviousRevisionIdentity() {
+        val draft = LocalMediaRevisionDraft(
+            originId = "old-image", kind = LocalMediaKind.IMAGE,
+            prompt = "原图", sourceMessageId = "chat-1", ratio = "9:16",
+        )
+        assertEquals("old-image", draft.forKind(LocalMediaKind.IMAGE)?.originId)
+        listOf(LocalMediaKind.VIDEO, LocalMediaKind.SPEECH, LocalMediaKind.TRANSCRIBE).forEach { kind ->
+            assertNull(draft.forKind(kind))
+        }
+        assertNull(draft.copy(kind = LocalMediaKind.VIDEO).forKind(LocalMediaKind.IMAGE))
+    }
+
     @Test fun revisionsLinkBackWithoutOverwritingOriginalAssetsOrProviderTasks() {
         val profile = p("mm", "MiniMax-M2.7", "https://api.minimaxi.com/v1")
         val offers = LocalMediaCatalog.offers(listOf(profile))
