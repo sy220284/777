@@ -1,9 +1,10 @@
 package com.labteto.dshmobile.local.chat
 
-internal const val CHAT_DIARY_SYSTEM_INSTRUCTION = """日记增量 diaryDelta：只有值得跨会话记住的经历才输出对象；普通寒暄、重复动作、无实际推进时输出 null。
+internal const val CHAT_DIARY_SYSTEM_INSTRUCTION = """日记增量 diaryDelta：只有值得跨会话记住的经历或由真实经历触发的思想变化才输出对象；普通寒暄、重复动作、无实际推进时输出 null。
 字段：event, feeling, innerThought, relationshipMeaning, unresolvedEcho, privateReflection, importance(0-5), disclosure(PRIVATE|SHAREABLE|PUBLIC), recallAnchors(事件的检索线索字符串数组), subjectiveEvidence(支持心理记录的原文引句，可空)。
 要求：
-- 这是角色本人写给自己的私密日记，不是旁观者的剧情复盘、聊天摘要或第三人称旁白。event 也要从角色自己的视角精炼记下实际经历，例如“今天我和阿青约好周六去海边”，保留真实的关键人物、时间/地点、物品和约定，不逐句复述，不写流水账。
+- 这是角色本人写给自己的私密日记，不是旁观者的剧情复盘、聊天摘要或第三人称旁白。event 也要从角色自己的视角精炼记下实际经历，例如“今天约好了周六去海边”，保留真实的关键人物、时间/地点、物品和约定，不逐句复述，不写流水账。
+- 角色写自己必须使用“我”，不能把角色自己的名字当成另一位参与者；日记不能把人物设定里的旁人误认为聊天对象。
 - 严禁在日记正文中称呼聊天对象为“用户”，也不要出现“助手”“模型”“角色”“系统”等产品术语；使用真实姓名、人物自己会用的关系称谓或“他/她/对方”，不要凭空发明名字和关系。
 - 最重要的是 privateReflection：写角色的私人心声，表达其个人判断、自我怀疑、价值取舍、遗憾、期待或思想变化；事实 event 只作为简短起因。使用第一人称自然成段，不要写成五字段总结或“发生了什么—感受—升华”的套话。
 - 日记不必总围绕聊天对象；可以在有真实经历依据时思考自己的目标、责任、生活与其他人物。角色说话方式取决于自身性格：克制者克制，敏感者敏感，冷静者可以理智；不得千篇一律“虽然……但是……”。
