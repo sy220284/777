@@ -33,6 +33,56 @@ import org.junit.Test
 
 class LocalToolExecutionCoordinatorTest {
     @Test
+    fun pinnedGitHubIsLoadedAcrossTurnsAndNeverBypassesCredentialGate() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("github_list_prs", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, family = "GitHub") { ToolResult("ok") })
+            register(tool("unrelated_task", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, keywords = setOf("处理")) { ToolResult("ok") })
+        }
+        var pinned = listOf("github")
+        val coordinator = coordinator(registry, pinnedConnectorIds = { pinned })
+        coordinator.prepareWorkTurnCapabilities("处理当前项目", emptyList(), { true })
+        assertEquals("github_list_prs", coordinator.enabledOptionalSnapshot().first())
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", emptyList(), { true })
+        assertTrue("github_list_prs" in coordinator.enabledOptionalSnapshot())
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", emptyList(), { false })
+        assertFalse("github_list_prs" in coordinator.enabledOptionalSnapshot())
+        pinned = emptyList()
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", emptyList(), { true })
+        assertFalse("github_list_prs" in coordinator.enabledOptionalSnapshot())
+    }
+
+    @Test
+    fun pinnedMcpLoadsOnlyRegisteredServiceToolsAheadOfHeuristicTools() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("mcp_figma_get_file", ToolAccess.NETWORK, ToolApprovalPolicy.ALWAYS,
+                exposure = ToolExposure.OPTIONAL, family = "MCP") { ToolResult("ok") })
+            register(tool("mcp_other_get_file", ToolAccess.NETWORK, ToolApprovalPolicy.ALWAYS,
+                exposure = ToolExposure.OPTIONAL, family = "MCP") { ToolResult("ok") })
+            register(tool("mcp_figma_fake", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, family = "Other") { ToolResult("ok") })
+            register(tool("background_job", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, keywords = setOf("设计")) { ToolResult("ok") })
+        }
+        var pinned = listOf("figma")
+        val coordinator = coordinator(registry, pinnedConnectorIds = { pinned })
+        coordinator.prepareWorkTurnCapabilities("设计", emptyList(), { false })
+        val selected = coordinator.enabledOptionalSnapshot().toList()
+        assertEquals("mcp_figma_get_file", selected.first())
+        assertTrue("background_job" in selected)
+        assertFalse("mcp_other_get_file" in selected)
+        assertFalse("mcp_figma_fake" in selected)
+        pinned = emptyList()
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", emptyList(), { false })
+        assertFalse("mcp_figma_get_file" in coordinator.enabledOptionalSnapshot())
+    }
+
+    @Test
     fun githubKeywordPreactivationCannotBypassNegationOrCredentialGate() = runBlocking {
         val registry = ToolRegistry().apply {
             register(tool(
@@ -1257,6 +1307,7 @@ class LocalToolExecutionCoordinatorTest {
         ) -> Unit = { _, _, _ -> },
         executionIdFactory: () -> String = { "exec-test" },
         networkSearchEnabled: () -> Boolean = { true },
+        pinnedConnectorIds: () -> List<String> = { emptyList() },
     ) = LocalToolExecutionCoordinator(
         registry = registry,
         currentSessionId = { "s1" },
@@ -1266,6 +1317,7 @@ class LocalToolExecutionCoordinatorTest {
         recordExecutionStarted = recordExecutionStarted,
         executionIdFactory = executionIdFactory,
         networkSearchEnabled = networkSearchEnabled,
+        pinnedConnectorIds = pinnedConnectorIds,
     )
 
     private fun webFetchTool(execute: suspend () -> ToolResult) = HarnessTool(
