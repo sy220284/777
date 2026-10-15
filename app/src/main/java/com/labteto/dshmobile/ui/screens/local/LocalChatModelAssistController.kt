@@ -15,7 +15,7 @@ internal class LocalChatModelAssistController(
 ) {
     private val state = runtime.state
 
-    suspend fun autoFillCurrentPersona(description: String): Result<PersonaProfile> {
+    suspend fun autoFillCurrentPersona(draft: PersonaProfile, description: String): Result<PersonaProfile> {
         val snapshot = state.value
         if (
             snapshot.loading ||
@@ -36,7 +36,7 @@ internal class LocalChatModelAssistController(
                 model = snapshot.modelState.model,
                 baseUrl = snapshot.modelState.baseUrl,
                 profileId = snapshot.modelState.modelSelection.activeProfileId,
-                current = snapshot.chat.chatPersona,
+                current = draft,
                 recentMessages = recentMessages,
                 description = description,
             )
