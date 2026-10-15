@@ -51,6 +51,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
     private val activityProjection: LocalToolActivityProjectionRuntime,
     private val networkSearchSettings: LocalNetworkSearchSettings,
     private val skillManager: com.labteto.dshmobile.local.tools.LocalSkillManager,
+    private val pinnedInvocations: com.labteto.dshmobile.local.tools.LocalPinnedInvocationStore,
 ) : LocalToolsManagementPort {
     internal val workspace = sessionStorage.files.workspace
     internal val toolOutputStore = LocalToolOutputStore(
@@ -152,6 +153,16 @@ internal class LocalToolCompositionRoot @Inject constructor(
             currentSessionId = runtimeStateStore::currentSessionId,
             planMode = { runtimeStateStore.state.value.work.planMode },
             networkSearchEnabled = networkSearchSettings::isEnabled,
+            pinnedConnectorIds = {
+                pinnedInvocations.selected.value
+                    .filter { it.kind == com.labteto.dshmobile.local.tools.LocalPinnedInvocation.Kind.CONNECTOR }
+                    .map { it.id }
+            },
+            pinnedSkillIds = {
+                pinnedInvocations.selected.value
+                    .filter { it.kind == com.labteto.dshmobile.local.tools.LocalPinnedInvocation.Kind.SKILL }
+                    .map { it.id }
+            },
             requestApproval = { call, tool, summary ->
                 approvalRuntime.approve(call, tool, summary)
             },

@@ -47,6 +47,8 @@ internal class LocalToolExecutionCoordinator(
     ) -> Unit = { _, _, _ -> },
     private val executionIdFactory: () -> String = { UUID.randomUUID().toString() },
     private val networkSearchEnabled: () -> Boolean = { true },
+    private val pinnedConnectorIds: () -> List<String> = { emptyList() },
+    private val pinnedSkillIds: () -> List<String> = { emptyList() },
 ) {
     // 前台 Lead 与所有后台成员共用此闸门，文件写入工具不得并行交错执行。
     private val workspaceReadWriteGate = LocalWorkspaceReadWriteGate()
@@ -108,7 +110,7 @@ internal class LocalToolExecutionCoordinator(
         target: MutableSet<String>? = null,
     ) {
         val intent = LocalToolCapabilityIntent.from(input, history)
-        val enableGitHub = if (intent.requestsGitHub) {
+        val enableGitHub = if (intent.requestsGitHub || "github" in pinnedConnectorIds()) {
             try {
                 gitHubConfigured()
             } catch (cancelled: CancellationException) {
@@ -137,6 +139,10 @@ internal class LocalToolExecutionCoordinator(
         if (enableGitHub) enableGitHubConnectorTools(resolvedTarget)
         enableTaskRelevantOptionalTools(taskContext, resolvedTarget, prioritize = prioritizeTask)
         if (networkSearchEnabled()) enableOptionalTools(DEFAULT_NETWORK_TOOLS, resolvedTarget)
+        // Preserve explicit user choices after ALL heuristic re-ranking, not before it.
+        // The credential gate above determines whether GitHub is admitted.
+        enablePinnedMediaTools(resolvedTarget)
+        prioritizePinnedConnectorTools(resolvedTarget, enableGitHub)
     }
 
     fun enableGitHubConnectorTools(target: MutableSet<String> = enabledOptionalTools) {
@@ -146,6 +152,45 @@ internal class LocalToolExecutionCoordinator(
             }
             .map(HarnessTool::name)
         enableOptionalTools(githubTools, target)
+    }
+
+    /** Reassert explicit pins after each model-step heuristic rerank, including step-2+ schemas. */
+    fun prioritizePinnedForModelStep(target: MutableSet<String> = enabledOptionalTools) {
+        // Only re-order tools already credential-admitted during prepare().
+        // Avoid adding GitHub tools after an unavailable/auth-failed preflight.
+        val admittedGithub = synchronized(target) {
+            target.any { name -> registry.get(name)?.let(::isGitHubConnectorTool) == true }
+        }
+        enablePinnedMediaTools(target)
+        prioritizePinnedConnectorTools(target, enableGitHub = admittedGithub)
+    }
+
+    private fun enablePinnedMediaTools(target: MutableSet<String>) {
+        if (pinnedSkillIds().none { it == "imagegen" || it == "minimax-media" }) return
+        enableOptionalTools(listOf("media_image_options", "media_image_status", "media_image_create"), target)
+    }
+
+    private fun prioritizePinnedConnectorTools(target: MutableSet<String>, enableGitHub: Boolean) {
+        val pins = pinnedConnectorIds().distinct()
+        if (pins.isEmpty()) return
+        val registered = registry.names().mapNotNull(registry::get)
+        val preferred = pins.flatMap { id ->
+            if (id == "github") {
+                if (enableGitHub) registered.filter(::isGitHubConnectorTool).map(HarnessTool::name)
+                else emptyList()
+            } else if (Regex("[A-Za-z0-9_-]{1,48}").matches(id)) {
+                registered.filter { it.metadata.family.equals("MCP", ignoreCase = true) &&
+                    it.name.startsWith("mcp_${id}_") }.map(HarnessTool::name)
+            } else emptyList()
+        }
+        // Registration, network policy and approval are still the single execution authority.
+        enableOptionalTools(preferred, target)
+        synchronized(target) {
+            val previous = target.toList()
+            target.clear()
+            target.addAll(preferred.filter { it in previous })
+            target.addAll(previous)
+        }
     }
 
     private fun isGitHubConnectorTool(tool: HarnessTool): Boolean =

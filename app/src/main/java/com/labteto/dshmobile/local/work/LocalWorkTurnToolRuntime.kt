@@ -70,6 +70,7 @@ internal class LocalWorkTurnToolRuntime(
         if (!activeTask.isNullOrBlank()) {
             execution.enableTaskRelevantOptionalTools(activeTask, binding.enabledOptionalTools)
         }
+        execution.prioritizePinnedForModelStep(binding.enabledOptionalTools)
         val enabled = synchronized(binding.enabledOptionalTools) {
             if (teamMode) {
                 val priority = listOf(
