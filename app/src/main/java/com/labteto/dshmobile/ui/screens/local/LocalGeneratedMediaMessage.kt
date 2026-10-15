@@ -12,6 +12,9 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.media.MediaPlayer
+import android.media.MediaMetadataRetriever
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
 import android.widget.MediaController
 import android.widget.VideoView
@@ -146,12 +149,7 @@ internal fun LocalGeneratedMediaResultRow(
         LocalMediaKind.TRANSCRIBE.name -> resources.getString(R.string.media_chat_transcript_done)
         else -> resources.getString(R.string.media_chat_generic_result)
     }
-    MediaMessageCard(title = label, subtitle = "${result.provider} · ${result.model}") {
-        result.description?.takeIf(String::isNotBlank)?.let {
-            Text(it, style = DsType.small13.withReadingWeight(),
-                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, maxLines = 3,
-                overflow = TextOverflow.Ellipsis)
-        }
+    MediaMessageCard(title = label, subtitle = "") {
         when (result.kind) {
             LocalMediaKind.IMAGE.name -> {
                 MediaInlinePicture(
@@ -163,14 +161,11 @@ internal fun LocalGeneratedMediaResultRow(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                     if (file != null) {
-                        SyButton(text = resources.getString(R.string.media_chat_view_image), size = SyButtonSize.Small,
-                            onClick = { viewMediaFile(context, file, imageMime(file)) { error = it } })
-                        SyButton(text = resources.getString(R.string.media_chat_share_save), size = SyButtonSize.Small,
+                        MediaSaveButton(file, imageMime(file))
+                        SyButton(text = "分享", size = SyButtonSize.Small,
                             variant = SyButtonVariant.Ghost,
                             onClick = { shareMediaFile(context, file, imageMime(file)) { error = it } })
                     } else result.remoteUrl?.let { url ->
-                        SyButton(text = resources.getString(R.string.media_chat_view_image), size = SyButtonSize.Small,
-                            onClick = { openMediaUrl(context, url) { error = it } })
                         SyButton(text = resources.getString(R.string.media_chat_share_url), size = SyButtonSize.Small,
                             variant = SyButtonVariant.Ghost,
                             onClick = { shareMediaUrl(context, url) { error = it } })
@@ -180,9 +175,12 @@ internal fun LocalGeneratedMediaResultRow(
             LocalMediaKind.SPEECH.name -> {
                 if (file != null) {
                     InlineSpeechPlayer(file)
-                    SyButton(text = resources.getString(R.string.media_chat_share_audio), size = SyButtonSize.Small,
-                        variant = SyButtonVariant.Ghost,
-                        onClick = { shareMediaFile(context, file, "audio/mpeg") { error = it } })
+                    Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+                        MediaSaveButton(file, "audio/mpeg")
+                        SyButton(text = "分享", size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
+                            onClick = { shareMediaFile(context, file, "audio/mpeg") { error = it } })
+                    }
                 } else Text(resources.getString(R.string.media_chat_audio_missing), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
             LocalMediaKind.TRANSCRIBE.name -> {
@@ -286,7 +284,8 @@ internal fun LocalGeneratedVideoTaskRow(
                     onClick = { showingPlayer = false },
                 )
                 if (localVideo != null) {
-                    SyButton(text = resources.getString(R.string.media_chat_share_video), size = SyButtonSize.Small,
+                    MediaSaveButton(localVideo, "video/mp4")
+                    SyButton(text = "分享", size = SyButtonSize.Small,
                         variant = SyButtonVariant.Ghost,
                         onClick = { shareMediaFile(context, localVideo, "video/mp4") { error = it } })
                 } else {
@@ -355,19 +354,42 @@ private fun MediaMessageCard(
     content: @Composable () -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    SyMaterialSurface(
-        modifier = modifier.fillMaxWidth(0.90f).widthIn(max = 470.dp),
-        shape = DsShapes.block,
-        tier = SyMaterialTier.L3_CARD,
-        border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
+    Column(
+        modifier = modifier.fillMaxWidth(0.90f).widthIn(max = 470.dp)
+            .padding(vertical = SyMetric.gapMd),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
     ) {
-        Column(Modifier.padding(SyMetric.gapLg),
-            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-            Text(title, style = DsType.small13Strong.withReadingWeight(), color = colors.text)
-            Text(subtitle, style = DsType.caption11.withReadingWeight(),
-                color = colors.textTertiary)
-            content()
+        Text(title, style = DsType.small13Strong.withReadingWeight(), color = colors.textSecondary)
+        if (subtitle.isNotBlank()) Text(subtitle, style = DsType.caption11.withReadingWeight(),
+            color = colors.textTertiary)
+        content()
+    }
+}
+
+/** Explicit user-selected device destination; sharing never masquerades as a save. */
+@Composable
+private fun MediaSaveButton(file: File, mime: String) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var status by remember(file.absolutePath) { mutableStateOf<String?>(null) }
+    val destination = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mime)) { uri ->
+        if (uri != null) scope.launch {
+            val saved = runCatching {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        file.inputStream().use { input -> input.copyTo(output) }
+                    } ?: error("无法写入选定位置")
+                }
+            }
+            status = if (saved.isSuccess) "已保存到设备" else "保存失败，请重试"
         }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        SyButton(text = "保存", size = SyButtonSize.Small, onClick = {
+            status = null
+            destination.launch(file.name)
+        })
+        status?.let { Text(it, style = DsType.caption11.withReadingWeight()) }
     }
 }
 
@@ -471,6 +493,18 @@ private fun InlineSpeechPlayer(file: File) {
     var positionMs by remember(file.absolutePath) { mutableStateOf(0) }
     DisposableEffect(file.absolutePath) {
         onDispose { player?.release(); player = null }
+    }
+    LaunchedEffect(file.absolutePath) {
+        durationMs = withContext(Dispatchers.IO) {
+            runCatching {
+                val metadata = MediaMetadataRetriever()
+                try {
+                    metadata.setDataSource(file.absolutePath)
+                    metadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                        ?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+                } finally { metadata.release() }
+            }.getOrDefault(0)
+        }
     }
     LaunchedEffect(playing, file.absolutePath) {
         while (playing) {
