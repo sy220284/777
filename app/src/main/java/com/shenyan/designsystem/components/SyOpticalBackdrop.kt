@@ -3,7 +3,7 @@ package com.shenyan.designsystem.components
 import android.graphics.RenderEffect as AndroidRenderEffect
 import android.graphics.RuntimeShader
 import android.os.Build
-import android.util.Log
+import com.labteto.dshmobile.observability.AppLog
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -76,7 +76,7 @@ internal fun SyOpticalBackdrop(
             shader.setFloatUniform("displacement", with(density) { 2.4.dp.toPx() })
             AndroidRenderEffect.createRuntimeShaderEffect(shader, "scene").asComposeRenderEffect()
         } catch (failure: RuntimeException) {
-            Log.w("SyOpticalBackdrop", "AGSL unsupported; using the scene fallback", failure)
+            AppLog.warn("SyOpticalBackdrop", "failure=true operation=create_optical_shader fallback=scene cause_type=${failure.javaClass.simpleName}")
             null
         }
     }
