@@ -211,6 +211,10 @@ fun LocalHarnessScreen(
     var taskEntryRequest by rememberSaveable { mutableIntStateOf(0) }
     var composerHandoff by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var installedSkillDisplayNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    val pinnedInvocations by viewModel.pinnedInvocations.collectAsStateWithLifecycle()
+    var composerInvocationOptions by remember {
+        mutableStateOf<List<com.labteto.dshmobile.local.tools.LocalComposerInvocationOption>>(emptyList())
+    }
     var pendingWorkCapability by rememberSaveable { mutableStateOf<String?>(null) }
     var workHandoffSourceSessionId by rememberSaveable { mutableStateOf("") }
     var workHandoffSummary by rememberSaveable { mutableStateOf("") }
@@ -253,6 +257,8 @@ fun LocalHarnessScreen(
         if (featurePage == LocalFeaturePage.HOME) {
             installedSkillDisplayNames = runCatching { viewModel.installedSkillDisplayNames() }
                 .getOrDefault(emptyMap())
+            composerInvocationOptions = runCatching { viewModel.composerInvocationOptions() }
+                .getOrDefault(emptyList())
         }
     }
     val featureStateHolder = rememberSaveableStateHolder()
@@ -548,6 +554,12 @@ fun LocalHarnessScreen(
             },
             composerHandoff = composerHandoff,
             skillDisplayNames = installedSkillDisplayNames,
+            invocationOptions = composerInvocationOptions,
+            pinnedInvocations = pinnedInvocations,
+            onToggleInvocation = { value ->
+                viewModel.togglePinnedInvocation(value)
+                composerInvocationOptions = composerInvocationOptions.map { it }
+            },
             onConsumeComposerHandoff = { composerHandoff = emptyList() },
         ),
         localChatFeatureUiContribution(
