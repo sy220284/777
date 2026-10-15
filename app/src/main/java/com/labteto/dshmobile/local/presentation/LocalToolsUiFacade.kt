@@ -1,5 +1,12 @@
 package com.labteto.dshmobile.local.presentation
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import com.labteto.dshmobile.R
+import com.labteto.dshmobile.local.tools.LocalComposerInvocationOption
+import com.labteto.dshmobile.local.tools.LocalPinnedInvocation
+import com.labteto.dshmobile.local.tools.LocalPinnedInvocationStore
+
 import com.labteto.dshmobile.local.tools.LocalToolsRuntime
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadinessProjector
 import javax.inject.Inject
@@ -16,7 +23,41 @@ data class LocalSkillEditorUiEntry(val id: String, val document: String)
 @Singleton
 class LocalToolsUiFacade @Inject constructor(
     private val tools: LocalToolsRuntime,
+    private val pinnedStore: LocalPinnedInvocationStore,
+    @ApplicationContext private val appContext: Context,
 ) {
+    internal val pinnedInvocations get() = pinnedStore.selected
+
+    internal fun togglePinnedInvocation(value: LocalPinnedInvocation) = pinnedStore.toggle(value)
+
+    internal suspend fun composerInvocationOptions(): List<LocalComposerInvocationOption> {
+        val available = mutableListOf<LocalComposerInvocationOption>()
+        if (githubConfigured()) {
+            available += LocalComposerInvocationOption(
+                LocalPinnedInvocation(LocalPinnedInvocation.Kind.CONNECTOR, "github"),
+                "GitHub", appContext.getString(R.string.composer_invocation_github_ready),
+            )
+        }
+        servers().filter { it.tools.isNotEmpty() }.forEach { server ->
+            available += LocalComposerInvocationOption(
+                LocalPinnedInvocation(LocalPinnedInvocation.Kind.CONNECTOR, server.id),
+                server.id, appContext.getString(R.string.composer_invocation_mcp_tools, server.tools.size),
+            )
+        }
+        installedSkills().filter { it.modelInvocable }.forEach { skill ->
+            available += LocalComposerInvocationOption(
+                LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, skill.name),
+                skill.displayName, skill.description,
+            )
+        }
+        val availableIds = available.map { it.invocation }.toSet()
+        return available + pinnedStore.selected.value.filterNot { it in availableIds }.map { missing ->
+            LocalComposerInvocationOption(
+                missing, missing.id, appContext.getString(R.string.composer_invocation_unavailable), false,
+            )
+        }
+    }
+
     internal suspend fun servers() = tools.servers()
     internal suspend fun githubConfigured() = tools.githubConfigured()
     /** Work handoff UI projection; capability hints do not grant execution permissions. */
