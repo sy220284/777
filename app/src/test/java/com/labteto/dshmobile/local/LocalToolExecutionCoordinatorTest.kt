@@ -83,6 +83,26 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun pinnedConnectorRecoversPriorityAfterLaterModelStepHeuristics() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("mcp_figma_frame", ToolAccess.NETWORK, ToolApprovalPolicy.ALWAYS,
+                exposure = ToolExposure.OPTIONAL, family = "MCP") { ToolResult("ok") })
+            register(tool("autodiscovered", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, keywords = setOf("查找")) { ToolResult("ok") })
+            register(tool("github_prs", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, family = "GitHub") { ToolResult("ok") })
+        }
+        val c = coordinator(registry, pinnedConnectorIds = { listOf("figma", "github") })
+        c.prepareWorkTurnCapabilities("继续", emptyList(), { false })
+        c.enableTaskRelevantOptionalTools("查找", prioritize = true)
+        assertEquals("autodiscovered", c.enabledOptionalSnapshot().first())
+        c.prioritizePinnedForModelStep()
+        assertEquals("mcp_figma_frame", c.enabledOptionalSnapshot().first())
+        // A fixed but unauthenticated GitHub may never appear during a later model step.
+        assertFalse("github_prs" in c.enabledOptionalSnapshot())
+    }
+
+    @Test
     fun githubKeywordPreactivationCannotBypassNegationOrCredentialGate() = runBlocking {
         val registry = ToolRegistry().apply {
             register(tool(
