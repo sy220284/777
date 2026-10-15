@@ -1000,7 +1000,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 },
                                 onEdit = { message -> editingUserMessage = message },
                                 onCreateMedia = { message, kind ->
-                                    mediaInitialPrompt = message.content
+                                    mediaInitialPrompt = mediaCreativeDraft(
+                                        kind, message.content,
+                                        if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) state.chatPersona.name else "",
+                                        if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) state.chatPersona.coreIdentity else "",
+                                    )
                                     mediaInitialKind = kind.name
                                     showMediaStudio = true
                                 },
@@ -1607,6 +1611,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 viewModel = mediaStudioViewModel,
                 onDelivered = { showMediaStudio = false },
                 initialPrompt = mediaInitialPrompt,
+                personaVoiceStyle = if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled)
+                    state.chatPersona.facts.filter { it.category == "voiceStyle" }.joinToString("；") { it.content }
+                else "",
                 initialKind = com.labteto.dshmobile.local.model.LocalMediaKind.valueOf(mediaInitialKind),
                 onInsertTranscript = { transcription ->
                     val previous = drafts[state.sessionId].orEmpty()
