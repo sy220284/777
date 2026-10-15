@@ -22,7 +22,7 @@ class PersonaFormSimplificationRegressionTest {
                 ChatPersonaDialog(
                     profile = PersonaProfile(name = "", coreIdentity = ""),
                     onSave = { Result.success(Unit) },
-                    onAutoFill = { Result.failure(IllegalStateException("not configured")) },
+                    onAutoFill = { _, _ -> Result.failure(IllegalStateException("not configured")) },
                     onDismiss = {},
                     creatingNew = true,
                 )
@@ -31,9 +31,9 @@ class PersonaFormSimplificationRegressionTest {
 
         // 所有预置字段无需点击「添加」就能填写，顺序遵循自身 → 认知 → 表达 → 外部世界。
         listOf(
-            "人物名字", "核心身份", "性格", "价值与取舍", "自我叙事",
-            "主观认知", "内外反差", "偏好与习惯", "语言风格",
-            "人生经历", "重要人物关系", "作品来源／所属系列", "自定义事实",
+            "人物名字", "这个人是谁", "性格特点", "看重什么、如何取舍", "如何看待自己",
+            "眼中的世界", "表里反差", "日常喜好与习惯", "说话方式",
+            "重要经历", "在意的人与关系", "出自哪部作品", "补充设定",
         ).forEach { compose.onNodeWithText(it).assertExists() }
         // 此前删去的六项不能因为默认展开所有字段而回来。
         listOf("命运选择", "情感烙印", "人生引力", "未竟之事", "能力与代价", "感知视角")
@@ -68,7 +68,7 @@ class PersonaFormSimplificationRegressionTest {
                 ChatPersonaDialog(
                     profile = persona,
                     onSave = { Result.success(Unit) },
-                    onAutoFill = { Result.failure(IllegalStateException("not configured")) },
+                    onAutoFill = { _, _ -> Result.failure(IllegalStateException("not configured")) },
                     onDismiss = {},
                 )
             }
@@ -76,9 +76,9 @@ class PersonaFormSimplificationRegressionTest {
 
         compose.onNodeWithText("人生经历").assertExists()
         compose.onNodeWithText("在远方长大").assertExists()
-        compose.onNodeWithText("作品来源／所属系列").assertExists()
-        compose.onNodeWithText("性格").assertExists()
-        compose.onNodeWithText("语言风格").assertExists()
+        compose.onNodeWithText("出自哪部作品").assertExists()
+        compose.onNodeWithText("性格特点").assertExists()
+        compose.onNodeWithText("说话方式").assertExists()
         compose.onNodeWithText("情感烙印").assertDoesNotExist()
     }
 }
