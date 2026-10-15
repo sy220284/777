@@ -137,6 +137,7 @@ internal class ToolsOperationGate {
 @HiltViewModel
 class ToolsViewModel @Inject constructor(
     private val localTools: LocalToolsUiFacade,
+    private val gitHubSkillImporter: com.labteto.dshmobile.local.tools.LocalGitHubSkillImporter,
     @ApplicationContext private val appContext: Context,
     private val networkSearchSettings: LocalNetworkSearchSettings,
 ) : ViewModel() {
@@ -222,6 +223,27 @@ class ToolsViewModel @Inject constructor(
     fun installPreset(id: String) = changeSkills { localTools.installPreset(id) }
     fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         changeSkills(createdId = id) { localTools.createSkill(id, displayName, description, instructions) }
+    fun importGitHubSkill(url: String) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                val id = gitHubSkillImporter.install(url)
+                _state.value = _state.value.copy(
+                    loading = false,
+                    skills = localTools.installedSkills(),
+                    presets = localTools.presetSkills(),
+                    createdSkillId = id,
+                    feedback = appContext.getString(R.string.skills_import_success, id),
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false,
+                    feedback = error.message ?: appContext.getString(R.string.skills_import_failed))
+            }
+        }
+    }
+
     fun importSkill(uri: Uri) {
         launchOperation {
             _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
@@ -569,6 +591,7 @@ fun ToolsScreen(
             onInstallPreset = viewModel::installPreset,
             onCreateSkill = viewModel::createSkill,
             onImportSkill = { skillFilePicker.launch(arrayOf("*/*")) },
+            onInstallFromGitHub = viewModel::importGitHubSkill,
             onRemoveSkill = viewModel::removeSkill,
             onOpenSkillEditor = viewModel::openSkillEditor,
             onCloseSkillEditor = viewModel::closeSkillEditor,
