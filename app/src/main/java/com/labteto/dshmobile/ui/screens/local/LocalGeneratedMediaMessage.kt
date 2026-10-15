@@ -102,7 +102,7 @@ internal fun LocalCreationJobMessageRow(
     }
     MediaMessageCard(
         title = resources.getString(phase),
-        subtitle = "${job.provider} · ${job.model}",
+        subtitle = resources.getString(if (job.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
     ) {
         job.prompt?.let { prompt ->
             Text(prompt, style = DsType.small13.withReadingWeight(),
@@ -149,7 +149,8 @@ internal fun LocalGeneratedMediaResultRow(
         LocalMediaKind.TRANSCRIBE.name -> resources.getString(R.string.media_chat_transcript_done)
         else -> resources.getString(R.string.media_chat_generic_result)
     }
-    MediaMessageCard(title = label, subtitle = "") {
+    MediaMessageCard(title = label,
+        subtitle = resources.getString(if (result.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply)) {
         when (result.kind) {
             LocalMediaKind.IMAGE.name -> {
                 MediaInlinePicture(
@@ -259,7 +260,8 @@ internal fun LocalGeneratedVideoTaskRow(
         LocalMediaVideoPhase.SUCCEEDED -> resources.getString(R.string.media_chat_video_done)
         LocalMediaVideoPhase.FAILED -> resources.getString(R.string.media_chat_generation_failed)
     }
-    MediaMessageCard(title = phase, subtitle = "${task.provider} · ${task.model}") {
+    MediaMessageCard(title = phase,
+        subtitle = resources.getString(if (task.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply)) {
         task.description?.let {
             Text(it, style = DsType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, maxLines = 3,
