@@ -151,13 +151,7 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
     fun updateVideo(id: String, transition: (LocalMediaVideoTask) -> LocalMediaVideoTask) = update(id) { row ->
         row.copy(video = transition(row.video ?: error("视频任务不存在")))
     }
-    /** Immutable lookup of a saved local image before starting a new billable edit. */
-    @Synchronized
-    fun result(id: String): LocalMediaResult? = operation {
-        initialize()
-        database.get(id)?.takeUnless { it.deleted }?.result
-    }
-
+    /** Saved local media results are retrieved by the single result() lookup below. */
     @Synchronized
     fun videosNeedingDelivery(): List<LocalMediaVideoTask> = operation {
         initialize(); database.pending().mapNotNull { it.video }.filter { it.phase == LocalMediaVideoPhase.SUCCEEDED && it.fileName == null }

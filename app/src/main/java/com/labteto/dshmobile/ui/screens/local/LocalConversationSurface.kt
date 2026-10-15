@@ -1086,9 +1086,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                     } else {
                                         attachmentError = when (localComposerAttachmentDecision(attachments, reusable)) {
                                             LocalComposerAttachmentDecision.ACCEPT -> {
-                                                attachments += reusable
-                                                val current = drafts[state.sessionId].orEmpty()
-                                                drafts.putBoundedLocalDraft(state.sessionId,
+                                                drafts.addAttachment(state.sessionId, reusable)
+                                                val current = draftValues[state.sessionId].orEmpty()
+                                                drafts.updateDraft(state.sessionId,
                                                     listOf(generatedImageEditPrompt, current)
                                                         .filter(String::isNotBlank).joinToString("\n\n"))
                                                 null
