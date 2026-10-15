@@ -48,13 +48,17 @@ class LocalWorkEvidenceUiAdapter @Inject internal constructor(
     override suspend fun submit(command: LinkWorkEvidenceReferenceCommand): UiCommandReceipt = withContext(Dispatchers.IO) {
         try {
             synchronized(state.foregroundRunHandle.lock) {
-                if (!current(command.identity)) return@withContext UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                if (!current(command.identity) ||
+                    command.verifyGoalId && state.state.value.work.goal?.id != command.expectedGoalId)
+                    return@withContext UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
             }
             val prepared = work.prepareRequirementEvidenceForUi(command.identity.sessionId, command.requirementIndex,
                 command.expectedRequirement, command.artifact) ?: return@withContext UiCommandReceipt.NotAdmitted
             currentCoroutineContext().ensureActive()
             synchronized(state.foregroundRunHandle.lock) {
-                if (!current(command.identity) || state.state.value.work.todos.getOrNull(command.requirementIndex)?.content != command.expectedRequirement)
+                if (!current(command.identity) ||
+                    command.verifyGoalId && state.state.value.work.goal?.id != command.expectedGoalId ||
+                    state.state.value.work.todos.getOrNull(command.requirementIndex)?.content != command.expectedRequirement)
                     return@synchronized UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
                 if (work.commitRequirementEvidenceForUi(prepared))
                     UiCommandReceipt.Accepted else UiCommandReceipt.NotAdmitted

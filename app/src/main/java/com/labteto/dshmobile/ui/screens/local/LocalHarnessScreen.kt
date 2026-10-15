@@ -594,7 +594,8 @@ fun LocalHarnessScreen(
             else if (target.goalId != viewModel.workState.value.goal?.id) false
             else viewModel.workEvidenceUiPort.submit(
                 com.labteto.dshmobile.uicontract.LinkWorkEvidenceReferenceCommand(
-                    identity, target.index, target.content, artifact),
+                    identity, target.index, target.content, artifact,
+                    expectedGoalId = target.goalId, verifyGoalId = true),
             ) == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
         },
     )

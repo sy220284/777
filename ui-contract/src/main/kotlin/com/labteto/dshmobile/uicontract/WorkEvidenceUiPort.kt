@@ -13,7 +13,10 @@ sealed interface UiWorkEvidenceReadReceipt {
     data class Failed(val message: String?) : UiWorkEvidenceReadReceipt
 }
 data class LinkWorkEvidenceReferenceCommand(val identity: UiSessionIdentity, val requirementIndex: Int,
-    val expectedRequirement: String, val artifact: LocalArtifactUiItem)
+    val expectedRequirement: String, val artifact: LocalArtifactUiItem,
+    /** When supplied by a visible Work requirement selection, reject a different goal. */
+    val expectedGoalId: String? = null,
+    val verifyGoalId: Boolean = false)
 interface WorkEvidenceUiPort {
     suspend fun read(identity: UiSessionIdentity): UiWorkEvidenceReadReceipt
     suspend fun submit(command: LinkWorkEvidenceReferenceCommand): UiCommandReceipt
