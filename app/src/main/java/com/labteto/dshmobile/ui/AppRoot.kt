@@ -55,11 +55,15 @@ fun AppRoot(
         componentEmphasis = settings.componentEmphasis,
         motionDurationScale = settings.motionDurationScale,
     ) {
-        LocalHarnessScreen(
-            requestedSessionId = requestedLocalSessionId,
-            onSessionRequestConsumed = onLocalSessionRequestConsumed,
-            onCheckUpdate = { viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME) },
-            updateStatus = updateInstallStatus,
-        )
+        com.labteto.dshmobile.ui.host.LocalApplicationUiHost(
+            installedPacks = com.labteto.dshmobile.ui.host.LocalApplicationPackInstallations.all,
+        ) {
+            LocalHarnessScreen(
+                requestedSessionId = requestedLocalSessionId,
+                onSessionRequestConsumed = onLocalSessionRequestConsumed,
+                onCheckUpdate = { viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME) },
+                updateStatus = updateInstallStatus,
+            )
+        }
     }
 }
