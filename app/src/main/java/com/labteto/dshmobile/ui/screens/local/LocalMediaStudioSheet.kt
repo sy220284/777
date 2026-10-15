@@ -50,6 +50,7 @@ import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.local.model.LocalMediaCatalog
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalMediaOffer
@@ -172,7 +173,9 @@ internal fun LocalMediaStudioSheetContent(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = selected.label,
+                    text = if (available.count { it.label == selected.label } > 1)
+                        "${selected.label} · ${selected.profile.displayName ?: selected.profile.model}"
+                    else selected.label,
                     modifier = Modifier.weight(1f),
                     style = DsType.small13Strong.withReadingWeight(),
                     color = colors.textSecondary,
@@ -606,6 +609,7 @@ internal fun MediaStudioFlatTabs(
     enabled: Boolean = true,
 ) {
     val colors = LocalSyColors.current
+    val pulse = rememberHapticPulse()
     Row(
         modifier = Modifier.fillMaxWidth().selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -619,7 +623,7 @@ internal fun MediaStudioFlatTabs(
                         selected = active,
                         enabled = enabled,
                         role = Role.Tab,
-                        onClick = { onSelect(index) },
+                        onClick = { if (!active) pulse(); onSelect(index) },
                     ),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Bottom,
