@@ -754,6 +754,7 @@ fun LocalHarnessScreen(
         scope.launch { drawerState.open() }
     }
 
+    val reduceMotionForBackGesture = com.shenyan.designsystem.foundation.LocalSyReduceMotion.current
     PredictiveBackHandler(
         enabled = (syWideViewport || !drawerState.isOpen) && featurePage != LocalFeaturePage.HOME,
     ) { progress ->
@@ -780,10 +781,14 @@ fun LocalHarnessScreen(
             }
         } catch (cancelled: CancellationException) {
             withContext(NonCancellable) {
-                predictiveBackProgress.animateTo(
-                    targetValue = 0f,
-                    animationSpec = DsAnimations.predictiveBackSettle,
-                )
+                if (reduceMotionForBackGesture) {
+                    predictiveBackProgress.snapTo(0f)
+                } else {
+                    predictiveBackProgress.animateTo(
+                        targetValue = 0f,
+                        animationSpec = DsAnimations.predictiveBackSettle,
+                    )
+                }
             }
             throw cancelled
         }
