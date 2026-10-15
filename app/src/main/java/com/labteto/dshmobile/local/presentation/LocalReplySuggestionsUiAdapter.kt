@@ -3,7 +3,12 @@ package com.labteto.dshmobile.local.presentation
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.uiBindingIdentity
-import com.labteto.dshmobile.uicontract.*
+import com.labteto.dshmobile.uicontract.ReplySuggestionsUiPort
+import com.labteto.dshmobile.uicontract.UiReplySuggestionsSnapshot
+import com.labteto.dshmobile.uicontract.UiChatReplySuggestion
+import com.labteto.dshmobile.uicontract.UiSessionIdentity
+import com.labteto.dshmobile.uicontract.UiCommandReceipt
+import com.labteto.dshmobile.uicontract.UiCommandRejection
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException

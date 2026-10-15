@@ -4,7 +4,14 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.session.LocalUiDocumentSessionStore
 import com.labteto.dshmobile.local.uiBindingIdentity
-import com.labteto.dshmobile.uicontract.*
+import com.labteto.dshmobile.uicontract.UiDocumentBudget
+import com.labteto.dshmobile.uicontract.UiSceneId
+import com.labteto.dshmobile.uicontract.UiDocumentSource
+import com.labteto.dshmobile.uicontract.UiDocumentNode
+import com.labteto.dshmobile.uicontract.UiDocumentBinding
+import com.labteto.dshmobile.uicontract.UiDocument
+import com.labteto.dshmobile.uicontract.UiDocumentProvenance
+import com.labteto.dshmobile.uicontract.UiDocumentOrigin
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
