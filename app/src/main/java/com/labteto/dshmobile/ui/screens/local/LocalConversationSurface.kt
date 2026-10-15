@@ -1589,6 +1589,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             title = stringResource(R.string.media_studio_title),
             onDismiss = { showMediaStudio = false },
             scrollable = true,
+            seamlessBackground = true,
+            dimScrimWhenSeamless = true,
         ) {
             LocalMediaStudioSheetContent(
                 profiles = state.modelProfiles,
