@@ -47,6 +47,7 @@ internal class LocalToolExecutionCoordinator(
     ) -> Unit = { _, _, _ -> },
     private val executionIdFactory: () -> String = { UUID.randomUUID().toString() },
     private val networkSearchEnabled: () -> Boolean = { true },
+    private val pinnedConnectorIds: () -> List<String> = { emptyList() },
 ) {
     // 前台 Lead 与所有后台成员共用此闸门，文件写入工具不得并行交错执行。
     private val workspaceReadWriteGate = LocalWorkspaceReadWriteGate()
@@ -108,7 +109,7 @@ internal class LocalToolExecutionCoordinator(
         target: MutableSet<String>? = null,
     ) {
         val intent = LocalToolCapabilityIntent.from(input, history)
-        val enableGitHub = if (intent.requestsGitHub) {
+        val enableGitHub = if (intent.requestsGitHub || "github" in pinnedConnectorIds()) {
             try {
                 gitHubConfigured()
             } catch (cancelled: CancellationException) {
@@ -137,6 +138,9 @@ internal class LocalToolExecutionCoordinator(
         if (enableGitHub) enableGitHubConnectorTools(resolvedTarget)
         enableTaskRelevantOptionalTools(taskContext, resolvedTarget, prioritize = prioritizeTask)
         if (networkSearchEnabled()) enableOptionalTools(DEFAULT_NETWORK_TOOLS, resolvedTarget)
+        // Explicit, persistent selections must survive per-turn schema resets and outrank
+        // heuristic discovery; registry, approval and model budgets still govern execution.
+        enablePinnedMcpConnectorTools(resolvedTarget)
     }
 
     fun enableGitHubConnectorTools(target: MutableSet<String> = enabledOptionalTools) {
@@ -146,6 +150,21 @@ internal class LocalToolExecutionCoordinator(
             }
             .map(HarnessTool::name)
         enableOptionalTools(githubTools, target)
+    }
+
+    private fun enablePinnedMcpConnectorTools(target: MutableSet<String>) {
+        val prefixes = pinnedConnectorIds().asSequence()
+            .filter { it != "github" && Regex("[A-Za-z0-9_-]{1,48}").matches(it) }
+            .map { "mcp_${it}_" }.toList()
+        if (prefixes.isEmpty()) return
+        val matching = registry.names().filter { name -> prefixes.any(name::startsWith) }
+        enableOptionalTools(matching, target)
+        synchronized(target) {
+            val previous = target.toList()
+            target.clear()
+            target.addAll(matching.filter { it in previous })
+            target.addAll(previous)
+        }
     }
 
     private fun isGitHubConnectorTool(tool: HarnessTool): Boolean =
