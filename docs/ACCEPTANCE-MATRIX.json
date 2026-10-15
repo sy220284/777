@@ -253,18 +253,18 @@
       ]
     },
     {
-      "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 单次、重复与每月日程",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/automation/AutomationMonthlyScheduleTest.kt#januaryAnchorRestoresDayAfterShortMonth"
-      ]
-    },
-    {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务操作异常与受理回执",
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementOperationTest.kt#failedAcknowledgementReadsCurrentFactsWithoutReplayingMutation",
         "app/src/test/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementOperationTest.kt#rejectedCommandIsDifferentFromFailureAndReadFailureDoesNotInventEmptyTasks"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 单次、重复与每月日程",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/automation/AutomationMonthlyScheduleTest.kt#januaryAnchorRestoresDayAfterShortMonth"
       ]
     },
     {
