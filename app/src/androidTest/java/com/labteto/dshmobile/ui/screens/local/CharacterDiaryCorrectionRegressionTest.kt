@@ -76,6 +76,30 @@ class CharacterDiaryCorrectionRegressionTest {
     }
 
     @Test
+    fun diaryStartsInReadingModeAndBrowsingCanReturnToTheCleanPage() {
+        compose.setContent {
+            DshTheme {
+                CharacterDiaryScreen(
+                    gallery = emptyList(),
+                    currentPersona = PersonaProfile(id = "person-1", name = "阿青"),
+                    currentGalleryId = null,
+                    loadEntries = { listOf(entry()) },
+                    onCorrectEntry = { _, _, _, _ -> false },
+                    onDeactivateEntry = { _, _, _ -> false },
+                    onOpenSourceSession = { false },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("diary_paper_event_event-1").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("搜索事件、感受或未说出口的念头").assertDoesNotExist()
+        compose.onNodeWithTag("diary_browse_toggle").performScrollTo().performClick()
+        compose.onNodeWithText("搜索事件、感受或未说出口的念头").assertExists()
+        compose.onNodeWithTag("diary_browse_toggle").performScrollTo().performClick()
+        compose.onNodeWithText("搜索事件、感受或未说出口的念头").assertDoesNotExist()
+    }
+
+    @Test
     fun editingDiaryRequiresExplicitSaveAndRefreshesCurrentCharacter() {
         val current = mutableStateOf(listOf(entry()))
         val saved = AtomicInteger(0)
