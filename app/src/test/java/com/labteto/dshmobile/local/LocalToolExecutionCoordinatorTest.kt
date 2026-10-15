@@ -103,6 +103,32 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun pinnedImagegenMakesRealMediaToolsVisibleAcrossStepsWithoutAutoSubmitting() = runBlocking {
+        val registry = ToolRegistry().apply {
+            for (name in listOf("media_image_options", "media_image_create", "media_image_status")) {
+                register(tool(
+                    name, if (name == "media_image_create") ToolAccess.PRIVILEGED else ToolAccess.READ_ONLY,
+                    if (name == "media_image_create") ToolApprovalPolicy.ALWAYS else ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL, family = "媒体创作",
+                    keywords = setOf("生图"),
+                ) { ToolResult("stub") })
+            }
+        }
+        var selected = listOf("imagegen")
+        val coordinator = coordinator(registry, pinnedSkillIds = { selected })
+        coordinator.prepareWorkTurnCapabilities("继续", enableGitHub = false)
+        assertTrue("media_image_create" in coordinator.enabledOptionalSnapshot())
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", enableGitHub = false)
+        coordinator.prioritizePinnedForModelStep()
+        assertTrue("media_image_options" in coordinator.enabledOptionalSnapshot())
+        selected = emptyList()
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", enableGitHub = false)
+        assertFalse("media_image_create" in coordinator.enabledOptionalSnapshot())
+    }
+
+    @Test
     fun githubKeywordPreactivationCannotBypassNegationOrCredentialGate() = runBlocking {
         val registry = ToolRegistry().apply {
             register(tool(
@@ -1328,6 +1354,7 @@ class LocalToolExecutionCoordinatorTest {
         executionIdFactory: () -> String = { "exec-test" },
         networkSearchEnabled: () -> Boolean = { true },
         pinnedConnectorIds: () -> List<String> = { emptyList() },
+        pinnedSkillIds: () -> List<String> = { emptyList() },
     ) = LocalToolExecutionCoordinator(
         registry = registry,
         currentSessionId = { "s1" },
@@ -1338,6 +1365,7 @@ class LocalToolExecutionCoordinatorTest {
         executionIdFactory = executionIdFactory,
         networkSearchEnabled = networkSearchEnabled,
         pinnedConnectorIds = pinnedConnectorIds,
+        pinnedSkillIds = pinnedSkillIds,
     )
 
     private fun webFetchTool(execute: suspend () -> ToolResult) = HarnessTool(
