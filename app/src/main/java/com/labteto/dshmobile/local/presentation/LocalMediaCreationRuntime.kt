@@ -91,10 +91,20 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         })
     }
 
-    suspend fun submitImage(offer: LocalMediaOffer, prompt: String, ratio: String, sessionId: String, sourceMessageId: String? = null, revisionOf: String? = null): LocalMediaCreationJob {
+    suspend fun submitImage(offer: LocalMediaOffer, prompt: String, ratio: String, sessionId: String, sourceMessageId: String? = null, revisionOf: String? = null, editSourceImageId: String? = null): LocalMediaCreationJob {
         validate(offer, LocalMediaKind.IMAGE); require(prompt.isNotBlank())
+        // Resolve the source before creating the paid receipt. Missing images must never
+        // silently fall back to text-to-image and spend credits on the wrong operation.
+        val sourceImage = editSourceImageId?.let { id -> withContext(Dispatchers.IO) {
+            require(offer.provider == LocalMediaProvider.OPENAI) { "当前模型不支持原图编辑，请选择支持的图片模型" }
+            val previous = store.result(id) ?: error("原图片已删除，无法以原图编辑")
+            require(previous.kind == LocalMediaKind.IMAGE.name) { "原记录不是图片" }
+            store.file(previous.fileName) ?: error("本地原图已不可用，请切换为重新画图")
+        } }
         return submit(offer, sessionId, prompt, sourceMessageId, revisionOf) { id ->
-            val result = when (offer.provider) {
+            val result = if (sourceImage != null) {
+                api.editImage(offer, prompt, ratio, sourceImage)
+            } else when (offer.provider) {
                 LocalMediaProvider.MINIMAX -> com.labteto.dshmobile.local.model.LocalMediaImageResult(url = miniMax.generateImage(offer.profile, prompt, ratio))
                 else -> api.image(offer, prompt, ratio)
             }
