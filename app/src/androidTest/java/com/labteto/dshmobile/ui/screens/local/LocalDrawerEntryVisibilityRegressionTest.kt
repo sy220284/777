@@ -6,12 +6,12 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.session.LocalSessionSummary
-import androidx.compose.runtime.mutableStateOf
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -151,7 +151,7 @@ class LocalDrawerEntryVisibilityRegressionTest {
 
 
     @Test
-    fun sessionDeleteActionOnlyExistsWhileSwipedAndResetsWhenDrawerCloses() {
+    fun sessionCannotBeDeletedBySwipeButLongPressOffersDelete() {
         val title = "滑动删除可见性测试会话标题足够长"
         val session = LocalSessionSummary(
             id = "swipe-regression",
@@ -159,8 +159,6 @@ class LocalDrawerEntryVisibilityRegressionTest {
             updatedAt = 10L,
             usageMode = LocalUsageMode.WORK,
         )
-        val selectionOpen = mutableStateOf(false)
-        val drawerVisible = mutableStateOf(true)
         var deleteRequests = 0
         compose.setContent {
             DshTheme {
@@ -172,8 +170,7 @@ class LocalDrawerEntryVisibilityRegressionTest {
                     pinned = false,
                     running = false,
                     selected = false,
-                    selectionOpen = selectionOpen.value,
-                    drawerVisible = drawerVisible.value,
+                    selectionOpen = false,
                     onClick = {},
                     onSelectMultiple = {},
                     onRename = {},
@@ -184,25 +181,19 @@ class LocalDrawerEntryVisibilityRegressionTest {
         }
 
         val deleteLabel = context.getString(R.string.local_delete_session)
-        // Default state: the trash control is absent, not merely covered by the glass surface.
+        // No swipe-only delete control may be exposed, even after either horizontal swipe.
         compose.onNodeWithContentDescription(deleteLabel).assertDoesNotExist()
         compose.onNodeWithText(title).performTouchInput { swipeLeft() }
-        compose.onNodeWithContentDescription(deleteLabel).assertExists()
+        compose.onNodeWithContentDescription(deleteLabel).assertDoesNotExist()
         compose.onNodeWithText(title).performTouchInput { swipeRight() }
         compose.onNodeWithContentDescription(deleteLabel).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(0, deleteRequests) }
 
-        compose.onNodeWithText(title).performTouchInput { swipeLeft() }
-        compose.onNodeWithContentDescription(deleteLabel).performClick()
+        // All session management actions, including deletion, remain in the long-press menu.
+        compose.onNodeWithText(title).performTouchInput { longClick() }
+        compose.onNodeWithText(context.getString(R.string.common_rename)).assertExists()
+        compose.onNodeWithText(deleteLabel).performClick()
         compose.runOnIdle { assertEquals(1, deleteRequests) }
-        compose.onNodeWithContentDescription(deleteLabel).assertDoesNotExist()
-
-        compose.onNodeWithText(title).performTouchInput { swipeLeft() }
-        compose.runOnIdle { selectionOpen.value = true }
-        compose.onNodeWithContentDescription(deleteLabel).assertDoesNotExist()
-        compose.runOnIdle { selectionOpen.value = false }
-        compose.onNodeWithText(title).performTouchInput { swipeLeft() }
-        compose.runOnIdle { drawerVisible.value = false }
-        compose.onNodeWithContentDescription(deleteLabel).assertDoesNotExist()
     }
 
 }

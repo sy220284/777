@@ -1113,8 +1113,16 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
                         is LocalTranscriptItem.WorkStep -> Box(
                             modifier = Modifier.fillMaxWidth().animateItem(
-                                fadeInSpec = tween(durationMillis = 180),
-                                placementSpec = tween(durationMillis = 220),
+                                fadeInSpec = tween(durationMillis = com.shenyan.designsystem.foundation.SyMotion.duration(
+                                    com.shenyan.designsystem.foundation.SyMotion.pageEnterFadeMs,
+                                    com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
+                                    com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
+                                )),
+                                placementSpec = tween(durationMillis = com.shenyan.designsystem.foundation.SyMotion.duration(
+                                    com.shenyan.designsystem.foundation.SyMotion.toolExpandMs,
+                                    com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
+                                    com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
+                                )),
                                 fadeOutSpec = null,
                             ),
                         ) {
@@ -1657,6 +1665,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             title = stringResource(R.string.media_studio_title),
             onDismiss = { showMediaStudio = false },
             scrollable = true,
+            seamlessBackground = true,
+            dimScrimWhenSeamless = true,
         ) {
             LocalMediaStudioSheetContent(
                 profiles = state.modelProfiles,

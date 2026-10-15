@@ -9,6 +9,8 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,9 +18,14 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -29,7 +36,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -37,6 +50,7 @@ import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalMediaOffer
 import com.labteto.dshmobile.local.model.LocalMediaProvider
@@ -49,6 +63,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import com.shenyan.designsystem.foundation.LocalSyColors
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -74,7 +89,7 @@ internal fun LocalMediaStudioSheetContent(
     val videoTasks = archive.videos
     val generatedResults = archive.results
     val storageError by viewModel.storageError.collectAsState()
-    var showHistory by remember { mutableStateOf(true) }
+    var showHistory by remember { mutableStateOf(false) }
     var showVideoArchive by remember { mutableStateOf(false) }
     var videoRefreshBusy by remember { mutableStateOf<String?>(null) }
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
@@ -131,14 +146,12 @@ internal fun LocalMediaStudioSheetContent(
     }
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(SyMetric.gapMd),
-        verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        com.shenyan.designsystem.components.SyNote(stringResource(R.string.media_studio_notice),
-            modifier = Modifier.fillMaxWidth())
         val mediaKinds = listOf(LocalMediaKind.IMAGE, LocalMediaKind.VIDEO,
             LocalMediaKind.SPEECH, LocalMediaKind.TRANSCRIBE)
-        FluidSectionNavigation(
+        MediaStudioFlatTabs(
             labels = listOf(R.string.minimax_media_image, R.string.minimax_media_video,
                 R.string.minimax_media_speech, R.string.minimax_media_asr).map { stringResource(it) },
             selected = mediaKinds.indexOf(kind),
@@ -150,20 +163,35 @@ internal fun LocalMediaStudioSheetContent(
             com.shenyan.designsystem.components.SyEmptyState(FeatherIcons.Image,
                 stringResource(R.string.media_studio_no_model), body = "")
         } else {
-            SyButton(
-                text = stringResource(
-                    R.string.media_studio_selected_model, selected.label,
-                    selected.profile.displayName ?: selected.profile.model,
-                ),
-                onClick = { if (!busy) showModelChoices = !showModelChoices },
-                modifier = Modifier.fillMaxWidth(),
-                variant = SyButtonVariant.Ghost,
-                enabled = !busy,
-            )
+            // 模型仍可切换，但不再用整行大按钮和聊天模型名称挤占创作区。
+            Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)
+                    .testTag("mediaStudioModelSelector")
+                    .clickable(enabled = !busy) { showModelChoices = !showModelChoices },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = if (available.count { it.label == selected.label } > 1)
+                        "${selected.label} · ${selected.profile.displayName ?: selected.profile.model}"
+                    else selected.label,
+                    modifier = Modifier.weight(1f),
+                    style = DsType.small13Strong.withReadingWeight(),
+                    color = colors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Icon(
+                    imageVector = FeatherIcons.ChevronDown,
+                    contentDescription = stringResource(R.string.media_studio_select_model),
+                    modifier = Modifier.size(18.dp),
+                    tint = colors.textSecondary,
+                )
+            }
             if (showModelChoices) {
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth().height(176.dp),
-                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                    modifier = Modifier.fillMaxWidth().height(152.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     items(available, key = { it.id }) { option ->
                         SyButton(
@@ -188,21 +216,21 @@ internal fun LocalMediaStudioSheetContent(
                         if (kind == LocalMediaKind.SPEECH) R.string.minimax_media_speech_input
                         else R.string.minimax_media_prompt
                     )) },
-                    minLines = 3, maxLines = 6,
+                    minLines = 4, maxLines = 8,
                     modifier = Modifier.fillMaxWidth(), enabled = !busy,
                 )
             }
 
             when (kind) {
                 LocalMediaKind.IMAGE -> {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                        listOf("1:1", "16:9", "9:16").forEach { option ->
-                            SyButton(text = option, enabled = !busy, size = SyButtonSize.Small,
-                                variant = if (ratio == option) SyButtonVariant.Primary else SyButtonVariant.Ghost,
-                                onClick = { ratio = option })
-                        }
-                    }
+                    val ratios = listOf("1:1", "16:9", "9:16")
+                    MediaStudioFlatTabs(
+                        labels = ratios,
+                        selected = ratios.indexOf(ratio),
+                        onSelect = { ratio = ratios[it] },
+                        tag = "mediaRatio",
+                        enabled = !busy,
+                    )
                     SyButton(text = stringResource(R.string.minimax_media_create_image),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
@@ -278,17 +306,24 @@ internal fun LocalMediaStudioSheetContent(
                     }
                 }
                 LocalMediaKind.SPEECH -> {
-                    SyTextField(
-                        value = voiceId, onValueChange = { voiceId = it },
-                        label = { Text(stringResource(R.string.minimax_media_voice_id)) },
-                        singleLine = true, enabled = !busy, modifier = Modifier.fillMaxWidth(),
-                    )
-                    SyButton(text = stringResource(R.string.minimax_media_select_voice),
-                        onClick = { submit(selected) {
-                            val fetched = viewModel.voices(selected)
-                            if (selected.id == activeOfferId) { voices = fetched; showVoices = true }
-                        } },
-                        enabled = !busy, modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Ghost)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        SyTextField(
+                            value = voiceId, onValueChange = { voiceId = it },
+                            label = { Text(stringResource(R.string.minimax_media_voice_id)) },
+                            singleLine = true, enabled = !busy, modifier = Modifier.weight(1f),
+                        )
+                        SyButton(text = stringResource(R.string.minimax_media_select_voice),
+                            onClick = { submit(selected) {
+                                val fetched = viewModel.voices(selected)
+                                if (selected.id == activeOfferId) { voices = fetched; showVoices = true }
+                            } },
+                            enabled = !busy, size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost)
+                    }
                     if (showVoices) {
                         SyTextField(value = voiceFilter, onValueChange = { voiceFilter = it },
                             label = { Text(stringResource(R.string.minimax_media_filter_voice)) },
@@ -557,6 +592,55 @@ internal fun LocalMediaStudioSheetContent(
         }
         historyError?.let { Text(it, color = colors.text,
             style = DsType.caption11.withReadingWeight()) }
+    }
+}
+
+/**
+ * 媒体创作专用轻量选项栏：仅保留文字和细选中线，不复用带材质底板的通用导航。
+ * 保留 selectable/Tab 语义与原有测试标签，窄屏仍有完整触控面积。
+ */
+@Composable
+internal fun MediaStudioFlatTabs(
+    labels: List<String>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    tag: String,
+    enabled: Boolean = true,
+) {
+    val colors = LocalSyColors.current
+    val pulse = rememberHapticPulse()
+    Row(
+        modifier = Modifier.fillMaxWidth().selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        labels.forEachIndexed { index, label ->
+            val active = index == selected
+            Column(
+                modifier = Modifier.weight(1f).heightIn(min = 44.dp)
+                    .testTag("$tag:$index")
+                    .selectable(
+                        selected = active,
+                        enabled = enabled,
+                        role = Role.Tab,
+                        onClick = { if (!active) pulse(); onSelect(index) },
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Bottom,
+            ) {
+                Text(
+                    text = label,
+                    modifier = Modifier.padding(horizontal = 2.dp, vertical = 10.dp),
+                    style = DsType.small13Strong.withReadingWeight(),
+                    color = if (active) colors.text else colors.textSecondary,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                )
+                androidx.compose.foundation.layout.Spacer(
+                    Modifier.fillMaxWidth().height(2.dp)
+                        .background(if (active) colors.primary else Color.Transparent),
+                )
+            }
+        }
     }
 }
 

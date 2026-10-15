@@ -29,6 +29,9 @@ class ShenyanGlobalVisualContractTest {
 
     @Test fun motionTokensKeepNavigationPriorityAndRespectReducedMotion() {
         assertTrue(SyMotion.pressMs < SyMotion.selectMs)
+        assertTrue("主页面动画应快速收敛", SyMotion.pushMs <= 300)
+        assertTrue("同级页面切换不应拖沓", SyMotion.pagePeerMs <= 160)
+        assertEquals(0, SyMotion.duration(SyMotion.pushMs, true, 1.3f))
         assertTrue(SyMotion.pagePeerMs < SyMotion.pagePopMs)
         assertTrue(SyMotion.pagePopMs < SyMotion.pushMs)
         assertTrue(SyMotion.pressedScale in 0f..1f)

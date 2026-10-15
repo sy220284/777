@@ -4,6 +4,7 @@ import com.shenyan.designsystem.foundation.SyMetric
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -93,11 +94,16 @@ internal fun FirstLaunchOnboarding(
                 }
             }
             Spacer(Modifier.height(SyMetric.gapPage))
+            val fadeDuration = com.shenyan.designsystem.foundation.SyMotion.duration(
+                com.shenyan.designsystem.foundation.SyMotion.fadeMs,
+                com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
+                com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
+            )
             AnimatedContent(
                 targetState = step,
                 modifier = Modifier.widthIn(max = 380.dp),
                 transitionSpec = {
-                    fadeIn(DsAnimations.fade) togetherWith fadeOut(DsAnimations.fade)
+                    fadeIn(tween(fadeDuration)) togetherWith fadeOut(tween(fadeDuration))
                 },
                 label = "onboardingStep",
             ) { current ->
