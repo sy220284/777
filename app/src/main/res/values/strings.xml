@@ -1927,10 +1927,8 @@
     <string name="persona_v4_custom_facts">自定义事实</string>
     <string name="persona_v4_section_core">人物核心 · V4</string>
     <string name="persona_v4_section_core_simple">基础信息</string>
-    <string name="local_persona_intro_simple">只需填写名字和人物身份，性格、经历等设定可以之后按需添加。</string>
-    <string name="persona_v4_add_field_picker">＋ 添加人物设定</string>
-    <string name="persona_v4_hide_field_picker">收起可选设定</string>
-    <string name="persona_v4_show_more_field_types">查看更多设定类别</string>
+    <string name="persona_v4_add_field_picker">＋ 添加扩展资料</string>
+    <string name="persona_v4_hide_field_picker">收起扩展资料</string>
     <string name="persona_v4_custom_field_name">自定义设定名称</string>
     <string name="persona_v4_edit_lore">编辑人物知识（%1$d 条）</string>
     <string name="persona_v4_expand_ai">AI 帮我完善人物</string>
