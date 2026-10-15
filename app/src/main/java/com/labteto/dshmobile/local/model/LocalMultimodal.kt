@@ -197,6 +197,7 @@ internal suspend fun prepareLocalMultimodalMessages(
     maxImageBytes: Long = MAX_NATIVE_IMAGE_BYTES,
     model: String? = null,
     baseUrl: String? = null,
+    planSharing: Boolean = false,
 ): List<JsonObject> = withContext(Dispatchers.IO) {
     val activeImageMessageIndices = activeImageMessageIndices(messages, mode)
     val activeFileMessageIndices = activeFileMessageIndices(messages)
@@ -243,7 +244,7 @@ internal suspend fun prepareLocalMultimodalMessages(
                     // Send the active document as a request-scoped input_file when this is an
                     // official OpenAI Responses route. No Files upload API or durable Base64.
                     val nativeMime = openAiNativeFileMime(name)
-                    val nativeFileAllowed = baseUrl != null &&
+                    val nativeFileAllowed = planSharing && baseUrl != null &&
                         usesOfficialOpenAiResponsesContract(baseUrl, false) &&
                         model != null &&
                         mode != LocalImageInputMode.TOOL &&
