@@ -2319,5 +2319,6 @@
     <string name="media_chat_edit_generated_image">修改这张图片</string>
     <string name="media_chat_edit_generated_image_prompt">请根据附图重新生成一张图片，修改要求：</string>
     <string name="media_chat_edit_generated_image_missing">原图已不可用，无法继续修改</string>
+    <string name="media_recreate_credential_changed">原创作账户凭据已变化，请重新选择创作账户</string>
 </resources>
 
