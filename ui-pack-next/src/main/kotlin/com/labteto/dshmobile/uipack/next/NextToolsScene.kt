@@ -153,8 +153,8 @@ fun NextToolsScene(
             if (page == NextToolsPage.OVERVIEW) {
                 Text(stringResource(if (facts.githubConfigured)
                     R.string.next_tools_github_configured else R.string.next_tools_github_missing))
-                Text(stringResource(R.string.next_tools_server_info,
-                    facts.servers.count { it.registration == UiToolRegistration.REGISTERED }.toString(),
+                Text(stringResource(R.string.next_tools_summary,
+                    facts.servers.count { it.registration == UiToolRegistration.REGISTERED },
                     facts.skills.size))
             }
             if (page != NextToolsPage.PLUGINS) {

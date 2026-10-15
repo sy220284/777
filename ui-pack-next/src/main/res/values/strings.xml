@@ -214,4 +214,5 @@
     <string name="next_tools_github_missing">GitHub 尚未配置</string>
     <string name="next_tools_skill">技能：%1$s</string>
     <string name="next_tools_plugin">插件：%1$s</string>
+    <string name="next_tools_summary">已登记 %1$d 台 MCP 服务器 · %2$d 项技能</string>
 </resources>

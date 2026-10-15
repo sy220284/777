@@ -2,6 +2,8 @@ package com.labteto.dshmobile.ui.host
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -82,7 +84,7 @@ class NextToolsSceneInstrumentedTest {
         compose.onNodeWithText(context.getString(R.string.next_tools_server_id)).performTextInput("new-server")
         compose.onNodeWithText(context.getString(R.string.next_tools_server_endpoint)).performTextInput("https://server.example/mcp")
         compose.onNodeWithText(context.getString(R.string.next_tools_connect)).performClick()
-        compose.onNodeWithText("new-server").assertExists()
+        compose.onNodeWithText(context.getString(R.string.next_tools_connection_applied)).assertExists()
         compose.runOnIdle { assertEquals(listOf("new-server" to "https://server.example/mcp"), owner.connects) }
     }
 
@@ -93,7 +95,7 @@ class NextToolsSceneInstrumentedTest {
         compose.onNodeWithText(context.getString(R.string.next_tools_disconnect)).performClick()
         compose.onNodeWithText(context.getString(R.string.next_tools_disconnect_confirm)).assertExists()
         compose.runOnIdle { assertEquals(0, owner.disconnects.size) }
-        compose.onNodeWithText(context.getString(R.string.next_tools_disconnect)).performClick()
+        compose.onAllNodesWithText(context.getString(R.string.next_tools_disconnect)).onLast().performClick()
         compose.onNodeWithText(context.getString(R.string.next_tools_mcp_none)).assertExists()
         compose.runOnIdle { assertEquals(listOf("existing"), owner.disconnects) }
     }
