@@ -9,7 +9,6 @@ import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.tools.LocalComposerInvocationOption
 import com.labteto.dshmobile.local.tools.LocalPinnedInvocation
-import com.labteto.dshmobile.local.tools.LocalPinnedInvocationStore
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.chat.ChatDiaryDelta
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
@@ -50,39 +49,12 @@ class LocalHarnessViewModel @Inject constructor(
     private val usageUi: com.labteto.dshmobile.local.presentation.LocalUsageUiFacade,
     private val approvalPreferences: LocalApprovalPreferences,
     private val networkSearchSettings: LocalNetworkSearchSettings,
-    private val pinnedStore: LocalPinnedInvocationStore,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
-    internal val pinnedInvocations get() = pinnedStore.selected
-
-    internal fun togglePinnedInvocation(value: LocalPinnedInvocation) = pinnedStore.toggle(value)
-
-    internal suspend fun composerInvocationOptions(): List<LocalComposerInvocationOption> {
-        val available = mutableListOf<LocalComposerInvocationOption>()
-        if (toolsUi.githubConfigured()) {
-            available += LocalComposerInvocationOption(
-                LocalPinnedInvocation(LocalPinnedInvocation.Kind.CONNECTOR, "github"),
-                "GitHub", "已连接 · 仓库与 PR",
-            )
-        }
-        toolsUi.servers().filter { it.tools.isNotEmpty() }.forEach { server ->
-            available += LocalComposerInvocationOption(
-                LocalPinnedInvocation(LocalPinnedInvocation.Kind.CONNECTOR, server.id),
-                server.id, "MCP · ${server.tools.size} 项工具",
-            )
-        }
-        toolsUi.installedSkills().filter { it.modelInvocable }.forEach { skill ->
-            available += LocalComposerInvocationOption(
-                LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, skill.name),
-                skill.displayName, skill.description,
-            )
-        }
-        val availableIds = available.map { it.invocation }.toSet()
-        // Keep missing or disconnected pins visible so the user can explicitly remove them.
-        return available + pinnedStore.selected.value.filterNot { it in availableIds }.map { missing ->
-            LocalComposerInvocationOption(missing, missing.id, "已离线或已移除 · 点击取消固定", false)
-        }
-    }
+    internal val pinnedInvocations get() = toolsUi.pinnedInvocations
+    internal fun togglePinnedInvocation(value: LocalPinnedInvocation) = toolsUi.togglePinnedInvocation(value)
+    internal suspend fun composerInvocationOptions(): List<LocalComposerInvocationOption> =
+        toolsUi.composerInvocationOptions()
 
     internal suspend fun installedSkillDisplayNames(): Map<String, String> =
         toolsUi.installedSkills().associate { it.name to it.displayName }
