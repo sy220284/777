@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
@@ -506,6 +507,7 @@ private fun decodeMediaPreview(file: File?, remoteUrl: String?, maxEdge: Int = 1
 @Composable
 private fun MediaImageDetailDialog(file: File?, remoteUrl: String?, onDismiss: () -> Unit) {
     val resources = LocalResources.current
+    val imageHeight = (LocalConfiguration.current.screenHeightDp.dp * 0.62f).coerceIn(190.dp, 580.dp)
     var detail by remember(file?.absolutePath, remoteUrl) { mutableStateOf<ImageBitmap?>(null) }
     var loading by remember(file?.absolutePath, remoteUrl) { mutableStateOf(true) }
     var zoom by remember(file?.absolutePath, remoteUrl) { mutableFloatStateOf(1f) }
@@ -525,11 +527,11 @@ private fun MediaImageDetailDialog(file: File?, remoteUrl: String?, onDismiss: (
     SyResponsiveSheet(
         title = null,
         onDismiss = onDismiss,
-        scrollable = true,
+        scrollable = false,
         showDragHandle = false,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().heightIn(max = 740.dp)
+            modifier = Modifier.fillMaxWidth()
                 .background(Color.Black)
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -543,7 +545,7 @@ private fun MediaImageDetailDialog(file: File?, remoteUrl: String?, onDismiss: (
                     size = SyButtonSize.Small, onClick = onDismiss)
             }
             Box(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 280.dp, max = 640.dp)
+                modifier = Modifier.fillMaxWidth().height(imageHeight)
                     .transformable(state = gesture),
                 contentAlignment = androidx.compose.ui.Alignment.Center,
             ) {
@@ -552,7 +554,7 @@ private fun MediaImageDetailDialog(file: File?, remoteUrl: String?, onDismiss: (
                         bitmap = detail!!,
                         contentDescription = resources.getString(R.string.media_chat_generated_image),
                         contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 280.dp, max = 640.dp)
+                        modifier = Modifier.fillMaxWidth().height(imageHeight)
                             .graphicsLayer {
                                 scaleX = zoom
                                 scaleY = zoom
