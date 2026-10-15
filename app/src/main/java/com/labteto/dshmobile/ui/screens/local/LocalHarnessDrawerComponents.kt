@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import com.shenyan.designsystem.foundation.SyMetric
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
@@ -215,7 +216,13 @@ internal fun DrawerQuickAction(
             hovered -> sy.l3
             else -> Color.Transparent
         },
-        animationSpec = DsAnimations.interactionColor,
+        animationSpec = tween(
+                            com.shenyan.designsystem.foundation.SyMotion.duration(
+                                com.shenyan.designsystem.foundation.SyMotion.interactionColorMs,
+                                com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
+                                com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
+                            ), easing = com.shenyan.designsystem.foundation.SyMotion.ease,
+                        ),
         label = "drawerQuickActionFeedback",
     )
     Row(
@@ -342,7 +349,13 @@ internal fun LocalSessionDrawerRow(
                             current -> colors.selected.copy(alpha = .18f)
                             else -> Color.Transparent
                         },
-                        animationSpec = DsAnimations.interactionColor,
+                        animationSpec = tween(
+                            com.shenyan.designsystem.foundation.SyMotion.duration(
+                                com.shenyan.designsystem.foundation.SyMotion.interactionColorMs,
+                                com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
+                                com.shenyan.designsystem.foundation.LocalSyMotionTempo.current,
+                            ), easing = com.shenyan.designsystem.foundation.SyMotion.ease,
+                        ),
                         label = "sessionRowBackground",
                     ).value,
                 )
