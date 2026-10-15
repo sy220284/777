@@ -60,7 +60,8 @@ internal class ChatInteractionPlanParser(
         }
         val diaryReflection = (diary?.get("privateReflection") as? kotlinx.serialization.json.JsonPrimitive)
             ?.takeIf { it.isString }?.content.orEmpty()
-        val shortAnchorWithContext = diaryReflection.trim().length >= 36
+        val shortAnchorWithContext = diaryReflection.isNotBlank() &&
+            (diaryImportance >= 3 || diaryReflection.trim().length >= 36)
         val diarySignificance = (normalized["turnSignificance"]
             as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty().uppercase()
         // Keep standalone diary-only patches viable for a grounded change of outlook,
