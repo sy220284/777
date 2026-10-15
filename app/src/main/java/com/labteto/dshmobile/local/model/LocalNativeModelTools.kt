@@ -16,6 +16,10 @@ private val EXPLICIT_CN_IMAGE_EDIT_COMMAND = Regex(
     """^(?:(?:请|帮我|给我|麻烦|现在|再|继续)\s*){0,3}(?:(?:根据|基于|参考|把|将|用).{0,100})?""" +
         """(?:修改|编辑|重绘|重画|重新画|重新生成|重做).{0,100}(?:图片|图像|照片|插画|海报|图|画)""",
 )
+private val EXPLICIT_EN_IMAGE_EDIT_COMMAND = Regex(
+    """^(?:please\s+)?(?:edit|modify|retouch|redraw)\s+(?:(?:this|the|my|attached)\s+)?(?:image|photo|picture|illustration)\b""",
+    RegexOption.IGNORE_CASE,
+)
 private val EXPLICIT_EN_IMAGE_COMMAND = Regex(
     """^(?:please\s+)?(?:draw|generate|render|create|make)\s+(?:(?:me|an?|the|some)\s+){0,3}(?:image|picture|illustration|photo|portrait|poster)\b""",
     RegexOption.IGNORE_CASE,
@@ -34,6 +38,7 @@ internal fun isExplicitImageGenerationRequest(text: String): Boolean {
                 (EXPLICIT_CN_IMAGE_COMMAND.containsMatchIn(clause) ||
                     EXPLICIT_CN_IMAGE_EDIT_COMMAND.containsMatchIn(clause) ||
                     CONTEXTUAL_CN_IMAGE_COMMAND.containsMatchIn(clause) ||
+                    EXPLICIT_EN_IMAGE_EDIT_COMMAND.containsMatchIn(clause) ||
                     EXPLICIT_EN_IMAGE_COMMAND.containsMatchIn(clause))
         }
 }
