@@ -9,7 +9,7 @@ class ChatTurnModeTest {
     @Test
     fun conversationPhrasesDoNotInstallAReactionMode() {
         val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
-        val persona = PersonaProfile(name = "阿青", portrait = "剑客，重情，寡言")
+        val persona = PersonaProfile(name = "阿青", coreIdentity = "剑客，重情，寡言")
         val scene = ChatContextState(scene = ChatSceneState(location = "院子"))
         val base = projector.project(persona, ChatCharacterState(), scene, "你好", null)
         listOf("继续", "为什么呢", "换个话题", "别出去", "你还记得上次吗").forEach { input ->
@@ -23,7 +23,7 @@ class ChatTurnModeTest {
     @Test
     fun unrelatedCurrentRequestsDoNotReactivateOldTasksButExplicitRecallDoes() {
         val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
-        val persona = PersonaProfile(name = "阿青", portrait = "温柔、活泼")
+        val persona = PersonaProfile(name = "阿青", coreIdentity = "温柔、活泼")
         val state = ChatCharacterState(
             activeGoal = "把宋制襦裙叠好",
             currentAgenda = "准备展示明制披衫",
