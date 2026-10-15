@@ -17,7 +17,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.res.painterResource
-import androidx.compose.material3.OutlinedTextField
+import com.shenyan.designsystem.components.SyTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -78,11 +78,12 @@ internal fun LocalComposerInvocationPicker(
                 Text(stringResource(R.string.composer_invocation_title), color = colors.text,
                     style = DsType.std14Strong.withReadingWeight(),
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-                OutlinedTextField(
+                SyTextField(
                     value = query,
                     onValueChange = { query = it },
                     placeholder = { Text(stringResource(R.string.composer_invocation_search)) },
                     singleLine = true,
+                    flat = true,
                     modifier = Modifier.width(286.dp).padding(horizontal = 8.dp),
                 )
                 if (entries.isEmpty()) {
