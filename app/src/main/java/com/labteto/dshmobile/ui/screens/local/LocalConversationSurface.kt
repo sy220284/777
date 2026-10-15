@@ -426,7 +426,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
     var showMediaStudio by rememberSaveable(state.sessionId) { mutableStateOf(false) }
-    var mediaRevision by remember(state.sessionId) { mutableStateOf<LocalMediaRevisionDraft?>(null) }
+    var mediaRevision by rememberSaveable(state.sessionId) { mutableStateOf<LocalMediaRevisionDraft?>(null) }
     var mediaInitialPrompt by rememberSaveable(state.sessionId) { mutableStateOf("") }
     var mediaSourceMessageId by rememberSaveable(state.sessionId) { mutableStateOf<String?>(null) }
     var mediaInitialKind by rememberSaveable(state.sessionId) {

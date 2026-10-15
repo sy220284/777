@@ -97,7 +97,7 @@ internal fun LocalMediaStudioSheetContent(
     val storageError by viewModel.storageError.collectAsState()
     var showHistory by remember { mutableStateOf(false) }
     var showArchive by rememberSaveable { mutableStateOf(false) }
-    var archiveRevision by remember { mutableStateOf<LocalMediaRevisionDraft?>(null) }
+    var archiveRevision by rememberSaveable { mutableStateOf<LocalMediaRevisionDraft?>(null) }
     val activeRevision = archiveRevision ?: revision
     var showVideoArchive by remember { mutableStateOf(false) }
     var videoRefreshBusy by remember { mutableStateOf<String?>(null) }

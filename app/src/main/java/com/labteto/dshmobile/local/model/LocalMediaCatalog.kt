@@ -26,7 +26,7 @@ data class LocalMediaRevisionDraft(
     val routeFingerprint: String? = null,
     val ratio: String = "1:1",
     val voiceId: String? = null,
-) {
+) : java.io.Serializable {
     fun originalOffer(offers: List<LocalMediaOffer>): LocalMediaOffer? =
         offers.firstOrNull {
             it.kind == kind && it.id == offerId && routeFingerprint != null &&
