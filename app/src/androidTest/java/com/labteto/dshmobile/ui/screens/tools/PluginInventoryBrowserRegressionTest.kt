@@ -247,7 +247,7 @@ class PluginInventoryBrowserRegressionTest {
             DshTheme {
                 PluginInventoryBrowser(
                     localIds = emptyList(),
-                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                    skills = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot(
                         "research-check", "核查改动正确性并追踪异常、复盘及验证修复结果", true,
                     )),
                     skillsOnly = true,
@@ -289,7 +289,7 @@ class PluginInventoryBrowserRegressionTest {
             DshTheme {
                 PluginInventoryBrowser(
                     localIds = emptyList(),
-                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                    skills = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot(
                         "research-check", "核查改动正确性", true,
                     )),
                     skillsOnly = true, loading = true,

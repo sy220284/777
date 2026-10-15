@@ -1,6 +1,6 @@
 {
   "schema": "777.ui-r4.code-tasks/1",
-  "asOf": "2026-10-14",
+  "asOf": "2026-10-15",
   "baseline": "828b5434",
   "scope": "整个 R4，非单一功能",
   "verificationPolicy": "用户要求延后测试、编译、设备和 CI 跟进；代码状态不代表验收通过",
@@ -30,7 +30,8 @@
       "id": "S0-02",
       "task": "隐性入口、设计与现行场景对应",
       "codeStatus": "CODE_PARTIAL",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "remaining": "补全 7 路由 / 21 设置目的地 / 78 Scene 的入口变更核对：以 #718 当前菜单、人物/模型选择、设置入口及 V6.3 新图标语义为基线；历史 9 路由/38 屏不得恢复。"
     },
     {
       "id": "S1-01",
@@ -129,7 +130,8 @@
       "id": "S3-03",
       "task": "完整 V6 页面/导航/Composer/时间线/设置移包",
       "codeStatus": "CODE_PARTIAL",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "remaining": "V6.3 基础组件已移 :ui-pack-v6，但全页面、Composer、时间线、菜单/无缝弹层与设置页尚未独立移包；要在包内保持主线 #718 视觉/触控行为，不建立 App 端同名 V6 组件副本。"
     },
     {
       "id": "S3-04",
@@ -159,13 +161,15 @@
       "id": "S3-08",
       "task": "剩余视觉语义/资源/动效治理",
       "codeStatus": "CODE_PARTIAL",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "remaining": "V6.3 128 图标变体、主题/背景材质、菜单/弹层同源层级、48dp 触控与无障碍待以真实当前路径校验；V6 独有材质与图标不得强制 Next 使用。"
     },
     {
       "id": "S3-09",
       "task": "设计入口与 Scene/组件/Owner 映射",
       "codeStatus": "CODE_PARTIAL",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "remaining": "将 #718 新交互入口与 7 路由/21 设置目的地映射到既有 Scene/Action/Owner，避免视觉重排导致重复 Action；缺口 108/173 动作需持续映射并形成回执/恢复证明。"
     },
     {
       "id": "S4-01",
@@ -227,7 +231,8 @@
       "id": "S5-01",
       "task": "最终 SHA CI 与 Android16/17 全场景/无障碍/弱网/收费矩阵",
       "codeStatus": "VERIFICATION_DEFERRED",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "remaining": "基于最终 SHA 重新运行必要 CI：192a4ceb 的 x86 AndroidTest 编译失败（onNode/旧 Skill 类型）必须修复并验证；Android16/17 当次因共享制品未通过，不应误判为真实设备行为失败；另验收 V6.3/#718 触控、无缝弹层、三主题、IME、TalkBack、字号、弱网/收费/恢复。"
     }
   ],
   "limitations": {
@@ -236,5 +241,16 @@
     "S3-03": "基础组件及新的独立证据 Overlay 已在 V6 模块；完整页面树仍留 App",
     "S4-07": "新增删除清理仅覆盖 Owner-confirmed IDs；完整版本迁移/崩溃恢复未完成",
     "S1-02": "编辑/删除的图库提交与当前会话同步是分立事实，Saved/Deleted + DEFERRED 不应重放图库操作。同期恢复相同条目/故事时不解绑其新引用。"
+  },
+  "mainlineReview": {
+    "mainCommit": "cd0edcff4fbf5153fdd4e58f9b4558ed1d79de2d",
+    "reviewedPrHead": "192a4cebad34d226fd9411b7e06a5643dc2a6252",
+    "mainAlreadyMerged": true,
+    "mainBehindAtReview": 0,
+    "scope": "V6.3 icons/materials/independent module and #718 overlays/touch/settings; never restore retired routes",
+    "ciRun": "https://github.com/sy220284/777/actions/runs/38589559423",
+    "ciConclusion": "FAILURE",
+    "ciFinding": "AndroidTest Kotlin unresolved onNode import and obsolete LocalSkillUiEntry (UiSkillSnapshot is current); Android 16/17 blocked by shared x86 test-artifact build",
+    "ciPolicy": "Only final SHA all required lanes success counts, independent device and real双包验收 remain separate"
   }
 }
