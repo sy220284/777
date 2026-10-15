@@ -137,6 +137,14 @@ internal fun LocalMediaStudioSheetContent(
             LocalMediaVoiceLabels.suggestedId(it, personaVoiceStyle)
         }.orEmpty())
     }
+    // A saved local image can be used as actual image input only on a wired edit route.
+    var editOriginalImage by rememberSaveable(matchingRevision?.originId, selected?.id) {
+        mutableStateOf(
+            matchingRevision?.originFileName != null &&
+                selected?.provider == LocalMediaProvider.OPENAI &&
+                selected.kind == LocalMediaKind.IMAGE
+        )
+    }
     var busy by remember { mutableStateOf(false) }
     var error by remember(selected?.id) { mutableStateOf<String?>(null) }
     var viewedVideoTaskId by rememberSaveable(selected?.id) { mutableStateOf("") }
@@ -295,10 +303,32 @@ internal fun LocalMediaStudioSheetContent(
                         tag = "mediaRatio",
                         enabled = !busy,
                     )
+                    if (matchingRevision != null) {
+                        if (selected.provider == LocalMediaProvider.OPENAI && matchingRevision.originFileName != null) {
+                            MediaStudioFlatTabs(
+                                labels = listOf(stringResource(R.string.media_recreate_edit_pixels),
+                                    stringResource(R.string.media_recreate_redraw_only)),
+                                selected = if (editOriginalImage) 0 else 1,
+                                onSelect = { editOriginalImage = it == 0 },
+                                tag = "mediaImageRevisionMode",
+                                enabled = !busy,
+                            )
+                        } else {
+                            Text(stringResource(R.string.media_recreate_edit_not_supported),
+                                color = colors.textSecondary, style = DsType.caption11.withReadingWeight())
+                        }
+                    }
                     SyButton(text = stringResource(R.string.minimax_media_create_image),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            viewModel.submitImage(selected, prompt, ratio, sessionId, if (matchingRevision != null) matchingRevision.sourceMessageId else sourceMessageId, matchingRevision?.originId)
+                            viewModel.submitImage(
+                                selected, prompt, ratio, sessionId,
+                                if (matchingRevision != null) matchingRevision.sourceMessageId else sourceMessageId,
+                                matchingRevision?.originId,
+                                if (editOriginalImage && matchingRevision != null &&
+                                    selected.provider == LocalMediaProvider.OPENAI)
+                                    matchingRevision.originId else null,
+                            )
                             if (selected.id == activeOfferId) onDelivered()
                         } })
                 }
