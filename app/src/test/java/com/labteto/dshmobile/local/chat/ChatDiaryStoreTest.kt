@@ -708,6 +708,33 @@ class ChatDiaryStoreTest {
     }
 
     @Test
+    fun groundedChangeOfOutlookCanBeKeptWithoutInventingAnEvent() {
+        val reflection = "我一直以为只要沉默就不会受伤。今天重新想了一遍，或许我也可以试着表达自己的期待。"
+        val request = request(
+            delta = ChatDiaryDelta(
+                event = "那次沉默", privateReflection = reflection, importance = 2,
+            ),
+            evidence = "那次沉默让我想了许久",
+        ).copy(turnSignificance = "MINOR")
+        val saved = store().record(request)
+        assertNotNull(saved)
+        assertEquals(reflection, saved!!.privateReflection)
+        assertEquals("那次沉默", saved.event)
+        // This exception only applies to an actual reflective passage about grounded
+        // experience. Small talk, a fabricated source, and NONE are still rejected.
+        val nonReflective = request.copy(
+            delta = request.delta!!.copy(privateReflection = ""),
+            sourceUserMessageIds = listOf("u-other"),
+            sourceAssistantMessageIds = listOf("a-other"),
+        )
+        assertNull(store().record(nonReflective))
+        assertNull(store().record(request.copy(
+            evidenceText = "只是天气不错", sourceUserMessageIds = listOf("u-another"),
+        )))
+        assertNull(store().record(request.copy(turnSignificance = "NONE")))
+    }
+
+    @Test
     fun groundedMajorEventWithoutSubjectiveFeelingStillBecomesSharedExperience() {
         val memory = store()
 
