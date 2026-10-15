@@ -453,11 +453,11 @@ internal fun UsageAggregateHero(
 }
 
 @Composable
-internal fun CompactMetric(label: String, value: String, modifier: Modifier = Modifier) {
+internal fun CompactMetric(label: String, value: String, modifier: Modifier = Modifier, testTag: String = "usageCompactMetric") {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     // Metric columns share their parent section instead of nesting another glass tile.
     Column(
-        modifier = modifier.testTag("usageCompactMetric")
+        modifier = modifier.testTag(testTag)
             .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
     ) {
