@@ -247,11 +247,11 @@ internal fun PluginInventoryBrowser(
                             com.shenyan.designsystem.components.SyTextField(
                                 value = gitHubSkillUrl,
                                 onValueChange = { gitHubSkillUrl = it },
-                                placeholder = { Text("GitHub 技能目录地址") },
+                                placeholder = { Text(stringResource(R.string.skills_github_url_hint)) },
                                 modifier = Modifier.weight(1f).testTag("skill-github-url"),
                             )
                             SyButton(
-                                text = "安装",
+                                text = stringResource(R.string.skills_github_install),
                                 onClick = { onInstallFromGitHub(gitHubSkillUrl.trim()) },
                                 enabled = !loading && gitHubSkillUrl.trim().startsWith("https://github.com/"),
                                 size = SyButtonSize.Small,
