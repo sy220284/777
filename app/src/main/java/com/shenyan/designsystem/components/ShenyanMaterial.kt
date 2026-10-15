@@ -1,5 +1,6 @@
 package com.shenyan.designsystem.components
 
+import android.os.Build
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -86,6 +87,7 @@ fun SyMaterialSurface(
     contentColor: Color = LocalSyColors.current.text,
     tonalElevation: Dp = 0.dp,
     shadowElevation: Dp? = null,
+    opticalGlass: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val c = LocalSyColors.current
@@ -139,8 +141,21 @@ fun SyMaterialSurface(
                     @Composable { SyPaintAlignedScene(sample, materialOrigin) }
                 }
                 if (sampled != null) {
-                    Box(Modifier.matchParentSize().blur(blurRadius, BlurredEdgeTreatment.Unbounded)) {
-                        sampled()
+                    val refract = sySupportsOpticalRefraction(
+                        sdk = Build.VERSION.SDK_INT,
+                        transparent = !LocalSyReduceTransparency.current && c.materialL3.alpha < 1f,
+                        hasScene = true,
+                        enabled = opticalGlass &&
+                            (resolved == SyMaterialTier.L2_BAR || resolved == SyMaterialTier.L4_OVERLAY),
+                        surfaceWidth = materialSize.width,
+                        surfaceHeight = materialSize.height,
+                    )
+                    // Distort only the aligned background layer; text, controls and click targets
+                    // stay sharp and independent of the platform AGSL capability.
+                    SyOpticalBackdrop(Modifier.matchParentSize(), enabled = refract) {
+                        Box(Modifier.matchParentSize().blur(blurRadius, BlurredEdgeTreatment.Unbounded)) {
+                            sampled()
+                        }
                     }
                 }
             }
@@ -206,6 +221,7 @@ fun SySceneBackgroundSurface(
     shape: Shape = RoundedCornerShape(SyMetric.radiusSheet),
     fallbackColor: Color? = null,
     tag: String = "sySceneBackgroundSurface",
+    opticalGlass: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val scene = LocalSySceneBackdrop.current
@@ -213,8 +229,19 @@ fun SySceneBackgroundSurface(
     val view = LocalView.current
     val windowOnScreen = remember { IntArray(2) }
     var origin by remember { mutableStateOf(IntOffset.Zero) }
+    var surfaceSize by remember { mutableStateOf(IntSize.Zero) }
+    val colors = LocalSyColors.current
+    val refractScene = sySupportsOpticalRefraction(
+        sdk = Build.VERSION.SDK_INT,
+        transparent = !LocalSyReduceTransparency.current && colors.materialL3.alpha < 1f,
+        hasScene = scene != null,
+        enabled = opticalGlass,
+        surfaceWidth = surfaceSize.width,
+        surfaceHeight = surfaceSize.height,
+    )
     Box(
         modifier.clip(shape).testTag(tag).onGloballyPositioned { coordinates ->
+            surfaceSize = coordinates.size
             view.rootView.getLocationOnScreen(windowOnScreen)
             val point = coordinates.positionInWindow()
             val next = IntOffset(point.x.roundToInt() + windowOnScreen[0],
@@ -224,8 +251,25 @@ fun SySceneBackgroundSurface(
     ) {
         // Show the theme canvas immediately while root coordinates are being measured.
         Box(Modifier.matchParentSize().background(canvas))
-        if (scene != null) SyPaintAlignedScene(scene, origin, Modifier.matchParentSize())
+        if (scene != null) {
+            SyOpticalBackdrop(Modifier.matchParentSize(), enabled = refractScene) {
+                SyPaintAlignedScene(scene, origin, Modifier.matchParentSize())
+            }
+        }
         content()
+        if (refractScene) {
+            // Thin specular rim, without another opaque material plate.
+            Canvas(Modifier.matchParentSize()) {
+                val inset = 1.dp.toPx()
+                drawLine(
+                    Brush.horizontalGradient(listOf(colors.materialSheen, Color.Transparent,
+                        colors.materialSheen.copy(alpha = .45f))),
+                    start = Offset(size.width * .08f, inset),
+                    end = Offset(size.width * .92f, inset),
+                    strokeWidth = 1.dp.toPx(),
+                )
+            }
+        }
     }
 }
 
