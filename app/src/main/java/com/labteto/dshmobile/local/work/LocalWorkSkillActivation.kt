@@ -22,12 +22,21 @@ internal fun resolveLocalWorkSkillGuidance(workspace: LocalWorkspace, input: Str
     }
 
     val requested = relevantSkillIdsForTask(input)
-    if (requested.isEmpty()) return ""
-    val catalog = workspace.modelSkillCatalog(query = input, maxChars = 2_200)
-    if (catalog.startsWith("未安装")) return ""
-    val lines = catalog.lineSequence().filter { line ->
-        requested.any { id -> line.startsWith("$id：") }
-    }.toList()
+    val task = input.lowercase()
+    val lines = workspace.skills().asSequence().mapNotNull { name ->
+        val meta = runCatching { workspace.skillMetadata(name) }.getOrNull()
+            ?.takeIf { it.modelInvocable } ?: return@mapNotNull null
+        val trigger = meta.whenToUse.orEmpty().trim()
+        val keywords = (meta.displayName.orEmpty() + " " + meta.description)
+            .split(Regex("[，、。；;\\s]+"))
+            .map(String::trim).filter { it.length >= 3 }
+        val customMatch = (trigger.length >= 2 && task.contains(trigger.lowercase())) ||
+            keywords.any { task.contains(it.lowercase()) }
+        if (name !in requested && !customMatch) return@mapNotNull null
+        val details = meta.whenToUse?.takeIf(String::isNotBlank)?.let { "；适用：$it" }.orEmpty()
+        name to "$name：${meta.description}$details"
+    }.sortedByDescending { (name, _) -> name in requested }
+        .take(8).map { it.second }.toList()
     if (lines.isEmpty()) return ""
     return """
         [与本轮任务相关的本地技能]

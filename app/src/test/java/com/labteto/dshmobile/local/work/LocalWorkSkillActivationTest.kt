@@ -42,6 +42,24 @@ class LocalWorkSkillActivationTest {
     }
 
     @Test
+    fun matchingCustomSkillsAreDiscoverableWithoutUnrelatedPresets() {
+        val root = Files.createTempDirectory("custom-skill-routing").toFile()
+        try {
+            val workspace = LocalWorkspace(root)
+            workspace.write(".dsh/skills/budget-planner/SKILL.md",
+                "---\\ndescription: budget planning\\nwhen-to-use: 整理预算\\n---\\nProduce a budget table.")
+            workspace.write(".dsh/skills/other-task/SKILL.md",
+                "---\\ndescription: unrelated action\\n---\\nDifferent task")
+            val context = resolveLocalWorkSkillGuidance(workspace, "请帮我整理预算")
+            assertTrue(context.contains("budget-planner：budget planning"))
+            assertFalse(context.contains("other-task"))
+            assertFalse(context.contains("Produce a budget table."))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun ordinaryWorkPromptOffersDiscoveryWithoutForcingSkill() {
         val root = Files.createTempDirectory("skill-catalog").toFile()
         try {
