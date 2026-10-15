@@ -84,6 +84,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.sync.withLock
 
 enum class ToolsNotice {
@@ -145,6 +147,32 @@ class ToolsViewModel @Inject constructor(
     private fun launchOperation(block: suspend () -> Unit) {
         viewModelScope.launch {
             operationGate.run(block)
+        }
+    }
+
+    /**
+     * Read the MCP registry lifecycle only while the user is connecting/disconnecting.
+     * Uses a separate coroutine so a slow handshake cannot block status refresh behind
+     * the command gate. Never treats reservation/registration as a health check.
+     */
+    private suspend fun <T> trackMcpOperation(block: suspend () -> T): T = kotlinx.coroutines.coroutineScope {
+        val watcher = launch {
+            while (kotlinx.coroutines.currentCoroutineContext().isActive) {
+                try {
+                    _state.value = _state.value.copy(servers = localTools.servers())
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { /* Observation failure does not replay a mutation. */ }
+                kotlinx.coroutines.delay(300)
+            }
+        }
+        try {
+            block()
+        } finally {
+            watcher.cancelAndJoin()
+            try {
+                _state.value = _state.value.copy(servers = localTools.servers())
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { /* Preserve actual command error when status read fails. */ }
         }
     }
 
@@ -308,7 +336,7 @@ class ToolsViewModel @Inject constructor(
         launchOperation {
             _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
             try {
-                localTools.connectHttp(serverId, endpoint)
+                trackMcpOperation { localTools.connectHttp(serverId, endpoint) }
                 _state.value = _state.value.copy(
                     loading = false,
                     servers = localTools.servers(),
@@ -332,7 +360,7 @@ class ToolsViewModel @Inject constructor(
         launchOperation {
             _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
             try {
-                localTools.connectStdio(serverId, command, workingDirectory)
+                trackMcpOperation { localTools.connectStdio(serverId, command, workingDirectory) }
                 _state.value = _state.value.copy(
                     loading = false,
                     servers = localTools.servers(),
@@ -402,7 +430,7 @@ class ToolsViewModel @Inject constructor(
         launchOperation {
             _state.value = _state.value.copy(loading = true, notice = null)
             try {
-                localTools.disconnect(serverId)
+                trackMcpOperation { localTools.disconnect(serverId) }
                 _state.value = _state.value.copy(
                     loading = false,
                     servers = localTools.servers(),
