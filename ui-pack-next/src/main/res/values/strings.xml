@@ -273,4 +273,5 @@
     <string name="next_workspace_binary">此文件不适合文本预览，原文件保持完整</string>
     <string name="next_workspace_truncated">当前为有界预览，完整文件未被截断</string>
     <string name="next_memory_save">保存记忆</string>
+    <string name="next_invocations_search">搜索连接器和技能</string>
 </resources>
