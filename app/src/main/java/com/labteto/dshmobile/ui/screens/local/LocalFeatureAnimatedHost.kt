@@ -10,12 +10,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.shenyan.LocalSyReducedMotion
 import com.labteto.dshmobile.ui.shenyan.SyDurations
 import androidx.compose.runtime.Composable
@@ -55,6 +58,9 @@ internal fun LocalFeatureAnimatedHost(
     val push = tween<IntOffset>(motion.duration(motion.pushMs, reduced, tempo), easing = ease)
     val pop = tween<IntOffset>(motion.duration(motion.pagePopMs, reduced, tempo), easing = ease)
     val peer = tween<IntOffset>(motion.duration(motion.pagePeerMs, reduced, tempo), easing = ease)
+    val vertical = tween<Int>(motion.duration(motion.pushMs, reduced, tempo), easing = ease)
+    val pageScale = tween<Float>(motion.duration(motion.pushMs, reduced, tempo), easing = ease)
+    val rise = with(LocalDensity.current) { 14.dp.roundToPx() }
     val fadeEnter = tween<Float>(motion.duration(motion.pageEnterFadeMs, reduced, tempo),
         delayMillis = motion.duration(motion.sidebarContentDelayMs, reduced, tempo), easing = ease)
     val fadeExit = tween<Float>(motion.duration(motion.pageExitFadeMs, reduced, tempo), easing = ease)
@@ -69,35 +75,35 @@ internal fun LocalFeatureAnimatedHost(
             alpha = 1f - (0.02f * settledBackProgress)
         },
         transitionSpec = {
+            // Each product area has a recognizable but quiet entrance. Leaving content
+            // stays stable: no full-screen bouncing or overlapping long transitions.
+            val nextPage = localFeatureCurrent(targetState)
             when {
-                targetState.size > initialState.size -> {
-                    (
-                        slideInHorizontally(push) { pushOffset } +
-                            fadeIn(fadeEnter)
-                        ).togetherWith(
-                        slideOutHorizontally(push) { -pushOffset / 2 } +
-                            fadeOut(fadeExit),
-                    )
-                }
-
+                reduced -> fadeIn(tween(0)).togetherWith(fadeOut(tween(0)))
                 targetState.size < initialState.size -> {
-                    (
-                        slideInHorizontally(pop) { -pushOffset / 2 } +
-                            fadeIn(fadeEnter)
-                        ).togetherWith(
-                        slideOutHorizontally(pop) { pushOffset } +
-                            fadeOut(fadeExit),
-                    )
+                    (slideInHorizontally(pop) { -pushOffset / 2 } + fadeIn(fadeEnter))
+                        .togetherWith(slideOutHorizontally(pop) { pushOffset } + fadeOut(fadeExit))
                 }
-
+                targetState.size > initialState.size -> {
+                    val enter = when (nextPage) {
+                        LocalFeaturePage.PERSONA_GALLERY ->
+                            slideInVertically(vertical) { rise } + fadeIn(fadeEnter)
+                        LocalFeaturePage.DIARY ->
+                            slideInVertically(vertical) { -rise / 2 } + fadeIn(fadeEnter)
+                        LocalFeaturePage.WORKSPACE ->
+                            scaleIn(initialScale = .985f, animationSpec = pageScale) + fadeIn(fadeEnter)
+                        LocalFeaturePage.TASKS ->
+                            slideInVertically(vertical) { rise / 2 } + fadeIn(fadeEnter)
+                        LocalFeaturePage.TOOLS ->
+                            scaleIn(initialScale = .975f, animationSpec = pageScale) + fadeIn(fadeEnter)
+                        LocalFeaturePage.SETTINGS, LocalFeaturePage.HOME ->
+                            slideInHorizontally(push) { pushOffset } + fadeIn(fadeEnter)
+                    }
+                    enter.togetherWith(fadeOut(fadeExit))
+                }
                 else -> {
-                    (
-                        slideInHorizontally(peer) { peerOffset } +
-                            fadeIn(fadeEnter)
-                        ).togetherWith(
-                        slideOutHorizontally(peer) { -peerOffset } +
-                            fadeOut(fadeExit),
-                    )
+                    (slideInHorizontally(peer) { peerOffset } + fadeIn(fadeEnter))
+                        .togetherWith(slideOutHorizontally(peer) { -peerOffset } + fadeOut(fadeExit))
                 }
             }
         },

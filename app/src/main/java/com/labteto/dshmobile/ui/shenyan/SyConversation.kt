@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.ui.shenyan
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
@@ -49,6 +51,7 @@ import com.shenyan.designsystem.foundation.LocalSyColors
 import com.shenyan.designsystem.foundation.LocalSyReduceMotion
 import com.shenyan.designsystem.foundation.SyMetric
 import com.shenyan.designsystem.foundation.SyMotion
+import com.shenyan.designsystem.foundation.LocalSyMotionTempo
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.DsType
@@ -202,7 +205,10 @@ fun <T> SyHierarchyPage(
 ) {
     val holder = rememberSaveableStateHolder()
     val reduceMotion = LocalSyReduceMotion.current
-    val ms = if (reduceMotion) 0 else SyMotion.pushMs
+    val ms = SyMotion.duration(SyMotion.pushMs, reduceMotion, LocalSyMotionTempo.current)
+    val shortMs = SyMotion.duration(SyMotion.pagePeerMs, reduceMotion, LocalSyMotionTempo.current)
+    val enterMs = SyMotion.duration(SyMotion.pageEnterFadeMs, reduceMotion, LocalSyMotionTempo.current)
+    val exitMs = SyMotion.duration(SyMotion.pageExitFadeMs, reduceMotion, LocalSyMotionTempo.current)
     AnimatedContent(
         targetState = page,
         modifier = modifier,
@@ -213,10 +219,20 @@ fun <T> SyHierarchyPage(
                 depth(targetState) < depth(initialState) -> -1
                 else -> 0
             }
-            ((slideInHorizontally(tween(ms)) { 20 * direction } +
-                fadeIn(tween(if (reduceMotion) 0 else 150))) togetherWith
-                (slideOutHorizontally(tween(ms)) { -10 * direction } +
-                    fadeOut(tween(if (reduceMotion) 0 else 110))))
+            // Appearance settles upward; model and usage pages focus gently.
+            // Remaining settings keep directional hierarchy for predictable Back.
+            val enter = when (pageKey(targetState)) {
+                "APPEARANCE", "MEMORY", "MEMORY_SETTINGS", "MEMORY_MANAGEMENT" ->
+                    slideInVertically(tween(shortMs, easing = SyMotion.ease)) { 12 * direction } +
+                        fadeIn(tween(enterMs))
+                "MODELS", "MODEL_USAGE", "USAGE", "USAGE_DETAIL", "USAGE_LOG", "MINIMAX_QUOTA" ->
+                    scaleIn(initialScale = if (reduceMotion) 1f else .99f, animationSpec = tween(ms)) +
+                        fadeIn(tween(enterMs))
+                else -> slideInHorizontally(tween(ms, easing = SyMotion.ease)) { 20 * direction } +
+                    fadeIn(tween(enterMs))
+            }
+            (enter togetherWith
+                (slideOutHorizontally(tween(shortMs)) { -10 * direction } + fadeOut(tween(exitMs))))
                 .using(SizeTransform(clip = false))
         },
         label = "syHierarchyPage",
