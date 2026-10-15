@@ -1,7 +1,7 @@
 {
   "schema": "777.ui-r4.code-tasks/1",
   "asOf": "2026-10-15",
-  "baseline": "2026-10-15 through 98ffdfbb; head CI required; R4 draft",
+  "baseline": "2026-10-15 through ef6b35a4; production root host admission integration, full packs still absent, CI pending",
   "scope": "整个 R4，非单一功能",
   "verificationPolicy": "当前 HEAD 基础 CI 可通过不代表 R4 交付验收；新增提交需自身 CI，真实双包使用/进程恢复/设备矩阵按 S2/S5 单独验证。",
   "sceneCount": 78,
@@ -118,23 +118,23 @@
       "task": "双包真实发送/编辑/审批/恢复与独立替换证明",
       "codeStatus": "VERIFICATION_DEFERRED",
       "verification": "DEFERRED",
-      "implemented": " 补 Next Compose 实际点击拒绝审批按钮→应用 Work Port→模拟 Owner 当前 nonce，确认审批一次性拒绝与防重放仪器化测试源码；仍非真实模型/网络/两套 UI 全链路验收。"
+      "implemented": " 补 Next Compose 实际点击拒绝审批按钮→应用 Work Port→模拟 Owner 当前 nonce，确认审批一次性拒绝与防重放仪器化测试源码；仍非真实模型/网络/两套 UI 全链路验收。 2026-10-15 新增在真实生产 Host 组件中切换两套独立且全场景覆盖的合成 Renderer 测试包、持久选择变更、不合法选择拒绝与显式恢复的 Android Compose 仪器化测试源码；该测试为 Host/UI 框架证明，绝不等同 V6/Next 两套真实业务页面完成。"
     },
     {
       "id": "S3-01",
       "task": "全应用 UiPack Scene Renderer API",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "新增独立 :ui-host 全应用 UiApplicationScenePack 逐 Scene Compose Renderer 契约、实际 renderer 覆盖与 manifest 双门禁、Host 历史/包身份准入的场景调度与 JVM 测试源码。",
-      "remaining": "需要在 V6/Next 独立整包真正实现所有 78 Scene 的 renderer、注入真实强类型 Feature Port，并用生产 Host 接线和设备 CI 证明；不能凭接口声称可更换整套 UI。"
+      "implemented": "新增独立 :ui-host 全应用 UiApplicationScenePack 逐 Scene Compose Renderer 契约、实际 renderer 覆盖与 manifest 双门禁、Host 历史/包身份准入的场景调度与 JVM 测试源码。 AppRoot 现接入真实全应用 UiApplicationScenePack 准入/Compose Renderer 路径，拒绝缺失 Scene/实际 Renderer 的包；当前注册表有意为空，不能宣称整包完工。",
+      "remaining": "仍需独立 :ui-pack-v6 / :ui-pack-next 为 78 Scene 建立完整可执行 Renderer 和真实强类型业务 Port，当前生产整包安装列表为空；已有 Host 生产入口但未交付整包替换。"
     },
     {
       "id": "S3-02",
       "task": "7 路由/二级场景/深链/返回的通用 Host",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "新增 :ui-host 的 UiHostSceneNavigation 纯导航约定：基于 Host 场景目录与当前包 manifest 区分 PAGE/OVERLAY/SLOT/SYSTEM，支持包身份校验、返回、有限的显式深链键及严格状态恢复；App JVM 回归测试覆盖拒绝旧包/无实现页面/系统服务/伪造历史。仅是独立导航内核，不是现网 Host 接线或 renderer 的完成证明。 本批增加 32 层历史上限、root 导航清栈、页面覆盖弹层去重和非法覆盖/回到 root 历史拒绝；增加有版本/长度预算的编码快照及 Host 恢复入口，严格重新核验场景和包身份；补 JVM 回归源码，本轮新增 UiApplicationSceneHost 中间层：仅接收完整 Pack admission 的真实 Compose renderer，使用 SaveableState 中立快照接收导航与系统返回，实时重新验证 pack/历史/renderer 并拒绝迟到画面回调；修正向上返回的 scope 也使用实际 Host 回调，新增 JVM 回归源码。仍未接入 AppRoot，最新 CI 待回执。",
-      "remaining": "全应用 7 一级路由与二级场景真实 Host 接线、导航快照 SavedState/持久化读写、DeepLink intent 绑定、Feature Owner 准入、系统返回/IME、包切换恢复、全应用 Scene Renderer 页面实现与真实设备回归仍未完成。"
+      "implemented": "新增 :ui-host 的 UiHostSceneNavigation 纯导航约定：基于 Host 场景目录与当前包 manifest 区分 PAGE/OVERLAY/SLOT/SYSTEM，支持包身份校验、返回、有限的显式深链键及严格状态恢复；App JVM 回归测试覆盖拒绝旧包/无实现页面/系统服务/伪造历史。仅是独立导航内核，不是现网 Host 接线或 renderer 的完成证明。 本批增加 32 层历史上限、root 导航清栈、页面覆盖弹层去重和非法覆盖/回到 root 历史拒绝；增加有版本/长度预算的编码快照及 Host 恢复入口，严格重新核验场景和包身份；补 JVM 回归源码，本轮新增 UiApplicationSceneHost 中间层：仅接收完整 Pack admission 的真实 Compose renderer，使用 SaveableState 中立快照接收导航与系统返回，实时重新验证 pack/历史/renderer 并拒绝迟到画面回调；修正向上返回的 scope 也使用实际 Host 回调，新增 JVM 回归源码。仍未接入 AppRoot，最新 CI 待回执。 生产 AppRoot 经 LocalApplicationUiHost 进入 UiHostSceneNavigation/RenderHostedScene；以 FeatureCatalog 7 一级路由与 SettingsDestination 构建可信内部跳转键；原 Work/Chat UI 场景请求经 Host 白名单状态机处理，并消费对应 VM 请求；错误持久历史可见提示、根返回 Activity 退出；支持 A→B→A 代次保护。",
+      "remaining": "仍需完整实际 Renderer、显式 Android DeepLink intent 注入、跨版本 Host 状态迁移/系统焦点/IME 和真实设备全场景测试；现有 Legacy Shell 内部导航仍保留，尚未全量退场。"
     },
     {
       "id": "S3-03",
@@ -155,8 +155,8 @@
       "task": "生产级包选择/注册/持久恢复",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "新增 Host 持久选择协调器：只有通过全应用真实 renderer 与 manifest 双门禁的包才能写入选择；过期/缺失选择仅返回显式稳定包选项，不暗中回退 V6；持久写失败拒绝报成功。含 JVM 回归源码。",
-      "remaining": "正式 App 偏好存储接线、完整 V6/Next 可登记 renderer、包切换恢复与 Android 真机验收未完成，生产开关不可开放。"
+      "implemented": "新增 Host 持久选择协调器：只有通过全应用真实 renderer 与 manifest 双门禁的包才能写入选择；过期/缺失选择仅返回显式稳定包选项，不暗中回退 V6；持久写失败拒绝报成功。含 JVM 回归源码。 AppRoot 使用本地 SharedPreferences 持久选包，实时观察其变更，只有通过 Host manifest+Renderer+已接 Feature Owner 能力校验的已登记整包可渲染，非法/缺失选择显式失败且必须点击恢复 Legacy；新增合成完整双包 Compose 切换 instrumentation 测试源码。",
+      "remaining": "生产已装整包列表目前为空（仅保留原 V6 为明确稳定模式），完整 V6/Next Renderer 注册、设置内可用选包入口、跨包真实会话/设置恢复、Android 真机验收尚未完成。"
     },
     {
       "id": "S3-06",
@@ -246,7 +246,7 @@
       "task": "最终 SHA CI 与 Android16/17 全场景/无障碍/弱网/收费矩阵",
       "codeStatus": "VERIFICATION_DEFERRED",
       "verification": "DEFERRED",
-      "remaining": "以最新 SHA 完成 AndroidTest 编译/测试、Android16/17、ARM64、CI 合并门禁；后续验证生产整包 Host、人物、媒体、动态文档、弱网、收费、辅助功能与恢复流程。",
+      "remaining": "对最新 PR SHA 执行 UI Host JVM/Android Compose 路由与选包测试、已有 Chat/Work Port 真实回执测试、Android16/17、ARM64、静态/架构/无障碍和弱网/用量场景检查；最终完整 V6/Next 包及其恢复测试仍待独立交付证据。",
       "implemented": " 2026-10-15 CI #38696536117 真实失败已定位 LocalHarnessViewModel.kt:325 编辑结果接口类型变化未兼容旧 V6；b4eb3bfb 完整映射11种结果后，旧 CI #38697453814 的 unit-tests 作业通过（其他 Job 状态需以对应最终 SHA 查证）。 另由 CI #38697453814 x86 Job 日志定位 NextConversationOwnerPortIntegrationTest 的无效 assertExists import 和错误 App R.string.next_deny；提交 238b1c02 更正模块资源归属。"
     }
   ],

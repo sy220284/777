@@ -1,5 +1,8 @@
 # UI 3.0-R4 实施台账
 
+> **2026-10-15 S3 优先推进：AppRoot 全应用 Host 真实入口（PR #705）**：`041ee4c9` 在生产 AppRoot 中接入全应用 UiApplicationPackRegistry 准入/真实 Compose Host，原 V6 Shell 保留为显式稳定模式，完整 Pack 未安装时不让会话切片冒充整包；`cf58a9d1` + `41cb87cd` + `04d7d94b` 增加全量场景包准入、缺 Renderer、过时包选择、跨包导航历史隔离以及路由白名单 JVM 测试源码；`b0d2c8f0` 加入导航快照恢复错误可见处理和根返回行为；`9caf00b0` 从实际 Feature Owner 接线生成宿主可用能力，不信任 UI Pack 自报；`71b63c93` 从 AppRoot 将 7 路由和全部现行 SettingsDestination 白名单内部场景请求接入 Host 状态机；`5b5f5d3c` 本地偏好变更实时切换；`ef6b35a4` 新增 Compose Instrumented 测试源码，在同一 Host 渲染两套**合成完整 Pack 夹具**并测试切包、非法持久选择与显式恢复。**注意：production `LocalApplicationPackInstallations.all` 目前仍是空列表，真实 V6/Next 全 78 场景 Renderer 尚未注册，因此只算 S3 生产入口和隔离基础进展，S2 业务双包证明仍未完成；CI 需要使用本轮最新 SHA，测试源码并不等于已通过验收。** S0 维持 75/173，E2E 恢复证据仍待签收。
+
+
 > **2026-10-15 设备 CI 二次编译修复与 MCP 观察补全（PR #705）**：读取 `#38697453814` x86 构建日志，确认 `NextConversationOwnerPortIntegrationTest.kt` 两个 AndroidTest 编译错误：无效 `assertExists` import、从 App 的 R 引用 Next 的字符串；`238b1c02` 移除错误导入并使用 `com.labteto.dshmobile.uipack.next.R`。此前单测 Job 已成功，但设备失败没有被证明为行为回归。新增 `98ffdfbb` 在用户发起 MCP 连接/断开时通过独立于命令互斥锁的短时观察协程刷新真实生命周期（操作完成即停止），避免长握手阻断页面状态。仍缺主动远程健康检查、外部操作的长期状态订阅、选中和授权事实；S-1 继续 `CODE_PARTIAL`。本轮新 CI 结果未出，S5 未签收。
 
 
