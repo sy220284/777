@@ -166,7 +166,7 @@ internal class LocalConversationSurfaceArgs(
     val onConfigureChatPersona: suspend (PersonaProfile) -> Result<Unit>,
     val onConfigureGroupMembers: (List<String>) -> Boolean,
     val onSelectGalleryPersona: (String) -> Boolean,
-    val onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
+    val onAutoFillChatPersona: suspend (PersonaProfile, String) -> Result<PersonaProfile>,
     val onSaveGroupAnnouncement: suspend (String) -> Result<Unit>,
     val onUndoPersonaCorrection: (Long, String, String) -> Unit,
     val onPlanModeChange: (Boolean) -> Unit,
