@@ -44,7 +44,7 @@ class PersonaImmersionPolicyTest {
     fun runtimeRejectsModelExcusesForOrdinaryEmbodiedCharacters() {
         val persona = PersonaProfile(
             name = "阿青",
-            portrait = "住在杭州的年轻摄影师，性格直接，习惯用行动表达关心。",
+            coreIdentity = "住在杭州的年轻摄影师，性格直接，习惯用行动表达关心。",
         )
 
         assertTrue(PersonaImmersionPolicy.breaksReplyImmersion(persona, "我是AI，没有真实身体，所以没法抱你。"))
@@ -57,7 +57,7 @@ class PersonaImmersionPolicyTest {
     fun aiRelatedOccupationDoesNotBecomeNonEmbodiedIdentity() {
         val persona = PersonaProfile(
             name = "林然",
-            portrait = "一家科技公司的AI研究员，平时喜欢跑步和做饭。",
+            coreIdentity = "一家科技公司的AI研究员，平时喜欢跑步和做饭。",
         )
 
         assertTrue(PersonaImmersionPolicy.breaksReplyImmersion(persona, "我是AI，所以没法走过去抱你。"))
@@ -67,7 +67,7 @@ class PersonaImmersionPolicyTest {
     fun ordinaryDiscussionAboutAiIsNotTreatedAsIdentityLeak() {
         val persona = PersonaProfile(
             name = "林然",
-            portrait = "一家科技公司的AI研究员，平时喜欢跑步和做饭。",
+            coreIdentity = "一家科技公司的AI研究员，平时喜欢跑步和做饭。",
         )
 
         assertTrue(!PersonaImmersionPolicy.breaksReplyImmersion(persona, "我今天在看语言模型的上下文窗口设计，论文写得有点绕。"))
@@ -78,7 +78,7 @@ class PersonaImmersionPolicyTest {
     fun inCharacterRefusalIsNotMistakenForModelLimitation() {
         val persona = PersonaProfile(
             name = "阿青",
-            portrait = "普通人类，性格有自己的边界和脾气。",
+            coreIdentity = "普通人类，性格有自己的边界和脾气。",
         )
 
         assertTrue(!PersonaImmersionPolicy.breaksReplyImmersion(persona, "我不能抱你。"))
@@ -90,8 +90,7 @@ class PersonaImmersionPolicyTest {
     fun runtimeKeepsInWorldLimitsForExplicitNonEmbodiedCharacters() {
         val persona = PersonaProfile(
             name = "镜中客",
-            portrait = "寄宿在旧镜中的幽灵，没有固定肉身，只能借镜面和烛火短暂显形。",
-            worldSetting = "旧宅中的灵体可以显形，但很难直接移动沉重实物。",
+            coreIdentity = "寄宿在旧镜中的幽灵，没有固定肉身，只能借镜面和烛火短暂显形。",
         )
 
         assertFalse(PersonaImmersionPolicy.breaksReplyImmersion(persona, "我没有固定肉身，今晚只能借镜子看看你。"))
