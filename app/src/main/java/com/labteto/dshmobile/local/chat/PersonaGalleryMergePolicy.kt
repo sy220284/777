@@ -128,29 +128,7 @@ internal fun applyPersonaSuggestions(
                 content = value,
                 provenance = CharacterFactProvenance.USER_CREATED,
             ))
-            "portrait" -> result.appendV4Suggestion(CharacterFactCategories.BIOGRAPHY, value)
-            "lifeContext" -> result.appendV4Suggestion(CharacterFactCategories.LIFE_GRAVITY, value)
-            "attentionBiases", "attentionKeywords", "perceptionBlindSpots" ->
-                result.appendV4Suggestion(CharacterFactCategories.SENSORY_SIGNATURE, value)
-            "quirks" -> result.appendV4Suggestion(CharacterFactCategories.PREFERENCES_AND_HABITS, value)
-            "limitations" -> result.appendV4Suggestion(CharacterFactCategories.LIMITS_AND_COSTS, value)
-            "coreValues" -> result.appendV4Suggestion(CharacterFactCategories.VALUES_AND_TRADEOFFS, value)
-            "coreTension" -> result.appendV4Suggestion(CharacterFactCategories.IDENTITY_GAP, value)
-            "stableTraits", "mutableTraits" ->
-                result.appendV4Suggestion(CharacterFactCategories.PERSONALITY, value)
-            "initialUserImpression" ->
-                result.appendV4Suggestion(CharacterFactCategories.SUBJECTIVE_BELIEFS, value)
-            "voiceSamples" -> result.appendV4Suggestion(CharacterFactCategories.VOICE_STYLE, value)
-            "worldSetting" -> result.copy(loreEntries = mergeLoreEntries(
-                result.loreEntries,
-                listOf(PersonaLoreEntry(id = "v4-world-suggestion", title = "世界背景",
-                    content = value, alwaysOn = true)), 80))
             "franchise" -> result.copy(franchise = mergePersonaText(result.franchise, value, 120))
-            "timelinePosition" -> result.copy(timelinePosition = mergePersonaText(result.timelinePosition, value, 2_000))
-            "knowledgeBoundary" -> result.copy(knowledgeBoundary = mergePersonaLines(result.knowledgeBoundary, listOf(value), 20))
-            "hardConstraints" -> result.copy(hardConstraints = mergePersonaLines(result.hardConstraints, listOf(value), 20))
-            "bannedPhrases" -> result.copy(bannedPhrases = mergePersonaLines(result.bannedPhrases, listOf(value), 30))
-            "corrections" -> result.copy(corrections = mergePersonaLines(result.corrections, listOf(value), 20))
             else -> result
         }
     }
