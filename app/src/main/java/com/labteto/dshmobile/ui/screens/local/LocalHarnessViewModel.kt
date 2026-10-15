@@ -109,6 +109,8 @@ class LocalHarnessViewModel @Inject constructor(
     val approvalMode = workPolicyUiPort.snapshots.map { it.approvalMode }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), workPolicyUiPort.snapshot().approvalMode)
     val networkSearchEnabled = networkSearchSettings.enabled
     fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)
+    /** The Tools Owner is shared by V6 and every independently rendered UI pack. */
+    val toolsUiPort: com.labteto.dshmobile.uicontract.ToolsUiPort get() = toolsUi
     val chatUiPort: com.labteto.dshmobile.uicontract.ChatUiPort = uiPorts.chat
     val workConversationUiPort: com.labteto.dshmobile.uicontract.WorkConversationUiPort = uiPorts.work
     val state = runtime.state
