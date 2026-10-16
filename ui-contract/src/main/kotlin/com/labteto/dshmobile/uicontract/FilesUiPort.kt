@@ -9,4 +9,8 @@ interface FilesUiPort {
     suspend fun workspaceFiles(): List<LocalWorkspaceFile>
     suspend fun conversationFiles(sessionId: String): LocalConversationFiles
     suspend fun previewWorkspaceFile(path: String): LocalWorkspaceFilePreview
+
+    /** User-granted SAF destination; the Owner alone validates and streams a workspace-local file. */
+    suspend fun exportWorkspaceFile(path: String, output: java.io.OutputStream): Long =
+        throw UnsupportedOperationException("Workspace export not supported by this Owner")
 }
