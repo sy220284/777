@@ -63,6 +63,14 @@ fun V6ToolsManagementScene(
     var serverId by remember(key) { mutableStateOf("") }
     var endpoint by remember(key) { mutableStateOf("") }
     var skillUrl by remember(key) { mutableStateOf("") }
+    var stdioArguments by remember(key) { mutableStateOf("") }
+    var stdioWorkDir by remember(key) { mutableStateOf("") }
+    var newSkillId by remember(key) { mutableStateOf("") }
+    var newSkillName by remember(key) { mutableStateOf("") }
+    var newSkillDescription by remember(key) { mutableStateOf("") }
+    var newSkillInstructions by remember(key) { mutableStateOf("") }
+    var editSkillId by remember(key) { mutableStateOf<String?>(null) }
+    var editSkillDocument by remember(key) { mutableStateOf("") }
     var githubToken by remember(key) { mutableStateOf("") }
     var disconnect by remember(key) { mutableStateOf<String?>(null) }
     var removeSkill by remember(key) { mutableStateOf<String?>(null) }
@@ -146,6 +154,18 @@ fun V6ToolsManagementScene(
             SyButton("添加 HTTP MCP", {
                 execute(ToolsUiCommand.ConnectHttp(serverId.trim(), endpoint.trim()))
             }, enabled = serverId.isNotBlank() && endpoint.startsWith("https://") && !busy)
+            SyInput(stdioArguments, { stdioArguments = it },
+                label = "本地 STDIO 命令和参数（每行一个参数）", singleLine = false)
+            SyInput(stdioWorkDir, { stdioWorkDir = it },
+                label = "工作目录（可选；需由原 Owner 检验）")
+            SyNote("STDIO 服务只允许由原工具 Owner 审核工作目录和可执行文件；UI 不调用 Shell。")
+            SyButton("添加本机 STDIO MCP", {
+                val argv = stdioArguments.lines().map(String::trim)
+                    .filter(String::isNotEmpty)
+                if (argv.isNotEmpty())
+                    execute(ToolsUiCommand.ConnectStdio(serverId.trim(), argv,
+                        stdioWorkDir.trim().takeIf(String::isNotEmpty)))
+            }, enabled = serverId.isNotBlank() && stdioArguments.isNotBlank() && !busy)
         }
         if (page == "tools.github") {
             Text(if (github) "GitHub 已配置" else "尚未配置 GitHub")
@@ -173,11 +193,55 @@ fun V6ToolsManagementScene(
                 SyGlassCard(Modifier.fillMaxWidth()) {
                     Text(skill.displayName)
                     Text(skill.description)
+                    SyButton("读取并编辑技能", {
+                        if (!busy) {
+                            busy = true
+                            scope.launch {
+                                try {
+                                    val document = withContext(Dispatchers.IO) {
+                                        owner.readSkillDocument(skill.name)
+                                    }
+                                    editSkillId = skill.name
+                                    editSkillDocument = document
+                                    feedback = "技能源码已读取，编辑后需要明确保存"
+                                } catch (cancelled: CancellationException) { throw cancelled }
+                                catch (failure: Exception) {
+                                    feedback = failure.message ?: "无法读取技能文档"
+                                } finally { busy = false }
+                            }
+                        }
+                    }, enabled = !busy, style = SyButtonStyle.SECONDARY)
                     SySwitch("允许模型调用", skill.modelInvocable, {
                         execute(ToolsUiCommand.SetSkillModelInvocable(skill.name, it))
                     }, enabled = !busy)
                     SyButton("移除技能", { removeSkill = skill.name },
                         enabled = !busy, style = SyButtonStyle.DANGER)
+                }
+            }
+            Text("新建本地技能", style = MaterialTheme.typography.titleMedium)
+            SyInput(newSkillId, { newSkillId = it }, label = "技能 ID")
+            SyInput(newSkillName, { newSkillName = it }, label = "技能名称")
+            SyInput(newSkillDescription, { newSkillDescription = it },
+                label = "用途简述", singleLine = false)
+            SyInput(newSkillInstructions, { newSkillInstructions = it },
+                label = "技能执行指令", singleLine = false)
+            SyButton("创建本地技能", {
+                execute(ToolsUiCommand.CreateSkill(newSkillId.trim(), newSkillName.trim(),
+                    newSkillDescription.trim(), newSkillInstructions))
+            }, enabled = !busy && newSkillId.isNotBlank() && newSkillName.isNotBlank() &&
+                newSkillInstructions.isNotBlank())
+            editSkillId?.let { id ->
+                SyGlassCard(Modifier.fillMaxWidth()) {
+                    Text("正在编辑：" + id, style = MaterialTheme.typography.titleMedium)
+                    SyInput(editSkillDocument, { editSkillDocument = it },
+                        label = "技能文档内容", singleLine = false)
+                    SyButton("保存技能文档", {
+                        execute(ToolsUiCommand.UpdateSkill(id, editSkillDocument))
+                        editSkillId = null
+                    }, enabled = !busy && editSkillDocument.isNotBlank(),
+                        style = SyButtonStyle.SECONDARY)
+                    SyButton("关闭编辑", { editSkillId = null },
+                        style = SyButtonStyle.GHOST)
                 }
             }
             Text("预置技能")
