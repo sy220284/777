@@ -22,12 +22,15 @@ internal val v6SettingsGroups = listOf(
     V6DestinationGroup("模型与账户", listOf(
         V6Destination("settings.models", "模型配置", "选择模型与连接方式"),
         V6Destination("settings.account", "ChatGPT 账户"),
+        V6Destination("settings.minimax_quota", "MiniMax 官方额度", "查看官方套餐与账户额度"),
+        V6Destination("settings.pricing", "费用估算", "核算不同模型的推理开销"),
         V6Destination("settings.model_performance", "模型性能", "推理与运行偏好"),
         V6Destination("settings.usage", "用量与额度"))),
     V6DestinationGroup("使用偏好", listOf(
         V6Destination("settings.appearance", "外观"),
         V6Destination("settings.chat", "聊天设置"),
         V6Destination("settings.memory", "记忆与个性化"),
+        V6Destination("settings.memory_management", "记忆管理", "管理已保存的长期记忆"),
         V6Destination("settings.notifications", "通知"))),
     V6DestinationGroup("应用与数据", listOf(
         V6Destination("settings.permissions", "系统权限"),
