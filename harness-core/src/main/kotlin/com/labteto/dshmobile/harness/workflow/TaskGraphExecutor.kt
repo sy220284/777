@@ -209,16 +209,9 @@ class TaskGraphExecutor(
             it.dependsOn.all { dep -> dep != it.id && dep in unique } }) {
             "Task graph contains duplicate, missing or self dependencies"
         }
-        val visiting = HashSet<String>()
-        val visited = HashSet<String>()
-        fun visit(id: String) {
-            if (id in visited) return
-            require(visiting.add(id)) { "Task graph contains a dependency cycle" }
-            unique.getValue(id).dependsOn.forEach(::visit)
-            visiting.remove(id)
-            visited.add(id)
+        require(!TaskGraphTopology.containsCycle(unique.mapValues { (_, node) -> node.dependsOn })) {
+            "Task graph contains a dependency cycle"
         }
-        nodes.forEach { visit(it.id) }
         return nodes
     }
 }

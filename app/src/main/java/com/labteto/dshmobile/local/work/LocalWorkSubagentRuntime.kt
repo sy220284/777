@@ -12,6 +12,7 @@ import com.labteto.dshmobile.local.tools.LocalToolCapabilityScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.put
 
 /** Work-owned subagent and workflow composition bound to the originating Work run. */
 internal class LocalWorkSubagentRuntime(
@@ -53,6 +54,14 @@ internal class LocalWorkSubagentRuntime(
         dependencies: List<List<Int>> = emptyList(),
     ): String {
         val workerSelection = LocalWorkerModelRouter.resolve(modelOverride, binding.aggregateSnapshot())
+        val graphId = java.util.UUID.randomUUID().toString()
+        binding.eventLog.append("taskgraph/start", kotlinx.serialization.json.buildJsonObject {
+            put("graph_id", graphId)
+            put("session_id", binding.sessionId)
+            put("goal_id", binding.workState.snapshot().goal?.id ?: "")
+            put("mode", mode)
+            put("task_count", tasks.size)
+        })
         binding.workState.update { current -> current.copy(workflowProgress = null) }
 
         return LocalWorkflowCoordinator(
@@ -75,6 +84,17 @@ internal class LocalWorkSubagentRuntime(
             },
             pruneOutput = { value -> pruneOutput(binding, value) },
             onProgress = { progress ->
+                // The canonical EventLog settles each task transition before UI projection.
+                binding.eventLog.append("taskgraph/progress", kotlinx.serialization.json.buildJsonObject {
+                    put("graph_id", graphId)
+                    put("goal_id", binding.workState.snapshot().goal?.id ?: "")
+                    put("task_index", progress.index)
+                    put("task", progress.task.take(500))
+                    put("stage", progress.stage)
+                    put("completed", progress.completed)
+                    put("total", progress.total)
+                    put("detail", progress.detail.take(500))
+                })
                 binding.workState.update { current ->
                     val previousBlock = current.workflowProgress?.takeIf { it.needsUserAction }
                     val blocked = progress.stage == "受阻"

@@ -13,6 +13,19 @@ class TaskGraphExecutorTest {
     private val graph = TaskGraphExecutor(maxNodes = 10, maxParallelism = 2)
 
     @Test
+    fun sharedTopologyRejectsTheSameCyclesAsTheWorkGraph() {
+        val cycle = mapOf("a" to listOf("b"), "b" to listOf("c"),
+            "c" to listOf("a"), "independent" to emptyList())
+        assertTrue(TaskGraphTopology.containsCycle(cycle))
+        assertFalse(TaskGraphTopology.containsCycle(mapOf(
+            "a" to emptyList(), "b" to listOf("a"),
+            "c" to listOf("a", "b"),
+        )))
+        // Team reducers filter deleted tasks before passing the active topology.
+        assertFalse(TaskGraphTopology.containsCycle(mapOf("a" to listOf("deleted"))))
+    }
+
+    @Test
     fun dependenciesReadPreviousResultsAndReturnOriginalOrder() = runTest {
         val nodes = listOf(
             TaskGraphNode("review", "审查", listOf("write", "test")),
