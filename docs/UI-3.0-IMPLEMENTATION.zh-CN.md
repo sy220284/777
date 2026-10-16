@@ -349,3 +349,11 @@ Host 的 `ConversationShellUiPort` 接入重命名与显式置顶；原偏好 St
 - 聊天主页增加人物与群聊入口，跳转仅经过 Host 原场景路由；拒绝、身份变化与 Busy 状态保留可见反馈。人数上下限以及可选人物图库 ID 均来自 Owner Snapshot，创建/修改前二次确认。新增群聊有效选择 4 项及 Host 场景覆盖回归测试源码。
 - 从 [CI #38847008039](https://github.com/sy220284/777/actions/runs/38847008039) 下载真实日志，确认 `:ui-pack-v6:compileDebugKotlin` 因 `V6ConversationScene.kt` 的 nullable `docSnapshot.documents` 与 nullable `message.editableText` 两处 Kotlin 类型错误失败；本轮已修复，等待新 CI 验证。其他后续 Android/构建任务受旧批次失败影响，不能宣称通过。
 - 当前独立 V6 候选为 **20/75** 必要场景，仍差 **55**，完整生产包门禁照旧拒绝、Legacy V6 保持启用，R4 35 项状态不因增量源码上报已验收。
+
+
+## 2026-10-16 追加：Work 来源分页恢复与人物归档/Work 团队
+
+- GitHub Actions #38847636813 日志显示：`:app:compileDebugKotlin` 中 `LocalWorkUiDocumentSource.kt` 首次读取历史时使用 `Long?` 游标，而 `LocalSessionEventLog.pageBeforeNewestFirst` 要求 `Long`。已将 null 初始游标明确映射为 `Long.MAX_VALUE`，以保持“从最新往历史读”的语义。既有 `LocalWorkUiDocumentSourceTest` 含 260 条事件跨页续跑/恢复断言；新 CI 尚待确认。
+- `V6PersonaArchiveScene.kt` 用 `PersonaGalleryUiPort`、`PersonaSelectionUiPort`、`PersonaStoryUiPort`、`PersonaGalleryDeletionUiPort` 真实承接 `chat.gallery`、`route.persona_gallery`、`chat.gallery_profile`、`chat.gallery_delete` 四个页面。支持人物库、故事信息修改与阶段备注、按原图库游标分页翻阅历史、开始/继续故事、显式确认删除人物/故事。档案保存与前台会话同步是不同 Owner 事实；刷新图库后仍保留真实回执和失败信息。
+- `V6WorkPlanTeamScenes.kt` 分别实现 `work.plan_review` 及 `work.team`：只读真实 Owner 计划、待办及状态，通过 `WorkPolicyUiPort` 变更计划模式；列出 Work Team 子任务及阶段、异步读取成员输出、向指定成员发送消息、带 ID/作业版本校验的停止成员与停止全队。全队停止确认所见的 `jobId` 集合，不接受确认后新增/替换的任务。补充 `V6WorkTeamSafetyTest` 三项回归。
+- `LocalApplicationUiHost` 组合根已注入上述原业务 Port，新增独立场景注册和完整目录拒绝测试。V6 原生候选 **26/75**，余 **49**。原 R4 状态 26 项 `CODE_PARTIAL`、4 项 `CODE_IMPLEMENTED_UNVERIFIED`、5 项 `VERIFICATION_DEFERRED`；生产仍必须保持 `legacy-v6-shell`，不能提前合并或宣称验收。
