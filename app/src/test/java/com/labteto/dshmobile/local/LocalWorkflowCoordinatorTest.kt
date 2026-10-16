@@ -76,6 +76,24 @@ class LocalWorkflowCoordinatorTest {
     }
 
     @Test
+    fun graphPreflightRejectsInvalidDependencyBeforeAnyStartIsPersisted() {
+        var executions = 0
+        val coordinator = LocalWorkflowCoordinator(
+            execute = { executions++; "should not execute" },
+            pruneOutput = { it }, onProgress = {},
+        )
+        val invalid = runCatching {
+            coordinator.prepare(listOf("A", "B"), "graph", emptyList(),
+                dependencies = listOf(listOf(1), listOf(0)))
+        }.exceptionOrNull()
+        assertTrue(invalid is IllegalArgumentException)
+        assertEquals(0, executions)
+        val accepted = coordinator.prepare(listOf("A", "B"), "graph", emptyList(),
+            dependencies = listOf(emptyList(), listOf(0)))
+        assertEquals(listOf("task-1"), accepted.nodes[1].dependsOn)
+    }
+
+    @Test
     fun graphRejectsDependencyCycleBeforeLaunchingAnyAgent() = runTest {
         var launched = 0
         val coordinator = LocalWorkflowCoordinator(

@@ -196,7 +196,8 @@ class TaskGraphExecutor(
             error = feedback, attempts = maxAttempts)
     }
 
-    private fun validateGraph(nodes: List<TaskGraphNode>): List<TaskGraphNode> {
+    /** Reject invalid graphs before Work persists a start fact or invokes an Agent. */
+    fun validateGraph(nodes: List<TaskGraphNode>): List<TaskGraphNode> {
         require(nodes.isNotEmpty() && nodes.size <= maxNodes) {
             "Task graph contains ${nodes.size} nodes; capacity is 1..$maxNodes"
         }

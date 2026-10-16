@@ -7,6 +7,13 @@ import com.labteto.dshmobile.harness.workflow.TaskGraphOutcome
 import com.labteto.dshmobile.harness.workflow.TaskGraphProgress
 import com.labteto.dshmobile.local.agent.LocalSubagentExecutionException
 
+/** Validated immutable Work execution request; safe to persist as started. */
+internal data class LocalPreparedWorkflow(
+    val nodes: List<TaskGraphNode>,
+    val evidence: List<String>,
+    val pipeline: Boolean,
+)
+
 /**
  * Work-owned read-only delegated task workflow using the shared Kotlin DAG scheduler.
  * Work still owns acceptance policy and subagent capabilities.
@@ -23,7 +30,14 @@ internal class LocalWorkflowCoordinator(
         mode: String,
         requiredEvidence: List<String>,
         dependencies: List<List<Int>> = emptyList(),
-    ): String {
+    ): String = run(prepare(tasks, mode, requiredEvidence, dependencies))
+
+    fun prepare(
+        tasks: List<String>,
+        mode: String,
+        requiredEvidence: List<String>,
+        dependencies: List<List<Int>> = emptyList(),
+    ): LocalPreparedWorkflow {
         require(tasks.size in 1..64 && tasks.none(String::isBlank)) {
             "工作流需要 1 到 64 个非空子任务"
         }
@@ -57,8 +71,15 @@ internal class LocalWorkflowCoordinator(
                 dependsOn = required.map { dep -> "task-${dep + 1}" },
             )
         }
+        graph.validateGraph(nodes)
+        return LocalPreparedWorkflow(nodes, requiredEvidence.toList(), pipeline)
+    }
+
+    suspend fun run(plan: LocalPreparedWorkflow): String {
+        val pipeline = plan.pipeline
+        val requiredEvidence = plan.evidence
         val results = graph.run(
-            nodes = nodes,
+            nodes = plan.nodes,
             retrySafe = true, // Work delegates are explicitly read-only.
             maxAttempts = 2,
             execute = { context, prompt ->

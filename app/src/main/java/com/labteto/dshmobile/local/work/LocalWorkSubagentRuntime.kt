@@ -54,17 +54,10 @@ internal class LocalWorkSubagentRuntime(
         dependencies: List<List<Int>> = emptyList(),
     ): String {
         val workerSelection = LocalWorkerModelRouter.resolve(modelOverride, binding.aggregateSnapshot())
+        // Preflight is pure and rejects cycles, missing nodes and capacity overflow
+        // before the canonical EventLog may declare a graph started.
         val graphId = java.util.UUID.randomUUID().toString()
-        binding.eventLog.append("taskgraph/start", kotlinx.serialization.json.buildJsonObject {
-            put("graph_id", graphId)
-            put("session_id", binding.sessionId)
-            put("goal_id", binding.workState.snapshot().goal?.id ?: "")
-            put("mode", mode)
-            put("task_count", tasks.size)
-        })
-        binding.workState.update { current -> current.copy(workflowProgress = null) }
-
-        return LocalWorkflowCoordinator(
+        val workflow = LocalWorkflowCoordinator(
             execute = { prompt ->
                 runner.runResult(
                     LocalSubagentLaunchSpec(
@@ -84,7 +77,7 @@ internal class LocalWorkSubagentRuntime(
             },
             pruneOutput = { value -> pruneOutput(binding, value) },
             onProgress = { progress ->
-                // The canonical EventLog settles each task transition before UI projection.
+                // An emitted EventLog progress fact precedes every Work UI projection.
                 binding.eventLog.append("taskgraph/progress", kotlinx.serialization.json.buildJsonObject {
                     put("graph_id", graphId)
                     put("goal_id", binding.workState.snapshot().goal?.id ?: "")
@@ -111,6 +104,41 @@ internal class LocalWorkSubagentRuntime(
                     )
                 }
             },
-        ).run(tasks, mode, requiredEvidence, dependencies)
+        )
+        val prepared = workflow.prepare(tasks, mode, requiredEvidence, dependencies)
+        binding.eventLog.append("taskgraph/start", kotlinx.serialization.json.buildJsonObject {
+            put("graph_id", graphId)
+            put("session_id", binding.sessionId)
+            put("goal_id", binding.workState.snapshot().goal?.id ?: "")
+            put("mode", mode)
+            put("task_count", tasks.size)
+        })
+        binding.workState.update { current -> current.copy(workflowProgress = null) }
+
+        fun settleGraph(outcome: String, detail: String = "") {
+            binding.eventLog.append("taskgraph/end", kotlinx.serialization.json.buildJsonObject {
+                put("graph_id", graphId)
+                put("goal_id", binding.workState.snapshot().goal?.id ?: "")
+                put("outcome", outcome)
+                put("detail", detail.take(500))
+            })
+        }
+        try {
+            val summary = workflow.run(prepared)
+            // "settled" denotes the execution phase ending. Goal acceptance has
+            // its own Work-owned evidence gate and must not be inferred here.
+            settleGraph("settled")
+            return summary
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                try { settleGraph("cancelled") }
+                catch (logFailure: Exception) { cancelled.addSuppressed(logFailure) }
+            }
+            throw cancelled
+        } catch (failure: Exception) {
+            try { settleGraph("failed", failure.message.orEmpty()) }
+            catch (logFailure: Exception) { failure.addSuppressed(logFailure) }
+            throw failure
+        }
     }
 }
