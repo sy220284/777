@@ -849,6 +849,8 @@ fun ToolsScreen(
                             label = stringResource(when (server.connection) {
                                 com.labteto.dshmobile.uicontract.UiToolConnection.HEALTH_UNCHECKED ->
                                     R.string.tools_server_health_unchecked
+                                com.labteto.dshmobile.uicontract.UiToolConnection.FAILED ->
+                                    R.string.tools_server_failed
                                 com.labteto.dshmobile.uicontract.UiToolConnection.CONNECTING ->
                                     R.string.tools_server_connecting
                                 com.labteto.dshmobile.uicontract.UiToolConnection.RECONNECTING ->

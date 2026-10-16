@@ -173,6 +173,7 @@ internal fun PluginInventoryBrowser(
                     com.labteto.dshmobile.uicontract.UiToolConnection.RECONNECTING -> R.string.tools_server_reconnecting
                     com.labteto.dshmobile.uicontract.UiToolConnection.DISCONNECTING -> R.string.tools_server_disconnecting
                     com.labteto.dshmobile.uicontract.UiToolConnection.HEALTH_UNCHECKED -> R.string.tools_server_health_unchecked
+                    com.labteto.dshmobile.uicontract.UiToolConnection.FAILED -> R.string.tools_server_failed
                 }),
             connectedService = server.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED,
             available = false,
