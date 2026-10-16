@@ -15,6 +15,30 @@ class LocalUiDocumentSessionStoreTest {
         UiDocumentSource("session", message, 2, "profile", null), 0,
         UiLocalDocumentData.ListItems(listOf("preserved")), budget, emptySet()).getOrThrow()
 
+    @Test fun userEditedDocumentIsCASVersionedAndCannotResurrectDeletedText() {
+        val directory = Files.createTempDirectory("ui-doc-user-edit").toFile()
+        try {
+            val registry = LocalSessionEventLogRegistry(directory, Json)
+            val store = LocalUiDocumentSessionStore(registry)
+            val first = document("message")
+            assertTrue(store.publish(first, provenance, null, null, budget, emptySet()))
+            val edited = first.withUserEditedText("item_0", "my corrected description")!!
+            val userProvenance = UiDocumentProvenance(null, "user-edited", false, UiDocumentOrigin.LOCAL)
+            assertTrue(store.publish(edited, userProvenance, null, first, budget, emptySet()))
+            assertFalse(store.publish(first.withUserEditedText("item_0", "stale content")!!,
+                userProvenance, null, first, budget, emptySet()))
+            val restored = LocalUiDocumentSessionStore(registry).read(
+                "session", setOf("message"), budget, emptySet()).single()
+            assertEquals(edited, restored.document)
+            assertEquals("user-edited", restored.provenance.model)
+            assertTrue(store.delete(edited, budget, emptySet()))
+            assertFalse(store.publish(edited.copy(revision = 2), userProvenance,
+                null, edited, budget, emptySet()))
+            assertNull(store.latestDocument("session", "message", first.documentId, budget, emptySet()))
+            registry.clearAndEvict(setOf("session"))
+        } finally { directory.deleteRecursively() }
+    }
+
     @Test fun lateProducerCannotOverwriteNewRevisionAndLocalProvenanceRestores() {
         val directory = Files.createTempDirectory("ui-doc-revision").toFile()
         try {
