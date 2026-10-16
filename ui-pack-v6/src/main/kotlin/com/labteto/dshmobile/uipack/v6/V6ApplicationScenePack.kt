@@ -109,6 +109,17 @@ class V6ApplicationScenePack(
         setOf(UiSceneId("shell.search")) else emptySet()
     private val shellErrorScene = if (conversations != null)
         setOf(UiSceneId("shell.error")) else emptySet()
+    private val extraPersonaScenes = if (secondary?.authoring != null &&
+        secondary.gallery != null && secondary.selection != null)
+        setOf(UiSceneId("chat.persona_editor"),UiSceneId("chat.world_book")) else emptySet()
+    private val extraTuningScene = if (secondary?.currentPersona != null)
+        setOf(UiSceneId("chat.character_tuning")) else emptySet()
+    private val extraPortraitScene = if (secondary?.portraits != null && secondary.gallery != null)
+        setOf(UiSceneId("chat.gallery_portrait")) else emptySet()
+    private val extraDiaryScenes = if (secondary?.diary != null && secondary.gallery != null)
+        setOf(UiSceneId("chat.diary"),UiSceneId("route.diary")) else emptySet()
+    private val extraMemoryScene = if (secondary?.memory != null && secondary.settings != null)
+        setOf(UiSceneId("settings.memory_management")) else emptySet()
 
 
     override val manifest = UiPackManifest(
@@ -119,7 +130,9 @@ class V6ApplicationScenePack(
             planScene + teamScene + settingsSuite + updateScene +
             messageActionScenes + suggestionsScenes + steeringScene +
             secondaryTools + secondaryWorkspace + secondaryMedia +
-            secondaryAutomations + secondaryShell + secondarySearch + shellErrorScene,
+            secondaryAutomations + secondaryShell + secondarySearch + shellErrorScene +
+            extraPersonaScenes + extraTuningScene + extraPortraitScene +
+            extraDiaryScenes + extraMemoryScene,
         requiredCapabilities = buildSet {
             if (conversations != null) {
                 addAll(setOf("chat.send_text", "work.send_text", "chat.edit", "chat.regenerate",
