@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.host
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
@@ -60,13 +61,13 @@ class V6ConversationLayoutInteractionTest {
         }
         return V6ConversationPorts(chat, work, drafts, reading, workMode = { true })
     }
-    private fun show(part: V6ConversationPart, withAttachments: Boolean = false) {
+    private fun show(part: V6ConversationPart, withAttachments: Boolean = false, shortWindow: Boolean = false) {
         val ports = ports(withAttachments)
         compose.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, 1.3f)) {
                 MaterialTheme {
-                    Box(Modifier.fillMaxSize().requiredWidth(320.dp)) {
+                    Box(Modifier.fillMaxSize().requiredWidth(320.dp).then(if (shortWindow) Modifier.requiredHeight(400.dp) else Modifier)) {
                         V6ConversationScene(ports, workMode = true, onBack = {}, part = part,
                             onNavigate = { UiSceneNavigationResult.Rejected(UiSceneNavigationRejection.PACK_MISSING_SCENE) })
                     }
@@ -80,6 +81,11 @@ class V6ConversationLayoutInteractionTest {
         compose.onNodeWithText("可继续阅读的工作内容").assertIsDisplayed()
         compose.onNodeWithText("附件（20）").performClick()
         compose.onNodeWithText("附件20.txt").performScrollTo().assertIsDisplayed()
+    }
+    @Test fun shortWindowStillKeepsSendAndReadingVisibleWithLargeDraft() {
+        show(V6ConversationPart.FULL, withAttachments = true, shortWindow = true)
+        compose.onNodeWithText("发送").assertIsDisplayed()
+        compose.onNodeWithText("可继续阅读的工作内容").assertIsDisplayed()
     }
     @Test fun deniedNavigationShowsFeedbackInsideOpenSheet() {
         show(V6ConversationPart.HEADER)

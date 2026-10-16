@@ -2,7 +2,8 @@ package com.labteto.dshmobile.uipack.v6
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -165,7 +166,6 @@ internal fun submitV6ConversationDraft(
  * Owner commands; a UI receipt never pretends to prove completion.
  * More advanced tool/media/document scenes are intentionally NOT registered yet.
  */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun V6ConversationScene(
     ports: V6ConversationPorts,
@@ -558,15 +558,16 @@ fun V6ConversationScene(
     }
 
     var navigationExpanded by remember(identity) { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().imePadding().padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    BoxWithConstraints(Modifier.fillMaxSize().imePadding().padding(12.dp)) {
+    val composerLines = when { maxHeight < 360.dp -> 1; maxHeight < 480.dp -> 2; else -> 5 }
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(if (workMode) "工作" else "聊天", style = MaterialTheme.typography.titleLarge)
+            Text(if (workMode) "工作" else "聊天", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+            if (onNavigate != null) SyButton("更多", { menuError = null; navigationExpanded = true }, style = SyButtonStyle.GHOST)
             SyButton("返回", onBack, style = SyButtonStyle.GHOST)
         }
         if (onNavigate != null) {
-            SyButton("更多", { menuError = null; navigationExpanded = true }, style = SyButtonStyle.GHOST)
             if (navigationExpanded) {
                 val groups = buildList {
                     add(V6DestinationGroup("会话", listOf(
@@ -729,15 +730,15 @@ fun V6ConversationScene(
             }
         }
         if (part == V6ConversationPart.FULL || part == V6ConversationPart.COMPOSER) {
-        if (imported.isNotEmpty()) SyButton("附件（${imported.size}）", {
-            feedback = null
-            attachmentsOpen = true
-        }, style = SyButtonStyle.GHOST)
         if (attachmentsOpen) com.shenyan.designsystem.components.SyModalSheet(
             onDismiss = { attachmentsOpen = false }, title = "待发送附件（${imported.size}）") {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 feedback?.let { Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
+                if (ports.attachments != null) SyButton("添加附件", {
+                    pickerIdentity = identity
+                    picker()
+                }, enabled = identity != null && !importing, style = SyButtonStyle.SECONDARY)
         imported.forEach { file ->
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Column(Modifier.fillMaxWidth()) {
@@ -780,14 +781,18 @@ fun V6ConversationScene(
         }
         SyInput(draft, { value ->
             identity?.let { ports.drafts.updateDraft(it.sessionId, value) }
-        }, label = "输入消息", enabled = identity != null, singleLine = false, maxLines = 5)
-        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (ports.attachments != null) SyButton("添加附件", {
-                pickerIdentity = identity
-                picker()
-            },
-                enabled = identity != null && !importing, style = SyButtonStyle.SECONDARY)
+        }, label = "输入消息", enabled = identity != null, singleLine = false, maxLines = composerLines)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState())) {
+                if (imported.isNotEmpty()) SyButton("附件（${imported.size}）", {
+                    feedback = null
+                    attachmentsOpen = true
+                }, style = SyButtonStyle.GHOST, compact = true)
+                else if (ports.attachments != null) SyButton("添加附件", {
+                    pickerIdentity = identity
+                    picker()
+                }, enabled = identity != null && !importing, style = SyButtonStyle.SECONDARY, compact = true)
+            }
             if (phase == UiExecutionPhase.RUNNING && identity != null) SyButton("停止", {
                 show(if (workMode) ports.work.submit(WorkConversationUiCommand.Stop(identity))
                     else ports.chat.submit(ChatUiCommand.Stop(identity)))
@@ -808,6 +813,7 @@ fun V6ConversationScene(
         if (!available && rejection != null)
             Text(v6RejectionLabel(rejection), color = LocalSyColors.current.textSecondary)
         }
+    }
     }
 }
 
