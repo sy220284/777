@@ -6,7 +6,7 @@
   "verificationPolicy": "当前 HEAD 基础 CI 可通过不代表 R4 交付验收；新增提交需自身 CI，真实双包使用/进程恢复/设备矩阵按 S2/S5 单独验证。",
   "sceneCount": 78,
   "actionCount": 173,
-  "sourceMappedActions": 75,
+  "sourceMappedActions": 78,
   "tasks": [
     {
       "id": "S-1-01",
@@ -27,8 +27,8 @@
       "task": "全量动作 Port/准入/回执/恢复映射",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "补充工具 MCP 注册/断开/工具清单、GitHub 凭据、历史分页/阅读锚点、Chat/Work 会话创建与入队回执的 10 个实际存在的源码级 Port 映射。",
-      "remaining": "剩余 98 个未映射；173 项动作仍无 E2E/恢复签收，源码映射不等于双包验收。"
+      "implemented": "补充工具 MCP 注册/断开/工具清单、GitHub 凭据、历史分页/阅读锚点、Chat/Work 会话创建与入队回执的 10 个实际存在的源码级 Port 映射。 2026-10-16：对照新增 V6 设置原生页面及现有真实 Owner，补外观/通知/聊天规则三项 edit_owner_configuration 的端口和回执源码映射，仍 PENDING_EVIDENCE，不标验证通过。",
+      "remaining": "剩余 95 个动作缺少可信源代码层 Port/Host 映射；173 项动作仍全部缺双包 E2E/恢复签收。"
     },
     {
       "id": "S0-02",
@@ -188,7 +188,7 @@
       "task": "设计入口与 Scene/组件/Owner 映射",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "remaining": "将现行 7 路由/21 设置目的地与 #718 入口对应到 Scene/Action/Owner，新增动作映射仍为 75/173，尚余 98 项，必须逐项补回执与恢复证据。"
+      "remaining": "按最新 7 路由/21 设置目的地逐项关联设计入口、Scene/Action/Owner；新映射达 78/173，另 95 项仍未映射且 173 项均未做真实恢复验收。"
     },
     {
       "id": "S4-01",
