@@ -20,6 +20,7 @@ internal data class LocalWorkGoalFollowUpConditions(
     val planMode: Boolean,
     val hadSuccessfulTool: Boolean,
     val hadToolFailure: Boolean,
+    val runtimeHealthy: Boolean = true,
     val cancelled: Boolean,
     val pendingInputs: Int,
     val steeringUnchanged: Boolean,
@@ -38,6 +39,7 @@ internal fun canAutomaticallyFollowUpWorkGoal(
         !conditions.planMode &&
         conditions.hadSuccessfulTool &&
         !conditions.hadToolFailure &&
+        conditions.runtimeHealthy &&
         !conditions.cancelled &&
         conditions.pendingInputs == 0 &&
         conditions.steeringUnchanged &&
@@ -81,6 +83,7 @@ internal fun queueWorkGoalProgressFollowUp(
         planMode = work.planMode,
         hadSuccessfulTool = hadSuccessfulTool,
         hadToolFailure = hadToolFailure,
+        runtimeHealthy = binding.state.value.error == null,
         cancelled = binding.runHandle.cancellationRequested,
         pendingInputs = binding.runHandle.pendingInputs.size(),
         steeringUnchanged = binding.steeringRevision.value == originalSteeringRevision,
