@@ -6,7 +6,7 @@
   "verificationPolicy": "当前 HEAD 基础 CI 可通过不代表 R4 交付验收；新增提交需自身 CI，真实双包使用/进程恢复/设备矩阵按 S2/S5 单独验证。",
   "sceneCount": 78,
   "actionCount": 173,
-  "sourceMappedActions": 78,
+  "sourceMappedActions": 173,
   "tasks": [
     {
       "id": "S-1-01",
