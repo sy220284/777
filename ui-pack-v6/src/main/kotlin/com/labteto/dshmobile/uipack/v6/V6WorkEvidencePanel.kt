@@ -125,7 +125,8 @@ fun V6WorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSessionIdentity,
                         reviewed.approvedByUser -> "用户已确认内容符合（不代表自动测试通过）"
                         else -> "用户已标记内容不符合要求"
                     })
-                    if (snapshot?.goalId?.isNotBlank() == true &&
+                    val displayedGoalId = snapshot?.goalId
+                    if (!displayedGoalId.isNullOrBlank() &&
                         reference.versionNow == reference.versionAtLink) {
                         listOf(true to "确认内容符合要求", false to "标记内容不符合").forEach { (approved, title) ->
                             TextButton(onClick = {
@@ -135,7 +136,7 @@ fun V6WorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSessionIdentity,
                                     scope.launch {
                                         try {
                                             val result = port.review(ReviewWorkEvidenceCommand(
-                                                identity, requireNotNull(snapshot?.goalId),
+                                                identity, displayedGoalId,
                                                 requirement.index, requirement.text,
                                                 reference.artifactPath, reference.eventSequence,
                                                 reference.versionAtLink, approved,
