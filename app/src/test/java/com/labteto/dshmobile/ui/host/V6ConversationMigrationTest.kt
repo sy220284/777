@@ -10,6 +10,7 @@ import com.labteto.dshmobile.uicontract.HostPreferencesUiPort
 import com.labteto.dshmobile.uicontract.SettingsUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentFormUiPort
+import com.labteto.dshmobile.uicontract.WorkEvidenceUiPort
 import com.labteto.dshmobile.uicontract.UI_CONTRACT_VERSION
 import com.labteto.dshmobile.uicontract.UiAccessibility
 import com.labteto.dshmobile.uicontract.UiActionAvailability
@@ -102,6 +103,14 @@ class V6ConversationMigrationTest {
         V6ConversationPorts(chat, work, drafts, reading, documents = documentPort,
             forms = formPort, workMode = { false }),
     )
+    private val evidencePort = java.lang.reflect.Proxy.newProxyInstance(
+        WorkEvidenceUiPort::class.java.classLoader, arrayOf(WorkEvidenceUiPort::class.java)
+    ) { _, method, _ -> error("Evidence Owner called during registry validation: ${method.name}") } as WorkEvidenceUiPort
+    private fun fullIncrementalCandidate() = V6ApplicationScenePack(
+        preferences, settings,
+        V6ConversationPorts(chat, work, drafts, reading, documents = documentPort,
+            forms = formPort, evidence = evidencePort, workMode = { true }),
+    )
     private fun requirements(manifest: UiPackManifest, onlyDeclared: Boolean) =
         UiPackAdmissionRequirements(
             UI_CONTRACT_VERSION,
@@ -154,6 +163,21 @@ class V6ConversationMigrationTest {
         assertTrue(incompatible is UiApplicationPackAdmission.Incompatible)
         assertTrue(UiSceneId("route.settings") in
             (incompatible as UiApplicationPackAdmission.Incompatible).compatibility.missingScenes)
+    }
+
+    @Test fun realEvidenceOwnerSceneIsRegisteredOnlyWhenInjected() {
+        val candidate = fullIncrementalCandidate()
+        val expected = documentCandidate().manifest.scenes +
+            UiSceneId("work.requirement_evidence")
+        assertEquals(expected, candidate.manifest.scenes)
+        assertEquals(expected, candidate.renderers.keys)
+        assertTrue(UiApplicationPackRegistry(listOf(candidate)).select(
+            candidate.manifest.id,
+            requirements(candidate.manifest, onlyDeclared = true),
+        ) is UiApplicationPackAdmission.Admitted)
+        val production = decideApplicationUi(candidate.manifest.id, listOf(candidate),
+            requirements(candidate.manifest, onlyDeclared = false))
+        assertTrue(production is LocalApplicationUiDecision.Unavailable)
     }
 
     @Test fun fullProductionCatalogContinuesRejectingIncompleteV6() {
