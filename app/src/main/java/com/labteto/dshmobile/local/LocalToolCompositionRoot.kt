@@ -193,6 +193,10 @@ internal class LocalToolCompositionRoot @Inject constructor(
 
     override suspend fun servers(): List<McpServerSnapshot> = plugins.mcpServers()
     override suspend fun checkMcpHealth(serverId: String) = plugins.checkMcpHealth(serverId)
+    override fun selectedConnectorIds(): Set<String> =
+        pinnedInvocations.selected.value.asSequence()
+            .filter { it.kind == com.labteto.dshmobile.local.tools.LocalPinnedInvocation.Kind.CONNECTOR }
+            .map { it.id }.toSet()
 
     override fun pluginLifecycleSnapshots() = plugins.lifecycleSnapshots()
     override suspend fun recoverFailedPlugin(id: String) = plugins.recoverFailedPlugin(id)
