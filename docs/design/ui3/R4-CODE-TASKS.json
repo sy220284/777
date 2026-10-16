@@ -200,8 +200,8 @@
       "task": "可信工具 Schema 与结构化结果适配",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "原 Work 工具结果按真实 callId/finishedSequence 读取，本地 JSON 对象/数组自动生成只读折叠和表格，普通文本原样显示；V6 单包入口，无模型调用。 2026-10-16 继续代码：新增 V6UiDocumentScene/V6DocumentMedia，接入现有 UiDocumentUiPort、UiDocumentFormUiPort、MediaUiPort，原生处理 Text/Media/Table/BarChart/BoundText/Column/Row/Field/Select/Switch/Button/Disclosure 全节点；按 documentId/revision 读取与更新表单，文档执行与删除只交原 Owner，并明确发送/授权确认；图片有界解码、音频生命周期、视频播放、会话隔离素材读取和 Android SAF 用户选址导出。消息时间线原位展示每条所属文档，添加生成/查看入口；生成可用本地实际 Owner 模板或显式同意的额外模型请求。注册 conversation.ui_document 与 conversation.ui_document_generate 两个 Scene。另将已有 V6WorkEvidencePanel 通过 WorkEvidenceUiPort 正式接入 work.requirement_evidence 真场景、读取核验需求和产物版本。新增源代码回归测试，均未冒报 CI/设备验收。 2026-10-16 续：UiDocumentFormUiPort 的交互字段在契约/Owner 分别按单行4096、多行16384、最终发送32768字符校验；V6 同步限制输入并提示，超限无法由模型动作绕过；新增字段/组合预算测试。",
-      "remaining": "仍缺可信工具 Schema 自描述到受限输入/预览控件的明确映射，真实工具准入 Owner 与会话/调用身份隔离，未知类型拒绝等契约测试。"
+      "implemented": "原 Work 工具结果按真实 callId/finishedSequence 读取，本地 JSON 对象/数组自动生成只读折叠和表格，普通文本原样显示；V6 单包入口，无模型调用。 2026-10-16 继续代码：新增 V6UiDocumentScene/V6DocumentMedia，接入现有 UiDocumentUiPort、UiDocumentFormUiPort、MediaUiPort，原生处理 Text/Media/Table/BarChart/BoundText/Column/Row/Field/Select/Switch/Button/Disclosure 全节点；按 documentId/revision 读取与更新表单，文档执行与删除只交原 Owner，并明确发送/授权确认；图片有界解码、音频生命周期、视频播放、会话隔离素材读取和 Android SAF 用户选址导出。消息时间线原位展示每条所属文档，添加生成/查看入口；生成可用本地实际 Owner 模板或显式同意的额外模型请求。注册 conversation.ui_document 与 conversation.ui_document_generate 两个 Scene。另将已有 V6WorkEvidencePanel 通过 WorkEvidenceUiPort 正式接入 work.requirement_evidence 真场景、读取核验需求和产物版本。新增源代码回归测试，均未冒报 CI/设备验收。 2026-10-16 续：UiDocumentFormUiPort 的交互字段在契约/Owner 分别按单行4096、多行16384、最终发送32768字符校验；V6 同步限制输入并提示，超限无法由模型动作绕过；新增字段/组合预算测试。\n2026-10-16 本轮代码增量：从 ToolRegistry 当前注册条目抽取真实参数 Schema，经 LocalToolsManagementPort/ToolsUiPort 到 V6 的工作能力表单；字段支持字符串、数值、布尔、枚举、数组/对象 JSON，必填与大小预算由原 JsonSchemaValidator 验证。提交前对照当前工具注册 Schema，工具已卸载/替换/非法 JSON 直接拒绝；V6 仅填充 Work 用户草稿，不创建 ToolContext、授权或执行。新增 UI 解析和 ToolRegistry 不执行/旧注册失效回归。尚未取得最终 SHA CI。",
+      "remaining": "可信注册表到受限表单和 Owner 校验/Work 草稿链已写入，仍需完善结构化工具结果/多层嵌套 UI 的呈现契约及对真实来源/调用身份的受控投影，最终编译单测通过后复核能否整体结项。"
     },
     {
       "id": "S4-02",
@@ -256,8 +256,8 @@
       "task": "敏感草稿/留存/节点/历史/重组预算",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "\n2026-10-16 本轮代码增量：Session UiDocumentStore 新增按 session/message/documentId 向原 EventLog 查询单份文档的版本准入；Work 高频活动更新不再为比较一个卡片而物化整段文档历史。\n2026-10-16 功能代码补充：Session 文档列表维持首次精准流式重建，随后对同一会话及消息窗口通过 EventLog sequence 游标增量追读；缓存只持有当前可见消息集的最近定义，无第二持久化权威。墓碑删除同步清理当前及各版本敏感表单草稿。 2026-10-16 续：Host 表单草稿 SavedState 增加单字段16384字符、每文档32字段、最多24文档及65536字符总预算，拒绝超限不先清空旧 revision，受损/旧版恢复均复用同一准入；测试覆盖超限、恢复、跨版本保留。 2026-10-16 本批：Host UiDocumentFormState 针对密码、Token、API Key、Secret 等字段保留本次会话内编辑，但不写入 Android SavedState；旧 v1/v2 保存快照恢复时拒绝敏感项并立即写回清理后的快照。字段名按边界识别以减少误判（如 secretary/tokenizer），覆盖新值保存、旧版清理、跨版本会话隔离回归测试。",
-      "remaining": "仍缺 EventLog 冷读有界增量索引、按敏感级别分层留存和清理、保存状态重建与长会话复杂度的自动化测试。"
+      "implemented": "\n2026-10-16 本轮代码增量：Session UiDocumentStore 新增按 session/message/documentId 向原 EventLog 查询单份文档的版本准入；Work 高频活动更新不再为比较一个卡片而物化整段文档历史。\n2026-10-16 功能代码补充：Session 文档列表维持首次精准流式重建，随后对同一会话及消息窗口通过 EventLog sequence 游标增量追读；缓存只持有当前可见消息集的最近定义，无第二持久化权威。墓碑删除同步清理当前及各版本敏感表单草稿。 2026-10-16 续：Host 表单草稿 SavedState 增加单字段16384字符、每文档32字段、最多24文档及65536字符总预算，拒绝超限不先清空旧 revision，受损/旧版恢复均复用同一准入；测试覆盖超限、恢复、跨版本保留。 2026-10-16 本批：Host UiDocumentFormState 针对密码、Token、API Key、Secret 等字段保留本次会话内编辑，但不写入 Android SavedState；旧 v1/v2 保存快照恢复时拒绝敏感项并立即写回清理后的快照。字段名按边界识别以减少误判（如 secretary/tokenizer），覆盖新值保存、旧版清理、跨版本会话隔离回归测试。\n2026-10-16 本轮代码增量：UiDocumentNode.Field 新增 UiFieldRetention(SAVED_STATE/MEMORY_ONLY) 的显式元数据；版本化 Codec 支持旧文档缺省读取和新声明往返；禁止敏感字段持久默认值。V6 向 Host 绑定字段级保存策略，Host 对旧 SavedState 敏感值当场清理、当前输入仅内存可用、忘记文档/会话同步清理策略；保留旧字段名识别用于旧载荷迁移，新增嵌套字段、旧快照清理和编码回归。最终 SHA CI 待通过。",
+      "remaining": "按字段显式禁止敏感 SavedState 已实现；仍缺完整的 EventLog 冷读有界增量索引、加密持久化级别（若需要）、长历史复杂度/存储压力测试及跨版本恢复代码级证据，不能仅凭字段草稿改造结项。"
     },
     {
       "id": "S4-09",
