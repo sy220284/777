@@ -89,21 +89,30 @@ class TaskGraphExecutor(
         // Each wave runs only nodes whose dependencies are already settled.
         // Branch failure stops descendants while independent branches proceed.
         while (results.size < total) {
-            val undecided = accepted.filter { it.id !in results }
-            val blocked = undecided.filter { node ->
-                node.dependsOn.any { dep ->
-                    results[dep]?.outcome == TaskGraphOutcome.FAILED ||
-                        results[dep]?.outcome == TaskGraphOutcome.BLOCKED
+            // Propagate a failed dependency through the *entire* DAG before choosing
+            // ready nodes. A single pass leaves grandchildren incorrectly "waiting"
+            // and can cause false deadlock when the root branch has already failed.
+            while (true) {
+                val blocked = accepted.filter { node ->
+                    node.id !in results && node.dependsOn.any { dep ->
+                        results[dep]?.outcome == TaskGraphOutcome.FAILED ||
+                            results[dep]?.outcome == TaskGraphOutcome.BLOCKED
+                    }
                 }
-            }
-            for (node in blocked) {
-                val index = indices.getValue(node.id)
-                val failedDeps = node.dependsOn.filter {
-                    results[it]?.outcome != TaskGraphOutcome.COMPLETED
+                if (blocked.isEmpty()) break
+                for (node in blocked) {
+                    val index = indices.getValue(node.id)
+                    val failedDeps = node.dependsOn.filter {
+                        results[it]?.outcome != TaskGraphOutcome.COMPLETED
+                    }
+                    val reason = "依赖未完成：${failedDeps.joinToString()}"
+                    results[node.id] = TaskGraphNodeResult(
+                        node, index, TaskGraphOutcome.BLOCKED, error = reason,
+                    )
+                    onProgress(TaskGraphProgress(
+                        index, node.task, "受阻", completed.incrementAndGet(), total, reason,
+                    ))
                 }
-                val reason = "依赖未完成：${failedDeps.joinToString()}"
-                results[node.id] = TaskGraphNodeResult(node, index, TaskGraphOutcome.BLOCKED, error = reason)
-                onProgress(TaskGraphProgress(index, node.task, "受阻", completed.incrementAndGet(), total, reason))
             }
             val ready = accepted.filter { node ->
                 node.id !in results && node.dependsOn.all {
