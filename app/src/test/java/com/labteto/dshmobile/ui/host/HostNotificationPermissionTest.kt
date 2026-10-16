@@ -13,6 +13,38 @@ class HostNotificationPermissionTest {
         assertFalse(hostNotificationPermissionEffective(36, false, false))
     }
 
+    @Test fun android14SelectedPhotosRemainPartialWithoutFullLibraryGrant() {
+        val media = projectHostMediaPermissions(34,
+            images = false, videos = false, audio = true,
+            partialVisual = true, legacyStorage = false)
+        assertFalse(media.images)
+        assertFalse(media.videos)
+        assertTrue(media.audio)
+        assertTrue(media.selectedVisualOnly)
+        assertTrue(media.usesScopedMediaPermissions)
+    }
+
+    @Test fun android13OnlyReportsActuallyGrantedMediaCollections() {
+        val media = projectHostMediaPermissions(33,
+            images = true, videos = false, audio = false,
+            partialVisual = true, legacyStorage = false)
+        assertTrue(media.images)
+        assertFalse(media.videos)
+        assertFalse(media.audio)
+        assertFalse(media.selectedVisualOnly)
+    }
+
+    @Test fun android12LegacyStorageCannotPretendModernScopedMediaPermissions() {
+        val media = projectHostMediaPermissions(32,
+            images = true, videos = true, audio = true,
+            partialVisual = true, legacyStorage = false)
+        assertFalse(media.images)
+        assertFalse(media.videos)
+        assertFalse(media.audio)
+        assertFalse(media.usesScopedMediaPermissions)
+        assertFalse(media.selectedVisualOnly)
+    }
+
     @Test fun earlierAndroidUsesSystemNotificationAllowanceWithoutRuntimeGrant() {
         assertTrue(hostNotificationPermissionEffective(32, false, true))
         assertFalse(hostNotificationPermissionEffective(32, true, false))
