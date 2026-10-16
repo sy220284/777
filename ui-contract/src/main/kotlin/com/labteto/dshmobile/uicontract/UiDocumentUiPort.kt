@@ -28,6 +28,16 @@ data class GenerateUiDocumentCommand(
     val acknowledgedAdditionalModelRequest: Boolean,
 )
 
+/** A user-requested text edit; never created or executed by document-defined actions. */
+data class EditUiDocumentTextCommand(
+    val identity: UiSessionIdentity,
+    val documentId: String,
+    val revision: Long,
+    val source: UiDocumentSource,
+    val textNodeId: String,
+    val replacementText: String,
+)
+
 /** Closed user intent; documents themselves cannot embed or invoke deletion. */
 data class DeleteUiDocumentCommand(
     val identity: UiSessionIdentity,
@@ -57,5 +67,7 @@ interface UiDocumentUiPort {
     suspend fun generateLocal(command: GenerateLocalUiDocumentCommand): UiDocumentReceipt
     suspend fun generate(command: GenerateUiDocumentCommand): UiDocumentReceipt
     suspend fun delete(command: DeleteUiDocumentCommand): UiDocumentReceipt
+    suspend fun replaceText(command: EditUiDocumentTextCommand): UiDocumentReceipt =
+        UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
     fun submit(identity: UiSessionIdentity, request: UiDocumentActionRequest): UiDocumentReceipt
 }
