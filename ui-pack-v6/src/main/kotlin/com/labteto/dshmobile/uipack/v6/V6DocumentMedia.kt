@@ -33,6 +33,7 @@ import com.labteto.dshmobile.uicontract.MediaUiPort
 import com.labteto.dshmobile.uicontract.MediaUiReceipt
 import com.labteto.dshmobile.uicontract.UiDocumentMediaKind
 import com.labteto.dshmobile.uicontract.UiDocumentNode
+import com.labteto.dshmobile.uicontract.UiMediaAsset
 import com.shenyan.designsystem.components.SyButton
 import com.shenyan.designsystem.components.SyButtonStyle
 import kotlinx.coroutines.CancellationException
@@ -40,6 +41,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** Never use MediaUiPort.asset() here: it lacks a session ownership check. */
+internal fun resolveV6DocumentMediaAsset(
+    media: MediaUiPort?,
+    node: UiDocumentNode.Media,
+    sessionId: String,
+): UiMediaAsset? = media?.assetForSession(node.assetId, sessionId)
+    ?.takeIf { it.kind == node.kind }
 
 /** Only session-fenced Media Owner references may enter a native decoder. */
 @Composable
@@ -49,7 +58,7 @@ internal fun V6DocumentMediaNode(node: UiDocumentNode.Media, sessionId: String, 
     }
     val page by updates.collectAsStateWithLifecycle(initialValue = LocalMediaPage())
     val asset = remember(media, sessionId, node.assetId, node.kind, page) {
-        media?.assetForSession(node.assetId, sessionId)?.takeIf { it.kind == node.kind }
+        resolveV6DocumentMediaAsset(media, node, sessionId)
     }
     val path = asset?.localPath
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
