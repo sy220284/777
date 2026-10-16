@@ -79,6 +79,10 @@ internal class LocalAttachmentImporter(
             throw error
         }
 
+        // Every failure after the initial copy must release temporary files, including
+        // metadata probing, hashing, cancellation and a failed final rename.
+        var normalizedTemp: File? = null
+        try {
         val probe = inspectImportedImage(incoming, declaredMediaType)
         if (declaredMediaType.startsWith("image/") && probe == null) {
             incoming.delete()
@@ -105,6 +109,7 @@ internal class LocalAttachmentImporter(
             throw error
         }
 
+        normalizedTemp = normalized.file
         val imageMetadata = normalized.imageMetadata
         if (imageMetadata != null) {
             try {
@@ -135,13 +140,7 @@ internal class LocalAttachmentImporter(
             throw error
         }
         val target = File(dir, attachmentId + extension?.let { ".$it" }.orEmpty())
-        if (target.exists()) {
-            normalized.file.delete()
-        } else if (!normalized.file.renameTo(target)) {
-            normalized.file.copyTo(target, overwrite = false)
-            normalized.file.delete()
-        }
-        if (normalized.file != incoming) incoming.delete()
+        commitImportedAttachmentFile(normalized.file, target)
 
         return LocalImportedAttachment(
             name = displayName ?: safeName,
@@ -152,6 +151,10 @@ internal class LocalAttachmentImporter(
             width = imageMetadata?.width,
             height = imageMetadata?.height,
         )
+        } finally {
+            incoming.delete()
+            normalizedTemp?.takeIf { it != incoming }?.delete()
+        }
     }
 
     private data class ImportedImageProbe(
@@ -274,4 +277,24 @@ internal suspend fun copyAttachmentCancellably(
         output.write(buffer, 0, read)
     }
     total
+}
+
+/**
+ * Publish only a complete attachment. Cross-volume fallback copies into a private temporary
+ * staging path before a same-directory rename, so a cancelled/failed copy never exposes a
+ * truncated file under its content-addressed final name. Existing shared hashes are retained.
+ * Caller owns and cleans the source temporary file in all cases.
+ */
+internal fun commitImportedAttachmentFile(source: File, target: File) {
+    if (target.exists()) return
+    if (source.renameTo(target)) return
+    val pending = File(target.parentFile, ".commit-${UUID.randomUUID()}")
+    try {
+        source.copyTo(pending, overwrite = false)
+        if (!target.exists() && !pending.renameTo(target)) {
+            error("附件保存失败")
+        }
+    } finally {
+        pending.delete()
+    }
 }
