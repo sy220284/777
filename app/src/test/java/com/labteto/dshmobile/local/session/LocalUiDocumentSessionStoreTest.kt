@@ -39,6 +39,34 @@ class LocalUiDocumentSessionStoreTest {
         } finally { directory.deleteRecursively() }
     }
 
+    @Test fun userEditedTableCellPublishesThroughOriginalEventLogWithRevisionCas() {
+        val directory = Files.createTempDirectory("ui-doc-table-edit").toFile()
+        try {
+            val registry = LocalSessionEventLogRegistry(directory, Json)
+            val store = LocalUiDocumentSessionStore(registry)
+            val original = UiDocument(1, "table-card",
+                UiDocumentSource("session", "message", 2, "profile", null), 0,
+                "当前项目数据",
+                listOf(UiDocumentNode.Table("rows", listOf("name", "value"),
+                    listOf(listOf("risk", "unverified"), listOf("phase", "draft")))),
+                emptyList(), "初始数据")
+            assertTrue(store.publish(original, provenance, null, null, budget, emptySet()))
+            val corrected = original.withUserEditedTableCell("rows", 0, 1, "user corrected")!!
+            val marker = UiDocumentProvenance(null, "user-edited", false, UiDocumentOrigin.LOCAL)
+            assertTrue(store.publish(corrected, marker, null, original, budget, emptySet()))
+            val stale = original.withUserEditedTableCell("rows", 0, 1, "stale competing write")!!
+            assertFalse(store.publish(stale, marker, null, original, budget, emptySet()))
+            val reopened = LocalUiDocumentSessionStore(registry).read(
+                "session", setOf("message"), budget, emptySet()).single()
+            assertEquals(corrected, reopened.document)
+            assertEquals(marker, reopened.provenance)
+            assertTrue(store.delete(corrected, budget, emptySet()))
+            assertFalse(store.publish(corrected.copy(revision = 2), marker, null,
+                corrected, budget, emptySet()))
+            registry.clearAndEvict(setOf("session"))
+        } finally { directory.deleteRecursively() }
+    }
+
     @Test fun lateProducerCannotOverwriteNewRevisionAndLocalProvenanceRestores() {
         val directory = Files.createTempDirectory("ui-doc-revision").toFile()
         try {
