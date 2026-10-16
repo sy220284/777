@@ -13,7 +13,7 @@ internal fun resolveWorkUiDocumentSource(log: LocalSessionEventLog, inputId: Str
     var runId = recoveryRunId
     var cursor: Long? = null
     while (true) {
-        val page = log.pageBeforeNewestFirst(cursor, limit = 128)
+        val page = log.pageBeforeNewestFirst(sequenceExclusive = cursor ?: Long.MAX_VALUE, limit = 128)
         if (page.isEmpty()) return inputId // Legacy provenance is unavailable; do not guess another turn.
         for (event in page) {
             if (runId == null && event.type == "turn/continuation-queued" &&
