@@ -39,6 +39,28 @@ class LocalSessionEventLogTest {
     }
 
     @Test
+    fun durableAppendAndResetEmitRevisionsWithoutInventingVerification() {
+        val directory = Files.createTempDirectory("local-event-revisions").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = LocalSessionEventLog(file, json, maxBytes = 4_096)
+            assertEquals(0L, log.changes.value)
+            val first = log.append("work/requirement-evidence", buildJsonObject {
+                put("assertion", "user_selected_reference_only")
+            })
+            assertEquals(0L, first.sequence)
+            assertEquals(1L, log.changes.value)
+            log.append("work/tool-result", buildJsonObject { put("status", "failed") })
+            assertEquals(2L, log.changes.value)
+            log.clear()
+            assertEquals(3L, log.changes.value)
+            assertTrue(log.snapshot().isEmpty())
+            log.close()
+            assertEquals(4L, log.changes.value)
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test
     fun appendReturnsTheExactDurableSequence() {
         val directory = Files.createTempDirectory("local-event-append-sequence").toFile()
         val file = directory.resolve("session.events.jsonl")
