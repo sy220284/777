@@ -47,6 +47,7 @@ data class V6SecondaryPorts(
     val selection: PersonaSelectionUiPort? = null,
     val portraits: PersonaPortraitUiPort? = null,
     val modelPerformance: ModelPerformanceUiPort? = null,
+    val pricing: PricingUiPort? = null,
 )
 
 @Composable
