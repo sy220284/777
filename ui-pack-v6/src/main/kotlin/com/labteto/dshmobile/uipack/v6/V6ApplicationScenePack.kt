@@ -43,6 +43,7 @@ class V6ApplicationScenePack(
     private val usageOwner: com.labteto.dshmobile.uicontract.UsageUiPort? = null,
     private val updateStatus: kotlinx.coroutines.flow.StateFlow<String?>? = null,
     private val checkForUpdate: (() -> Unit)? = null,
+    private val secondary: V6SecondaryPorts? = null,
 ) : UiApplicationScenePack {
     private val pages = mapOf(
         UiSceneId("settings.appearance") to V6PreferencesPage.APPEARANCE,
@@ -92,6 +93,13 @@ class V6ApplicationScenePack(
         setOf(UiSceneId("chat.reply_suggestions")) else emptySet()
     private val steeringScene = if (conversations?.workPolicy != null)
         setOf(UiSceneId("work.steering_choice")) else emptySet()
+    private val secondaryTools = if (secondary?.tools != null)
+        setOf("route.tools","tools.mcp","tools.github","tools.plugins","work.capabilities")
+            .map(::UiSceneId).toSet() else emptySet()
+    private val secondaryWorkspace = if (secondary?.files != null)
+        setOf(UiSceneId("route.workspace"),UiSceneId("workspace.preview")) else emptySet()
+    private val secondaryMedia = if (secondary?.media != null && secondary.settings != null)
+        setOf(UiSceneId("media.creation"),UiSceneId("media.result")) else emptySet()
 
 
     override val manifest = UiPackManifest(
@@ -100,7 +108,8 @@ class V6ApplicationScenePack(
         scenes = pages.keys + sessionSettings + conversationScenes + documentScenes +
             evidenceScene + personaScene + groupScenes + archiveScenes +
             planScene + teamScene + settingsSuite + updateScene +
-            messageActionScenes + suggestionsScenes + steeringScene,
+            messageActionScenes + suggestionsScenes + steeringScene +
+            secondaryTools + secondaryWorkspace + secondaryMedia,
         requiredCapabilities = buildSet {
             if (conversations != null) {
                 addAll(setOf("chat.send_text", "work.send_text", "chat.edit", "chat.regenerate",
@@ -126,6 +135,35 @@ class V6ApplicationScenePack(
             put(id, UiSceneRenderer { scope ->
                 V6PreferencesScene(page, preferences, onBack = { scope.onBack(); Unit })
             })
+        }
+        secondary?.let { owners ->
+            owners.tools?.let { tools ->
+                secondaryTools.forEach { id ->
+                    put(id, UiSceneRenderer { scope ->
+                        V6ToolsManagementScene(id, tools,
+                            onNavigate = scope.onNavigate,
+                            onBack = { scope.onBack(); Unit })
+                    })
+                }
+            }
+            owners.files?.let { files ->
+                secondaryWorkspace.forEach { id ->
+                    put(id, UiSceneRenderer { scope ->
+                        V6WorkspaceScene(files, previewFirst = id.value == "workspace.preview",
+                            onBack = { scope.onBack(); Unit })
+                    })
+                }
+            }
+            val media = owners.media
+            val settingsOwner = owners.settings
+            if (media != null && settingsOwner != null)
+                secondaryMedia.forEach { id ->
+                    put(id, UiSceneRenderer { scope ->
+                        V6MediaScene(media, settingsOwner, owners.sessionId(),
+                            creation = id.value == "media.creation",
+                            onBack = { scope.onBack(); Unit })
+                    })
+                }
         }
         conversations?.let { owners ->
             listOf(
