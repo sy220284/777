@@ -5,6 +5,8 @@ import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 /** ToolsFeature management contract for the one process-wide plugin composition. */
 internal interface LocalToolsManagementPort {
     suspend fun servers(): List<McpServerSnapshot>
+    /** Emitted by the authoritative MCP registry or Composer selection Owner. */
+    fun serverChanges(): kotlinx.coroutines.flow.Flow<Unit>
     suspend fun checkMcpHealth(serverId: String): com.labteto.dshmobile.interop.mcp.McpServerHealth
     /** Composer Owner's selected connector IDs; disconnected pins remain selected. */
     fun selectedConnectorIds(): Set<String> = emptySet()
