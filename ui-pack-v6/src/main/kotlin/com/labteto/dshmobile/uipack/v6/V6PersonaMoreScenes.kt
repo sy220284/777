@@ -47,6 +47,12 @@ fun V6PersonaAuthoringScene(
     var suggestion by remember { mutableStateOf("") }
     var loreTitle by remember { mutableStateOf("") }
     var loreContent by remember { mutableStateOf("") }
+    var loreKeywords by remember { mutableStateOf("") }
+    var loreSecondary by remember { mutableStateOf("") }
+    var lorePriority by remember { mutableStateOf("50") }
+    var loreStage by remember { mutableStateOf("") }
+    var factCategory by remember { mutableStateOf("personal") }
+    var factContent by remember { mutableStateOf("") }
     var confirmDiscard by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(gallery) {
@@ -137,6 +143,79 @@ fun V6PersonaAuthoringScene(
                         dirty = true
                     }, label = field, singleLine = false)
                 }
+                SyInput(draft.timelinePosition, {
+                    draft = draft.copy(timelinePosition = it); dirty = true
+                }, label = "故事时间线当前位置")
+                listOf(
+                    "知识边界（每行一条）" to "knowledge",
+                    "硬性行为约束（每行一条）" to "constraints",
+                    "禁用表达（每行一条）" to "banned",
+                    "明确纠正事实（每行一条）" to "corrections",
+                ).forEach { (label, field) ->
+                    val values = when (field) {
+                        "knowledge" -> draft.knowledgeBoundary
+                        "constraints" -> draft.hardConstraints
+                        "banned" -> draft.bannedPhrases
+                        else -> draft.corrections
+                    }
+                    SyInput(values.joinToString("\n"), { input ->
+                        val next = input.lines().map(String::trim).filter(String::isNotEmpty)
+                        draft = when (field) {
+                            "knowledge" -> draft.copy(knowledgeBoundary = next)
+                            "constraints" -> draft.copy(hardConstraints = next)
+                            "banned" -> draft.copy(bannedPhrases = next)
+                            else -> draft.copy(corrections = next)
+                        }
+                        dirty = true
+                    }, label = label, singleLine = false)
+                }
+                Text("结构化事实（由人确认，未检验的内容不自动提升为已验证）")
+                draft.facts.forEach { fact ->
+                    SyGlassCard(Modifier.fillMaxWidth()) {
+                        Text("事实：" + fact.id.take(12))
+                        SyInput(fact.category, { value ->
+                            draft = draft.copy(facts = draft.facts.map {
+                                if (it.id == fact.id) it.copy(category = value) else it
+                            }); dirty = true
+                        }, label = "事实类型")
+                        SyInput(fact.content, { value ->
+                            draft = draft.copy(facts = draft.facts.map {
+                                if (it.id == fact.id) it.copy(content = value) else it
+                            }); dirty = true
+                        }, label = "事实内容", singleLine = false)
+                        SyInput(fact.perspective, { value ->
+                            draft = draft.copy(facts = draft.facts.map {
+                                if (it.id == fact.id) it.copy(perspective = value) else it
+                            }); dirty = true
+                        }, label = "记录视角")
+                        SyInput(fact.source, { value ->
+                            draft = draft.copy(facts = draft.facts.map {
+                                if (it.id == fact.id) it.copy(source = value) else it
+                            }); dirty = true
+                        }, label = "事实来源")
+                        SyInput(fact.stage, { value ->
+                            draft = draft.copy(facts = draft.facts.map {
+                                if (it.id == fact.id) it.copy(stage = value) else it
+                            }); dirty = true
+                        }, label = "阶段")
+                        Text("原始事实标记：" + fact.provenance)
+                        SyButton("删除这条事实", {
+                            draft = draft.copy(facts = draft.facts.filterNot { it.id == fact.id })
+                            dirty = true
+                        }, style = SyButtonStyle.DANGER)
+                    }
+                }
+                SyInput(factCategory, { factCategory = it }, label = "新事实类别")
+                SyInput(factContent, { factContent = it }, label = "新事实内容", singleLine = false)
+                SyButton("添加待核实事实", {
+                    if (factCategory.isNotBlank() && factContent.isNotBlank()) {
+                        draft = draft.copy(facts = draft.facts + UiPersonaFact(
+                            java.util.UUID.randomUUID().toString(), factCategory.trim(),
+                            factContent.trim(), provenance = "UNVERIFIED"))
+                        factContent = ""; dirty = true
+                    }
+                }, enabled = factCategory.isNotBlank() && factContent.isNotBlank(),
+                    style = SyButtonStyle.SECONDARY)
                 SyInput(suggestion, { suggestion = it },
                     label = "额外模型辅助设计要求（明确点击后才调用）", singleLine = false)
                 val identity = selection.snapshot().identity
@@ -149,9 +228,49 @@ fun V6PersonaAuthoringScene(
                 Text("世界书条目：" + draft.lore.size)
                 draft.lore.forEach { lore ->
                     SyGlassCard(Modifier.fillMaxWidth()) {
-                        Text(lore.title, style = MaterialTheme.typography.titleMedium)
-                        Text(lore.content)
-                        Text("关键词：" + lore.keywords.joinToString())
+                        Text("世界书：" + lore.id.take(12), style = MaterialTheme.typography.titleMedium)
+                        SyInput(lore.title, { value ->
+                            draft = draft.copy(lore = draft.lore.map {
+                                if (it.id == lore.id) it.copy(title = value) else it
+                            }); dirty = true
+                        }, label = "标题")
+                        SyInput(lore.content, { value ->
+                            draft = draft.copy(lore = draft.lore.map {
+                                if (it.id == lore.id) it.copy(content = value) else it
+                            }); dirty = true
+                        }, label = "内容", singleLine = false)
+                        SyInput(lore.keywords.joinToString(","), { value ->
+                            draft = draft.copy(lore = draft.lore.map {
+                                if (it.id == lore.id) it.copy(
+                                    keywords = value.split(",").map(String::trim).filter(String::isNotEmpty))
+                                else it
+                            }); dirty = true
+                        }, label = "触发关键词（英文逗号分隔）")
+                        SyInput(lore.secondaryKeywords.joinToString(","), { value ->
+                            draft = draft.copy(lore = draft.lore.map {
+                                if (it.id == lore.id) it.copy(
+                                    secondaryKeywords = value.split(",").map(String::trim).filter(String::isNotEmpty))
+                                else it
+                            }); dirty = true
+                        }, label = "次级关键词")
+                        SyInput(lore.priority.toString(), { value ->
+                            val priority = value.toIntOrNull()
+                            if (priority != null && priority in 0..100) {
+                                draft = draft.copy(lore = draft.lore.map {
+                                    if (it.id == lore.id) it.copy(priority = priority) else it
+                                }); dirty = true
+                            }
+                        }, label = "优先级（0–100）")
+                        SyInput(lore.stage, { value ->
+                            draft = draft.copy(lore = draft.lore.map {
+                                if (it.id == lore.id) it.copy(stage = value) else it
+                            }); dirty = true
+                        }, label = "生效阶段")
+                        SySwitch("始终启用", lore.alwaysOn, { enabled ->
+                            draft = draft.copy(lore = draft.lore.map {
+                                if (it.id == lore.id) it.copy(alwaysOn = enabled) else it
+                            }); dirty = true
+                        })
                         SyButton("删除这条世界书", {
                             draft = draft.copy(lore = draft.lore.filterNot { it.id == lore.id })
                             dirty = true
@@ -160,15 +279,26 @@ fun V6PersonaAuthoringScene(
                 }
                 SyInput(loreTitle, { loreTitle = it }, label = "世界书标题")
                 SyInput(loreContent, { loreContent = it }, label = "世界书内容", singleLine = false)
+                SyInput(loreKeywords, { loreKeywords = it }, label = "触发关键词（逗号分隔）")
+                SyInput(loreSecondary, { loreSecondary = it }, label = "次级关键词")
+                SyInput(lorePriority, { lorePriority = it.filter(Char::isDigit).take(3) },
+                    label = "优先级（0–100）")
+                SyInput(loreStage, { loreStage = it }, label = "条目生效阶段")
                 SyButton("添加世界书条目", {
                     if (loreTitle.isNotBlank() && loreContent.isNotBlank()) {
                         draft = draft.copy(lore = draft.lore + UiPersonaLore(
                             "v6-" + java.util.UUID.randomUUID().toString(), loreTitle.trim(),
-                            loreContent.trim()))
-                        loreTitle = ""; loreContent = ""
+                            loreContent.trim(),
+                            keywords = loreKeywords.split(",").map(String::trim).filter(String::isNotEmpty),
+                            secondaryKeywords = loreSecondary.split(",").map(String::trim).filter(String::isNotEmpty),
+                            priority = lorePriority.toIntOrNull() ?: 50,
+                            stage = loreStage.trim()))
+                        loreTitle = ""; loreContent = ""; loreKeywords = ""
+                        loreSecondary = ""; lorePriority = "50"; loreStage = ""
                         dirty = true
                     }
-                }, enabled = loreTitle.isNotBlank() && loreContent.isNotBlank())
+                }, enabled = loreTitle.isNotBlank() && loreContent.isNotBlank() &&
+                    lorePriority.toIntOrNull() in 0..100)
             }
             SyButton(if (worldBook) "保存世界书" else "保存人物档案", {
                 val id = galleryId
