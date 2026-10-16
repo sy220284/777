@@ -88,10 +88,10 @@ def errors(matrix, catalog):
     # owners. Checking only counts could let a renamed/retired entry silently pass.
     features = (ROOT / "app/src/main/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalog.kt").read_text(encoding="utf-8")
     settings = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt").read_text(encoding="utf-8")
-    native_routes = re.search(r"internal enum class LocalFeatureRoute\\s*\\{([^}]+)\\}", features, re.S)
-    native_settings = re.search(r"enum class SettingsDestination\\s*\\{([^}]+)\\}", settings, re.S)
+    native_routes = re.search(r"internal enum class LocalFeatureRoute\s*\{([^}]+)\}", features, re.S)
+    native_settings = re.search(r"enum class SettingsDestination\s*\{([^}]+)\}", settings, re.S)
     def names(match):
-        return set(re.findall(r"^\\s*([A-Z][A-Z_]+)\\s*(?:,|$)", match.group(1), re.M)) if match else set()
+        return set(re.findall(r"^\s*([A-Z][A-Z_]+)\s*(?:,|$)", match.group(1), re.M)) if match else set()
     route_ids = {"route." + name.lower() for name in names(native_routes)}
     settings_ids = {"settings." + name.lower() for name in names(native_settings)}
     documented_routes = {sid for sid in documented if sid.startswith("route.")}
