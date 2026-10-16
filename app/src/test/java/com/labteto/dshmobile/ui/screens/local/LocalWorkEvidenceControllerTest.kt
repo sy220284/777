@@ -21,6 +21,8 @@ class LocalWorkEvidenceControllerTest {
             { _, _, _ -> false },
     ) = LocalWorkFeatureUiActions(
         evidence = object : com.labteto.dshmobile.uicontract.WorkEvidenceUiPort {
+            override fun changes(identity: com.labteto.dshmobile.uicontract.UiSessionIdentity):
+                kotlinx.coroutines.flow.Flow<Unit> = kotlinx.coroutines.flow.flowOf(Unit)
             override suspend fun read(identity: com.labteto.dshmobile.uicontract.UiSessionIdentity) =
                 com.labteto.dshmobile.uicontract.UiWorkEvidenceReadReceipt.Rejected(
                     com.labteto.dshmobile.uicontract.UiCommandRejection.STALE_IDENTITY)
