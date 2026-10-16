@@ -34,11 +34,14 @@ internal fun v6ToolFormFields(schema: JsonObject): List<V6ToolFormField> {
         require(type in setOf("string", "number", "integer", "boolean", "object", "array")) {
             "工具包含未支持的输入字段类型：$name / $type"
         }
-        val values = (field["enum"] as? JsonArray).orEmpty().map { it.toString() }
+        val values = (field["enum"] as? JsonArray).orEmpty().map { choice ->
+            (choice as? JsonPrimitive)?.takeIf { it.isString }?.content ?: choice.toString()
+        }
+        require(values.size <= 32) { "枚举选项太多：$name" }
         V6ToolFormField(name, type, name in required,
             (field["title"] as? JsonPrimitive)?.contentOrNull?.take(120) ?: name,
             (field["description"] as? JsonPrimitive)?.contentOrNull?.take(240).orEmpty(),
-            values.take(32))
+            values)
     }
 }
 
