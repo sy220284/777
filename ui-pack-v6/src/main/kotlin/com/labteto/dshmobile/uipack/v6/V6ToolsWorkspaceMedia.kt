@@ -506,11 +506,12 @@ fun V6MediaScene(media: MediaUiPort, settings: SettingsUiPort,
                 result.description?.let { Text(it) }
                 val asset = sessionId?.let { media.assetForSession(result.id, it) }
                 asset?.textOutput?.let { Text(it) }
-                if (asset?.localPath != null && asset.kind != null && sessionId != null) {
-                    // The same scoped Owner and native renderer serve chat documents and the
-                    // media archive; the archive never decodes a foreign-session filesystem path.
+                val localKind = asset?.kind
+                if (asset?.localPath != null && localKind != null && sessionId != null) {
+                    // Snapshot the cross-module nullable kind for Kotlin smart-cast stability.
+                    // Only session-scoped media assets enter a native local-file decoder.
                     V6DocumentMediaNode(
-                        UiDocumentNode.Media("archive-" + result.id, result.id, asset.kind,
+                        UiDocumentNode.Media("archive-" + result.id, result.id, localKind,
                             "预览并导出本地媒体"), sessionId, media)
                 } else if (asset?.localPath != null) {
                     Text("本地媒体类型尚未通过 Owner 标注，无法安全预览")
