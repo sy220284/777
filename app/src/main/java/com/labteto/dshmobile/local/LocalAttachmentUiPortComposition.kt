@@ -11,6 +11,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 
+/** URI admission is a pure, unit-testable boundary; Android still enforces provider grants. */
+internal fun isSupportedPickerAttachmentUri(scheme: String?, authority: String?): Boolean =
+    scheme == "content" && !authority.isNullOrBlank()
+
 /** Platform data adaptation; the existing Session/File owner performs the only durable import. */
 @Singleton
 class LocalAttachmentUiPortComposition @Inject internal constructor(
@@ -27,7 +31,7 @@ class LocalAttachmentUiPortComposition @Inject internal constructor(
             val uri = Uri.parse(command.contentUri)
             // The UI contract only admits a URI returned by an explicit Android document
             // picker. A file:// or other scheme would bypass the user's provider grant.
-            if (uri.scheme != "content" || uri.authority.isNullOrBlank()) {
+            if (!isSupportedPickerAttachmentUri(uri.scheme, uri.authority)) {
                 return UiAttachmentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
             }
             val imported = files.importAttachment(uri)
