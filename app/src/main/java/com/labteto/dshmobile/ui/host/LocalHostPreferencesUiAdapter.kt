@@ -23,6 +23,26 @@ internal fun hostNotificationPermissionEffective(
     apiLevel: Int, runtimePermissionGranted: Boolean, notificationsEnabled: Boolean,
 ): Boolean = notificationsEnabled && (apiLevel < 33 || runtimePermissionGranted)
 
+/** Media permissions are distinct from SAF one-file grants and never authorize a tool. */
+internal fun projectHostMediaPermissions(
+    apiLevel: Int, images: Boolean, videos: Boolean, audio: Boolean,
+    partialVisual: Boolean, legacyStorage: Boolean,
+): UiHostMediaPermissionSnapshot = when {
+    apiLevel >= 34 -> UiHostMediaPermissionSnapshot(
+        images = images, videos = videos, audio = audio,
+        selectedVisualOnly = partialVisual && !images && !videos,
+        usesScopedMediaPermissions = true,
+    )
+    apiLevel >= 33 -> UiHostMediaPermissionSnapshot(
+        images = images, videos = videos, audio = audio,
+        selectedVisualOnly = false, usesScopedMediaPermissions = true,
+    )
+    else -> UiHostMediaPermissionSnapshot(
+        images = legacyStorage, videos = legacyStorage, audio = legacyStorage,
+        selectedVisualOnly = false, usesScopedMediaPermissions = false,
+    )
+}
+
 /** Existing DataStore remains the only durable application preferences writer. */
 @Singleton
 internal class LocalHostPreferencesUiAdapter @Inject constructor(
@@ -90,32 +110,19 @@ internal class LocalHostPreferencesUiAdapter @Inject constructor(
         runCatching {
             fun granted(permission: String): Boolean =
                 context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
-            when {
-                Build.VERSION.SDK_INT >= 34 -> {
-                    val image = granted(Manifest.permission.READ_MEDIA_IMAGES)
-                    val video = granted(Manifest.permission.READ_MEDIA_VIDEO)
-                    UiHostMediaPermissionSnapshot(
-                        images = image, videos = video,
-                        audio = granted(Manifest.permission.READ_MEDIA_AUDIO),
-                        selectedVisualOnly = granted(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) &&
-                            !image && !video,
-                        usesScopedMediaPermissions = true,
-                    )
-                }
-                Build.VERSION.SDK_INT >= 33 -> UiHostMediaPermissionSnapshot(
-                    images = granted(Manifest.permission.READ_MEDIA_IMAGES),
-                    videos = granted(Manifest.permission.READ_MEDIA_VIDEO),
-                    audio = granted(Manifest.permission.READ_MEDIA_AUDIO),
-                    selectedVisualOnly = false, usesScopedMediaPermissions = true,
-                )
-                else -> {
-                    val storage = granted(Manifest.permission.READ_EXTERNAL_STORAGE)
-                    UiHostMediaPermissionSnapshot(
-                        images = storage, videos = storage, audio = storage,
-                        selectedVisualOnly = false, usesScopedMediaPermissions = false,
-                    )
-                }
-            }
+            projectHostMediaPermissions(
+                apiLevel = Build.VERSION.SDK_INT,
+                images = Build.VERSION.SDK_INT >= 33 &&
+                    granted(Manifest.permission.READ_MEDIA_IMAGES),
+                videos = Build.VERSION.SDK_INT >= 33 &&
+                    granted(Manifest.permission.READ_MEDIA_VIDEO),
+                audio = Build.VERSION.SDK_INT >= 33 &&
+                    granted(Manifest.permission.READ_MEDIA_AUDIO),
+                partialVisual = Build.VERSION.SDK_INT >= 34 &&
+                    granted(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED),
+                legacyStorage = Build.VERSION.SDK_INT < 33 &&
+                    granted(Manifest.permission.READ_EXTERNAL_STORAGE),
+            )
         }.getOrNull()
 
     override fun openSystemPermissions(): Boolean = open(
