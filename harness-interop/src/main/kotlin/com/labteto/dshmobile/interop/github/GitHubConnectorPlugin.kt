@@ -295,7 +295,8 @@ class GitHubConnectorPlugin(
             ToolResult(
                 content = "[$code] ${error.javaClass.simpleName}: " + when (code) {
                     "GITHUB_RESPONSE_TOO_LARGE" -> "GitHub 响应超过 2 MiB 上限"
-                    "GITHUB_INVALID_REQUEST" -> "API 路径或请求参数违反工具契约"
+                    "GITHUB_INVALID_REQUEST" ->
+                        "API 路径或请求参数违反工具契约：${error.message.orEmpty().take(240)}"
                     else -> "GitHub 传输未完成，未取得完整 HTTP 响应"
                 },
                 isError = true,
