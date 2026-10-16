@@ -20,4 +20,3 @@ data class UiPackAdmissionRequirements(
 ) {
     init { require(contractVersion > 0) }
 }
-
