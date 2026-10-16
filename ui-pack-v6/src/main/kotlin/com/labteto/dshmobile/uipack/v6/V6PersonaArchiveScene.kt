@@ -85,7 +85,7 @@ fun V6PersonaArchiveScene(
     var deleteTarget by remember(activeGallery, activeStory) { mutableStateOf<Pair<String, String?>?>(null) }
     val scope = rememberCoroutineScope()
 
-    suspend fun readGallery() {
+    suspend fun readGallery(clearNotice: Boolean = true) {
         when (val result = withContext(Dispatchers.IO) { gallery.read() }) {
             is UiPersonaGalleryReadReceipt.Available -> {
                 entries = result.entries
@@ -93,7 +93,7 @@ fun V6PersonaArchiveScene(
                     activeGallery = null
                     activeStory = null
                 }
-                notice = null
+                if (clearNotice) notice = null
             }
             is UiPersonaGalleryReadReceipt.Failed ->
                 notice = result.message ?: "人物档案读取失败"
@@ -169,7 +169,8 @@ fun V6PersonaArchiveScene(
             try {
                 val result = withContext(Dispatchers.IO) { operation() }
                 notice = result
-                if (afterSuccess) readGallery()
+                // A successful refresh must not erase the actual write receipt.
+                if (afterSuccess) readGallery(clearNotice = false)
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { notice = failure.message ?: "档案操作失败" }
             finally { pending = false }
