@@ -106,13 +106,13 @@ class V6ConversationMigrationTest {
             "settings.session", "settings.chat",
             "route.home", "conversation.chat", "conversation.work",
             "conversation.header", "conversation.timeline", "conversation.composer",
-            "conversation.reply_status",
+            "conversation.reply_status", "work.approval", "work.question",
         ).map(::UiSceneId).toSet()
         assertEquals(expected, candidate.manifest.scenes)
         assertEquals(expected, candidate.renderers.keys)
     }
 
-    @Test fun scopedTwelveScenePackPassesContractWithoutExecutingOwners() {
+    @Test fun scopedFourteenScenePackPassesContractWithoutExecutingOwners() {
         val candidate = pack()
         assertTrue(UiApplicationPackRegistry(listOf(candidate)).select(
             candidate.manifest.id, requirements(candidate.manifest, onlyDeclared = true),
