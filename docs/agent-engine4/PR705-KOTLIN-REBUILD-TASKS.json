@@ -156,10 +156,16 @@
         "AE4V3-08",
         "AE4V3-09"
       ],
-      "status": "not_started",
-      "code_evidence": [],
+      "status": "in_progress",
+      "code_evidence": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentInputQueue.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkContinuation.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistry.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt"
+      ],
       "tests_verified": [],
-      "notes": ""
+      "notes": "已接入生产 Turn 终态→Work Run Owner onIdle→持久 agent/inbox→自动下一轮的安全 Goal 进度续轮；仅在已存在身份明确的 active Goal、真实成功工具回执、无工具错误、无用户新输入/steer/取消、无持久化错误、现有证据仍为 NEEDS_EXECUTION 时准入；复用已有最多 2 次续轮预算和 checkpoint；新增 8 个 JVM 场景但最终 SHA 编译/CI 未验证。仍缺多轮动态进度证明、跨进程目标 revision/fencing、工具未知结算与完整 GoalDriver。"
     },
     {
       "id": "AE4V3-12",
@@ -353,9 +359,21 @@
   "status": "first incremental implementation, not entire refactor",
   "current_slice": {
     "date": "2026-10-16",
-    "component": "Work goal typed turn disposition",
-    "head_before": "90a451dca3602393c2ba6ac43f30136dbd50b0ca",
-    "description": "Use one Work-owned acceptance-evidence snapshot for turn-end disposition and completion quality; no automatic resumption before safe GoalDriver admission.",
-    "ci": "awaiting latest branch SHA"
+    "component": "Work GoalDriver bounded auto follow-through",
+    "status": "code_committed_ci_pending",
+    "pr": 705,
+    "description": "Real Work Turn→Run owner→atomic durable queue→next Turn; strong user-priority and identity guards; verified read-only evidence is required to consider goal outstanding. Does not claim a complete autonomous engine.",
+    "code_evidence": [
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentInputQueue.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkContinuation.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistry.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt"
+    ],
+    "tests": [
+      "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/agent/AgentInputQueueTest.kt",
+      "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuationTest.kt"
+    ],
+    "ci": "await latest branch SHA"
   }
 }
