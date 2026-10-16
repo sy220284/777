@@ -12,6 +12,7 @@ class LocalToolsRuntime @Inject internal constructor(
 ) {
     internal suspend fun servers(): List<McpServerSnapshot> = management.servers()
     internal suspend fun checkMcpHealth(serverId: String) = management.checkMcpHealth(serverId)
+    internal fun selectedConnectorIds(): Set<String> = management.selectedConnectorIds()
     internal suspend fun githubConfigured(): Boolean = githubCredentials.configured()
     internal suspend fun configureGitHub(token: String) = githubCredentials.configure(token)
     internal suspend fun clearGitHub() = githubCredentials.clear()
