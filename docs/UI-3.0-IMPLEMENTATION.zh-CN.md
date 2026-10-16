@@ -328,7 +328,7 @@ Host 的 `ConversationShellUiPort` 接入重命名与显式置顶；原偏好 St
 ## 2026-10-16 优先实现：V6 原生聊天/Work 与独立会话子场景
 
 - 新增 `:ui-pack-v6/V6ConversationScene.kt`，通过 Chat/Work/草稿/附件/阅读锚点/历史 Port 实现真实主界面、消息时间线、Composer、工具授权及 Work 问答。V6 组件单独编译；Host 注入 Feature Owner 实例，不在 Pack 新建 Session、Work 或 Chat Owner。
-- 注册 `route.home`、`conversation.chat`、`conversation.work`，并以独立布局分支支持 `conversation.header`、`conversation.timeline`、`conversation.composer`、`conversation.reply_status` 四个真正可执行子场景，和原 5 个设置场景合计 **12/75**。不存在空白 Renderer；仍严格拒绝整包生产准入。
+- 注册 `route.home`、`conversation.chat`、`conversation.work`，并以独立布局分支支持 `conversation.header`、`conversation.timeline`、`conversation.composer`、`conversation.reply_status` 四个真正可执行子场景，和原 5 个设置场景合计 **14/75**（另含独立 Work 审批、问答 Scene）。不存在空白 Renderer；仍严格拒绝整包生产准入。
 - 消息可发送普通文字或纯附件；只在原 Owner 接受/排队，且当前身份未变化时清空草稿；拒绝或结果未知不丢草稿。补齐异步历史失败的身份校验、列表阅读锚点和加载状态变化恢复，阻止连续切换会话串写反馈；审批须明确二次确认、展示源 Owner 工具参数及影响等级。
 - 增加 `V6ConversationSubmissionTest` 的 4 个 Owner 命令测试及 `V6ConversationMigrationTest` 的 12 场景门禁断言。**仅提交了测试源码，未宣称 CI/真机已通过。**
-- 下阶段仍需独立 V6 全部动态文档/媒体、聊天人物和群聊子场景、Work 计划/证据/团队及原有导航 Shell 的行为等价。其余 **63 个**必需场景尚未完整独立；当前 Legacy V6 保留。
+- 下阶段仍需独立 V6 全部动态文档/媒体、聊天人物和群聊子场景、Work 计划/证据/团队及原有导航 Shell 的行为等价。其余 **61 个**必需场景尚未完整独立；当前 Legacy V6 保留。
