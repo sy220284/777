@@ -89,6 +89,48 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         else -> null
     }
 
+    override suspend fun retrySessionImageDownload(id: String, sessionId: String): MediaUiReceipt {
+        if (sessionId.isBlank()) return MediaUiReceipt.Failed("会话身份缺失，不能获取图片")
+        val original = try { store.result(id) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { return MediaUiReceipt.Failed(failure.message) }
+        if (original?.sessionId != sessionId || original.kind != LocalMediaKind.IMAGE.name)
+            return MediaUiReceipt.Failed("原图片不存在或不属于当前会话")
+        val flight = synchronized(imageDownloads) {
+            imageDownloads[id]?.takeUnless { it.isCompleted } ?: scope.async(start = CoroutineStart.LAZY) {
+                restoreImageFromOriginalResult(id, sessionId)
+            }.also { deferred ->
+                imageDownloads[id] = deferred
+                deferred.invokeOnCompletion { synchronized(imageDownloads) {
+                    if (imageDownloads[id] === deferred) imageDownloads.remove(id)
+                } }
+                deferred.start()
+            }
+        }
+        return flight.await()
+    }
+
+    private suspend fun restoreImageFromOriginalResult(id: String, sessionId: String): MediaUiReceipt =
+        try {
+            withContext(Dispatchers.IO) {
+                val original = store.result(id)?.takeIf {
+                    it.sessionId == sessionId && it.kind == LocalMediaKind.IMAGE.name
+                } ?: return@withContext MediaUiReceipt.Failed("原图片身份或会话已失效")
+                if (store.file(original.fileName) != null) return@withContext MediaUiReceipt.Applied
+                val url = original.remoteUrl
+                    ?: return@withContext MediaUiReceipt.Failed("原成果没有可用下载地址，不能重新付费生成")
+                var downloaded: File? = null
+                var committed = false
+                try {
+                    downloaded = api.downloadGeneratedImage(url)
+                    committed = store.attachDownloadedImage(id, sessionId, url, downloaded)
+                    if (committed) MediaUiReceipt.Applied
+                    else MediaUiReceipt.Failed("下载期间成果已删除、变更或由其他操作保存，请刷新")
+                } finally { if (!committed) downloaded?.delete() }
+            }
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) { MediaUiReceipt.Failed("重新下载原图片失败：${failure.message}") }
+
     override suspend fun exportToSessionAsset(
         id: String, sessionId: String, output: OutputStream,
     ): MediaUiReceipt = try {
@@ -133,6 +175,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO +
         CoroutineExceptionHandler { _, failure -> AppLog.failure("MediaCreation", "media_operation", failure) })
     private val downloads = mutableMapOf<String, Deferred<Unit>>()
+    private val imageDownloads = mutableMapOf<String, Deferred<MediaUiReceipt>>()
     override val storageError: StateFlow<String?> get() = store.recoveryErrors
     override fun observe(sessionId: String?, limit: Int): Flow<LocalMediaPage> = store.observe(sessionId, limit)
     fun resultFile(item: LocalMediaResult): File? = store.file(item.fileName)
