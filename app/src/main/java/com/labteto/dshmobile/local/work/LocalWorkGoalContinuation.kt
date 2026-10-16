@@ -78,6 +78,20 @@ private fun LocalAgentTeamUiState.activeMemberCountForContinuation(): Int =
         pendingMessageCount + members.sumOf { it.pendingMessageCount } +
         members.count { it.awaitingReview }
 
+/**
+ * Run Owner calls this for each *actual* dequeued input, inside the durable poll callback.
+ * A newly accepted user command invalidates a still-pending autonomous Goal follow-up.
+ */
+internal fun shouldDiscardWorkGoalContinuation(
+    input: com.labteto.dshmobile.harness.agent.QueuedAgentInput,
+    remaining: List<com.labteto.dshmobile.harness.agent.QueuedAgentInput>,
+    work: LocalWorkState,
+): Boolean =
+    input.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.WORK_CONTINUATION &&
+        input.continuation?.failureCode == WORK_GOAL_PROGRESS_CONTINUATION &&
+        (remaining.any { it.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.USER } ||
+            !isCurrentWorkGoalContinuation(input.continuation, work))
+
 internal const val WORK_GOAL_PROGRESS_CONTINUATION = "WORK_GOAL_PROGRESS"
 
 internal const val INTERNAL_WORK_GOAL_PROGRESS_PROMPT =
