@@ -130,6 +130,23 @@ internal fun V6DocumentCard(
     }
     var confirmDelete by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
     var deleting by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
+    var editingText by remember(doc.documentId, doc.revision) { mutableStateOf<UiDocumentNode.Text?>(null) }
+    var editDraft by remember(doc.documentId, doc.revision) { mutableStateOf("") }
+    var editBusy by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
+    val textNodes = remember(doc) {
+        val collected = mutableListOf<UiDocumentNode.Text>()
+        fun collect(node: UiDocumentNode) {
+            when (node) {
+                is UiDocumentNode.Text -> collected += node
+                is UiDocumentNode.Column -> node.children.forEach(::collect)
+                is UiDocumentNode.Row -> node.children.forEach(::collect)
+                is UiDocumentNode.Disclosure -> node.children.forEach(::collect)
+                else -> Unit
+            }
+        }
+        doc.nodes.forEach(::collect)
+        collected.toList()
+    }
     val scope = rememberCoroutineScope()
     val validIdentity = snapshot.recoveryNotice == null &&
         identity.sessionId == doc.source.sessionId &&
@@ -163,7 +180,8 @@ internal fun V6DocumentCard(
     SyGlassCard(Modifier.fillMaxWidth()) {
         Text(doc.title, style = MaterialTheme.typography.titleMedium)
         val provenance = when (snapshot.provenance.origin) {
-            UiDocumentOrigin.LOCAL -> "本地真实数据生成"
+            UiDocumentOrigin.LOCAL -> if (snapshot.provenance.model == "user-edited")
+                "用户编辑版本（内容未经业务核验）" else "本地真实数据生成"
             UiDocumentOrigin.MODEL -> "模型生成：" + snapshot.provenance.model
             UiDocumentOrigin.UNKNOWN -> "来源信息不完整"
         }
@@ -179,6 +197,16 @@ internal fun V6DocumentCard(
                     media = media, update = { id, value -> forms.update(key, id, value) },
                     submit = ::action)
             }
+        }
+        if (validIdentity && textNodes.isNotEmpty() &&
+            doc.actions.none { it is UiDocumentAction.AnswerApproval } &&
+            !doc.documentId.startsWith("work-live:")) {
+            SyButton("编辑文档文本", {
+                if (identityIsCurrent()) {
+                    editingText = textNodes.first()
+                    editDraft = textNodes.first().text
+                }
+            }, enabled = !editBusy && !deleting, style = SyButtonStyle.SECONDARY)
         }
         if (validIdentity) SyButton("删除这份文档", { confirmDelete = true },
             style = SyButtonStyle.GHOST, enabled = !deleting)
@@ -201,6 +229,56 @@ internal fun V6DocumentCard(
                 dispatch(request.copy(confirmed = true))
             }) { Text("确认") } },
             dismissButton = { TextButton(onClick = { pendingConfirm = null }) { Text("取消") } },
+        )
+    }
+
+    editingText?.let { currentText ->
+        AlertDialog(
+            onDismissRequest = { if (!editBusy) editingText = null },
+            title = { Text("编辑此文档的显示文本") },
+            text = {
+                Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (textNodes.size > 1) {
+                        Text("选择要编辑的文本节点")
+                        textNodes.forEach { node ->
+                            TextButton(onClick = {
+                                editingText = node
+                                editDraft = node.text
+                            }, enabled = !editBusy) {
+                                Text(if (node.id == currentText.id) "✓ " + node.id else node.id)
+                            }
+                        }
+                    }
+                    SyInput(editDraft, { editDraft = it.take(16_384) },
+                        label = "文本内容（仅影响文档显示）", singleLine = false,
+                        enabled = !editBusy)
+                    Text("最多 16,384 字符；更改保留为新的用户编辑版本")
+                }
+            },
+            confirmButton = { TextButton(onClick = {
+                if (!validIdentity || !identityIsCurrent() || editBusy) {
+                    feedback = "会话已变化，请重新打开文档"
+                    return@TextButton
+                }
+                editBusy = true
+                val command = EditUiDocumentTextCommand(identity, doc.documentId, doc.revision,
+                    doc.source, currentText.id, editDraft)
+                scope.launch {
+                    try {
+                        val receipt = owner.replaceText(command)
+                        if (identityIsCurrent()) {
+                            feedback = describeV6DocumentReceipt(receipt)
+                            if (receipt is UiDocumentReceipt.Published) editingText = null
+                        }
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (failure: Exception) {
+                        if (identityIsCurrent()) feedback = failure.message ?: "文档编辑保存失败"
+                    } finally { editBusy = false }
+                }
+            }, enabled = !editBusy) { Text("保存新版本") } },
+            dismissButton = { TextButton(onClick = { editingText = null },
+                enabled = !editBusy) { Text("取消") } },
         )
     }
 
