@@ -257,7 +257,7 @@ fun V6ConversationScene(
         // If a process-restored pending request belongs to an old/changed target, drop it.
         // The Session's saved anchor is the only valid recovery identity.
         if (pendingAnchorId != null &&
-            (anchor?.followingTail != false || pendingAnchorId != targetMessageId)) {
+            recoverableV6PendingAnchor(pendingAnchorId, anchor) == null) {
             pendingAnchorId = null
         }
         val historyOwner = ports.history
@@ -789,6 +789,13 @@ fun V6ConversationScene(
  * The bounded result is intentionally incomplete on very long histories; callers must
  * disclose that instead of claiming to have located a missing target.
  */
+/** Never trust a saved per-session continuation cursor or a stale target after process death. */
+internal fun recoverableV6PendingAnchor(savedMessageId: String?, anchor: UiReadingAnchor?): String? =
+    savedMessageId?.takeIf { id ->
+        id.isNotBlank() && id.length <= 256 &&
+            anchor?.followingTail == false && anchor.messageId == id
+    }
+
 internal data class V6HistoryAnchorLookup(
     val messages: List<UiMessageSnapshot>,
     val nextCursor: UiTranscriptCursor?,
