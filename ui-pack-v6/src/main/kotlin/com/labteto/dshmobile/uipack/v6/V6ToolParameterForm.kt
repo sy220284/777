@@ -29,8 +29,10 @@ internal fun v6ToolFormFields(schema: JsonObject): List<V6ToolFormField> {
         (it as JsonPrimitive).content
     }.toSet()
     return properties.map { (name, element) ->
-        val field = element as JsonObject
-        val type = (field["type"] as JsonPrimitive).content
+        val field = element as? JsonObject
+            ?: throw IllegalArgumentException("字段定义必须是对象：$name")
+        val type = (field["type"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+            ?: throw IllegalArgumentException("字段缺少明确类型：$name")
         require(type in setOf("string", "number", "integer", "boolean", "object", "array")) {
             "工具包含未支持的输入字段类型：$name / $type"
         }
