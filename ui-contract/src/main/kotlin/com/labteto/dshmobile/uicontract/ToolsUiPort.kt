@@ -1,10 +1,10 @@
 package com.labteto.dshmobile.uicontract
 
-enum class UiToolRegistration { REGISTERED, PENDING, REMOVING }
+enum class UiToolRegistration { REGISTERED, PENDING, REMOVING, FAILED }
 /** Explicit ping only; RESPONDED never implies tool authorization or continuous availability. */
 enum class UiMcpHealth { RESPONDED, BUSY, NOT_CONNECTED, UNCONFIRMED, UNSUPPORTED }
 enum class UiToolSelection { UNKNOWN, SELECTED, NOT_SELECTED }
-enum class UiToolConnection { HEALTH_UNCHECKED, CONNECTING, RECONNECTING, DISCONNECTING }
+enum class UiToolConnection { HEALTH_UNCHECKED, CONNECTING, RECONNECTING, DISCONNECTING, FAILED }
 enum class UiToolAuthorization { REQUIRED_PER_CALL }
 
 /** Selection is only the persisted composer preference, never execution authorization. */

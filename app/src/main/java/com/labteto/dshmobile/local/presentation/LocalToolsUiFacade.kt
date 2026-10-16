@@ -22,6 +22,8 @@ class LocalToolsUiFacade @Inject internal constructor(
                 com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED
             com.labteto.dshmobile.interop.mcp.McpServerLifecycle.DISCONNECTING ->
                 com.labteto.dshmobile.uicontract.UiToolRegistration.REMOVING
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.FAILED ->
+                com.labteto.dshmobile.uicontract.UiToolRegistration.FAILED
             com.labteto.dshmobile.interop.mcp.McpServerLifecycle.CONNECTING,
             com.labteto.dshmobile.interop.mcp.McpServerLifecycle.RECONNECTING ->
                 com.labteto.dshmobile.uicontract.UiToolRegistration.PENDING
@@ -35,6 +37,8 @@ class LocalToolsUiFacade @Inject internal constructor(
                 com.labteto.dshmobile.uicontract.UiToolConnection.RECONNECTING
             com.labteto.dshmobile.interop.mcp.McpServerLifecycle.DISCONNECTING ->
                 com.labteto.dshmobile.uicontract.UiToolConnection.DISCONNECTING
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.FAILED ->
+                com.labteto.dshmobile.uicontract.UiToolConnection.FAILED
         }
         com.labteto.dshmobile.uicontract.UiMcpServerSnapshot(it.id, it.transport, it.target, it.tools,
             registration = registration, connection = connection,

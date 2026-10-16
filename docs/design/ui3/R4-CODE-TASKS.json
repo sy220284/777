@@ -13,15 +13,15 @@
       "task": "实时 MCP 注册/选中/连接/授权观测",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "MCP 原 Harness 连接租约/工具 Registry 返回连接中、注册完成（不代表健康在线）、重连中、排空断开中事实；LocalPluginComposition → LocalToolsUiFacade → Tools 页面及插件列表透传生命周期，过渡期不计作已注册服务、不准触发断开/调用入口；McpToolBridgePluginTest 增加慢连接、重连、排空断开的异步断言。已增加用户主动触发的 MCP 标准 ping 健康检查，成功仅代表该次远端响应，不代表已授权或持续在线；普通注册状态仍不假装健康已验证。 ToolsViewModel 对用户主动发起的 MCP 连接/断开在操作持续时建立 300ms 短时生命周期观察协程；操作完成后自动停止，不将长握手排在同一个命令锁后读取。 本轮在 V6 MCP 管理页打开期间按2秒刷新本地注册/连接生命周期，仅反映原 Plugin Owner 事实；主动 ping 结果随连接变化失效，不代表持续在线、工具已选中或授权。 2026-10-16 本批：ToolsUiPort.UiToolSelection 新增 SELECTED/NOT_SELECTED，从原 LocalPinnedInvocationStore CONNECTOR 选择只读投影到 V6 MCP 服务；断线或重连仅显示注册/连接事实，选用不授予调用权限，补契约回归。\n2026-10-16 代码升级：MCP 原 Plugin Owner 每次连接保留/成功/断开/重连/卸载状态转换发布 StateFlow revision；Composer 已选插件变化与 MCP 变化通过单一管理 Port Flow 传到 V6。V6 已删除 2s 生命周期轮询，改为订阅并显示真实读取错误；新增异步连接/断开版本递增回归。该链路尚待最终 Kotlin/JVM 编译测试，远程无请求断线及逐次授权投影仍缺。",
-      "remaining": "MCP Owner 到 V6 工具页的连接/选中事件订阅已实现（待编译与单测）；仍缺远端未经主动调用时断开/恢复事件的可靠传输通知、外部 Agent 全量状态订阅和按会话/调用 ID 隔离的逐次授权回执。应补类型化远端状态和 Owner 事件回归，不能把 ping 视作持续在线。"
+      "implemented": "MCP 原 Harness 连接租约/工具 Registry 返回连接中、注册完成（不代表健康在线）、重连中、排空断开中事实；LocalPluginComposition → LocalToolsUiFacade → Tools 页面及插件列表透传生命周期，过渡期不计作已注册服务、不准触发断开/调用入口；McpToolBridgePluginTest 增加慢连接、重连、排空断开的异步断言。已增加用户主动触发的 MCP 标准 ping 健康检查，成功仅代表该次远端响应，不代表已授权或持续在线；普通注册状态仍不假装健康已验证。 ToolsViewModel 对用户主动发起的 MCP 连接/断开在操作持续时建立 300ms 短时生命周期观察协程；操作完成后自动停止，不将长握手排在同一个命令锁后读取。 本轮在 V6 MCP 管理页打开期间按2秒刷新本地注册/连接生命周期，仅反映原 Plugin Owner 事实；主动 ping 结果随连接变化失效，不代表持续在线、工具已选中或授权。 2026-10-16 本批：ToolsUiPort.UiToolSelection 新增 SELECTED/NOT_SELECTED，从原 LocalPinnedInvocationStore CONNECTOR 选择只读投影到 V6 MCP 服务；断线或重连仅显示注册/连接事实，选用不授予调用权限，补契约回归。\n2026-10-16 代码升级：MCP 原 Plugin Owner 每次连接保留/成功/断开/重连/卸载状态转换发布 StateFlow revision；Composer 已选插件变化与 MCP 变化通过单一管理 Port Flow 传到 V6。V6 已删除 2s 生命周期轮询，改为订阅并显示真实读取错误；新增异步连接/断开版本递增回归。该链路尚待最终 Kotlin/JVM 编译测试，远程无请求断线及逐次授权投影仍缺。\n2026-10-16 增量：MCP 实际传输在工具调用期间因 IOException/HTTP 身份或端点失效时，原 MCP Owner 原子撤下该服务全部工具、标记 FAILED 并通过原生命周期 StateFlow 通知 V6；保留用户选中偏好但失去准入，用户显式 reconnect 才恢复注册，未知副作用不自动重放。审批 Owner 同时向原 Session EventLog 发布 session_id+call_id+tool 精确绑定的人工/自动授权事实，拒绝跨会话晚到同意。新增工具故障/重连回归。",
+      "remaining": "远端无主动调用时服务器突然断开/恢复的可靠异步通知、外部 Agent 全量状态订阅和进程隔离仍缺；已实现的调用中断取消准入、会话/调用授权事实尚需全链路 JVM/CI 验证。"
     },
     {
       "id": "S-1-02",
       "task": "插件故障隔离与恢复",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "原 PluginManager 单锁管理生命周期变更、并发替换及失败恢复；MCP 失败关闭逐个解绑工具，连接占位始终清理；已有插件并发/恢复源码测试。 2026-10-16 本轮补受控失败态恢复：PluginManager.recoverFailed 仅允许显式失败的插件，在依赖审查与旧外部资源清理成功后重新安装；V6 tools.plugins 展示真实生命周期并经确认触发 ToolsUiCommand.RecoverFailedPlugin。运行资源插件禁止热恢复。PluginRegistry 对单插件安装和批量回滚清理失败维护 PendingPluginCleanup、保留 FAILED 状态并封闭工具准入；重试清理及再安装成功后才重开。新增失败重试、批量清理、状态隔离与不自动重放测试源码。",
+      "implemented": "原 PluginManager 单锁管理生命周期变更、并发替换及失败恢复；MCP 失败关闭逐个解绑工具，连接占位始终清理；已有插件并发/恢复源码测试。 2026-10-16 本轮补受控失败态恢复：PluginManager.recoverFailed 仅允许显式失败的插件，在依赖审查与旧外部资源清理成功后重新安装；V6 tools.plugins 展示真实生命周期并经确认触发 ToolsUiCommand.RecoverFailedPlugin。运行资源插件禁止热恢复。PluginRegistry 对单插件安装和批量回滚清理失败维护 PendingPluginCleanup、保留 FAILED 状态并封闭工具准入；重试清理及再安装成功后才重开。新增失败重试、批量清理、状态隔离与不自动重放测试源码。\n2026-10-16 增量：MCP 工具传输失败原子撤销注册并保留 FAILED 状态，精确故障生命周期订阅/显式恢复；该代码层限制了新调用，尚未隔离服务运行进程。",
       "remaining": "仍缺针对可崩溃插件的独立进程/IPC 执行域、失联后原子撤销工具准入、未知副作用拒绝重放等代码与自动化故障测试。"
     },
     {

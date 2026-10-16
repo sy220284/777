@@ -203,6 +203,12 @@ class McpToolBridgePluginTest {
         assertFalse(failed.retryable)
         assertEquals(1, remoteCalls)
         assertEquals(1, connections)
+        assertEquals(
+            listOf("broken" to McpServerLifecycle.FAILED),
+            plugin.lifecycleSnapshots().map { it.id to it.lifecycle },
+        )
+        assertNull(registry.context.tools.get("mcp_broken_write"))
+        assertEquals(McpServerHealth.NOT_CONNECTED, plugin.checkServerHealthFromUi("broken"))
 
         val reconnected = registry.context.tools.execute(
             "mcp_reconnect",
@@ -213,6 +219,7 @@ class McpToolBridgePluginTest {
         assertTrue(oldClosed)
         assertEquals(2, connections)
         assertEquals(1, remoteCalls)
+        assertEquals(McpServerLifecycle.REGISTERED, plugin.lifecycleSnapshots().single().lifecycle)
         val recovered = registry.context.tools.execute(
             "mcp_broken_write", buildJsonObject { },
             context = ToolContext(approval = { true }),

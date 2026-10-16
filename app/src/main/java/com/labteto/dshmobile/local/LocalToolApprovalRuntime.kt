@@ -32,6 +32,8 @@ internal class LocalToolApprovalRuntime @Inject constructor(
         val interactions = runtimeStateStore.foregroundInteractions
         if (interactions.deviceApprovalLeaseEnabled() && canUseDeviceApprovalLease(tool)) {
             eventLog.append("approval/auto", buildJsonObject {
+                put("call_id", call.id)
+                put("session_id", sessionId)
                 put("tool", call.name)
                 put("summary", summary)
                 put("access", tool.access.name.lowercase())
@@ -42,6 +44,8 @@ internal class LocalToolApprovalRuntime @Inject constructor(
         val approvalMode = approvalPreferences.currentMode()
         if (shouldAutoApproveTool(approvalMode, tool)) {
             eventLog.append("approval/auto", buildJsonObject {
+                put("call_id", call.id)
+                put("session_id", sessionId)
                 put("tool", call.name)
                 put("summary", summary)
                 put("access", tool.access.name.lowercase())
@@ -50,7 +54,7 @@ internal class LocalToolApprovalRuntime @Inject constructor(
             })
             return true
         }
-        return interactions.awaitApproval(
+        val approved = interactions.awaitApproval(
             LocalApproval(
                 callId = call.id,
                 toolName = call.name,
@@ -62,5 +66,20 @@ internal class LocalToolApprovalRuntime @Inject constructor(
                 canApproveDeviceTurn = canUseDeviceApprovalLease(tool),
             ),
         )
+        // An approval is an exact (session, call, tool) decision. Switching sessions
+        // while an approval dialog is open must revoke the late decision.
+        val accepted = approved && runtimeStateStore.currentSessionId == sessionId &&
+            !eventLog.isClosed && sessionStorage.eventLogs.get(sessionId) === eventLog
+        if (!eventLog.isClosed) {
+            eventLog.append("approval/decision", buildJsonObject {
+                put("call_id", call.id)
+                put("session_id", sessionId)
+                put("tool", call.name)
+                put("access", tool.access.name.lowercase())
+                put("approved", accepted)
+                put("decision_source", "foreground-user")
+            })
+        }
+        return accepted
     }
 }

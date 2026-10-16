@@ -84,7 +84,7 @@ internal fun mcpExtensionFailure(serverId: String, error: Exception, connecting:
 
 internal const val MAX_MCP_TOOL_RESULT_CHARS = 256 * 1024
 
-enum class McpServerLifecycle { CONNECTING, REGISTERED, RECONNECTING, DISCONNECTING }
+enum class McpServerLifecycle { CONNECTING, REGISTERED, RECONNECTING, DISCONNECTING, FAILED }
 data class McpServerSnapshot(
     val id: String,
     val transport: String,
@@ -141,6 +141,12 @@ class McpToolBridgePlugin(
         private var activeCalls = 0
         private var drained: CompletableDeferred<Unit>? = null
         private var clientClosed = false
+        private var failedTransport = false
+        fun isTransportFailed(): Boolean = synchronized(this) { failedTransport }
+        fun markTransportFailed(): DisconnectTicket = synchronized(this) {
+            failedTransport = true
+            beginDisconnect()
+        }
 
         fun beginCall(): Boolean = synchronized(this) {
             if (!acceptingCalls) {
@@ -420,6 +426,7 @@ class McpToolBridgePlugin(
      */
     suspend fun checkServerHealthFromUi(serverId: String): McpServerHealth {
         val binding = mutex.withLock { servers[serverId] } ?: return McpServerHealth.NOT_CONNECTED
+        if (binding.isTransportFailed()) return McpServerHealth.NOT_CONNECTED
         if (!binding.beginCall()) return McpServerHealth.BUSY
         return try {
             val received = withTimeoutOrNull(8_000L) { binding.client.ping(); true } == true
@@ -437,7 +444,7 @@ class McpToolBridgePlugin(
                 id = binding.id,
                 transport = binding.transport,
                 target = binding.displayTarget,
-                tools = binding.toolNames.toList(),
+                tools = if (binding.isTransportFailed()) emptyList() else binding.toolNames.toList(),
             )
         }
     }
@@ -451,11 +458,12 @@ class McpToolBridgePlugin(
         val registered = servers.values.map { binding ->
             val lifecycle = when {
                 binding.id in reconnectingIds -> McpServerLifecycle.RECONNECTING
+                binding.isTransportFailed() -> McpServerLifecycle.FAILED
                 !binding.isAcceptingCalls() -> McpServerLifecycle.DISCONNECTING
                 else -> McpServerLifecycle.REGISTERED
             }
             McpServerSnapshot(binding.id, binding.transport, binding.displayTarget,
-                binding.toolNames.toList(), lifecycle)
+                if (binding.isTransportFailed()) emptyList() else binding.toolNames.toList(), lifecycle)
         }
         val pending = (connectingIds + reconnectingIds)
             .filterNot(servers::containsKey)
@@ -605,6 +613,7 @@ class McpToolBridgePlugin(
                                         isError = true,
                                     )
                                 } else {
+                                    var failedCleanup: ServerBinding.DisconnectTicket? = null
                                     try {
                                         val result = client.callTool(definition.name, input)
                                         val remoteError = result["isError"]?.jsonPrimitive?.booleanOrNull == true
@@ -619,9 +628,33 @@ class McpToolBridgePlugin(
                                     } catch (cancelled: CancellationException) {
                                         throw cancelled
                                     } catch (error: Exception) {
+                                        // A transport termination invalidates all tool registrations on the
+                                        // same server. Semantic tool errors/rate limits do not imply disconnection.
+                                        if (error is IOException ||
+                                            (error is McpHttpException &&
+                                                error.statusCode in setOf(401, 403, 404, 410))) {
+                                            failedCleanup = withContext(NonCancellable) {
+                                                mutex.withLock {
+                                                    if (servers[serverId] === binding) {
+                                                        binding.markTransportFailed().also { ticket ->
+                                                            if (ticket.started) {
+                                                                binding.toolNames.forEach(context.tools::unregister)
+                                                                signalLifecycleChangedLocked()
+                                                            }
+                                                        }
+                                                    } else null
+                                                }
+                                            }
+                                        }
                                         mcpExtensionFailure(serverId, error, connecting = false)
                                     } finally {
                                         binding.endCall()
+                                        failedCleanup?.let { ticket ->
+                                            withContext(NonCancellable) {
+                                                ticket.drained?.await()
+                                                binding.closeClientOnce()
+                                            }
+                                        }
                                     }
                                 }
                             },
@@ -685,7 +718,7 @@ class McpToolBridgePlugin(
         } ?: return "MCP 服务未连接：$serverId"
 
         val (binding, ticket) = prepared
-        if (!ticket.started) {
+        if (!ticket.started && !binding.isTransportFailed()) {
             ticket.drained?.await()
             return "MCP 服务正在断开：$serverId"
         }
