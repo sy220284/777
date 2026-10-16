@@ -40,8 +40,8 @@ class LocalApplicationUiHostInstrumentedTest {
 
     private fun clearHostPreferences() {
         preference.edit().remove("selected_pack")
-            .remove("navigation_snapshot.fixture-next")
-            .remove("navigation_snapshot.fixture-v6").commit()
+            .remove(localNavigationSnapshotKey("fixture-next", null))
+            .remove(localNavigationSnapshotKey("fixture-v6", null)).commit()
     }
 
     private fun fullFixture(id: String, title: String): UiApplicationScenePack {
@@ -83,7 +83,7 @@ class LocalApplicationUiHostInstrumentedTest {
         compose.onNodeWithText("settings.models").assertExists()
         compose.runOnIdle {
             assertEquals(listOf("settings.models"), acknowledgements)
-            val saved = preference.getString("navigation_snapshot.fixture-next", null)
+            val saved = preference.getString(localNavigationSnapshotKey("fixture-next", null), null)
             assertEquals(UiSceneId("settings.models"),
                 com.labteto.dshmobile.uihost.UiSceneNavigationSnapshotCodec
                     .decodeOrNull(saved)?.stack?.last())
@@ -96,7 +96,7 @@ class LocalApplicationUiHostInstrumentedTest {
             com.labteto.dshmobile.uihost.UiSceneNavigationState(
                 next.manifest.id, listOf(UiSceneId("route.home"), UiSceneId("settings.models"))))
         preference.edit().putString("selected_pack", next.manifest.id)
-            .putString("navigation_snapshot.fixture-next", snapshot).commit()
+            .putString(localNavigationSnapshotKey("fixture-next", null), snapshot).commit()
         compose.setContent {
             MaterialTheme {
                 LocalApplicationUiHost(
@@ -114,7 +114,7 @@ class LocalApplicationUiHostInstrumentedTest {
             com.labteto.dshmobile.uihost.UiSceneNavigationState(
                 "old-pack", listOf(UiSceneId("route.home"))))
         preference.edit().putString("selected_pack", next.manifest.id)
-            .putString("navigation_snapshot.fixture-next", foreign).commit()
+            .putString(localNavigationSnapshotKey("fixture-next", null), foreign).commit()
         compose.setContent {
             MaterialTheme {
                 LocalApplicationUiHost(
@@ -127,7 +127,7 @@ class LocalApplicationUiHostInstrumentedTest {
         compose.onNodeWithText(context.getString(R.string.ui_pack_back_to_stable)).performClick()
         compose.onNodeWithText("Explicit legacy screen").assertExists()
         compose.runOnIdle {
-            assertEquals(null, preference.getString("navigation_snapshot.fixture-next", null))
+            assertEquals(null, preference.getString(localNavigationSnapshotKey("fixture-next", null), null))
         }
     }
 
