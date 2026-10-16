@@ -10,8 +10,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.onAllNodesWithText
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -119,7 +120,7 @@ class V6ConversationLayoutInteractionTest {
             state.value = state.value.copy(messages = emptyList())
         }
         compose.onNodeWithText("这条消息已不在当前列表，请返回后重新选择").assertIsDisplayed()
-        compose.onNodeWithText("重新生成这条回复").assertDoesNotExist()
+        assertTrue(compose.onAllNodesWithText("重新生成这条回复").fetchSemanticsNodes().isEmpty())
         assertEquals(0, workCommands.size)
     }
 
