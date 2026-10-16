@@ -204,6 +204,8 @@ class V6ConversationMigrationTest {
         val expected = fullIncrementalCandidate().manifest.scenes + setOf(
             UiSceneId("chat.persona_picker"), UiSceneId("chat.group_members"),
             UiSceneId("chat.group_announcement"),
+            UiSceneId("chat.gallery"), UiSceneId("route.persona_gallery"),
+            UiSceneId("chat.gallery_profile"), UiSceneId("chat.gallery_delete"),
         )
         assertEquals(expected, candidate.manifest.scenes)
         assertEquals(expected, candidate.renderers.keys)
