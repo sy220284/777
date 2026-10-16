@@ -187,7 +187,7 @@ internal fun LocalWorkEvidenceSheet(
             val evidenceText = when (val loaded = evidenceState) {
                 WorkEvidenceLoadState.Loading -> stringResource(R.string.common_loading)
                 WorkEvidenceLoadState.Absent -> stringResource(R.string.work_tool_detail_missing)
-                WorkEvidenceLoadState.Failed -> "工具证据读取失败；原始记录未被删除，请返回后重新打开"
+                WorkEvidenceLoadState.Failed -> stringResource(R.string.work_tool_evidence_read_failed)
                 is WorkEvidenceLoadState.Ready -> loaded.text.take(32_000)
             }
             SelectionContainer { Text(evidenceText, style = DsType.small13,
