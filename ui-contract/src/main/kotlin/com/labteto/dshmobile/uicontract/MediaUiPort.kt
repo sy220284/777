@@ -49,6 +49,9 @@ interface MediaUiPort {
     fun asset(id: String): UiMediaAsset?
     /** Deny references to different sessions, including media created before scope enforcement. */
     fun assetForSession(id: String, sessionId: String): UiMediaAsset? = null
+    /** Explicit non-billable fetch of a previously generated image; never submit generation again. */
+    suspend fun retrySessionImageDownload(id: String, sessionId: String): MediaUiReceipt =
+        MediaUiReceipt.Failed("Image download recovery is unavailable")
     /** User-picked SAF output. Owner rechecks session and local file at copy time. */
     suspend fun exportToSessionAsset(id: String, sessionId: String, output: OutputStream): MediaUiReceipt =
         MediaUiReceipt.Failed("Export is not available")
