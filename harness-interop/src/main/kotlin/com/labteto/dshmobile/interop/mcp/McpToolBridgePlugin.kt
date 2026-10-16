@@ -602,8 +602,10 @@ class McpToolBridgePlugin(
             withContext(NonCancellable) {
                 // Even if remote transport close fails, release the reservation so one bad
                 // server cannot poison subsequent connects or unrelated MCP servers.
-                runCatching { registered.forEach(context.tools::unregister) }
-                    .exceptionOrNull()?.let(error::addSuppressed)
+                registered.asReversed().forEach { name ->
+                    runCatching { context.tools.unregister(name) }
+                        .exceptionOrNull()?.let(error::addSuppressed)
+                }
                 runCatching { client.close() }.exceptionOrNull()?.let(error::addSuppressed)
                 mutex.withLock { releaseConnectionReservationLocked(serverId) }
             }
