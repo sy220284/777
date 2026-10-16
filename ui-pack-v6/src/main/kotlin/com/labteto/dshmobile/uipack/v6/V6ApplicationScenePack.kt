@@ -63,12 +63,16 @@ class V6ApplicationScenePack(
     private val groupScenes = if (conversations?.groups != null)
         setOf(UiSceneId("chat.group_members"), UiSceneId("chat.group_announcement"))
         else emptySet()
+    private val archiveScenes = if (conversations?.gallery != null &&
+        conversations.selection != null)
+        setOf("chat.gallery", "route.persona_gallery", "chat.gallery_profile",
+            "chat.gallery_delete").map(::UiSceneId).toSet() else emptySet()
 
     override val manifest = UiPackManifest(
         id = "v6-application-migrating", version = 1,
         minContractVersion = UI_CONTRACT_VERSION, maxContractVersion = UI_CONTRACT_VERSION,
         scenes = pages.keys + sessionSettings + conversationScenes + documentScenes +
-            evidenceScene + personaScene + groupScenes,
+            evidenceScene + personaScene + groupScenes + archiveScenes,
         requiredCapabilities = buildSet {
             if (conversations != null) {
                 addAll(setOf("chat.send_text", "work.send_text", "chat.edit", "chat.regenerate",
@@ -100,6 +104,20 @@ class V6ApplicationScenePack(
                     V6PersonaPickerScene(galleryOwner, selectOwner,
                         onBack = { scope.onBack(); Unit })
                 })
+            if (galleryOwner != null && selectOwner != null) {
+                listOf(
+                    "chat.gallery" to V6PersonaArchivePart.GALLERY,
+                    "route.persona_gallery" to V6PersonaArchivePart.GALLERY,
+                    "chat.gallery_profile" to V6PersonaArchivePart.PROFILE,
+                    "chat.gallery_delete" to V6PersonaArchivePart.DELETE,
+                ).forEach { (scene, part) ->
+                    put(UiSceneId(scene), UiSceneRenderer { scope ->
+                        V6PersonaArchiveScene(galleryOwner, selectOwner,
+                            stories = owners.stories, deletion = owners.galleryDeletion,
+                            part = part, onBack = { scope.onBack(); Unit })
+                    })
+                }
+            }
             owners.groups?.let { groupOwner ->
                 put(UiSceneId("chat.group_members"), UiSceneRenderer { scope ->
                     V6ChatGroupScene(groupOwner, announcementOnly = false,
