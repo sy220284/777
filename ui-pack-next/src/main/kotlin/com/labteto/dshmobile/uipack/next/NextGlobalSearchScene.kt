@@ -14,6 +14,8 @@ import com.labteto.dshmobile.uicontract.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.first
 
 /** Uses the Session owner's scoped, opaque search continuations across real sessions. */
 @Composable
@@ -49,6 +51,19 @@ internal fun NextGlobalSearchScene(
                 awaitingOpen = null
                 navigationNotice = sessionState.error
             }
+        }
+    }
+
+    // Admission does not guarantee an eventual session activation. Release the pending
+    // state after a bounded wait rather than disabling every search result indefinitely.
+    LaunchedEffect(awaitingOpen, sessions) {
+        val target = awaitingOpen ?: return@LaunchedEffect
+        val activated = withTimeoutOrNull(15_000L) {
+            sessions.snapshots.first { !it.loading && it.identity?.sessionId == target }
+        }
+        if (awaitingOpen == target && activated == null) {
+            awaitingOpen = null
+            navigationNotice = "会话切换尚未确认，请检查当前会话后再重试"
         }
     }
 
