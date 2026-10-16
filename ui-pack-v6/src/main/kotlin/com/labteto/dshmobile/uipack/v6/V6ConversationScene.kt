@@ -54,6 +54,9 @@ import com.labteto.dshmobile.uicontract.PersonaGalleryUiPort
 import com.labteto.dshmobile.uicontract.PersonaSelectionUiPort
 import com.labteto.dshmobile.uicontract.PersonaStoryUiPort
 import com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort
+import com.labteto.dshmobile.uicontract.WorkReadUiPort
+import com.labteto.dshmobile.uicontract.WorkPolicyUiPort
+import com.labteto.dshmobile.uicontract.WorkTeamUiPort
 import com.labteto.dshmobile.uicontract.ChatGroupUiPort
 import com.labteto.dshmobile.uicontract.UiTranscriptCursor
 import com.labteto.dshmobile.uicontract.WorkConversationUiCommand
@@ -91,6 +94,9 @@ data class V6ConversationPorts(
     val groups: ChatGroupUiPort? = null,
     val stories: PersonaStoryUiPort? = null,
     val galleryDeletion: PersonaGalleryDeletionUiPort? = null,
+    val workReads: WorkReadUiPort? = null,
+    val workPolicy: WorkPolicyUiPort? = null,
+    val workTeam: WorkTeamUiPort? = null,
     val workMode: () -> Boolean,
     val workModeUpdates: Flow<Boolean>? = null,
 )
@@ -296,6 +302,22 @@ fun V6ConversationScene(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(if (workMode) "Work" else "聊天", style = MaterialTheme.typography.titleLarge)
             SyButton("返回", onBack, style = SyButtonStyle.GHOST)
+        }
+        if (workMode && identity != null &&
+            (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) &&
+            onNavigate != null) {
+            if (ports.workReads != null && ports.workPolicy != null)
+                SyButton("Work 计划审阅", {
+                    val receipt = onNavigate(UiSceneId("work.plan_review"))
+                    if (receipt !is UiSceneNavigationResult.Changed)
+                        feedback = "当前无法打开 Work 计划"
+                }, style = SyButtonStyle.SECONDARY)
+            if (ports.workTeam != null)
+                SyButton("Work 团队成员", {
+                    val receipt = onNavigate(UiSceneId("work.team"))
+                    if (receipt !is UiSceneNavigationResult.Changed)
+                        feedback = "当前无法打开 Work 团队"
+                }, style = SyButtonStyle.SECONDARY)
         }
         if (!workMode && identity != null &&
             (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) &&
