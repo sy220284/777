@@ -21,8 +21,8 @@
       "task": "插件故障隔离与恢复",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "原 PluginManager 单锁管理生命周期变更、并发替换及失败恢复；MCP 失败关闭逐个解绑工具，连接占位始终清理；已有插件并发/恢复源码测试。",
-      "remaining": "各插件运行中故障导致的真实进程级隔离、失败后业务回执与重启恢复仍需逐插件实测；不能把源码测试存在当作真机验收。"
+      "implemented": "原 PluginManager 单锁管理生命周期变更、并发替换及失败恢复；MCP 失败关闭逐个解绑工具，连接占位始终清理；已有插件并发/恢复源码测试。 2026-10-16 本轮补受控失败态恢复：PluginManager.recoverFailed 仅允许显式失败的插件，在依赖审查与旧外部资源清理成功后重新安装；V6 tools.plugins 展示真实生命周期并经确认触发 ToolsUiCommand.RecoverFailedPlugin。运行资源插件禁止热恢复。PluginRegistry 对单插件安装和批量回滚清理失败维护 PendingPluginCleanup、保留 FAILED 状态并封闭工具准入；重试清理及再安装成功后才重开。新增失败重试、批量清理、状态隔离与不自动重放测试源码。",
+      "remaining": "进程边界内的插件生命周期故障恢复已有可调用代码路径，但真正独立 OS 进程级崩溃隔离未覆盖所有插件，仍需进程退出/弱网/系统重启及运行中工具异常的设备回归与恢复回执。当前只允许用户显式重新安装插件，不自动重放失败工具调用；尚不能提升该任务为代码完成。"
     },
     {
       "id": "S0-01",
