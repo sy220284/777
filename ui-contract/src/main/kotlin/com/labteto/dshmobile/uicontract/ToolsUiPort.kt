@@ -30,6 +30,8 @@ data class UiSkillEditorSnapshot(val id: String, val document: String)
 /** Metadata is not an invocation grant. Actual tool execution remains outside this management port. */
 interface ToolsUiPort {
     suspend fun servers(): List<UiMcpServerSnapshot>
+    /** Owner-issued lifecycle/selection changes; not a remote health or tool authorization grant. */
+    fun serverChanges(): kotlinx.coroutines.flow.Flow<Unit>
     suspend fun checkServerHealth(serverId: String): UiMcpHealth = UiMcpHealth.UNSUPPORTED
     suspend fun githubConfigured(): Boolean
     fun capabilityCatalogue(): List<UiToolCapabilitySnapshot>
