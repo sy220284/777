@@ -17,7 +17,10 @@ internal fun resolveWorkGoalTransition(
     RuntimeStateTransitionPolicy<LocalGoal> { runtimeOwned, proposed ->
         // Check the proposed goal status, not its previous status: a blocked goal must
         // be allowed to become completed when all actual obligations have cleared.
-        val evidence = localWorkCompletionEvidence(work.copy(goal = proposed), deliveryEvidence)
+        // Use the same Work evidence and typed disposition as real turn settlement.
+        // The disposition itself is not a second Goal owner or a completion permission.
+        val evidence = assessLocalWorkGoal(work.copy(goal = proposed),
+            localWorkCompletionEvidence(work.copy(goal = proposed), deliveryEvidence)).evidence
         if (proposed.status == "completed" && !evidence.readyForGoalCompletion) {
             rejectRuntimeStateTransition(
                 runtimeOwned,
