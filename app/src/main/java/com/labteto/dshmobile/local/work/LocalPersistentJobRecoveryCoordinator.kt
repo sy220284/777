@@ -374,8 +374,13 @@ internal class LocalPersistentJobRecoveryCoordinator(
         ) {
             return
         }
-        // 可写代理已经产生的副作用不能跨进程无条件重放；恢复前交由 Lead 核验并重派。
-        if (capabilities.teamManaged && capabilities.allowMutation) {
+        // Crash interruption can leave a writable side effect unresolved: require the Lead
+        // to inspect it before reassigning work. A typed local request-slice boundary is
+        // reached before provider admission, after the last completed tool checkpoint.
+        // The latter resumes only with a newly admitted root Work slice.
+        if (capabilities.teamManaged && capabilities.allowMutation &&
+            snapshot.status != "waiting_slice"
+        ) {
             jobs.failResumable(
                 snapshot.id,
                 "可写团队成员在应用中断后停止自动续跑；请由主代理先核验文件和任务状态，再重新分配。",
