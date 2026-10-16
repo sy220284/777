@@ -7,6 +7,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.uicontract.*
@@ -31,6 +32,25 @@ internal fun NextGlobalSearchScene(
     var progress by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var limited by remember { mutableStateOf(false) }
+    val sessionState by sessions.snapshots.collectAsStateWithLifecycle(initialValue = sessions.snapshot())
+    var awaitingOpen by remember { mutableStateOf<String?>(null) }
+    var navigationNotice by remember { mutableStateOf<String?>(null) }
+
+    // Queued only means admitted to the Session owner; navigate after the target is actually active.
+    LaunchedEffect(awaitingOpen, sessionState.identity?.sessionId, sessionState.loading, sessionState.error) {
+        val target = awaitingOpen ?: return@LaunchedEffect
+        when {
+            sessionState.identity?.sessionId == target && !sessionState.loading -> {
+                awaitingOpen = null
+                navigationNotice = null
+                onOpenSession()
+            }
+            !sessionState.loading && sessionState.error != null -> {
+                awaitingOpen = null
+                navigationNotice = sessionState.error
+            }
+        }
+    }
 
     LaunchedEffect(sessions, history, submitted, revision) {
         if (submitted.isBlank()) return@LaunchedEffect
@@ -87,6 +107,7 @@ internal fun NextGlobalSearchScene(
             revision++
         }, enabled = query.isNotBlank() && !busy) { Text("开始搜索") }
         if (busy) Text(progress)
+        navigationNotice?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (limited) Text("结果或分页达到单次检索预算；请缩小关键词再查找，不代表所有历史均已扫描。")
         Text("已找到 ${results.size} 条")
@@ -99,10 +120,26 @@ internal fun NextGlobalSearchScene(
                         SelectionContainer { Text(hit.message.text.take(2000)) }
                         TextButton(onClick = {
                             when (val receipt = sessions.submit(SessionUiCommand.Open(hit.sessionId))) {
-                                UiCommandReceipt.Accepted, UiCommandReceipt.Queued -> onOpenSession()
-                                is UiCommandReceipt.Failed -> error = receipt.message
-                                is UiCommandReceipt.Rejected -> error = "会话不可打开：${receipt.reason}"
-                                else -> error = "会话未打开，请刷新会话列表"
+                                UiCommandReceipt.Accepted -> {
+                                    awaitingOpen = hit.sessionId
+                                    navigationNotice = "正在打开目标会话"
+                                }
+                                UiCommandReceipt.Queued -> {
+                                    awaitingOpen = hit.sessionId
+                                    navigationNotice = "会话切换已排队，等待目标会话真正激活"
+                                }
+                                is UiCommandReceipt.Failed -> {
+                                    awaitingOpen = null
+                                    error = receipt.message ?: "会话打开失败"
+                                }
+                                is UiCommandReceipt.Rejected -> {
+                                    awaitingOpen = null
+                                    error = "会话不可打开：${receipt.reason}"
+                                }
+                                else -> {
+                                    awaitingOpen = null
+                                    error = "会话打开结果未知；请查看当前会话后再重试"
+                                }
                             }
                         }) { Text("打开所属会话") }
                     }
