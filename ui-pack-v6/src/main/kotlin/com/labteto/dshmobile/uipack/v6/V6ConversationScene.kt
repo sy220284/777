@@ -144,8 +144,10 @@ fun V6ConversationScene(
     val imported = attachments[identity?.sessionId].orEmpty()
     val docOwner = ports.documents
     val formOwner = ports.forms
-    val docSnapshot = docOwner?.snapshots?.collectAsStateWithLifecycle(
-        initialValue = remember(docOwner) { docOwner.snapshot() })?.value
+    val docSnapshot = docOwner?.let { owner ->
+        owner.snapshots.collectAsStateWithLifecycle(
+            initialValue = remember(owner) { owner.snapshot() }).value
+    }
     var feedback by remember(identity) { mutableStateOf<String?>(null) }
     var editing by remember(identity) { mutableStateOf<UiMessageSnapshot?>(null) }
     var editText by remember(identity) { mutableStateOf("") }
