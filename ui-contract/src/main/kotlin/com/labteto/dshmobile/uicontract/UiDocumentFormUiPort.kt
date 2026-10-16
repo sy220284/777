@@ -49,7 +49,11 @@ fun UiDocument.invalidInputFields(action: UiDocumentAction.SendUserInput, values
     }
     // A structurally valid form still cannot create an unbounded outgoing Chat/Work
     // message. Count the exact prepared representation used by the Owner.
-    if (preparedInput(action, values).length > MAX_UI_DOCUMENT_PREPARED_CHARS)
+    val initial = initialFields()
+    val preparedLength = action.fieldIds.fold(action.text.length.toLong()) { count, id ->
+        count + 1L + id.length + 2L + (values[id] ?: initial[id]).orEmpty().length
+    }
+    if (preparedLength > MAX_UI_DOCUMENT_PREPARED_CHARS)
         return action.fieldIds.toSet() + "__total_input_budget__"
     return action.fieldIds.filterTo(linkedSetOf()) { id ->
         val value = values[id]
