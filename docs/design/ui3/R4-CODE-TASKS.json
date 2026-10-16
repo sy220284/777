@@ -96,8 +96,8 @@
       "task": "附件多类型预览、状态与恢复",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "文件系统选择的 content URI 准入、原文件 Owner 取消感知导入、重复内容核验、同目录 inode 原子发布且不可覆盖现有路径，拒绝损坏同名文件及符号链接，附 JVM 回归测试源码。",
-      "remaining": "多类型预览与读取状态、Provider 授权撤销/跨进程系统文件选择器恢复、超大文件和不支持硬链接设备的真实行为验证仍缺；不宣称全功能闭环。"
+      "implemented": "文件系统选择的 content URI 准入、原文件 Owner 取消感知导入、重复内容核验、同目录 inode 原子发布且不可覆盖现有路径，拒绝损坏同名文件及符号链接，附 JVM 回归测试源码。 新增只读 InspectUiAttachmentCommand：V6 Composer 可显示实际文件可用性、类型/长度、16KiB 限长文本预览；对8MiB及以下 SHA256 全量校验，较大文件清晰标明只确认长度；拒绝工作区越界、无效路径及符号链接。新增 JVM 用例覆盖有效文本、文件更改/缺失、越界与链接、超大文件的有界展示。",
+      "remaining": "音视频/图像实际播放和更多容器预览、原 Provider 授权撤销及系统文件选择器跨进程恢复、不支持硬链接设备及 Android16/17 真实附件 E2E 仍缺。大型文件仅核对存在与长度，完整性未核验，不宣称功能全部验收。"
     },
     {
       "id": "S1-08",
