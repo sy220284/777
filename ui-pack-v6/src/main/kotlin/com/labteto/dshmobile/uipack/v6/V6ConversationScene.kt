@@ -419,7 +419,7 @@ fun V6ConversationScene(
                     Text(info.displayName)
                     Text(info.mediaType + " · " + info.bytes + " 字节")
                     SyNote(if (info.digestVerified) "当前文件完整性已校验"
-                        else "大型文件仅确认存在及长度，尚未完整哈希核验")
+                        else "附件完整性尚未确认，请重新检查")
                     val preview = info.preview
                     if (preview != null) Text(preview)
                     else SyNote("此类文件提供元数据与状态；二进制内容暂无直接播放器")
