@@ -56,11 +56,13 @@ class V6ApplicationScenePack(
     private val documentScenes = if (conversations?.documents != null &&
         conversations.forms != null) setOf(UiSceneId("conversation.ui_document"),
         UiSceneId("conversation.ui_document_generate")) else emptySet()
+    private val evidenceScene = if (conversations?.evidence != null)
+        setOf(UiSceneId("work.requirement_evidence")) else emptySet()
 
     override val manifest = UiPackManifest(
         id = "v6-application-migrating", version = 1,
         minContractVersion = UI_CONTRACT_VERSION, maxContractVersion = UI_CONTRACT_VERSION,
-        scenes = pages.keys + sessionSettings + conversationScenes + documentScenes,
+        scenes = pages.keys + sessionSettings + conversationScenes + documentScenes + evidenceScene,
         requiredCapabilities = if (conversations == null) emptySet() else
             setOf("chat.send_text", "work.send_text", "chat.edit", "chat.regenerate",
                 "chat.select_variant", "chat.stop", "work.edit", "work.regenerate",
@@ -91,6 +93,21 @@ class V6ApplicationScenePack(
                 V6ConversationScene(owners, workMode = true, onBack = { scope.onBack(); Unit },
                     onNavigate = scope.onNavigate)
             })
+            owners.evidence?.let { evidenceOwner ->
+                put(UiSceneId("work.requirement_evidence"), UiSceneRenderer { scope ->
+                    val work by owners.work.snapshots.collectAsStateWithLifecycle(
+                        initialValue = owners.work.snapshot())
+                    val identity = work.identity
+                    if (identity == null) {
+                        androidx.compose.material3.Text("正在切换 Work 会话，证据暂不可查看")
+                    } else {
+                        androidx.compose.foundation.layout.Column {
+                            SyButton("返回", { scope.onBack(); Unit }, style = SyButtonStyle.GHOST)
+                            V6WorkEvidencePanel(evidenceOwner, identity, openOnEntry = true)
+                        }
+                    }
+                })
+            }
             val docOwner = owners.documents
             val formOwner = owners.forms
             if (docOwner != null && formOwner != null) {
