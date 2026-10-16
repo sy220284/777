@@ -273,7 +273,13 @@ internal fun mergeLocalMediaTimeline(
         (successful.keys + unfinished.keys).forEach { slot ->
             val completed = successful[slot]?.maxWithOrNull(compareBy<LocalMediaResult> { it.createdAtMillis }.thenBy { it.id })
             val newest = unfinished[slot]?.maxWithOrNull(compareBy<LocalMediaCreationJob> { it.createdAtMillis }.thenBy { it.id })
-            if (completed != null) add(LocalTranscriptItem.MediaResult(completed, slot, newest))
+            if (completed != null) {
+                // Once a newer version succeeds, an older failed attempt cannot reappear
+                // as a stale error under the new audio.
+                val completedAt = operations[completed.id] ?: completed.createdAtMillis
+                add(LocalTranscriptItem.MediaResult(completed, slot,
+                    newest?.takeIf { it.createdAtMillis > completedAt }))
+            }
             else if (newest != null) add(LocalTranscriptItem.CreationJob(newest, slot))
         }
         sessionVideos.groupBy { root(it.id) }.forEach { (slot, versions) ->

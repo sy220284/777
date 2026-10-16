@@ -59,6 +59,22 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun supersededFailedReceiptDoesNotShowUnderNewSuccessfulAudio() {
+        val old = com.labteto.dshmobile.local.model.LocalMediaResult(
+            id = "old", model = "speech", provider = "MINIMAX", kind = "SPEECH",
+            createdAtMillis = 100, fileName = "old.mp3", sessionId = "s")
+        val failed = com.labteto.dshmobile.local.model.LocalMediaCreationJob(
+            id = "failed", sessionId = "s", kind = "SPEECH", provider = "MINIMAX",
+            model = "speech", prompt = "text", createdAtMillis = 120, revisionOf = "old",
+            phase = com.labteto.dshmobile.local.model.LocalMediaCreationPhase.FAILED)
+        val delivered = old.copy(id = "success", createdAtMillis = 200,
+            revisionOf = "old", fileName = "success.mp3")
+        val actual = mergeLocalMediaTimeline(emptyList(), "s", listOf(old, delivered), emptyList(), listOf(failed))
+        assertEquals(1, actual.size)
+        assertEquals(null, (actual.single() as LocalTranscriptItem.MediaResult).revisionJob)
+    }
+
+    @Test
     fun differentMediaTypesNeverReplaceEachOther() {
         val voice = com.labteto.dshmobile.local.model.LocalMediaResult(
             id = "voice", model = "speech", provider = "MINIMAX", kind = "SPEECH",

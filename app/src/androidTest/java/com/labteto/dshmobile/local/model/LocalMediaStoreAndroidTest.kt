@@ -136,6 +136,22 @@ class LocalMediaStoreAndroidTest {
         assertTrue(store().page().results.isEmpty())
     }
 
+    @Test fun deletingRegeneratedResultDoesNotResurrectOldAudioOrDeleteOtherResults() {
+        val old = result("original", 10L, file = "original.png")
+        val revision = result("revision", 20L, file = "revision.png").copy(revisionOf = "original")
+        val other = result("unrelated", 30L, file = "unrelated.png")
+        listOf(old, revision, other).forEach { File(directory, it.fileName!!).writeBytes(byteArrayOf(7)) }
+        legacy(listOf(old, revision, other))
+        val first = store()
+        assertEquals(3, first.page().results.size)
+        first.removeRevisionFamily("revision")
+        assertEquals(listOf("unrelated"), first.page().results.map { it.id })
+        assertFalse(File(directory, "original.png").exists())
+        assertFalse(File(directory, "revision.png").exists())
+        assertTrue(File(directory, "unrelated.png").isFile)
+        assertEquals(listOf("unrelated"), store().page().results.map { it.id })
+    }
+
     @Test fun indexedPagesKeepAllHistoryAndSeparateSessions() {
         legacy((1..130).map { result("r$it", it.toLong(), if (it % 2 == 0) "even" else "odd") })
         val first = store()
