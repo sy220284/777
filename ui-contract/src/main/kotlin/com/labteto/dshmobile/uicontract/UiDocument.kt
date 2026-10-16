@@ -32,6 +32,9 @@ enum class UiDocumentMediaKind { IMAGE, AUDIO, VIDEO }
 /** Read-only typed numbers, never authority or a verified progress claim. */
 data class UiChartPoint(val label: String, val value: Double)
 
+/** A field's storage policy comes from the authored document contract, not its guessed name. */
+enum class UiFieldRetention { SAVED_STATE, MEMORY_ONLY }
+
 sealed interface UiDocumentNode {
     val id: String
     data class Text(override val id: String, val text: String) : UiDocumentNode
@@ -49,7 +52,7 @@ sealed interface UiDocumentNode {
     data class Column(override val id: String, val children: List<UiDocumentNode>) : UiDocumentNode
     data class Row(override val id: String, val children: List<UiDocumentNode>) : UiDocumentNode
     data class Field(override val id: String, val label: String, val initial: String, val required: Boolean,
-        val multiline: Boolean) : UiDocumentNode
+        val multiline: Boolean, val retention: UiFieldRetention = UiFieldRetention.SAVED_STATE) : UiDocumentNode
     data class Select(override val id: String, val label: String, val options: List<String>, val initial: String) : UiDocumentNode
     data class Switch(override val id: String, val label: String, val initial: Boolean) : UiDocumentNode
     data class Button(override val id: String, val label: String, val actionId: String) : UiDocumentNode
@@ -143,7 +146,12 @@ fun UiDocument.validate(
             is UiDocumentNode.Column -> node.children.forEach { walk(it, depth + 1) }
             is UiDocumentNode.Row -> node.children.forEach { walk(it, depth + 1) }
             is UiDocumentNode.Disclosure -> { textChars += node.title.length; node.children.forEach { walk(it, depth + 1) } }
-            is UiDocumentNode.Field -> textChars += node.label.length.toLong() + node.initial.length
+            is UiDocumentNode.Field -> {
+                textChars += node.label.length.toLong() + node.initial.length
+                if (node.retention == UiFieldRetention.MEMORY_ONLY && node.initial.isNotEmpty()) {
+                    problems += "sensitive_field_default"
+                }
+            }
             is UiDocumentNode.Select -> {
                 textChars += node.label.length.toLong() + node.options.sumOf { it.length.toLong() }
                 if (node.options.isEmpty() || node.options.distinct().size != node.options.size || node.initial !in node.options) problems += "select_options"
