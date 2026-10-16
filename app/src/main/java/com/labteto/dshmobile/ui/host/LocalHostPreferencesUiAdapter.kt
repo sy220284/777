@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.host
 
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -61,6 +62,11 @@ internal class LocalHostPreferencesUiAdapter @Inject constructor(
         } }
         return true
     }
+
+    override fun notificationPermissionGranted(): Boolean? =
+        runCatching {
+            context.getSystemService(NotificationManager::class.java)?.areNotificationsEnabled()
+        }.getOrNull()
 
     override fun openSystemPermissions(): Boolean = open(
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
