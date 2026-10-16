@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -81,12 +79,14 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
         deletionNotice?.let { Text(it) }
         receipt?.let { result -> LocalDocumentActionFeedback(result) }
     }
-    if (confirmDeletion) AlertDialog(
-        onDismissRequest = { if (!deleting) confirmDeletion = false },
-        title = { Text("确认删除文档") },
-        text = { Text("仅删除这条消息下的当前文档，不删除消息或其他成果。") },
-        confirmButton = { TextButton(enabled = !deleting, onClick = {
-            val ownerIdentity = identity ?: return@TextButton
+    if (confirmDeletion) ConfirmDialog(
+        title = stringResource(R.string.ui_document_delete_title),
+        body = stringResource(R.string.ui_document_delete_body),
+        confirmLabel = stringResource(R.string.ui_document_delete_confirm),
+        onDismiss = { if (!deleting) confirmDeletion = false },
+        onConfirm = {
+            if (deleting) return@ConfirmDialog
+            val ownerIdentity = identity ?: return@ConfirmDialog
             confirmDeletion = false
             deleting = true
             scope.launch {
@@ -105,8 +105,7 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
                 catch (failure: Exception) { deletionNotice = failure.message ?: "删除失败" }
                 finally { deleting = false }
             }
-        }) { Text("删除") } },
-        dismissButton = { TextButton(onClick = { confirmDeletion = false }) { Text("取消") } },
+        },
     )
 }
 

@@ -2459,5 +2459,8 @@
     <string name="ui_document_media_audio_preparing">正在准备音频…</string>
     <string name="ui_document_media_retry">重新加载音频</string>
     <string name="ui_document_deleted">文档已删除</string>
+    <string name="ui_document_delete_title">确认删除文档</string>
+    <string name="ui_document_delete_body">仅删除这条消息下的当前文档，不删除消息或其他成果。</string>
+    <string name="ui_document_delete_confirm">删除</string>
 </resources>
 
