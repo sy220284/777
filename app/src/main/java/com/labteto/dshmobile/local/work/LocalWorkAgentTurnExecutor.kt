@@ -126,6 +126,7 @@ internal class LocalWorkAgentTurnExecutor(
         sourceMessageId: String? = null,
         binding: LocalWorkRunBinding,
         preownedLease: LocalSessionRuntimeLease? = null,
+        continuation: com.labteto.dshmobile.harness.agent.AgentContinuationRef? = null,
     ) {
         val ownerJob = currentCoroutineContext()[Job]
         // Preserve the Work turn's origin even when the live transcript window is compacted.
@@ -143,6 +144,16 @@ internal class LocalWorkAgentTurnExecutor(
             ) {
             val runState = BoundRunState(binding)
             val runEventLog = binding.eventLog
+            // Final Goal fence: a user can change Work after inbox consumption but
+            // before this lazy coroutine obtains its Session runtime ownership.
+            if (!isCurrentWorkGoalContinuation(continuation, runState.value.work)) {
+                runEventLog.append("turn/goal-continuation-stale", buildJsonObject {
+                    put("source_run_id", continuation?.sourceRunId ?: "")
+                    put("goal_id", continuation?.goalId ?: "")
+                    put("reason", "goal_changed_before_model_start")
+                })
+                return@withOwner
+            }
             val runHistory = binding.runHandle.modelHistory
             val runTranscript = binding.transcriptRuntime
             val runSessionId = binding.sessionId
@@ -822,6 +833,7 @@ internal class LocalWorkAgentTurnExecutor(
                                     memoryInput = next.memoryInput,
                                     sourceMessageId = next.continuation?.sourceMessageId ?: next.id,
                                     binding = ownedBinding,
+                                    continuation = next.continuation,
                                 )
                             }
                         }?.start()
