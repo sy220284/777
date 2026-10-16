@@ -387,7 +387,7 @@ internal fun V6DocumentCard(
     if (confirmDelete) AlertDialog(
         onDismissRequest = { if (!deleting) confirmDelete = false },
         title = { Text("确认删除文档") },
-        text = { Text("只删除该版本的文档，不删除所属聊天消息。") },
+        text = { Text("删除这份文档及其历史版本，不删除所属聊天消息。删除后无法恢复。") },
         confirmButton = { TextButton(enabled = !deleting, onClick = {
             if (!identityIsCurrent() || !validIdentity) {
                 confirmDelete = false
