@@ -183,6 +183,7 @@ class LocalWorkRunRegistry internal constructor(
     internal fun finishTurn(
         binding: LocalWorkRunBinding,
         completedJob: Job?,
+        onIdle: () -> Unit = {},
         startNext: (QueuedAgentInput, LocalWorkRunBinding) -> Job,
     ): Job? = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
         if (binding.runHandle.job !== completedJob) return@synchronized null
@@ -197,6 +198,11 @@ class LocalWorkRunRegistry internal constructor(
                 return@synchronized null
             }
             persistDerivedBinding(binding)
+            if (binding.runHandle.cancellationRequested) return@synchronized null
+
+            // Last admission opportunity belongs to this run owner. User inputs may arrive
+            // while the model is running; the opportunistic follow-up must not jump over them.
+            if (binding.runHandle.pendingInputs.size() == 0) onIdle()
             if (binding.runHandle.cancellationRequested) return@synchronized null
 
             val next = binding.runHandle.pendingInputs.pollCommitted { input, remaining ->
