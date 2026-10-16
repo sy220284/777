@@ -85,6 +85,13 @@ class V6ApplicationScenePack(
     ).map(::UiSceneId).toSet()
     private val updateScene = if (settings != null && checkForUpdate != null &&
         updateStatus != null) setOf(UiSceneId("settings.update")) else emptySet()
+    private val messageActionScenes = if (conversations != null) setOf(
+        "conversation.message_actions", "conversation.edit",
+        "conversation.reader", "chat.branches").map(::UiSceneId).toSet() else emptySet()
+    private val suggestionsScenes = if (conversations?.replySuggestions != null)
+        setOf(UiSceneId("chat.reply_suggestions")) else emptySet()
+    private val steeringScene = if (conversations?.workPolicy != null)
+        setOf(UiSceneId("work.steering_choice")) else emptySet()
 
 
     override val manifest = UiPackManifest(
@@ -92,7 +99,8 @@ class V6ApplicationScenePack(
         minContractVersion = UI_CONTRACT_VERSION, maxContractVersion = UI_CONTRACT_VERSION,
         scenes = pages.keys + sessionSettings + conversationScenes + documentScenes +
             evidenceScene + personaScene + groupScenes + archiveScenes +
-            planScene + teamScene + settingsSuite + updateScene,
+            planScene + teamScene + settingsSuite + updateScene +
+            messageActionScenes + suggestionsScenes + steeringScene,
         requiredCapabilities = buildSet {
             if (conversations != null) {
                 addAll(setOf("chat.send_text", "work.send_text", "chat.edit", "chat.regenerate",
@@ -120,6 +128,29 @@ class V6ApplicationScenePack(
             })
         }
         conversations?.let { owners ->
+            listOf(
+                "conversation.message_actions" to V6MessageOperation.ACTIONS,
+                "conversation.edit" to V6MessageOperation.EDIT,
+                "conversation.reader" to V6MessageOperation.READER,
+                "chat.branches" to V6MessageOperation.BRANCHES,
+            ).forEach { (id, action) ->
+                put(UiSceneId(id), UiSceneRenderer { scope ->
+                    val mode = owners.workModeUpdates?.collectAsStateWithLifecycle(
+                        initialValue = owners.workMode())?.value ?: owners.workMode()
+                    V6MessageOperationScene(owners, mode, action, onBack = { scope.onBack(); Unit })
+                })
+            }
+            owners.replySuggestions?.let { suggestions ->
+                put(UiSceneId("chat.reply_suggestions"), UiSceneRenderer { scope ->
+                    V6ReplySuggestionsScene(suggestions, owners.drafts,
+                        onBack = { scope.onBack(); Unit })
+                })
+            }
+            owners.workPolicy?.let { policy ->
+                put(UiSceneId("work.steering_choice"), UiSceneRenderer { scope ->
+                    V6WorkSteeringScene(policy, onBack = { scope.onBack(); Unit })
+                })
+            }
             val galleryOwner = owners.gallery
             val selectOwner = owners.selection
             if (galleryOwner != null && selectOwner != null)
