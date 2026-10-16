@@ -11,6 +11,9 @@ import com.labteto.dshmobile.uicontract.SettingsUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentFormUiPort
 import com.labteto.dshmobile.uicontract.WorkEvidenceUiPort
+import com.labteto.dshmobile.uicontract.PersonaGalleryUiPort
+import com.labteto.dshmobile.uicontract.PersonaSelectionUiPort
+import com.labteto.dshmobile.uicontract.ChatGroupUiPort
 import com.labteto.dshmobile.uicontract.UI_CONTRACT_VERSION
 import com.labteto.dshmobile.uicontract.UiAccessibility
 import com.labteto.dshmobile.uicontract.UiActionAvailability
@@ -111,6 +114,22 @@ class V6ConversationMigrationTest {
         V6ConversationPorts(chat, work, drafts, reading, documents = documentPort,
             forms = formPort, evidence = evidencePort, workMode = { true }),
     )
+    private val galleryPort = java.lang.reflect.Proxy.newProxyInstance(
+        PersonaGalleryUiPort::class.java.classLoader, arrayOf(PersonaGalleryUiPort::class.java)
+    ) { _, method, _ -> error("Unexpected gallery read while registering: ${method.name}") } as PersonaGalleryUiPort
+    private val selectionPort = java.lang.reflect.Proxy.newProxyInstance(
+        PersonaSelectionUiPort::class.java.classLoader, arrayOf(PersonaSelectionUiPort::class.java)
+    ) { _, method, _ -> error("Unexpected selection while registering: ${method.name}") } as PersonaSelectionUiPort
+    private val groupPort = java.lang.reflect.Proxy.newProxyInstance(
+        ChatGroupUiPort::class.java.classLoader, arrayOf(ChatGroupUiPort::class.java)
+    ) { _, method, _ -> error("Unexpected group mutation while registering: ${method.name}") } as ChatGroupUiPort
+    private fun personaAndGroupCandidate() = V6ApplicationScenePack(
+        preferences, settings,
+        V6ConversationPorts(chat, work, drafts, reading, documents = documentPort,
+            forms = formPort, evidence = evidencePort, gallery = galleryPort,
+            selection = selectionPort, groups = groupPort, workMode = { false }),
+    )
+
     private fun requirements(manifest: UiPackManifest, onlyDeclared: Boolean) =
         UiPackAdmissionRequirements(
             UI_CONTRACT_VERSION,
@@ -178,6 +197,23 @@ class V6ConversationMigrationTest {
         val production = decideApplicationUi(candidate.manifest.id, listOf(candidate),
             requirements(candidate.manifest, onlyDeclared = false))
         assertTrue(production is LocalApplicationUiDecision.Unavailable)
+    }
+
+    @Test fun personaAndGroupScenesRequireTheActualInjectedOwners() {
+        val candidate = personaAndGroupCandidate()
+        val expected = fullIncrementalCandidate().manifest.scenes + setOf(
+            UiSceneId("chat.persona_picker"), UiSceneId("chat.group_members"),
+            UiSceneId("chat.group_announcement"),
+        )
+        assertEquals(expected, candidate.manifest.scenes)
+        assertEquals(expected, candidate.renderers.keys)
+        assertTrue(UiApplicationPackRegistry(listOf(candidate)).select(
+            candidate.manifest.id,
+            requirements(candidate.manifest, onlyDeclared = true),
+        ) is UiApplicationPackAdmission.Admitted)
+        assertTrue(decideApplicationUi(candidate.manifest.id, listOf(candidate),
+            requirements(candidate.manifest, onlyDeclared = false))
+            is LocalApplicationUiDecision.Unavailable)
     }
 
     @Test fun fullProductionCatalogContinuesRejectingIncompleteV6() {
