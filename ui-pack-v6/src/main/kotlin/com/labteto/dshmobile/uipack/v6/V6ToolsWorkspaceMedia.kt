@@ -54,6 +54,8 @@ fun V6ToolsManagementScene(
     owner: ToolsUiPort,
     onNavigate: (UiSceneId) -> UiSceneNavigationResult,
     onBack: () -> Unit,
+    work: WorkConversationUiPort? = null,
+    drafts: ConversationDraftUiPort? = null,
 ) {
     var revision by remember(owner) { mutableIntStateOf(0) }
     var servers by remember(owner) { mutableStateOf(emptyList<UiMcpServerSnapshot>()) }
@@ -74,6 +76,8 @@ fun V6ToolsManagementScene(
     var newSkillDescription by remember(key) { mutableStateOf("") }
     var newSkillInstructions by remember(key) { mutableStateOf("") }
     var editSkillId by remember(key) { mutableStateOf<String?>(null) }
+    var selectedCapability by remember(key) { mutableStateOf<String?>(null) }
+    var capabilityInstructions by remember(key) { mutableStateOf("") }
     var editSkillDocument by remember(key) { mutableStateOf("") }
     var githubToken by remember(key) { mutableStateOf("") }
     var disconnect by remember(key) { mutableStateOf<String?>(null) }
@@ -181,6 +185,38 @@ fun V6ToolsManagementScene(
                     Text(ability.name + " · " + ability.family)
                     Text("访问：" + ability.access + " · 授权：" + ability.approval)
                     ability.requirements.forEach { Text(it) }
+                    if (page == "work.capabilities" && work != null && drafts != null) {
+                        SyButton("在 Work 中使用此能力", {
+                            selectedCapability = ability.name
+                        }, style = SyButtonStyle.SECONDARY)
+                    }
+                }
+            }
+            if (page == "work.capabilities" && selectedCapability != null &&
+                work != null && drafts != null) {
+                SyGlassCard(Modifier.fillMaxWidth()) {
+                    Text("使用能力：" + selectedCapability)
+                    SyInput(capabilityInstructions, { capabilityInstructions = it },
+                        label = "需要完成的具体任务（由你确认后发送）", singleLine = false)
+                    SyButton("填写到 Work 草稿", {
+                        val identity = work.snapshot().identity
+                        if (identity == null || capabilityInstructions.isBlank()) {
+                            feedback = "当前没有有效 Work 会话，或缺少任务要求"
+                        } else {
+                            val target = selectedCapability
+                            val message = "使用 ${target}：${capabilityInstructions.trim()}"
+                            drafts.updateDraft(identity.sessionId, message)
+                            val nav = onNavigate(UiSceneId("conversation.work"))
+                            feedback = if (nav is UiSceneNavigationResult.Changed)
+                                "已填写 Work 草稿，发送前仍可编辑；实际工具调用需经原 Work Owner 审批"
+                            else "已保存 Work 草稿，但该会话页面暂不可达"
+                            selectedCapability = null
+                            capabilityInstructions = ""
+                        }
+                    }, enabled = capabilityInstructions.isNotBlank(),
+                        style = SyButtonStyle.SECONDARY)
+                    SyButton("取消", { selectedCapability = null },
+                        style = SyButtonStyle.GHOST)
                 }
             }
         }
