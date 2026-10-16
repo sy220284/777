@@ -18,14 +18,14 @@ class V6ToolParameterFormTest {
         put("properties", buildJsonObject {
             put("query", buildJsonObject {
                 put("type", "string")
-                put("enum", buildJsonArray { add("create"); add("inspect") })
+                put("enum", buildJsonArray { add(JsonPrimitive("create")); add(JsonPrimitive("inspect")) })
             })
             put("amount", buildJsonObject { put("type", "number") })
             put("enabled", buildJsonObject { put("type", "boolean") })
             put("filters", buildJsonObject { put("type", "object") })
             put("ids", buildJsonObject { put("type", "array") })
         })
-        put("required", buildJsonArray { add("query") })
+        put("required", buildJsonArray { add(JsonPrimitive("query")) })
         put("additionalProperties", false)
     }
 
