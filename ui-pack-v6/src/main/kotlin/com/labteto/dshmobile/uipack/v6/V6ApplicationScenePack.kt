@@ -78,6 +78,9 @@ class V6ApplicationScenePack(
                     addAll(setOf("ui_document.generate", "ui_document.generate_local",
                         "ui_document.prepare_input"))
                 if (conversations.evidence != null) add("work.evidence_reference")
+                if (conversations.gallery != null && conversations.selection != null)
+                    add("chat.persona_selection")
+                if (conversations.groups != null) add("chat.group_members")
             }
         }.map(::UiCapabilityId).toSet(),
         windowClasses = UiWindowClass.entries.toSet(),
