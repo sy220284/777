@@ -77,6 +77,7 @@ internal object LocalApplicationPackInstallations {
                     groups = owner.chatGroupUiPort,
                     stories = owner.personaStoryUiPort,
                     galleryDeletion = owner.personaGalleryDeletionUiPort,
+                    personaAuthoring = owner.personaAuthoringUiPort,
                     workReads = owner.workReadUiPort,
                     workPolicy = owner.workPolicyUiPort,
                     workTeam = owner.workTeamUiPort,
