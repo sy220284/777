@@ -423,4 +423,5 @@ fun V6MediaScene(media: MediaUiPort, settings: SettingsUiPort,
             submit(MediaUiCommand.RemoveResult(id))
         }) { Text("确认删除") } },
         dismissButton = { TextButton(onClick = { deletion = null }) { Text("取消") } })
+    }
 }
