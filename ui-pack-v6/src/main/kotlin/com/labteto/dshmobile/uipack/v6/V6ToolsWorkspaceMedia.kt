@@ -30,6 +30,7 @@ import com.shenyan.designsystem.components.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
@@ -166,21 +167,22 @@ fun V6ToolsManagementScene(
             } finally { busy = false }
         }
     }
-    // Observe lifecycle changes initiated by remote agents while this page is visible.
-    // This is an in-process registry poll, never a remote health/authorization subscription.
+    // Follow the actual MCP registry and Composer selection Owners; no timer or shadow lifecycle.
     LaunchedEffect(owner, key.value) {
         if (key.value != "tools.mcp") return@LaunchedEffect
-        while (true) {
-            delay(2_000L)
-            if (loading || busy) continue
-            val refreshed = try {
-                withContext(Dispatchers.IO) { owner.servers() }
+        owner.serverChanges().collect {
+            try {
+                val refreshed = withContext(Dispatchers.IO) { owner.servers() }
+                if (refreshed != servers) {
+                    val original = servers.associateBy(UiMcpServerSnapshot::id)
+                    val connectionChanged = refreshed.any { now ->
+                        original[now.id]?.let { it.connection != now.connection || it.registration != now.registration } ?: true
+                    } || original.keys.any { id -> refreshed.none { it.id == id } }
+                    if (connectionChanged) healthResults = emptyMap()
+                    servers = refreshed
+                }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { continue }
-            if (refreshed != servers) {
-                healthResults = emptyMap() // Never carry a previous ping through reconnect.
-                servers = refreshed
-            }
+            catch (failure: Exception) { feedback = failure.message ?: "MCP 连接状态读取失败" }
         }
     }
     fun execute(command: ToolsUiCommand) {
