@@ -441,7 +441,10 @@ fun V6GlobalHistorySearchScene(
 
 @Composable
 fun V6ShellErrorScene(ports: V6ConversationPorts,
-    onDiagnostics: () -> UiSceneNavigationResult, onBack: () -> Unit) {
+    onDiagnostics: () -> UiSceneNavigationResult, onBack: () -> Unit,
+    sessions: SessionUiPort? = null,
+    onReopen: () -> UiSceneNavigationResult = { UiSceneNavigationResult.AtRoot },
+) {
     val chat by ports.chat.snapshots.collectAsStateWithLifecycle(initialValue = ports.chat.snapshot())
     val work by ports.work.snapshots.collectAsStateWithLifecycle(initialValue = ports.work.snapshot())
     var feedback by remember { mutableStateOf<String?>(null) }
@@ -452,6 +455,25 @@ fun V6ShellErrorScene(ports: V6ConversationPorts,
         chat.error?.let { SyNote("聊天：" + it) }
         work.error?.let { SyNote("Work：" + it) }
         feedback?.let { SyNote(it) }
+        val session = sessions?.snapshot()
+        val activeId = session?.identity
+        if (activeId != null && !session.loading) {
+            SyButton("重新打开当前本地会话", {
+                val latest = sessions.snapshot()
+                if (latest.identity != activeId) {
+                    feedback = "会话已切换，请刷新错误页"
+                } else {
+                    val receipt = sessions.submit(SessionUiCommand.Open(activeId.sessionId))
+                    feedback = describeV6ConversationReceipt(receipt)
+                    if (receipt == UiCommandReceipt.Accepted || receipt == UiCommandReceipt.Queued) {
+                        val navigation = onReopen()
+                        if (navigation !is UiSceneNavigationResult.Changed)
+                            feedback = "已提交重新打开原会话，请手动返回聊天首页查看"
+                    }
+                }
+            }, style = SyButtonStyle.SECONDARY)
+            SyNote("重新打开不会自动重发消息或重试可能计费的模型请求")
+        }
         SyButton("查看诊断", {
             val receipt = onDiagnostics()
             if (receipt !is UiSceneNavigationResult.Changed)
