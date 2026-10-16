@@ -296,6 +296,7 @@ class V6ApplicationScenePack(
                     put(UiSceneId(scene), UiSceneRenderer { scope ->
                         V6PersonaArchiveScene(galleryOwner, selectOwner,
                             stories = owners.stories, deletion = owners.galleryDeletion,
+                            authoring = owners.personaAuthoring,
                             part = part, onBack = { scope.onBack(); Unit })
                     })
                 }
