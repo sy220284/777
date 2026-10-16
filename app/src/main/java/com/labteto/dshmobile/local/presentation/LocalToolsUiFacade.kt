@@ -11,6 +11,8 @@ class LocalToolsUiFacade @Inject internal constructor(
     private val tools: LocalToolsRuntime,
     private val gitHubSkillImporter: com.labteto.dshmobile.local.tools.LocalGitHubSkillImporter,
 ) : com.labteto.dshmobile.uicontract.ToolsUiPort {
+    override fun serverChanges(): kotlinx.coroutines.flow.Flow<Unit> = tools.serverChanges()
+
     override suspend fun servers(): List<com.labteto.dshmobile.uicontract.UiMcpServerSnapshot> {
         val selectedIds = tools.selectedConnectorIds()
         return tools.servers().map {
