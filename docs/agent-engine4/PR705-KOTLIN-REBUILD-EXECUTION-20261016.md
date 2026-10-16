@@ -75,3 +75,12 @@ PR #705 同时维护 510 个文件（此数字为核对时快照），为 V6 UI 
 ## 7. 不允许提前宣布完成
 
 本次完成预期仅为：PR #705 分支上有可审计的 V4 实施 ADR、24 项任务台账以及第一个可证实的执行语义修复。**整套 4.0 重构并未完成。** 任何 Kotlin 编译、CI、旧版兼容或真实多模型表现，只有本提交 SHA 实测通过才可标记通过。
+
+## 8. 第二批：Work 目标语义接入真实 `turn/end`（增量）
+
+本轮在 `LocalWorkCompletionEvidence` 中声明强类型 `LocalWorkGoalDisposition`：`NO_GOAL` / `PAUSED` / `BLOCKED` / `WAITING_APPROVAL` / `WAITING_USER` / `WAITING_TEAM` / `NEEDS_EXECUTION` / `READY_FOR_SETTLEMENT` / `COMPLETED`。它完全**从 Work 当前真实状态及已有检查证据派生**，不新建任务状态数据库。
+
+- `recordWorkCompletionQuality` 的结果同时提供 `LocalWorkGoalAssessment`，避免重复读取文件哈希与 EventLog；`LocalWorkAgentTurnExecutor` 在原生产 `turn/end` 事件附带 `goal_disposition` / `goal_id` / `goal_status` / `goal_outstanding_count` / `goal_ready_for_settlement`。`reason=completed` 继续表示 *Turn* 正常结束，绝不等价于 Goal 完成。
+- `READY_FOR_SETTLEMENT` 只意味着**当前已知义务清零**，不自动把 Goal 状态写为 `completed`；用户审批/提问、正在运行的团队成员及暂停/阻塞状态都禁止被当作需要立即再开模型请求。
+- 即使旧 Goal 状态为 `completed`，如文件证据过期仍投影 `NEEDS_EXECUTION`，不制造成功。
+- 新增有开放 Todo、有证据缺口、目标暂停、团队执行中及无 Goal 场景的 JVM 状态断言。此提交没有实现 GoalDriver 自动续轮、真实 SideEffect Unknown 状态裁决、Agent Team 统一 TaskGraph，不能把 AE4V3-04 / -11 判定完成。
