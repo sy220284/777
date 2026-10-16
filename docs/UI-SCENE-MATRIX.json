@@ -293,14 +293,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "read": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiMessageHistoryPort.messagePage(sessionId, cursor, limit)",
+          "receiptType": "UiMessagePage",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "close": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -321,8 +321,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "select_profile": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SettingsUiPort.submit(SettingsUiCommand.SelectModel(profileId))",
+          "receiptType": "SettingsUiReceipt.Submitted / Rejected / Failed",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -388,14 +388,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "configure_persona": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "PersonaAuthoringUiPort.create(draft) / save(galleryId, expectedRevision, draft)",
+          "receiptType": "UiPersonaAuthoringReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "auto_fill": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "PersonaAuthoringUiPort.suggest(identity, draft, description)",
+          "receiptType": "UiPersonaAuthoringReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -416,8 +416,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "configure_behavior": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "CurrentPersonaUiPort.save(target, draft)",
+          "receiptType": "UiCurrentPersonaReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -504,14 +504,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "generate_suggestions": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ReplySuggestionsUiPort.generate(identity)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "send": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ConversationDraftUiPort.updateDraft(sessionId, suggestionText) [prepare only; send requires ChatUiPort.submit]",
+          "receiptType": "UiCommandReceipt only on separate ChatUiCommand.Send",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -591,14 +591,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "select_steering": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "WorkPolicyUiPort.submit(WorkPolicyUiCommand.SetApprovalMode(identity, mode))",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "dismiss_steering": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -744,8 +744,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "preview": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "FilesUiPort.previewWorkspaceFile(relativePath)",
+          "receiptType": "LocalWorkspaceFilePreview (read-only projection)",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -851,8 +851,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "edit": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "PersonaStoryUiPort.submit(PersonaStoryUiCommand.SaveDetails) / PersonaGalleryUiPort.submit(PersonaGalleryUiCommand.RenameStory)",
+          "receiptType": "UiPersonaStoryReceipt / UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -885,8 +885,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "edit_world_book": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "PersonaAuthoringUiPort.save(galleryId, expectedRevision, draft.copy(lore=...))",
+          "receiptType": "UiPersonaAuthoringReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -973,14 +973,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "correct_diary": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "DiaryUiPort.correct(UiDiaryCorrection)",
+          "receiptType": "UiDiaryReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "deactivate_diary": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "DiaryUiPort.deactivate(galleryId, diaryId, expectedUpdatedAt)",
+          "receiptType": "UiDiaryReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1073,8 +1073,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "configure_schedule": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "AutomationUiPort.submit(AutomationUiCommand.Create/Update/UpdatePolicy)",
+          "receiptType": "AutomationUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1163,26 +1163,26 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "install": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.InstallPreset/CreateSkill/InstallGitHubSkill)",
+          "receiptType": "ToolsUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "enable": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.SetSkillModelInvocable(id, true))",
+          "receiptType": "ToolsUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "disable": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.SetSkillModelInvocable(id, false))",
+          "receiptType": "ToolsUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "remove": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.RemoveSkill)",
+          "receiptType": "ToolsUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1312,14 +1312,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "search": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiMessageHistoryPort.searchMessages(sessionId, query, cursor)",
+          "receiptType": "UiMessageSearchReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "open_result": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.Open(sessionId))",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1341,14 +1341,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "configure": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.SelectMode)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "finish": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.Create)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1376,8 +1376,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "create_session": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.Create)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1465,8 +1465,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1494,8 +1494,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1523,8 +1523,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1552,8 +1552,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1581,8 +1581,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1610,8 +1610,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1639,8 +1639,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1668,8 +1668,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1697,8 +1697,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1726,8 +1726,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1755,8 +1755,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1784,8 +1784,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1813,8 +1813,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1842,8 +1842,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1871,8 +1871,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1900,8 +1900,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1929,8 +1929,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1958,8 +1958,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1987,8 +1987,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -2016,8 +2016,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -2045,8 +2045,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -2103,14 +2103,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "navigate": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "back": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected / AtRoot",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -2132,14 +2132,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "navigate": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "back": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected / AtRoot",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -2161,14 +2161,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "navigate": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "back": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected / AtRoot",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -2190,14 +2190,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "navigate": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "back": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected / AtRoot",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -2219,14 +2219,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "navigate": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "back": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected / AtRoot",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -2248,14 +2248,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "navigate": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "back": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected / AtRoot",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -2277,14 +2277,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "navigate": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "back": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected / AtRoot",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -2342,8 +2342,8 @@
       "acceptance": "编译/协议自动化验证；真实模型收费与取消旅程待验收",
       "actionProof": {
         "acknowledge_additional_model_request": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiDocumentUiPort.generate(GenerateUiDocumentCommand.acknowledgedAdditionalModelRequest=true) [explicit UI confirmation]",
+          "receiptType": "UiDocumentReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
