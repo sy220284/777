@@ -198,5 +198,9 @@ fun UiDocument.withUserEditedText(nodeId: String, newText: String): UiDocument? 
         else -> node
     }
     val rewritten = nodes.map(::rewrite)
-    return if (replacements == 1) copy(revision = revision + 1, nodes = rewritten) else null
+    return if (replacements == 1) copy(
+        revision = revision + 1, nodes = rewritten,
+        fallbackText = if (rewritten.size == 1 && rewritten[0] is UiDocumentNode.Text)
+            newText else "此文档包含用户修改的文本，请查看结构化内容",
+    ) else null
 }
