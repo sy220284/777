@@ -218,14 +218,19 @@ fun V6SettingsSuiteScene(
                 else {
                     val revision by owner.revision.collectAsStateWithLifecycle()
                     val figures = remember(owner, revision) { owner.snapshot() }
-                    Text("请求：${figures.tracked.requestCount}")
-                    Text("输入 Token：${figures.tracked.inputTokens}")
-                    Text("输出 Token：${figures.tracked.outputTokens}")
-                    Text("台账预估成本（人民币）：${figures.tracked.estimatedCostCny}")
-                    if (figures.tracked.unreportedRequestCount > 0)
+                    val selectedFigures = usageModelFilter?.let { figures.byModel[it] }
+                        ?: figures.takeIf { usageModelFilter == null }
+                    if (selectedFigures == null) SyNote("所选模型暂无本地用量记录")
+                    val active = selectedFigures ?: com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot()
+                    Text("当前账本：" + (usageModelFilter ?: "全部模型"))
+                    Text("请求：${active.tracked.requestCount}")
+                    Text("输入 Token：${active.tracked.inputTokens}")
+                    Text("输出 Token：${active.tracked.outputTokens}")
+                    Text("台账预估成本（人民币）：${active.tracked.estimatedCostCny}")
+                    if (active.tracked.unreportedRequestCount > 0)
                         SyNote("部分请求缺少供应商用量回执，费用可能不完整")
                     if (scene.value == "settings.model_performance")
-                        Text("聊天请求：${figures.chat.aggregate.requestCount}；Work 请求：${figures.work.aggregate.requestCount}")
+                        Text("聊天请求：${active.chat.aggregate.requestCount}；Work 请求：${active.work.aggregate.requestCount}")
                     Text("费用与额度以服务商账单为准；这里仅显示本地请求账本。")
                     if (figures.byModel.isNotEmpty()) {
                         Text("切换账本模型", style = MaterialTheme.typography.titleMedium)
