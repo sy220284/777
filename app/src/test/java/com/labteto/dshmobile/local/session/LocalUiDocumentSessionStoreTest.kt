@@ -233,6 +233,42 @@ class LocalUiDocumentSessionStoreTest {
         } finally { directory.deleteRecursively() }
     }
 
+    @Test fun separateOwnersShareOneCompareAndAppendLease() {
+        val directory = Files.createTempDirectory("ui-doc-owner-race").toFile()
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(2)
+        try {
+            val registry = LocalSessionEventLogRegistry(directory, Json)
+            val first = LocalUiDocumentSessionStore(registry)
+            val second = LocalUiDocumentSessionStore(registry)
+            val original = document("shared")
+            assertTrue(first.publish(original, provenance, null, null, budget, emptySet()))
+            val ready = java.util.concurrent.CountDownLatch(2)
+            val begin = java.util.concurrent.CountDownLatch(1)
+            fun race(owner: LocalUiDocumentSessionStore, title: String) = executor.submit<Boolean> {
+                ready.countDown()
+                check(begin.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                owner.publish(original.copy(revision = 1, title = title), provenance,
+                    null, original, budget, emptySet())
+            }
+            val a = race(first, "first owner")
+            val b = race(second, "second owner")
+            assertTrue(ready.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            begin.countDown()
+            val results = listOf(a.get(10, java.util.concurrent.TimeUnit.SECONDS),
+                b.get(10, java.util.concurrent.TimeUnit.SECONDS))
+            assertEquals(1, results.count { it })
+            val restored = LocalUiDocumentSessionStore(registry)
+                .latestDocument("session", "shared", original.documentId, budget, emptySet())
+            assertEquals(1L, restored!!.document.revision)
+            assertTrue(restored.document.title in setOf("first owner", "second owner"))
+            assertEquals(1L, registry.get("session").latestSequence())
+            registry.clearAndEvict(setOf("session"))
+        } finally {
+            executor.shutdownNow()
+            directory.deleteRecursively()
+        }
+    }
+
     @Test fun incrementalReplayReadsNewCardsWithoutDroppingExistingVisibleCards() {
         val directory = Files.createTempDirectory("ui-doc-incremental").toFile()
         try {

@@ -88,6 +88,16 @@ class SessionEventLog(
         }
     }
 
+    /**
+     * Serializes a higher-level compare-and-append against all adapters for this durable path.
+     * The body must not suspend or leave the session lock. This is an in-process CAS lease;
+     * cross-process writers still require OS-level file coordination.
+     */
+    fun <T> withWriterLease(block: () -> T): T = synchronized(lock) {
+        check(!closed.get()) { "事件日志已关闭，拒绝新的比较写入" }
+        block()
+    }
+
     fun diagnostics(): SessionEventLogDiagnostics = SessionEventLogDiagnostics(
         malformedRows = malformedRows.get(),
         segmentReadFailures = segmentReadFailures.get(),

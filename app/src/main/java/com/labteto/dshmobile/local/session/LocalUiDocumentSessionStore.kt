@@ -52,22 +52,23 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
     /** The Session sidecar owns revision admission for every producer, including local templates. */
     @Synchronized
     fun publish(document: UiDocument, provenance: UiDocumentProvenance, pendingApprovalId: String?,
-        expected: UiDocument?, budget: UiDocumentBudget, knownScenes: Set<UiSceneId>): Boolean {
+        expected: UiDocument?, budget: UiDocumentBudget, knownScenes: Set<UiSceneId>): Boolean =
+        logs.get(document.source.sessionId).withWriterLease {
         val source = document.source
         // An explicit user tombstone is final for this ID. A delayed Work tool
         // callback must not resurrect a card that the user already deleted.
         val latest = latestDocumentEvent(source.sessionId, source.messageId, document.documentId)
-        if (latest != null && latest.type != UI_DOCUMENT_EVENT) return false
+        if (latest != null && latest.type != UI_DOCUMENT_EVENT) return@withWriterLease false
         val occupied = latest?.let {
             decodeEvent(it, source.sessionId, setOf(source.messageId), budget, knownScenes)
         }
         if (occupied?.recoveryNotice != null || occupied?.document?.source?.let { it != source } == true)
-            return false
+            return@withWriterLease false
         val current = occupied?.document
-        if (current != expected) return false
+        if (current != expected) return@withWriterLease false
         if (current == null) {
-            if (document.revision != 0L) return false
-        } else if (!com.labteto.dshmobile.uicontract.UiDocumentPatch(document.documentId, current.revision, document).matches(current)) return false
+            if (document.revision != 0L) return@withWriterLease false
+        } else if (!com.labteto.dshmobile.uicontract.UiDocumentPatch(document.documentId, current.revision, document).matches(current)) return@withWriterLease false
         val definition = LocalUiDocumentCodec.encode(document)
         LocalUiDocumentCodec.decode(definition.toString(), source, budget, knownScenes, pendingApprovalId).getOrThrow()
         logs.get(source.sessionId).append(UI_DOCUMENT_EVENT, buildJsonObject {
@@ -85,7 +86,7 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
             pendingApprovalId?.let { put("admittedApprovalId", it) }
         })
         mutableRevision.update { it + 1L }
-        return true
+        return@withWriterLease true
     }
 
     fun read(sessionId: String, messageIds: Set<String>, budget: UiDocumentBudget,
@@ -171,12 +172,13 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
     /** Explicit user deletion is a versioned event in the same Session authority. */
     @Synchronized
     fun delete(document: UiDocument, budget: UiDocumentBudget,
-        knownScenes: Set<UiSceneId>): Boolean {
+        knownScenes: Set<UiSceneId>): Boolean =
+        logs.get(document.source.sessionId).withWriterLease {
         val source = document.source
         val current = latestDocument(source.sessionId, source.messageId,
             document.documentId, budget, knownScenes)
-            ?.takeIf { it.recoveryNotice == null }?.document ?: return false
-        if (current != document) return false
+            ?.takeIf { it.recoveryNotice == null }?.document ?: return@withWriterLease false
+        if (current != document) return@withWriterLease false
         logs.get(source.sessionId).append(UI_DOCUMENT_DELETED_EVENT, buildJsonObject {
             put("source", buildJsonObject {
                 put("sessionId", source.sessionId)
@@ -187,7 +189,7 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
             put("deletedRevision", document.revision)
         })
         mutableRevision.update { it + 1L }
-        return true
+        return@withWriterLease true
     }
 
     /**
@@ -199,17 +201,18 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
     fun deleteBatch(documents: List<UiDocument>, budget: UiDocumentBudget,
         knownScenes: Set<UiSceneId>): Boolean {
         if (documents.size !in 2..32) return false
+        return logs.get(documents.first().source.sessionId).withWriterLease {
         val sessionId = documents.first().source.sessionId
         if (sessionId.isBlank() || documents.any {
             it.source.sessionId != sessionId || it.source.messageId.isBlank() ||
                 it.documentId.isBlank() || it.documentId.length > 200
-        }) return false
+        }) return@withWriterLease false
         val keys = documents.map { it.source.messageId to it.documentId }
-        if (keys.distinct().size != keys.size) return false
+        if (keys.distinct().size != keys.size) return@withWriterLease false
         if (documents.any { doc ->
             latestDocument(sessionId, doc.source.messageId, doc.documentId, budget, knownScenes)
                 ?.takeIf { it.recoveryNotice == null }?.document != doc
-        }) return false
+        }) return@withWriterLease false
         logs.get(sessionId).append(UI_DOCUMENT_BATCH_DELETED_EVENT, buildJsonObject {
             put("sessionId", sessionId)
             put("targets", buildJsonArray {
@@ -223,7 +226,8 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
             })
         })
         mutableRevision.update { it + 1L }
-        return true
+        return@withWriterLease true
+        }
     }
 
     private fun latestDocumentEvent(sessionId: String, messageId: String,

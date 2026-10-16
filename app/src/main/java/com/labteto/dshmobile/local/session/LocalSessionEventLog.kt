@@ -80,6 +80,10 @@ class LocalSessionEventLog(
         checkpoints.write(name, LocalSessionProjectionCheckpoint(version, projectionIdentity(), throughSequence, payload))
     }
 
+    /** Shares the native Session Owner's compare/append lock with every adapter for this path. */
+    internal fun <T> withWriterLease(block: () -> T): T =
+        delegate.withWriterLease(block)
+
     fun append(type: String, data: JsonObject): Event {
         val committed = delegate.append(type, data).toLocalEvent()
         mutableChanges.update { it + 1L }
