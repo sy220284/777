@@ -510,8 +510,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "send": {
-          "ownerPort": "ConversationDraftUiPort.updateDraft(sessionId, suggestionText) [prepare only; send requires ChatUiPort.submit]",
-          "receiptType": "UiCommandReceipt only on separate ChatUiCommand.Send",
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.SendText(identity, selectedSuggestion.text)); optional draft prep via ConversationDraftUiPort.updateDraft",
+          "receiptType": "UiCommandReceipt (Accepted / Queued / NotAdmitted / Rejected / Failed / OutcomeUnknown)",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
