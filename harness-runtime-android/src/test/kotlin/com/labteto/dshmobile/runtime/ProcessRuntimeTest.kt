@@ -31,8 +31,7 @@ class ProcessRuntimeTest {
         repeat(12) { attempt ->
             val output = runtime.execute(ProcessRequest(
                 command = listOf(
-                    "sh", "-c", "printf start; printf 'permission-$1' >&2; exit 126",
-                    "case", attempt.toString(),
+                    "sh", "-c", "printf start; printf permission-" + attempt + " >&2; exit 126",
                 ),
                 timeoutMillis = 3_000,
             ))
