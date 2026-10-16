@@ -720,8 +720,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "use_capability": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "WorkConversationUiPort.snapshot() + ConversationDraftUiPort.updateDraft(sessionId, userProvidedCapabilityRequest) + UiHostSceneNavigation.navigate(conversation.work) [draft only; subsequent Work send is separate]",
+          "receiptType": "UiSceneNavigationResult / actual WorkConversationUiCommand.SendMessage receipt on separate user send",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1398,8 +1398,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "retry_if_owner_allows": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.Open(currentSessionId)) guarded by current UiSessionIdentity [reopen only; no tool/model retry]",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
