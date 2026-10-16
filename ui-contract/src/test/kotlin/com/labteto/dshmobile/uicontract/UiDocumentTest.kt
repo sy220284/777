@@ -107,6 +107,39 @@ class UiDocumentTest {
             setOf("choice", "enabled"))
     }
 
+    @Test fun typedControlsRejectOversizedTextWithoutGrantingOwnerSend() {
+        val action = UiDocumentAction.SendUserInput("send", "Request", listOf("short", "long"))
+        val form = document(listOf(
+            UiDocumentNode.Field("short", "Single line", "", true, false),
+            UiDocumentNode.Field("long", "Long text", "", false, true),
+        ), listOf(action))
+        assertTrue(form.invalidInputFields(action, mapOf(
+            "short" to "x".repeat(MAX_UI_DOCUMENT_SINGLE_LINE_CHARS + 1),
+            "long" to "y",
+        )) == setOf("short"))
+        assertTrue(form.invalidInputFields(action, mapOf(
+            "short" to "ok",
+            "long" to "y".repeat(MAX_UI_DOCUMENT_MULTILINE_CHARS + 1),
+        )) == setOf("long"))
+        assertTrue(form.invalidInputFields(action, mapOf(
+            "short" to "ok", "long" to "y".repeat(MAX_UI_DOCUMENT_MULTILINE_CHARS),
+        )).isEmpty())
+    }
+
+    @Test fun combinedOutgoingMessageBudgetIsEnforcedBeforeInputConstruction() {
+        val fields = (0..2).map { "long_$it" }
+        val action = UiDocumentAction.SendUserInput("send", "Request", fields)
+        val form = document(fields.map { id ->
+            UiDocumentNode.Field(id, "Details", "", true, true)
+        }, listOf(action))
+        val huge = fields.associateWith { "x".repeat(MAX_UI_DOCUMENT_MULTILINE_CHARS) }
+        val invalid = form.invalidInputFields(action, huge)
+        assertTrue("__total_input_budget__" in invalid)
+        assertTrue(fields.all { it in invalid })
+        val safe = fields.associateWith { "x".repeat(500) }
+        assertTrue(form.invalidInputFields(action, safe).isEmpty())
+    }
+
     @Test fun actionsOnlyRequireTheirOwnInputsAndCannotReferenceMissingControls() {
         val form = document(listOf(
             UiDocumentNode.Field("optional", "Optional", "", false, true),
