@@ -25,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.uicontract.UiSessionIdentity
 import com.labteto.dshmobile.uicontract.UiWorkPlanSnapshot
 import com.labteto.dshmobile.uicontract.UiWorkTeamMember
+import com.labteto.dshmobile.uicontract.UiWorkTeamSnapshot
 import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.WorkPolicyUiCommand
 import com.labteto.dshmobile.uicontract.WorkPolicyUiPort
@@ -119,6 +120,14 @@ fun V6WorkPlanScene(
         }
     }
 }
+
+/** Stop-all must target the exact set of jobs the user reviewed in the confirmation. */
+internal fun canStopV6WorkTeam(
+    expectedIdentity: UiSessionIdentity,
+    expectedJobIds: Set<String>,
+    snapshot: UiWorkTeamSnapshot,
+): Boolean = expectedJobIds.isNotEmpty() && snapshot.identity == expectedIdentity &&
+    snapshot.members.map { it.jobId }.toSet() == expectedJobIds
 
 /** Team child jobs are inspected and controlled only through original Work Team owner. */
 @Composable
@@ -242,8 +251,7 @@ fun V6WorkTeamScene(
             confirmButton = { TextButton(onClick = {
                 confirmTeamStop = null
                 val latest = team.snapshot()
-                if (latest.identity == identity &&
-                    latest.members.map { it.jobId }.toSet() == expectedJobs) {
+                if (canStopV6WorkTeam(identity, expectedJobs, latest)) {
                     submit(WorkTeamUiCommand.StopTeam(identity, expectedJobs))
                 } else feedback = "Work 团队任务已变化，请重新确认后再停止"
             }) { Text("确认停止全部") } },
