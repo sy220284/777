@@ -23,6 +23,13 @@ class LocalUiSceneCatalogTest {
         assertTrue(UiSceneId("settings.account") in result.missingScenes)
     }
 
+    @Test fun updateCheckRemainsAnInlineHostActionRatherThanADeadSettingsRoute() {
+        val update = LocalUiSceneCatalog.requirements.single { it.id == UiSceneId("settings.update") }
+        assertEquals(UiSceneKind.SLOT, update.kind)
+        assertFalse(update.hostProvided)
+        assertFalse(SettingsDestination.entries.any { it.name.equals("UPDATE", ignoreCase = true) })
+    }
+
     @Test fun requiredCoverageIncludesEveryOwnedRouteAndSettingsDestination() {
         val requirements = LocalUiSceneCatalog.requirements
         val ids = requirements.map { it.id }.toSet()
