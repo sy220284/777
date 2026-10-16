@@ -26,6 +26,22 @@ internal class LocalUiDocumentFormState(
         private const val MAX_STATE_CHARS = 65_536
     }
 
+    /**
+     * Sensitive fields may be used while the form is on screen, but must never enter
+     * Android SavedState (including legacy restored payloads). The classifier uses
+     * complete field-name tokens so "secretary" or "tokenizer" remain ordinary fields.
+     * UI-only policy: the original Owner still governs tool authorization and submission.
+     */
+    private fun sensitiveField(id: String): Boolean {
+        val components = id.replace(Regex("([a-z])([A-Z])"), "$1_$2")
+            .lowercase().split(Regex("[^a-z0-9]+")).filter(String::isNotBlank)
+        val normalized = components.joinToString("")
+        return components.any { it in setOf("password", "passwd", "pwd", "secret",
+            "token", "credential", "credentials", "privatekey", "apikey") } ||
+            normalized in setOf("apikey", "accesstoken", "refreshtoken",
+                "clientsecret", "privatekey", "authorizationcode", "bearertoken")
+    }
+
     private val fields = linkedMapOf<UiDocumentFormKey, Map<String, String>>()
     private val mutableValues = MutableStateFlow<Map<UiDocumentFormKey, Map<String, String>>>(emptyMap())
     override val values = mutableValues.asStateFlow()
@@ -38,7 +54,7 @@ internal class LocalUiDocumentFormState(
                 val revision = entry[2].toLongOrNull() ?: return@forEach
                 if (revision < 0 || entry[0].isBlank() || entry[1].isBlank() || entry[3].isBlank()) return@forEach
                 val key = UiDocumentFormKey(entry[0], entry[1], revision)
-                putWithinBudget(key, entry[3], entry[4])
+                if (!sensitiveField(entry[3])) putWithinBudget(key, entry[3], entry[4])
             }
         } else {
             saved.asSequence()
@@ -46,7 +62,7 @@ internal class LocalUiDocumentFormState(
                 .chunked(4).filter { it.size == 4 }.forEach { entry ->
                 if (entry[0].isBlank() || entry[1].isBlank() || entry[2].isBlank()) return@forEach
                 val key = UiDocumentFormKey(entry[0], entry[1])
-                putWithinBudget(key, entry[2], entry[3])
+                if (!sensitiveField(entry[2])) putWithinBudget(key, entry[2], entry[3])
             }
         }
         mutableValues.value = fields.toMap()
@@ -105,8 +121,10 @@ internal class LocalUiDocumentFormState(
         save(ArrayList<String>().apply {
             add(FORMAT_V2)
             fields.forEach { (form, entries) -> entries.forEach { (id, text) ->
-                add(form.sessionId); add(form.documentId); add(form.revision.toString())
-                add(id); add(text)
+                if (!sensitiveField(id)) {
+                    add(form.sessionId); add(form.documentId); add(form.revision.toString())
+                    add(id); add(text)
+                }
             } }
         })
     }
