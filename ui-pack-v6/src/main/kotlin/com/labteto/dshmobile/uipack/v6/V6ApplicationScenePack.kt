@@ -270,7 +270,7 @@ class V6ApplicationScenePack(
             }
             owners.replySuggestions?.let { suggestions ->
                 put(UiSceneId("chat.reply_suggestions"), UiSceneRenderer { scope ->
-                    V6ReplySuggestionsScene(suggestions, owners.drafts,
+                    V6ReplySuggestionsScene(suggestions, owners.drafts, owners.chat,
                         onBack = { scope.onBack(); Unit })
                 })
             }
