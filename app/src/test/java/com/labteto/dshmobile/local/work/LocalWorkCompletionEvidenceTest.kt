@@ -114,6 +114,31 @@ class LocalWorkCompletionEvidenceTest {
     }
 
     @Test
+    fun pendingApprovalAndPendingQuestionHaveDifferentNonRunnableStates() {
+        val goal = LocalGoal("继续实施", id = "g-interaction")
+        val waiting = LocalWorkState(
+            goal = goal,
+            todos = listOf(LocalTodoItem("等待实际操作", "pending")),
+            pendingApproval = com.labteto.dshmobile.local.interaction.LocalApproval(
+                callId = "call-approval", toolName = "write_file", summary = "写入文件",
+                arguments = "{}", access = "write",
+            ),
+        )
+        val approval = assessLocalWorkGoal(waiting)
+        assertTrue(approval.disposition == LocalWorkGoalDisposition.WAITING_APPROVAL)
+        assertFalse(approval.hasRunnableRemainingWork)
+
+        val question = assessLocalWorkGoal(waiting.copy(
+            pendingApproval = null,
+            pendingQuestion = com.labteto.dshmobile.local.interaction.LocalQuestion(
+                callId = "call-question", question = "需要选择哪一种结果？",
+            ),
+        ))
+        assertTrue(question.disposition == LocalWorkGoalDisposition.WAITING_USER)
+        assertFalse(question.hasRunnableRemainingWork)
+    }
+
+    @Test
     fun turnCompletionAndGoalCompletionRemainDistinct() {
         val goal = LocalGoal("修复并验证", id = "g1", status = "active")
         val open = LocalWorkState(goal = goal, todos = listOf(LocalTodoItem("跑测试", "pending")))
