@@ -253,6 +253,7 @@ internal class LocalWorkAgentTurnExecutor(
             var hadSuccessfulToolReceipt = false
             var hadToolFailure = false
             var completedGoalTurn = false
+            var dispositionAtTurnCompletion: LocalWorkGoalDisposition? = null
 
             fun settlePendingTools(reason: String) {
                 val actuallyStarted = startedToolCallIdsForActiveStep(runEventLog, activeToolCalls)
@@ -645,6 +646,8 @@ internal class LocalWorkAgentTurnExecutor(
                         is AgentEvent.TurnCompleted -> {
                             val goalAssessment = recordWorkCompletionQuality(
                                 event.answer, runState.value, runEventLog, File(workspacePath))
+                            // Preserve approval/question/team blockers observed BEFORE teardown.
+                            dispositionAtTurnCompletion = goalAssessment?.disposition
                             runEventLog.append("turn/end", buildJsonObject {
                                 put("source_message_id", uiSourceMessageId)
                                 // The model finished this turn; Work goal completion is independent.
@@ -798,7 +801,9 @@ internal class LocalWorkAgentTurnExecutor(
                         finally { serviceReleased = true }
                     } finally {
                         workRunRegistry.finishTurn(binding, completedJob, onIdle = {
-                            if (completedGoalTurn) {
+                            if (completedGoalTurn &&
+                                dispositionAtTurnCompletion == LocalWorkGoalDisposition.NEEDS_EXECUTION
+                            ) {
                                 queueWorkGoalProgressFollowUp(
                                     binding = binding,
                                     originalGoal = goalAtTurnStart,
