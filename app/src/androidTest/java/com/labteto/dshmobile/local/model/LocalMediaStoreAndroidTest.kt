@@ -136,6 +136,28 @@ class LocalMediaStoreAndroidTest {
         assertTrue(store().page().results.isEmpty())
     }
 
+    @Test fun originalImageRedownloadKeepsSessionAndCannotReviveDeletedResult() {
+        val media = store()
+        val job = media.beginCreation(offer, "session", "image")
+        media.requestStarted(job.id)
+        media.providerSucceeded(job.id)
+        val url = "https://images.example.org/original.png"
+        media.addResult(offer, LocalMediaKind.IMAGE, "session",
+            operationId = job.id, link = url)
+        val downloaded = File(directory, "recovered.png").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        assertFalse(media.attachDownloadedImage(job.id, "another-session", url, downloaded))
+        assertFalse(media.attachDownloadedImage(job.id, "session", "https://wrong.example.org", downloaded))
+        assertTrue(media.attachDownloadedImage(job.id, "session", url, downloaded))
+        val restored = store().result(job.id)
+        assertEquals("recovered.png", restored?.fileName)
+        assertEquals(null, restored?.remoteUrl)
+        assertFalse(media.attachDownloadedImage(job.id, "session", url, downloaded))
+        media.remove(job.id)
+        val lateFile = File(directory, "late.png").apply { writeBytes(byteArrayOf(4)) }
+        assertFalse(media.attachDownloadedImage(job.id, "session", url, lateFile))
+        assertEquals(null, store().result(job.id))
+    }
+
     @Test fun deletingRegeneratedResultDoesNotResurrectOldAudioOrDeleteOtherResults() {
         val old = result("original", 10L, file = "original.png")
         val revision = result("revision", 20L, file = "revision.png").copy(revisionOf = "original")
