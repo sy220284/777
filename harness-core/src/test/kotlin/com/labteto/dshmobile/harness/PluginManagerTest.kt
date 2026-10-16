@@ -418,6 +418,39 @@ class PluginManagerTest {
     }
 
     @Test
+    fun failedInstallCleanupBlocksToolsUntilRecoveryRetriesExternalCleanup() = runTest {
+        val registry = PluginRegistry()
+        var installs = 0
+        var cleanupAttempts = 0
+        val manager = manager(
+            definition("leaky", onInstall = {
+                installs++
+                it.events.register("attempt", installs)
+                if (installs == 1) error("remote setup failed")
+            }, onUninstall = {
+                cleanupAttempts++
+                if (cleanupAttempts == 1) error("remote teardown failed")
+                it.events.unregister("attempt")
+            }),
+            registry = registry,
+        )
+        assertTrue(runCatching { manager.install("leaky") }.isFailure)
+        assertEquals(PluginLifecycleState.FAILED, manager.lifecycleSnapshot("leaky")?.state)
+        val blocked = registry.context.tools.execute(
+            "unregistered", kotlinx.serialization.json.buildJsonObject { },
+        )
+        assertEquals("TOOL_LIFECYCLE_UNAVAILABLE", blocked.errorCode)
+        assertEquals(listOf("leaky"), manager.recoverFailed("leaky"))
+        assertEquals(2, cleanupAttempts)
+        assertEquals(2, installs)
+        assertEquals(PluginLifecycleState.ACTIVE, manager.lifecycleSnapshot("leaky")?.state)
+        val restored = registry.context.tools.execute(
+            "unregistered", kotlinx.serialization.json.buildJsonObject { },
+        )
+        assertEquals("UNKNOWN_TOOL", restored.errorCode)
+    }
+
+    @Test
     fun failedRecoveryNeverClaimsAnActivePluginOrPublishesPartialResources() = runTest {
         val manager = manager(
             definition("broken", onInstall = {
