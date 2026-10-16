@@ -26,13 +26,37 @@ internal fun mediaCreativeDraft(
             append("\n仅表现以下场景的可见动作、环境和情绪，不要把对白绘制成字：\n")
             append(stageDirections.ifBlank { message.take(200) })
         }
-        LocalMediaKind.SPEECH -> spokenDialogueOnly(message)
+        LocalMediaKind.SPEECH -> spokenDialogueOnly(reply)
         LocalMediaKind.TRANSCRIBE -> ""
     }
 }
 
-/** Strip bracketed actions before TTS, leaving only the character's audible utterance. */
-internal fun spokenDialogueOnly(reply: String): String =
-    reply.replace(Regex("（[^）]*）|\\([^)]*\\)|\\*[^*\\n]+\\*"), "")
+/** A media type must never inherit a different type's creation instructions. */
+internal fun initialMediaTextForKind(
+    kind: LocalMediaKind,
+    initialKind: LocalMediaKind,
+    initialPrompt: String,
+    sourceReply: String?,
+    personaName: String,
+    personaIdentity: String,
+): String = when {
+    kind == initialKind -> initialPrompt
+    sourceReply != null -> mediaCreativeDraft(kind, sourceReply, personaName, personaIdentity)
+    else -> ""
+}
+
+private val spokenContentHeader = Regex(
+    """(?m)^[ \t]*(?:朗读内容|配音内容|配音文本|配音文案|朗读文本|需要朗读的文字|台词|正文)[ \t]*[：:][ \t]*"""
+)
+private val nonSpokenDirective = Regex(
+    """^(?:提示词|配音提示词|朗读要求|配音要求|音色|语气|情绪|风格)[：:].*"""
+)
+
+/** Only audible text goes into TTS; explicit creative directions are not dialogue. */
+internal fun spokenDialogueOnly(reply: String): String {
+    val content = spokenContentHeader.find(reply)?.let { reply.substring(it.range.last + 1) } ?: reply
+    return content.replace(Regex("（[^）]*）|\\([^)]*\\)|\\*[^*\\n]+\\*"), "")
         .lines().map(String::trim).filter(String::isNotBlank)
+        .filterNot(nonSpokenDirective::matches)
         .joinToString("\n").trim().take(1800)
+}

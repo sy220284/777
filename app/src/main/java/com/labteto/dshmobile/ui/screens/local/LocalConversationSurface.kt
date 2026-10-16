@@ -431,6 +431,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var mediaRevision by rememberSaveable(state.sessionId) { mutableStateOf<LocalMediaRevisionDraft?>(null) }
     var mediaInitialPrompt by rememberSaveable(state.sessionId) { mutableStateOf("") }
     var mediaSourceMessageId by rememberSaveable(state.sessionId) { mutableStateOf<String?>(null) }
+    var mediaSourceReply by rememberSaveable(state.sessionId) { mutableStateOf<String?>(null) }
+    var mediaSourcePersonaName by rememberSaveable(state.sessionId) { mutableStateOf("") }
+    var mediaSourcePersonaIdentity by rememberSaveable(state.sessionId) { mutableStateOf("") }
     var mediaInitialKind by rememberSaveable(state.sessionId) {
         mutableStateOf(com.labteto.dshmobile.local.model.LocalMediaKind.IMAGE.name)
     }
@@ -1045,10 +1048,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 onCreateMedia = { message, kind ->
                                     mediaRevision = null
                                     mediaSourceMessageId = message.id
+                                    mediaSourceReply = message.content.take(12_000)
+                                    mediaSourcePersonaName = if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled)
+                                        state.chatPersona.name else ""
+                                    mediaSourcePersonaIdentity = if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled)
+                                        state.chatPersona.coreIdentity else ""
                                     mediaInitialPrompt = mediaCreativeDraft(
-                                        kind, message.content,
-                                        if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) state.chatPersona.name else "",
-                                        if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) state.chatPersona.coreIdentity else "",
+                                        kind, message.content, mediaSourcePersonaName, mediaSourcePersonaIdentity,
                                     )
                                     mediaInitialKind = kind.name
                                     showMediaStudio = true
@@ -1073,6 +1079,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 mediaRevision = draft
                                 mediaInitialPrompt = draft.prompt
                                 mediaSourceMessageId = draft.sourceMessageId
+                                mediaSourceReply = null
+                                mediaSourcePersonaName = ""
+                                mediaSourcePersonaIdentity = ""
                                 mediaInitialKind = draft.kind.name
                                 showMediaStudio = true
                             },
@@ -1096,6 +1105,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 mediaRevision = draft
                                 mediaInitialPrompt = draft.prompt
                                 mediaSourceMessageId = draft.sourceMessageId
+                                mediaSourceReply = null
+                                mediaSourcePersonaName = ""
+                                mediaSourcePersonaIdentity = ""
                                 mediaInitialKind = draft.kind.name
                                 showMediaStudio = true
                             },
@@ -1621,6 +1633,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         mediaRevision = null
                         mediaInitialPrompt = ""
                         mediaSourceMessageId = null
+                        mediaSourceReply = null
+                        mediaSourcePersonaName = ""
+                        mediaSourcePersonaIdentity = ""
                         mediaInitialKind = com.labteto.dshmobile.local.model.LocalMediaKind.IMAGE.name
                         showMediaStudio = true
                     },
@@ -1673,6 +1688,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 viewModel = mediaStudioViewModel,
                 onDelivered = { showMediaStudio = false },
                 initialPrompt = mediaInitialPrompt,
+                sourceReply = mediaSourceReply,
+                sourcePersonaName = mediaSourcePersonaName,
+                sourcePersonaIdentity = mediaSourcePersonaIdentity,
                 sourceMessageId = mediaSourceMessageId,
                 revision = mediaRevision,
                 personaVoiceStyle = if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled)
