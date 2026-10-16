@@ -3,6 +3,7 @@ package com.labteto.dshmobile.uipack.v6
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -426,24 +427,41 @@ fun V6MediaScene(media: MediaUiPort, settings: SettingsUiPort,
     sessionId: String?, creation: Boolean, onBack: () -> Unit) {
     val config by settings.state.collectAsStateWithLifecycle(initialValue = settings.initialState)
     val offers = remember(config.modelProfiles) { media.offers(config.modelProfiles) }
-    val entries by remember(media) { media.observe(null, media.pageSize * 4) }
+    val entries by remember(media, sessionId) { media.observe(sessionId, media.pageSize * 4) }
         .collectAsStateWithLifecycle(initialValue = LocalMediaPage())
     val storageError by media.storageError.collectAsStateWithLifecycle()
-    var picked by remember(offers) { mutableStateOf(offers.firstOrNull()?.id) }
-    var prompt by remember { mutableStateOf("") }
+    var chosenKind by rememberSaveable { mutableStateOf(LocalMediaKind.IMAGE.name) }
+    val kind = LocalMediaKind.valueOf(chosenKind)
+    val candidates = offers.filter { it.kind == kind }
+    var picked by rememberSaveable(chosenKind) { mutableStateOf("") }
+    var imageText by rememberSaveable { mutableStateOf("") }
+    var videoText by rememberSaveable { mutableStateOf("") }
+    var speechText by rememberSaveable { mutableStateOf("") }
+    var showModels by rememberSaveable { mutableStateOf(false) }
+    var showArchive by rememberSaveable { mutableStateOf(!creation) }
+    var audioRouteId by remember { mutableStateOf<String?>(null) }
+    var frozenRequest by remember { mutableStateOf<MediaUiCommand?>(null) }
+    val prompt = when(kind) {
+        LocalMediaKind.IMAGE -> imageText
+        LocalMediaKind.VIDEO -> videoText
+        LocalMediaKind.SPEECH -> speechText
+        LocalMediaKind.TRANSCRIBE -> ""
+    }
     var ratio by remember { mutableStateOf("1:1") }
     var voice by remember { mutableStateOf("") }
     var voices by remember { mutableStateOf(emptyList<LocalMediaVoice>()) }
     var notice by remember { mutableStateOf<String?>(null) }
     var pending by remember { mutableStateOf(false) }
-    var confirmation by remember { mutableStateOf(false) }
     var deletion by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    val offer = offers.firstOrNull { it.id == picked }
+    val offer = candidates.firstOrNull { it.id == picked } ?: candidates.firstOrNull()
     LaunchedEffect(offer) {
         voices = emptyList()
         if (offer?.kind == LocalMediaKind.SPEECH) {
-            try { voices = withContext(Dispatchers.IO) { media.voices(offer) } }
+            try {
+                voices = withContext(Dispatchers.IO) { media.voices(offer) }
+                if (voices.none { it.id == voice }) voice = voices.firstOrNull()?.id.orEmpty()
+            }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { notice = failure.message ?: "音色读取失败" }
         }
@@ -466,6 +484,13 @@ fun V6MediaScene(media: MediaUiPort, settings: SettingsUiPort,
             finally { pending = false }
         }
     }
+    val audioPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val original = offers.firstOrNull { it.id == audioRouteId && it.kind == LocalMediaKind.TRANSCRIBE }
+        audioRouteId = null
+        if (uri != null && original != null && !sessionId.isNullOrBlank()) {
+            frozenRequest = MediaUiCommand.Transcribe(original, uri.toString(), sessionId)
+        }
+    }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(if (creation) "媒体创作" else "媒体成果", style = MaterialTheme.typography.titleLarge)
@@ -476,27 +501,86 @@ fun V6MediaScene(media: MediaUiPort, settings: SettingsUiPort,
             submit(MediaUiCommand.RetryStorage)
         }, enabled = !pending)
         if (creation) {
-            Text("模型提供方实际支持的媒体类型")
-            offers.forEach { candidate ->
-                SyButton(candidate.label + " · " + candidate.kind.name,
-                    { picked = candidate.id },
-                    style = if (picked == candidate.id) SyButtonStyle.PRIMARY else SyButtonStyle.SECONDARY)
-            }
-            SyInput(prompt, { prompt = it },
-                label = if (offer?.kind == LocalMediaKind.SPEECH) "朗读文本" else "媒体创作描述",
-                singleLine = false)
-            if (offer?.kind == LocalMediaKind.IMAGE)
-                SyInput(ratio, { ratio = it.take(16) }, label = "画幅比例")
-            if (offer?.kind == LocalMediaKind.SPEECH)
-                voices.forEach { candidate ->
-                    SyButton(candidate.name, { voice = candidate.id },
-                        style = if (candidate.id == voice) SyButtonStyle.PRIMARY else SyButtonStyle.GHOST)
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(LocalMediaKind.IMAGE to "图片", LocalMediaKind.VIDEO to "视频",
+                    LocalMediaKind.SPEECH to "配音", LocalMediaKind.TRANSCRIBE to "转写").forEach { (mode, label) ->
+                    SyButton(label, {
+                        if (!pending) { chosenKind = mode.name; showModels = false; notice = null }
+                    }, style = if (kind == mode) SyButtonStyle.PRIMARY else SyButtonStyle.GHOST,
+                        enabled = !pending, compact = true)
                 }
-            SyButton("检查并确认媒体创作", { confirmation = true },
-                enabled = !pending && offer != null && prompt.isNotBlank() &&
-                    !sessionId.isNullOrBlank() && offer.kind != LocalMediaKind.TRANSCRIBE &&
-                    (offer.kind != LocalMediaKind.SPEECH || voices.any { it.id == voice }))
+            }
+            if (offer == null) SyNote("该类型没有可用的创作模型，请配置官方 API 账户。")
+            else {
+                SyButton("模型：" + offer.label + " ▾", { showModels = !showModels },
+                    enabled = !pending, style = SyButtonStyle.GHOST, compact = true)
+                if (showModels) candidates.forEach { alternative ->
+                    SyButton(alternative.label + " · " +
+                            (alternative.profile.displayName ?: alternative.profile.model),
+                        { picked = alternative.id; showModels = false },
+                        style = if (alternative.id == offer.id) SyButtonStyle.PRIMARY else SyButtonStyle.GHOST,
+                        enabled = !pending, compact = true)
+                }
+                if (kind != LocalMediaKind.TRANSCRIBE) {
+                    SyInput(prompt, { value ->
+                        when (kind) {
+                            LocalMediaKind.IMAGE -> imageText = value
+                            LocalMediaKind.VIDEO -> videoText = value
+                            LocalMediaKind.SPEECH -> speechText = value
+                            LocalMediaKind.TRANSCRIBE -> Unit
+                        }
+                    }, label = if (kind == LocalMediaKind.SPEECH) "朗读正文" else "创作描述",
+                        singleLine = false, enabled = !pending)
+                }
+                if (kind == LocalMediaKind.IMAGE) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("1:1", "16:9", "9:16").forEach { aspect ->
+                        SyButton(aspect, { ratio = aspect },
+                            style = if (ratio == aspect) SyButtonStyle.PRIMARY else SyButtonStyle.GHOST,
+                            enabled = !pending, compact = true)
+                    }
+                }
+                if (kind == LocalMediaKind.SPEECH) {
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        voices.forEach { option ->
+                            SyButton(option.name, { voice = option.id },
+                                style = if (voice == option.id) SyButtonStyle.PRIMARY else SyButtonStyle.GHOST,
+                                enabled = !pending, compact = true)
+                        }
+                    }
+                }
+                if (kind == LocalMediaKind.TRANSCRIBE) {
+                    Text("选择音频文件，文字结果将显示在当前聊天。",
+                        style = MaterialTheme.typography.bodySmall)
+                    SyButton("选择音频并转写", {
+                        audioRouteId = offer.id
+                        audioPicker.launch(arrayOf("audio/*"))
+                    }, enabled = !pending && !sessionId.isNullOrBlank())
+                } else {
+                    SyButton(when(kind) {
+                        LocalMediaKind.IMAGE -> "生成图片"
+                        LocalMediaKind.VIDEO -> "生成视频"
+                        LocalMediaKind.SPEECH -> "生成配音"
+                        LocalMediaKind.TRANSCRIBE -> "转写"
+                    }, {
+                        val sid = sessionId
+                        if (!sid.isNullOrBlank()) frozenRequest = when (kind) {
+                            LocalMediaKind.IMAGE -> MediaUiCommand.Image(offer, imageText, ratio, sid)
+                            LocalMediaKind.VIDEO -> MediaUiCommand.Video(offer, videoText, sid)
+                            LocalMediaKind.SPEECH -> MediaUiCommand.Speech(offer, speechText, voice, sid)
+                            LocalMediaKind.TRANSCRIBE -> null
+                        }
+                    }, enabled = !pending && prompt.isNotBlank() && !sessionId.isNullOrBlank() &&
+                        (kind != LocalMediaKind.SPEECH || voices.any { it.id == voice }))
+                }
+                Text("独立创作 API 可能另行计费，请确认后提交。",
+                    style = MaterialTheme.typography.labelSmall)
+            }
         }
+        SyButton(if (showArchive) "收起历史成果 ▴" else "查看历史成果 ▾",
+            { showArchive = !showArchive }, style = SyButtonStyle.GHOST, compact = true)
+        if (showArchive) {
         entries.jobs.forEach { job ->
             SyGlassCard(Modifier.fillMaxWidth()) {
                 Text(job.kind + " · " + job.phase.name + " · " + job.model)
@@ -562,22 +646,17 @@ fun V6MediaScene(media: MediaUiPort, settings: SettingsUiPort,
         }
         if (entries.unavailable) SyNote("媒体记录暂不可读取")
         if (entries.hasMore) SyNote("更多旧记录尚未全部加载")
+        }
     }
-    if (confirmation) AlertDialog(onDismissRequest = { confirmation = false },
-        title = { Text("确认发起媒体模型请求") },
-        text = { Text("该操作可能产生实际费用；即使响应断开，服务商也可能继续执行。") },
+    frozenRequest?.let { fixed -> AlertDialog(onDismissRequest = { frozenRequest = null },
+        title = { Text("确认媒体创作请求") },
+        text = { Text("将调用专业创作接口，可能单独计费。断线后不要盲目重复提交。") },
         confirmButton = { TextButton(onClick = {
-            confirmation = false
-            val target = offer
-            val sid = sessionId
-            if (target != null && !sid.isNullOrBlank()) when(target.kind) {
-                LocalMediaKind.IMAGE -> submit(MediaUiCommand.Image(target, prompt, ratio, sid))
-                LocalMediaKind.VIDEO -> submit(MediaUiCommand.Video(target, prompt, sid))
-                LocalMediaKind.SPEECH -> submit(MediaUiCommand.Speech(target, prompt, voice, sid))
-                LocalMediaKind.TRANSCRIBE -> Unit
-            }
-        }) { Text("确认计费请求") } },
-        dismissButton = { TextButton(onClick = { confirmation = false }) { Text("取消") } })
+            frozenRequest = null
+            submit(fixed)
+        }, enabled = !pending) { Text("确认提交") } },
+        dismissButton = { TextButton(onClick = { frozenRequest = null }) { Text("取消") } })
+    }
     deletion?.let { id -> AlertDialog(onDismissRequest = { deletion = null },
         title = { Text("确认删除媒体成果") },
         text = { Text("删除后此成果可能无法恢复。") },
