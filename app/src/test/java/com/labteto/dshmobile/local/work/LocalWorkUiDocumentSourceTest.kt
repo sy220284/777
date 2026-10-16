@@ -23,7 +23,13 @@ class LocalWorkUiDocumentSourceTest {
             log.append("turn/start", buildJsonObject { put("run_id", "run-2"); put("source_message_id", "original-user") })
             assertEquals("original-user", resolveWorkUiDocumentSource(log, "run-recovery:run-2"))
             assertEquals("new-user", resolveWorkUiDocumentSource(log, "new-user"))
-            assertEquals("run-recovery:unknown", resolveWorkUiDocumentSource(log, "run-recovery:unknown"))
+            assertNull(resolveWorkUiDocumentSource(log, "run-recovery:unknown"))
+            assertNull(resolveWorkUiDocumentSource(log, "continuation-unknown"))
+            assertNull(workDocumentSourceOrLastUser("run-recovery:unknown", null, "other-turn"))
+            assertNull(workDocumentSourceOrLastUser("continuation-unknown", null, "other-turn"))
+            assertEquals("actual-user", workDocumentSourceOrLastUser(null, null, "actual-user"))
+            assertEquals("original-user", workDocumentSourceOrLastUser(
+                "run-recovery:known", "original-user", "wrong-user"))
             assertNull(resolveWorkUiDocumentSource(log, null))
         } finally { logs.clearAndEvict(setOf("s")); root.deleteRecursively() }
     }
