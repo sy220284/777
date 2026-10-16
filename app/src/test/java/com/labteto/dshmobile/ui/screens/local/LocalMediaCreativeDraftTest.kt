@@ -5,6 +5,10 @@ import com.labteto.dshmobile.local.session.LocalMessageBlock
 import com.labteto.dshmobile.local.session.LocalMessageMediaSource
 import com.labteto.dshmobile.local.presentation.mediaCreativeDraft
 import com.labteto.dshmobile.local.presentation.initialMediaTextForKind
+import com.labteto.dshmobile.local.presentation.speechPayloadText
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.visibleBlocks
+import com.labteto.dshmobile.local.session.plainTextProjection
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -39,6 +43,29 @@ class LocalMediaCreativeDraftTest {
             "只用于图片的描述", null, "", ""))
         assertEquals("用户自己写的语音文本", initialMediaTextForKind(LocalMediaKind.SPEECH,
             LocalMediaKind.SPEECH, "用户自己写的语音文本", null, "", ""))
+    }
+
+    @Test fun manualSpeechOnlyStripsExplicitInstructions() {
+        val structured = "提示词：轻声配音。\n朗读内容：\n（点头）你好。\n语气：温柔"
+        assertEquals("你好。", speechPayloadText(structured))
+        assertEquals("", speechPayloadText("提示词：轻声配音。"))
+        assertEquals("（这句话也要读出）", speechPayloadText("（这句话也要读出）"))
+        assertEquals("我*真的*喜欢你。", speechPayloadText("我*真的*喜欢你。"))
+        assertEquals("我真的喜欢你。", mediaCreativeDraft(LocalMediaKind.SPEECH,
+            "我*真的*喜欢你。", "", ""))
+    }
+
+    @Test fun longManualSpeechIsNotSilentlyTruncated() {
+        val input = "你好".repeat(1100)
+        assertEquals(input, speechPayloadText(input))
+    }
+
+    @Test fun visibleTextBlocksArePreferredOverLegacyContentForMediaDraft() {
+        val message = LocalHarnessMessage(id = "reply-1", role = "assistant",
+            content = "提示词：不要朗读这个内容", createdAt = 1L,
+            blocks = listOf(LocalMessageBlock.Text("（轻笑）只朗读这句。")))
+        val visible = message.visibleBlocks().plainTextProjection()
+        assertEquals("只朗读这句。", mediaCreativeDraft(LocalMediaKind.SPEECH, visible, "", ""))
     }
 
     @Test fun imageDraftCarriesKnownIdentityAndNoTextRule() {

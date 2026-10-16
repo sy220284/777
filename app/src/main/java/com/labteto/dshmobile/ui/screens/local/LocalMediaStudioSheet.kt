@@ -61,6 +61,7 @@ import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.presentation.LocalMediaVoice
 import com.labteto.dshmobile.local.presentation.LocalMediaVoiceLabels
 import com.labteto.dshmobile.local.presentation.initialMediaTextForKind
+import com.labteto.dshmobile.local.presentation.speechPayloadText
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -482,8 +483,18 @@ internal fun LocalMediaStudioSheetContent(
                             label = { Text(stringResource(R.string.media_voice_custom_field)) },
                             singleLine = true, enabled = !busy, modifier = Modifier.fillMaxWidth())
                     }
+                    val actualSpeechText = speechPayloadText(speechText)
+                    if (actualSpeechText != speechText.trim()) {
+                        Text(
+                            text = if (actualSpeechText.isBlank())
+                                stringResource(R.string.media_speech_no_readable_content)
+                            else stringResource(R.string.media_speech_actual_preview, actualSpeechText),
+                            color = colors.textSecondary, style = DsType.caption11.withReadingWeight(),
+                            maxLines = 3, overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     SyButton(text = stringResource(R.string.minimax_media_create_speech),
-                        enabled = !busy && prompt.isNotBlank() && voiceId.isNotBlank(),
+                        enabled = !busy && actualSpeechText.isNotBlank() && voiceId.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
                             viewModel.submitSpeech(selected, prompt, voiceId, sessionId, if (matchingRevision != null) matchingRevision.sourceMessageId else sourceMessageId, matchingRevision?.originId)

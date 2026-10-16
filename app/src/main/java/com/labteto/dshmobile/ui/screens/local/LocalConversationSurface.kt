@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.local.presentation.mediaCreativeDraft
+import com.labteto.dshmobile.local.session.plainTextProjection
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
@@ -1048,13 +1049,16 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 onCreateMedia = { message, kind ->
                                     mediaRevision = null
                                     mediaSourceMessageId = message.id
-                                    mediaSourceReply = message.content.take(12_000)
+                                    // Derive creative input from visible text blocks, not the
+                                    // compatibility/raw transcript field (which may differ).
+                                    val visibleReply = message.visibleBlocks().plainTextProjection()
+                                    mediaSourceReply = visibleReply.take(12_000)
                                     mediaSourcePersonaName = if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled)
                                         state.chatPersona.name else ""
                                     mediaSourcePersonaIdentity = if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled)
                                         state.chatPersona.coreIdentity else ""
                                     mediaInitialPrompt = mediaCreativeDraft(
-                                        kind, message.content, mediaSourcePersonaName, mediaSourcePersonaIdentity,
+                                        kind, visibleReply, mediaSourcePersonaName, mediaSourcePersonaIdentity,
                                     )
                                     mediaInitialKind = kind.name
                                     showMediaStudio = true

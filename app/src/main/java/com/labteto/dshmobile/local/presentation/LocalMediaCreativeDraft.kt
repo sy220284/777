@@ -49,14 +49,26 @@ private val spokenContentHeader = Regex(
     """(?m)^[ \t]*(?:朗读内容|配音内容|配音文本|配音文案|朗读文本|需要朗读的文字|台词|正文)[ \t]*[：:][ \t]*"""
 )
 private val nonSpokenDirective = Regex(
-    """^(?:提示词|配音提示词|朗读要求|配音要求|音色|语气|情绪|风格)[：:].*"""
+    """^(?:提示词|语音提示词|配音提示词|朗读提示|朗读要求|配音要求|音色|语气|情绪|风格)[ \\t]*[：:].*"""
 )
 
+/**
+ * Keep manually entered dialogue literal unless it contains explicit labeled
+ * creation instructions. In that case, send only the labeled spoken section.
+ * Never silently truncate billable manual TTS: provider limits are checked first.
+ */
+internal fun speechPayloadText(input: String): String {
+    val text = input.trim()
+    val hasCreationInstructions = spokenContentHeader.containsMatchIn(text) ||
+        text.lineSequence().any { nonSpokenDirective.matches(it.trim()) }
+    return if (hasCreationInstructions) spokenDialogueOnly(text, Int.MAX_VALUE) else text
+}
+
 /** Only audible text goes into TTS; explicit creative directions are not dialogue. */
-internal fun spokenDialogueOnly(reply: String): String {
+internal fun spokenDialogueOnly(reply: String, limit: Int = 1800): String {
     val content = spokenContentHeader.find(reply)?.let { reply.substring(it.range.last + 1) } ?: reply
-    return content.replace(Regex("（[^）]*）|\\([^)]*\\)|\\*[^*\\n]+\\*"), "")
+    return content.replace(Regex("（[^）]*）|\\([^)]*\\)|^[ \\t]*\\*[^*\\n]+\\*", RegexOption.MULTILINE), "")
         .lines().map(String::trim).filter(String::isNotBlank)
         .filterNot(nonSpokenDirective::matches)
-        .joinToString("\n").trim().take(1800)
+        .joinToString("\n").trim().take(limit)
 }
