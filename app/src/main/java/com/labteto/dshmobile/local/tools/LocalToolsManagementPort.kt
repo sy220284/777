@@ -6,6 +6,8 @@ import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 internal interface LocalToolsManagementPort {
     suspend fun servers(): List<McpServerSnapshot>
     suspend fun checkMcpHealth(serverId: String): com.labteto.dshmobile.interop.mcp.McpServerHealth
+    /** Composer Owner's selected connector IDs; disconnected pins remain selected. */
+    fun selectedConnectorIds(): Set<String> = emptySet()
 
     fun pluginLifecycleSnapshots(): List<com.labteto.dshmobile.harness.plugin.PluginLifecycleSnapshot> =
         emptyList()
