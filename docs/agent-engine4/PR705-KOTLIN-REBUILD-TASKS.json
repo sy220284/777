@@ -83,10 +83,14 @@
       "depends_on": [
         "AE4V3-04"
       ],
-      "status": "not_started",
-      "code_evidence": [],
+      "status": "in_progress",
+      "code_evidence": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt"
+      ],
       "tests_verified": [],
-      "notes": ""
+      "notes": "将 Work Goal 的工具副作用核验与 SessionRecovery 的异常工具补写统一到 harness-core/session/ToolAttemptLedger；读取原有 EventLog 不另立账本，原有历史兼容测试和新投影单测待最新 SHA CI。"
     },
     {
       "id": "AE4V3-06",
@@ -145,10 +149,14 @@
         "AE4V3-06",
         "AE4V3-08"
       ],
-      "status": "not_started",
-      "code_evidence": [],
+      "status": "in_progress",
+      "code_evidence": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt"
+      ],
       "tests_verified": [],
-      "notes": ""
+      "notes": "共享 Kotlin ToolAttemptLedger 强类型状态机在 Work 和 SessionRecovery 真实生产路径接管工具执行事实；尚未重构平台 Tool Executor 权限/租约/未知副作用权威核销。"
     },
     {
       "id": "AE4V3-10",
@@ -385,8 +393,15 @@
   "status": "first incremental implementation, not entire refactor",
   "current_slice": {
     "date": "2026-10-16",
-    "component": "TaskGraph durable-event failure is terminal rather than a tool retry",
-    "head_before": "0f15de2ea136d6ac05bf596b37af427d88fa929a",
-    "status": "code_committed_ci_pending"
+    "component": "Session/ToolAttempt durable semantic consolidation",
+    "baseline_head": "2716b5f7db915d217a7e52636c390a6bdd0ecf75",
+    "status": "code_committed_ci_pending",
+    "paths": [
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
+      "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedgerTest.kt"
+    ],
+    "tests_verified": []
   }
 }

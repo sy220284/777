@@ -6,6 +6,7 @@ import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import java.io.File
 import java.security.MessageDigest
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.harness.session.ToolAttemptLedger
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -123,42 +124,14 @@ internal fun hasUnresolvedWorkGoalToolEffects(
     eventLog: LocalSessionEventLog,
     goal: LocalGoal,
 ): Boolean {
-    val callIds = mutableSetOf<String>()
-    val started = mutableSetOf<String>()
-    val settled = mutableSetOf<String>()
-    var unknown = false
+    // Share SessionRecovery's typed tool-attempt reducer. Each event is
+    // consumed once, from this Goal's first persisted sequence onwards.
+    val ledger = ToolAttemptLedger()
     val goalStartSequence = goal.startedAtSequence.takeIf { it >= 0L } ?: -1L
     for (event in eventLog.snapshotAfter(goalStartSequence)) {
-        val data = event.data
-        val callId = (data["id"] as? kotlinx.serialization.json.JsonPrimitive)
-            ?.contentOrNull?.takeIf(String::isNotBlank) ?: continue
-        when (event.type) {
-            "tool/call" -> {
-                if ((data["goal_id"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull == goal.id) {
-                    callIds.add(callId)
-                }
-            }
-            "tool/execution-started" -> {
-                val attributes = data["attributes"] as? JsonObject
-                if ((attributes?.get("goal_id") as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull == goal.id ||
-                    callId in callIds) {
-                    callIds.add(callId)
-                    started.add(callId)
-                }
-            }
-            "tool/result" -> {
-                if (callId !in callIds) continue
-                settled.add(callId)
-                val code = (data["error_code"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
-                val sideEffect = (data["side_effect"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
-                val isError = (data["is_error"] as? kotlinx.serialization.json.JsonPrimitive)?.booleanOrNull == true
-                if (code == "TOOL_OUTCOME_UNKNOWN" || (isError && sideEffect == "possible")) {
-                    unknown = true
-                }
-            }
-        }
+        ledger.observe(event.type, event.data)
     }
-    return unknown || started.any { it !in settled }
+    return ledger.hasUnresolvedExternalEffects(goal.id)
 }
 
 /** Content-addressed identity for a Work goal including its acceptance contract. */
