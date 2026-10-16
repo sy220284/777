@@ -36,6 +36,7 @@ import com.labteto.dshmobile.uicontract.SessionUiCommand
 import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import com.labteto.dshmobile.uicontract.UiSceneId
 import com.labteto.dshmobile.uicontract.UiWindowClass
 import com.labteto.dshmobile.uihost.UiApplicationPackAdmission
@@ -56,6 +57,10 @@ import kotlinx.coroutines.flow.map
 
 /** The original shipped screen is an explicit compatibility mode, never a fake complete UiPack. */
 internal const val LEGACY_V6_APP_UI = "legacy-v6-shell"
+
+/** Never route a notification to Home until the Session Owner confirms the exact target. */
+internal fun localNotificationHomeReady(target: String?, snapshot: com.labteto.dshmobile.uicontract.UiSessionsSnapshot?): Boolean =
+    target != null && snapshot?.loading == false && snapshot.identity?.sessionId == target
 
 /**
  * Persisted UI navigation is scoped to the actual locally-owned conversation.
@@ -255,16 +260,17 @@ internal fun LocalApplicationUiHost(
             }
             // Notification session IDs are only local selectors, never arbitrary scene URLs.
             // Validate the target against the Session Owner catalog before opening it.
-            var notificationHomePending by remember(packId, snapshotKey) {
-                mutableStateOf(false)
+            var notificationHomeTarget by remember(packId) {
+                mutableStateOf<String?>(null)
             }
-            var notificationError by remember(packId, snapshotKey) {
+            var notificationError by remember(packId) {
                 mutableStateOf<String?>(null)
             }
             LaunchedEffect(packId, notificationSessions, notificationSessionId) {
                 val target = notificationSessionId
                 val sessions = notificationSessions
                 if (target == null || sessions == null) return@LaunchedEffect
+                notificationHomeTarget = null
                 notificationError = null
                 try {
                     require(target.length <= 256 && target.isNotBlank() &&
@@ -276,7 +282,13 @@ internal fun LocalApplicationUiHost(
                     val result = sessions.submit(SessionUiCommand.Open(target))
                     if (result == UiCommandReceipt.Accepted ||
                         result == UiCommandReceipt.Queued) {
-                        notificationHomePending = true
+                        // Accepted/Queued is not proof the target became the active session.
+                        // The Host must not navigate the old conversation while switching.
+                        val opened = withTimeoutOrNull(15_000L) {
+                            sessions.snapshots.first { !it.loading && it.identity?.sessionId == target }
+                        }
+                        if (opened != null) notificationHomeTarget = target
+                        else notificationError = "通知会话切换未确认，请从会话列表重新打开"
                     } else {
                         notificationError = "当前无法打开通知指定的本地会话"
                     }
@@ -287,13 +299,14 @@ internal fun LocalApplicationUiHost(
                     onNotificationSessionProcessed()
                 }
             }
+            val notificationHomeReady = localNotificationHomeReady(notificationHomeTarget, sessionState)
             val result = decision.admission.RenderHostedScene(
                 nav, onAtRootBack = { activity?.finish() },
-                requestedDeepLinkKey = if (notificationHomePending) "route.home"
+                requestedDeepLinkKey = if (notificationHomeReady) "route.home"
                     else requestedSceneKey,
                 onDeepLinkProcessed = { key, receipt ->
-                    if (key == "route.home" && notificationHomePending)
-                        notificationHomePending = false
+                    if (key == "route.home" && notificationHomeReady)
+                        notificationHomeTarget = null
                     else onSceneRequestProcessed(key, receipt)
                 },
                 persistedNavigationSnapshot = persistedSnapshot,
