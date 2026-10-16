@@ -46,6 +46,9 @@ import com.labteto.dshmobile.uicontract.UiReadingAnchor
 import com.labteto.dshmobile.uicontract.UiSceneStatus
 import com.labteto.dshmobile.uicontract.UiSessionIdentity
 import com.labteto.dshmobile.uicontract.UiMessageHistoryPort
+import com.labteto.dshmobile.uicontract.UiDocumentUiPort
+import com.labteto.dshmobile.uicontract.UiDocumentFormUiPort
+import com.labteto.dshmobile.uicontract.MediaUiPort
 import com.labteto.dshmobile.uicontract.UiTranscriptCursor
 import com.labteto.dshmobile.uicontract.WorkConversationUiCommand
 import com.labteto.dshmobile.uicontract.WorkConversationUiPort
@@ -71,6 +74,9 @@ data class V6ConversationPorts(
     val reading: ConversationReadingUiPort,
     val attachments: AttachmentUiPort? = null,
     val history: UiMessageHistoryPort? = null,
+    val documents: UiDocumentUiPort? = null,
+    val forms: UiDocumentFormUiPort? = null,
+    val media: MediaUiPort? = null,
     val workMode: () -> Boolean,
     val workModeUpdates: Flow<Boolean>? = null,
 )
@@ -136,6 +142,10 @@ fun V6ConversationScene(
     val attachments by ports.drafts.attachments.collectAsStateWithLifecycle()
     val draft = drafts[identity?.sessionId].orEmpty()
     val imported = attachments[identity?.sessionId].orEmpty()
+    val docOwner = ports.documents
+    val formOwner = ports.forms
+    val docSnapshot = docOwner?.snapshots?.collectAsStateWithLifecycle(
+        initialValue = remember(docOwner) { docOwner.snapshot() })?.value
     var feedback by remember(identity) { mutableStateOf<String?>(null) }
     var editing by remember(identity) { mutableStateOf<UiMessageSnapshot?>(null) }
     var editText by remember(identity) { mutableStateOf("") }
@@ -299,6 +309,23 @@ fun V6ConversationScene(
                     }, style = MaterialTheme.typography.labelMedium,
                         color = LocalSyColors.current.textSecondary)
                     Text(message.text)
+                    if (docOwner != null && formOwner != null &&
+                        docSnapshot?.sessionId == identity?.sessionId && identity != null) {
+                        val related = docSnapshot.documents.filter {
+                            it.document.source.sessionId == identity.sessionId &&
+                                it.document.source.messageId == message.id
+                        }
+                        related.forEach { document ->
+                            androidx.compose.runtime.key(document.document.documentId,
+                                document.document.revision) {
+                                V6DocumentCard(document, identity, docOwner, formOwner, ports.media,
+                                    identityIsCurrent = {
+                                        (if (workMode) ports.work.snapshot().identity
+                                        else ports.chat.snapshot().identity) == identity
+                                    })
+                            }
+                        }
+                    }
                     val actionReady = identity != null && phase == UiExecutionPhase.IDLE &&
                         status != UiSceneStatus.LOADING
                     if (message.role == UiMessageRole.USER && message.editableText != null &&
