@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -127,6 +126,7 @@ fun V6ConversationScene(
     var hasOlder by remember(identity) { mutableStateOf(ports.history != null) }
     var loadingHistory by remember(identity) { mutableStateOf(false) }
     var importing by remember(identity) { mutableStateOf(false) }
+    var pickerIdentity by remember(identity) { mutableStateOf<UiSessionIdentity?>(null) }
     val list = rememberLazyListState()
     val seen = hot.map { it.id }.toSet()
     val messages = older.filterNot { it.id in seen } + hot
@@ -188,7 +188,8 @@ fun V6ConversationScene(
     }
 
     val picker = rememberUiAttachmentPicker { uri ->
-        val target = identity
+        val target = pickerIdentity
+        pickerIdentity = null
         val importOwner = ports.attachments
         if (uri != null && target != null && importOwner != null) {
             importing = true
@@ -341,7 +342,10 @@ fun V6ConversationScene(
             identity?.let { ports.drafts.updateDraft(it.sessionId, value) }
         }, label = "输入消息", enabled = identity != null, singleLine = false)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (ports.attachments != null) SyButton("添加附件", { picker() },
+            if (ports.attachments != null) SyButton("添加附件", {
+                pickerIdentity = identity
+                picker()
+            },
                 enabled = identity != null && !importing, style = SyButtonStyle.SECONDARY)
             if (phase == UiExecutionPhase.RUNNING && identity != null) SyButton("停止", {
                 show(if (workMode) ports.work.submit(WorkConversationUiCommand.Stop(identity))
