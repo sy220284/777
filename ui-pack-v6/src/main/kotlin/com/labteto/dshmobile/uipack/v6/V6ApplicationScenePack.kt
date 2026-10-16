@@ -58,11 +58,17 @@ class V6ApplicationScenePack(
         UiSceneId("conversation.ui_document_generate")) else emptySet()
     private val evidenceScene = if (conversations?.evidence != null)
         setOf(UiSceneId("work.requirement_evidence")) else emptySet()
+    private val personaScene = if (conversations?.gallery != null &&
+        conversations.selection != null) setOf(UiSceneId("chat.persona_picker")) else emptySet()
+    private val groupScenes = if (conversations?.groups != null)
+        setOf(UiSceneId("chat.group_members"), UiSceneId("chat.group_announcement"))
+        else emptySet()
 
     override val manifest = UiPackManifest(
         id = "v6-application-migrating", version = 1,
         minContractVersion = UI_CONTRACT_VERSION, maxContractVersion = UI_CONTRACT_VERSION,
-        scenes = pages.keys + sessionSettings + conversationScenes + documentScenes + evidenceScene,
+        scenes = pages.keys + sessionSettings + conversationScenes + documentScenes +
+            evidenceScene + personaScene + groupScenes,
         requiredCapabilities = buildSet {
             if (conversations != null) {
                 addAll(setOf("chat.send_text", "work.send_text", "chat.edit", "chat.regenerate",
@@ -84,6 +90,23 @@ class V6ApplicationScenePack(
             })
         }
         conversations?.let { owners ->
+            val galleryOwner = owners.gallery
+            val selectOwner = owners.selection
+            if (galleryOwner != null && selectOwner != null)
+                put(UiSceneId("chat.persona_picker"), UiSceneRenderer { scope ->
+                    V6PersonaPickerScene(galleryOwner, selectOwner,
+                        onBack = { scope.onBack(); Unit })
+                })
+            owners.groups?.let { groupOwner ->
+                put(UiSceneId("chat.group_members"), UiSceneRenderer { scope ->
+                    V6ChatGroupScene(groupOwner, announcementOnly = false,
+                        onBack = { scope.onBack(); Unit })
+                })
+                put(UiSceneId("chat.group_announcement"), UiSceneRenderer { scope ->
+                    V6ChatGroupScene(groupOwner, announcementOnly = true,
+                        onBack = { scope.onBack(); Unit })
+                })
+            }
             put(UiSceneId("route.home"), UiSceneRenderer { scope ->
                 val workMode = owners.workModeUpdates
                     ?.collectAsStateWithLifecycle(initialValue = owners.workMode())?.value
