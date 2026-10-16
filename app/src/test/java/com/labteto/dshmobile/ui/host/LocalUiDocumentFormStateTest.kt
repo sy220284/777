@@ -112,6 +112,29 @@ class LocalUiDocumentFormStateTest {
             legacy.values.value[UiDocumentFormKey("s", "doc", 0)])
     }
 
+    @Test fun explicitMemoryOnlyRetentionScrubsHistoricalValuesAndKeepsCurrentDraftTransient() {
+        val key = UiDocumentFormKey("session", "typed-document", 4)
+        var saved = arrayListOf<String>()
+        val old = listOf("ui-document-form-v2", "session", "typed-document", "4",
+            "oneTimeCode", "old-secret", "session", "typed-document", "4", "ordinary", "safe")
+        val forms = LocalUiDocumentFormState(old) { saved = it }
+        assertEquals("old-secret", forms.values.value[key]?.get("oneTimeCode"))
+        forms.bindRetention(key, mapOf(
+            "oneTimeCode" to com.labteto.dshmobile.uicontract.UiFieldRetention.MEMORY_ONLY,
+            "ordinary" to com.labteto.dshmobile.uicontract.UiFieldRetention.SAVED_STATE,
+        ))
+        assertFalse(saved.contains("old-secret"))
+        assertFalse(forms.values.value[key].orEmpty().containsKey("oneTimeCode"))
+        forms.update(key, "oneTimeCode", "current-only")
+        forms.update(key, "ordinary", "edited")
+        assertEquals("current-only", forms.values.value[key]?.get("oneTimeCode"))
+        assertFalse(saved.contains("current-only"))
+        val restored = LocalUiDocumentFormState(saved) {}
+        assertEquals(mapOf("ordinary" to "edited"), restored.values.value[key])
+        forms.forgetDocument(key)
+        assertFalse(forms.values.value.containsKey(key))
+    }
+
     @Test fun deletedDocumentDraftsCannotReturnFromSavedState() {
         var saved = arrayListOf<String>()
         val forms = LocalUiDocumentFormState(emptyList()) { saved = it }
