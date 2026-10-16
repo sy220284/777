@@ -25,6 +25,8 @@ sealed interface MediaUiCommand {
     data class PollVideo(val offer: LocalMediaOffer, val taskId: String) : MediaUiCommand
     data class RetryLocalVideoSave(val id: String) : MediaUiCommand
     data class RemoveResult(val id: String) : MediaUiCommand
+    /** Delete all versions represented by the visible media slot. */
+    data class RemoveRevisionFamily(val id: String) : MediaUiCommand
     data class DismissJob(val id: String) : MediaUiCommand
     data object RetryStorage : MediaUiCommand
 }
