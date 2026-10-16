@@ -75,6 +75,9 @@ data class V6ConversationPorts(
     val workModeUpdates: Flow<Boolean>? = null,
 )
 
+/** The four slots are distinct executable scenes, not aliases for the whole page. */
+enum class V6ConversationPart { FULL, HEADER, TIMELINE, COMPOSER, REPLY_STATUS }
+
 internal fun describeV6ConversationReceipt(receipt: UiCommandReceipt): String = when (receipt) {
     UiCommandReceipt.Accepted -> "请求已受理，尚不代表执行完成"
     UiCommandReceipt.Queued -> "请求已排队，等待原业务调度"
@@ -116,6 +119,7 @@ fun V6ConversationScene(
     ports: V6ConversationPorts,
     workMode: Boolean,
     onBack: () -> Unit,
+    part: V6ConversationPart = V6ConversationPart.FULL,
 ) {
     val chat by ports.chat.snapshots.collectAsStateWithLifecycle(initialValue = ports.chat.snapshot())
     val work by ports.work.snapshots.collectAsStateWithLifecycle(initialValue = ports.work.snapshot())
@@ -175,7 +179,9 @@ fun V6ConversationScene(
         }
     }
 
-    LaunchedEffect(identity?.sessionId, hot.firstOrNull()?.id, anchorRestored) {
+    LaunchedEffect(identity?.sessionId, hot.firstOrNull()?.id, anchorRestored, part) {
+        if (part != V6ConversationPart.FULL && part != V6ConversationPart.TIMELINE)
+            return@LaunchedEffect
         val sid = identity?.sessionId ?: return@LaunchedEffect
         if (!anchorRestored && status != UiSceneStatus.LOADING && messages.isNotEmpty()) {
             val anchor = ports.reading.anchor(sid)
@@ -190,7 +196,9 @@ fun V6ConversationScene(
             anchorRestored = true
         }
     }
-    LaunchedEffect(identity?.sessionId, anchorRestored, messages) {
+    LaunchedEffect(identity?.sessionId, anchorRestored, messages, part) {
+        if (part != V6ConversationPart.FULL && part != V6ConversationPart.TIMELINE)
+            return@LaunchedEffect
         val sid = identity?.sessionId ?: return@LaunchedEffect
         if (!anchorRestored) return@LaunchedEffect
         snapshotFlow {
@@ -257,6 +265,7 @@ fun V6ConversationScene(
 
     Column(Modifier.fillMaxSize().imePadding().padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(if (workMode) "Work" else "聊天", style = MaterialTheme.typography.titleLarge)
             SyButton("返回", onBack, style = SyButtonStyle.GHOST)
@@ -268,8 +277,11 @@ fun V6ConversationScene(
                 color = LocalSyColors.current.textSecondary,
                 style = MaterialTheme.typography.labelMedium)
         }
-        LazyColumn(
-            state = list, modifier = Modifier.weight(1f).fillMaxWidth(),
+        }
+        if (part == V6ConversationPart.FULL || part == V6ConversationPart.TIMELINE) LazyColumn(
+            state = list,
+            modifier = (if (part == V6ConversationPart.FULL) Modifier.weight(1f)
+                else Modifier.fillMaxSize()).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (ports.history != null && hasOlder) item(key = "older") {
@@ -321,7 +333,7 @@ fun V6ConversationScene(
             if (messages.isEmpty() && status == UiSceneStatus.EMPTY)
                 item(key = "empty") { SyNote("当前会话还没有消息") }
         }
-        if (workMode && identity != null) {
+        if (part == V6ConversationPart.FULL && workMode && identity != null) {
             work.question?.let { question ->
                 SyGlassCard(Modifier.fillMaxWidth()) {
                     Text(question.question, style = MaterialTheme.typography.titleSmall)
@@ -373,8 +385,17 @@ fun V6ConversationScene(
                 }
             }
         }
-        ownerError?.let { SyNote(it) }
-        feedback?.let { Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
+        if (part == V6ConversationPart.FULL || part == V6ConversationPart.REPLY_STATUS) {
+            ownerError?.let { SyNote(it) }
+            feedback?.let { Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
+            Text(when (phase) {
+                UiExecutionPhase.IDLE -> if (status == UiSceneStatus.LOADING) "正在加载" else "等待输入"
+                UiExecutionPhase.RUNNING -> "正在生成回复"
+                UiExecutionPhase.WAITING_FOR_USER -> "正在等待用户操作"
+            }, style = MaterialTheme.typography.labelMedium)
+            if (queued > 0) Text("队列中：" + queued)
+        }
+        if (part == V6ConversationPart.FULL || part == V6ConversationPart.COMPOSER) {
         imported.forEach { file ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(file.name, modifier = Modifier.weight(1f))
@@ -411,5 +432,6 @@ fun V6ConversationScene(
         }
         if (!available && rejection != null)
             Text("发送暂不可用：${rejection.name}", color = LocalSyColors.current.textSecondary)
+        }
     }
 }
