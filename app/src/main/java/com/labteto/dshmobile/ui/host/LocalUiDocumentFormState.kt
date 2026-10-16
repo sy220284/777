@@ -32,14 +32,18 @@ internal class LocalUiDocumentFormState(
 
     init {
         if (saved.firstOrNull() == FORMAT_V2) {
-            saved.drop(1).chunked(5).filter { it.size == 5 }.forEach { entry ->
+            saved.asSequence().drop(1)
+                .take(MAX_RETAINED_DOCUMENTS * MAX_FIELDS_PER_DOCUMENT * 5)
+                .chunked(5).filter { it.size == 5 }.forEach { entry ->
                 val revision = entry[2].toLongOrNull() ?: return@forEach
                 if (revision < 0 || entry[0].isBlank() || entry[1].isBlank() || entry[3].isBlank()) return@forEach
                 val key = UiDocumentFormKey(entry[0], entry[1], revision)
                 putWithinBudget(key, entry[3], entry[4])
             }
         } else {
-            saved.chunked(4).filter { it.size == 4 }.forEach { entry ->
+            saved.asSequence()
+                .take(MAX_RETAINED_DOCUMENTS * MAX_FIELDS_PER_DOCUMENT * 4)
+                .chunked(4).filter { it.size == 4 }.forEach { entry ->
                 if (entry[0].isBlank() || entry[1].isBlank() || entry[2].isBlank()) return@forEach
                 val key = UiDocumentFormKey(entry[0], entry[1])
                 putWithinBudget(key, entry[2], entry[3])
