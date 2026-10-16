@@ -11,7 +11,9 @@ class LocalToolsUiFacade @Inject internal constructor(
     private val tools: LocalToolsRuntime,
     private val gitHubSkillImporter: com.labteto.dshmobile.local.tools.LocalGitHubSkillImporter,
 ) : com.labteto.dshmobile.uicontract.ToolsUiPort {
-    override suspend fun servers() = tools.servers().map {
+    override suspend fun servers(): List<com.labteto.dshmobile.uicontract.UiMcpServerSnapshot> {
+        val selectedIds = tools.selectedConnectorIds()
+        return tools.servers().map {
         val lifecycle = it.lifecycle
         val registration = when (lifecycle) {
             com.labteto.dshmobile.interop.mcp.McpServerLifecycle.REGISTERED ->
@@ -33,7 +35,9 @@ class LocalToolsUiFacade @Inject internal constructor(
                 com.labteto.dshmobile.uicontract.UiToolConnection.DISCONNECTING
         }
         com.labteto.dshmobile.uicontract.UiMcpServerSnapshot(it.id, it.transport, it.target, it.tools,
-            registration = registration, connection = connection)
+            registration = registration, connection = connection,
+            selection = com.labteto.dshmobile.uicontract.uiMcpToolSelection(it.id, selectedIds))
+        }
     }
     override suspend fun checkServerHealth(serverId: String): com.labteto.dshmobile.uicontract.UiMcpHealth =
         when (tools.checkMcpHealth(serverId)) {
