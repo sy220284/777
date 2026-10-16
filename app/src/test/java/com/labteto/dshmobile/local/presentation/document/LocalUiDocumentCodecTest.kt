@@ -63,6 +63,20 @@ class LocalUiDocumentCodecTest {
         assertTrue(decode(raw("""{"id":"trend","type":"line_chart","title":"bad","unit":"次","points":[{"label":"a","value":1.0},{"label":"a","value":2.0}]}""")).isFailure)
     }
 
+    @Test fun sensitiveFieldRetentionRoundTripsAndOlderDocumentsRemainReadable() {
+        val legacy = decode(raw("""{"id":"oneTimeCode","type":"field","label":"验证码","initial":"","required":true}"""))
+            .getOrThrow()
+        val oldField = legacy.nodes.single() as com.labteto.dshmobile.uicontract.UiDocumentNode.Field
+        assertEquals(com.labteto.dshmobile.uicontract.UiFieldRetention.SAVED_STATE, oldField.retention)
+        val strict = decode(raw("""{"id":"oneTimeCode","type":"field","label":"验证码","initial":"","required":true,"retention":"MEMORY_ONLY"}"""))
+            .getOrThrow()
+        val field = strict.nodes.single() as com.labteto.dshmobile.uicontract.UiDocumentNode.Field
+        assertEquals(com.labteto.dshmobile.uicontract.UiFieldRetention.MEMORY_ONLY, field.retention)
+        assertEquals(strict, decode(LocalUiDocumentCodec.encode(strict).toString()).getOrThrow())
+        assertTrue(decode(raw("""{"id":"oneTimeCode","type":"field","label":"验证码","initial":"secret","required":true,"retention":"MEMORY_ONLY"}""")).isFailure)
+        assertTrue(decode(raw("""{"id":"oneTimeCode","type":"field","label":"验证码","initial":"","required":true,"retention":"UNKNOWN"}""")).isFailure)
+    }
+
     @Test fun oversizedInputFailsBeforeParsingRatherThanSilentlyTruncating() {
         val value = raw("""{"id":"text","type":"text","text":"${"x".repeat(4096)}"}""")
         val result = decode(value)
