@@ -192,6 +192,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
     internal suspend fun installStartup() = plugins.installStartup()
 
     override suspend fun servers(): List<McpServerSnapshot> = plugins.mcpServers()
+    override suspend fun checkMcpHealth(serverId: String) = plugins.checkMcpHealth(serverId)
 
     override fun installedPluginIds(): List<String> = plugins.installedPluginIds()
     override fun capabilityCatalogue(): List<com.labteto.dshmobile.local.tools.LocalToolCatalogueEntry> =
