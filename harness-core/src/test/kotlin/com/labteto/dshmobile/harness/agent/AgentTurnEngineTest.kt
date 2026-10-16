@@ -14,11 +14,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class AgentLoopTest {
+class AgentTurnEngineTest {
     @Test
     fun completesPlainTurnWithDurableOrdering() = runTest {
         val events = mutableListOf<AgentEvent>()
-        val loop = AgentLoop(
+        val loop = AgentTurnEngine(
             model = AgentModel { AgentModelReply(content = "完成") },
             tools = AgentToolExecutor { error("不应调用工具") },
             eventSink = AgentEventSink { events += it },
@@ -60,7 +60,7 @@ class AgentLoopTest {
                 AgentModelReply(content = "已读取")
             }
         }
-        val loop = AgentLoop(
+        val loop = AgentTurnEngine(
             model = model,
             tools = AgentToolExecutor { AgentToolResult("文件内容") },
             eventSink = AgentEventSink { events += it },
@@ -95,7 +95,7 @@ class AgentLoopTest {
             arguments = buildJsonObject { put("task", "乙") },
             rawArguments = "{\"task\":\"乙\"}",
         )
-        val loop = AgentLoop(
+        val loop = AgentTurnEngine(
             model = AgentModel { messages ->
                 request += 1
                 if (request == 1) {
@@ -134,7 +134,7 @@ class AgentLoopTest {
     fun toolResultRetentionPropagatesToFinishedEvent() = runTest {
         val events = mutableListOf<AgentEvent>()
         var request = 0
-        val loop = AgentLoop(
+        val loop = AgentTurnEngine(
             model = AgentModel {
                 request += 1
                 if (request == 1) {
@@ -163,7 +163,7 @@ class AgentLoopTest {
     fun structuredToolErrorIsPreservedButStillAllowsModelRecovery() = runTest {
         val events = mutableListOf<AgentEvent>()
         var request = 0
-        val loop = AgentLoop(
+        val loop = AgentTurnEngine(
             model = AgentModel { messages ->
                 request += 1
                 if (request == 1) {
@@ -216,7 +216,7 @@ class AgentLoopTest {
     @Test
     fun stepLimitIsAControlledStopInsteadOfFailure() = runTest {
         val events = mutableListOf<AgentEvent>()
-        val loop = AgentLoop(
+        val loop = AgentTurnEngine(
             model = AgentModel {
                 AgentModelReply(
                     toolCalls = listOf(
@@ -241,7 +241,7 @@ class AgentLoopTest {
     fun softStepBudgetExtendsSameTurnUntilTaskCompletes() = runTest {
         val events = mutableListOf<AgentEvent>()
         var request = 0
-        val loop = AgentLoop(
+        val loop = AgentTurnEngine(
             model = AgentModel {
                 request += 1
                 if (request < 4) {
@@ -278,7 +278,7 @@ class AgentLoopTest {
     @Test
     fun modelFailureProducesFailureWithoutCompletion() = runTest {
         val events = mutableListOf<AgentEvent>()
-        val loop = AgentLoop(
+        val loop = AgentTurnEngine(
             model = AgentModel { error("模型失败") },
             tools = AgentToolExecutor { AgentToolResult("") },
             eventSink = AgentEventSink { events += it },
@@ -297,7 +297,7 @@ class AgentLoopTest {
     fun terminalFailureEventCannotReplacePrimaryEventSinkFailure() = runTest {
         val primary = IllegalStateException("checkpoint write failed")
         val secondary = IllegalStateException("turn failed write also failed")
-        val loop = AgentLoop(
+        val loop = AgentTurnEngine(
             model = AgentModel { AgentModelReply(content = "完成") },
             tools = AgentToolExecutor { AgentToolResult("") },
             eventSink = AgentEventSink { event ->
@@ -320,7 +320,7 @@ class AgentLoopTest {
     @Test
     fun toolFailureProducesFailureWithoutSyntheticToolResult() = runTest {
         val events = mutableListOf<AgentEvent>()
-        val loop = AgentLoop(
+        val loop = AgentTurnEngine(
             model = AgentModel {
                 AgentModelReply(
                     toolCalls = listOf(
@@ -346,7 +346,7 @@ class AgentLoopTest {
     fun cancellationNeverProducesCompletion() = runTest {
         val gate = CompletableDeferred<Unit>()
         val events = mutableListOf<AgentEvent>()
-        val loop = AgentLoop(
+        val loop = AgentTurnEngine(
             model = AgentModel {
                 gate.await()
                 AgentModelReply(content = "不会返回")
@@ -369,7 +369,7 @@ class AgentLoopTest {
     fun softBudgetCanCrossLegacy128LimitWithoutResettingTurnOrStepNumbers() = runTest {
         val events = mutableListOf<AgentEvent>()
         var request = 0
-        val loop = AgentLoop(
+        val loop = AgentTurnEngine(
             model = AgentModel {
                 request += 1
                 if (request <= 129) {
@@ -413,7 +413,7 @@ class AgentLoopTest {
     fun nonGrowingSoftBudgetStopsExactlyAtExhaustedLimit() = runTest {
         val events = mutableListOf<AgentEvent>()
         var extenderCalls = 0
-        val loop = AgentLoop(
+        val loop = AgentTurnEngine(
             model = AgentModel {
                 AgentModelReply(
                     toolCalls = listOf(
@@ -447,9 +447,61 @@ class AgentLoopTest {
         assertFalse(events.any { it is AgentEvent.TurnFailed })
     }
 
+
+    @Test
+    fun toolDispatchMixesSequentialAndParallelGroupsWithoutReorderingSettlements() = runTest {
+        val events = mutableListOf<AgentEvent>()
+        var calls = 0
+        val a = AgentToolCall("a", "write", buildJsonObject {})
+        val b = AgentToolCall("b", "read", buildJsonObject {})
+        val c = AgentToolCall("c", "read", buildJsonObject {})
+        val d = AgentToolCall("d", "write", buildJsonObject {})
+        val executed = mutableListOf<String>()
+        val engine = AgentTurnEngine(
+            model = AgentModel {
+                calls++
+                if (calls == 1) AgentModelReply(toolCalls = listOf(a, b, c, d))
+                else AgentModelReply(content = "完毕")
+            },
+            tools = AgentToolExecutor { call ->
+                executed += call.id
+                AgentToolResult("result-${call.id}")
+            },
+            toolBatch = AgentToolBatchExecutor { batch ->
+                executed += batch.map { it.id }
+                batch.map { AgentToolResult("result-${it.id}") }
+            },
+            isParallelTool = { it.name == "read" },
+            eventSink = AgentEventSink { events += it },
+            idFactory = { "mixed" },
+        )
+        val result = engine.run("实施")
+        assertEquals(listOf("a", "b", "c", "d"), executed)
+        assertEquals(listOf("a", "b", "c", "d"),
+            events.filterIsInstance<AgentEvent.ToolFinished>().map { it.call.id })
+        assertEquals("完毕", result.answer)
+        assertEquals(2, result.steps)
+    }
+
+    @Test
+    fun invalidAssistantToolDeclarationCannotReachExecution() = runTest {
+        var toolCalls = 0
+        val events = mutableListOf<AgentEvent>()
+        val bad = AgentToolCall("", "write", buildJsonObject {})
+        val engine = AgentTurnEngine(
+            model = AgentModel { AgentModelReply(toolCalls = listOf(bad)) },
+            tools = AgentToolExecutor { toolCalls++; AgentToolResult("unexpected") },
+            eventSink = AgentEventSink { events += it },
+        )
+        assertTrue(runCatching { engine.run("执行") }.isFailure)
+        assertEquals(0, toolCalls)
+        assertTrue(events.last() is AgentEvent.TurnFailed)
+        assertFalse(events.any { it is AgentEvent.ToolStarted })
+    }
+
     @Test
     fun configuredBudgetCanStartAboveLegacy128Limit() = runTest {
-        val loop = AgentLoop(
+        val loop = AgentTurnEngine(
             model = AgentModel { AgentModelReply(content = "完成") },
             tools = AgentToolExecutor { error("不应调用工具") },
             maxSteps = 256,

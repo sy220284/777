@@ -1,0 +1,90 @@
+package com.labteto.dshmobile.harness.agent
+
+import java.util.UUID
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+
+/**
+ * Kotlin native Turn executor shared by foreground Work, child Agents and
+ * reference conformance. The engine owns the Step lifecycle only; a Work Goal,
+ * the Tool's external side effect and a Session's lease retain their own owners.
+ *
+ * This is a new production engine, not a delegate to the former AgentLoop.
+ */
+class AgentTurnEngine(
+    private val model: AgentModel,
+    private val tools: AgentToolExecutor,
+    private val toolBatch: AgentToolBatchExecutor = AgentToolBatchExecutor { calls ->
+        calls.map { tools.execute(it) }
+    },
+    private val isParallelTool: (AgentToolCall) -> Boolean = { false },
+    private val eventSink: AgentEventSink = AgentEventSink { },
+    private val maxSteps: Int = DEFAULT_MAX_STEPS,
+    private val stepLimitExtender: AgentStepLimitExtender? = null,
+    private val idFactory: () -> String = { UUID.randomUUID().toString() },
+) {
+    private val toolDispatch = AgentToolDispatch(tools, toolBatch, isParallelTool, eventSink)
+    init { require(maxSteps > 0) { "代理步数必须大于 0" } }
+
+    suspend fun run(
+        input: String,
+        history: List<AgentMessage> = emptyList(),
+    ): AgentRunResult {
+        val command = input.trim()
+        require(command.isNotEmpty()) { "用户输入不能为空" }
+        val turn = AgentTurnState(idFactory(), command, history)
+        val budget = AgentTurnStepBudget(maxSteps, stepLimitExtender)
+
+        eventSink.append(AgentEvent.TurnStarted(turn.turnId, command))
+        try {
+            while (budget.admits(turn.steps + 1)) {
+                val step = turn.startStep()
+                eventSink.append(AgentEvent.StepStarted(turn.turnId, step))
+                val reply = model.complete(turn.snapshot())
+                turn.acceptModelReply(reply)
+                eventSink.append(AgentEvent.AssistantObserved(
+                    turnId = turn.turnId,
+                    step = step,
+                    content = reply.content,
+                    toolCalls = reply.toolCalls,
+                ))
+                if (reply.toolCalls.isNotEmpty()) {
+                    toolDispatch.executeStep(turn, step, reply.toolCalls)
+                }
+                eventSink.append(AgentEvent.StepFinished(turn.turnId, step))
+                turn.closeStep()
+
+                if (reply.toolCalls.isEmpty()) {
+                    eventSink.append(AgentEvent.TurnCompleted(turn.turnId, step, reply.content))
+                    return turn.result(AgentStopReason.COMPLETED)
+                }
+            }
+            eventSink.append(AgentEvent.TurnStepLimit(turn.turnId, turn.steps))
+            return turn.result(AgentStopReason.STEP_LIMIT)
+        } catch (cancelled: CancellationException) {
+            withContext(NonCancellable) {
+                try {
+                    eventSink.append(AgentEvent.TurnCancelled(turn.turnId))
+                } catch (terminalError: Exception) {
+                    if (terminalError !== cancelled) cancelled.addSuppressed(terminalError)
+                }
+            }
+            throw cancelled
+        } catch (error: Exception) {
+            try {
+                eventSink.append(AgentEvent.TurnFailed(
+                    turnId = turn.turnId,
+                    reason = error.message ?: error::class.java.simpleName,
+                ))
+            } catch (terminalError: Exception) {
+                if (terminalError !== error) error.addSuppressed(terminalError)
+            }
+            throw error
+        }
+    }
+
+    private companion object {
+        const val DEFAULT_MAX_STEPS = 32
+    }
+}

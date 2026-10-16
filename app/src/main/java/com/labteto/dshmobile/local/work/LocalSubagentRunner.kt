@@ -2,7 +2,7 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.AgentEventSink
-import com.labteto.dshmobile.harness.agent.AgentLoop
+import com.labteto.dshmobile.harness.agent.AgentTurnEngine
 import com.labteto.dshmobile.harness.agent.AgentModel
 import com.labteto.dshmobile.harness.agent.AgentModelReply
 import com.labteto.dshmobile.harness.agent.AgentStepLimitExtender
@@ -460,7 +460,7 @@ internal class LocalSubagentRunner(
                 )
             }
             val remainingSteps = totalBudgetLimit - recoveredBaseStep
-            val loop = AgentLoop(
+            val loop = AgentTurnEngine(
                 model = AgentModel {
                     currentCoroutineContext().ensureActive()
                     backgroundJobId?.let { jobId ->

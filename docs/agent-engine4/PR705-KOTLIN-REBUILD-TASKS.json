@@ -65,10 +65,16 @@
       "code_evidence": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionEvidence.kt",
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionClaimGuard.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentExecutionContracts.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentTurnState.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentToolDispatch.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentTurnEngine.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunner.kt",
+        "reference-validation/src/main/kotlin/com/labteto/dshmobile/reference/NativeConformanceRunner.kt"
       ],
       "tests_verified": [],
-      "notes": "已对 Work 实际 turn/end 事件增加 Kotlin 强类型 GoalDisposition（NO_GOAL/PAUSED/BLOCKED/WAITING_* /NEEDS_EXECUTION/READY_FOR_SETTLEMENT/COMPLETED），与真实 Work 验收证据共享同一快照；仅首个可交付切片，完整 Run/Turn/Tool typed contract 尚未完成。"
+      "notes": "已对 Work 实际 turn/end 事件增加 Kotlin 强类型 GoalDisposition（NO_GOAL/PAUSED/BLOCKED/WAITING_* /NEEDS_EXECUTION/READY_FOR_SETTLEMENT/COMPLETED），与真实 Work 验收证据共享同一快照；仅首个可交付切片，完整 Run/Turn/Tool typed contract 尚未完成。 本批直接替换平台中立 Agent 执行核心及 Work/Subagent/参考验证消费者，旧 AgentLoop 源码移除；待新 SHA CI 验证，不能标 completed。"
     },
     {
       "id": "AE4V3-05",
@@ -117,10 +123,18 @@
         "AE4V3-06",
         "AE4V3-07"
       ],
-      "status": "not_started",
-      "code_evidence": [],
+      "status": "in_progress",
+      "code_evidence": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentExecutionContracts.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentTurnState.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentToolDispatch.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentTurnEngine.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunner.kt",
+        "reference-validation/src/main/kotlin/com/labteto/dshmobile/reference/NativeConformanceRunner.kt"
+      ],
       "tests_verified": [],
-      "notes": ""
+      "notes": " 本批直接替换平台中立 Agent 执行核心及 Work/Subagent/参考验证消费者，旧 AgentLoop 源码移除；待新 SHA CI 验证，不能标 completed。"
     },
     {
       "id": "AE4V3-09",
@@ -361,10 +375,21 @@
   "status": "first incremental implementation, not entire refactor",
   "current_slice": {
     "date": "2026-10-16",
-    "head_before": "99fd2dca41081f03360ac40fffefeaa0512beecb",
-    "component": "Work autonomous follow-up effect guard and failure-queue race",
-    "status": "committed_ci_pending",
-    "tests_verified": [],
-    "description": "unknown started effects and outcome-unknown results block auto goal continuation; model failure follow-ups use atomic empty-inbox commit"
+    "component": "AgentTurnEngine Kotlin native core production cutover",
+    "prior_head": "ab9504061c944186a32987e8a97125c37bb9eae3",
+    "changed": [
+      "AgentLoop removed",
+      "AgentExecutionContracts",
+      "AgentTurnState",
+      "AgentToolDispatch",
+      "AgentTurnEngine",
+      "Work",
+      "Subagent",
+      "Reference Validation",
+      "new engine test"
+    ],
+    "status": "submitted_ci_pending",
+    "description": "An actual core replacement and old implementation exit, not Goal patches",
+    "tests_verified": []
   }
 }

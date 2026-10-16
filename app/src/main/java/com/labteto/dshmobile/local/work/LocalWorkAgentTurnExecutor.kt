@@ -3,7 +3,7 @@ package com.labteto.dshmobile.local.work
 import android.content.Context
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.AgentEventSink
-import com.labteto.dshmobile.harness.agent.AgentLoop
+import com.labteto.dshmobile.harness.agent.AgentTurnEngine
 import com.labteto.dshmobile.harness.agent.AgentModel
 import com.labteto.dshmobile.harness.agent.AgentModelReply
 import com.labteto.dshmobile.harness.agent.AgentToolBatchExecutor
@@ -75,7 +75,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
 /**
- * WorkFeature owner of the foreground AgentLoop for one bound Work run.
+ * WorkFeature owner of the foreground AgentTurnEngine for one bound Work run.
  *
  * Session/run identity and resources stay Shared; Work owns prompt composition, tool policy,
  * history/inbox transactions, completion truthfulness, continuation and run teardown.
@@ -294,7 +294,7 @@ internal class LocalWorkAgentTurnExecutor(
                 }
             }
 
-            val loop = AgentLoop(
+            val loop = AgentTurnEngine(
                 model = AgentModel {
                     agentRunCoordinator.ensureCurrentOwner(runContext)
                     // Persistent history stays compact; user rules, recalled memory and handoff are
