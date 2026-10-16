@@ -303,7 +303,7 @@ class HarnessJobManager(
             .filter { record ->
                 record.isContinuableAgent() &&
                     record.inbox.isNotEmpty() &&
-                    record.status in setOf("running", "dormant", "completed", "interrupted")
+                    record.status in setOf("running", "dormant", "completed", "interrupted", "waiting_slice")
             }
             .map(::snapshot)
     }
@@ -787,6 +787,7 @@ class HarnessJobManager(
                 !record.resumeKind.isNullOrBlank() &&
                     (
                         record.status == "interrupted" ||
+                            record.status == "waiting_slice" ||
                             record.isIdleContinuableAgent()
                         )
             if (record.status != "running" && !dormantPersistent) {
@@ -870,6 +871,7 @@ class HarnessJobManager(
                 persistent &&
                     (
                         found.status == "interrupted" ||
+                            found.status == "waiting_slice" ||
                             found.isIdleContinuableAgent()
                         )
             if (found.status != "running" && !requiresResume) {
@@ -1087,7 +1089,7 @@ class HarnessJobManager(
     }
 
     private fun Record.mustRetainForContinuation(): Boolean =
-        (status == "interrupted" && !resumeKind.isNullOrBlank()) ||
+        (status in setOf("interrupted", "waiting_slice") && !resumeKind.isNullOrBlank()) ||
             isIdleContinuableAgent()
 
     private fun Record.toJobInfo(): JobInfo {
@@ -1097,6 +1099,7 @@ class HarnessJobManager(
                 (
                     status == "running" ||
                         status == "interrupted" ||
+                        status == "waiting_slice" ||
                         isIdleContinuableAgent()
                     )
         return JobInfo(
