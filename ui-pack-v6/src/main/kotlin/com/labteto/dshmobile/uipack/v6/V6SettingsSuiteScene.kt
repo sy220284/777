@@ -32,6 +32,7 @@ fun V6SettingsSuiteScene(
     updateStatus: kotlinx.coroutines.flow.StateFlow<String?>? = null,
     checkForUpdate: (() -> Unit)? = null,
     performance: ModelPerformanceUiPort? = null,
+    providerPricing: PricingUiPort? = null,
 ) {
     val state by settings.state.collectAsStateWithLifecycle(initialValue = settings.initialState)
     val scope = rememberCoroutineScope()
@@ -103,6 +104,10 @@ fun V6SettingsSuiteScene(
     // would give an unbounded height and crash Compose when navigating the scene.
     if (scene.value == "settings.model_performance" && performance != null) {
         V6ModelPerformanceScene(performance, onBack)
+        return
+    }
+    if (scene.value == "settings.pricing" && providerPricing != null) {
+        V6ProviderPricingScene(providerPricing, onBack)
         return
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -183,6 +188,8 @@ fun V6SettingsSuiteScene(
             }
             "settings.model_performance" ->
                 SyNote("模型性能 Owner 未连接，当前不能修改全局参数")
+            "settings.pricing" ->
+                SyNote("官方价格 Owner 未连接，请使用原设置页刷新真实费率")
             "settings.minimax_quota" -> {
                 val profile = state.miniMaxQuotaProfile
                 if (profile == null) SyNote("当前无可查询的 MiniMax 模型账户")
@@ -222,7 +229,7 @@ fun V6SettingsSuiteScene(
                     a in 1..10000 && b in 1..10000 && c in 1..100)
             }
             "settings.usage","settings.model_usage","settings.usage_log",
-            "settings.usage_detail","settings.pricing" -> {
+            "settings.usage_detail" -> {
                 val owner = usage
                 if (owner == null) SyNote("请求台账 Owner 不可用")
                 else {
