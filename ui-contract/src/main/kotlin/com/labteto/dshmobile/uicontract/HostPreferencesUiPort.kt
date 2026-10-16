@@ -35,6 +35,12 @@ sealed interface UiHostPreferencesCommand {
     ) : UiHostPreferencesCommand
 }
 
+/** Direct media collection permissions; SAF document-picker grants are scoped separately. */
+data class UiHostMediaPermissionSnapshot(
+    val images: Boolean, val videos: Boolean, val audio: Boolean,
+    val selectedVisualOnly: Boolean, val usesScopedMediaPermissions: Boolean,
+)
+
 interface HostPreferencesUiPort {
     val snapshots: Flow<UiHostPreferences>
     suspend fun submit(command: UiHostPreferencesCommand): Boolean
@@ -43,4 +49,6 @@ interface HostPreferencesUiPort {
     fun openSystemNotifications(): Boolean
     /** OS-level notification access, not a saved preference and never a permission grant. */
     fun notificationPermissionGranted(): Boolean? = null
+    /** OS permission facts only: this query never requests or grants access. */
+    fun mediaPermissionSnapshot(): UiHostMediaPermissionSnapshot? = null
 }
