@@ -39,6 +39,7 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.shenyan.designsystem.foundation.LocalSyColors
 import com.shenyan.designsystem.foundation.SyMetric
 import kotlinx.coroutines.CancellationException
+import com.labteto.dshmobile.observability.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -167,18 +168,41 @@ internal fun LocalWorkEvidenceSheet(
         }
     }
     evidenceRequest?.let { request ->
-        var detail by remember(request) { mutableStateOf<String?>(null) }
-        var finished by remember(request) { mutableStateOf(false) }
+        var evidenceState by remember(request) { mutableStateOf<WorkEvidenceLoadState>(WorkEvidenceLoadState.Loading) }
         LaunchedEffect(request) {
-            try { detail = withContext(Dispatchers.IO) { actions.toolEvidence(sessionId, request.first, request.second) } }
-            catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { detail = null }
-            finally { finished = true }
+            evidenceState = try {
+                val evidence = withContext(Dispatchers.IO) {
+                    actions.toolEvidence(sessionId, request.first, request.second)
+                }
+                if (evidence == null) WorkEvidenceLoadState.Absent
+                else WorkEvidenceLoadState.Ready(evidence)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                AppLog.failure("WorkEvidence", "read_tool_detail", failure, sessionId = sessionId)
+                WorkEvidenceLoadState.Failed
+            }
         }
         SyResponsiveSheet(stringResource(R.string.work_tool_details), onDismiss = { evidenceRequest = null }, scrollable = true) {
-            SelectionContainer { Text(detail?.take(32_000) ?: stringResource(if (finished) R.string.work_tool_detail_missing else R.string.common_loading),
-                style = DsType.small13, color = colors.text) }
-            if ((detail?.length ?: 0) > 32_000) Text(stringResource(R.string.work_evidence_preview_limited), color = colors.textSecondary)
+            val evidenceText = when (val loaded = evidenceState) {
+                WorkEvidenceLoadState.Loading -> stringResource(R.string.common_loading)
+                WorkEvidenceLoadState.Absent -> stringResource(R.string.work_tool_detail_missing)
+                WorkEvidenceLoadState.Failed -> "工具证据读取失败；原始记录未被删除，请返回后重新打开"
+                is WorkEvidenceLoadState.Ready -> loaded.text.take(32_000)
+            }
+            SelectionContainer { Text(evidenceText, style = DsType.small13,
+                color = if (evidenceState == WorkEvidenceLoadState.Failed) colors.dangerInk else colors.text) }
+            if ((evidenceState as? WorkEvidenceLoadState.Ready)?.text?.length?.let { it > 32_000 } == true) {
+                Text(stringResource(R.string.work_evidence_preview_limited), color = colors.textSecondary)
+            }
         }
     }
+}
+
+/** UI-only read status; durable tool evidence remains owned by the Work session store. */
+internal sealed interface WorkEvidenceLoadState {
+    data object Loading : WorkEvidenceLoadState
+    data object Absent : WorkEvidenceLoadState
+    data object Failed : WorkEvidenceLoadState
+    data class Ready(val text: String) : WorkEvidenceLoadState
 }

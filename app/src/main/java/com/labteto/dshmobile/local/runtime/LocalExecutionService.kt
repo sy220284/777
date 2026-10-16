@@ -30,7 +30,6 @@ import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
@@ -56,7 +55,6 @@ class LocalExecutionService : Service() {
     private val turns = LocalExecutionTurnLedger()
     private var foregroundReady = false
     private val jobs = linkedMapOf<String, Hold>()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -90,11 +88,12 @@ class LocalExecutionService : Service() {
         }
 
         foregroundReady = true
+        // Any valid promoted service fulfills the outstanding admissions, even if a
+        // concurrent background-job synchronization delivered the first start intent.
+        pendingTurns.values.forEach(turns::acquire)
+        pendingTurns.clear()
         when (intent?.action) {
-            ACTION_START_TURN -> {
-                pendingTurns.values.forEach(turns::acquire)
-                pendingTurns.clear()
-            }
+            ACTION_START_TURN -> Unit
             ACTION_SYNC_JOBS -> replaceJobs(
                 intent.getStringArrayListExtra(EXTRA_JOB_IDS).orEmpty(),
                 intent.getStringArrayListExtra(EXTRA_JOB_LABELS).orEmpty(),
@@ -170,7 +169,6 @@ class LocalExecutionService : Service() {
         if (runningService === this) runningService = null
         startupGate?.complete(false)
         startupGate = null
-        scope.cancel()
         super.onDestroy()
     }
 
@@ -217,7 +215,7 @@ class LocalExecutionService : Service() {
     }
 
     private fun postCompletion(sessionId: String, outcome: String) {
-        scope.launch {
+        notificationScope.launch {
             val notificationSettings = runCatching { hostsStore.settingsOnce() }
                     .onFailure { failure ->
                         // A cancelled lifecycle scope is expected when the service stops.
@@ -272,6 +270,8 @@ class LocalExecutionService : Service() {
         @Volatile private var runningService: LocalExecutionService? = null
         private var startupGate: CompletableDeferred<Boolean>? = null
         private val pendingTurns = linkedMapOf<String, LocalExecutionTurnLedger.Hold>()
+        // Completion notification outlives the service's own foreground lifecycle.
+        private val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         /**
          * An execution permit is returned only after Service.startForeground succeeds.
