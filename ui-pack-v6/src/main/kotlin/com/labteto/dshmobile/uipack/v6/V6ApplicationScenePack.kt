@@ -52,7 +52,7 @@ class V6ApplicationScenePack(
     private val conversationScenes = if (conversations == null) emptySet() else
         setOf("route.home", "conversation.chat", "conversation.work",
             "conversation.header", "conversation.timeline", "conversation.composer",
-            "conversation.reply_status").map(::UiSceneId).toSet()
+            "conversation.reply_status", "work.approval", "work.question").map(::UiSceneId).toSet()
 
     override val manifest = UiPackManifest(
         id = "v6-application-migrating", version = 1,
@@ -90,6 +90,8 @@ class V6ApplicationScenePack(
                 "conversation.timeline" to V6ConversationPart.TIMELINE,
                 "conversation.composer" to V6ConversationPart.COMPOSER,
                 "conversation.reply_status" to V6ConversationPart.REPLY_STATUS,
+                "work.approval" to V6ConversationPart.WORK_APPROVAL,
+                "work.question" to V6ConversationPart.WORK_QUESTION,
             ).forEach { (key, part) ->
                 put(UiSceneId(key), UiSceneRenderer { scope ->
                     val mode = owners.workModeUpdates
