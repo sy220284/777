@@ -395,6 +395,43 @@ class PluginManagerTest {
         assertEquals("mcp-bridge", manager.observeActivePlugin("mcp-bridge") { it.id })
     }
 
+    @Test
+    fun failedPluginCanBeRecoveredWithoutRestartingOrReplayingUnrelatedPlugins() = runTest {
+        var attempts = 0
+        var healthyInstalls = 0
+        val manager = manager(
+            definition("healthy", onInstall = { healthyInstalls++ }),
+            definition("recoverable", onInstall = {
+                if (++attempts == 1) error("temporary plugin failure")
+                it.events.register("recovered", true)
+            }, onUninstall = { it.events.unregister("recovered") }),
+        )
+        manager.install("healthy")
+        assertTrue(runCatching { manager.install("recoverable") }.isFailure)
+        assertEquals(PluginLifecycleState.FAILED, manager.lifecycleSnapshot("recoverable")?.state)
+        assertTrue("healthy plugin must remain active", "healthy" in manager.installedPluginIds())
+        assertEquals(listOf("recoverable"), manager.recoverFailed("recoverable"))
+        assertEquals(PluginLifecycleState.ACTIVE, manager.lifecycleSnapshot("recoverable")?.state)
+        assertEquals(true, manager.context.events.get("recovered"))
+        assertEquals(1, healthyInstalls)
+        assertTrue(runCatching { manager.recoverFailed("healthy") }.isFailure)
+    }
+
+    @Test
+    fun failedRecoveryNeverClaimsAnActivePluginOrPublishesPartialResources() = runTest {
+        val manager = manager(
+            definition("broken", onInstall = {
+                it.events.register("incomplete", "should-rollback")
+                error("still broken")
+            }),
+        )
+        assertTrue(runCatching { manager.install("broken") }.isFailure)
+        assertTrue(runCatching { manager.recoverFailed("broken") }.isFailure)
+        assertEquals(PluginLifecycleState.FAILED, manager.lifecycleSnapshot("broken")?.state)
+        assertTrue("broken" !in manager.installedPluginIds())
+        assertEquals(null, manager.context.events.get("incomplete"))
+    }
+
     private fun manager(
         vararg definitions: PluginDefinition,
         registry: PluginRegistry = PluginRegistry(),

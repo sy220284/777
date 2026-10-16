@@ -68,6 +68,8 @@ fun V6ToolsManagementScene(
     var servers by remember(owner) { mutableStateOf(emptyList<UiMcpServerSnapshot>()) }
     var healthResults by remember(owner) { mutableStateOf<Map<String, UiMcpHealth>>(emptyMap()) }
     var plugins by remember(owner) { mutableStateOf(emptyList<String>()) }
+    var pluginStates by remember(owner) { mutableStateOf(emptyList<UiPluginLifecycle>()) }
+    var recoverPluginId by remember(owner) { mutableStateOf<String?>(null) }
     var skills by remember(owner) { mutableStateOf(emptyList<UiSkillSnapshot>()) }
     var presets by remember(owner) { mutableStateOf(emptyList<UiPresetSkillSnapshot>()) }
     var github by remember(owner) { mutableStateOf(false) }
@@ -140,6 +142,7 @@ fun V6ToolsManagementScene(
             withContext(Dispatchers.IO) {
                 servers = owner.servers()
                 plugins = owner.installedPluginIds().filterNot { it == "local-builtin" }
+                pluginStates = owner.pluginLifecycleSnapshots()
                 skills = owner.installedSkills()
                 presets = owner.presetSkills()
                 github = owner.githubConfigured()
@@ -321,8 +324,22 @@ fun V6ToolsManagementScene(
             }, enabled = skillUrl.startsWith("https://") && !busy)
         }
         if (page == "tools.plugins") {
-            Text("已安装插件")
-            plugins.forEach { Text(it) }
+            Text("插件真实生命周期")
+            pluginStates.forEach { plugin ->
+                SyGlassCard(Modifier.fillMaxWidth()) {
+                    Text(plugin.id + " · " + plugin.state.name)
+                    if (plugin.state == UiPluginLifecycleState.FAILED) {
+                        SyNote("插件失败，旧工具不会被当作可用；需要明确恢复")
+                        if (plugin.id != "android-runtime" && plugin.id != "android-device") {
+                            SyButton("重新初始化失败插件", { recoverPluginId = plugin.id },
+                                enabled = !busy, style = SyButtonStyle.SECONDARY)
+                        } else {
+                            SyNote("平台资源插件须重启运行环境")
+                        }
+                    }
+                }
+            }
+            if (pluginStates.isEmpty()) plugins.forEach { Text(it) }
             Text("已安装技能")
             skills.forEach { skill ->
                 SyGlassCard(Modifier.fillMaxWidth()) {
@@ -394,6 +411,16 @@ fun V6ToolsManagementScene(
             }
         }
     }
+    recoverPluginId?.let { id -> AlertDialog(
+        onDismissRequest = { recoverPluginId = null },
+        title = { Text("确认恢复失败插件") },
+        text = { Text("将清理旧实例并重新安装：" + id + "。不会重放先前失败的工具调用。") },
+        confirmButton = { TextButton(onClick = {
+            recoverPluginId = null
+            execute(ToolsUiCommand.RecoverFailedPlugin(id))
+        }) { Text("确认恢复") } },
+        dismissButton = { TextButton(onClick = { recoverPluginId = null }) { Text("取消") } },
+    ) }
     disconnect?.let { id -> AlertDialog(onDismissRequest = { disconnect = null },
         title = { Text("确认撤销连接") },
         text = { Text("将交由工具 Owner 修改本地凭据或连接状态。") },

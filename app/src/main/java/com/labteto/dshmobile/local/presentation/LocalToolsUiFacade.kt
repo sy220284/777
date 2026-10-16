@@ -68,6 +68,14 @@ class LocalToolsUiFacade @Inject internal constructor(
     override fun capabilityCatalogue() = tools.capabilityCatalogue().map {
         com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot(it.name, it.family, it.access, it.approval, it.requirements)
     }
+    override fun pluginLifecycleSnapshots(): List<com.labteto.dshmobile.uicontract.UiPluginLifecycle> =
+        tools.pluginLifecycleSnapshots().map { state ->
+            com.labteto.dshmobile.uicontract.UiPluginLifecycle(
+                state.id, com.labteto.dshmobile.uicontract.UiPluginLifecycleState.valueOf(state.state.name),
+            )
+        }
+    override suspend fun recoverFailedPlugin(id: String): List<String> =
+        tools.recoverFailedPlugin(id)
     override fun installedPluginIds() = tools.installedPluginIds()
     /** Registry presence is a configuration hint, not an execution grant. */
     internal suspend fun handoffExternalReadiness(): Pair<Boolean, Boolean> {

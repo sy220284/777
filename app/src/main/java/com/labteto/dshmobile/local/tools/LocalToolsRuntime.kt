@@ -17,6 +17,8 @@ class LocalToolsRuntime @Inject internal constructor(
     internal suspend fun clearGitHub() = githubCredentials.clear()
     internal fun capabilityCatalogue() = management.capabilityCatalogue()
     internal fun installedPluginIds(): List<String> = management.installedPluginIds()
+    internal fun pluginLifecycleSnapshots() = management.pluginLifecycleSnapshots()
+    internal suspend fun recoverFailedPlugin(id: String) = management.recoverFailedPlugin(id)
     internal suspend fun installedSkills(): List<LocalInstalledSkill> =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.installedSkills() }
     internal suspend fun presetSkills(): List<LocalPresetSkill> =

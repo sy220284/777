@@ -13,6 +13,9 @@ data class UiMcpServerSnapshot(
     val connection: UiToolConnection = UiToolConnection.HEALTH_UNCHECKED,
     val authorization: UiToolAuthorization = UiToolAuthorization.REQUIRED_PER_CALL,
 )
+enum class UiPluginLifecycleState { INSTALLING, ACTIVE, REPLACING, UNINSTALLING, FAILED }
+data class UiPluginLifecycle(val id: String, val state: UiPluginLifecycleState)
+
 data class UiToolCapabilitySnapshot(val name: String, val family: String, val access: String,
     val approval: String, val requirements: List<String>)
 data class UiSkillSnapshot(val name: String, val description: String, val modelInvocable: Boolean,
@@ -26,6 +29,9 @@ interface ToolsUiPort {
     suspend fun checkServerHealth(serverId: String): UiMcpHealth = UiMcpHealth.UNSUPPORTED
     suspend fun githubConfigured(): Boolean
     fun capabilityCatalogue(): List<UiToolCapabilitySnapshot>
+    fun pluginLifecycleSnapshots(): List<UiPluginLifecycle> = emptyList()
+    suspend fun recoverFailedPlugin(id: String): List<String> =
+        error("当前工具 Owner 不支持插件恢复")
     fun installedPluginIds(): List<String>
     suspend fun installedSkills(): List<UiSkillSnapshot>
     suspend fun presetSkills(): List<UiPresetSkillSnapshot>
@@ -49,6 +55,7 @@ sealed interface ToolsUiCommand {
     data class ConnectHttp(val serverId: String, val endpoint: String) : ToolsUiCommand
     data class ConnectStdio(val serverId: String, val command: List<String>, val workingDirectory: String?) : ToolsUiCommand
     data class Disconnect(val serverId: String) : ToolsUiCommand
+    data class RecoverFailedPlugin(val id: String) : ToolsUiCommand
     class ConfigureGitHub(val token: String) : ToolsUiCommand {
         override fun toString() = "ConfigureGitHub(<redacted>)"
     }
@@ -90,6 +97,7 @@ suspend fun ToolsUiPort.submit(command: ToolsUiCommand): ToolsUiReceipt = try {
         is ToolsUiCommand.ConnectHttp -> connectHttp(command.serverId, command.endpoint)
         is ToolsUiCommand.ConnectStdio -> connectStdio(command.serverId, command.command, command.workingDirectory)
         is ToolsUiCommand.Disconnect -> disconnect(command.serverId)
+        is ToolsUiCommand.RecoverFailedPlugin -> recoverFailedPlugin(command.id).joinToString(",")
         is ToolsUiCommand.ConfigureGitHub -> { configureGitHub(command.token); null }
         ToolsUiCommand.ClearGitHub -> { clearGitHub(); null }
         is ToolsUiCommand.InstallGitHubSkill -> installGitHubSkill(command.url)

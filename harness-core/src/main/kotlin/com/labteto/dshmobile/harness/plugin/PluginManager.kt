@@ -52,6 +52,27 @@ class PluginManager(
 
     suspend fun uninstall(id: String): Boolean = disable(id)
 
+    /**
+     * User-approved recovery of a failed, reloadable plugin only. Any incomplete cleanup is
+     * retried by PluginRegistry; on failure its state remains FAILED and no stale tools are
+     * re-admitted. Never replay an Agent tool call or silently recover a healthy plugin.
+     */
+    suspend fun recoverFailed(id: String): List<String> = mutationMutex.withLock {
+        require(registry.lifecycleSnapshot(id)?.state == PluginLifecycleState.FAILED) {
+            "插件未处于失败态：$id"
+        }
+        require(activeDependents(id).isEmpty()) {
+            "插件仍被其他已启用插件依赖，禁止直接恢复：$id"
+        }
+        // A failed replacement can still own old resources; explicitly remove them first.
+        // A failed installation has no installed instance and can proceed to a new install.
+        if (registry.isInstalled(id)) registry.uninstall(id)
+        val plan = catalog.resolveInstallOrder(listOf(id), installedVersions(), apiVersion)
+        val plugins = plan.map(PluginDefinition::create)
+        registry.installAll(plugins)
+        plugins.map(HarnessPlugin::id)
+    }
+
     suspend fun replace(definition: PluginDefinition) = mutationMutex.withLock {
         val replacement = definition.descriptor
         require(replacement.apiVersion == apiVersion) {

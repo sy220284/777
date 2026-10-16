@@ -253,6 +253,11 @@ internal class LocalPluginComposition(
 
     suspend fun enablePlugin(id: String): List<String> = pluginManager.enable(id)
 
+    suspend fun recoverFailedPlugin(id: String): List<String> {
+        requireReloadablePlugin(id)
+        return pluginManager.recoverFailed(id)
+    }
+
     suspend fun disablePlugin(id: String): Boolean {
         requireReloadablePlugin(id)
         return pluginManager.disable(id)

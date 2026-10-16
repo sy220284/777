@@ -7,6 +7,10 @@ internal interface LocalToolsManagementPort {
     suspend fun servers(): List<McpServerSnapshot>
     suspend fun checkMcpHealth(serverId: String): com.labteto.dshmobile.interop.mcp.McpServerHealth
 
+    fun pluginLifecycleSnapshots(): List<com.labteto.dshmobile.harness.plugin.PluginLifecycleSnapshot> =
+        emptyList()
+    suspend fun recoverFailedPlugin(id: String): List<String> =
+        error("当前工具 Owner 不支持插件恢复")
     fun installedPluginIds(): List<String>
     fun capabilityCatalogue(): List<LocalToolCatalogueEntry> = emptyList()
 
