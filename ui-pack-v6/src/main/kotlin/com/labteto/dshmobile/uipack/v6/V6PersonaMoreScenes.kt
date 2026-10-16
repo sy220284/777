@@ -184,7 +184,6 @@ fun V6PersonaAuthoringScene(
             confirmDiscard = false; onBack()
         }) { Text("放弃修改") } },
         dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("继续编辑") } })
-    }
 }
 
 /** Active persona tuning uses a different revision-bearing target from archive authoring. */
