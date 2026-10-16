@@ -178,6 +178,45 @@ fun UiDocumentPatch.matches(current: UiDocument): Boolean = documentId == curren
     replacement.documentId == current.documentId && replacement.source == current.source &&
     baseRevision == current.revision && current.revision < Long.MAX_VALUE && replacement.revision == current.revision + 1
 
+
+/**
+ * A user may correct one table display cell without changing its shape, controls or action
+ * definitions. The replacement remains user-edited presentation data, not verified evidence.
+ * The Session Owner must independently enforce revision CAS and UI budget on publication.
+ */
+fun UiDocument.withUserEditedTableCell(
+    tableId: String, row: Int, column: Int, value: String,
+): UiDocument? {
+    if (tableId.isBlank() || row < 0 || column < 0 || value.length > 4096 ||
+        revision == Long.MAX_VALUE || documentId.startsWith("work-live:")) return null
+    var changed = 0
+    fun rewrite(node: UiDocumentNode): UiDocumentNode = when (node) {
+        is UiDocumentNode.Table -> {
+            if (node.id != tableId || row !in node.rows.indices ||
+                column !in node.headers.indices ||
+                node.rows[row].size != node.headers.size) node
+            else {
+                changed++
+                node.copy(rows = node.rows.mapIndexed { index, cells ->
+                    if (index != row) cells else cells.mapIndexed { position, cell ->
+                        if (position == column) value else cell
+                    }
+                })
+            }
+        }
+        is UiDocumentNode.Column -> node.copy(children = node.children.map(::rewrite))
+        is UiDocumentNode.Row -> node.copy(children = node.children.map(::rewrite))
+        is UiDocumentNode.Disclosure -> node.copy(children = node.children.map(::rewrite))
+        else -> node
+    }
+    val rewritten = nodes.map(::rewrite)
+    return if (changed == 1) copy(
+        revision = revision + 1,
+        nodes = rewritten,
+        fallbackText = "此文档包含用户修改的表格数据，内容尚未经业务核验",
+    ) else null
+}
+
 /**
  * Editing a text node changes only presentation content and increments one document revision.
  * It cannot modify tool approvals, actions, media identities, or owner-verified Work facts.
