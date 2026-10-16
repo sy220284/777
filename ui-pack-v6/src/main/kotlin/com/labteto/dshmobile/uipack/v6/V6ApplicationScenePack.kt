@@ -160,6 +160,28 @@ class V6ApplicationScenePack(
             })
         }
         secondary?.let { owners ->
+            val author = owners.authoring
+            val gallery = owners.gallery
+            val selection = owners.selection
+            if (author != null && gallery != null && selection != null) {
+                listOf(false, true).forEach { worldBook ->
+                    put(UiSceneId(if (worldBook) "chat.world_book" else "chat.persona_editor"),
+                        UiSceneRenderer { scope ->
+                            V6PersonaAuthoringScene(author, gallery, selection, worldBook,
+                                onBack = { scope.onBack(); Unit })
+                        })
+                }
+            }
+            owners.currentPersona?.let { persona ->
+                put(UiSceneId("chat.character_tuning"), UiSceneRenderer { scope ->
+                    V6CurrentPersonaTuningScene(persona, onBack = { scope.onBack(); Unit })
+                })
+            }
+            if (gallery != null) owners.portraits?.let { portraits ->
+                put(UiSceneId("chat.gallery_portrait"), UiSceneRenderer { scope ->
+                    V6PortraitScene(gallery, portraits, onBack = { scope.onBack(); Unit })
+                })
+            }
             owners.automation?.let { tasks ->
                 secondaryAutomations.forEach { id ->
                     put(id, UiSceneRenderer { scope ->
