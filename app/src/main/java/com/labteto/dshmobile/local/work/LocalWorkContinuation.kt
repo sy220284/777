@@ -20,6 +20,7 @@ internal data class LocalWorkResumeCommand(
     val failureCode: String,
     val index: Int,
     val sourceMessageId: String?,
+    val prompt: String = INTERNAL_WORK_CONTINUATION_PROMPT,
 ) {
     init {
         require(sourceRunId.isNotBlank() && checkpointSequence >= 0L && index > 0)
@@ -28,11 +29,11 @@ internal data class LocalWorkResumeCommand(
     val id: String get() = "continuation-$sourceRunId-$index"
 
     fun toQueueInput(): QueuedAgentInput = QueuedAgentInput(
-        content = INTERNAL_WORK_CONTINUATION_PROMPT,
+        content = prompt,
         memoryInput = "",
         modelMessage = buildJsonObject {
             put("role", "system")
-            put("content", INTERNAL_WORK_CONTINUATION_PROMPT)
+            put("content", prompt)
         },
         id = id,
         kind = QueuedAgentInputKind.WORK_CONTINUATION,
