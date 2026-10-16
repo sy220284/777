@@ -222,19 +222,53 @@ fun V6ConversationScene(
     LaunchedEffect(identity, messages.lastOrNull()?.id, status, anchorRestored, part) {
         if (part != V6ConversationPart.FULL && part != V6ConversationPart.TIMELINE)
             return@LaunchedEffect
-        val sid = identity?.sessionId ?: return@LaunchedEffect
-        if (!anchorRestored && status != UiSceneStatus.LOADING && messages.isNotEmpty()) {
-            val anchor = ports.reading.anchor(sid)
-            val index = messages.indexOfFirst { it.id == anchor?.messageId }
-            val historyHeader = if (ports.history != null && hasOlder) 1 else 0
-            list.scrollToItem(
-                if (index >= 0 && anchor?.followingTail == false) index + historyHeader
-                else messages.lastIndex + historyHeader,
-                if (index >= 0 && anchor?.followingTail == false)
-                    anchor.offsetPx.coerceAtLeast(0) else 0,
-            )
-            anchorRestored = true
+        val target = identity ?: return@LaunchedEffect
+        if (anchorRestored || status == UiSceneStatus.LOADING || messages.isEmpty()) return@LaunchedEffect
+        val anchor = ports.reading.anchor(target.sessionId)
+        var restored = messages
+        var restoreCursor = cursor
+        var more = hasOlder
+        // A search result can be far older than the hot message window. Follow only the
+        // Session owner's opaque history cursors; never guess a timeline position or issue
+        // another Chat/Work command. Bound the scan to avoid an unresponsive UI on long logs.
+        if (anchor?.followingTail == false && anchor.messageId != null &&
+            restored.none { it.id == anchor.messageId } && ports.history != null) {
+            loadingHistory = true
+            try {
+                repeat(25) {
+                    if (!more || restored.any { it.id == anchor.messageId }) return@repeat
+                    val page = withContext(Dispatchers.IO) {
+                        ports.history.messagePage(target.sessionId, restoreCursor, 100)
+                    }
+                    val next = (page.messages + restored).distinctBy { it.id }
+                    if (next.size == restored.size && page.nextCursor == restoreCursor) {
+                        more = false
+                    } else {
+                        restored = next
+                        restoreCursor = page.nextCursor
+                        more = page.nextCursor != null
+                    }
+                }
+                if (restored != messages) {
+                    older = restored.filterNot { it.id in seen }
+                    cursor = restoreCursor
+                    hasOlder = more
+                }
+                if (restored.none { it.id == anchor.messageId })
+                    feedback = "目标消息超出单次历史定位范围或已失效，请使用更精确的检索"
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { feedback = failure.message ?: "无法读取目标历史消息" }
+            finally { loadingHistory = false }
         }
+        val index = restored.indexOfFirst { it.id == anchor?.messageId }
+        val historyHeader = if (ports.history != null && more) 1 else 0
+        list.scrollToItem(
+            if (index >= 0 && anchor?.followingTail == false) index + historyHeader
+            else restored.lastIndex + historyHeader,
+            if (index >= 0 && anchor?.followingTail == false)
+                anchor.offsetPx.coerceAtLeast(0) else 0,
+        )
+        anchorRestored = true
     }
     LaunchedEffect(identity?.sessionId, anchorRestored, messages, part) {
         if (part != V6ConversationPart.FULL && part != V6ConversationPart.TIMELINE)
