@@ -61,10 +61,34 @@ internal fun V6DocumentMediaNode(node: UiDocumentNode.Media, sessionId: String, 
         resolveV6DocumentMediaAsset(media, node, sessionId)
     }
     val path = asset?.localPath
+    val scope = rememberCoroutineScope()
+    var restoring by remember(node.assetId, sessionId) { mutableStateOf(false) }
+    var restoreNotice by remember(node.assetId, sessionId) { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(node.label)
         if (path == null || media == null) {
             Text("此会话的媒体文件尚未保存在设备上，或当前访问未获授权。")
+            if (media != null && asset?.remoteUrl != null && node.kind == UiDocumentMediaKind.IMAGE) {
+                SyButton(if (restoring) "正在恢复原图片…" else "重新下载已生成图片（不重新生成）", {
+                    if (!restoring) {
+                        restoring = true
+                        scope.launch {
+                            try {
+                                restoreNotice = when (val receipt = withContext(Dispatchers.IO) {
+                                    media.retrySessionImageDownload(node.assetId, sessionId)
+                                }) {
+                                    MediaUiReceipt.Applied -> "原图片已重新保存到本地"
+                                    is MediaUiReceipt.Failed -> receipt.message ?: "原图片下载失败"
+                                    else -> "图片恢复结果未知，请刷新后查看原任务记录"
+                                }
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (failure: Exception) { restoreNotice = failure.message ?: "原图片下载失败" }
+                            finally { restoring = false }
+                        }
+                    }
+                }, enabled = !restoring, style = SyButtonStyle.SECONDARY)
+                restoreNotice?.let { Text(it) }
+            }
         } else {
             V6MediaExport(node, sessionId, media, path)
             when (node.kind) {
