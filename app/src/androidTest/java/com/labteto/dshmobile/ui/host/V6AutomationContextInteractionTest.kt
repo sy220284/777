@@ -26,7 +26,10 @@ class V6AutomationContextInteractionTest {
     private val first = UiSessionIdentity("chat-1", "story-a", 1L, null, null)
     private val second = UiSessionIdentity("chat-2", "story-b", 2L, null, null)
 
-    private class AutomationOwner(identity: UiSessionIdentity) : AutomationUiPort {
+    private class AutomationOwner(
+        identity: UiSessionIdentity,
+        private val beforeSubmitReturns: (() -> Unit)? = null,
+    ) : AutomationUiPort {
         override val snapshots = MutableStateFlow(
             UiAutomationSnapshot(UiAutomationContext(identity, LocalUsageMode.CHAT, false, "Persona"),
                 emptyList())
@@ -38,6 +41,7 @@ class V6AutomationContextInteractionTest {
         // observe the same synchronized submission list without a flaky visibility race.
         val submissions = java.util.concurrent.CopyOnWriteArrayList<AutomationUiCommand>()
         override fun submit(command: AutomationUiCommand): AutomationUiReceipt {
+            beforeSubmitReturns?.invoke()
             submissions += command
             return AutomationUiReceipt.Applied("task-id")
         }
@@ -79,6 +83,32 @@ class V6AutomationContextInteractionTest {
             assertEquals(com.labteto.dshmobile.automation.AutomationScheduleType.DAILY,
                 command.schedule.scheduleType)
             assertEquals(1440L, command.schedule.recurringMinutes)
+        }
+    }
+
+    @Test fun slowOldSessionSubmissionCannotCloseStaleEditorAfterActivationChanges() {
+        val started = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val owner = AutomationOwner(first) {
+            started.countDown()
+            check(release.await(8, java.util.concurrent.TimeUnit.SECONDS)) {
+                "Timed out releasing the stale automation submission"
+            }
+        }
+        try {
+            show(owner)
+            compose.onNodeWithText("创建任务").performScrollTo().performClick()
+            compose.waitUntil(10_000) { started.count == 0L }
+            compose.runOnIdle { owner.change(second) }
+            release.countDown()
+            compose.waitUntil(10_000) { owner.submissions.size == 1 }
+            // An applied result from the previous session cannot complete this editor.
+            compose.onNodeWithText("创建任务").assertIsNotEnabled()
+            compose.runOnIdle {
+                assertEquals(first, (owner.submissions.single() as AutomationUiCommand.Create).identity)
+            }
+        } finally {
+            release.countDown()
         }
     }
 
