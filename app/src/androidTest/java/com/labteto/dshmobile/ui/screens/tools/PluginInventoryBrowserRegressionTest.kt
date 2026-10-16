@@ -30,7 +30,7 @@ class PluginInventoryBrowserRegressionTest {
         compose.setContent {
             DshTheme {
                 PluginInventoryBrowser(
-                    localIds = listOf("local-builtin"),
+                    localIds = listOf("android-local-builtins"),
 
                     onBack = {},
                     onManageConnections = {},
