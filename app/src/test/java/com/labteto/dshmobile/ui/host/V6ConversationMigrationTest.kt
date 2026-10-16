@@ -8,6 +8,8 @@ import com.labteto.dshmobile.uicontract.ConversationDraftUiPort
 import com.labteto.dshmobile.uicontract.ConversationReadingUiPort
 import com.labteto.dshmobile.uicontract.HostPreferencesUiPort
 import com.labteto.dshmobile.uicontract.SettingsUiPort
+import com.labteto.dshmobile.uicontract.UiDocumentUiPort
+import com.labteto.dshmobile.uicontract.UiDocumentFormUiPort
 import com.labteto.dshmobile.uicontract.UI_CONTRACT_VERSION
 import com.labteto.dshmobile.uicontract.UiAccessibility
 import com.labteto.dshmobile.uicontract.UiActionAvailability
@@ -89,6 +91,17 @@ class V6ConversationMigrationTest {
         preferences, settings,
         V6ConversationPorts(chat, work, drafts, reading, workMode = { false }),
     )
+    private val documentPort = java.lang.reflect.Proxy.newProxyInstance(
+        UiDocumentUiPort::class.java.classLoader, arrayOf(UiDocumentUiPort::class.java)
+    ) { _, method, _ -> error("Owner called during registration: ${method.name}") } as UiDocumentUiPort
+    private val formPort = java.lang.reflect.Proxy.newProxyInstance(
+        UiDocumentFormUiPort::class.java.classLoader, arrayOf(UiDocumentFormUiPort::class.java)
+    ) { _, method, _ -> error("Form Owner called during registration: ${method.name}") } as UiDocumentFormUiPort
+    private fun documentCandidate() = V6ApplicationScenePack(
+        preferences, settings,
+        V6ConversationPorts(chat, work, drafts, reading, documents = documentPort,
+            forms = formPort, workMode = { false }),
+    )
     private fun requirements(manifest: UiPackManifest, onlyDeclared: Boolean) =
         UiPackAdmissionRequirements(
             UI_CONTRACT_VERSION,
@@ -117,6 +130,30 @@ class V6ConversationMigrationTest {
         assertTrue(UiApplicationPackRegistry(listOf(candidate)).select(
             candidate.manifest.id, requirements(candidate.manifest, onlyDeclared = true),
         ) is UiApplicationPackAdmission.Admitted)
+    }
+
+    @Test fun bothTypedDocumentScenesAreActualRendererEntries() {
+        val withoutDocument = pack()
+        val withDocument = documentCandidate()
+        val expected = setOf(UiSceneId("conversation.ui_document"),
+            UiSceneId("conversation.ui_document_generate"))
+        assertEquals(withoutDocument.manifest.scenes + expected, withDocument.manifest.scenes)
+        assertEquals(withDocument.manifest.scenes, withDocument.renderers.keys)
+        assertTrue(UiApplicationPackRegistry(listOf(withDocument)).select(
+            withDocument.manifest.id,
+            requirements(withDocument.manifest, onlyDeclared = true),
+        ) is UiApplicationPackAdmission.Admitted)
+    }
+
+    @Test fun fullCatalogStillRejectsEvenWithRealDocumentRenderers() {
+        val candidate = documentCandidate()
+        val rejection = decideApplicationUi(candidate.manifest.id, listOf(candidate),
+            requirements(candidate.manifest, onlyDeclared = false))
+        assertTrue(rejection is LocalApplicationUiDecision.Unavailable)
+        val incompatible = (rejection as LocalApplicationUiDecision.Unavailable).rejection
+        assertTrue(incompatible is UiApplicationPackAdmission.Incompatible)
+        assertTrue(UiSceneId("route.settings") in
+            (incompatible as UiApplicationPackAdmission.Incompatible).compatibility.missingScenes)
     }
 
     @Test fun fullProductionCatalogContinuesRejectingIncompleteV6() {
