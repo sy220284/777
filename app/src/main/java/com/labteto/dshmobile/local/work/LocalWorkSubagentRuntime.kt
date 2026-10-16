@@ -50,6 +50,7 @@ internal class LocalWorkSubagentRuntime(
         toolAllowlist: Set<String>?,
         binding: LocalWorkRunBinding,
         runner: LocalSubagentRunner,
+        dependencies: List<List<Int>> = emptyList(),
     ): String {
         val workerSelection = LocalWorkerModelRouter.resolve(modelOverride, binding.aggregateSnapshot())
         binding.workState.update { current -> current.copy(workflowProgress = null) }
@@ -90,6 +91,6 @@ internal class LocalWorkSubagentRuntime(
                     )
                 }
             },
-        ).run(tasks, mode, requiredEvidence)
+        ).run(tasks, mode, requiredEvidence, dependencies)
     }
 }

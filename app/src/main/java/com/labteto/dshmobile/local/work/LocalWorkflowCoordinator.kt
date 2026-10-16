@@ -18,23 +18,43 @@ internal class LocalWorkflowCoordinator(
 ) {
     private val graph = TaskGraphExecutor(maxNodes = 64, maxParallelism = 4)
 
-    suspend fun run(tasks: List<String>, mode: String, requiredEvidence: List<String>): String {
+    suspend fun run(
+        tasks: List<String>,
+        mode: String,
+        requiredEvidence: List<String>,
+        dependencies: List<List<Int>> = emptyList(),
+    ): String {
         require(tasks.size in 1..64 && tasks.none(String::isBlank)) {
             "工作流需要 1 到 64 个非空子任务"
         }
         require(requiredEvidence.isEmpty() || requiredEvidence.size == tasks.size) {
             "验收证据必须与子任务逐项对应"
         }
-        val pipeline = when (mode.lowercase()) {
-            "parallel" -> false
-            "pipeline" -> true
-            else -> error("工作流模式必须为 parallel 或 pipeline")
+        val graphMode = mode.lowercase()
+        require(graphMode in setOf("parallel", "pipeline", "graph")) {
+            "工作流模式必须为 parallel、pipeline 或 graph"
         }
+        require(graphMode == "graph" || dependencies.isEmpty()) {
+            "显式任务依赖必须使用 graph 模式"
+        }
+        require(graphMode != "graph" || dependencies.size == tasks.size) {
+            "graph 模式 dependencies 必须和 tasks 一一对应"
+        }
+        val pipeline = graphMode == "pipeline"
         val nodes = tasks.mapIndexed { index, task ->
+            val required = when (graphMode) {
+                "pipeline" -> if (index > 0) listOf(index - 1) else emptyList()
+                "graph" -> dependencies[index]
+                else -> emptyList()
+            }
+            require(required.distinct().size == required.size &&
+                required.all { it in tasks.indices && it != index }) {
+                "任务 ${index + 1} 含重复、越界或自依赖"
+            }
             TaskGraphNode(
                 id = "task-${index + 1}",
                 task = task,
-                dependsOn = if (pipeline && index > 0) listOf("task-$index") else emptyList(),
+                dependsOn = required.map { dep -> "task-${dep + 1}" },
             )
         }
         val results = graph.run(
@@ -42,9 +62,11 @@ internal class LocalWorkflowCoordinator(
             retrySafe = true, // Work delegates are explicitly read-only.
             maxAttempts = 2,
             execute = { context, prompt ->
-                val prior = if (pipeline) context.dependencyOutputs.values.lastOrNull() else null
-                val actualPrompt = if (!prior.isNullOrBlank()) {
-                    "上一步结果：\n${pruneOutput(prior)}\n\n当前阶段：\n$prompt"
+                val dependenciesText = context.dependencyOutputs.entries.joinToString("\n\n") {
+                    (id, output) -> "$id 的已验收结果：\n${pruneOutput(output)}"
+                }
+                val actualPrompt = if (dependenciesText.isNotBlank()) {
+                    "依赖任务的已验收结果：\n$dependenciesText\n\n当前任务：\n$prompt"
                 } else prompt
                 execute(actualPrompt)
             },

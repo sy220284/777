@@ -47,6 +47,64 @@ class LocalWorkflowCoordinatorTest {
         assertEquals(1, calls)
     }
 
+
+    @Test
+    fun graphExecutesDiamondAfterBothDependenciesAreVerified() = runTest {
+        val observed = mutableListOf<String>()
+        val coordinator = LocalWorkflowCoordinator(
+            execute = { prompt ->
+                observed += prompt
+                when {
+                    "总结" in prompt -> {
+                        assertTrue(prompt.contains("task-2 的已验收结果"))
+                        assertTrue(prompt.contains("task-3 的已验收结果"))
+                        "最终总结"
+                    }
+                    "资料甲" in prompt -> "资料甲成果"
+                    "资料乙" in prompt -> "资料乙成果"
+                    else -> "原始数据"
+                }
+            }, pruneOutput = { it }, onProgress = {},
+        )
+        val result = coordinator.run(
+            tasks = listOf("采集", "资料甲", "资料乙", "总结"),
+            mode = "graph", requiredEvidence = emptyList(),
+            dependencies = listOf(emptyList(), listOf(0), listOf(0), listOf(1, 2)),
+        )
+        assertTrue(result.contains("最终总结"))
+        assertEquals(4, observed.size)
+    }
+
+    @Test
+    fun graphRejectsDependencyCycleBeforeLaunchingAnyAgent() = runTest {
+        var launched = 0
+        val coordinator = LocalWorkflowCoordinator(
+            execute = { launched++; "执行" },
+            pruneOutput = { it }, onProgress = {},
+        )
+        val failure = runCatching {
+            coordinator.run(listOf("A", "B"), "graph", emptyList(),
+                listOf(listOf(1), listOf(0)))
+        }.exceptionOrNull()
+        assertTrue(failure is IllegalArgumentException)
+        assertEquals(0, launched)
+    }
+
+    @Test
+    fun graphRejectsIndexOutsideTaskListBeforeAnyAgentStarts() = runTest {
+        var launched = 0
+        val coordinator = LocalWorkflowCoordinator(
+            execute = { launched++; "执行" },
+            pruneOutput = { it }, onProgress = {},
+        )
+        val failure = runCatching {
+            coordinator.run(listOf("A", "B"), "graph", emptyList(),
+                listOf(emptyList(), listOf(2)))
+        }.exceptionOrNull()
+        assertTrue(failure is IllegalArgumentException)
+        assertEquals(0, launched)
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun mismatchedEvidenceCannotSilentlyPass() = runTest {
         LocalWorkflowCoordinator(execute = { "完成" }, pruneOutput = { it }, onProgress = {})

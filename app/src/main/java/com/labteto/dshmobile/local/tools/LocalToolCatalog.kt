@@ -205,17 +205,26 @@ object LocalToolCatalog {
         add(tool("interrupt_agent", "停止正在运行的后台代理", properties(
             "agent_id" to string("后台代理编号"),
         ), listOf("agent_id")))
-        add(tool("workflow", "并行执行只读子任务，或按顺序传递结果；逐项验收，失败最多重新指派一次", properties(
+        add(tool("workflow", "以 Kotlin DAG 调度只读子任务。支持 parallel、pipeline、graph 依赖模式；独立分支并发执行，失败传播到后继节点，证据不足才重新指派", properties(
             "tasks" to buildJsonObject {
                 put("type", "array")
                 put("items", buildJsonObject { put("type", "string") })
             },
             "mode" to buildJsonObject {
                 put("type", "string")
-                put("description", "parallel 并行或 pipeline 顺序执行，默认 parallel")
+                put("description", "parallel 全并行、pipeline 顺序，或 graph 自定义有向无环依赖；默认 parallel")
                 put("enum", buildJsonArray {
                     add(JsonPrimitive("parallel"))
                     add(JsonPrimitive("pipeline"))
+                    add(JsonPrimitive("graph"))
+                })
+            },
+            "dependencies" to buildJsonObject {
+                put("type", "array")
+                put("description", "graph 模式必填。与 tasks 等长的二维数组，dependencies[i] 为任务 i 依赖的零基任务序号；依赖必须已执行成功才启动，禁止循环和自依赖")
+                put("items", buildJsonObject {
+                    put("type", "array")
+                    put("items", buildJsonObject { put("type", "integer") })
                 })
             },
             "required_evidence" to buildJsonObject {
