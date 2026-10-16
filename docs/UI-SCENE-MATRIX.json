@@ -857,14 +857,14 @@
           "status": "PENDING_EVIDENCE"
         },
         "inspect": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "PersonaAuthoringUiPort.inspect(identity, galleryId, storyId)",
+          "receiptType": "UiPersonaInspectionReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "apply_suggestions": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "PersonaAuthoringUiPort.applySuggestions(galleryId, expectedRevision, selectedSuggestions)",
+          "receiptType": "UiPersonaAuthoringReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1241,20 +1241,20 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "preview": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "MediaUiPort.assetForSession(resultId, sessionId) -> V6DocumentMediaNode",
+          "receiptType": "UiMediaAsset? (Owner-scoped)",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "save": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "MediaUiPort.exportToSessionAsset(resultId, sessionId, userSelectedOutput)",
+          "receiptType": "MediaUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "play": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "MediaUiPort.assetForSession(resultId, sessionId) -> V6AudioPlayback / V6VideoPlayback",
+          "receiptType": "UiMediaAsset? + Android MediaPlayer/VideoView local playback state",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1370,8 +1370,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "configure": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.SelectMode)",
+          "receiptType": "UiCommandReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1442,8 +1442,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "request_permission": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "HostPreferencesUiPort.openSystemPermissions()",
+          "receiptType": "Boolean (Host native system permission page)",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
