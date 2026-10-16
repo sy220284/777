@@ -102,6 +102,7 @@ internal object LocalApplicationPackInstallations {
                     selection = owner.personaSelectionUiPort,
                     portraits = owner.personaPortraitUiPort,
                     modelPerformance = LocalModelPerformanceUiOwner,
+                    pricing = owner.memoryUiPort as? com.labteto.dshmobile.uicontract.PricingUiPort,
                 ),
             ),
             NextApplicationScenePack(NextApplicationFeaturePorts(
