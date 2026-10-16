@@ -3,9 +3,13 @@ package com.labteto.dshmobile.uicontract
 enum class UiToolRegistration { REGISTERED, PENDING, REMOVING }
 /** Explicit ping only; RESPONDED never implies tool authorization or continuous availability. */
 enum class UiMcpHealth { RESPONDED, BUSY, NOT_CONNECTED, UNCONFIRMED, UNSUPPORTED }
-enum class UiToolSelection { UNKNOWN }
+enum class UiToolSelection { UNKNOWN, SELECTED, NOT_SELECTED }
 enum class UiToolConnection { HEALTH_UNCHECKED, CONNECTING, RECONNECTING, DISCONNECTING }
 enum class UiToolAuthorization { REQUIRED_PER_CALL }
+
+/** Selection is only the persisted composer preference, never execution authorization. */
+fun uiMcpToolSelection(serverId: String, selectedConnectorIds: Set<String>): UiToolSelection =
+    if (serverId in selectedConnectorIds) UiToolSelection.SELECTED else UiToolSelection.NOT_SELECTED
 data class UiMcpServerSnapshot(
     val id: String, val transport: String, val target: String, val tools: List<String>,
     val registration: UiToolRegistration = UiToolRegistration.REGISTERED,
