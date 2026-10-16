@@ -81,6 +81,9 @@ internal fun LocalWorkEvidenceSheet(
         SyButton(stringResource(R.string.work_evidence_refresh), onClick = controller::refresh,
             enabled = !state.loading && !state.linking, variant = SyButtonVariant.Ghost)
         if (state.linksFailed) Text(stringResource(R.string.work_evidence_link_error), color = colors.dangerInk)
+        if (currentWork?.workProjectionOutOfSync == true) {
+            Text(stringResource(R.string.work_evidence_projection_sync_failed), color = colors.dangerInk)
+        }
         LazyColumn(Modifier.fillMaxWidth().heightIn(max = maxHeight).testTag("work_evidence_records"),
             verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
             if (state.loading) item { Text(stringResource(R.string.common_loading), color = colors.textSecondary) }

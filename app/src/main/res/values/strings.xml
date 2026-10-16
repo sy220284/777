@@ -2476,5 +2476,6 @@
     <string name="media_chat_regenerate_failed">重新生成未成功，原成果仍可使用</string>
     <string name="notification_session_open_unconfirmed">通知会话切换未确认，请从会话列表重新打开</string>
     <string name="work_tool_evidence_read_failed">工具证据读取失败；原始记录未被删除，请返回后重新打开</string>
+    <string name="work_evidence_projection_sync_failed">工作进度视图同步失败，执行记录已保留；后续事件将重新同步。可刷新查看最新结果。</string>
 </resources>
 

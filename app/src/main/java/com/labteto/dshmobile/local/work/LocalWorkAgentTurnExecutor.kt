@@ -501,12 +501,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 put("model", runState.value.modelState.model)
                             })
                             onRootExecutionSliceStarted(runSessionId)
-                            try {
-                                workUiDocumentPublisher.onToolResult(binding, uiSourceMessageId)
-                            } catch (cancelled: CancellationException) { throw cancelled }
-                            catch (failure: Exception) {
-                                AppLog.failure("WorkUiDocument", "publish_progress", failure)
-                            }
+                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_progress")
                         }
                         is AgentEvent.StepStarted -> {
                             activeStep = event.step
@@ -553,12 +548,7 @@ internal class LocalWorkAgentTurnExecutor(
                             workModelHistoryRuntime.updateContextMetrics(binding)
                             runTranscript.applyMessages(transcriptMessages, assistantEvent.sequence)
                             workModelHistoryRuntime.persist(binding)
-                            try {
-                                workUiDocumentPublisher.onToolResult(binding, uiSourceMessageId)
-                            } catch (cancelled: CancellationException) { throw cancelled }
-                            catch (failure: Exception) {
-                                AppLog.failure("WorkUiDocument", "publish_progress", failure)
-                            }
+                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_progress")
                         }
                         is AgentEvent.ToolStarted -> {
                             runEventLog.append("tool/call", buildJsonObject {
@@ -571,12 +561,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 put("execution_started", false)
                             })
                             // Pending tool status is durable before the Work card observes it.
-                            try {
-                                workUiDocumentPublisher.onToolResult(binding, uiSourceMessageId)
-                            } catch (cancelled: CancellationException) { throw cancelled }
-                            catch (failure: Exception) {
-                                AppLog.failure("WorkUiDocument", "publish_tool_started", failure)
-                            }
+                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_tool_started")
                         }
                         is AgentEvent.ToolFinished -> {
                             progressTracker.recordToolResult(event.call, event.output, event.isError)
@@ -640,13 +625,7 @@ internal class LocalWorkAgentTurnExecutor(
                             workModelHistoryRuntime.persist(binding)
                             // Event is durable before exposing a UI snapshot. A broken card must
                             // never abort a completed tool or alter its execution result.
-                            try {
-                                workUiDocumentPublisher.onToolResult(binding, uiSourceMessageId)
-                            } catch (cancelled: CancellationException) {
-                                throw cancelled
-                            } catch (failure: Exception) {
-                                AppLog.failure("WorkUiDocument", "publish_tool_progress", failure)
-                            }
+                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_tool_progress")
                         }
                         is AgentEvent.StepFinished -> {
                             runEventLog.append("step/end", buildJsonObject {
@@ -665,12 +644,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 put("messages", runState.value.transcriptIndex.totalMessageCount)
                             })
                             workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/completed")
-                            try {
-                                workUiDocumentPublisher.onToolResult(binding, uiSourceMessageId)
-                            } catch (cancelled: CancellationException) { throw cancelled }
-                            catch (failure: Exception) {
-                                AppLog.failure("WorkUiDocument", "publish_completed_turn", failure)
-                            }
+                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_completed_turn")
                         }
                         is AgentEvent.TurnStepLimit -> {
                             val transcriptMessage = runTranscript.newMessage(
@@ -687,12 +661,7 @@ internal class LocalWorkAgentTurnExecutor(
                             runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
                             workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/step-limit")
                             workModelHistoryRuntime.persist(binding)
-                            try {
-                                workUiDocumentPublisher.onToolResult(binding, uiSourceMessageId)
-                            } catch (cancelled: CancellationException) { throw cancelled }
-                            catch (failure: Exception) {
-                                AppLog.failure("WorkUiDocument", "publish_step_limit", failure)
-                            }
+                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_step_limit")
                         }
                         is AgentEvent.TurnFailed -> {
                             settlePendingTools("failed")
@@ -730,12 +699,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/failed")
                             }
                             workModelHistoryRuntime.persist(binding)
-                            try {
-                                workUiDocumentPublisher.onToolResult(binding, uiSourceMessageId)
-                            } catch (cancelled: CancellationException) { throw cancelled }
-                            catch (failure: Exception) {
-                                AppLog.failure("WorkUiDocument", "publish_failed_turn", failure)
-                            }
+                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_failed_turn")
                         }
                         is AgentEvent.TurnCancelled -> {
                             settlePendingTools("cancelled")
@@ -749,12 +713,7 @@ internal class LocalWorkAgentTurnExecutor(
                             runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
                             workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/cancelled")
                             workModelHistoryRuntime.persist(binding)
-                            try {
-                                workUiDocumentPublisher.onToolResult(binding, uiSourceMessageId)
-                            } catch (cancelled: CancellationException) { throw cancelled }
-                            catch (failure: Exception) {
-                                AppLog.failure("WorkUiDocument", "publish_cancelled_turn", failure)
-                            }
+                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_cancelled_turn")
                         }
                     }
                     agentRunCoordinator.recordEvent(runContext, event)

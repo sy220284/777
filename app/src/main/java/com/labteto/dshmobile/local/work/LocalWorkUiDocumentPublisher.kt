@@ -13,6 +13,11 @@ import com.labteto.dshmobile.uicontract.UiDocument
 import com.labteto.dshmobile.uicontract.UiDocumentProvenance
 import com.labteto.dshmobile.uicontract.UiDocumentOrigin
 import javax.inject.Inject
+import com.labteto.dshmobile.observability.AppLog
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.update
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import javax.inject.Singleton
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -31,13 +36,47 @@ internal class LocalWorkUiDocumentPublisher @Inject constructor(
     private val budget = UiDocumentBudget(512, 16, 262_144)
     private val scenes = emptySet<UiSceneId>()
 
-    fun onToolResult(binding: LocalWorkRunBinding, originatingMessageId: String?) {
+    /**
+     * Derived progress may fail independently of completed tools. Record that as an explicit
+     * presentation failure and let the next durable tool/turn event rebuild the projection.
+     * Never present a projection write failure as a model or tool failure.
+     */
+    fun reconcile(binding: LocalWorkRunBinding, sourceMessageId: String?, stage: String) {
+        if (sourceMessageId.isNullOrBlank()) return
+        try {
+            val published = onToolResult(binding, sourceMessageId)
+            if (published && binding.state.value.work.workProjectionOutOfSync) {
+                binding.eventLog.append("work/ui-projection-resynced", buildJsonObject {
+                    put("source_message_id", sourceMessageId)
+                    put("stage", stage)
+                })
+                binding.state.update { state ->
+                    state.copy(work = state.work.copy(workProjectionOutOfSync = false))
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            // Failure evidence must be durably recorded. A broken EventLog itself is fatal.
+            binding.eventLog.append("work/ui-projection-failed", buildJsonObject {
+                put("source_message_id", sourceMessageId)
+                put("stage", stage)
+                put("failure_type", failure.javaClass.simpleName)
+            })
+            binding.state.update { state ->
+                state.copy(work = state.work.copy(workProjectionOutOfSync = true))
+            }
+            AppLog.failure("WorkUiDocument", stage, failure, sessionId = binding.sessionId)
+        }
+    }
+
+    fun onToolResult(binding: LocalWorkRunBinding, originatingMessageId: String?): Boolean {
         val snapshot = binding.state.value
         // The authenticated Work turn already captured its source message before execution.
         // A long tool-only transcript may evict that user message from the in-memory window.
         // Only the Run Owner may bind a progress card to an original user message.
         // A missing continuation source must not attach results to another turn.
-        val sourceMessageId = originatingMessageId?.takeIf(String::isNotBlank) ?: return
+        val sourceMessageId = originatingMessageId?.takeIf(String::isNotBlank) ?: return false
         // Only the current session's actual identity can grant live actions or bindings.
         val identity = synchronized(runtime.foregroundRunHandle.lock) {
             val current = runtime.state.value
@@ -49,7 +88,7 @@ internal class LocalWorkUiDocumentPublisher @Inject constructor(
         // A stable Work card ID never overwrites user or model cards on the same message.
         val existing = documents.latestDocument(
             binding.sessionId, sourceMessageId, docId, budget, scenes)
-        if (existing?.recoveryNotice != null) return
+        if (existing?.recoveryNotice != null) return false
         val previous = existing?.document
         // Preserve the source provenance across foreground/background transitions.
         val source = previous?.source ?: UiDocumentSource(
@@ -148,7 +187,7 @@ internal class LocalWorkUiDocumentPublisher @Inject constructor(
             source, revision, "Work 渐进成果", nodes, emptyList(),
             "工具回执与阶段输出已保存；当前结果未经独立核验。",
         )
-        documents.publish(
+        return documents.publish(
             document, UiDocumentProvenance(null, "", false, UiDocumentOrigin.LOCAL),
             pendingApprovalId = null, expected = previous, budget = budget,
             knownScenes = scenes,

@@ -98,6 +98,8 @@ data class LocalWorkState(
     val pendingApproval: LocalApproval? = null,
     val pendingQuestion: LocalQuestion? = null,
     val deviceApprovalLease: Boolean = false,
+    /** Presentation-only status; tool/turn facts remain in the Session EventLog. */
+    val workProjectionOutOfSync: Boolean = false,
 )
 
 /** Bounded display projection of durable team events; never an execution owner. */
