@@ -147,6 +147,39 @@ class UiDocumentTest {
             emptySet(), null).problems.contains("text_budget"))
     }
 
+    @Test fun chartCorrectionVersionsOnlyTheSelectedPointWithoutAuthorizingTools() {
+        val before = document(listOf(UiDocumentNode.Column("group", listOf(
+            UiDocumentNode.BarChart("bars", "统计", "次",
+                listOf(UiChartPoint("成功", 2.0), UiChartPoint("失败", 1.0))),
+            UiDocumentNode.LineChart("line", "变化", "次",
+                listOf(UiChartPoint("前", 3.0), UiChartPoint("后", 4.0))),
+            UiDocumentNode.Button("action", "发送", "send"),
+        ))), listOf(UiDocumentAction.SendUserInput("send", "原操作", emptyList())))
+        val correctedBar = before.withUserEditedChartPoint("bars", 1, 7.0)!!
+        val nodes = (correctedBar.nodes.single() as UiDocumentNode.Column).children
+        assertTrue((nodes[0] as UiDocumentNode.BarChart).points.map { it.value } == listOf(2.0, 7.0))
+        assertTrue((nodes[1] as UiDocumentNode.LineChart).points.map { it.value } == listOf(3.0, 4.0))
+        assertTrue(correctedBar.actions == before.actions && correctedBar.revision == 1L)
+        assertTrue(correctedBar.fallbackText.contains("未经业务核验"))
+        assertTrue(UiDocumentPatch(before.documentId, 0, correctedBar).matches(before))
+        val correctedLine = correctedBar.withUserEditedChartPoint("line", 0, 8.0)!!
+        val nextNodes = (correctedLine.nodes.single() as UiDocumentNode.Column).children
+        assertTrue((nextNodes[1] as UiDocumentNode.LineChart).points.map { it.value } == listOf(8.0, 4.0))
+        assertTrue(correctedLine.revision == 2L)
+        assertTrue(before.withUserEditedChartPoint("missing", 0, 2.0) == null)
+        assertTrue(before.withUserEditedChartPoint("action", 0, 2.0) == null)
+        assertTrue(before.withUserEditedChartPoint("bars", -1, 2.0) == null)
+        assertTrue(before.withUserEditedChartPoint("bars", 10, 2.0) == null)
+        listOf(Double.NaN, Double.POSITIVE_INFINITY, -1.0, 1.0e13).forEach {
+            assertTrue(before.withUserEditedChartPoint("bars", 0, it) == null)
+        }
+        assertTrue(before.copy(documentId = "work-live:123")
+            .withUserEditedChartPoint("bars", 0, 2.0) == null)
+        assertTrue(before.copy(revision = Long.MAX_VALUE)
+            .withUserEditedChartPoint("bars", 0, 2.0) == null)
+        assertTrue(correctedBar.validate(UiDocumentBudget(20, 4, 1024), emptySet(), null).valid)
+    }
+
     @Test fun patchesCannotCrossMessagesOrApplyToAnOldRevision() {
         val current = document(listOf(UiDocumentNode.Text("text", "old")), emptyList())
         val updated = current.copy(revision = 1, nodes = listOf(UiDocumentNode.Text("text", "new")))
