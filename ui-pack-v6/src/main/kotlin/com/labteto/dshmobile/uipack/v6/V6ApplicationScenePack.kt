@@ -219,7 +219,7 @@ class V6ApplicationScenePack(
                 }
                 owners.transcript?.let { transcript ->
                     put(UiSceneId("shell.search"), UiSceneRenderer { scope ->
-                        V6GlobalHistorySearchScene(sessions, transcript,
+                        V6GlobalHistorySearchScene(sessions, transcript, conversations?.reading,
                             onOpen = { scope.onNavigate(UiSceneId("route.home")); Unit },
                             onBack = { scope.onBack(); Unit })
                     })
