@@ -427,11 +427,14 @@ class McpToolBridgePluginTest {
         val registry = PluginRegistry()
         registry.install(plugin)
         plugin.connectHttpFromUi(registry.context, "fast", "https://example.com/fast")
+        val revisionAfterFast = plugin.lifecycleRevisions.value
 
         val slow = async {
             plugin.connectHttpFromUi(registry.context, "slow", "https://example.com/slow")
         }
         slowEntered.await()
+        val revisionConnecting = plugin.lifecycleRevisions.value
+        assertTrue(revisionConnecting > revisionAfterFast)
 
         val snapshots = plugin.serverSnapshots()
         assertEquals(listOf("fast"), snapshots.map(McpServerSnapshot::id))
@@ -443,6 +446,12 @@ class McpToolBridgePluginTest {
 
         slowRelease.complete(Unit)
         assertTrue(slow.await().contains("已连接"))
+        assertTrue(plugin.lifecycleRevisions.value > revisionConnecting)
+        assertEquals(McpServerLifecycle.REGISTERED, plugin.lifecycleSnapshots().last().lifecycle)
+        val revisionRegistered = plugin.lifecycleRevisions.value
+        plugin.disconnectFromUi(registry.context, "slow")
+        assertTrue(plugin.lifecycleRevisions.value > revisionRegistered)
+        assertEquals(listOf("fast"), plugin.lifecycleSnapshots().map(McpServerSnapshot::id))
     }
 
     @Test
