@@ -67,6 +67,13 @@ fun V6UiDocumentScene(
     val sourceMessage = (if (workMode) work.messages else chat.messages).lastOrNull()
     val phase = if (workMode) work.phase else chat.phase
     val documents by owner.snapshots.collectAsStateWithLifecycle(initialValue = owner.snapshot())
+    val scope = rememberCoroutineScope()
+    var selectedForDeletion by remember(identity) {
+        mutableStateOf<Set<Pair<String, String>>>(emptySet())
+    }
+    var confirmBatchDeletion by remember(identity) { mutableStateOf(false) }
+    var batchDeleting by remember(identity) { mutableStateOf(false) }
+    var batchFeedback by remember(identity) { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(if (generationOnly) "生成结构化内容" else "会话结构化内容",
@@ -83,8 +90,67 @@ fun V6UiDocumentScene(
         } else if (identity != null && documents.sessionId == identity.sessionId) {
             val present = documents.documents.filter { it.document.source.sessionId == identity.sessionId }
             if (present.isEmpty()) SyNote("此会话尚无结构化文档")
+            if (present.isNotEmpty()) {
+                SyNote("批量整理：勾选要删除的文档，然后统一确认；保留所属聊天消息")
+                batchFeedback?.let { SyNote(it) }
+                SyButton("删除选中的文档（${selectedForDeletion.size}）", {
+                    confirmBatchDeletion = true
+                }, enabled = !batchDeleting && selectedForDeletion.size in 2..32,
+                    style = SyButtonStyle.SECONDARY)
+            }
+            if (confirmBatchDeletion) AlertDialog(
+                onDismissRequest = { if (!batchDeleting) confirmBatchDeletion = false },
+                title = { Text("批量删除 ${selectedForDeletion.size} 份文档？") },
+                text = { Text("同一次操作将写入一条持久删除事件。版本或会话发生变化时整批拒绝。") },
+                confirmButton = { TextButton(onClick = {
+                    confirmBatchDeletion = false
+                    val chosen = present.filter {
+                        (it.document.source.messageId to it.document.documentId) in selectedForDeletion
+                    }
+                    val currentIdentity = if (workMode) conversations.work.snapshot().identity
+                        else conversations.chat.snapshot().identity
+                    if (currentIdentity != identity || chosen.size != selectedForDeletion.size ||
+                        chosen.size !in 2..32) {
+                        batchFeedback = "选择已失效，请重新勾选当前文档"
+                    } else {
+                        batchDeleting = true
+                        val commands = chosen.map {
+                            DeleteUiDocumentCommand(identity, it.document.documentId,
+                                it.document.revision, it.document.source)
+                        }
+                        scope.launch {
+                            try {
+                                val receipt = owner.deleteBatch(commands)
+                                batchFeedback = describeV6DocumentReceipt(receipt)
+                                if (receipt == UiDocumentReceipt.Deleted) {
+                                    chosen.forEach { forms.forgetDocument(UiDocumentFormKey(
+                                        it.document.source.sessionId, it.document.documentId,
+                                        it.document.revision,
+                                    )) }
+                                    selectedForDeletion = emptySet()
+                                }
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (failure: Exception) {
+                                batchFeedback = failure.message ?: "批量删除失败"
+                            } finally { batchDeleting = false }
+                        }
+                    }
+                }, enabled = !batchDeleting) { Text("删除整批") } },
+                dismissButton = { TextButton(onClick = {
+                    confirmBatchDeletion = false
+                }, enabled = !batchDeleting) { Text("取消") } },
+            )
             present.forEach { item ->
                 androidx.compose.runtime.key(item.document.documentId, item.document.revision) {
+                    val selectedKey = item.document.source.messageId to item.document.documentId
+                    TextButton(onClick = {
+                        selectedForDeletion = if (selectedKey in selectedForDeletion)
+                            selectedForDeletion - selectedKey
+                        else selectedForDeletion + selectedKey
+                    }, enabled = !batchDeleting) {
+                        Text((if (selectedKey in selectedForDeletion) "☑ " else "☐ ") +
+                            "选择：" + item.document.title)
+                    }
                     V6DocumentCard(item, identity, owner, forms, media,
                         identityIsCurrent = {
                             (if (workMode) conversations.work.snapshot().identity

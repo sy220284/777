@@ -90,6 +90,8 @@ interface UiDocumentUiPort {
     suspend fun generateLocal(command: GenerateLocalUiDocumentCommand): UiDocumentReceipt
     suspend fun generate(command: GenerateUiDocumentCommand): UiDocumentReceipt
     suspend fun delete(command: DeleteUiDocumentCommand): UiDocumentReceipt
+    /** Exactly one durable tombstone for 2–32 explicit user-selected documents. */
+    suspend fun deleteBatch(commands: List<DeleteUiDocumentCommand>): UiDocumentReceipt
     suspend fun replaceText(command: EditUiDocumentTextCommand): UiDocumentReceipt =
         UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
     suspend fun replaceTableCell(command: EditUiDocumentTableCellCommand): UiDocumentReceipt =

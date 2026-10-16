@@ -204,6 +204,35 @@ class LocalUiDocumentSessionStoreTest {
         } finally { directory.deleteRecursively() }
     }
 
+    @Test fun batchDeletionIsOneEventAllOrNothingAndSurvivesColdRestore() {
+        val directory = Files.createTempDirectory("ui-doc-batch-delete").toFile()
+        try {
+            val registry = LocalSessionEventLogRegistry(directory, Json)
+            val owner = LocalUiDocumentSessionStore(registry)
+            val one = document("one")
+            val two = document("two")
+            val three = document("three")
+            for (doc in listOf(one, two, three))
+                assertTrue(owner.publish(doc, provenance, null, null, budget, emptySet()))
+            val log = registry.get("session")
+            val before = log.latestSequence()
+            assertFalse(owner.deleteBatch(listOf(one, two.copy(revision = 1)), budget, emptySet()))
+            assertEquals(before, log.latestSequence())
+            assertEquals(3, owner.read("session", setOf("one", "two", "three"), budget, emptySet()).size)
+            assertTrue(owner.deleteBatch(listOf(one, two), budget, emptySet()))
+            assertEquals(before + 1, log.latestSequence())
+            assertEquals(UI_DOCUMENT_BATCH_DELETED_EVENT, log.latest(UI_DOCUMENT_BATCH_DELETED_EVENT)?.type)
+            assertNull(owner.latestDocument("session", "one", one.documentId, budget, emptySet()))
+            assertNull(owner.latestDocument("session", "two", two.documentId, budget, emptySet()))
+            assertFalse(owner.publish(one.copy(revision = 1), provenance, null, one, budget, emptySet()))
+            val restored = LocalUiDocumentSessionStore(registry)
+            assertEquals(listOf(three), restored.read(
+                "session", setOf("one", "two", "three"), budget, emptySet()).map { it.document })
+            assertFalse(restored.deleteBatch(listOf(one, two), budget, emptySet()))
+            registry.clearAndEvict(setOf("session"))
+        } finally { directory.deleteRecursively() }
+    }
+
     @Test fun incrementalReplayReadsNewCardsWithoutDroppingExistingVisibleCards() {
         val directory = Files.createTempDirectory("ui-doc-incremental").toFile()
         try {

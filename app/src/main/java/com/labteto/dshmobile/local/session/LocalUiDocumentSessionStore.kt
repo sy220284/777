@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -23,6 +25,7 @@ import kotlinx.serialization.json.boolean
 
 internal const val UI_DOCUMENT_EVENT = "ui.document.published"
 internal const val UI_DOCUMENT_DELETED_EVENT = "ui.document.deleted"
+internal const val UI_DOCUMENT_BATCH_DELETED_EVENT = "ui.document.batch-deleted"
 internal data class LocalUiDocumentRecord(val document: UiDocument, val provenance: UiDocumentProvenance,
     val recoveryNotice: String? = null)
 
@@ -54,7 +57,7 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
         // An explicit user tombstone is final for this ID. A delayed Work tool
         // callback must not resurrect a card that the user already deleted.
         val latest = latestDocumentEvent(source.sessionId, source.messageId, document.documentId)
-        if (latest?.type == UI_DOCUMENT_DELETED_EVENT) return false
+        if (latest != null && latest.type != UI_DOCUMENT_EVENT) return false
         val occupied = latest?.let {
             decodeEvent(it, source.sessionId, setOf(source.messageId), budget, knownScenes)
         }
@@ -101,17 +104,28 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
         val candidate = lastRead?.takeIf { old ->
             old.key.copy(revision = revision) == key && old.throughSequence <= checkpoint
         }
-        fun indexKey(event: LocalSessionEventLog.Event): Pair<String, String>? {
-            if (event.type != UI_DOCUMENT_EVENT && event.type != UI_DOCUMENT_DELETED_EVENT) return null
+        fun indexKeys(event: LocalSessionEventLog.Event): List<Pair<String, String>> {
+            if (event.type == UI_DOCUMENT_BATCH_DELETED_EVENT) {
+                if (event.data["sessionId"]?.jsonPrimitive?.content != sessionId) return emptyList()
+                return event.data["targets"]?.jsonArray.orEmpty().mapNotNull { target ->
+                    val data = target as? JsonObject ?: return@mapNotNull null
+                    val message = data["messageId"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                    val documentId = data["documentId"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                    if (message in messageIds && documentId.isNotBlank()) message to documentId
+                    else null
+                }
+            }
+            if (event.type != UI_DOCUMENT_EVENT && event.type != UI_DOCUMENT_DELETED_EVENT)
+                return emptyList()
             val anchor = runCatching {
                 event.data["source"]?.jsonObject?.get("messageId")?.jsonPrimitive?.content
-            }.getOrNull()?.takeIf { it in messageIds } ?: return null
+            }.getOrNull()?.takeIf { it in messageIds } ?: return emptyList()
             val documentId = runCatching {
                 if (event.type == UI_DOCUMENT_DELETED_EVENT)
                     event.data["documentId"]?.jsonPrimitive?.content
                 else event.data["definition"]?.jsonObject?.get("documentId")?.jsonPrimitive?.content
             }.getOrNull() ?: "malformed:${event.sequence}"
-            return anchor to documentId
+            return listOf(anchor to documentId)
         }
         val indexed: Map<Pair<String, String>, LocalSessionEventLog.Event> =
             if (candidate != null) {
@@ -127,20 +141,20 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
                         break
                     }
                     val admitted = page.takeWhile { it.sequence <= checkpoint }
-                    admitted.forEach { event -> indexKey(event)?.let { next[it] = event } }
+                    admitted.forEach { event -> indexKeys(event).forEach { next[it] = event } }
                     cursor = admitted.lastOrNull()?.sequence ?: checkpoint
                     if (admitted.size < page.size) break
                 }
                 if (continuity) next else log.withEvents { stream ->
                     val rebuild = LinkedHashMap<Pair<String, String>, LocalSessionEventLog.Event>()
-                    stream.forEach { event -> indexKey(event)?.let { rebuild[it] = event } }
+                    stream.forEach { event -> indexKeys(event).forEach { rebuild[it] = event } }
                     rebuild
                 }
             } else log.withEvents { stream ->
                 // An uncached/after-restart read is exact, including historical revisions.
                 // Only the latest event for each visible (message, document) is retained.
                 val rebuild = LinkedHashMap<Pair<String, String>, LocalSessionEventLog.Event>()
-                stream.forEach { event -> indexKey(event)?.let { rebuild[it] = event } }
+                stream.forEach { event -> indexKeys(event).forEach { rebuild[it] = event } }
                 rebuild
             }
 
@@ -176,10 +190,54 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
         return true
     }
 
+    /**
+     * All-or-nothing multi-card deletion. The Session EventLog receives exactly one durable
+     * tombstone after EVERY card has passed current-revision/source validation.
+     * No serial UI deletes, which would leave half the selection removed on a late conflict.
+     */
+    @Synchronized
+    fun deleteBatch(documents: List<UiDocument>, budget: UiDocumentBudget,
+        knownScenes: Set<UiSceneId>): Boolean {
+        if (documents.size !in 2..32) return false
+        val sessionId = documents.first().source.sessionId
+        if (sessionId.isBlank() || documents.any {
+            it.source.sessionId != sessionId || it.source.messageId.isBlank() ||
+                it.documentId.isBlank() || it.documentId.length > 200
+        }) return false
+        val keys = documents.map { it.source.messageId to it.documentId }
+        if (keys.distinct().size != keys.size) return false
+        if (documents.any { doc ->
+            latestDocument(sessionId, doc.source.messageId, doc.documentId, budget, knownScenes)
+                ?.takeIf { it.recoveryNotice == null }?.document != doc
+        }) return false
+        logs.get(sessionId).append(UI_DOCUMENT_BATCH_DELETED_EVENT, buildJsonObject {
+            put("sessionId", sessionId)
+            put("targets", buildJsonArray {
+                documents.forEach { doc ->
+                    add(buildJsonObject {
+                        put("messageId", doc.source.messageId)
+                        put("documentId", doc.documentId)
+                        put("deletedRevision", doc.revision)
+                    })
+                }
+            })
+        })
+        mutableRevision.update { it + 1L }
+        return true
+    }
+
     private fun latestDocumentEvent(sessionId: String, messageId: String,
         documentId: String): LocalSessionEventLog.Event? =
-        logs.get(sessionId).latestMatching(setOf(UI_DOCUMENT_EVENT, UI_DOCUMENT_DELETED_EVENT)) { data ->
-            runCatching {
+        logs.get(sessionId).latestMatching(setOf(
+            UI_DOCUMENT_EVENT, UI_DOCUMENT_DELETED_EVENT, UI_DOCUMENT_BATCH_DELETED_EVENT,
+        )) { data ->
+            if (data["sessionId"]?.jsonPrimitive?.content == sessionId) {
+                data["targets"]?.jsonArray?.any { target ->
+                    val entry = target as? JsonObject
+                    entry?.get("messageId")?.jsonPrimitive?.content == messageId &&
+                        entry["documentId"]?.jsonPrimitive?.content == documentId
+                } == true
+            } else runCatching {
                 data["source"]?.jsonObject?.get("messageId")?.jsonPrimitive?.content == messageId &&
                     (data["documentId"]?.jsonPrimitive?.content
                         ?: data["definition"]?.jsonObject?.get("documentId")?.jsonPrimitive?.content) == documentId
@@ -193,7 +251,7 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
     ): LocalUiDocumentRecord? {
         if (sessionId.isBlank() || messageId.isBlank() || documentId.isBlank()) return null
         val event = latestDocumentEvent(sessionId, messageId, documentId) ?: return null
-        if (event.type == UI_DOCUMENT_DELETED_EVENT) return null
+        if (event.type != UI_DOCUMENT_EVENT) return null
         return decodeEvent(event, sessionId, setOf(messageId), budget, knownScenes)
     }
 

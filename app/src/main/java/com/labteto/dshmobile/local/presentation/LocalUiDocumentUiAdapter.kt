@@ -374,6 +374,42 @@ internal class LocalUiDocumentUiAdapter(
             catch (failure: Exception) { UiDocumentReceipt.Failed(failure.message) }
         }
 
+    override suspend fun deleteBatch(commands: List<DeleteUiDocumentCommand>): UiDocumentReceipt =
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
+            if (commands.size !in 2..32 || commands.map { it.source.messageId to it.documentId }
+                    .distinct().size != commands.size)
+                return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+            val identity = commands.first().identity
+            if (commands.any { it.identity != identity || it.source.sessionId != identity.sessionId })
+                return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+            try {
+                val documents = commands.map { command ->
+                    val record = store.latestDocument(identity.sessionId, command.source.messageId,
+                        command.documentId, generation.budget, knownScenes)
+                        ?: return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                    if (record.recoveryNotice != null ||
+                        record.document.revision != command.revision ||
+                        record.document.source != command.source)
+                        return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                    record.document
+                }
+                synchronized(state.foregroundRunHandle.lock) {
+                    val current = state.state.value
+                    if (state.sessionTransitioning ||
+                        state.uiBindingIdentity(current) != identity ||
+                        documents.any { doc ->
+                            (current.usageMode == LocalUsageMode.WORK) != doc.source.workMode ||
+                            current.messages.none { it.id == doc.source.messageId } ||
+                            !sourceMatches(doc.source, identity, doc.source.workMode)
+                        }) UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                    else if (store.deleteBatch(documents, generation.budget, knownScenes))
+                        UiDocumentReceipt.Deleted
+                    else UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { UiDocumentReceipt.Failed(failure.message) }
+        }
+
     override fun submit(identity: UiSessionIdentity, request: UiDocumentActionRequest): UiDocumentReceipt {
         if (request.source.sessionId != identity.sessionId || request.source.messageId.isBlank() ||
             request.documentId.isBlank() || request.documentId.length > 200)
