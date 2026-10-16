@@ -57,6 +57,7 @@ import com.labteto.dshmobile.uicontract.PersonaGalleryUiPort
 import com.labteto.dshmobile.uicontract.PersonaSelectionUiPort
 import com.labteto.dshmobile.uicontract.PersonaStoryUiPort
 import com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort
+import com.labteto.dshmobile.uicontract.PersonaAuthoringUiPort
 import com.labteto.dshmobile.uicontract.WorkReadUiPort
 import com.labteto.dshmobile.uicontract.WorkPolicyUiPort
 import com.labteto.dshmobile.uicontract.WorkTeamUiPort
@@ -98,6 +99,7 @@ data class V6ConversationPorts(
     val groups: ChatGroupUiPort? = null,
     val stories: PersonaStoryUiPort? = null,
     val galleryDeletion: PersonaGalleryDeletionUiPort? = null,
+    val personaAuthoring: PersonaAuthoringUiPort? = null,
     val workReads: WorkReadUiPort? = null,
     val workPolicy: WorkPolicyUiPort? = null,
     val workTeam: WorkTeamUiPort? = null,
