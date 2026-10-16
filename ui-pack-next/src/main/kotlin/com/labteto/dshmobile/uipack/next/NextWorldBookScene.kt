@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.uipack.next
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
@@ -133,7 +135,8 @@ internal fun NextWorldBookScene(
     editing?.let { original ->
         AlertDialog(onDismissRequest = { if (!busy) editing = null },
             title = { Text("世界资料编辑") },
-            text = { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            text = { Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedTextField(title, { title = it.take(150) }, label = { Text("标题") })
                 OutlinedTextField(content, { content = it.take(6000) }, label = { Text("背景信息") },
                     minLines = 3)
