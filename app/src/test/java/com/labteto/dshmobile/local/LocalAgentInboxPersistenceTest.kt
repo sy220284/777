@@ -64,6 +64,28 @@ class LocalAgentInboxPersistenceTest {
     }
 
     @Test
+    fun incompleteGoalRevisionInRecoveredContinuationFailsClosed() {
+        val broken = buildJsonObject {
+            put("version", 1)
+            put("action", "queued")
+            put("pending", kotlinx.serialization.json.JsonArray(listOf(buildJsonObject {
+                put("id", "continuation-run-1")
+                put("content", "progress")
+                put("kind", "WORK_CONTINUATION")
+                put("continuation", buildJsonObject {
+                    put("source_run_id", "run-1")
+                    put("checkpoint_sequence", 42L)
+                    put("failure_code", "WORK_GOAL_PROGRESS")
+                    put("index", 1)
+                    put("goal_id", "goal-current")
+                    // Contract fingerprint is missing, so the command must not be resumed.
+                })
+            })))
+        }
+        assertNull(decodeLocalAgentInboxPending(broken))
+    }
+
+    @Test
     fun malformedInputKindDoesNotBecomeUserRequest() {
         val payload = buildJsonObject {
             put("version", 1)
