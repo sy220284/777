@@ -41,6 +41,7 @@ class LocalWorkGoalContinuationTest {
     fun noToolProgressOrUncertainToolFailureNeverTriggersBlindReplay() {
         assertFalse(canAutomaticallyFollowUpWorkGoal(conditions().copy(hadSuccessfulTool = false)))
         assertFalse(canAutomaticallyFollowUpWorkGoal(conditions().copy(hadToolFailure = true)))
+        assertFalse(canAutomaticallyFollowUpWorkGoal(conditions().copy(runtimeHealthy = false)))
     }
 
     @Test
