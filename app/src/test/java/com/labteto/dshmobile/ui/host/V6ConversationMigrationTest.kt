@@ -175,6 +175,8 @@ class V6ConversationMigrationTest {
             "settings.usage", "settings.model_usage", "settings.usage_log",
             "settings.usage_detail", "settings.memory", "settings.memory_settings",
             "settings.advanced", "settings.session_storage", "settings.diagnostics",
+            "conversation.message_actions", "conversation.edit", "conversation.reader",
+            "chat.branches", "shell.error",
         ).map(::UiSceneId).toSet()
         assertEquals(expected, candidate.manifest.scenes)
         assertEquals(expected, candidate.renderers.keys)
@@ -248,7 +250,8 @@ class V6ConversationMigrationTest {
     @Test fun workPlanAndTeamHaveRealConditionalRenderers() {
         val candidate = fullBusinessCandidate()
         val expected = personaAndGroupCandidate().manifest.scenes +
-            setOf(UiSceneId("work.plan_review"), UiSceneId("work.team"))
+            setOf(UiSceneId("work.plan_review"), UiSceneId("work.team"),
+                UiSceneId("work.steering_choice"))
         assertEquals(expected, candidate.manifest.scenes)
         assertEquals(expected, candidate.renderers.keys)
         assertTrue(UiApplicationPackRegistry(listOf(candidate)).select(
