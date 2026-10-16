@@ -94,6 +94,9 @@ fun V6UiDocumentScene(
     }
 }
 
+/** Display correction target only; business truth and revision remain with the Session Owner. */
+private data class V6EditableChart(val id: String, val title: String, val points: List<UiChartPoint>)
+
 /** Every action gets the Owner's actual receipt, never a fabricated success. */
 internal fun describeV6DocumentReceipt(receipt: UiDocumentReceipt): String = when (receipt) {
     UiDocumentReceipt.AdditionalRequestConsentRequired -> "需要明确同意额外模型调用"
@@ -144,6 +147,25 @@ internal fun V6DocumentCard(
     }
     var editingCellText by remember(doc.documentId, doc.revision) { mutableStateOf("") }
     var tableBusy by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
+    var editingChart by remember(doc.documentId, doc.revision) { mutableStateOf<V6EditableChart?>(null) }
+    var chartPointIndex by remember(doc.documentId, doc.revision) { mutableStateOf<Int?>(null) }
+    var chartValueDraft by remember(doc.documentId, doc.revision) { mutableStateOf("") }
+    var chartBusy by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
+    val chartNodes = remember(doc) {
+        val found = mutableListOf<V6EditableChart>()
+        fun collect(node: UiDocumentNode) {
+            when (node) {
+                is UiDocumentNode.BarChart -> found += V6EditableChart(node.id, node.title, node.points)
+                is UiDocumentNode.LineChart -> found += V6EditableChart(node.id, node.title, node.points)
+                is UiDocumentNode.Column -> node.children.forEach(::collect)
+                is UiDocumentNode.Row -> node.children.forEach(::collect)
+                is UiDocumentNode.Disclosure -> node.children.forEach(::collect)
+                else -> Unit
+            }
+        }
+        doc.nodes.forEach(::collect)
+        found.toList()
+    }
     val tableNodes = remember(doc) {
         val found = mutableListOf<UiDocumentNode.Table>()
         fun collect(node: UiDocumentNode) {
@@ -243,6 +265,18 @@ internal fun V6DocumentCard(
                     editingCellText = ""
                 }
             }, enabled = !editBusy && !tableBusy && !deleting,
+                style = SyButtonStyle.SECONDARY)
+        }
+        if (validIdentity && chartNodes.isNotEmpty() &&
+            doc.actions.none { it is UiDocumentAction.AnswerApproval } &&
+            !doc.documentId.startsWith("work-live:")) {
+            SyButton("修正图表数据", {
+                if (identityIsCurrent()) {
+                    editingChart = chartNodes.first()
+                    chartPointIndex = null
+                    chartValueDraft = ""
+                }
+            }, enabled = !editBusy && !tableBusy && !chartBusy && !deleting,
                 style = SyButtonStyle.SECONDARY)
         }
         if (validIdentity) SyButton("删除这份文档", { confirmDelete = true },
@@ -381,6 +415,73 @@ internal fun V6DocumentCard(
             }, enabled = editingCell != null && !tableBusy) { Text("保存新版本") } },
             dismissButton = { TextButton(onClick = { editingTable = null },
                 enabled = !tableBusy) { Text("取消") } },
+        )
+    }
+
+    editingChart?.let { chart ->
+        val validValue = chartValueDraft.toDoubleOrNull()?.takeIf {
+            it.isFinite() && it in 0.0..1.0e12
+        }
+        AlertDialog(
+            onDismissRequest = { if (!chartBusy) editingChart = null },
+            title = { Text("修正图表数据（未经业务核验）") },
+            text = {
+                Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (chartNodes.size > 1) {
+                        Text("选择图表")
+                        chartNodes.forEach { option ->
+                            TextButton(onClick = {
+                                editingChart = option
+                                chartPointIndex = null
+                                chartValueDraft = ""
+                            }, enabled = !chartBusy) {
+                                Text((if (option.id == chart.id) "✓ " else "") + option.title)
+                            }
+                        }
+                    }
+                    chart.points.forEachIndexed { index, point ->
+                        TextButton(onClick = {
+                            chartPointIndex = index
+                            chartValueDraft = point.value.toString()
+                        }, enabled = !chartBusy) {
+                            Text("${point.label}：${point.value}")
+                        }
+                    }
+                    if (chartPointIndex != null) {
+                        SyInput(chartValueDraft, { chartValueDraft = it.take(40) },
+                            label = "新的图表数值（0 至 1 万亿）", enabled = !chartBusy)
+                    }
+                    Text("仅修正当前文档的展示数据，不修改工具结果、执行记录或核验结论")
+                }
+            },
+            confirmButton = { TextButton(onClick = {
+                val pointIndex = chartPointIndex ?: return@TextButton
+                val value = validValue ?: return@TextButton
+                if (!validIdentity || !identityIsCurrent() || chartBusy) {
+                    feedback = "会话已变化，请重新加载文档"
+                    return@TextButton
+                }
+                chartBusy = true
+                val command = EditUiDocumentChartPointCommand(identity, doc.documentId,
+                    doc.revision, doc.source, chart.id, pointIndex, value)
+                scope.launch {
+                    try {
+                        val receipt = owner.replaceChartPoint(command)
+                        if (identityIsCurrent()) {
+                            feedback = describeV6DocumentReceipt(receipt)
+                            if (receipt is UiDocumentReceipt.Published) editingChart = null
+                        }
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (failure: Exception) {
+                        if (identityIsCurrent()) feedback = failure.message ?: "图表数据保存失败"
+                    } finally { chartBusy = false }
+                }
+            }, enabled = chartPointIndex != null && validValue != null && !chartBusy) {
+                Text("保存新版本")
+            } },
+            dismissButton = { TextButton(onClick = { editingChart = null },
+                enabled = !chartBusy) { Text("取消") } },
         )
     }
 
