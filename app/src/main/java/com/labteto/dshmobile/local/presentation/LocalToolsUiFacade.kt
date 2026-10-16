@@ -72,8 +72,13 @@ class LocalToolsUiFacade @Inject internal constructor(
     override suspend fun configureGitHub(token: String) { tools.configureGitHub(token) }
     override suspend fun clearGitHub() = tools.clearGitHub()
     override fun capabilityCatalogue() = tools.capabilityCatalogue().map {
-        com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot(it.name, it.family, it.access, it.approval, it.requirements)
+        com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot(it.name, it.family, it.access, it.approval, it.requirements, it.parameterSchema)
     }
+    override fun validateCapabilityDraft(
+        name: String, expectedSchema: kotlinx.serialization.json.JsonObject, argumentsJson: String,
+    ): com.labteto.dshmobile.uicontract.UiToolDraftValidation =
+        tools.validateCapabilityDraft(name, expectedSchema, argumentsJson)
+
     override fun pluginLifecycleSnapshots(): List<com.labteto.dshmobile.uicontract.UiPluginLifecycle> =
         tools.pluginLifecycleSnapshots().map { state ->
             com.labteto.dshmobile.uicontract.UiPluginLifecycle(
