@@ -211,9 +211,36 @@ internal class LocalToolCompositionRoot @Inject constructor(
                 com.labteto.dshmobile.local.tools.LocalToolCatalogueEntry(
                     tool.name, tool.metadata.family, tool.access.name, tool.approvalPolicy.name,
                     tool.metadata.requirements,
+                    (tool.schema["function"] as kotlinx.serialization.json.JsonObject)["parameters"]
+                        as kotlinx.serialization.json.JsonObject,
                 )
             }
         }
+
+    override fun validateCapabilityDraft(
+        name: String, expectedSchema: kotlinx.serialization.json.JsonObject, argumentsJson: String,
+    ): com.labteto.dshmobile.uicontract.UiToolDraftValidation {
+        fun reject(reason: String) =
+            com.labteto.dshmobile.uicontract.UiToolDraftValidation.Rejected(reason)
+        if (argumentsJson.toByteArray(Charsets.UTF_8).size > 16_384)
+            return reject("工具参数超过 16 KB，不能放入 Work 草稿")
+        val registered = registry.get(name) ?: return reject("工具已经卸载或未注册")
+        if (registered.exposure == com.labteto.dshmobile.harness.tools.ToolExposure.INTERNAL)
+            return reject("内部工具不能从此入口选用")
+        val function = registered.schema["function"] as kotlinx.serialization.json.JsonObject
+        val current = function["parameters"] as kotlinx.serialization.json.JsonObject
+        if (current != expectedSchema) return reject("工具字段已更新，请重新选择当前能力")
+        val parsed = try {
+            kotlinx.serialization.json.Json.parseToJsonElement(argumentsJson)
+        } catch (error: kotlinx.serialization.SerializationException) {
+            return reject("工具参数不是合法 JSON")
+        }
+        val arguments = parsed as? kotlinx.serialization.json.JsonObject
+            ?: return reject("工具参数必须是对象")
+        val problem = com.labteto.dshmobile.harness.tools.JsonSchemaValidator.validate(arguments, current)
+        return if (problem == null) com.labteto.dshmobile.uicontract.UiToolDraftValidation.Valid
+            else reject(problem)
+    }
 
     override fun installedSkills() = skillManager.installed()
     override fun presetSkills() = skillManager.presets()
