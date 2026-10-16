@@ -205,7 +205,7 @@ fun V6ReplySuggestionsScene(
                     }, style = SyButtonStyle.SECONDARY)
                     SyButton("直接发送此建议", {
                         val latest = chat.snapshot()
-                        if (owner.snapshot().identity != identity || latest.identity != identity ||
+                        if (state.identity != identity || latest.identity != identity ||
                             !latest.send.enabled) {
                             notice = "会话或发送权限已变化，请重新确认"
                         } else {
