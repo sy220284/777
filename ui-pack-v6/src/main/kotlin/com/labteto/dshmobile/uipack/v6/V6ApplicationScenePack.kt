@@ -80,13 +80,16 @@ class V6ApplicationScenePack(
                 val workMode = owners.workModeUpdates
                     ?.collectAsStateWithLifecycle(initialValue = owners.workMode())?.value
                     ?: owners.workMode()
-                V6ConversationScene(owners, workMode, onBack = { scope.onBack(); Unit })
+                V6ConversationScene(owners, workMode, onBack = { scope.onBack(); Unit },
+                    onNavigate = scope.onNavigate)
             })
             put(UiSceneId("conversation.chat"), UiSceneRenderer { scope ->
-                V6ConversationScene(owners, workMode = false, onBack = { scope.onBack(); Unit })
+                V6ConversationScene(owners, workMode = false, onBack = { scope.onBack(); Unit },
+                    onNavigate = scope.onNavigate)
             })
             put(UiSceneId("conversation.work"), UiSceneRenderer { scope ->
-                V6ConversationScene(owners, workMode = true, onBack = { scope.onBack(); Unit })
+                V6ConversationScene(owners, workMode = true, onBack = { scope.onBack(); Unit },
+                    onNavigate = scope.onNavigate)
             })
             val docOwner = owners.documents
             val formOwner = owners.forms
@@ -118,7 +121,8 @@ class V6ApplicationScenePack(
                     val mode = owners.workModeUpdates
                         ?.collectAsStateWithLifecycle(initialValue = owners.workMode())?.value
                         ?: owners.workMode()
-                    V6ConversationScene(owners, mode, onBack = { scope.onBack(); Unit }, part = part)
+                    V6ConversationScene(owners, mode, onBack = { scope.onBack(); Unit }, part = part,
+                        onNavigate = scope.onNavigate)
                 })
             }
         }
