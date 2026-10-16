@@ -13,6 +13,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.uicontract.*
@@ -38,6 +40,7 @@ fun V6MessageOperationScene(
     val snapshots = if (workMode) work.messages else chat.messages
     val phase = if (workMode) work.phase else chat.phase
     val scope = rememberCoroutineScope()
+    val clipboard = LocalClipboardManager.current
     var focusId by remember(target, mode) { mutableStateOf<String?>(null) }
     var edit by remember(target, focusId) { mutableStateOf("") }
     var feedback by remember(target) { mutableStateOf<String?>(null) }
@@ -114,6 +117,12 @@ fun V6MessageOperationScene(
             focused?.let { message ->
                 SyGlassCard(Modifier.fillMaxWidth()) {
                     SelectionContainer { Text(message.text) }
+                    if (mode == V6MessageOperation.ACTIONS) {
+                        SyButton("复制此消息", {
+                            clipboard.setText(AnnotatedString(message.text))
+                            feedback = "此消息已复制到系统剪贴板"
+                        }, enabled = message.text.isNotEmpty(), style = SyButtonStyle.SECONDARY)
+                    }
                     if (mode == V6MessageOperation.EDIT ||
                         mode == V6MessageOperation.ACTIONS) {
                         if (message.role == UiMessageRole.USER && message.editableText != null) {
