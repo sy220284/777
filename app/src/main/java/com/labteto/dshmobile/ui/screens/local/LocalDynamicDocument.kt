@@ -54,10 +54,10 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
     val key = UiDocumentFormKey(document.source.sessionId, document.documentId, document.revision)
     val defaults = remember(document) { document.initialFields() }
     val values = defaults + allValues[key].orEmpty()
-    var receipt by remember(document.documentId, document.revision) { mutableStateOf<UiDocumentReceipt?>(null) }
-    var confirmDeletion by remember(document.documentId, document.revision) { mutableStateOf(false) }
-    var deleting by remember(document.documentId, document.revision) { mutableStateOf(false) }
-    var deletionNotice by remember(document.documentId, document.revision) { mutableStateOf<String?>(null) }
+    var receipt by remember(document.documentId, document.revision, identity) { mutableStateOf<UiDocumentReceipt?>(null) }
+    var confirmDeletion by remember(document.documentId, document.revision, identity) { mutableStateOf(false) }
+    var deleting by remember(document.documentId, document.revision, identity) { mutableStateOf(false) }
+    var deletionNotice by remember(document.documentId, document.revision, identity) { mutableStateOf<String?>(null) }
     // A pending confirmation is bound to the exact active Owner activation.
     // Switching chats, modes or reactivating a session invalidates the old modal.
     var pendingSend by remember(document.documentId, document.revision, identity) {
