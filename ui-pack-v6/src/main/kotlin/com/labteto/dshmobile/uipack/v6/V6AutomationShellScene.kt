@@ -74,6 +74,10 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
     var busy by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    // Editor and list have very different heights. Restore the viewport when switching so
+    // "新建任务" and the editor header cannot remain outside the accessible viewport.
+    val editorScroll = rememberScrollState()
+    LaunchedEffect(editor) { editorScroll.scrollTo(0) }
     fun send(command: AutomationUiCommand) {
         if (busy) return
         busy = true
@@ -123,7 +127,7 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
         notify = task.notify
         editor = true
     }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+    Column(Modifier.fillMaxSize().verticalScroll(editorScroll).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(if (onlyChat) "人物互动自动任务" else "自动任务",
             style = MaterialTheme.typography.titleLarge)
