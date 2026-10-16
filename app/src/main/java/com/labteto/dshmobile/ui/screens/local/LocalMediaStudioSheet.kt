@@ -60,6 +60,8 @@ import com.labteto.dshmobile.local.model.LocalMediaVideoPhase
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalMediaVoice
 import com.labteto.dshmobile.local.presentation.LocalMediaVoiceLabels
+import com.labteto.dshmobile.local.presentation.initialMediaTextForKind
+import com.labteto.dshmobile.local.presentation.speechPayloadText
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -82,6 +84,9 @@ internal fun LocalMediaStudioSheetContent(
     onDelivered: () -> Unit = {},
     viewModel: LocalMediaStudioViewModel = hiltViewModel(),
     initialPrompt: String = "",
+    sourceReply: String? = null,
+    sourcePersonaName: String = "",
+    sourcePersonaIdentity: String = "",
     personaVoiceStyle: String = "",
     sourceMessageId: String? = null,
     initialKind: LocalMediaKind = LocalMediaKind.IMAGE,
@@ -128,7 +133,29 @@ internal fun LocalMediaStudioSheetContent(
     val manualRouteActive = chosenId.isNotBlank() && selected?.id == chosenId
     val activeOfferId by rememberUpdatedState(selected?.id)
     var showModelChoices by remember { mutableStateOf(false) }
-    var prompt by rememberSaveable(activeRevision?.originId) { mutableStateOf(activeRevision?.prompt ?: initialPrompt) }
+    val entryKind = activeRevision?.kind ?: initialKind
+    val entryText = activeRevision?.prompt ?: initialPrompt
+    // A revision has its own creator input, not the original conversation text.
+    val entrySourceReply = sourceReply.takeIf { activeRevision == null }
+    // Per-kind inputs avoid sending an image/video prompt as speech.
+    var imagePrompt by rememberSaveable(activeRevision?.originId, sourceMessageId, initialKind.name, initialPrompt) {
+        mutableStateOf(initialMediaTextForKind(LocalMediaKind.IMAGE, entryKind, entryText,
+            entrySourceReply, sourcePersonaName, sourcePersonaIdentity))
+    }
+    var videoPrompt by rememberSaveable(activeRevision?.originId, sourceMessageId, initialKind.name, initialPrompt) {
+        mutableStateOf(initialMediaTextForKind(LocalMediaKind.VIDEO, entryKind, entryText,
+            entrySourceReply, sourcePersonaName, sourcePersonaIdentity))
+    }
+    var speechText by rememberSaveable(activeRevision?.originId, sourceMessageId, initialKind.name, initialPrompt) {
+        mutableStateOf(initialMediaTextForKind(LocalMediaKind.SPEECH, entryKind, entryText,
+            entrySourceReply, sourcePersonaName, sourcePersonaIdentity))
+    }
+    val prompt = when (kind) {
+        LocalMediaKind.IMAGE -> imagePrompt
+        LocalMediaKind.VIDEO -> videoPrompt
+        LocalMediaKind.SPEECH -> speechText
+        LocalMediaKind.TRANSCRIBE -> ""
+    }
     var ratio by rememberSaveable(activeRevision?.originId) { mutableStateOf(activeRevision?.ratio ?: "1:1") }
     var voiceId by rememberSaveable(selected?.id, personaVoiceStyle, activeRevision?.originId) {
         // An old provider voice ID is never valid evidence for a newly selected account/provider.
@@ -285,7 +312,14 @@ internal fun LocalMediaStudioSheetContent(
 
             if (kind != LocalMediaKind.TRANSCRIBE) {
                 SyTextField(
-                    value = prompt, onValueChange = { prompt = it },
+                    value = prompt, onValueChange = { text ->
+                        when (kind) {
+                            LocalMediaKind.IMAGE -> imagePrompt = text
+                            LocalMediaKind.VIDEO -> videoPrompt = text
+                            LocalMediaKind.SPEECH -> speechText = text
+                            LocalMediaKind.TRANSCRIBE -> Unit
+                        }
+                    },
                     label = { Text(stringResource(
                         if (kind == LocalMediaKind.SPEECH) R.string.minimax_media_speech_input
                         else R.string.minimax_media_prompt
@@ -449,8 +483,18 @@ internal fun LocalMediaStudioSheetContent(
                             label = { Text(stringResource(R.string.media_voice_custom_field)) },
                             singleLine = true, enabled = !busy, modifier = Modifier.fillMaxWidth())
                     }
+                    val actualSpeechText = speechPayloadText(speechText)
+                    if (actualSpeechText != speechText.trim()) {
+                        Text(
+                            text = if (actualSpeechText.isBlank())
+                                stringResource(R.string.media_speech_no_readable_content)
+                            else stringResource(R.string.media_speech_actual_preview, actualSpeechText),
+                            color = colors.textSecondary, style = DsType.caption11.withReadingWeight(),
+                            maxLines = 3, overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     SyButton(text = stringResource(R.string.minimax_media_create_speech),
-                        enabled = !busy && prompt.isNotBlank() && voiceId.isNotBlank(),
+                        enabled = !busy && actualSpeechText.isNotBlank() && voiceId.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
                             viewModel.submitSpeech(selected, prompt, voiceId, sessionId, if (matchingRevision != null) matchingRevision.sourceMessageId else sourceMessageId, matchingRevision?.originId)
