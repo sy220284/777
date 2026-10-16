@@ -105,6 +105,11 @@ class LocalDynamicDocumentFeedbackTest {
             assertEquals("actual input", sent.single().fields["choice"])
         }
         compose.onNodeWithText(context.getString(R.string.ui_document_enqueued)).assertExists()
+        compose.runOnIdle {
+            activeIdentity.value = UiSessionIdentity("s", "activation-third", 2, null, null)
+        }
+        // An old Owner's queued receipt must never be presented as the new activation's outcome.
+        compose.onNodeWithText(context.getString(R.string.ui_document_enqueued)).assertDoesNotExist()
     }
 
 }
