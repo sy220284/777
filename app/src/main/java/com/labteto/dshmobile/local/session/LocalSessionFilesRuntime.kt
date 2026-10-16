@@ -72,6 +72,9 @@ class LocalSessionFilesRuntime @Inject internal constructor(
 
     override suspend fun previewWorkspaceFile(path: String): LocalWorkspaceFilePreview =
         withContext(Dispatchers.IO) { coordinator.preview(path) }
+
+    override suspend fun exportWorkspaceFile(path: String, output: java.io.OutputStream): Long =
+        withContext(Dispatchers.IO) { workspace.exportFileForUi(path, output) }
 }
 
 @dagger.Module
