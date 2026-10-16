@@ -70,7 +70,16 @@ class LocalDynamicDocumentFeedbackTest {
         }
         // This card contains no media; a call would expose an unexpected renderer dependency.
         val media = java.lang.reflect.Proxy.newProxyInstance(MediaUiPort::class.java.classLoader,
-            arrayOf(MediaUiPort::class.java)) { _, _, _ -> error("No media should be read") } as MediaUiPort
+            arrayOf(MediaUiPort::class.java)) { proxy, method, args ->
+            when (method.name) {
+                // Compose can compare unchanged dependencies during recomposition.
+                // JVM Object methods aren't media reads and must remain safe.
+                "equals" -> proxy === args?.firstOrNull()
+                "hashCode" -> System.identityHashCode(proxy)
+                "toString" -> "unread-media-owner"
+                else -> error("No media should be read: ${method.name}")
+            }
+        } as MediaUiPort
         val forms = LocalUiDocumentFormState(emptyList()) {}
         compose.setContent { LocalDynamicDocument(snapshot, UiSessionIdentity("s", "activation", 0, null, null), port, forms, media) }
         compose.onNodeWithText("Submit choice").performClick()
