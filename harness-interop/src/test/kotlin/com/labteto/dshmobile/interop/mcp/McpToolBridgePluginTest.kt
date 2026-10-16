@@ -5,6 +5,8 @@ import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.tools.ToolContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.runTest
@@ -27,7 +29,7 @@ import org.junit.Test
 
 class McpToolBridgePluginTest {
     @Test
-    fun unsolicitedTransportExitRevokesOnlyThatServerWithoutReplayingItsTool() = runTest {
+    fun unsolicitedTransportExitRevokesOnlyThatServerWithoutReplayingItsTool() = runBlocking {
         val termination = MutableSharedFlow<Throwable>(replay = 1)
         var remoteCalls = 0
         var closed = 0
@@ -66,7 +68,7 @@ class McpToolBridgePluginTest {
         val revision = plugin.lifecycleRevisions.value
         termination.emit(java.io.IOException("stream ended without a request"))
         withTimeout(5_000) {
-            while (plugin.lifecycleSnapshots().singleOrNull()?.lifecycle != McpServerLifecycle.FAILED) yield()
+            while (plugin.lifecycleSnapshots().singleOrNull()?.lifecycle != McpServerLifecycle.FAILED) delay(10)
         }
         assertTrue(plugin.lifecycleRevisions.value > revision)
         assertNull(registry.context.tools.get(registered.single()))

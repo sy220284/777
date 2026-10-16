@@ -219,10 +219,13 @@
         "AE4V3-12",
         "AE4V3-13"
       ],
-      "status": "not_started",
-      "code_evidence": [],
+      "status": "in_progress",
+      "code_evidence": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/workflow/TaskGraphExecutor.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkflowCoordinator.kt"
+      ],
       "tests_verified": [],
-      "notes": ""
+      "notes": "本轮重构并接入 DAG 图调度器（不可变拓扑、依赖条件、环与容量原子拒绝、执行并发上限、独立分支隔离、阻塞传播、Work 只读委托验收）。删除旧 HarnessWorkflowRunner 及旧测试；Agent Team 的持久 TaskGraph/恢复仍待统一，不能标记完成。"
     },
     {
       "id": "AE4V3-15",
@@ -375,21 +378,16 @@
   "status": "first incremental implementation, not entire refactor",
   "current_slice": {
     "date": "2026-10-16",
-    "component": "AgentTurnEngine Kotlin native core production cutover",
-    "prior_head": "ab9504061c944186a32987e8a97125c37bb9eae3",
-    "changed": [
-      "AgentLoop removed",
-      "AgentExecutionContracts",
-      "AgentTurnState",
-      "AgentToolDispatch",
-      "AgentTurnEngine",
-      "Work",
-      "Subagent",
-      "Reference Validation",
-      "new engine test"
+    "component": "Kotlin DAG TaskGraph and Work workflow production cutover; MCP deterministic test clock",
+    "status": "committed_ci_pending",
+    "pr": 705,
+    "origin_head": "4dea5eb43a365da95d98646cf7250c6201c3fcbd",
+    "changes": [
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/workflow/TaskGraphExecutor.kt",
+      "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/workflow/TaskGraphExecutorTest.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkflowCoordinator.kt",
+      "harness-interop/src/test/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePluginTest.kt"
     ],
-    "status": "submitted_ci_pending",
-    "description": "An actual core replacement and old implementation exit, not Goal patches",
     "tests_verified": []
   }
 }
