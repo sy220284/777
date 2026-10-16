@@ -235,20 +235,14 @@ fun V6ConversationScene(
             restored.none { it.id == anchor.messageId } && ports.history != null) {
             loadingHistory = true
             try {
-                repeat(25) {
-                    if (!more || restored.any { it.id == anchor.messageId }) return@repeat
-                    val page = withContext(Dispatchers.IO) {
-                        ports.history.messagePage(target.sessionId, restoreCursor, 100)
-                    }
-                    val next = (page.messages + restored).distinctBy { it.id }
-                    if (next.size == restored.size && page.nextCursor == restoreCursor) {
-                        more = false
-                    } else {
-                        restored = next
-                        restoreCursor = page.nextCursor
-                        more = page.nextCursor != null
-                    }
-                }
+                val lookup = locateV6HistoryAnchor(
+                    owner = ports.history, sessionId = target.sessionId,
+                    initial = restored, initialCursor = restoreCursor, initiallyHasOlder = more,
+                    targetMessageId = anchor.messageId, maxPages = 25,
+                )
+                restored = lookup.messages
+                restoreCursor = lookup.nextCursor
+                more = lookup.hasOlder
                 if (restored != messages) {
                     older = restored.filterNot { it.id in seen }
                     cursor = restoreCursor
@@ -632,4 +626,45 @@ fun V6ConversationScene(
             Text("发送暂不可用：${rejection.name}", color = LocalSyColors.current.textSecondary)
         }
     }
+}
+
+/**
+ * Opaque paging only: never guess message offsets from timestamps, IDs or search snippets.
+ * The bounded result is intentionally incomplete on very long histories; callers must
+ * disclose that instead of claiming to have located a missing target.
+ */
+internal data class V6HistoryAnchorLookup(
+    val messages: List<UiMessageSnapshot>,
+    val nextCursor: UiTranscriptCursor?,
+    val hasOlder: Boolean,
+    val found: Boolean,
+)
+
+internal suspend fun locateV6HistoryAnchor(
+    owner: UiMessageHistoryPort,
+    sessionId: String,
+    initial: List<UiMessageSnapshot>,
+    initialCursor: UiTranscriptCursor?,
+    initiallyHasOlder: Boolean,
+    targetMessageId: String,
+    maxPages: Int,
+): V6HistoryAnchorLookup {
+    require(maxPages in 1..100) { "历史定位分页预算无效" }
+    var messages = initial
+    var cursor = initialCursor
+    var hasOlder = initiallyHasOlder
+    for (index in 0 until maxPages) {
+        if (!hasOlder || messages.any { it.id == targetMessageId }) break
+        val page = withContext(Dispatchers.IO) { owner.messagePage(sessionId, cursor, 100) }
+        val next = (page.messages + messages).distinctBy { it.id }
+        if (next.size == messages.size && page.nextCursor == cursor) {
+            hasOlder = false // Defensive stop for a broken or repeating owner continuation.
+            break
+        }
+        messages = next
+        cursor = page.nextCursor
+        hasOlder = cursor != null
+    }
+    return V6HistoryAnchorLookup(messages, cursor, hasOlder,
+        messages.any { it.id == targetMessageId })
 }
