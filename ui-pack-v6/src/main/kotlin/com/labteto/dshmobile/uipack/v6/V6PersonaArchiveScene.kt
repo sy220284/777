@@ -24,6 +24,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.uicontract.DeletePersonaGalleryCommand
 import com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort
+import com.labteto.dshmobile.uicontract.PersonaAuthoringUiPort
+import com.labteto.dshmobile.uicontract.UiPersonaInspection
+import com.labteto.dshmobile.uicontract.UiPersonaInspectionReceipt
+import com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt
 import com.labteto.dshmobile.uicontract.PersonaGalleryUiCommand
 import com.labteto.dshmobile.uicontract.PersonaGalleryUiPort
 import com.labteto.dshmobile.uicontract.PersonaSelectionUiCommand
@@ -65,6 +69,7 @@ fun V6PersonaArchiveScene(
     selection: PersonaSelectionUiPort,
     stories: PersonaStoryUiPort?,
     deletion: PersonaGalleryDeletionUiPort?,
+    authoring: PersonaAuthoringUiPort? = null,
     part: V6PersonaArchivePart,
     onBack: () -> Unit,
 ) {
@@ -83,6 +88,9 @@ fun V6PersonaArchiveScene(
     var notes by remember(activeGallery, activeStory) { mutableStateOf("") }
     var stage by remember(activeGallery, activeStory) { mutableStateOf("") }
     var deleteTarget by remember(activeGallery, activeStory) { mutableStateOf<Pair<String, String?>?>(null) }
+    var inspection by remember(activeGallery, activeStory) { mutableStateOf<UiPersonaInspection?>(null) }
+    var suggestionIndices by remember(activeGallery, activeStory) { mutableStateOf<Set<Int>>(emptySet()) }
+    var confirmSuggestions by remember(activeGallery, activeStory) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     suspend fun readGallery(clearNotice: Boolean = true) {
@@ -273,6 +281,65 @@ fun V6PersonaArchiveScene(
                         gallery.submit(PersonaGalleryUiCommand.RenameStory(id, sid, rename)))
                 }, afterSuccess = true)
             }, enabled = !pending && rename.isNotBlank(), style = SyButtonStyle.SECONDARY)
+            if (authoring != null && currentIdentity != null) {
+                SyButton("检查人物与故事设定", {
+                    if (!pending) {
+                        val id = chosen.id
+                        val sid = story.id
+                        val expected = currentIdentity
+                        pending = true
+                        scope.launch {
+                            try {
+                                val receipt = withContext(Dispatchers.IO) {
+                                    authoring.inspect(expected, id, sid)
+                                }
+                                if (activeGallery == id && activeStory == sid &&
+                                    selection.snapshot().identity == expected) {
+                                    when (receipt) {
+                                        is UiPersonaInspectionReceipt.Inspected -> {
+                                            inspection = receipt.inspection
+                                            suggestionIndices = receipt.inspection.suggestions.indices.toSet()
+                                            notice = "检查返回 ${receipt.inspection.conflicts.size} 条冲突、${receipt.inspection.suggestions.size} 条建议；尚未更改人物档案"
+                                        }
+                                        UiPersonaInspectionReceipt.Rejected ->
+                                            notice = "原 Owner 拒绝检查请求"
+                                        is UiPersonaInspectionReceipt.Failed ->
+                                            notice = receipt.message ?: "设定检查失败"
+                                    }
+                                }
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (failure: Exception) { notice = failure.message ?: "设定检查失败" }
+                            finally { pending = false }
+                        }
+                    }
+                }, enabled = !pending && !loading,
+                    style = SyButtonStyle.SECONDARY)
+                inspection?.takeIf { it.galleryId == chosen.id }?.let { examined ->
+                    Text("检查版本：${examined.revision} · 建议尚未应用")
+                    examined.conflicts.forEach { issue ->
+                        SyGlassCard(Modifier.fillMaxWidth()) {
+                            Text("冲突：" + issue.field)
+                            Text("期望：" + issue.fixedValue)
+                            Text("实际：" + issue.observedValue)
+                            Text(issue.reason)
+                        }
+                    }
+                    examined.suggestions.forEachIndexed { index, suggestion ->
+                        SyGlassCard(Modifier.fillMaxWidth()) {
+                            Text(suggestion.field + "：" + suggestion.value)
+                            Text("建议依据：" + suggestion.evidence)
+                            com.shenyan.designsystem.components.SySwitch(
+                                "应用此条建议", index in suggestionIndices,
+                                onCheckedChange = { checked ->
+                                    suggestionIndices = if (checked) suggestionIndices + index
+                                        else suggestionIndices - index
+                                })
+                        }
+                    }
+                    SyButton("确认并应用所选建议", { confirmSuggestions = true },
+                        enabled = suggestionIndices.isNotEmpty() && !pending && !loading)
+                }
+            }
             SyButton(if (historyLoaded) "重新读取历史" else "读取历史消息", {
                 loadHistory(false)
             }, enabled = !pending, style = SyButtonStyle.SECONDARY)
@@ -287,6 +354,52 @@ fun V6PersonaArchiveScene(
                     enabled = !pending)
             }
         }
+    }
+    if (confirmSuggestions) {
+        val examined = inspection
+        val owner = authoring
+        AlertDialog(onDismissRequest = { if (!pending) confirmSuggestions = false },
+            title = { Text("将检查建议写入人物档案？") },
+            text = { Text("只写入勾选的建议，由 Chat Owner 使用档案版本 ${examined?.revision} 再次校验。保存图库不会自动改变正在运行的角色。") },
+            confirmButton = { TextButton(onClick = {
+                confirmSuggestions = false
+                val doc = examined ?: return@TextButton
+                val author = owner ?: return@TextButton
+                val galleryId = activeGallery ?: return@TextButton
+                if (doc.galleryId != galleryId || pending ||
+                    suggestionIndices.isEmpty()) return@TextButton
+                val chosenSuggestions = doc.suggestions.filterIndexed { index, _ ->
+                    index in suggestionIndices
+                }
+                pending = true
+                scope.launch {
+                    try {
+                        val receipt = withContext(Dispatchers.IO) {
+                            author.applySuggestions(galleryId, doc.revision, chosenSuggestions)
+                        }
+                        if (activeGallery == galleryId) {
+                            notice = when (receipt) {
+                                is UiPersonaAuthoringReceipt.Saved -> {
+                                    inspection = null; suggestionIndices = emptySet()
+                                    readGallery(clearNotice = false)
+                                    "所选建议已保存至人物图库，前台人物仍须显式重新选择"
+                                }
+                                is UiPersonaAuthoringReceipt.Rejected ->
+                                    "档案版本或权限已变化，未覆盖，请重新检查：" + receipt.reason.name
+                                is UiPersonaAuthoringReceipt.Failed ->
+                                    receipt.message ?: "建议写入失败"
+                                else -> "未收到图库保存确认，请重新检查"
+                            }
+                        }
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (failure: Exception) { notice = failure.message ?: "建议写入失败" }
+                    finally { pending = false }
+                }
+            }, enabled = !pending) { Text("确认保存") } },
+            dismissButton = { TextButton(onClick = { confirmSuggestions = false }) {
+                Text("取消")
+            } },
+        )
     }
     deleteTarget?.let { (galleryId, storyId) ->
         AlertDialog(
