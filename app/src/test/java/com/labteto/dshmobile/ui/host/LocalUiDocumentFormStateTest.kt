@@ -72,6 +72,40 @@ class LocalUiDocumentFormStateTest {
         assertTrue(saved.size <= 1 + 24 * 5)
     }
 
+    @Test fun sensitiveFieldsStayEditableButAreNotWrittenIntoSavedState() {
+        var snapshot = arrayListOf<String>()
+        val key = UiDocumentFormKey("session", "credentials", 2)
+        val form = LocalUiDocumentFormState(emptyList()) { snapshot = it }
+        form.update(key, "apiKey", "sk-example-private")
+        form.update(key, "refresh_token", "sensitive-refresh")
+        form.update(key, "password", "very-private")
+        form.update(key, "ordinary", "safe-public")
+        assertEquals("sk-example-private", form.values.value[key]?.get("apiKey"))
+        assertEquals("sensitive-refresh", form.values.value[key]?.get("refresh_token"))
+        assertEquals("very-private", form.values.value[key]?.get("password"))
+        assertEquals("safe-public", form.values.value[key]?.get("ordinary"))
+        assertFalse(snapshot.any { "private" in it || "sensitive-refresh" in it })
+        val restored = LocalUiDocumentFormState(snapshot) {}
+        assertEquals(mapOf("ordinary" to "safe-public"), restored.values.value[key])
+    }
+
+    @Test fun oldUntrustedSavedStateCannotReintroduceSensitiveCredentials() {
+        val records = listOf("ui-document-form-v2",
+            "s", "doc", "1", "clientSecret", "secret-restored",
+            "s", "doc", "1", "secretary", "valid-name",
+            "s", "doc", "1", "tokenizer", "valid-code",
+            "s", "doc", "1", "access_token", "secret-access",
+            "s", "doc", "1", "ordinary", "safe")
+        val form = LocalUiDocumentFormState(records) {}
+        assertEquals(mapOf("secretary" to "valid-name", "tokenizer" to "valid-code",
+            "ordinary" to "safe"), form.values.value[UiDocumentFormKey("s", "doc", 1)])
+        val legacy = LocalUiDocumentFormState(
+            listOf("s", "doc", "password", "old-password",
+                "s", "doc", "ordinary", "safe")) {}
+        assertEquals(mapOf("ordinary" to "safe"),
+            legacy.values.value[UiDocumentFormKey("s", "doc", 0)])
+    }
+
     @Test fun deletedDocumentDraftsCannotReturnFromSavedState() {
         var saved = arrayListOf<String>()
         val forms = LocalUiDocumentFormState(emptyList()) { saved = it }
