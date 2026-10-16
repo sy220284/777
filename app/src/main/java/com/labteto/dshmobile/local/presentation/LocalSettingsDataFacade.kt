@@ -84,7 +84,7 @@ class LocalSettingsDataFacade @Inject internal constructor(
         memoryStore.listActiveFromMessage(sessionId, messageId)
 }
 
-private fun DeepSeekPricingState.asUiProviderPricing() = UiProviderPricingSnapshot(
+internal fun DeepSeekPricingState.asUiProviderPricing() = UiProviderPricingSnapshot(
     models = models.map { model ->
         UiProviderPriceModel(
             modelId = model.modelId,
