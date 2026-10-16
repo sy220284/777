@@ -41,6 +41,15 @@ class OpenAiResponsesClientTest {
         Json { ignoreUnknownKeys = true },
     )
 
+    private fun planToolNamespaces(payload: JsonObject): JsonArray {
+        assertFalse("Responses Lite must not emit top-level tools", "tools" in payload)
+        val item = payload["input"]!!.jsonArray.first().jsonObject
+        assertEquals("additional_tools", item["type"]!!.jsonPrimitive.content)
+        assertEquals("developer", item["role"]!!.jsonPrimitive.content)
+        assertTrue(item["id"]!!.jsonPrimitive.content.startsWith("at_"))
+        return item["tools"]!!.jsonArray
+    }
+
     @Test
     fun apiAndPlanReasoningSelectionPreserveDefaultAndUseNativeFields() {
         listOf(false, true).forEach { plan ->
@@ -352,9 +361,8 @@ class OpenAiResponsesClientTest {
         ]""").jsonArray
         listOf(false, true).forEach { plan ->
             val payload = client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = plan)
-            val emitted = payload["tools"]!!.jsonArray.let {
-                if (plan) it.single().jsonObject["tools"]!!.jsonArray else it
-            }
+            val emitted = if (plan) planToolNamespaces(payload).single().jsonObject["tools"]!!.jsonArray
+                else payload["tools"]!!.jsonArray
             assertEquals("false", emitted[0].jsonObject["strict"]!!.jsonPrimitive.content)
             assertEquals("true", emitted[1].jsonObject["strict"]!!.jsonPrimitive.content)
             assertEquals(tools[0].jsonObject["function"]!!.jsonObject["parameters"], emitted[0].jsonObject["parameters"])
@@ -770,9 +778,11 @@ class OpenAiResponsesClientTest {
     @Test
     fun explicitSearchGetsNativeWebSearchOnlyWithoutLocalToolsAndOnlyWithPlan() {
         val prompt = listOf(buildJsonObject { put("role", "user"); put("content", "联网搜索今天的新闻") })
-        val plan = client.buildPayload("gpt-6-astra", prompt, JsonArray(emptyList()),
-            temperature = null, planSharing = true)
-        assertEquals("web_search", plan["tools"]!!.jsonArray.single().jsonObject["type"]?.jsonPrimitive?.content)
+        val rejection = runCatching {
+            client.buildPayload("gpt-6-astra", prompt, JsonArray(emptyList()),
+                temperature = null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("CHATGPT_PLAN_UNSUPPORTED_CAPABILITY", rejection?.code)
         val api = client.buildPayload("gpt-6-astra", prompt, JsonArray(emptyList()),
             temperature = null, planSharing = false)
         assertFalse("tools" in api)
@@ -827,6 +837,23 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun planSharingUsesCodexResponsesLiteAdditionalToolsInsteadOfTopLevelTools() {
+        val catalog = Json.parseToJsonElement("""[
+            {"type":"function","function":{"name":"read_file","description":"read",
+            "parameters":{"type":"object","properties":{}}}}
+        ]""").jsonArray
+        val messages = listOf(buildJsonObject { put("role", "user"); put("content", "读取文件") })
+        val first = client.buildPayload("gpt-test", messages, catalog, null, planSharing = true)
+        val second = client.buildPayload("gpt-test", messages, catalog, null, planSharing = true)
+        assertEquals(planToolNamespaces(first), planToolNamespaces(second))
+        assertEquals("user", first["input"]!!.jsonArray[1].jsonObject["role"]?.jsonPrimitive?.content)
+        val apiKey = client.buildPayload("gpt-test", messages, catalog, null, planSharing = false)
+        assertTrue("tools" in apiKey)
+        assertEquals("user", apiKey["input"]!!.jsonArray.first().jsonObject["role"]?.jsonPrimitive?.content)
+        client.validateRequestPayload(first, planSharing = true)
+    }
+
+    @Test
     fun chatGptPlanWrapsFunctionToolsInNamespace() {
         val tools = JsonArray(
             listOf(
@@ -855,7 +882,7 @@ class OpenAiResponsesClientTest {
             planSharing = true,
         )
 
-        val namespace = payload["tools"]!!.jsonArray.single().jsonObject
+        val namespace = planToolNamespaces(payload).single().jsonObject
         assertEquals("namespace", namespace["type"]?.jsonPrimitive?.content)
         assertEquals("local", namespace["name"]?.jsonPrimitive?.content)
         val function = namespace["tools"]!!.jsonArray.single().jsonObject
@@ -889,7 +916,7 @@ class OpenAiResponsesClientTest {
             temperature = null,
             planSharing = true,
         )
-        val namespace = payload["tools"]!!.jsonArray.single().jsonObject
+        val namespace = planToolNamespaces(payload).single().jsonObject
 
         assertEquals("namespace", namespace["type"]?.jsonPrimitive?.content)
         assertEquals("local", namespace["name"]?.jsonPrimitive?.content)
@@ -918,9 +945,8 @@ class OpenAiResponsesClientTest {
                 temperature = null,
                 planSharing = plan,
             )
-            val emitted = payload["tools"]!!.jsonArray.let { outer ->
-                if (plan) outer.single().jsonObject["tools"]!!.jsonArray else outer
-            }.single().jsonObject
+            val emitted = (if (plan) planToolNamespaces(payload).single().jsonObject["tools"]!!.jsonArray
+                else payload["tools"]!!.jsonArray).single().jsonObject
 
             assertEquals("function", emitted["type"]?.jsonPrimitive?.content)
             assertEquals("minimal_tool", emitted["name"]?.jsonPrimitive?.content)
@@ -940,7 +966,7 @@ class OpenAiResponsesClientTest {
             temperature = null,
             planSharing = true,
         )
-        val namespace = payload["tools"]!!.jsonArray.single().jsonObject
+        val namespace = planToolNamespaces(payload).single().jsonObject
         assertTrue(namespace["description"]?.jsonPrimitive?.content.orEmpty().isNotBlank())
 
         namespace["tools"]!!.jsonArray.forEach { element ->
@@ -1035,7 +1061,7 @@ class OpenAiResponsesClientTest {
             temperature = null,
             planSharing = true,
         )
-        val function = payload["tools"]!!.jsonArray.single().jsonObject["tools"]!!
+        val function = planToolNamespaces(payload).single().jsonObject["tools"]!!
             .jsonArray.single().jsonObject
 
         assertEquals("true", function["strict"]!!.jsonPrimitive.content)

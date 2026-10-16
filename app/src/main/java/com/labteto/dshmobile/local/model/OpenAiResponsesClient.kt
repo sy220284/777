@@ -87,6 +87,9 @@ class OpenAiResponsesClient @Inject constructor(
             .url(responsesEndpoint(baseUrl, planSharing))
             .header("Authorization", "Bearer $accessToken")
             .header("Content-Type", "application/json")
+            .apply {
+                if (planSharing) header("x-openai-internal-codex-responses-lite", "true")
+            }
             .post(payload.toString().toRequestBody(JSON_MEDIA).withModelAdmissionTracking(admissionTracker))
             .build()
         var admittedRequestId: String? = null
@@ -234,11 +237,20 @@ class OpenAiResponsesClient @Inject constructor(
             )
         }
         if (!planSharing) return
+        if ((payload["tools"] as? JsonArray)?.isNotEmpty() == true) {
+            throw LocalModelException(
+                code = "CHATGPT_PLAN_UNSUPPORTED_CAPABILITY",
+                message = "ChatGPT 套餐 Responses Lite 只接受 input.additional_tools，禁止顶层 tools",
+                retryable = false,
+            )
+        }
         val unsupportedTools = setOf(
             "image_generation", "file_search", "code_interpreter", "computer",
             "mcp", "tool_search", "programmatic_tool_calling",
         )
-        val unsupported = (payload["tools"] as? JsonArray).orEmpty()
+        val unsupported = input.mapNotNull { it as? JsonObject }
+            .filter { it["type"]?.jsonPrimitive?.contentOrNull == "additional_tools" }
+            .flatMap { (it["tools"] as? JsonArray).orEmpty() }
             .mapNotNull { it as? JsonObject }
             .firstOrNull { it["type"]?.jsonPrimitive?.contentOrNull in unsupportedTools }
         if (unsupported != null) throw LocalModelException(
@@ -301,7 +313,6 @@ class OpenAiResponsesClient @Inject constructor(
         val nativeImageToolEnabled = enableImageGenerationTool && !planSharing
         put("model", model)
         responseInstructions(messages).takeIf(String::isNotBlank)?.let { put("instructions", it) }
-        put("input", responseInput(messages))
         put("store", false)
         put("stream", true)
         reasoningEffort?.let { effort ->
@@ -332,14 +343,29 @@ class OpenAiResponsesClient @Inject constructor(
             put("include", buildJsonArray { add(JsonPrimitive("reasoning.encrypted_content")) })
         }
         val adaptedTools = responseTools(tools, planSharing, enforceOpenAiToolSchema)
-        // Native search is opt-in per explicit user request and only when no local tool
-        // already owns search. Model/workspace policy is decided by the official route.
-        val nativeWebSearchEnabled = planSharing &&
-            adaptedTools.isEmpty() && explicitNativeWebSearchRequested(messages)
-        if (adaptedTools.isNotEmpty() || nativeImageToolEnabled || nativeWebSearchEnabled) {
+        // Codex Responses Lite accepts executable namespaces as a developer input item.
+        // Top-level tools belongs exclusively to the standard API-key Responses route.
+        if (planSharing && adaptedTools.isEmpty() && explicitNativeWebSearchRequested(messages)) {
+            throw LocalModelException(
+                code = "CHATGPT_PLAN_UNSUPPORTED_CAPABILITY",
+                message = "套餐共享 Responses Lite 不支持直接请求托管 web_search，请通过已配置的本地搜索工具执行",
+                retryable = false,
+            )
+        }
+        put("input", buildJsonArray {
+            if (planSharing && adaptedTools.isNotEmpty()) {
+                add(buildJsonObject {
+                    put("type", "additional_tools")
+                    put("id", "at_" + UUID.nameUUIDFromBytes(adaptedTools.toString().toByteArray(Charsets.UTF_8)))
+                    put("role", "developer")
+                    put("tools", adaptedTools)
+                })
+            }
+            responseInput(messages).forEach(::add)
+        })
+        if (!planSharing && (adaptedTools.isNotEmpty() || nativeImageToolEnabled)) {
             put("tools", buildJsonArray {
                 adaptedTools.forEach(::add)
-                if (nativeWebSearchEnabled) add(buildJsonObject { put("type", "web_search") })
                 if (nativeImageToolEnabled) {
                     add(buildJsonObject {
                         put("type", "image_generation")
