@@ -103,6 +103,9 @@ fun AppRoot(
             },
             availableCapabilities = hostCapabilities,
             requestedSceneKey = requestedExternalSceneKey ?: requestedHostScene,
+            notificationSessionId = requestedLocalSessionId,
+            notificationSessions = features.sessionUiPort,
+            onNotificationSessionProcessed = onLocalSessionRequestConsumed,
             onSceneRequestProcessed = { key, _ ->
                 if (requestedExternalSceneKey == key) onExternalSceneRequestConsumed()
                 else features.consumeUiSceneRequest(key)
