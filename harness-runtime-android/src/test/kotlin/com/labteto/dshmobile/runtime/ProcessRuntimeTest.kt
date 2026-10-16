@@ -25,6 +25,24 @@ class ProcessRuntimeTest {
         assertFalse(result.timedOut)
     }
 
+    @Test(timeout = 15000)
+    fun shortLivedFailingCommandsRetainCompleteStderrToEof() = kotlinx.coroutines.runBlocking {
+        val runtime = AndroidProcessRuntime()
+        repeat(12) { attempt ->
+            val output = runtime.execute(ProcessRequest(
+                command = listOf(
+                    "sh", "-c", "printf start; printf 'permission-$1' >&2; exit 126",
+                    "case", attempt.toString(),
+                ),
+                timeoutMillis = 3_000,
+            ))
+            assertEquals(126, output.exitCode)
+            assertEquals("start", output.stdout)
+            assertEquals("permission-$attempt", output.stderr)
+            assertFalse(output.timedOut)
+        }
+    }
+
     @Test
     fun extraSearchPathCommandCanActuallyExecute() = runTest {
         val dir = kotlin.io.path.createTempDirectory("runtime-path-").toFile()
