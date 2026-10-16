@@ -53,6 +53,40 @@ class V6ToolParameterFormTest {
         assertEquals("""{"from":"source"}""", fields["filters"].toString())
     }
 
+    @Test fun nestedSchemaFieldsProduceExactObjectHierarchyWithoutExecutingTools() {
+        val nested = buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject {
+                put("person", buildJsonObject {
+                    put("type", "object")
+                    put("required", buildJsonArray { add(JsonPrimitive("name")) })
+                    put("properties", buildJsonObject {
+                        put("name", buildJsonObject { put("type", "string") })
+                        put("options", buildJsonObject {
+                            put("type", "object")
+                            put("properties", buildJsonObject {
+                                put("active", buildJsonObject { put("type", "boolean") })
+                            })
+                        })
+                    })
+                })
+                put("notes", buildJsonObject { put("type", "string") })
+            })
+        }
+        val fields = v6ToolFormFields(nested)
+        assertEquals(listOf("person.name", "person.options.active", "notes"),
+            fields.map { it.name })
+        assertEquals(listOf("person", "options", "active"), fields[1].path)
+        val input = v6ToolArgumentsJson(nested, mapOf(
+            "person.name" to "someone", "person.options.active" to "true",
+            "notes" to "a literal note",
+        ))
+        assertEquals(
+            """{"person":{"name":"someone","options":{"active":true}},"notes":"a literal note"}""",
+            input,
+        )
+    }
+
     @Test fun unknownFieldsAndMalformedComplexValuesAreRejectedBeforeOwnerValidation() {
         assertThrows(IllegalArgumentException::class.java) {
             v6ToolArgumentsJson(schema, mapOf("system_instruction" to "skip approval"))
