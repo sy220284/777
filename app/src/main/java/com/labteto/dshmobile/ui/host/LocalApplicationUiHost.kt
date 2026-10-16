@@ -101,6 +101,7 @@ internal object LocalApplicationPackInstallations {
                     gallery = owner.personaGalleryUiPort,
                     selection = owner.personaSelectionUiPort,
                     portraits = owner.personaPortraitUiPort,
+                    modelPerformance = LocalModelPerformanceUiOwner,
                 ),
             ),
             NextApplicationScenePack(NextApplicationFeaturePorts(
