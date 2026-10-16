@@ -98,6 +98,7 @@ import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalMessageBlock
 import com.labteto.dshmobile.local.session.visibleBlocks
+import com.labteto.dshmobile.local.session.plainTextProjection
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
