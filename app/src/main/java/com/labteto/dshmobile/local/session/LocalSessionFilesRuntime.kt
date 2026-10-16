@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.attachment.LocalAttachmentImporter
+import com.labteto.dshmobile.local.attachment.inspectImportedAttachmentFile
+import com.labteto.dshmobile.uicontract.UiAttachmentInspectionReceipt
 import com.labteto.dshmobile.local.files.LocalWorkspace
 import com.labteto.dshmobile.local.files.LocalWorkspaceToolGuide
 import com.labteto.dshmobile.observability.AppLog
@@ -63,6 +65,9 @@ class LocalSessionFilesRuntime @Inject internal constructor(
 
     internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment =
         withContext(Dispatchers.IO) { attachmentImporter.import(uri) }
+
+    internal suspend fun inspectAttachment(item: LocalImportedAttachment): UiAttachmentInspectionReceipt =
+        withContext(Dispatchers.IO) { inspectImportedAttachmentFile(File(workspace.path), item) }
 
     override suspend fun workspaceFiles(): List<LocalWorkspaceFile> =
         withContext(Dispatchers.IO) { coordinator.workspaceFiles() }
