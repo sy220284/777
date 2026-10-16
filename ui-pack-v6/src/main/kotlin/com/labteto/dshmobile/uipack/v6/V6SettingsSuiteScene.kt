@@ -99,6 +99,12 @@ fun V6SettingsSuiteScene(
         "settings.update" -> "检查更新"
         else -> scene.value
     }
+    // Performance has its own scrollable layout. Nesting it inside this page's scroll
+    // would give an unbounded height and crash Compose when navigating the scene.
+    if (scene.value == "settings.model_performance" && performance != null) {
+        V6ModelPerformanceScene(performance, onBack)
+        return
+    }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -175,10 +181,8 @@ fun V6SettingsSuiteScene(
                 }, enabled = !busy && !state.loading &&
                     modelName.isNotBlank() && modelUrl.isNotBlank())
             }
-            "settings.model_performance" -> {
-                if (performance == null) SyNote("模型性能 Owner 未连接，当前不能修改全局参数")
-                else V6ModelPerformanceScene(performance, onBack)
-            }
+            "settings.model_performance" ->
+                SyNote("模型性能 Owner 未连接，当前不能修改全局参数")
             "settings.minimax_quota" -> {
                 val profile = state.miniMaxQuotaProfile
                 if (profile == null) SyNote("当前无可查询的 MiniMax 模型账户")
