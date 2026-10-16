@@ -306,7 +306,7 @@ jobs:
 
   device-artifacts-x86:
     needs: [scope, static-gates, architecture-3-gates]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_device == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
+    if: ${{ always() && github.event_name != 'pull_request' && needs.scope.result == 'success' && needs.scope.outputs.run_device == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -349,7 +349,7 @@ jobs:
   android-16-instrumented:
     # Prewarm emulator and SDK in parallel with shared APK compilation.
     needs: [scope, static-gates, architecture-3-gates]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_android16 == 'true' && needs.scope.outputs.run_device == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
+    if: ${{ always() && github.event_name != 'pull_request' && needs.scope.result == 'success' && needs.scope.outputs.run_android16 == 'true' && needs.scope.outputs.run_device == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -400,7 +400,7 @@ jobs:
   android-17-instrumented:
     # Prewarm emulator and SDK in parallel with shared APK compilation.
     needs: [scope, static-gates, architecture-3-gates]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_android17 == 'true' && needs.scope.outputs.run_device == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
+    if: ${{ always() && github.event_name != 'pull_request' && needs.scope.result == 'success' && needs.scope.outputs.run_android17 == 'true' && needs.scope.outputs.run_device == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -495,6 +495,8 @@ jobs:
           REQUIRE_DEVICE: ${{ needs.scope.outputs.run_device }}
           REQUIRE_ANDROID16: ${{ needs.scope.outputs.run_android16 }}
           REQUIRE_ANDROID17: ${{ needs.scope.outputs.run_android17 }}
+          # PR validates code only; main and manual builds retain full device release gates.
+          CHECK_DEVICE_LANES: ${{ github.event_name != 'pull_request' }}
           STATIC_RESULT: ${{ needs.static-gates.result }}
           ARCHITECTURE_RESULT: ${{ needs.architecture-3-gates.result }}
           FIXTURE_RESULT: ${{ needs.fixture-provenance.result }}
@@ -530,8 +532,10 @@ jobs:
           check_lane "$REQUIRE_FIXTURE" "$FIXTURE_RESULT" "fixture-provenance"
           check_lane "$REQUIRE_UNIT" "$UNIT_RESULT" "unit-tests"
           check_lane "$REQUIRE_BUILD" "$BUILD_RESULT" "build-arm64"
-          check_lane "$REQUIRE_DEVICE" "$DEVICE_RESULT" "device-artifacts-x86"
-          check_lane "$REQUIRE_ANDROID16" "$ANDROID16_RESULT" "android-16-instrumented"
-          check_lane "$REQUIRE_ANDROID17" "$ANDROID17_RESULT" "android-17-instrumented"
+          if [ "$CHECK_DEVICE_LANES" = "true" ]; then
+            check_lane "$REQUIRE_DEVICE" "$DEVICE_RESULT" "device-artifacts-x86"
+            check_lane "$REQUIRE_ANDROID16" "$ANDROID16_RESULT" "android-16-instrumented"
+            check_lane "$REQUIRE_ANDROID17" "$ANDROID17_RESULT" "android-17-instrumented"
+          fi
 
           echo "CI 合并门禁通过：scope=$SCOPE_NAME，所有本次必需检查均成功"
