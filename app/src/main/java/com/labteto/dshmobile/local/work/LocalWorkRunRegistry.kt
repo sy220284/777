@@ -205,22 +205,33 @@ class LocalWorkRunRegistry internal constructor(
             if (binding.runHandle.pendingInputs.size() == 0) onIdle()
             if (binding.runHandle.cancellationRequested) return@synchronized null
 
-            val next = binding.runHandle.pendingInputs.pollCommitted { input, remaining ->
-                val message = input.modelMessage ?: buildJsonObject {
-                    put("role", "user")
-                    put("content", input.content)
+            // Re-validate persisted Goal follow-ups immediately before consuming them.
+            // A goal may have changed after admission (or while the device was suspended).
+            // Stale continuations are durably discarded without entering model history.
+            fun nextAdmissibleInput(): QueuedAgentInput? {
+                while (true) {
+                    var staleGoal = false
+                    val polled = binding.runHandle.pendingInputs.pollCommitted { input, remaining ->
+                        staleGoal = input.kind == QueuedAgentInputKind.WORK_CONTINUATION &&
+                            !isCurrentWorkGoalContinuation(input.continuation, binding.workState.snapshot())
+                        val message = input.modelMessage ?: buildJsonObject {
+                            put("role", "user")
+                            put("content", input.content)
+                        }
+                        binding.eventLog.append(
+                            LOCAL_AGENT_INBOX_EVENT_TYPE,
+                            encodeLocalAgentInboxEvent(
+                                action = if (staleGoal) "goal-continuation-discarded-stale" else "resumed",
+                                pending = remaining,
+                                affected = listOf(input),
+                                modelMessages = if (staleGoal) emptyList() else listOf(message),
+                            ),
+                        )
+                    } ?: return null
+                    if (!staleGoal) return polled
                 }
-                binding.eventLog.append(
-                    LOCAL_AGENT_INBOX_EVENT_TYPE,
-                    encodeLocalAgentInboxEvent(
-                        action = "resumed",
-                        pending = remaining,
-                        affected = listOf(input),
-                        modelMessages = listOf(message),
-                    ),
-                )
             }
-            if (next == null) return@synchronized null
+            val next = nextAdmissibleInput() ?: return@synchronized null
             // A separate user input is a fresh task allowance. Only internal continuation
             // inputs retain the bounded count for their original interrupted task.
             if (next.kind == QueuedAgentInputKind.WORK_CONTINUATION) {
