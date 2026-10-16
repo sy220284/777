@@ -53,11 +53,14 @@ class V6ApplicationScenePack(
         setOf("route.home", "conversation.chat", "conversation.work",
             "conversation.header", "conversation.timeline", "conversation.composer",
             "conversation.reply_status", "work.approval", "work.question").map(::UiSceneId).toSet()
+    private val documentScenes = if (conversations?.documents != null &&
+        conversations.forms != null) setOf(UiSceneId("conversation.ui_document"),
+        UiSceneId("conversation.ui_document_generate")) else emptySet()
 
     override val manifest = UiPackManifest(
         id = "v6-application-migrating", version = 1,
         minContractVersion = UI_CONTRACT_VERSION, maxContractVersion = UI_CONTRACT_VERSION,
-        scenes = pages.keys + sessionSettings + conversationScenes,
+        scenes = pages.keys + sessionSettings + conversationScenes + documentScenes,
         requiredCapabilities = if (conversations == null) emptySet() else
             setOf("chat.send_text", "work.send_text", "chat.edit", "chat.regenerate",
                 "chat.select_variant", "chat.stop", "work.edit", "work.regenerate",
@@ -85,6 +88,24 @@ class V6ApplicationScenePack(
             put(UiSceneId("conversation.work"), UiSceneRenderer { scope ->
                 V6ConversationScene(owners, workMode = true, onBack = { scope.onBack(); Unit })
             })
+            val docOwner = owners.documents
+            val formOwner = owners.forms
+            if (docOwner != null && formOwner != null) {
+                put(UiSceneId("conversation.ui_document"), UiSceneRenderer { scope ->
+                    val mode = owners.workModeUpdates
+                        ?.collectAsStateWithLifecycle(initialValue = owners.workMode())?.value
+                        ?: owners.workMode()
+                    V6UiDocumentScene(owners, docOwner, formOwner, owners.media,
+                        workMode = mode, onBack = { scope.onBack(); Unit })
+                })
+                put(UiSceneId("conversation.ui_document_generate"), UiSceneRenderer { scope ->
+                    val mode = owners.workModeUpdates
+                        ?.collectAsStateWithLifecycle(initialValue = owners.workMode())?.value
+                        ?: owners.workMode()
+                    V6UiDocumentScene(owners, docOwner, formOwner, owners.media,
+                        workMode = mode, onBack = { scope.onBack(); Unit }, generationOnly = true)
+                })
+            }
             listOf(
                 "conversation.header" to V6ConversationPart.HEADER,
                 "conversation.timeline" to V6ConversationPart.TIMELINE,
