@@ -242,8 +242,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "copy": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "Android LocalClipboardManager.setText(AnnotatedString(message.text))",
+          "receiptType": "OS clipboard write; screen-local feedback",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
@@ -1471,8 +1471,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "UiHostSceneNavigation.navigate(state, childSettingsScene)",
+          "receiptType": "UiSceneNavigationResult",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1500,8 +1500,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "V6SessionSettingsScene -> UiHostSceneNavigation.navigate(settings.chat)",
+          "receiptType": "UiSceneNavigationResult; SettingsUiPort.submit in child scene",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1587,8 +1587,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SettingsUiPort.save(SettingsUiCommand.SaveModel) / submit(SelectModel/RemoveModel)",
+          "receiptType": "SettingsUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1645,8 +1645,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SettingsUiPort.connectChatGpt / selectChatGptAccount / disconnectChatGptAccount / removeChatGptAccount",
+          "receiptType": "suspend Owner outcome + ChatGptUiState flow",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1848,8 +1848,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SettingsUiPort.submit(SettingsUiCommand.Personalization)",
+          "receiptType": "SettingsUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1877,8 +1877,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SettingsUiPort.submit(SettingsUiCommand.Personalization)",
+          "receiptType": "SettingsUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1906,8 +1906,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "MemoryUiPort.submit(MemoryUiCommand.Update/Forget)",
+          "receiptType": "MemoryUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1935,8 +1935,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "HostPreferencesUiPort.openSystemPermissions() in V6PreferencesScene",
+          "receiptType": "Boolean from Host-native OS settings entry",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1993,8 +1993,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SettingsUiPort.submit(SettingsUiCommand.RuntimeLimits)",
+          "receiptType": "SettingsUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -2022,8 +2022,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SettingsUiPort.compactSessionStorage() following explicit confirmation",
+          "receiptType": "LocalSessionStorageStatus",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -2074,14 +2074,14 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "check_update": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "LocalApplicationUiHost.checkForUpdate callback passed into V6SettingsSuiteScene",
+          "receiptType": "Owner updateStatus StateFlow",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "observe_download_install_status": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "V6SettingsSuiteScene.updateStatus.collectAsStateWithLifecycle()",
+          "receiptType": "StateFlow<String?> observed Owner status",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
