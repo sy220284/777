@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.attachment.copyAttachmentCancellably
+import com.labteto.dshmobile.local.attachment.commitImportedAttachmentFile
+import java.io.File
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
@@ -14,10 +16,37 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalAttachmentImporterTest {
+    @Test
+    fun committingAttachmentDoesNotReplaceAnExistingSharedHash() {
+        val dir = kotlin.io.path.createTempDirectory("attachment-dedup").toFile()
+        try {
+            val incoming = File(dir, ".incoming").apply { writeText("new contents") }
+            val existing = File(dir, "digest.txt").apply { writeText("existing") }
+            commitImportedAttachmentFile(incoming, existing)
+            assertEquals("existing", existing.readText())
+            // Caller owns this temporary file even when a duplicate target exists.
+            assertEquals("new contents", incoming.readText())
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test
+    fun committingNewAttachmentPublishesACompleteFile() {
+        val dir = kotlin.io.path.createTempDirectory("attachment-commit").toFile()
+        try {
+            val incoming = File(dir, ".incoming").apply { writeText("complete attachment") }
+            val target = File(dir, "digest.txt")
+            commitImportedAttachmentFile(incoming, target)
+            assertEquals("complete attachment", target.readText())
+            assertFalse(incoming.exists())
+            assertTrue(dir.listFiles().orEmpty().none { it.name.startsWith(".commit-") })
+        } finally { dir.deleteRecursively() }
+    }
+
     @Test
     fun attachmentLargerThanOldTwentyMegabyteLimitCopiesWithoutRejection() = runBlocking {
         val size = 21L * 1024L * 1024L
