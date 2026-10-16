@@ -24,7 +24,9 @@ internal fun projectRequirementEvidenceLinks(
         if (event.type != "work/requirement-evidence") return@forEach
         val data = event.data
         val savedGoal = (data["goal_id"] as? JsonPrimitive)?.contentOrNull
-        if (savedGoal != null && savedGoal != goalId) return@forEach
+        // Legacy unscoped references are readable only while there is no active goal.
+        // Reusing an identical task title in another goal must never inherit evidence.
+        if (savedGoal != goalId) return@forEach
         val index = (data["requirement_index"] as? JsonPrimitive)?.intOrNull ?: return@forEach
         val text = (data["requirement"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
         val path = (data["artifact_path"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
