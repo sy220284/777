@@ -43,17 +43,6 @@ internal fun projectRequirementEvidenceLinks(
     return linked.values.toList().sortedBy(LocalRequirementEvidenceLink::requirementIndex)
 }
 
-/** User review is independent of the file reference and never asserts an automatic pass. */
-internal data class LocalRequirementEvidenceReview(
-    val requirementIndex: Int,
-    val requirement: String,
-    val artifactPath: String,
-    val linkSequence: Long,
-    val version: String,
-    val reviewSequence: Long,
-    val approvedByUser: Boolean,
-)
-
 /** Reviews bind to one exact current link/goal/version. Replacing a link invalidates old reviews. */
 internal fun projectRequirementEvidenceReviews(
     events: Sequence<LocalSessionEventLog.Event>,
