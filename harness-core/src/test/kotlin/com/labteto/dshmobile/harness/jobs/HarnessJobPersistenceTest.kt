@@ -187,6 +187,7 @@ class HarnessJobPersistenceTest {
             resumeKind = "subagent_readonly",
             resumePayload = "{}",
             ownerId = "session-A",
+            continuable = true,
         ) { _, _ ->
             throw JobExecutionSliceBoundaryException(IllegalStateException("WORK_BUDGET_EXHAUSTED"))
         }
