@@ -18,6 +18,8 @@ import com.labteto.dshmobile.automation.AutomationStatus
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.uicontract.ConversationReadingUiPort
+import com.labteto.dshmobile.uicontract.UiReadingAnchor
 import com.labteto.dshmobile.uicontract.*
 import com.labteto.dshmobile.uihost.UiSceneNavigationResult
 import com.shenyan.designsystem.components.*
@@ -420,7 +422,7 @@ fun V6SessionShellScene(
 @Composable
 fun V6GlobalHistorySearchScene(
     sessions: SessionUiPort, history: UiMessageHistoryPort,
-    onOpen: () -> Unit, onBack: () -> Unit,
+    reading: ConversationReadingUiPort?, onOpen: () -> Unit, onBack: () -> Unit,
 ) {
     data class Result(val sessionId: String, val title: String, val message: UiMessageSnapshot)
     var query by remember { mutableStateOf("") }
@@ -500,8 +502,13 @@ fun V6GlobalHistorySearchScene(
                                         }
                                     }
                                     if (openingSession == target) {
-                                        if (activated != null) onOpen()
-                                        else feedback = "会话切换尚未生效，请从会话列表确认后重试"
+                                        if (activated != null) {
+                                            // This is a presentation anchor only, not a mutating
+                                            // Chat/Work action or a fabricated session activation.
+                                            reading?.rememberAnchor(target,
+                                                UiReadingAnchor(result.message.id, 0, false))
+                                            onOpen()
+                                        } else feedback = "会话切换尚未生效，请从会话列表确认后重试"
                                     }
                                 } catch (cancelled: CancellationException) { throw cancelled }
                                 catch (failure: Exception) {
