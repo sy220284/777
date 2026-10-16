@@ -38,7 +38,7 @@
       "codeStatus": "CODE_IMPLEMENTED_UNVERIFIED",
       "verification": "DEFERRED",
       "remaining": "待实机对照当前菜单/二级隐性入口与 Figma/V6.3 可见布局，人工复核全部78场景的用户可达性、动画与可访问性；代码清单完整不等于设备签收。",
-      "implemented": "现行 7 主路由与 LocalFeatureCatalog、21 项设置入口与 SettingsDestination 已由 LocalUiSceneCatalogTest 精确核验；78 个 Scene 与 LocalUiSceneCatalog 有逐项源码矩阵，V6FullSceneCoverageTest 检验独立 V6 的 75 Renderer。CI 的 check-ui-r4-scene-matrix.py 现额外拒绝不存在/越界源文件、退役路由、原生入口身份漂移，并有自测；check-ui-design-system-boundaries.py 对照当前 V6 设计清单、离线样图、原生导航与设置枚举。历史 9 路由/38 屏保持退役。"
+      "implemented": "现行 7 主路由与 LocalFeatureCatalog、21 项设置入口与 SettingsDestination 已由 LocalUiSceneCatalogTest 精确核验；78 个 Scene 与 LocalUiSceneCatalog 有逐项源码矩阵，V6FullSceneCoverageTest 检验独立 V6 的 75 Renderer。CI 的 check-ui-r4-scene-matrix.py 现额外拒绝不存在/越界源文件、退役路由、原生入口身份漂移，并有自测；check-ui-design-system-boundaries.py 对照当前 V6 设计清单、离线样图、原生导航与设置枚举。历史 9 路由/38 屏保持退役。 2026-10-16 本轮核实设置首页 16 个分组条目中的 settings.update 属于退役独立页面的 SLOT（Host 导航拒绝），已改为在设置首页原位调用真实 checkForUpdate 并显示状态，不变更 SceneKind，不恢复独立更新页；追加 Host 目录约束测试。"
     },
     {
       "id": "S1-01",
