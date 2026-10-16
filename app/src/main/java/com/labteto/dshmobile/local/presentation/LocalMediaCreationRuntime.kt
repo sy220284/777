@@ -196,15 +196,23 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         }
     }
     suspend fun submitSpeech(offer: LocalMediaOffer, text: String, voice: String, sessionId: String, sourceMessageId: String? = null, revisionOf: String? = null): LocalMediaCreationJob {
-        validate(offer, LocalMediaKind.SPEECH); require(text.isNotBlank() && voice.isNotBlank())
-        return submit(offer, sessionId, text, sourceMessageId, revisionOf) { id ->
+        validate(offer, LocalMediaKind.SPEECH)
+        val spoken = speechPayloadText(text)
+        require(spoken.isNotBlank()) { "没有可朗读的正文，请填写实际要朗读的文字" }
+        require(voice.isNotBlank()) { "请选择音色" }
+        when (offer.provider) {
+            LocalMediaProvider.OPENAI -> require(spoken.length <= 4096) { "OpenAI 单次配音输入最多 4096 字符" }
+            LocalMediaProvider.MINIMAX -> require(spoken.length <= 10_000) { "MiniMax 单次配音最多 10000 字符" }
+            else -> error("此服务商未接入配音")
+        }
+        return submit(offer, sessionId, spoken, sourceMessageId, revisionOf) { id ->
             val file = when (offer.provider) {
-                LocalMediaProvider.MINIMAX -> miniMax.synthesizeSpeech(offer.profile, text, voice)
-                LocalMediaProvider.OPENAI -> api.speech(offer, text, voice)
+                LocalMediaProvider.MINIMAX -> miniMax.synthesizeSpeech(offer.profile, spoken, voice)
+                LocalMediaProvider.OPENAI -> api.speech(offer, spoken, voice)
                 else -> error("此服务商未接入配音")
             }
             markMediaProviderSucceeded()
-            store.addResult(offer, LocalMediaKind.SPEECH, sessionId, text, id, file = file, sourceMessageId = sourceMessageId, voiceId = voice, revisionOf = revisionOf)
+            store.addResult(offer, LocalMediaKind.SPEECH, sessionId, spoken, id, file = file, sourceMessageId = sourceMessageId, voiceId = voice, revisionOf = revisionOf)
         }
     }
     suspend fun submitTranscribe(offer: LocalMediaOffer, uri: Uri, sessionId: String, sourceMessageId: String? = null, revisionOf: String? = null): LocalMediaCreationJob {
