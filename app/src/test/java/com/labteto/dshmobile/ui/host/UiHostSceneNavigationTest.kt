@@ -6,7 +6,6 @@ import com.labteto.dshmobile.uihost.UiSceneNavigationResult
 import com.labteto.dshmobile.uihost.UiSceneNavigationState
 import com.labteto.dshmobile.uihost.UiSceneNavigationSnapshotCodec
 import com.labteto.dshmobile.uicontract.UiSceneId
-import com.labteto.dshmobile.uipack.next.NextConversationUiPack
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -16,7 +15,7 @@ class UiHostSceneNavigationTest {
     private fun id(value: String) = UiSceneId(value)
     private val nav = UiHostSceneNavigation(
         requiredScenes = LocalUiSceneCatalog.requirements,
-        pack = NextConversationUiPack.manifest,
+        pack = testConversationSliceManifest,
         root = id("conversation.chat"),
         deepLinks = mapOf("chat" to id("conversation.chat"), "work" to id("conversation.work")),
     )
@@ -73,7 +72,7 @@ class UiHostSceneNavigationTest {
     }
 
     @Test fun registrationDoesNotAllowAHostServiceAsARootOrDeepLink() {
-        val manifest = NextConversationUiPack.manifest
+        val manifest = testConversationSliceManifest
         val badRoot = runCatching {
             UiHostSceneNavigation(LocalUiSceneCatalog.requirements, manifest, id("route.settings"))
         }
