@@ -289,8 +289,14 @@ fun V6SessionShellScene(
             feedback = "当前会话没有可复用的续聊摘要"
             return
         }
-        feedback = describeV6ConversationReceipt(sessions.submit(
-            SessionUiCommand.Create(target, mode, state.usageMode, handoff)))
+        val receipt = sessions.submit(
+            SessionUiCommand.Create(target, mode, state.usageMode, handoff))
+        feedback = describeV6ConversationReceipt(receipt)
+        if (receipt == UiCommandReceipt.Accepted || receipt == UiCommandReceipt.Queued) {
+            val navigation = onNavigate(UiSceneId("route.home"))
+            if (navigation !is UiSceneNavigationResult.Changed)
+                feedback = "会话创建请求已提交，聊天首页暂不可达；请从会话列表进入"
+        }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
