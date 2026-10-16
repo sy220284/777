@@ -24,7 +24,13 @@ class LocalAttachmentUiPortComposition @Inject internal constructor(
     override suspend fun import(command: ImportUiAttachmentCommand): UiAttachmentReceipt {
         if (!current(command)) return UiAttachmentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
         return try {
-            val imported = files.importAttachment(Uri.parse(command.contentUri))
+            val uri = Uri.parse(command.contentUri)
+            // The UI contract only admits a URI returned by an explicit Android document
+            // picker. A file:// or other scheme would bypass the user's provider grant.
+            if (uri.scheme != "content" || uri.authority.isNullOrBlank()) {
+                return UiAttachmentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+            }
+            val imported = files.importAttachment(uri)
             // A copied workspace file does not authorize adding it to a different active composer.
             if (!current(command)) UiAttachmentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
             else UiAttachmentReceipt.Imported(imported)
