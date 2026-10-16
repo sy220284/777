@@ -51,6 +51,7 @@ fun V6SettingsSuiteScene(
     var mainSteps by remember(scene) { mutableStateOf("") }
     var subSteps by remember(scene) { mutableStateOf("") }
     var attempts by remember(scene) { mutableStateOf("") }
+    var diagnosticHost by remember(scene) { mutableStateOf("") }
     LaunchedEffect(scene, state.loading) {
         if (!state.loading) {
             rules = state.userRules
@@ -302,6 +303,12 @@ fun V6SettingsSuiteScene(
                 SyButton("运行环境", { read { settings.environmentInfo() } }, enabled = !busy)
                 SyButton("生成诊断报告", { read { settings.diagnosticReport() } },
                     enabled = !busy, style = SyButtonStyle.SECONDARY)
+                SyInput(diagnosticHost, { diagnosticHost = it.take(256) },
+                    label = "诊断目标（由原 Owner 校验地址）")
+                SyButton("检查目标网络连接", {
+                    read { settings.diagnoseNetwork(diagnosticHost.trim()) }
+                }, enabled = !busy && diagnosticHost.isNotBlank(),
+                    style = SyButtonStyle.SECONDARY)
             }
             "settings.account" -> V6AccountManagementSection(settings)
             "settings.update" -> {
