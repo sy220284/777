@@ -47,7 +47,9 @@ class LocalToolCatalogTest {
         val forkProperties = functions.getValue("subagent_fork").jsonObject["function"]!!
             .jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
 
-        assertEquals(setOf("parallel", "pipeline"), modes.toSet())
+        assertEquals(setOf("parallel", "pipeline", "graph"), modes.toSet())
+        assertTrue("dependencies" in workflowProperties)
+        assertTrue("required_evidence" in workflowProperties)
         val contextModes = subagentProperties.getValue("context_mode").jsonObject["enum"]!!.jsonArray
             .map { it.jsonPrimitive.content }.toSet()
         assertEquals(setOf("isolated", "inherit"), contextModes)

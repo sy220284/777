@@ -34,6 +34,8 @@ class LocalWorkGoalContinuationTest {
             put("id", id)
             put("name", "write_file")
             put("goal_id", belongsTo)
+            // This fixture models the modern durable declaration, before executor admission.
+            put("execution_started", false)
         })
     }
 
@@ -129,6 +131,22 @@ class LocalWorkGoalContinuationTest {
         } finally {
             log.close()
         }
+    }
+
+    @Test
+    fun oldUnstampedToolCallStillBlocksAutomaticReplayUntilResult() {
+        val log = toolLog()
+        try {
+            log.append("tool/call", buildJsonObject {
+                put("id", "legacy-side-effect")
+                put("goal_id", goal.id)
+                put("name", "write_file")
+                // Historical records lacked execution_started. Outcome stays unknown.
+            })
+            assertTrue(hasUnresolvedWorkGoalToolEffects(log, goalFromStartOfTestLog))
+            log.goalToolResult("legacy-side-effect")
+            assertFalse(hasUnresolvedWorkGoalToolEffects(log, goalFromStartOfTestLog))
+        } finally { log.close() }
     }
 
     @Test
