@@ -53,7 +53,10 @@ internal class LocalWorkEvidenceController(
         val request = ++revision
         reading?.cancel()
         val previous = state.value
-        mutable.update { it.copy(loading = true, failed = false, inspected = null, linkAccepted = null) }
+        // A refresh supersedes the previous inspection/link UI generation.
+        // The former operation may finish later, but must not keep this view busy.
+        mutable.update { it.copy(loading = true, failed = false, inspected = null,
+            linkAccepted = null, linking = false) }
         reading = scope.launch {
             try {
                 val (page, activities) = withContext(Dispatchers.IO) {
@@ -89,7 +92,9 @@ internal class LocalWorkEvidenceController(
                 if (request == revision) mutable.update { it.copy(inspected = inspected, linkAccepted = if (inspected == null) false else null) }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { if (request == revision) mutable.update { it.copy(linkAccepted = false) } }
-            finally { mutable.update { it.copy(linking = false) } }
+            finally {
+                if (request == revision) mutable.update { it.copy(linking = false) }
+            }
         }
     }
     fun link(target: LocalRequirementUiTarget, item: LocalArtifactUiItem) {
@@ -109,7 +114,9 @@ internal class LocalWorkEvidenceController(
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { if (request == revision) mutable.update { it.copy(linkAccepted = false) } }
-            finally { mutable.update { it.copy(linking = false) } }
+            finally {
+                if (request == revision) mutable.update { it.copy(linking = false) }
+            }
         }
     }
 }
