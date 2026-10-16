@@ -69,13 +69,16 @@ internal object LocalUiDocumentCodec {
                 "bound_text" -> mapOf("label" to text, "binding" to text)
                 "column", "row" -> mapOf("children" to objects)
                 "disclosure" -> mapOf("title" to text, "children" to objects)
-                "field", "textarea" -> mapOf("label" to text, "initial" to text, "required" to boolean)
+                "field", "textarea" -> mapOf("label" to text, "initial" to text, "required" to boolean, "retention" to text)
                 "select" -> mapOf("label" to text, "options" to strings, "initial" to text)
                 "switch" -> mapOf("label" to text, "initial" to boolean)
                 "button" -> mapOf("label" to text, "actionId" to text)
                 else -> error("unsupported_node:$kind")
             }
-            checkSchema(value, schema(listOf("id", "type") + properties.keys, mapOf("id" to text, "type" to text) + properties))
+            val requiredProperties = properties.keys - if (kind in setOf("field", "textarea"))
+                setOf("retention") else emptySet()
+            checkSchema(value, schema(listOf("id", "type") + requiredProperties,
+                mapOf("id" to text, "type" to text) + properties))
             val id = value.string("id")
             fun children() = value.array("children").map { node(it.jsonObject, depth + 1) }
             return when (kind) {
