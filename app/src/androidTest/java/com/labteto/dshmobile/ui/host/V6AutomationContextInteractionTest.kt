@@ -35,7 +35,9 @@ class V6AutomationContextInteractionTest {
         override val planningChanges = MutableStateFlow("")
         override fun planningRevision() = "rev"
         override fun snapshot() = snapshots.value
-        val submissions = mutableListOf<AutomationUiCommand>()
+        // AutomationUiPort.submit executes on Dispatchers.IO; ensure cross-thread assertions
+        // observe the same synchronized submission list without a flaky visibility race.
+        val submissions = java.util.concurrent.CopyOnWriteArrayList<AutomationUiCommand>()
         override fun submit(command: AutomationUiCommand): AutomationUiReceipt {
             submissions += command
             return AutomationUiReceipt.Applied("task-id")
