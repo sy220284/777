@@ -39,6 +39,8 @@ fun V6SettingsSuiteScene(
     var busy by remember(scene) { mutableStateOf(false) }
     var confirmCompact by remember(scene) { mutableStateOf(false) }
     var selectedModel by remember(scene) { mutableStateOf<String?>(null) }
+    var usageModelFilter by remember(scene) { mutableStateOf<String?>(null) }
+    var selectedRequestId by remember(scene) { mutableStateOf<String?>(null) }
     var modelName by remember(scene) { mutableStateOf("") }
     var modelUrl by remember(scene) { mutableStateOf("") }
     // A secret must never enter SavedState, settings navigation or a retained draft.
@@ -225,7 +227,20 @@ fun V6SettingsSuiteScene(
                     if (scene.value == "settings.model_performance")
                         Text("聊天请求：${figures.chat.aggregate.requestCount}；Work 请求：${figures.work.aggregate.requestCount}")
                     Text("费用与额度以服务商账单为准；这里仅显示本地请求账本。")
-                    figures.byModel.forEach { (key, value) ->
+                    if (figures.byModel.isNotEmpty()) {
+                        Text("切换账本模型", style = MaterialTheme.typography.titleMedium)
+                        SyButton("所有已配置模型", { usageModelFilter = null },
+                            style = if (usageModelFilter == null) SyButtonStyle.PRIMARY
+                                else SyButtonStyle.GHOST)
+                        figures.byModel.keys.sorted().forEach { model ->
+                            SyButton(model, { usageModelFilter = model; selectedRequestId = null },
+                                style = if (usageModelFilter == model) SyButtonStyle.PRIMARY
+                                    else SyButtonStyle.SECONDARY)
+                        }
+                    }
+                    figures.byModel.filterKeys {
+                        usageModelFilter == null || it == usageModelFilter
+                    }.forEach { (key, value) ->
                         SyGlassCard(Modifier.fillMaxWidth()) {
                             Text(key)
                             Text("调用数：${value.tracked.requestCount} · Tokens：${value.tracked.inputTokens + value.tracked.outputTokens}")
@@ -233,11 +248,38 @@ fun V6SettingsSuiteScene(
                     }
                     if (scene.value in setOf("settings.usage_log","settings.usage_detail",
                             "settings.model_performance","settings.model_usage")) {
-                        figures.recentRecords.take(80).forEach { record ->
+                        val records = figures.recentRecords.filter {
+                            usageModelFilter == null || it.model == usageModelFilter
+                        }
+                        Text("当前列表：" + records.size + " 条（最多显示前 80 条）")
+                        records.take(80).forEach { record ->
                             SyGlassCard(Modifier.fillMaxWidth()) {
                                 Text(record.model + " · " + record.context.action)
                                 Text("请求 ID：" + record.requestId)
                                 Text("已报告 Tokens：" + record.totalTokens.toString())
+                                SyButton("查看此请求明细", {
+                                    selectedRequestId = record.requestId
+                                }, style = SyButtonStyle.SECONDARY)
+                            }
+                        }
+                        selectedRequestId?.let { id ->
+                            val detail = remember(owner, revision, id) {
+                                owner.requestDetail(id)
+                            }
+                            SyGlassCard(Modifier.fillMaxWidth()) {
+                                Text("请求明细：" + id,
+                                    style = MaterialTheme.typography.titleMedium)
+                                if (detail == null)
+                                    SyNote("该请求已不在当前账本或已过期")
+                                else {
+                                    Text("模型：" + detail.model)
+                                    Text("输入 Tokens：" + detail.inputTokens)
+                                    Text("输出 Tokens：" + detail.outputTokens)
+                                    Text("合计 Tokens：" + detail.totalTokens)
+                                    Text("操作：" + detail.context.action)
+                                }
+                                SyButton("关闭明细", { selectedRequestId = null },
+                                    style = SyButtonStyle.GHOST)
                             }
                         }
                     }
