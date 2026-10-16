@@ -32,12 +32,28 @@ internal fun NextPersonaAuthoringScene(
     var busy by remember(galleryId) { mutableStateOf(false) }
     var dirty by rememberSaveable(galleryId) { mutableStateOf(false) }
     var confirmClose by remember { mutableStateOf(false) }
+    var confirmReload by remember { mutableStateOf(false) }
     fun close() { if (dirty) confirmClose = true else onBack() }
+    fun reloadLatest() {
+        if (dirty) confirmReload = true
+        else { initialized = false; editGeneration++; reload++ }
+    }
     BackHandler { if (!busy) close() }
     if (confirmClose) AlertDialog(onDismissRequest = { confirmClose = false },
         title = { Text(stringResource(R.string.next_persona_discard)) },
         confirmButton = { TextButton(onClick = { onBack() }) { Text(stringResource(R.string.next_persona_discard_confirm)) } },
         dismissButton = { TextButton(onClick = { confirmClose = false }) { Text(stringResource(R.string.next_persona_keep_editing)) } })
+    if (confirmReload) AlertDialog(onDismissRequest = { confirmReload = false },
+        title = { Text("重新读取人物档案？") },
+        text = { Text("将舍弃当前未保存的修改，再读取 Owner 中的最新版本。") },
+        confirmButton = { TextButton(onClick = {
+            confirmReload = false
+            dirty = false
+            initialized = false
+            editGeneration++
+            reload++
+        }) { Text("舍弃并重新读取") } },
+        dismissButton = { TextButton(onClick = { confirmReload = false }) { Text("保留草稿") } })
     var loading by remember(galleryId) { mutableStateOf(galleryId != null) }
     var feedback by remember(galleryId) { mutableStateOf<String?>(null) }
     var editGeneration by remember(galleryId) { mutableStateOf(0L) }
@@ -57,7 +73,13 @@ internal fun NextPersonaAuthoringScene(
         try {
             when (val result = owner.read(galleryId)) {
                 is UiPersonaAuthoringReceipt.Loaded -> {
-                    if (!initialized) { show(result.snapshot.draft); revision = result.snapshot.revision; initialized = true }
+                    if (!initialized) {
+                        show(result.snapshot.draft)
+                        revision = result.snapshot.revision
+                        dirty = false
+                        initialized = true
+                        feedback = null
+                    }
                 }
                 is UiPersonaAuthoringReceipt.Failed -> feedback = result.message ?: failed
                 else -> feedback = stale
@@ -75,6 +97,11 @@ internal fun NextPersonaAuthoringScene(
             feedback?.let { Text(it) }
             if (loading) Text(stringResource(R.string.next_loading))
             if (!initialized && !loading) TextButton(onClick = { reload++ }) { Text(stringResource(R.string.next_gallery_refresh)) }
+            if (galleryId != null && initialized && !loading) {
+                TextButton(onClick = { reloadLatest() }, enabled = !busy) {
+                    Text("重新读取最新版")
+                }
+            }
         }
         items(labels.size) { index ->
             OutlinedTextField(values[index], { text ->
