@@ -13,8 +13,8 @@
       "task": "实时 MCP 注册/选中/连接/授权观测",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "MCP 原 Harness 连接租约/工具 Registry 返回连接中、注册完成（不代表健康在线）、重连中、排空断开中事实；LocalPluginComposition → LocalToolsUiFacade → Tools 页面及插件列表透传生命周期，过渡期不计作已注册服务、不准触发断开/调用入口；McpToolBridgePluginTest 增加慢连接、重连、排空断开的异步断言。已增加用户主动触发的 MCP 标准 ping 健康检查，成功仅代表该次远端响应，不代表已授权或持续在线；普通注册状态仍不假装健康已验证。 ToolsViewModel 对用户主动发起的 MCP 连接/断开在操作持续时建立 300ms 短时生命周期观察协程；操作完成后自动停止，不将长握手排在同一个命令锁后读取。 本轮在 V6 MCP 管理页打开期间按2秒刷新本地注册/连接生命周期，仅反映原 Plugin Owner 事实；主动 ping 结果随连接变化失效，不代表持续在线、工具已选中或授权。",
-      "remaining": "还缺工具真实选中、逐次授权结果及外部 Agent 主动状态事件订阅（目前为页面内本地轮询）；远端掉线无法无请求感知，缺真实设备弱网/重启验证。"
+      "implemented": "MCP 原 Harness 连接租约/工具 Registry 返回连接中、注册完成（不代表健康在线）、重连中、排空断开中事实；LocalPluginComposition → LocalToolsUiFacade → Tools 页面及插件列表透传生命周期，过渡期不计作已注册服务、不准触发断开/调用入口；McpToolBridgePluginTest 增加慢连接、重连、排空断开的异步断言。已增加用户主动触发的 MCP 标准 ping 健康检查，成功仅代表该次远端响应，不代表已授权或持续在线；普通注册状态仍不假装健康已验证。 ToolsViewModel 对用户主动发起的 MCP 连接/断开在操作持续时建立 300ms 短时生命周期观察协程；操作完成后自动停止，不将长握手排在同一个命令锁后读取。 本轮在 V6 MCP 管理页打开期间按2秒刷新本地注册/连接生命周期，仅反映原 Plugin Owner 事实；主动 ping 结果随连接变化失效，不代表持续在线、工具已选中或授权。 2026-10-16 本批：ToolsUiPort.UiToolSelection 新增 SELECTED/NOT_SELECTED，从原 LocalPinnedInvocationStore CONNECTOR 选择只读投影到 V6 MCP 服务；断线或重连仅显示注册/连接事实，选用不授予调用权限，补契约回归。",
+      "remaining": "MCP Composer 真实选用已可读；逐次工具授权结果的会话绑定投影、远端主动断线事件与外部 Agent 的全量生命周期事件订阅仍缺。现有 V6 可见期2秒只读轮询及手动 ping 不能证明持续在线；Android 弱网/重启/授权恢复尚需验收。"
     },
     {
       "id": "S-1-02",
@@ -105,8 +105,8 @@
       "task": "Host 权限/文件/分享/通知/焦点服务",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "\n2026-10-15 本次增量：新增 HostPreferencesUiPort 以原 HostsStore DataStore 为真相源控制外观、通知和系统权限设置跳转；明确用户手势且不自行授予权限。",
-      "remaining": "Android 系统通知权限反馈/文件多类型权限/分享与键盘焦点完整 Host SDK 的独立功能治理仍未完成。"
+      "implemented": "\n2026-10-15 本次增量：新增 HostPreferencesUiPort 以原 HostsStore DataStore 为真相源控制外观、通知和系统权限设置跳转；明确用户手势且不自行授予权限。 2026-10-16 本批：Host 通知授权读数同时核对 Android13+ POST_NOTIFICATIONS 运行时 grant 和 NotificationManager 系统开关；补 Android12/13/14+ 图片、视频、音频、部分照片的独立只读权限投影，V6 系统权限页在 onResume 时刷新；中立 UiHostMediaPermissionSnapshot 不将 SAF 单文件授权伪作全库权限。独立 Host RenderHostedScene 在实际场景栈/会话 scope 改变时清除过期焦点并关闭 IME；新增纯逻辑回归。",
+      "remaining": "通知及媒体权限反馈、Host 独立导航焦点/IME 基础治理已有源码；仍缺多类型 SAF 权限撤销/恢复、分享/外部打开完整 Host SDK 化、真实设备输入法/系统设置往返/进程重建 E2E，不能视为所有系统服务已交付。"
     },
     {
       "id": "S1-09",
@@ -144,8 +144,8 @@
       "task": "7 路由/二级场景/深链/返回的通用 Host",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "新增 :ui-host 的 UiHostSceneNavigation 纯导航约定：基于 Host 场景目录与当前包 manifest 区分 PAGE/OVERLAY/SLOT/SYSTEM，支持包身份校验、返回、有限的显式深链键及严格状态恢复；App JVM 回归测试覆盖拒绝旧包/无实现页面/系统服务/伪造历史。仅是独立导航内核，不是现网 Host 接线或 renderer 的完成证明。 本批增加 32 层历史上限、root 导航清栈、页面覆盖弹层去重和非法覆盖/回到 root 历史拒绝；增加有版本/长度预算的编码快照及 Host 恢复入口，严格重新核验场景和包身份；补 JVM 回归源码，本轮新增 UiApplicationSceneHost 中间层：仅接收完整 Pack admission 的真实 Compose renderer，使用 SaveableState 中立快照接收导航与系统返回，实时重新验证 pack/历史/renderer 并拒绝迟到画面回调；修正向上返回的 scope 也使用实际 Host 回调，新增 JVM 回归源码。仍未接入 AppRoot，最新 CI 待回执。 生产 AppRoot 经 LocalApplicationUiHost 进入 UiHostSceneNavigation/RenderHostedScene；以 FeatureCatalog 7 一级路由与 SettingsDestination 构建可信内部跳转键；原 Work/Chat UI 场景请求经 Host 白名单状态机处理，并消费对应 VM 请求；错误持久历史可见提示、根返回 Activity 退出；支持 A→B→A 代次保护。 2026-10-15 增量：生产 MainActivity 已注册 dsh777://scene/{key} Android VIEW 入口，精确 Host 既有 Scene 白名单并拒绝未知/编码路径/参数/片段；onNewIntent 和已消费状态不重复发起请求，AppRoot 将外部请求送至真实 Host。补 URI JVM 检查与整包渲染夹具仪器化测试源码。",
-      "remaining": "独立 V6 全部实际 Renderer、完整 Legacy Shell 退场、跨版本 Host 状态迁移/系统焦点/IME、全部真实设备导航/外部深链验证仍未完成；目前默认稳定模式并不声称外部链接能打开  未实现页面。"
+      "implemented": "新增 :ui-host 的 UiHostSceneNavigation 纯导航约定：基于 Host 场景目录与当前包 manifest 区分 PAGE/OVERLAY/SLOT/SYSTEM，支持包身份校验、返回、有限的显式深链键及严格状态恢复；App JVM 回归测试覆盖拒绝旧包/无实现页面/系统服务/伪造历史。仅是独立导航内核，不是现网 Host 接线或 renderer 的完成证明。 本批增加 32 层历史上限、root 导航清栈、页面覆盖弹层去重和非法覆盖/回到 root 历史拒绝；增加有版本/长度预算的编码快照及 Host 恢复入口，严格重新核验场景和包身份；补 JVM 回归源码，本轮新增 UiApplicationSceneHost 中间层：仅接收完整 Pack admission 的真实 Compose renderer，使用 SaveableState 中立快照接收导航与系统返回，实时重新验证 pack/历史/renderer 并拒绝迟到画面回调；修正向上返回的 scope 也使用实际 Host 回调，新增 JVM 回归源码。仍未接入 AppRoot，最新 CI 待回执。 生产 AppRoot 经 LocalApplicationUiHost 进入 UiHostSceneNavigation/RenderHostedScene；以 FeatureCatalog 7 一级路由与 SettingsDestination 构建可信内部跳转键；原 Work/Chat UI 场景请求经 Host 白名单状态机处理，并消费对应 VM 请求；错误持久历史可见提示、根返回 Activity 退出；支持 A→B→A 代次保护。 2026-10-15 增量：生产 MainActivity 已注册 dsh777://scene/{key} Android VIEW 入口，精确 Host 既有 Scene 白名单并拒绝未知/编码路径/参数/片段；onNewIntent 和已消费状态不重复发起请求，AppRoot 将外部请求送至真实 Host。补 URI JVM 检查与整包渲染夹具仪器化测试源码。 2026-10-16 本批：ui-host RenderHostedScene 根据已验证编码导航栈或会话 scope 变化清除焦点与关闭输入法；正常未导航的编辑重新组合不清除焦点。",
+      "remaining": "独立 V6 Renderer 生产门禁仍关闭；完整 Legacy Shell 退场、跨版本 Host 导航状态迁移、7 路由及深链/返回/IME 的 Android16/17 全量 E2E 验收仍缺。"
     },
     {
       "id": "S3-03",
@@ -254,8 +254,8 @@
       "task": "敏感草稿/留存/节点/历史/重组预算",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "\n2026-10-16 本轮代码增量：Session UiDocumentStore 新增按 session/message/documentId 向原 EventLog 查询单份文档的版本准入；Work 高频活动更新不再为比较一个卡片而物化整段文档历史。\n2026-10-16 功能代码补充：Session 文档列表维持首次精准流式重建，随后对同一会话及消息窗口通过 EventLog sequence 游标增量追读；缓存只持有当前可见消息集的最近定义，无第二持久化权威。墓碑删除同步清理当前及各版本敏感表单草稿。 2026-10-16 续：Host 表单草稿 SavedState 增加单字段16384字符、每文档32字段、最多24文档及65536字符总预算，拒绝超限不先清空旧 revision，受损/旧版恢复均复用同一准入；测试覆盖超限、恢复、跨版本保留。",
-      "remaining": "Session EventLog 冷恢复首次全量扫描、超长历史独立有界索引与用户敏感输入分级加密/清理仍未闭环；SavedState 预算不能被当作加密存储或持久化恢复验收。"
+      "implemented": "\n2026-10-16 本轮代码增量：Session UiDocumentStore 新增按 session/message/documentId 向原 EventLog 查询单份文档的版本准入；Work 高频活动更新不再为比较一个卡片而物化整段文档历史。\n2026-10-16 功能代码补充：Session 文档列表维持首次精准流式重建，随后对同一会话及消息窗口通过 EventLog sequence 游标增量追读；缓存只持有当前可见消息集的最近定义，无第二持久化权威。墓碑删除同步清理当前及各版本敏感表单草稿。 2026-10-16 续：Host 表单草稿 SavedState 增加单字段16384字符、每文档32字段、最多24文档及65536字符总预算，拒绝超限不先清空旧 revision，受损/旧版恢复均复用同一准入；测试覆盖超限、恢复、跨版本保留。 2026-10-16 本批：Host UiDocumentFormState 针对密码、Token、API Key、Secret 等字段保留本次会话内编辑，但不写入 Android SavedState；旧 v1/v2 保存快照恢复时拒绝敏感项并立即写回清理后的快照。字段名按边界识别以减少误判（如 secretary/tokenizer），覆盖新值保存、旧版清理、跨版本会话隔离回归测试。",
+      "remaining": "敏感动态表单字段从 Android SavedState 排除并清理旧遗留值的源码已补；仍缺 Session EventLog 冷恢复独立有界索引、所有敏感输入来源分级加密/清理及 Android 进程崩溃恢复/实际驻留内存安全验收；不得把 SavedState 过滤宣称为加密。"
     },
     {
       "id": "S4-09",
