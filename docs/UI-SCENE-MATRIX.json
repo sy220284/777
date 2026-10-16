@@ -1529,8 +1529,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "HostPreferencesUiPort.submit(UiHostPreferencesCommand.Appearance)",
+          "receiptType": "Boolean (Host DataStore 保存结果)",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1558,8 +1558,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SettingsUiPort.submit(SettingsUiCommand.StyleGuard/AddStylePhrase/RemoveStylePhrase/ClearStyleHits)",
+          "receiptType": "SettingsUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1964,8 +1964,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "HostPreferencesUiPort.submit(UiHostPreferencesCommand.Notifications)",
+          "receiptType": "Boolean (Host DataStore 保存结果)",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
