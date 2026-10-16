@@ -263,6 +263,52 @@ internal class LocalUiDocumentUiAdapter(
             catch (failure: Exception) { UiDocumentReceipt.Failed(failure.message) }
         }
 
+    /**
+     * User-edited presentation text is a new Session EventLog revision. The edited card
+     * receives explicit USER-EDITED provenance, and CAS prevents overwriting late work
+     * updates or a concurrently deleted document. No approval/tool action can be edited.
+     */
+    override suspend fun replaceText(command: com.labteto.dshmobile.uicontract.EditUiDocumentTextCommand):
+        UiDocumentReceipt = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        if (command.documentId.isBlank() || command.documentId.length > 200 ||
+            command.source.sessionId != command.identity.sessionId ||
+            command.source.messageId.isBlank() || command.replacementText.length > 16_384)
+            return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+        try {
+            val original = store.latestDocument(command.identity.sessionId, command.source.messageId,
+                command.documentId, generation.budget, knownScenes)
+                ?: return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+            val document = original.document
+            if (original.recoveryNotice != null || document.revision != command.revision ||
+                document.source != command.source ||
+                document.actions.any { it is UiDocumentAction.AnswerApproval } ||
+                document.documentId.startsWith("work-live:"))
+                return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+            val changed = com.labteto.dshmobile.uicontract.withUserEditedText(
+                document, command.textNodeId, command.replacementText)
+                ?: return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+            // Version and output budgets are verified again under the existing Store CAS.
+            synchronized(state.foregroundRunHandle.lock) {
+                val current = state.state.value
+                if (state.sessionTransitioning ||
+                    state.uiBindingIdentity(current) != command.identity ||
+                    (current.usageMode == LocalUsageMode.WORK) != command.source.workMode ||
+                    current.messages.none { it.id == command.source.messageId } ||
+                    !sourceMatches(command.source, command.identity,
+                        current.usageMode == LocalUsageMode.WORK))
+                    return@synchronized UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                val provenance = com.labteto.dshmobile.uicontract.UiDocumentProvenance(
+                    null, "user-edited", false,
+                    com.labteto.dshmobile.uicontract.UiDocumentOrigin.LOCAL)
+                if (store.publish(changed, provenance, null, document,
+                        generation.budget, knownScenes))
+                    UiDocumentReceipt.Published(changed.documentId)
+                else UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+            }
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) { UiDocumentReceipt.Failed(failure.message) }
+    }
+
     /** Explicit user deletion, not a model-generated action; the EventLog owns the tombstone. */
     override suspend fun delete(command: DeleteUiDocumentCommand): UiDocumentReceipt =
         kotlinx.coroutines.withContext(Dispatchers.IO) {
