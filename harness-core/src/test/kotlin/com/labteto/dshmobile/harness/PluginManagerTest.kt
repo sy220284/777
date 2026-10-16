@@ -11,7 +11,9 @@ import com.labteto.dshmobile.harness.plugin.PluginDescriptor
 import com.labteto.dshmobile.harness.plugin.PluginLifecycleState
 import com.labteto.dshmobile.harness.plugin.PluginManager
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -344,6 +346,53 @@ class PluginManagerTest {
             manager.lifecycleSnapshot("replaceable")?.state,
         )
         assertTrue(runCatching { manager.install("replaceable") }.isFailure)
+    }
+
+    @Test
+    fun readOnlyPluginObservationDoesNotWaitForRemoteCommandAndStopsAfterDisable() = runTest {
+        val manager = manager(definition("mcp-bridge"))
+        manager.install("mcp-bridge")
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val remoteCommand = async {
+            manager.withActivePlugin("mcp-bridge") { _, _ ->
+                started.complete(Unit)
+                release.await()
+            }
+        }
+        started.await()
+        assertEquals("mcp-bridge", manager.observeActivePlugin("mcp-bridge") { it.id })
+        val disable = async { manager.disable("mcp-bridge") }
+        yield()
+        assertFalse(disable.isCompleted)
+        release.complete(Unit)
+        remoteCommand.await()
+        assertTrue(disable.await())
+        assertTrue(runCatching {
+            manager.observeActivePlugin("mcp-bridge") { it.id }
+        }.isFailure)
+    }
+
+    @Test
+    fun pluginObservationRejectsInstanceReplacedDuringSuspendedRead() = runTest {
+        val manager = manager(definition("mcp-bridge"))
+        manager.install("mcp-bridge")
+        val reading = CompletableDeferred<Unit>()
+        val resume = CompletableDeferred<Unit>()
+        val observation = async {
+            runCatching {
+                manager.observeActivePlugin("mcp-bridge") { plugin ->
+                    reading.complete(Unit)
+                    resume.await()
+                    plugin.id
+                }
+            }
+        }
+        reading.await()
+        manager.replace(definition("mcp-bridge", version = 2))
+        resume.complete(Unit)
+        assertTrue(observation.await().isFailure)
+        assertEquals("mcp-bridge", manager.observeActivePlugin("mcp-bridge") { it.id })
     }
 
     private fun manager(
