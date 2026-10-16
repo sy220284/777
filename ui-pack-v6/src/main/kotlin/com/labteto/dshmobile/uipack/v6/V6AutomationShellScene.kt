@@ -318,8 +318,11 @@ fun V6SessionShellScene(
             scope.launch {
                 try {
                     val active = withTimeoutOrNull(15_000L) {
-                        sessions.snapshots.first { !it.loading && it.identity != null &&
-                            it.identity.sessionId != previousSessionId }
+                        sessions.snapshots.first { snapshot ->
+                            val activeIdentity = snapshot.identity
+                            !snapshot.loading && activeIdentity != null &&
+                                activeIdentity.sessionId != previousSessionId
+                        }
                     }
                     if (active == null) feedback = "新会话尚未确认激活，请从会话列表查看真实创建结果"
                     else if (onNavigate(UiSceneId("route.home")) !is UiSceneNavigationResult.Changed)
