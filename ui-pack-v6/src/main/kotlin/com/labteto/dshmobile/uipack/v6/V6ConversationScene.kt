@@ -57,6 +57,7 @@ import com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort
 import com.labteto.dshmobile.uicontract.WorkReadUiPort
 import com.labteto.dshmobile.uicontract.WorkPolicyUiPort
 import com.labteto.dshmobile.uicontract.WorkTeamUiPort
+import com.labteto.dshmobile.uicontract.ReplySuggestionsUiPort
 import com.labteto.dshmobile.uicontract.ChatGroupUiPort
 import com.labteto.dshmobile.uicontract.UiTranscriptCursor
 import com.labteto.dshmobile.uicontract.WorkConversationUiCommand
@@ -97,6 +98,7 @@ data class V6ConversationPorts(
     val workReads: WorkReadUiPort? = null,
     val workPolicy: WorkPolicyUiPort? = null,
     val workTeam: WorkTeamUiPort? = null,
+    val replySuggestions: ReplySuggestionsUiPort? = null,
     val workMode: () -> Boolean,
     val workModeUpdates: Flow<Boolean>? = null,
 )
