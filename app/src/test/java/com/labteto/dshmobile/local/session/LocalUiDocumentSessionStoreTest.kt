@@ -67,6 +67,39 @@ class LocalUiDocumentSessionStoreTest {
         } finally { directory.deleteRecursively() }
     }
 
+    @Test fun chartPointCorrectionsRoundTripWithCasAndTombstones() {
+        val directory = Files.createTempDirectory("ui-doc-chart-edit").toFile()
+        try {
+            val registry = LocalSessionEventLogRegistry(directory, Json)
+            val store = LocalUiDocumentSessionStore(registry)
+            val original = UiDocument(1, "chart-card",
+                UiDocumentSource("session", "message", 2, "profile", null), 0,
+                "真实图表引用",
+                listOf(UiDocumentNode.BarChart("bars", "请求量", "次",
+                    listOf(UiChartPoint("成功", 3.0), UiChartPoint("失败", 1.0))),
+                    UiDocumentNode.LineChart("trend", "请求趋势", "次",
+                        listOf(UiChartPoint("昨天", 4.0), UiChartPoint("今天", 5.0)))),
+                emptyList(), "初始图表")
+            val user = UiDocumentProvenance(null, "user-edited", false, UiDocumentOrigin.LOCAL)
+            assertTrue(store.publish(original, provenance, null, null, budget, emptySet()))
+            val barEdit = original.withUserEditedChartPoint("bars", 1, 8.0)!!
+            assertTrue(store.publish(barEdit, user, null, original, budget, emptySet()))
+            val stale = original.withUserEditedChartPoint("trend", 0, 7.0)!!
+            assertFalse(store.publish(stale, user, null, original, budget, emptySet()))
+            val reopened = LocalUiDocumentSessionStore(registry)
+            assertEquals(barEdit, reopened.read("session", setOf("message"), budget, emptySet()).single().document)
+            val lineEdit = barEdit.withUserEditedChartPoint("trend", 0, 9.0)!!
+            assertTrue(reopened.publish(lineEdit, user, null, barEdit, budget, emptySet()))
+            assertEquals(lineEdit, LocalUiDocumentSessionStore(registry).read(
+                "session", setOf("message"), budget, emptySet()).single().document)
+            assertTrue(store.delete(lineEdit, budget, emptySet()))
+            assertFalse(store.publish(lineEdit.copy(revision = 3), user, null, lineEdit, budget, emptySet()))
+            assertNull(LocalUiDocumentSessionStore(registry)
+                .latestDocument("session", "message", "chart-card", budget, emptySet()))
+            registry.clearAndEvict(setOf("session"))
+        } finally { directory.deleteRecursively() }
+    }
+
     @Test fun lateProducerCannotOverwriteNewRevisionAndLocalProvenanceRestores() {
         val directory = Files.createTempDirectory("ui-doc-revision").toFile()
         try {
