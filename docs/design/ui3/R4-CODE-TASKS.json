@@ -13,7 +13,7 @@
       "task": "实时 MCP 注册/选中/连接/授权观测",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "MCP 原 Harness 连接租约/工具 Registry 返回连接中、注册完成（不代表健康在线）、重连中、排空断开中事实；LocalPluginComposition → LocalToolsUiFacade → Tools 页面及插件列表透传生命周期，过渡期不计作已注册服务、不准触发断开/调用入口；McpToolBridgePluginTest 增加慢连接、重连、排空断开的异步断言。已增加用户主动触发的 MCP 标准 ping 健康检查，成功仅代表该次远端响应，不代表已授权或持续在线；普通注册状态仍不假装健康已验证。 ToolsViewModel 对用户主动发起的 MCP 连接/断开在操作持续时建立 300ms 短时生命周期观察协程；操作完成后自动停止，不将长握手排在同一个命令锁后读取。 本轮在 V6 MCP 管理页打开期间按2秒刷新本地注册/连接生命周期，仅反映原 Plugin Owner 事实；主动 ping 结果随连接变化失效，不代表持续在线、工具已选中或授权。 2026-10-16 本批：ToolsUiPort.UiToolSelection 新增 SELECTED/NOT_SELECTED，从原 LocalPinnedInvocationStore CONNECTOR 选择只读投影到 V6 MCP 服务；断线或重连仅显示注册/连接事实，选用不授予调用权限，补契约回归。",
+      "implemented": "MCP 原 Harness 连接租约/工具 Registry 返回连接中、注册完成（不代表健康在线）、重连中、排空断开中事实；LocalPluginComposition → LocalToolsUiFacade → Tools 页面及插件列表透传生命周期，过渡期不计作已注册服务、不准触发断开/调用入口；McpToolBridgePluginTest 增加慢连接、重连、排空断开的异步断言。已增加用户主动触发的 MCP 标准 ping 健康检查，成功仅代表该次远端响应，不代表已授权或持续在线；普通注册状态仍不假装健康已验证。 ToolsViewModel 对用户主动发起的 MCP 连接/断开在操作持续时建立 300ms 短时生命周期观察协程；操作完成后自动停止，不将长握手排在同一个命令锁后读取。 本轮在 V6 MCP 管理页打开期间按2秒刷新本地注册/连接生命周期，仅反映原 Plugin Owner 事实；主动 ping 结果随连接变化失效，不代表持续在线、工具已选中或授权。 2026-10-16 本批：ToolsUiPort.UiToolSelection 新增 SELECTED/NOT_SELECTED，从原 LocalPinnedInvocationStore CONNECTOR 选择只读投影到 V6 MCP 服务；断线或重连仅显示注册/连接事实，选用不授予调用权限，补契约回归。\n2026-10-16 代码升级：MCP 原 Plugin Owner 每次连接保留/成功/断开/重连/卸载状态转换发布 StateFlow revision；Composer 已选插件变化与 MCP 变化通过单一管理 Port Flow 传到 V6。V6 已删除 2s 生命周期轮询，改为订阅并显示真实读取错误；新增异步连接/断开版本递增回归。该链路尚待最终 Kotlin/JVM 编译测试，远程无请求断线及逐次授权投影仍缺。",
       "remaining": "MCP 注册/选用状态已可读；仍缺同一 Owner 事件驱动生命周期订阅、会话+调用绑定的逐次授权回执，以及主动断线/外部 Agent 连接事件。代码级验证须覆盖断线、重连、过时回执。"
     },
     {
