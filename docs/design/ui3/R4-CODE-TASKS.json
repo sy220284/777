@@ -1,9 +1,9 @@
 {
   "schema": "777.ui-r4.code-tasks/1",
   "asOf": "2026-10-16",
-  "baseline": "2026-10-16 R4 调整为单 V6 独立包交付：删除 Next 专项 S3-04 与已有模块/调试入口/装配代码，原 35 项调整为 34 项。75/75 必需 V6 Scene 源码登记、173/173 Action 源码映射不代表行为验收，正式 E2E/恢复 0/173。保留 v6.migration.accepted、Legacy Shell 退场与完整 Android16/17/无障碍门禁，PR 继续 Draft。",
+  "baseline": "2026-10-16 R4 仅交付 V6 独立包 + 中立 Host/Feature Port + 真实业务闭环，共 34 项；保留 75/75 Scene、173/173 Action 源码映射与 Legacy 退场任务。按最新用户裁定，设备/模拟器/仪器/人工验收移除；代码完整性及编译/单测/静态架构检查为本轮标准。PR 保持 Draft 至代码闭环与质量检查完成。",
   "scope": "R4 单 V6 + 中立 Host/Feature Port；不含 Next 和完整双 UI 切换",
-  "verificationPolicy": "最终 SHA CI 不等于全量功能签收；V6 单包真实 Owner 动作、Android16/17、进程重建、弱网、无障碍、收费与失败语义必须独立验证。",
+  "verificationPolicy": "只执行代码级验证：Owner/Port 真实行为和恢复实现、类型/权限/并发/收费语义回归、Kotlin 编译、JVM/Compose 单测、静态与架构门禁。无需 Android16/17 实机/模拟器、设备仪器化、人工视觉、弱网设备和 TalkBack 验收。未跑代码测试不得报通过。",
   "sceneCount": 78,
   "actionCount": 173,
   "sourceMappedActions": 173,
@@ -14,7 +14,7 @@
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
       "implemented": "MCP 原 Harness 连接租约/工具 Registry 返回连接中、注册完成（不代表健康在线）、重连中、排空断开中事实；LocalPluginComposition → LocalToolsUiFacade → Tools 页面及插件列表透传生命周期，过渡期不计作已注册服务、不准触发断开/调用入口；McpToolBridgePluginTest 增加慢连接、重连、排空断开的异步断言。已增加用户主动触发的 MCP 标准 ping 健康检查，成功仅代表该次远端响应，不代表已授权或持续在线；普通注册状态仍不假装健康已验证。 ToolsViewModel 对用户主动发起的 MCP 连接/断开在操作持续时建立 300ms 短时生命周期观察协程；操作完成后自动停止，不将长握手排在同一个命令锁后读取。 本轮在 V6 MCP 管理页打开期间按2秒刷新本地注册/连接生命周期，仅反映原 Plugin Owner 事实；主动 ping 结果随连接变化失效，不代表持续在线、工具已选中或授权。 2026-10-16 本批：ToolsUiPort.UiToolSelection 新增 SELECTED/NOT_SELECTED，从原 LocalPinnedInvocationStore CONNECTOR 选择只读投影到 V6 MCP 服务；断线或重连仅显示注册/连接事实，选用不授予调用权限，补契约回归。",
-      "remaining": "MCP Composer 真实选用已可读；逐次工具授权结果的会话绑定投影、远端主动断线事件与外部 Agent 的全量生命周期事件订阅仍缺。现有 V6 可见期2秒只读轮询及手动 ping 不能证明持续在线；Android 弱网/重启/授权恢复尚需验收。"
+      "remaining": "MCP 注册/选用状态已可读；仍缺同一 Owner 事件驱动生命周期订阅、会话+调用绑定的逐次授权回执，以及主动断线/外部 Agent 连接事件。代码级验证须覆盖断线、重连、过时回执。"
     },
     {
       "id": "S-1-02",
@@ -22,7 +22,7 @@
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
       "implemented": "原 PluginManager 单锁管理生命周期变更、并发替换及失败恢复；MCP 失败关闭逐个解绑工具，连接占位始终清理；已有插件并发/恢复源码测试。 2026-10-16 本轮补受控失败态恢复：PluginManager.recoverFailed 仅允许显式失败的插件，在依赖审查与旧外部资源清理成功后重新安装；V6 tools.plugins 展示真实生命周期并经确认触发 ToolsUiCommand.RecoverFailedPlugin。运行资源插件禁止热恢复。PluginRegistry 对单插件安装和批量回滚清理失败维护 PendingPluginCleanup、保留 FAILED 状态并封闭工具准入；重试清理及再安装成功后才重开。新增失败重试、批量清理、状态隔离与不自动重放测试源码。",
-      "remaining": "进程边界内的插件生命周期故障恢复已有可调用代码路径，但真正独立 OS 进程级崩溃隔离未覆盖所有插件，仍需进程退出/弱网/系统重启及运行中工具异常的设备回归与恢复回执。当前只允许用户显式重新安装插件，不自动重放失败工具调用；尚不能提升该任务为代码完成。"
+      "remaining": "仍缺针对可崩溃插件的独立进程/IPC 执行域、失联后原子撤销工具准入、未知副作用拒绝重放等代码与自动化故障测试。"
     },
     {
       "id": "S0-01",
@@ -82,7 +82,7 @@
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
       "implemented": "2026-10-16：原 Work Owner 按选中文件源/事件/要求提交时校验版本，并在文件哈希读取前后复核 inode/大小/修改时间；拒绝工作区符号链接及目录符号链接，避免别名冒充交付证据。补路径穿越与文件版本的 JVM 测试源码。\n2026-10-16 本轮修复旧证据无 goal_id 的跨目标继承：投影要求保存的 goal_id 与当前 Work goal 完全一致，旧无目标记录只在无目标 Work 下显示；更新 JVM 回归，仍未解决内容核验/并发字节锁定与设备验收。",
-      "remaining": "真实证据内容核验和用户授权结论、文件修改与提交间剩余竞态的设备级复查、并发进程恢复回归仍缺。文件哈希一致仅说明字节版本，没有证明任务完成。"
+      "remaining": "仍缺可信核验结论与用户授权独立事件、证据写入到提交之间的并发文件版本定界、EventLog 冷读及同目标多进程竞争单测；哈希相同仍不构成完成证明。"
     },
     {
       "id": "S1-06",
@@ -98,7 +98,7 @@
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
       "implemented": "文件系统选择的 content URI 准入、原文件 Owner 取消感知导入、重复内容核验、同目录 inode 原子发布且不可覆盖现有路径，拒绝损坏同名文件及符号链接，附 JVM 回归测试源码。 新增只读 InspectUiAttachmentCommand：V6 Composer 可显示实际文件可用性、类型/长度、16KiB 限长文本预览；对所有尺寸的已导入附件采用32KiB缓冲流式 SHA256 全量校验（包含超过8MiB的文件），对预览文本仍限制16KiB；拒绝工作区越界、无效路径及符号链接。新增 JVM 用例覆盖有效文本、文件更改/缺失、越界与链接、超大文件的有界展示。 新增9MiB文件同长度尾段篡改回归，拒绝只凭长度错误认定完整性。",
-      "remaining": "音视频/图像实际播放和更多容器预览、原 Provider 授权撤销及系统文件选择器跨进程恢复、不支持硬链接设备及 Android16/17 真实附件 E2E 仍缺。大型文件的完整哈希已有源码和测试，仍待多种设备的性能/取消/恢复回归，不宣称全功能验收。"
+      "remaining": "仍缺图像/音视频与多容器的真实预览/播放适配，以及 SAF 授权撤销/恢复与硬链接隔离的代码级回归。"
     },
     {
       "id": "S1-08",
@@ -106,7 +106,7 @@
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
       "implemented": "\n2026-10-15 本次增量：新增 HostPreferencesUiPort 以原 HostsStore DataStore 为真相源控制外观、通知和系统权限设置跳转；明确用户手势且不自行授予权限。 2026-10-16 本批：Host 通知授权读数同时核对 Android13+ POST_NOTIFICATIONS 运行时 grant 和 NotificationManager 系统开关；补 Android12/13/14+ 图片、视频、音频、部分照片的独立只读权限投影，V6 系统权限页在 onResume 时刷新；中立 UiHostMediaPermissionSnapshot 不将 SAF 单文件授权伪作全库权限。独立 Host RenderHostedScene 在实际场景栈/会话 scope 改变时清除过期焦点并关闭 IME；新增纯逻辑回归。",
-      "remaining": "通知及媒体权限反馈、Host 独立导航焦点/IME 基础治理已有源码；仍缺多类型 SAF 权限撤销/恢复、分享/外部打开完整 Host SDK 化、真实设备输入法/系统设置往返/进程重建 E2E，不能视为所有系统服务已交付。"
+      "remaining": "仍缺中立 Host 系统服务协议收敛：文件导入/导出/分享/外部打开、权限和通知回执、焦点/IME 生命周期统一接线与代码级生命周期回归。"
     },
     {
       "id": "S1-09",
@@ -114,14 +114,15 @@
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
       "implemented": "持续移除群聊、团队、图库故事/删除/保存/立绘的 UI 业务编排；现行大型 UI 回调与其他设置/人物业务尚待迁出。 本批预置人物安装和图库检查/建议应用迁入Chat Owner：预置图片先暂存并校验，档案/图片引用一次提交，失败后只清理实际未引用图片；模型检查冻结会话/模型和图库版本，建议由用户选择后条件版本追加。V6旧安装器和检查/建议业务编排退出，独立图库接入预置列表安装、显式模型检查、冲突阅读及建议选择。建议只更新图库，当前故事由用户重新选择应用。 当前人物配置/采样/模型补全已迁出旧UI业务编排，原LocalChatRuntime.configureChatPersona和Facade模型补全转发退出。\n2026-10-16 本轮源代码：V6 原有媒体时间线与动态 UiDocument 都消费同一个 MediaUiPort，消除漏实现媒体节点的 when； 仅架构探针。\n2026-10-16 本轮代码增量：V6 LocalDynamicDocument 的 MediaUiPort 由原 LocalMediaStudioViewModel 会话组合层显式传入；LocalDocumentMediaNode 移除内部 Hilt EntryPoint 全局查找，媒体读取/播放/导出仍经原 Owner。",
-      "remaining": "其余 V6 巨型界面业务回调及专有 Owner 逻辑仍在 App Shell，完整独立移包与旧回调退场尚未完成。"
+      "remaining": "仍有 V6 巨型旧 Shell 中的业务编排和回调，需完整迁入真实 Feature Owner + Port；删除旧回调后用纯代码装配测试证明独立 V6 不依赖它。"
     },
     {
       "id": "S1-10",
       "task": "统一 Port 行为与失败/撤权/晚到业务验证",
       "codeStatus": "VERIFICATION_DEFERRED",
       "verification": "DEFERRED",
-      "implemented": " UiMessageEditOutcome 映射 JVM 单测覆盖 11/11 枚举分支；全量V6 单包行为/失败/晚到设备测试仍未验收。"
+      "implemented": " UiMessageEditOutcome 映射 JVM 单测覆盖 11/11 枚举分支；全量V6 单包行为/失败/晚到设备测试仍未验收。",
+      "remaining": "通过 Owner 契约单测覆盖 Port 行为、拒绝/撤权/迟到与幂等，不再要求设备回归。"
     },
     {
       "id": "S2-01",
@@ -129,7 +130,7 @@
       "codeStatus": "VERIFICATION_DEFERRED",
       "verification": "DEFERRED",
       "implemented": "Host/Port 身份与拒绝处理已有源码级测试基础；原第二套 UI 测试实现本次移除，不当作 V6 业务验收。",
-      "remaining": "按 V6 实际 Owner 逐项验收发送、编辑、审批 nonce、防重放、恢复、失败与未知结果，并取得 Android16/17 真正执行回执。"
+      "remaining": "用业务集成/Compose 测试覆盖 V6 发送、编辑、审批 nonce、防重放、取消、恢复、失败和未知结果；不需要设备验收。"
     },
     {
       "id": "S3-01",
@@ -145,7 +146,7 @@
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
       "implemented": "新增 :ui-host 的 UiHostSceneNavigation 纯导航约定：基于 Host 场景目录与当前包 manifest 区分 PAGE/OVERLAY/SLOT/SYSTEM，支持包身份校验、返回、有限的显式深链键及严格状态恢复；App JVM 回归测试覆盖拒绝旧包/无实现页面/系统服务/伪造历史。仅是独立导航内核，不是现网 Host 接线或 renderer 的完成证明。 本批增加 32 层历史上限、root 导航清栈、页面覆盖弹层去重和非法覆盖/回到 root 历史拒绝；增加有版本/长度预算的编码快照及 Host 恢复入口，严格重新核验场景和包身份；补 JVM 回归源码，本轮新增 UiApplicationSceneHost 中间层：仅接收完整 Pack admission 的真实 Compose renderer，使用 SaveableState 中立快照接收导航与系统返回，实时重新验证 pack/历史/renderer 并拒绝迟到画面回调；修正向上返回的 scope 也使用实际 Host 回调，新增 JVM 回归源码。仍未接入 AppRoot，最新 CI 待回执。 生产 AppRoot 经 LocalApplicationUiHost 进入 UiHostSceneNavigation/RenderHostedScene；以 FeatureCatalog 7 一级路由与 SettingsDestination 构建可信内部跳转键；原 Work/Chat UI 场景请求经 Host 白名单状态机处理，并消费对应 VM 请求；错误持久历史可见提示、根返回 Activity 退出；支持 A→B→A 代次保护。 2026-10-15 增量：生产 MainActivity 已注册 dsh777://scene/{key} Android VIEW 入口，精确 Host 既有 Scene 白名单并拒绝未知/编码路径/参数/片段；onNewIntent 和已消费状态不重复发起请求，AppRoot 将外部请求送至真实 Host。补 URI JVM 检查与整包渲染夹具仪器化测试源码。 2026-10-16 本批：ui-host RenderHostedScene 根据已验证编码导航栈或会话 scope 变化清除焦点与关闭输入法；正常未导航的编辑重新组合不清除焦点。",
-      "remaining": "独立 V6 Renderer 生产门禁仍关闭；完整 Legacy Shell 退场、跨版本 Host 导航状态迁移、7 路由及深链/返回/IME 的 Android16/17 全量 E2E 验收仍缺。"
+      "remaining": "仍需完成旧 Shell 退场、跨版本 Host 导航快照/深链/7 路由/返回与 IME 生命周期的源码接线和状态机/Compose 单测；生产准入仍受完整代码闭环约束。"
     },
     {
       "id": "S3-03",
@@ -167,7 +168,8 @@
       "id": "S3-06",
       "task": "Host/Shell 旧绑定退场",
       "codeStatus": "CODE_PARTIAL",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "remaining": "旧 Host/Shell 回调仍参与业务装配；应抽离业务 Owner 并提供不加载 Legacy Shell 的 V6 组合与编译/导航/发送/审批回归，不以设备验收作为交付条件。"
     },
     {
       "id": "S3-07",
@@ -175,7 +177,7 @@
       "codeStatus": "VERIFICATION_DEFERRED",
       "verification": "DEFERRED",
       "implemented": "V6 独立候选与 Host 已具备完整场景清单登记和拦截条件，旧 Shell 仍保留。",
-      "remaining": "在旧 Shell 不参与渲染时，真实 V6 独立包全部 7 路由/75 Scene/173 Action 等价运行、重启恢复及 Android16/17 验收。"
+      "remaining": "禁用 Legacy Shell 的组合/编译验证和完整 V6 Scene/Port 可达性测试；保留运行行为的代码实现，不要求设备运行。"
     },
     {
       "id": "S3-08",
@@ -199,7 +201,7 @@
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
       "implemented": "原 Work 工具结果按真实 callId/finishedSequence 读取，本地 JSON 对象/数组自动生成只读折叠和表格，普通文本原样显示；V6 单包入口，无模型调用。 2026-10-16 继续代码：新增 V6UiDocumentScene/V6DocumentMedia，接入现有 UiDocumentUiPort、UiDocumentFormUiPort、MediaUiPort，原生处理 Text/Media/Table/BarChart/BoundText/Column/Row/Field/Select/Switch/Button/Disclosure 全节点；按 documentId/revision 读取与更新表单，文档执行与删除只交原 Owner，并明确发送/授权确认；图片有界解码、音频生命周期、视频播放、会话隔离素材读取和 Android SAF 用户选址导出。消息时间线原位展示每条所属文档，添加生成/查看入口；生成可用本地实际 Owner 模板或显式同意的额外模型请求。注册 conversation.ui_document 与 conversation.ui_document_generate 两个 Scene。另将已有 V6WorkEvidencePanel 通过 WorkEvidenceUiPort 正式接入 work.requirement_evidence 真场景、读取核验需求和产物版本。新增源代码回归测试，均未冒报 CI/设备验收。 2026-10-16 续：UiDocumentFormUiPort 的交互字段在契约/Owner 分别按单行4096、多行16384、最终发送32768字符校验；V6 同步限制输入并提示，超限无法由模型动作绕过；新增字段/组合预算测试。",
-      "remaining": "真实工具 Schema 自描述到交互控件的映射、更多工具业务结果适配仍待实现；目前仅支持封闭的 SendUserInput/导航/当前 Work 审批意图，不将模型描述直接作为工具权限。"
+      "remaining": "仍缺可信工具 Schema 自描述到受限输入/预览控件的明确映射，真实工具准入 Owner 与会话/调用身份隔离，未知类型拒绝等契约测试。"
     },
     {
       "id": "S4-02",
@@ -207,7 +209,7 @@
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
       "implemented": "MEDIA_RESULTS 本地模板从真实 Media Owner 构造文档节点。\n2026-10-16 本轮源代码：V6 的媒体卡现在都监听 Media Owner 状态变化；音频异步 prepare、播放器销毁释放；导出沿用原文件实际已识别的后缀。\n2026-10-16 功能代码补充：原 V6 经 SAF CreateDocument 导出媒体时失败/取消后尝试移除新建的不完整目标文件；清理失败显式提示，避免损坏文件被误报为已保存。\n2026-10-16 审计修复：V6 音频分开准备、真实失败和显式重新加载，释放替换播放器。 最终 SHA CI 待核对，仍不视为完整验收。\n2026-10-16 交互回复与渐进成果闭环代码：V6 补齐 MEDIA_RESULTS 本地入口，与  共用原 Media Owner 实际结果及受控导出。 2026-10-16 续：V6MediaScene 现复用 V6DocumentMediaNode 与 MediaUiPort.assetForSession/exportToSessionAsset，在媒体成果页显示真实图片音频视频与 Android 用户选择位置的安全导出。不支持未获会话归属的远程资产自动下载。仍需远程合法下载及中断恢复验收。 2026-10-16：工作区文件经 Android SAF 导出并分享/外部打开；文件读取只由 Files Owner 在本地 Workspace 沙箱根内流式处理，防止借用共享存储白名单外泄。",
-      "remaining": "远程成果的可授权下载及中断恢复与更多编码容器支持仍缺；完整播放器回归不在本轮执行。"
+      "remaining": "仍缺 Media Owner 授权远程成果下载、断点/版本恢复和更多容器播放的代码与状态持久化回归；不得自动重发可能付费的生成。"
     },
     {
       "id": "S4-03",
@@ -215,7 +217,7 @@
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
       "implemented": " 2026-10-16：V6 可从原 WorkReadUiPort 的真实 requirementEvidenceForUi 快照生成只读来源关联卡，区分关联时/当前文件版本相同、已变化及不可判定；显式标注未核验，不将来源关联伪报通过；同模板原位 revision 版本更新。 本轮 V6 Work 证据面板打开期间每30秒重新读取 Work Owner 来源状态；任务/目标/会话代次改变撤销已选证据，文件或引用改变撤销旧检视；用户未授予操作权限时不执行核验。新增纯契约回归测试。",
-      "remaining": "完整实际核验执行、显式授权及来源有效性订阅仍缺；本轮为界面可见期间定时复查而非持续订阅；需 Android 16/17 设备及重启后真实重核验收。"
+      "remaining": "仍缺来源变动的事件订阅、独立 Work 真实核验结论/人工授权记录与冷读恢复；不得使用 30 秒轮询、字节哈希或模型文本冒充通过。"
     },
     {
       "id": "S4-04",
@@ -247,7 +249,7 @@
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
       "implemented": "删除确认/副作用不自动恢复或重放；完整跨版本迁移、崩溃与V6 单包恢复验收仍缺。\n2026-10-16 本轮源代码：Session 文档读写按 (sourceMessageId, documentId) 维护独立最新版本；本地模板按身份与模板建立稳定 ID，模型生成仅更新模型起源卡，损坏记录不得覆盖；增加同消息并存与并发版本冲突测试源码。\n2026-10-16 功能代码补充：Session EventLog 增加同文档 ID 的版本化删除墓碑；删除前强制当前会话身份、原始消息、文档修订号及存储记录 CAS 比对。被删除文档不可由迟到的 Work 事件原 ID 再生；热缓存增量回放与冷恢复均隐藏墓碑。V6 删除确认调用原 UiDocumentUiPort，Owner 真实持久化后返回 Deleted；同步清除该文档所有版本的 SavedState 表单草稿，新增相关回归测试。\n2026-10-16 审计修复：复核并保留最新文档解析显式 return 修复和增量索引/删除能力。 最终 SHA CI 待核对，仍不视为完整验收。 2026-10-16 续：新增显式 EditUiDocumentTextCommand，经原 Session EventLog CAS 对文本节点生成 revision+1；限制16384字符、会话/消息/版本身份及业务操作；Work live 卡和审批节点不允许编辑；V6 提供文本选择/修改/确认入口，来源标注用户编辑并同步安全 fallback，新增契约及 EventLog 重开/墓碑回归。 2026-10-16 本轮新增结构化表格单元格用户编辑：UiDocument 封闭 pure transform、EditUiDocumentTableCellCommand、原 Session EventLog CAS+文档预算+身份再校验，V6 明确标注用户修改/未经业务核验；JVM 契约及冷读恢复、旧版本竞争、删除后禁止复活回归测试源码已提交。",
-      "remaining": "消息级批量整理、图表等其他非文本节点的可控编辑、老版本复杂迁移和并发崩溃/跨进程恢复仍未实现；本轮新增表格编辑需最新 SHA Kotlin/JVM/Android16/17 回执确认，未经验证不得升级整项状态。"
+      "remaining": "仍缺消息级批量编辑、图表等非文本节点的受控编辑、历史版本升级器与并发冷恢复状态机回归；已补表格编辑源码仍待编译/单测确认。"
     },
     {
       "id": "S4-08",
@@ -255,7 +257,7 @@
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
       "implemented": "\n2026-10-16 本轮代码增量：Session UiDocumentStore 新增按 session/message/documentId 向原 EventLog 查询单份文档的版本准入；Work 高频活动更新不再为比较一个卡片而物化整段文档历史。\n2026-10-16 功能代码补充：Session 文档列表维持首次精准流式重建，随后对同一会话及消息窗口通过 EventLog sequence 游标增量追读；缓存只持有当前可见消息集的最近定义，无第二持久化权威。墓碑删除同步清理当前及各版本敏感表单草稿。 2026-10-16 续：Host 表单草稿 SavedState 增加单字段16384字符、每文档32字段、最多24文档及65536字符总预算，拒绝超限不先清空旧 revision，受损/旧版恢复均复用同一准入；测试覆盖超限、恢复、跨版本保留。 2026-10-16 本批：Host UiDocumentFormState 针对密码、Token、API Key、Secret 等字段保留本次会话内编辑，但不写入 Android SavedState；旧 v1/v2 保存快照恢复时拒绝敏感项并立即写回清理后的快照。字段名按边界识别以减少误判（如 secretary/tokenizer），覆盖新值保存、旧版清理、跨版本会话隔离回归测试。",
-      "remaining": "敏感动态表单字段从 Android SavedState 排除并清理旧遗留值的源码已补；仍缺 Session EventLog 冷恢复独立有界索引、所有敏感输入来源分级加密/清理及 Android 进程崩溃恢复/实际驻留内存安全验收；不得把 SavedState 过滤宣称为加密。"
+      "remaining": "仍缺 EventLog 冷读有界增量索引、按敏感级别分层留存和清理、保存状态重建与长会话复杂度的自动化测试。"
     },
     {
       "id": "S4-09",
@@ -263,14 +265,14 @@
       "codeStatus": "VERIFICATION_DEFERRED",
       "verification": "DEFERRED",
       "implemented": "V6 已按真实 Owner 接受、拒绝、失败、排队、结果未知分类回执，具备 Compose 测试源码。",
-      "remaining": "验收 V6 动态文档创建、编辑、保存、拒绝、取消、过期、历史回放和进程重建恢复；不做第二套界面。"
+      "remaining": "用文档 Owner/Compose/JVM 回归覆盖创建、编辑、保存、拒绝、过期、历史回放和持久化重建；不要求设备测试。"
     },
     {
       "id": "S5-01",
-      "task": "最终 SHA CI 与 Android16/17 全场景/无障碍/弱网/收费矩阵",
+      "task": "最终 SHA 编译、单测、静态与架构质量门禁",
       "codeStatus": "VERIFICATION_DEFERRED",
       "verification": "DEFERRED",
-      "remaining": "以当前 SHA 验证增量  Renderer 的 Kotlin/JVM/Android16/17 编译与图库四项设备测试、ARM64、架构/静态门禁；仍需完整 V6 V6 单包业务、弱网、审批、收费、TalkBack、恢复/E2E 等最终验收。",
+      "remaining": "最终 SHA 的 Kotlin/JVM/Compose 单测、静态门禁、架构检查、模块编译及高风险 Owner 契约回归全通过，不要求设备/模拟器/仪器测试。",
       "implemented": " 2026-10-15 CI #38696536117 真实失败已定位 LocalHarnessViewModel.kt:325 编辑结果接口类型变化未兼容旧 V6；b4eb3bfb 完整映射11种结果后，旧 CI #38697453814 的 unit-tests 作业通过（其他 Job 状态需以对应最终 SHA 查证）。"
     }
   ],
@@ -294,5 +296,6 @@
   },
   "hostProvidedScenes": 3,
   "uiPackSceneCount": 75,
-  "sceneCoveragePolicy": "78 Scene 中 3 项系统服务由 Host 提供，75 项为 V6 独立包真实 Renderer/原 Owner 业务要求。源码清单登记不等于功能等价或设备验收，不要求第二套 UI 包。"
+  "sceneCoveragePolicy": "78 Scene 中 3 项系统服务由 Host 提供，75 项为 V6 独立包真实 Renderer/原 Owner 业务要求。源码清单登记不等于功能等价或设备验收，不要求第二套 UI 包。",
+  "verificationMode": "CODE_ONLY"
 }
