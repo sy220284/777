@@ -256,7 +256,9 @@ class V6ApplicationScenePack(
             put(UiSceneId("shell.error"), UiSceneRenderer { scope ->
                 V6ShellErrorScene(owners,
                     onDiagnostics = { scope.onNavigate(UiSceneId("settings.diagnostics")) },
-                    onBack = { scope.onBack(); Unit })
+                    onBack = { scope.onBack(); Unit },
+                    sessions = secondary?.sessions,
+                    onReopen = { scope.onNavigate(UiSceneId("route.home")) })
             })
             listOf(
                 "conversation.message_actions" to V6MessageOperation.ACTIONS,
