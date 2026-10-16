@@ -74,6 +74,8 @@ internal object LocalApplicationPackInstallations {
                     gallery = owner.personaGalleryUiPort,
                     selection = owner.personaSelectionUiPort,
                     groups = owner.chatGroupUiPort,
+                    stories = owner.personaStoryUiPort,
+                    galleryDeletion = owner.personaGalleryDeletionUiPort,
                     workMode = { owner.shellState.value.usageMode == LocalUsageMode.WORK },
                     workModeUpdates = owner.shellState.map { it.usageMode == LocalUsageMode.WORK },
                 ),
