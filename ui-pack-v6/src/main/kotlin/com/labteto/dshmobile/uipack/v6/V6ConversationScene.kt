@@ -52,6 +52,8 @@ import com.labteto.dshmobile.uicontract.MediaUiPort
 import com.labteto.dshmobile.uicontract.WorkEvidenceUiPort
 import com.labteto.dshmobile.uicontract.PersonaGalleryUiPort
 import com.labteto.dshmobile.uicontract.PersonaSelectionUiPort
+import com.labteto.dshmobile.uicontract.PersonaStoryUiPort
+import com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort
 import com.labteto.dshmobile.uicontract.ChatGroupUiPort
 import com.labteto.dshmobile.uicontract.UiTranscriptCursor
 import com.labteto.dshmobile.uicontract.WorkConversationUiCommand
@@ -87,6 +89,8 @@ data class V6ConversationPorts(
     val gallery: PersonaGalleryUiPort? = null,
     val selection: PersonaSelectionUiPort? = null,
     val groups: ChatGroupUiPort? = null,
+    val stories: PersonaStoryUiPort? = null,
+    val galleryDeletion: PersonaGalleryDeletionUiPort? = null,
     val workMode: () -> Boolean,
     val workModeUpdates: Flow<Boolean>? = null,
 )
@@ -296,6 +300,12 @@ fun V6ConversationScene(
         if (!workMode && identity != null &&
             (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) &&
             onNavigate != null) {
+            if (ports.gallery != null && ports.selection != null)
+                SyButton("人物档案与故事", {
+                    val result = onNavigate(UiSceneId("route.persona_gallery"))
+                    if (result !is UiSceneNavigationResult.Changed)
+                        feedback = "人物档案馆暂不可达"
+                }, style = SyButtonStyle.SECONDARY)
             if (ports.gallery != null && ports.selection != null)
                 SyButton("选择人物", onClick = {
                     val result = onNavigate(UiSceneId("chat.persona_picker"))
