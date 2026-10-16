@@ -45,6 +45,7 @@ import com.labteto.dshmobile.uicontract.UiPersonaGalleryDeletionReceipt
 import com.labteto.dshmobile.uicontract.UiPersonaGalleryStory
 import com.labteto.dshmobile.uicontract.UiPersonaStoryReceipt
 import com.labteto.dshmobile.uicontract.UiSessionIdentity
+import com.shenyan.designsystem.components.SyEntrance
 import com.shenyan.designsystem.components.SyButton
 import com.shenyan.designsystem.components.SyButtonStyle
 import com.shenyan.designsystem.components.SyGlassCard
@@ -225,14 +226,19 @@ fun V6PersonaArchiveScene(
         if (chosen != null && part != V6PersonaArchivePart.DELETE)
             SyButton("切换人物", { requestDeparture { activeGallery = null; activeStory = null } },
                 enabled = !pending, style = SyButtonStyle.GHOST)
-        if (chosen == null || part == V6PersonaArchivePart.DELETE) entries.forEach { person ->
-            Column(Modifier.fillMaxWidth()) {
-                com.shenyan.designsystem.components.SyCategoryRow(title = person.name,
-                    subtitle = "${person.stories.size} 段故事", onClick = { requestDeparture { chooseGallery(person.id) } })
-                if (part == V6PersonaArchivePart.DELETE && deletion != null)
-                    SyButton("删除此人物及其档案", {
-                        deleteTarget = person.id to null
-                    }, style = SyButtonStyle.GHOST, enabled = !pending)
+        if (chosen == null || part == V6PersonaArchivePart.DELETE) entries.forEachIndexed { index, person ->
+            androidx.compose.runtime.key(person.id) {
+                SyEntrance("gallery:${person.id}", order = index) {
+                    Column(Modifier.fillMaxWidth()) {
+                        com.shenyan.designsystem.components.SyCategoryRow(title = person.name,
+                            subtitle = "${person.stories.size} 段故事",
+                            onClick = { requestDeparture { chooseGallery(person.id) } })
+                        if (part == V6PersonaArchivePart.DELETE && deletion != null)
+                            SyButton("删除此人物及其档案", {
+                                deleteTarget = person.id to null
+                            }, style = SyButtonStyle.GHOST, enabled = !pending)
+                    }
+                }
             }
         }
         if (chosen != null && part != V6PersonaArchivePart.DELETE) {
@@ -287,7 +293,7 @@ fun V6PersonaArchiveScene(
             if (stories != null) {
                 SyInput(notes, { notes = it }, label = "故事备注", singleLine = false, enabled = !pending, maxLines = 8)
                 SyInput(stage, { stage = it }, label = "故事阶段", enabled = !pending)
-                SyButton("保存故事资料", {
+                SyButton(if (pending) "正在处理" else "保存故事资料", loading = pending, onClick = {
                     val id = chosen.id
                     val sid = story.id
                     val expected = currentIdentity

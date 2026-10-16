@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.shenyan.designsystem.foundation.LocalSyColors
 import com.shenyan.designsystem.foundation.LocalSyReduceMotion
+import com.shenyan.designsystem.foundation.LocalSyMotionTempo
 import com.shenyan.designsystem.foundation.SyMetric
 import com.shenyan.designsystem.foundation.SyMotion
 import com.shenyan.designsystem.foundation.SyOption
@@ -220,7 +221,7 @@ fun SySegmentedControl(
             val selected = option.id == selectedId
             val background by animateColorAsState(
                 if (selected) p.selected else Color.Transparent,
-                animationSpec = tween(if (reduceMotion) 0 else SyMotion.selectMs),
+                animationSpec = tween(SyMotion.duration(SyMotion.selectMs, reduceMotion, LocalSyMotionTempo.current)),
                 label = "sySegment",
             )
             val itemModifier = if (stretch) Modifier.weight(1f) else Modifier

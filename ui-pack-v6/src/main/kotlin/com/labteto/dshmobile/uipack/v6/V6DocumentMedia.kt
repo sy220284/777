@@ -34,6 +34,13 @@ import com.labteto.dshmobile.uicontract.MediaUiReceipt
 import com.labteto.dshmobile.uicontract.UiDocumentMediaKind
 import com.labteto.dshmobile.uicontract.UiDocumentNode
 import com.labteto.dshmobile.uicontract.UiMediaAsset
+import com.shenyan.designsystem.components.SyEntrance
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.ContentScale
+import com.shenyan.designsystem.foundation.SyMotion
 import com.shenyan.designsystem.components.SyButton
 import com.shenyan.designsystem.components.SyButtonStyle
 import kotlinx.coroutines.CancellationException
@@ -109,8 +116,13 @@ internal fun V6DocumentMediaNode(node: UiDocumentNode.Media, sessionId: String, 
                             }.getOrNull()
                         }
                     }
-                    if (bitmap == null) Text("图片载入中或无法解码")
-                    else Image(bitmap!!, node.label, Modifier.fillMaxWidth().heightIn(max = 320.dp))
+                    Box(Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) {
+                        val image = bitmap
+                        if (image == null) Text("图片载入中或无法解码")
+                        else SyEntrance("media:$sessionId:${node.assetId}:$path", durationMs = SyMotion.portraitRevealMs) {
+                            Image(image, node.label, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                        }
+                    }
                 }
                 UiDocumentMediaKind.AUDIO -> V6AudioPlayback(path)
                 UiDocumentMediaKind.VIDEO -> V6VideoPlayback(path)

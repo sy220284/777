@@ -48,6 +48,10 @@ class V6ApplicationScenePack(
     private val checkForUpdate: (() -> Unit)? = null,
     private val secondary: V6SecondaryPorts? = null,
 ) : UiApplicationScenePack {
+    @Composable
+    override fun SceneFrame(state: com.labteto.dshmobile.uihost.UiSceneNavigationState,
+        content: @Composable () -> Unit) = V6SceneMotionFrame(state, content)
+
     private val pages = mapOf(
         UiSceneId("settings.appearance") to V6PreferencesPage.APPEARANCE,
         UiSceneId("settings.notifications") to V6PreferencesPage.NOTIFICATIONS,

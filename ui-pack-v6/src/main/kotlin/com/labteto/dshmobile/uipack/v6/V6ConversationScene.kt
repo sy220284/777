@@ -19,6 +19,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.SideEffect
+import com.shenyan.designsystem.components.SyEntrance
+import com.shenyan.designsystem.components.SyAnimatedReveal
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -252,6 +255,10 @@ fun V6ConversationScene(
     // Never reuse list position across a different Owner activation.
     val list = remember(identity) { LazyListState() }
     val seen = hot.map { it.id }.toSet()
+    var initialMessages by remember(identity) { mutableStateOf<Set<String>?>(null) }
+    if (initialMessages == null && status != UiSceneStatus.LOADING) {
+        SideEffect { initialMessages = seen }
+    }
     val messages = older.filterNot { it.id in seen } + hot
     val ids = messages.map { it.id }.toSet()
     var anchorRestored by remember(identity) { mutableStateOf(false) }
@@ -619,9 +626,7 @@ fun V6ConversationScene(
         if (identity == null || status == UiSceneStatus.LOADING) {
             SyNote("正在加载会话，请稍候")
         } else {
-            Text(v6PhaseLabel(phase, workMode) + if (queued > 0) " · $queued 条消息待处理" else "",
-                color = LocalSyColors.current.textSecondary,
-                style = MaterialTheme.typography.labelMedium)
+            V6ExecutionFeedback(phase, workMode, queued, ownerError != null)
         }
         }
         if (part == V6ConversationPart.FULL || part == V6ConversationPart.TIMELINE) LazyColumn(
@@ -642,66 +647,73 @@ fun V6ConversationScene(
                     style = SyButtonStyle.SECONDARY)
             }
             items(messages, key = { "message:${it.id}" }) { message ->
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    V6MessageBody(message, workMode,
-                        onOpenFile = if (ports.files != null && identity != null) {
-                            { path -> readingFile = path }
-                        } else null)
-                    val documentState = docSnapshot
-                    if (docOwner != null && formOwner != null && identity != null &&
-                        documentState != null && documentState.sessionId == identity.sessionId) {
-                        val related = documentState.documents.filter {
-                            it.document.source.sessionId == identity.sessionId &&
-                                it.document.source.messageId == message.id
-                        }
-                        related.forEach { document ->
-                            androidx.compose.runtime.key(document.document.documentId,
-                                document.document.revision) {
-                                V6DocumentCard(document, identity, docOwner, formOwner, ports.media,
-                                    identityIsCurrent = {
-                                        (if (workMode) ports.work.snapshot().identity
-                                        else ports.chat.snapshot().identity) == identity
-                                    })
+                SyEntrance("message:${message.id}", enabled = initialMessages?.let {
+                    message.id !in it && message.id in seen
+                } == true) {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        V6MessageBody(message, workMode,
+                            onOpenFile = if (ports.files != null && identity != null) {
+                                { path -> readingFile = path }
+                            } else null)
+                        val documentState = docSnapshot
+                        if (docOwner != null && formOwner != null && identity != null &&
+                            documentState != null && documentState.sessionId == identity.sessionId) {
+                            val related = documentState.documents.filter {
+                                it.document.source.sessionId == identity.sessionId &&
+                                    it.document.source.messageId == message.id
+                            }
+                            related.forEach { document ->
+                                androidx.compose.runtime.key(document.document.documentId) {
+                                    SyEntrance("document:${document.document.documentId}") {
+                                        androidx.compose.runtime.key(document.document.revision) {
+                                            V6DocumentCard(document, identity, docOwner, formOwner, ports.media,
+                                                identityIsCurrent = {
+                                                    (if (workMode) ports.work.snapshot().identity
+                                                    else ports.chat.snapshot().identity) == identity
+                                                })
+                                        }
+                                    }
+                                }
                             }
                         }
-                    }
-                    if (docOwner != null && formOwner != null && onNavigate != null &&
-                        identity != null && message.id == messages.lastOrNull()?.id &&
-                        phase == UiExecutionPhase.IDLE &&
-                        part == V6ConversationPart.FULL) {
-                        SyButton("从这条消息生成结构化内容", onClick = {
-                            val result = onNavigate(UiSceneId("conversation.ui_document_generate"))
-                            if (result !is UiSceneNavigationResult.Changed)
-                                feedback = "结构化文档生成界面暂不可达"
-                        }, style = SyButtonStyle.SECONDARY)
-                    }
-                    val actionReady = identity != null && phase == UiExecutionPhase.IDLE &&
-                        status != UiSceneStatus.LOADING
-                    if (message.role == UiMessageRole.USER && message.editableText != null &&
-                        actionReady) SyButton("修改", {
-                            editing = message; editText = message.editableText.orEmpty(); editError = null
-                        }, style = SyButtonStyle.GHOST)
-                    if (message.role == UiMessageRole.ASSISTANT && !message.proactive &&
-                        message.id == messages.lastOrNull()?.id && actionReady) {
-                        SyButton("重新生成", {
-                            show(if (workMode) ports.work.submit(
-                                WorkConversationUiCommand.RegenerateReply(identity, message.id))
-                            else ports.chat.submit(ChatUiCommand.RegenerateReply(identity, message.id)))
-                        }, style = SyButtonStyle.GHOST)
-                    }
-                    val branch = message.branch
-                    if (!workMode && branch != null && branch.count > 1 && actionReady) {
-                        Text("版本 ${branch.index + 1}/${branch.count}",
-                            style = MaterialTheme.typography.labelMedium)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SyButton("上一版", {
-                                show(ports.chat.submit(ChatUiCommand.SelectVariant(
-                                    identity, message.id, branch.index - 1)))
-                            }, enabled = branch.index > 0 && actionReady, style = SyButtonStyle.GHOST)
-                            SyButton("下一版", {
-                                show(ports.chat.submit(ChatUiCommand.SelectVariant(
-                                    identity, message.id, branch.index + 1)))
-                            }, enabled = branch.index + 1 < branch.count && actionReady, style = SyButtonStyle.GHOST)
+                        if (docOwner != null && formOwner != null && onNavigate != null &&
+                            identity != null && message.id == messages.lastOrNull()?.id &&
+                            phase == UiExecutionPhase.IDLE &&
+                            part == V6ConversationPart.FULL) {
+                            SyButton("从这条消息生成结构化内容", onClick = {
+                                val result = onNavigate(UiSceneId("conversation.ui_document_generate"))
+                                if (result !is UiSceneNavigationResult.Changed)
+                                    feedback = "结构化文档生成界面暂不可达"
+                            }, style = SyButtonStyle.SECONDARY)
+                        }
+                        val actionReady = identity != null && phase == UiExecutionPhase.IDLE &&
+                            status != UiSceneStatus.LOADING
+                        if (message.role == UiMessageRole.USER && message.editableText != null &&
+                            actionReady) SyButton("修改", {
+                                editing = message; editText = message.editableText.orEmpty(); editError = null
+                            }, style = SyButtonStyle.GHOST)
+                        if (message.role == UiMessageRole.ASSISTANT && !message.proactive &&
+                            message.id == messages.lastOrNull()?.id && actionReady) {
+                            SyButton("重新生成", {
+                                show(if (workMode) ports.work.submit(
+                                    WorkConversationUiCommand.RegenerateReply(identity, message.id))
+                                else ports.chat.submit(ChatUiCommand.RegenerateReply(identity, message.id)))
+                            }, style = SyButtonStyle.GHOST)
+                        }
+                        val branch = message.branch
+                        if (!workMode && branch != null && branch.count > 1 && actionReady) {
+                            Text("版本 ${branch.index + 1}/${branch.count}",
+                                style = MaterialTheme.typography.labelMedium)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                SyButton("上一版", {
+                                    show(ports.chat.submit(ChatUiCommand.SelectVariant(
+                                        identity, message.id, branch.index - 1)))
+                                }, enabled = branch.index > 0 && actionReady, style = SyButtonStyle.GHOST)
+                                SyButton("下一版", {
+                                    show(ports.chat.submit(ChatUiCommand.SelectVariant(
+                                        identity, message.id, branch.index + 1)))
+                                }, enabled = branch.index + 1 < branch.count && actionReady, style = SyButtonStyle.GHOST)
+                            }
                         }
                     }
                 }
@@ -722,11 +734,11 @@ fun V6ConversationScene(
         }
         if (part == V6ConversationPart.FULL || part == V6ConversationPart.REPLY_STATUS) {
             ownerError?.let { SyNote(it) }
-            feedback?.let { Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
+            feedback?.let { notice ->
+                SyEntrance("feedback:$notice") { Text(notice, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
+            }
             if (part == V6ConversationPart.REPLY_STATUS) {
-                Text(if (status == UiSceneStatus.LOADING) "正在加载" else v6PhaseLabel(phase, workMode),
-                    style = MaterialTheme.typography.labelMedium)
-                if (queued > 0) Text("$queued 条消息待处理")
+                V6ExecutionFeedback(phase, workMode, queued, ownerError != null)
             }
         }
         if (part == V6ConversationPart.FULL || part == V6ConversationPart.COMPOSER) {
@@ -784,19 +796,25 @@ fun V6ConversationScene(
         }, label = "输入消息", enabled = identity != null, singleLine = false, maxLines = composerLines)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.weight(1f).horizontalScroll(rememberScrollState())) {
-                if (imported.isNotEmpty()) SyButton("附件（${imported.size}）", {
-                    feedback = null
-                    attachmentsOpen = true
-                }, style = SyButtonStyle.GHOST, compact = true)
-                else if (ports.attachments != null) SyButton("添加附件", {
-                    pickerIdentity = identity
-                    picker()
-                }, enabled = identity != null && !importing, style = SyButtonStyle.SECONDARY, compact = true)
+                SyAnimatedReveal(imported.isNotEmpty()) {
+                    SyButton("附件（${imported.size}）", {
+                        feedback = null
+                        attachmentsOpen = true
+                    }, style = SyButtonStyle.GHOST, compact = true)
+                }
+                SyAnimatedReveal(imported.isEmpty() && ports.attachments != null) {
+                    SyButton("添加附件", {
+                        pickerIdentity = identity
+                        picker()
+                    }, enabled = identity != null && !importing, style = SyButtonStyle.SECONDARY, compact = true)
+                }
             }
-            if (phase == UiExecutionPhase.RUNNING && identity != null) SyButton("停止", {
-                show(if (workMode) ports.work.submit(WorkConversationUiCommand.Stop(identity))
-                    else ports.chat.submit(ChatUiCommand.Stop(identity)))
-            }, style = SyButtonStyle.SECONDARY)
+            SyAnimatedReveal(phase == UiExecutionPhase.RUNNING && identity != null) {
+                if (identity != null) SyButton("停止", {
+                    show(if (workMode) ports.work.submit(WorkConversationUiCommand.Stop(identity))
+                        else ports.chat.submit(ChatUiCommand.Stop(identity)))
+                }, enabled = phase == UiExecutionPhase.RUNNING, style = SyButtonStyle.SECONDARY)
+            }
             SyButton("发送", {
                 val target = identity ?: return@SyButton
                 if ((if (workMode) ports.work.snapshot().identity else ports.chat.snapshot().identity) != target)

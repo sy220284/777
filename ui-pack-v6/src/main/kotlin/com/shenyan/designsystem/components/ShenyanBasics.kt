@@ -74,7 +74,8 @@ fun SyButton(
     val tempo = LocalSyMotionTempo.current
     val scale by animateFloatAsState(
         if (pressed && enabled && !reduceMotion) SyMotion.pressedScale else 1f,
-        animationSpec = tween(SyMotion.duration(SyMotion.pressMs, reduceMotion, tempo)),
+        animationSpec = tween(SyMotion.duration(if (pressed) SyMotion.pressMs else SyMotion.releaseMs, reduceMotion, tempo),
+            easing = if (pressed) SyMotion.ease else SyMotion.releaseEase),
         label = "syButtonPress",
     )
     val fill = if (!enabled) syMaterialColor(SyMaterialTier.L2_BAR) else when (style) {
@@ -177,7 +178,7 @@ fun SyModalSheet(onDismiss: () -> Unit, title: String, content: @Composable Colu
         Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 14.dp), content = {
             Text(title, style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(14.dp))
-            content()
+            SyEntrance("sheet-content", order = 1) { Column(content = content) }
             Spacer(Modifier.height(26.dp))
         })
     }

@@ -137,7 +137,7 @@ fun UiApplicationPackAdmission.Admitted.RenderHostedScene(
             onNavigate = { target -> commit(navigation.navigate(restored.state, target)) },
             onBack = { commit(navigation.back(restored.state)) },
         ))
-        hosted.renderer.Render(hosted.scope)
+        pack.SceneFrame(restored.state) { hosted.renderer.Render(hosted.scope) }
         return hosted
     }
     // No legacy-page fallback on rejected/missing scenes.

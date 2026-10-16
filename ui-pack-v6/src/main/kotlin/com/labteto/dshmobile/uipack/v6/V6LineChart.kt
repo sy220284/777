@@ -1,5 +1,10 @@
 package com.labteto.dshmobile.uipack.v6
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.drawscope.clipRect
+import com.shenyan.designsystem.foundation.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +39,13 @@ internal fun v6LineChartCoordinates(values: List<Double>): List<Pair<Float, Floa
 internal fun V6LineChart(node: UiDocumentNode.LineChart) {
     val coordinates = remember(node.points) { v6LineChartCoordinates(node.points.map { it.value }) }
     val tint = MaterialTheme.colorScheme.primary
+    val reduced = LocalSyReduceMotion.current
+    val tempo = LocalSyMotionTempo.current
+    val reveal = remember(node.id) { Animatable(if (reduced) 1f else 0f) }
+    LaunchedEffect(node.id, reduced, tempo) {
+        if (reduced) reveal.snapTo(1f)
+        else reveal.animateTo(1f, tween(SyMotion.duration(SyMotion.chartRevealMs, false, tempo), easing = SyMotion.ease))
+    }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(node.title, style = MaterialTheme.typography.titleSmall)
         if (coordinates.isEmpty()) Text("暂无数据", style = MaterialTheme.typography.bodyMedium)
@@ -43,6 +55,7 @@ internal fun V6LineChart(node: UiDocumentNode.LineChart) {
             val width = (size.width - inset * 2).coerceAtLeast(0f)
             val height = (size.height - inset * 2).coerceAtLeast(0f)
             val positions = coordinates.map { (x, y) -> Offset(inset + x * width, inset + y * height) }
+            clipRect(right = size.width * reveal.value) {
             if (positions.size == 1) drawCircle(tint, radius = 3.dp.toPx(), center = positions.first())
             else {
                 val path = Path()
@@ -50,6 +63,7 @@ internal fun V6LineChart(node: UiDocumentNode.LineChart) {
                     if (i == 0) path.moveTo(point.x, point.y) else path.lineTo(point.x, point.y)
                 }
                 drawPath(path, tint, style = Stroke(width = 2.dp.toPx()))
+            }
             }
         }
         node.points.forEach { Text("${it.label}：${it.value} ${node.unit}") }

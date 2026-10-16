@@ -43,9 +43,11 @@ internal val v6SettingsGroups = listOf(
 @Composable
 internal fun V6DestinationSection(group: V6DestinationGroup, onSelect: (V6Destination) -> Unit) {
     SySectionHeader(group.title, Modifier.padding(top = 12.dp))
-    group.entries.forEach { entry ->
-        SyCategoryRow(title = entry.title, subtitle = entry.summary,
-            onClick = { onSelect(entry) })
+    group.entries.forEachIndexed { index, entry ->
+        SyEntrance("destination:${entry.id}", order = index) {
+            SyCategoryRow(title = entry.title, subtitle = entry.summary,
+                onClick = { onSelect(entry) })
+        }
     }
 }
 

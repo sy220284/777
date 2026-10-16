@@ -1,5 +1,15 @@
 package com.shenyan.designsystem.components
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.draw.scale
+import com.shenyan.designsystem.foundation.LocalSyReduceMotion
+import com.shenyan.designsystem.foundation.LocalSyMotionTempo
+import com.shenyan.designsystem.foundation.SyMotion
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -116,7 +126,14 @@ fun SyCategoryRow(
     if (onClick == null) {
         Surface(modifier, shape = shape, color = Color.Transparent) { row() }
     } else {
-        Surface(onClick = onClick, modifier = modifier,
+        val interaction = remember { MutableInteractionSource() }
+        val pressed by interaction.collectIsPressedAsState()
+        val reduced = LocalSyReduceMotion.current
+        val tempo = LocalSyMotionTempo.current
+        val scale by animateFloatAsState(if (pressed && !reduced) SyMotion.pressedScale else 1f,
+            tween(SyMotion.duration(if (pressed) SyMotion.pressMs else SyMotion.releaseMs, reduced, tempo),
+                easing = if (pressed) SyMotion.ease else SyMotion.releaseEase), label = "syRowPress")
+        Surface(onClick = onClick, modifier = modifier.scale(scale), interactionSource = interaction,
             shape = shape, color = Color.Transparent) { row() }
     }
 }

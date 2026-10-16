@@ -146,6 +146,7 @@ object SyMotion {
     // One motion vocabulary for the current V6 UI pack. Timing variants belong here,
     // not in screens or a second DsAnimations token collection.
     val ease = CubicBezierEasing(.22f, 1f, .36f, 1f)
+    val releaseEase = CubicBezierEasing(.2f, 1.35f, .35f, 1f)
     const val pressedScale = .985f
     const val reducedMotionMs = 0
     fun duration(ms: Int, reducedMotion: Boolean, tempo: Float = 1f): Int =
@@ -175,6 +176,10 @@ object SyMotion {
     const val pageExitFadeMs = 95
     const val cascadeStaggerMs = 55
     const val livePulseMs = 900
+    const val entranceMs = 280
+    const val portraitRevealMs = 360
+    const val chartRevealMs = 480
+    const val releaseMs = 220
     const val holdStartMs = 420L
     const val holdRepeatMs = 90L
     const val hapticIntervalMs = 45L

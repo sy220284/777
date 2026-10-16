@@ -53,7 +53,7 @@ private fun syLiveAlpha(active: Boolean): Float {
     if (!active || LocalSyReduceMotion.current) return 1f
     val transition = rememberInfiniteTransition(label = "syLiveStatus")
     val alpha by transition.animateFloat(.55f, 1f,
-        infiniteRepeatable(tween(SyMotion.livePulseMs, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "syLiveAlpha")
+        infiniteRepeatable(tween(SyMotion.duration(SyMotion.livePulseMs, false, LocalSyMotionTempo.current), easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "syLiveAlpha")
     return alpha
 }
 

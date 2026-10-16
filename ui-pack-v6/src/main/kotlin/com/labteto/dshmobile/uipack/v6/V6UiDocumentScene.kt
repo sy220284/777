@@ -32,6 +32,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.uicontract.*
+import com.shenyan.designsystem.components.SyAnimatedReveal
+import com.shenyan.designsystem.components.SyAnimatedBar
 import com.shenyan.designsystem.components.SyButton
 import com.shenyan.designsystem.components.SyButtonStyle
 import com.shenyan.designsystem.components.SyGlassCard
@@ -345,9 +347,7 @@ private fun V6DocumentNode(
             val max = node.points.maxOfOrNull { it.value } ?: 0.0
             node.points.forEach { point ->
                 Text("${point.label}：${point.value} ${node.unit}")
-                LinearProgressIndicator(
-                    progress = { if (max > 0.0) (point.value / max).toFloat().coerceIn(0f, 1f) else 0f },
-                    modifier = Modifier.fillMaxWidth())
+                SyAnimatedBar(if (max > 0.0) (point.value / max).toFloat().coerceIn(0f, 1f) else 0f)
             }
         }
         is UiDocumentNode.LineChart -> V6LineChart(node)
@@ -407,9 +407,13 @@ private fun V6DocumentNode(
             }
             SyButton(node.title, { expanded = !expanded },
                 style = SyButtonStyle.GHOST)
-            if (expanded) node.children.forEach { child ->
-                androidx.compose.runtime.key(child.id) {
-                    V6DocumentNode(child, values, snapshot, active, media, update, submit)
+            SyAnimatedReveal(expanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    node.children.forEach { child ->
+                        androidx.compose.runtime.key(child.id) {
+                            V6DocumentNode(child, values, snapshot, active && expanded, media, update, submit)
+                        }
+                    }
                 }
             }
         }

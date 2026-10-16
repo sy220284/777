@@ -18,6 +18,14 @@ import com.labteto.dshmobile.uicontract.checkCompatibility
 interface UiApplicationScenePack {
     val manifest: UiPackManifest
     val renderers: Map<UiSceneId, UiSceneRenderer>
+
+    /** Pack-owned visual continuity; Host remains the sole navigation owner.
+     * Implementations render content exactly once, without retaining old live scenes.
+     */
+    @Composable
+    fun SceneFrame(state: UiSceneNavigationState, content: @Composable () -> Unit) {
+        content()
+    }
 }
 
 fun interface UiSceneRenderer {
