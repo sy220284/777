@@ -22,6 +22,16 @@ import org.junit.Test
 
 class LocalAttachmentImporterTest {
     @Test
+    fun onlySystemContentUrisMayCrossTheAttachmentPort() {
+        assertTrue(isSupportedPickerAttachmentUri("content", "com.android.providers.media.documents"))
+        assertFalse(isSupportedPickerAttachmentUri("file", ""))
+        assertFalse(isSupportedPickerAttachmentUri("https", "example.com"))
+        assertFalse(isSupportedPickerAttachmentUri("content", null))
+        assertFalse(isSupportedPickerAttachmentUri("content", " "))
+        assertFalse(isSupportedPickerAttachmentUri(null, "provider"))
+    }
+
+    @Test
     fun committingAttachmentDoesNotReplaceAnExistingSharedHash() {
         val dir = kotlin.io.path.createTempDirectory("attachment-dedup").toFile()
         try {
