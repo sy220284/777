@@ -334,6 +334,11 @@ class LocalExecutionService : Service() {
                     withContext(NonCancellable + Dispatchers.Main.immediate) {
                         pendingTurns.remove(key)
                         runningService?.releaseTurn(key, null, notify = false)
+                        // The admission deadline belongs to the waiting run. Once no
+                        // request remains, an unfinished startup is no longer owned.
+                        if (pendingTurns.isEmpty() && startupGate === startup &&
+                            runningService?.foregroundReady != true
+                        ) startupGate = null
                     }
                 }
             }
