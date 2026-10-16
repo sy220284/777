@@ -357,3 +357,18 @@ Host 的 `ConversationShellUiPort` 接入重命名与显式置顶；原偏好 St
 - `V6PersonaArchiveScene.kt` 用 `PersonaGalleryUiPort`、`PersonaSelectionUiPort`、`PersonaStoryUiPort`、`PersonaGalleryDeletionUiPort` 真实承接 `chat.gallery`、`route.persona_gallery`、`chat.gallery_profile`、`chat.gallery_delete` 四个页面。支持人物库、故事信息修改与阶段备注、按原图库游标分页翻阅历史、开始/继续故事、显式确认删除人物/故事。档案保存与前台会话同步是不同 Owner 事实；刷新图库后仍保留真实回执和失败信息。
 - `V6WorkPlanTeamScenes.kt` 分别实现 `work.plan_review` 及 `work.team`：只读真实 Owner 计划、待办及状态，通过 `WorkPolicyUiPort` 变更计划模式；列出 Work Team 子任务及阶段、异步读取成员输出、向指定成员发送消息、带 ID/作业版本校验的停止成员与停止全队。全队停止确认所见的 `jobId` 集合，不接受确认后新增/替换的任务。补充 `V6WorkTeamSafetyTest` 三项回归。
 - `LocalApplicationUiHost` 组合根已注入上述原业务 Port，新增独立场景注册和完整目录拒绝测试。V6 原生候选 **26/75**，余 **49**。原 R4 状态 26 项 `CODE_PARTIAL`、4 项 `CODE_IMPLEMENTED_UNVERIFIED`、5 项 `VERIFICATION_DEFERRED`；生产仍必须保持 `legacy-v6-shell`，不能提前合并或宣称验收。
+
+
+## 2026-10-16 49 个剩余场景：全量源码登记与生产验收隔离
+
+本次不修改完整目录、不删除要求。以 `LocalUiSceneCatalog.requirements` **78 个 Scene** 为唯一验收口径：Host 原生 3 个，Pack 必须 75 个。独立 `:ui-pack-v6` 的 `V6ApplicationScenePack.manifest.scenes` 与 `renderers.keys` 现覆盖全 **75/75** 个必需 ID，新增 `V6FullSceneCoverageTest` 用完整目录和无副作用 Mock Owner 检查。此前剩余的 **49** 个 Scene 已分组补齐真实 Port 的条件性注册和 Kotlin Renderer：
+
+- 设置和模型：`V6SettingsSuiteScene` 对接 Settings / Usage / ChatGPT 账户 / MiniMax 额度 / 诊断 / 更新 Owner，包含设置首页、模型选择和临时凭据编辑、单独用量页、费率与账本、本地记忆规则、运行参数、会话存储确认。
+- 聊天/Work 消息：`V6ConversationActionsScene` 对接 Chat、Work、历史、草稿和 WorkPolicy，承接消息操作、编辑、Reader、回复分支、建议与 Work 策略。
+- 工具/媒体/工作区：`V6ToolsWorkspaceMedia` 对接 Tools、Files、Media、Settings Owner；包含 MCP/插件/GitHub 配置、Work 能力、文件目录和有界预览、用户确认的媒体创作与媒体历史、供应商凭据匹配后查询。
+- 自动任务与系统会话：`V6AutomationShellScene` 接原 Automation / Session / History Owners，含任务目录/编辑/人物互动、会话创建/欢迎页/空态/错误状态与跨会话全文搜索。
+- 人物与记忆：`V6PersonaMoreScenes` 原生承接人物卡与世界书编辑、当前人物微调、仅 Owner 私有 bytes / Android SAF 导入的头像；`V6DiaryMemoryScenes` 接 Diary / Memory / Settings Owner，承接两个日记路由与版本化记忆修订/删除。
+
+**重要安全边界：** 一个 Scene 名称已经登记，说明有实际 Composable/业务 Owner 接线，但 UI 功能等价、权限、状态恢复、可访问性/材质/响应式质量仍需逐项验证。为避免新包在未验收时自动替换现有稳定界面，V6 全包的 `requiredCapabilities` 现增加独立 `v6.migration.accepted`，生产 Host 在未验收前不得授予，继续使用 `legacy-v6-shell`。注册覆盖 100% 不能直接推导发布就绪或可以合并。
+
+**后续阻断与验收：** 最新完整 CI 必须有 Debug/Optimized Kotlin 编译、JVM 单测、Android16/17 仪表与 ARM64 构建成功；真实 Owner 操作需要 E2E 验证，尤其 Session 切换、模型与媒体消费、第三方工具、工作区跨进程恢复；全部质量签收后才允许解除门禁。当前仍记录未通过或未取得证明的验收项，保持 Draft。
