@@ -455,15 +455,16 @@ fun V6ShellErrorScene(ports: V6ConversationPorts,
         chat.error?.let { SyNote("聊天：" + it) }
         work.error?.let { SyNote("Work：" + it) }
         feedback?.let { SyNote(it) }
-        val session = sessions?.snapshot()
+        val sessionOwner = sessions
+        val session = sessionOwner?.snapshot()
         val activeId = session?.identity
-        if (activeId != null && !session.loading) {
+        if (activeId != null && sessionOwner != null && session != null && !session.loading) {
             SyButton("重新打开当前本地会话", {
-                val latest = sessions.snapshot()
+                val latest = sessionOwner.snapshot()
                 if (latest.identity != activeId) {
                     feedback = "会话已切换，请刷新错误页"
                 } else {
-                    val receipt = sessions.submit(SessionUiCommand.Open(activeId.sessionId))
+                    val receipt = sessionOwner.submit(SessionUiCommand.Open(activeId.sessionId))
                     feedback = describeV6ConversationReceipt(receipt)
                     if (receipt == UiCommandReceipt.Accepted || receipt == UiCommandReceipt.Queued) {
                         val navigation = onReopen()
