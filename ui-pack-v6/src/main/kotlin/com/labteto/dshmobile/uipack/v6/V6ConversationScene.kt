@@ -260,6 +260,7 @@ fun V6ConversationScene(
             catch (failure: Exception) { feedback = failure.message ?: "无法读取目标历史消息" }
             finally { loadingHistory = false }
         }
+        if (restored != messages) androidx.compose.runtime.withFrameNanos { }
         val index = restored.indexOfFirst { it.id == anchor?.messageId }
         val historyHeader = if (ports.history != null && more) 1 else 0
         list.scrollToItem(
