@@ -3986,7 +3986,7 @@
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ChatSettingsScene.kt",
-      "sha256": "8ec557e9c370daf1"
+      "sha256": "0a1393d65de48f7d"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6WorkEvidencePanel.kt",
@@ -4058,16 +4058,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "7a258bb66133",
+  "source_snapshot": "74352b1e714f",
   "observed_delta": {
-    "baseline": "04a9a8b10a94",
-    "added_production_files": [
-      "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ChatSettingsScene.kt"
-    ],
+    "baseline": "7a258bb66133",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalApplicationUiHost.kt",
-      "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt"
+      "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ChatSettingsScene.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
