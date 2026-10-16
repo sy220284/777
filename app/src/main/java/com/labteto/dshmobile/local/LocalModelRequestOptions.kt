@@ -11,6 +11,8 @@ import kotlinx.serialization.json.JsonArray
 internal data class LocalModelRequestOptions(
     val toolsOverride: JsonArray? = null,
     val publishPreviewEnabled: Boolean = true,
+    /** A new display-only delta transform per provider attempt; never changes transport evidence. */
+    val previewDeltaTransformFactory: (() -> ((String) -> String))? = null,
     val maxAttemptsOverride: Int? = null,
     val allowContextOverflowRecovery: Boolean = true,
     val persistOverflowHistory: Boolean = false,

@@ -359,6 +359,33 @@
         }
       ],
       "conclusion": "本地类型输入可制作状态、原文清单和回复表单，复用生产 Codec/Session 定义 Owner；新增模型调用为零的实现路径不依赖模型网关。工具 Schema 与结构化结果自动适配、媒体/证据节点及真实设备验收仍待实现。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 原回复内交互卡片（迁移中）",
+      "kind": "ui_contract_migration_slice",
+      "independent": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/document/LocalReplyUiDocument.kt",
+          "symbol": "LocalReplyUiDocumentPublisher"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDirectTurnExecutor.kt",
+          "symbol": "LocalChatDirectTurnExecutor"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
+          "symbol": "LocalWorkAgentTurnExecutor"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/presentation/document/LocalReplyUiDocumentTest.kt",
+          "method": "automaticCardRestoresExactOwnerSourceAndCannotReviveAfterDeletion"
+        }
+      ],
+      "conclusion": "Chat单聊/群聊与Work从原回复抽取封闭卡片，经原Session日志存储和恢复；原生确认文本后交原会话Owner发送。自动卡不增加模型调用，不授予工具/支付/审批权限。实际设备和完整跨包恢复仍待验收。"
     }
   ]
 }

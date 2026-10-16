@@ -58,6 +58,14 @@
       "test": "app/src/test/java/com/labteto/dshmobile/local/LocalConversationUiPortTest.kt#staleActivationTransitionAndModeCannotInvokeEitherOwner"
     },
     {
+      "id": "ui.document.inline_reply",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 原回复内交互卡片（迁移中）",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/presentation/document/LocalReplyUiDocument.kt",
+      "entry": "LocalReplyUiDocumentPublisher",
+      "owner": "SHELL",
+      "test": "app/src/test/java/com/labteto/dshmobile/local/presentation/document/LocalReplyUiDocumentTest.kt#automaticCardRestoresExactOwnerSourceAndCannotReviveAfterDeletion"
+    },
+    {
       "id": "ui.document.local_builder",
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）",
       "source": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilder.kt",

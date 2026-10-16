@@ -56,7 +56,8 @@ sealed interface UiDocumentNode {
 sealed interface UiDocumentAction {
     val id: String
     /** User intent only: it cannot introduce a system message, tool call or privileged input. */
-    data class SendUserInput(override val id: String, val text: String, val fieldIds: List<String>) : UiDocumentAction
+    data class SendUserInput(override val id: String, val text: String, val fieldIds: List<String>,
+        val submit: Boolean = false) : UiDocumentAction
     data class OpenKnownScene(override val id: String, val sceneId: UiSceneId) : UiDocumentAction
     /** The pending identity must be obtained from the current Work owner at dispatch time. */
     data class AnswerApproval(override val id: String, val pendingId: String, val approved: Boolean) : UiDocumentAction
@@ -68,6 +69,7 @@ data class UiDocumentActionRequest(
     val source: UiDocumentSource,
     val actionId: String,
     val fields: Map<String, String>,
+    val confirmed: Boolean = false,
 )
 
 /** Explicit caller budget; renderers do not silently truncate a document. */

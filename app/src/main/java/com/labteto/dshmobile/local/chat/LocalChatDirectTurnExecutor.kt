@@ -72,6 +72,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
     private val postTurn: LocalChatContextRefreshCoordinator,
     private val queue: LocalChatQueueRuntime,
     private val webContext: LocalChatWebContextProvider,
+    private val replyDocuments: com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPublisher,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val imageCapabilities
@@ -207,7 +208,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     currentFacts = snapshot.chat.chatContext.canonicalFactLines(),
                 ),
                 stableContext = turnContext.stablePrompt,
-                dynamicContext = dynamicContext,
+                dynamicContext = dynamicContext + "\n" + com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.instruction,
             )
             val selectedMode = resolveLocalImageInputMode(
                 snapshot.modelState.imageInputMode,
@@ -246,6 +247,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 put("persona_id", turnContext.persona.id)
             })
 
+            val replyCards = LocalChatReplyUiDocuments()
             val rawReply = try {
                 modelRequests.complete(
                     snapshot = snapshot,
@@ -289,14 +291,14 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
 
             val reply = replyCoordinator.finalizeDirect(
                 snapshot = snapshot,
-                reply = rawReply,
+                reply = replyCards.capture(rawReply),
                 userMessage = input,
                 step = 1,
                 usage = ForegroundTokenUsageSeed(
                     turnId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
                 ),
                 retryRaw = { repairHint ->
-                    modelRequests.complete(
+                    replyCards.capture(modelRequests.complete(
                         snapshot = snapshot,
                         messages = withEphemeralContext(requestMessages, repairHint),
                         step = 1,
@@ -315,7 +317,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                                 runtimeStateStore.state.value.sessionId == sessionId
                         },
                         ),
-                    )
+                    ))
                 },
                 appendEvent = { type, data -> eventLog.append(type, data) },
             )
@@ -357,6 +359,15 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     JsonObject(assistantData + ("replaces" to JsonPrimitive(replacingMessageId)))
                 },
             )
+
+            assistantTranscript?.let { message ->
+                replyDocuments.publish(replyCards.definitionFor(reply.content.orEmpty()),
+                    com.labteto.dshmobile.uicontract.UiDocumentSource(sessionId, message.id,
+                        snapshot.chat.chatContext.generation,
+                        snapshot.modelState.modelSelection.activeProfileId, snapshot.projectId, false),
+                    replyCards.requestIdFor(reply.content.orEmpty()), snapshot.modelState.model,
+                    replyCards.reportedFor(reply.content.orEmpty()))
+            }
 
             if (replacingMessageId != null) {
                 check(

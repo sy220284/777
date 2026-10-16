@@ -203,7 +203,7 @@
       "task": "动态图片/音频/视频状态/预览/保存",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": " Next 新增独立媒体创作及成果管理界面，经原 MediaUiPort 显示真实创建、视频、保存状态并做受控操作；这是媒体功能页面，不是 UiDocument 中的动态媒体节点。\n2026-10-15 本次增量：新增 UiDocument.Media IMAGE/AUDIO/VIDEO 结构化节点，闭合 JSON codec 和预算校验；Next 本地图片限尺寸解码、音视频原生预览、SAF 用户选址保存；Owner 按 Session ID + 真实媒体类型解析和受控字节导出，不接受文档指定原始 URL/路径。MEDIA_RESULTS 本地模板从真实 Media Owner 构造文档节点。\n2026-10-16 本轮源代码：V6 与 Next 的媒体卡现在都监听 Media Owner 状态变化；音频异步 prepare、播放器销毁释放；导出沿用原文件实际已识别的后缀。\n2026-10-16 功能代码补充：原 V6、Next 经 SAF CreateDocument 导出媒体时失败/取消后尝试移除新建的不完整目标文件；清理失败显式提示，避免损坏文件被误报为已保存。\n2026-10-16 审计修复：V6/Next 音频分开准备、真实失败和显式重新加载，释放替换播放器。 最终 SHA CI 待核对，仍不视为完整验收。",
+      "implemented": " Next 新增独立媒体创作及成果管理界面，经原 MediaUiPort 显示真实创建、视频、保存状态并做受控操作；这是媒体功能页面，不是 UiDocument 中的动态媒体节点。\n2026-10-15 本次增量：新增 UiDocument.Media IMAGE/AUDIO/VIDEO 结构化节点，闭合 JSON codec 和预算校验；Next 本地图片限尺寸解码、音视频原生预览、SAF 用户选址保存；Owner 按 Session ID + 真实媒体类型解析和受控字节导出，不接受文档指定原始 URL/路径。MEDIA_RESULTS 本地模板从真实 Media Owner 构造文档节点。\n2026-10-16 本轮源代码：V6 与 Next 的媒体卡现在都监听 Media Owner 状态变化；音频异步 prepare、播放器销毁释放；导出沿用原文件实际已识别的后缀。\n2026-10-16 功能代码补充：原 V6、Next 经 SAF CreateDocument 导出媒体时失败/取消后尝试移除新建的不完整目标文件；清理失败显式提示，避免损坏文件被误报为已保存。\n2026-10-16 审计修复：V6/Next 音频分开准备、真实失败和显式重新加载，释放替换播放器。 最终 SHA CI 待核对，仍不视为完整验收。\n2026-10-16 交互回复与渐进成果闭环代码：V6 补齐 MEDIA_RESULTS 本地入口，与 Next 共用原 Media Owner 实际结果及受控导出。",
       "remaining": "远程成果的可授权下载及中断恢复与更多编码容器支持仍缺；完整播放器回归不在本轮执行。"
     },
     {
@@ -219,23 +219,23 @@
       "task": "同文档真实事件/成果渐进更新",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "\n2026-10-16 审计修复：Work 自动卡不再绑定当前前台回合状态，旧版活动卡也禁止注入其他回合实时字段。 最终 SHA CI 待核对，仍不视为完整验收。"
+      "implemented": "\n2026-10-16 审计修复：Work 自动卡不再绑定当前前台回合状态，旧版活动卡也禁止注入其他回合实时字段。 最终 SHA CI 待核对，仍不视为完整验收。\n2026-10-16 交互回复与渐进成果闭环代码：原请求内的可选 ui_document 自动进入 Session 文档日志；单聊、群聊、Work 都在业务正文/历史/记忆之前剥离定义，修复候选绑定自己的卡片与真实请求标识。Work 同卡追加实际回执预览及最新阶段结论，原 turn/start 后不再借用上次结束状态。"
     },
     {
       "id": "S4-05",
       "task": "原 Work Owner 运行内自动发布",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "\n2026-10-15 本次增量：Work AgentToolFinished 在 tool/result 原始事件已持久化后通过 LocalWorkUiDocumentPublisher 同步发布单会话版本化 UiDocument；投影真实阶段、最近工具回执与错误，原 Session EventLog CAS，避免覆盖用户手工/AI设计，卡片失败不改变工具执行结果，无二次模型请求。\n2026-10-16 本轮源代码：Work 活动文档使用 work-live:<sourceMessageId> 稳定 ID，隔离用户本地模板和模型生成卡；跨前后台保留同一卡原来源，纯只读历史卡可在前台会话切换后继续显示，不恢复已过期的执行授权。\n2026-10-16 本轮代码增量：Work 回合的开始/工具调用/真实回执/完成/步数上限/失败/取消事件追加来源消息标识，原 Work Owner 在事件落日志后更新同源 UiDocument；按真实 call_id 配对未完成与完成回执，关联事件时 SHA256，但不宣称当前文件已验收。\n2026-10-16 功能代码补充：Work 自动生成文档与用户删除共用同一会话 EventLog：被用户删除的同 ID Work 卡不允许晚到事件重新写入；独立卡的 CAS 版本更新不覆盖同消息其他卡。\n2026-10-16 审计修复：Work 中断结算保留原 source_message_id，区分未执行、只读中断和可能副作用的结果未知；增加真实 EventLog→Session 文档回归。 最终 SHA CI 待核对，仍不视为完整验收。",
-      "remaining": "多次后台续跑身份恢复、源事件全量回放和跨进程连续发布还有实现缺口。"
+      "implemented": "\n2026-10-15 本次增量：Work AgentToolFinished 在 tool/result 原始事件已持久化后通过 LocalWorkUiDocumentPublisher 同步发布单会话版本化 UiDocument；投影真实阶段、最近工具回执与错误，原 Session EventLog CAS，避免覆盖用户手工/AI设计，卡片失败不改变工具执行结果，无二次模型请求。\n2026-10-16 本轮源代码：Work 活动文档使用 work-live:<sourceMessageId> 稳定 ID，隔离用户本地模板和模型生成卡；跨前后台保留同一卡原来源，纯只读历史卡可在前台会话切换后继续显示，不恢复已过期的执行授权。\n2026-10-16 本轮代码增量：Work 回合的开始/工具调用/真实回执/完成/步数上限/失败/取消事件追加来源消息标识，原 Work Owner 在事件落日志后更新同源 UiDocument；按真实 call_id 配对未完成与完成回执，关联事件时 SHA256，但不宣称当前文件已验收。\n2026-10-16 功能代码补充：Work 自动生成文档与用户删除共用同一会话 EventLog：被用户删除的同 ID Work 卡不允许晚到事件重新写入；独立卡的 CAS 版本更新不覆盖同消息其他卡。\n2026-10-16 审计修复：Work 中断结算保留原 source_message_id，区分未执行、只读中断和可能副作用的结果未知；增加真实 EventLog→Session 文档回归。 最终 SHA CI 待核对，仍不视为完整验收。\n2026-10-16 交互回复与渐进成果闭环代码：续跑来源由持久化 turn/continuation-queued 与带 run_id 的 turn/start 恢复，保持原消息同卡 ID；进程 run-recovery 输入也按原 run 找回来源，不新建执行器或队列。新阶段及回执仍经 Work Owner 原 EventLog 发布。",
+      "remaining": "旧版缺少 run_id/来源的事件不猜测归属；长历史窗口之外的完整成果阅读沿用原历史入口。真实多次后台/跨进程恢复及双包设备验收仍需当前 SHA 证明。"
     },
     {
       "id": "S4-06",
       "task": "必要图表/数据选择/操作组合",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": " 2026-10-16：UiDocument 新增封闭 BarChart/UiChartPoint 只读数值节点、节点/数值/文字预算及严格 JSON schema，V6/Next 原生进度比例绘制并显示精确数据标签；用户可选 Work Owner 工具调用统计本地模板，无额外模型请求、不假定通过，补协议/Codec/Builder 用例。",
-      "remaining": "其他必要图表、字段筛选/选择和真实操作组合、数据事实自动更新及完整跨包/设备验收仍未完成；工具调用统计不等于完成统计。"
+      "implemented": " 2026-10-16：UiDocument 新增封闭 BarChart/UiChartPoint 只读数值节点、节点/数值/文字预算及严格 JSON schema，V6/Next 原生进度比例绘制并显示精确数据标签；用户可选 Work Owner 工具调用统计本地模板，无额外模型请求、不假定通过，补协议/Codec/Builder 用例。\n2026-10-16 交互回复与渐进成果闭环代码：新增 submit_user_input 封闭意图：V6/Next 原生确认完整冻结文本，经原 Chat/Work SendText Owner 返回真实受理/排队/失败；未确认、旧身份/版本仍拒绝。旧 send_user_input 保持只准备草稿。双包表格补齐 revision 隔离的本地文字筛选。",
+      "remaining": "复杂实时数据计算与更多图表、特定业务直达操作仍须对应 Owner 的显式能力，不能由模型声明授权；完整跨包设备验收未完成。工具统计不等于完成统计。"
     },
     {
       "id": "S4-07",

@@ -101,7 +101,8 @@ internal class LocalWorkUiDocumentPublisher @Inject constructor(
             toolFacts[callId] = row
         }
         val toolRows = toolFacts.values.toList().takeLast(24)
-        val endReason = window.firstOrNull { it.type == "turn/end" && isCurrentTurn(it) }
+        val endReason = window.firstOrNull { it.type in setOf("turn/start", "turn/end") && isCurrentTurn(it) }
+            ?.takeIf { it.type == "turn/end" }
             ?.data?.get("reason")?.jsonPrimitive?.contentOrNull
         val endLabel = when (endReason) {
             "completed" -> "本轮已记录结束；输出质量尚未验收"
@@ -113,7 +114,8 @@ internal class LocalWorkUiDocumentPublisher @Inject constructor(
             null -> "本轮还未记录结束事件"
             else -> "本轮结束原因：${endReason.take(80)}"
         }
-        val nodes = listOf(
+        val nodes = buildList {
+            addAll(listOf(
             UiDocumentNode.Text("work_turn_status", endLabel),
             UiDocumentNode.Text("work_scope",
                 "最近 256 条事件窗口内，本轮最多 24 个工具调用与回执；不代表全部历史结果。"),
@@ -121,12 +123,30 @@ internal class LocalWorkUiDocumentPublisher @Inject constructor(
                 listOf("工具", "真实回执", "错误代码", "事件时文件版本（未经复核）"), toolRows),
             UiDocumentNode.Text("work_warning",
                 "此处仅表示工具事件已经记录；实际文件有效性、完成质量与审批需单独确认。"),
-        )
+            ))
+            // Native previews use the actual bounded durable result, never model-invented artifacts.
+            val results = window.filter { it.type == "tool/result" && isCurrentTurn(it) }
+                .distinctBy { it.data["id"]?.jsonPrimitive?.contentOrNull }.take(6).asReversed()
+            results.forEachIndexed { index, event ->
+                val content = event.data["content"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                if (content.isNotBlank()) add(UiDocumentNode.Disclosure("work_output_$index",
+                    "${event.data["name"]?.jsonPrimitive?.contentOrNull.orEmpty().take(120)} · 实际回执预览（未核验）",
+                    listOf(UiDocumentNode.Text("work_output_text_$index",
+                        com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair(content, 1600)))))
+            }
+            window.firstOrNull { it.type == "assistant/message" && isCurrentTurn(it) }
+                ?.data?.get("content")?.let { it as? kotlinx.serialization.json.JsonPrimitive }
+                ?.contentOrNull?.takeIf(String::isNotBlank)?.let { content ->
+                    add(UiDocumentNode.Disclosure("work_findings", "本轮最新阶段输出（模型陈述，未核验）",
+                        listOf(UiDocumentNode.Text("work_findings_text",
+                            com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair(content, 4000)))))
+                }
+        }
         val revision = previous?.revision?.let { Math.addExact(it, 1L) } ?: 0L
         val document = UiDocument(
             1, docId,
-            source, revision, "Work 实时活动", nodes, emptyList(),
-            "工具事件已记录；当前结果未经独立核验。",
+            source, revision, "Work 渐进成果", nodes, emptyList(),
+            "工具回执与阶段输出已保存；当前结果未经独立核验。",
         )
         documents.publish(
             document, UiDocumentProvenance(null, "", false, UiDocumentOrigin.LOCAL),

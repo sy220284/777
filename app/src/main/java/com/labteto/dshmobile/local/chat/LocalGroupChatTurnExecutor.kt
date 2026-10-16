@@ -83,6 +83,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
     private val chatReplyCoordinator: LocalChatReplyCoordinator,
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
     private val webContext: LocalChatWebContextProvider,
+    private val replyDocuments: com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPublisher,
     private val usageTracker: DeepSeekUsageTracker,
     private val json: Json,
 ) {
@@ -217,7 +218,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             val groupRequestHistory = withChatTurnContext(
                 history = baseHistory,
                 stableContext = chatTurnCoordinator.chatStablePrompt(snapshot, turnContext.stablePrompt),
-                dynamicContext = turnContext.dynamicPrompt,
+                dynamicContext = turnContext.dynamicPrompt + "\n" + com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.instruction,
             )
             val groupImageMode = resolveLocalImageInputMode(
                 snapshot.modelState.imageInputMode,
@@ -251,13 +252,14 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     snapshot.modelState.model, snapshot.modelState.baseUrl,
                 ),
             )
+            val replyCards = LocalChatReplyUiDocuments()
             val finalContent = chatReplyCoordinator.finalizeGroup(
                 snapshot = snapshot,
                 persona = persona,
                 member = member,
                 input = input,
                 index = index,
-                rawReply = rawReply,
+                rawReply = replyCards.capture(rawReply),
                 sharedContext = snapshot.chat.groupChat.context,
                 usageContext = buildTokenUsageContext(
                     snapshot = snapshot,
@@ -269,7 +271,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     step = 100 + index,
                 ),
                 retryRaw = { repairHint ->
-                    completeWithRetry(
+                    replyCards.capture(completeWithRetry(
                         key = key,
                         snapshot = snapshot,
                         messages = withTailEphemeralContext(requestMessages, repairHint),
@@ -281,7 +283,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         temperature = persona.behaviorTuning.roleplayTemperature(
                             snapshot.modelState.model, snapshot.modelState.baseUrl,
                         ),
-                    )
+                    ))
                 },
                 appendEvent = { type, data ->
                     eventLog.append(type, data)
@@ -294,10 +296,14 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 put("status", "success")
                 put("elapsed_ms", (System.nanoTime() - startedAtNanos) / 1_000_000L)
             })
+            replyCards.normalizeGroup(member.displayName, persona.name)
             GroupGeneratedReply(
                 member = member,
                 persona = persona,
                 content = finalContent,
+                uiDefinition = replyCards.definitionFor(finalContent),
+                requestId = replyCards.requestIdFor(finalContent),
+                uiUsageReported = replyCards.reportedFor(finalContent),
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -951,6 +957,11 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         listOf(transcript),
                     )
                     val assistantEvent = eventLog.append("assistant/message", eventData)
+                    replyDocuments.publish(generated.uiDefinition,
+                        com.labteto.dshmobile.uicontract.UiDocumentSource(snapshot.sessionId, transcript.id,
+                            snapshot.chat.chatContext.generation,
+                            snapshot.modelState.modelSelection.activeProfileId, snapshot.projectId, false),
+                        generated.requestId, snapshot.modelState.model, generated.uiUsageReported)
                     val publicReply = buildJsonObject {
                         put("role", "assistant")
                         put("content", groupTranscriptLine(transcript))

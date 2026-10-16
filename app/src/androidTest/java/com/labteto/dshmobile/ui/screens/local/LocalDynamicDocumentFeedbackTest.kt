@@ -9,6 +9,11 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.UiCommandRejection
 import com.labteto.dshmobile.uicontract.UiDocumentReceipt
+import com.labteto.dshmobile.uicontract.*
+import com.labteto.dshmobile.ui.host.LocalUiDocumentFormState
+import kotlinx.coroutines.flow.MutableStateFlow
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -43,4 +48,41 @@ class LocalDynamicDocumentFeedbackTest {
         compose.onNodeWithText(context.getString(R.string.ui_document_media_retry)).performClick()
         compose.onNodeWithText(context.getString(R.string.ui_document_media_playback_failed)).assertExists()
     }
+    @Test fun cardSubmissionRequiresExplicitConfirmationAndCapturesExactFields() {
+        val source = UiDocumentSource("s", "assistant", 0, null, null)
+        val action = UiDocumentAction.SendUserInput("send", "Continue", listOf("choice"), submit = true)
+        val document = UiDocument(1, "doc", source, 0, "Choose",
+            listOf(UiDocumentNode.Field("choice", "Choice", "actual input", true, false),
+                UiDocumentNode.Button("button", "Submit choice", "send")), listOf(action), "Choose")
+        val snapshot = UiDocumentSnapshot(document, UiDocumentProvenance(null, "model", false),
+            mapOf("send" to UiActionAvailability(true)))
+        val sent = mutableListOf<UiDocumentActionRequest>()
+        val port = object : UiDocumentUiPort {
+            override val snapshots = MutableStateFlow(UiDocumentsSceneSnapshot("s", listOf(snapshot), false, null))
+            override fun snapshot() = snapshots.value
+            override suspend fun generateLocal(command: GenerateLocalUiDocumentCommand) = UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+            override suspend fun generate(command: GenerateUiDocumentCommand) = UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+            override suspend fun delete(command: DeleteUiDocumentCommand) = UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+            override fun submit(identity: UiSessionIdentity, request: UiDocumentActionRequest): UiDocumentReceipt {
+                sent += request
+                return UiDocumentReceipt.OwnerReceipt(UiCommandReceipt.Queued)
+            }
+        }
+        // This card contains no media; a call would expose an unexpected renderer dependency.
+        val media = java.lang.reflect.Proxy.newProxyInstance(MediaUiPort::class.java.classLoader,
+            arrayOf(MediaUiPort::class.java)) { _, _, _ -> error("No media should be read") } as MediaUiPort
+        val forms = LocalUiDocumentFormState(emptyList()) {}
+        compose.setContent { LocalDynamicDocument(snapshot, UiSessionIdentity("s", "activation", 0, null, null), port, forms, media) }
+        compose.onNodeWithText("Submit choice").performClick()
+        compose.onNodeWithText("Continue\nchoice: actual input").assertExists()
+        compose.runOnIdle { assertTrue(sent.isEmpty()) }
+        compose.onNodeWithText(context.getString(R.string.ui_document_send_confirm)).performClick()
+        compose.runOnIdle {
+            assertEquals(1, sent.size)
+            assertTrue(sent.single().confirmed)
+            assertEquals("actual input", sent.single().fields["choice"])
+        }
+        compose.onNodeWithText(context.getString(R.string.ui_document_enqueued)).assertExists()
+    }
+
 }

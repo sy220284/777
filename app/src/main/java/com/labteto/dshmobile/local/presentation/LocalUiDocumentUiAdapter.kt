@@ -25,6 +25,7 @@ import com.labteto.dshmobile.uicontract.UiDocumentAction
 import com.labteto.dshmobile.uicontract.UiDocumentSource
 import com.labteto.dshmobile.uicontract.WorkConversationUiCommand
 import com.labteto.dshmobile.uicontract.initialFields
+import com.labteto.dshmobile.uicontract.preparedInput
 import com.labteto.dshmobile.uicontract.invalidInputFields
 import com.labteto.dshmobile.local.uiBindingIdentity
 import kotlinx.coroutines.CancellationException
@@ -321,12 +322,15 @@ internal class LocalUiDocumentUiAdapter(
                     val fields = defaults + request.fields
                     val invalid = record.invalidInputFields(action, fields)
                     if (invalid.isNotEmpty()) return UiDocumentReceipt.InvalidFields(invalid)
-                    val text = buildString {
-                        append(action.text)
-                        action.fieldIds.forEach { id -> append('\n'); append(id); append(": "); append(fields.getValue(id)) }
+                    val text = record.preparedInput(action, fields)
+                    when {
+                        text.isBlank() -> UiDocumentReceipt.Rejected(UiCommandRejection.EMPTY_INPUT)
+                        action.submit && !request.confirmed -> UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+                        action.submit -> UiDocumentReceipt.OwnerReceipt(if (workMode)
+                            conversations.work.submit(WorkConversationUiCommand.SendText(identity, text))
+                            else conversations.chat.submit(com.labteto.dshmobile.uicontract.ChatUiCommand.SendText(identity, text)))
+                        else -> { drafts.updateDraft(identity.sessionId, text); UiDocumentReceipt.DraftPrepared }
                     }
-                    if (text.isBlank()) UiDocumentReceipt.Rejected(UiCommandRejection.EMPTY_INPUT)
-                    else { drafts.updateDraft(identity.sessionId, text); UiDocumentReceipt.DraftPrepared }
                 }
                 is UiDocumentAction.OpenKnownScene -> {
                     if (action.sceneId !in navigationScenes) UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)

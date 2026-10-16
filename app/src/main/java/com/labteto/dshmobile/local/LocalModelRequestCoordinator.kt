@@ -782,6 +782,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             put("provider_attempt_fingerprint", providerAttemptFingerprint)
                         })
                     }
+                    val previewDeltaTransform = options.previewDeltaTransformFactory?.invoke()
                     val streamPreview = LocalStreamPreview(
                         maxChars = maxStreamPreviewChars,
                         minIntervalMs = streamPreviewIntervalMs,
@@ -823,7 +824,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             onDelta = { delta ->
                                     val visible = delta.content
                                     attemptEvidence.append(visible)
-                                    streamPreview.append(visible)
+                                    streamPreview.append(previewDeltaTransform?.invoke(visible) ?: visible)
                                 },
                             )
                         } catch (cancelled: CancellationException) {

@@ -96,6 +96,7 @@ internal class LocalWorkAgentTurnExecutor(
     private val workToolResultRuntime: LocalWorkToolResultRuntime,
     private val workTurnToolRuntime: LocalWorkTurnToolRuntime,
     private val workUiDocumentPublisher: LocalWorkUiDocumentPublisher,
+    private val replyDocuments: com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPublisher,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val resourceScheduler
@@ -127,7 +128,7 @@ internal class LocalWorkAgentTurnExecutor(
     ) {
         val ownerJob = currentCoroutineContext()[Job]
         // Preserve the Work turn's origin even when the live transcript window is compacted.
-        val uiSourceMessageId = sourceMessageId?.takeIf(String::isNotBlank)
+        val uiSourceMessageId = resolveWorkUiDocumentSource(binding.eventLog, sourceMessageId)
             ?: binding.state.value.messages.lastOrNull { it.role == "user" }?.id
         var heldSession: String? = null
         var serviceReleased = false
@@ -183,6 +184,7 @@ internal class LocalWorkAgentTurnExecutor(
                 )
             }
             val repliesByStep = mutableMapOf<Int, LocalModelReply>()
+            val uiDefinitionsByStep = mutableMapOf<Int, String?>()
             var modelStep = 0
             var latestAcceptedSamplingRevision = binding.steeringRevision.value
             val modelToolStepSurface = LocalModelToolStepSurface()
@@ -321,7 +323,7 @@ internal class LocalWorkAgentTurnExecutor(
                     val durableRequestMessages = withWorkTurnContext(
                         withLocalWorkExecutionMode(runHistory.snapshot()),
                         workPromptContext.stable,
-                        workPromptContext.dynamic,
+                        workPromptContext.dynamic + "\n" + com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.instruction,
                         workPromptContext.skill,
                     )
                     val selectedMode = resolveLocalImageInputMode(
@@ -356,6 +358,10 @@ internal class LocalWorkAgentTurnExecutor(
                             options = com.labteto.dshmobile.local.LocalModelRequestOptions(
                                 toolsOverride = tools,
                                 publishPreviewEnabled = true,
+                                previewDeltaTransformFactory = {
+                                    val preview = com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPreview()
+                                    preview::append
+                                },
                                 persistOverflowHistory = true,
                                 requestLog = runEventLog,
                                 previewGuard = {
@@ -420,9 +426,13 @@ internal class LocalWorkAgentTurnExecutor(
                             step = modelStep + 1,
                         )
                     }
-                    val deliveryReply = guardWorkCompletionDelivery(reply, runState.value, runEventLog, File(workspacePath))
+                    val parts = com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.split(reply.content.orEmpty())
+                    val cleanReply = if (parts.text == reply.content) reply else
+                        com.labteto.dshmobile.local.model.withLocalReplyContent(reply, parts.text).copy(providerContentForReplay = null)
+                    val deliveryReply = guardWorkCompletionDelivery(cleanReply, runState.value, runEventLog, File(workspacePath))
                     modelStep += 1
                     repliesByStep[modelStep] = deliveryReply
+                    uiDefinitionsByStep[modelStep] = parts.definition.takeIf { deliveryReply.content == cleanReply.content }
                     return@AgentModel AgentModelReply(
                         content = deliveryReply.content.orEmpty(),
                         toolCalls = if (runPolicy.allowToolExecution) {
@@ -476,9 +486,16 @@ internal class LocalWorkAgentTurnExecutor(
                     when (event) {
                         is AgentEvent.TurnStarted -> {
                             runEventLog.append("turn/start", buildJsonObject {
+                                put("run_id", runContext.runId)
                                 put("source_message_id", uiSourceMessageId)
                                 put("model", runState.value.modelState.model)
                             })
+                            try {
+                                workUiDocumentPublisher.onToolResult(binding, uiSourceMessageId)
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (failure: Exception) {
+                                AppLog.failure("WorkUiDocument", "publish_progress", failure)
+                            }
                         }
                         is AgentEvent.StepStarted -> {
                             activeStep = event.step
@@ -510,13 +527,27 @@ internal class LocalWorkAgentTurnExecutor(
                             activeToolCalls = event.toolCalls
                             completedToolCallIds.clear()
                             val assistantEvent = runEventLog.append(
-                                "assistant/message", runTranscript.withTranscript(reply.message, transcriptMessages)
+                                "assistant/message", runTranscript.withTranscript(
+                                    kotlinx.serialization.json.JsonObject(reply.message + ("source_message_id" to JsonPrimitive(uiSourceMessageId))), transcriptMessages)
                                     .withModelToolCallEventData(reply.toolCalls),
                             )
+                            uiSourceMessageId?.let { source ->
+                                replyDocuments.publish(uiDefinitionsByStep.remove(event.step),
+                                    com.labteto.dshmobile.uicontract.UiDocumentSource(binding.sessionId, source, 0L,
+                                        beforeAssistant.modelState.modelSelection.activeProfileId,
+                                        beforeAssistant.projectId, true), reply.requestId,
+                                    beforeAssistant.modelState.model, reply.usage.reported)
+                            }
                             runHistory.append(reply.message)
                             workModelHistoryRuntime.updateContextMetrics(binding)
                             runTranscript.applyMessages(transcriptMessages, assistantEvent.sequence)
                             workModelHistoryRuntime.persist(binding)
+                            try {
+                                workUiDocumentPublisher.onToolResult(binding, uiSourceMessageId)
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (failure: Exception) {
+                                AppLog.failure("WorkUiDocument", "publish_progress", failure)
+                            }
                         }
                         is AgentEvent.ToolStarted -> {
                             runEventLog.append("tool/call", buildJsonObject {

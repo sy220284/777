@@ -332,4 +332,8 @@
     <string name="next_document_audio_pause">暂停音频</string>
     <string name="next_document_local_tool_counts">工具调用统计图</string>
     <string name="next_document_local_work_evidence">需求来源关联卡</string>
+    <string name="next_document_send_title">确认发送卡片内容</string>
+    <string name="next_document_send_confirm">发送</string>
+    <string name="next_document_send_cancel">取消</string>
+    <string name="next_document_table_filter">筛选表格</string>
 </resources>

@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.flowOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -51,6 +52,8 @@ import com.labteto.dshmobile.uicontract.UiDocumentFormUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentNode
 import com.labteto.dshmobile.uicontract.UiDocumentBoundValue
 import com.labteto.dshmobile.uicontract.UiExecutionPhase
+import com.labteto.dshmobile.uicontract.preparedInput
+import com.labteto.dshmobile.uicontract.UiDocumentAction
 import com.labteto.dshmobile.uicontract.UiDocumentActionRequest
 import com.labteto.dshmobile.uicontract.UiDocumentUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentReceipt
@@ -76,6 +79,9 @@ internal fun NextUiDocument(snapshot: UiDocumentSnapshot, identity: UiSessionIde
     var confirmDeletion by remember(document.documentId, document.revision) { mutableStateOf(false) }
     var deleting by remember(document.documentId, document.revision) { mutableStateOf(false) }
     var deletionNotice by remember(document.documentId, document.revision) { mutableStateOf<String?>(null) }
+    var pendingSend by remember(document.documentId, document.revision) {
+        mutableStateOf<Pair<UiSessionIdentity, UiDocumentActionRequest>?>(null)
+    }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     Surface(Modifier.fillMaxWidth(), tonalElevation = 2.dp) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -91,8 +97,11 @@ internal fun NextUiDocument(snapshot: UiDocumentSnapshot, identity: UiSessionIde
                 NextDocumentNode(node, values, snapshot, identity != null,
                     update = { id, text -> forms.update(key, id, text) },
                     submit = { action -> identity?.let {
-                        receipt = port.submit(it, UiDocumentActionRequest(document.documentId, document.revision,
-                            document.source, action, values))
+                        val request = UiDocumentActionRequest(document.documentId, document.revision,
+                            document.source, action, values.toMap())
+                        val descriptor = document.actions.firstOrNull { value -> value.id == action }
+                        if (descriptor is UiDocumentAction.SendUserInput && descriptor.submit) pendingSend = it to request
+                        else receipt = port.submit(it, request)
                     } })
             }
             if (identity != null && snapshot.recoveryNotice == null)
@@ -100,6 +109,18 @@ internal fun NextUiDocument(snapshot: UiDocumentSnapshot, identity: UiSessionIde
             deletionNotice?.let { Text(it) }
             receipt?.let { result -> NextDocumentActionFeedback(result) }
         }
+    }
+    pendingSend?.let { (ownerIdentity, request) ->
+        val action = document.actions.filterIsInstance<UiDocumentAction.SendUserInput>()
+            .first { it.id == request.actionId }
+        AlertDialog(onDismissRequest = { pendingSend = null },
+            title = { Text(stringResource(R.string.next_document_send_title)) },
+            text = { Text(document.preparedInput(action, request.fields)) },
+            confirmButton = { TextButton(onClick = {
+                pendingSend = null
+                scope.launch { receipt = port.submit(ownerIdentity, request.copy(confirmed = true)) }
+            }) { Text(stringResource(R.string.next_document_send_confirm)) } },
+            dismissButton = { TextButton(onClick = { pendingSend = null }) { Text(stringResource(R.string.next_document_send_cancel)) } })
     }
     if (confirmDeletion) AlertDialog(
         onDismissRequest = { if (!deleting) confirmDeletion = false },
@@ -137,13 +158,18 @@ private fun NextDocumentNode(node: UiDocumentNode, values: Map<String, String>, 
         is UiDocumentNode.Text -> Text(node.text)
         is UiDocumentNode.Media -> NextDocumentMediaNode(node, snapshot.document.source.sessionId)
         is UiDocumentNode.Table -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            node.rows.forEachIndexed { index, row ->
+            var query by rememberSaveable(snapshot.document.documentId, snapshot.document.revision, node.id) { mutableStateOf("") }
+            OutlinedTextField(value = query, onValueChange = { query = it },
+                label = { Text(stringResource(R.string.next_document_table_filter)) },
+                singleLine = true, modifier = Modifier.fillMaxWidth())
+            val visible = node.rows.filter { row -> query.isBlank() || row.any { it.contains(query, ignoreCase = true) } }
+            visible.forEachIndexed { index, row ->
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text((index + 1).toString(), style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
                     node.headers.zip(row).forEach { (header, value) -> Text("${header}: ${value}") }
                 }
             }
-            if (node.rows.isEmpty()) Text(stringResource(R.string.next_document_table_empty))
+            if (visible.isEmpty()) Text(stringResource(R.string.next_document_table_empty))
         }
         is UiDocumentNode.BarChart -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(node.title)

@@ -103,7 +103,7 @@ internal object LocalUiDocumentCodec {
         fun action(value: JsonObject): UiDocumentAction {
             val kind = value.string("type")
             val properties = when (kind) {
-                "send_user_input" -> mapOf("text" to text, "fieldIds" to strings)
+                "send_user_input", "submit_user_input" -> mapOf("text" to text, "fieldIds" to strings)
                 "open_known_feature" -> mapOf("sceneId" to text)
                 "answer_approval" -> mapOf("pendingId" to text, "approved" to boolean)
                 else -> error("unsupported_action:$kind")
@@ -111,7 +111,7 @@ internal object LocalUiDocumentCodec {
             checkSchema(value, schema(listOf("id", "type") + properties.keys, mapOf("id" to text, "type" to text) + properties))
             val id = value.string("id")
             return when (kind) {
-                "send_user_input" -> UiDocumentAction.SendUserInput(id, value.string("text"), value.array("fieldIds").map { it.jsonPrimitive.content })
+                "send_user_input", "submit_user_input" -> UiDocumentAction.SendUserInput(id, value.string("text"), value.array("fieldIds").map { it.jsonPrimitive.content }, submit = kind == "submit_user_input")
                 "open_known_feature" -> UiDocumentAction.OpenKnownScene(id, UiSceneId(value.string("sceneId")))
                 else -> UiDocumentAction.AnswerApproval(id, value.string("pendingId"), value.bool("approved"))
             }
@@ -162,7 +162,7 @@ internal object LocalUiDocumentCodec {
             put("actions", JsonArray(document.actions.map { action -> buildJsonObject {
                 put("id", action.id)
                 when (action) {
-                    is UiDocumentAction.SendUserInput -> { put("type", "send_user_input"); put("text", action.text); put("fieldIds", JsonArray(action.fieldIds.map(::JsonPrimitive))) }
+                    is UiDocumentAction.SendUserInput -> { put("type", if (action.submit) "submit_user_input" else "send_user_input"); put("text", action.text); put("fieldIds", JsonArray(action.fieldIds.map(::JsonPrimitive))) }
                     is UiDocumentAction.OpenKnownScene -> { put("type", "open_known_feature"); put("sceneId", action.sceneId.value) }
                     is UiDocumentAction.AnswerApproval -> { put("type", "answer_approval"); put("pendingId", action.pendingId); put("approved", action.approved) }
                 }

@@ -52,3 +52,11 @@ fun UiDocument.invalidInputFields(action: UiDocumentAction.SendUserInput, values
         }
     }
 }
+
+/** The confirmation preview and Owner dispatch use the same exact text. */
+fun UiDocument.preparedInput(action: UiDocumentAction.SendUserInput, values: Map<String, String>): String =
+    buildString {
+        append(action.text)
+        val fields = initialFields() + values
+        action.fieldIds.forEach { id -> append('\n'); append(id); append(": "); append(fields[id].orEmpty()) }
+    }

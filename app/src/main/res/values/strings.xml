@@ -2464,5 +2464,9 @@
     <string name="ui_document_delete_confirm">删除</string>
     <string name="ui_document_local_tool_counts">工具调用统计图</string>
     <string name="ui_document_local_work_evidence">需求来源关联卡</string>
+    <string name="ui_document_send_title">确认发送卡片内容</string>
+    <string name="ui_document_send_confirm">发送</string>
+    <string name="ui_document_local_media">媒体结果卡</string>
+    <string name="ui_document_table_filter">筛选表格</string>
 </resources>
 

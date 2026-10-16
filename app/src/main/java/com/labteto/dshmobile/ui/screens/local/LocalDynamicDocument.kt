@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -27,6 +28,8 @@ import com.labteto.dshmobile.uicontract.UiDocumentNode
 import com.labteto.dshmobile.uicontract.MediaUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentBoundValue
 import com.labteto.dshmobile.uicontract.UiExecutionPhase
+import com.labteto.dshmobile.uicontract.preparedInput
+import com.labteto.dshmobile.uicontract.UiDocumentAction
 import com.labteto.dshmobile.uicontract.UiDocumentActionRequest
 import com.labteto.dshmobile.uicontract.UiDocumentUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentReceipt
@@ -55,6 +58,9 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
     var confirmDeletion by remember(document.documentId, document.revision) { mutableStateOf(false) }
     var deleting by remember(document.documentId, document.revision) { mutableStateOf(false) }
     var deletionNotice by remember(document.documentId, document.revision) { mutableStateOf<String?>(null) }
+    var pendingSend by remember(document.documentId, document.revision) {
+        mutableStateOf<Pair<UiSessionIdentity, UiDocumentActionRequest>?>(null)
+    }
     val scope = rememberCoroutineScope()
     SyGlassCard(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
         if (snapshot.recoveryNotice != null) Text(stringResource(R.string.ui_document_history_incomplete))
@@ -69,8 +75,11 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
             LocalDocumentNode(node, values, snapshot, identity != null, media,
                 update = { id, text -> forms.update(key, id, text) },
                 submit = { action -> identity?.let {
-                    receipt = port.submit(it, UiDocumentActionRequest(document.documentId, document.revision,
-                        document.source, action, values))
+                    val request = UiDocumentActionRequest(document.documentId, document.revision,
+                        document.source, action, values.toMap())
+                    val descriptor = document.actions.firstOrNull { value -> value.id == action }
+                    if (descriptor is UiDocumentAction.SendUserInput && descriptor.submit) pendingSend = it to request
+                    else receipt = port.submit(it, request)
                 } })
         }
         if (identity != null && snapshot.recoveryNotice == null)
@@ -78,6 +87,18 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
                 enabled = !deleting, variant = SyButtonVariant.Ghost)
         deletionNotice?.let { Text(it) }
         receipt?.let { result -> LocalDocumentActionFeedback(result) }
+    }
+    pendingSend?.let { (ownerIdentity, request) ->
+        val action = document.actions.filterIsInstance<UiDocumentAction.SendUserInput>()
+            .first { it.id == request.actionId }
+        ConfirmDialog(title = stringResource(R.string.ui_document_send_title),
+            body = document.preparedInput(action, request.fields),
+            confirmLabel = stringResource(R.string.ui_document_send_confirm),
+            onDismiss = { pendingSend = null },
+            onConfirm = {
+                pendingSend = null
+                scope.launch { receipt = port.submit(ownerIdentity, request.copy(confirmed = true)) }
+            })
     }
     if (confirmDeletion) ConfirmDialog(
         title = stringResource(R.string.ui_document_delete_title),
@@ -163,13 +184,18 @@ private fun LocalDocumentNode(node: UiDocumentNode, values: Map<String, String>,
         is UiDocumentNode.Text -> Text(node.text)
         is UiDocumentNode.Media -> LocalDocumentMediaNode(node, snapshot.document.source.sessionId, media)
         is UiDocumentNode.Table -> Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-            node.rows.forEachIndexed { index, row ->
+            var query by rememberSaveable(snapshot.document.documentId, snapshot.document.revision, node.id) { mutableStateOf("") }
+            SyTextField(value = query, onValueChange = { query = it },
+                label = { Text(stringResource(R.string.ui_document_table_filter)) },
+                singleLine = true, modifier = Modifier.fillMaxWidth())
+            val visible = node.rows.filter { row -> query.isBlank() || row.any { it.contains(query, ignoreCase = true) } }
+            visible.forEachIndexed { index, row ->
                 Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                     Text((index + 1).toString())
                     node.headers.zip(row).forEach { (header, value) -> Text("${header}: ${value}") }
                 }
             }
-            if (node.rows.isEmpty()) Text(stringResource(R.string.ui_document_table_empty))
+            if (visible.isEmpty()) Text(stringResource(R.string.ui_document_table_empty))
         }
         is UiDocumentNode.BarChart -> Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             Text(node.title)

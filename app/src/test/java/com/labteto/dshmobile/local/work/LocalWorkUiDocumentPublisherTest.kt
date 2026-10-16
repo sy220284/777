@@ -62,12 +62,28 @@ class LocalWorkUiDocumentPublisherTest {
                 assertTrue(finished.nodes.filterIsInstance<UiDocumentNode.Text>().any { it.text == "本轮已终止" })
                 assertTrue(finished.actions.isEmpty())
             }
+            log.append("turn/start", buildJsonObject { put("source_message_id", "cancelled-write") })
+            log.append("assistant/message", buildJsonObject {
+                put("source_message_id", "cancelled-write"); put("content", "Actual partial finding")
+            })
+            log.append("tool/result", buildJsonObject {
+                put("source_message_id", "cancelled-write"); put("id", "partial"); put("name", "read")
+                put("content", "Actual file excerpt"); put("is_error", false)
+            })
+            publisher.onToolResult(binding, "cancelled-write")
+            val resumed = LocalUiDocumentSessionStore(logs).latestDocument("work", "cancelled-write",
+                "work-live:cancelled-write", budget, emptySet())!!.document
+            assertTrue(resumed.nodes.filterIsInstance<UiDocumentNode.Text>().any { it.text == "本轮还未记录结束事件" })
+            val previews = resumed.nodes.filterIsInstance<UiDocumentNode.Disclosure>()
+                .flatMap { it.children }.filterIsInstance<UiDocumentNode.Text>().map { it.text }
+            assertTrue("Actual partial finding" in previews)
+            assertTrue("Actual file excerpt" in previews)
             log.append("tool/call", buildJsonObject {
                 put("source_message_id", "new-turn"); put("id", "other-call"); put("name", "another-tool")
             })
             publisher.onToolResult(binding, "new-turn")
             val old = documents.latestDocument("work", "cancelled-write", "work-live:cancelled-write", budget, emptySet())!!.document
-            assertEquals("tool-cancelled-write", old.nodes.filterIsInstance<UiDocumentNode.Table>().single().rows.single()[0])
+            assertTrue(old.nodes.filterIsInstance<UiDocumentNode.Table>().single().rows.none { it[0] == "another-tool" })
             assertTrue(old.nodes.none { it is UiDocumentNode.BoundText })
         } finally { logs.clearAndEvict(setOf("work")) }
     }

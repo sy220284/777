@@ -61,6 +61,7 @@ internal class LocalWorkComposition @Inject constructor(
     contextComposer: ContextComposer,
     private val workRunRegistry: LocalWorkRunRegistry,
     private val workUiDocumentPublisher: LocalWorkUiDocumentPublisher,
+    replyDocuments: com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPublisher,
     workMemoryRuntime: LocalWorkMemoryRuntime,
     workModelHistoryRuntime: LocalWorkModelHistoryRuntime,
     workSessionProjection: LocalWorkSessionProjectionRuntime,
@@ -284,6 +285,7 @@ internal class LocalWorkComposition @Inject constructor(
         workToolResultRuntime = toolResultRuntime,
         workTurnToolRuntime = turnToolRuntime,
         workUiDocumentPublisher = workUiDocumentPublisher,
+        replyDocuments = replyDocuments,
     )
 
     internal val turnStarter = LocalWorkTurnStarter(
