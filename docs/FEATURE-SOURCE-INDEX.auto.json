@@ -2695,7 +2695,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalComposerInvocationPicker.kt",
-      "sha256": "466a8c3a6d884646"
+      "sha256": "7bf0e99546d5f401"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationActionsMenu.kt",
@@ -3739,7 +3739,7 @@
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiMarkdown.kt",
-      "sha256": "7bb634b68ba4053e"
+      "sha256": "fcd2d6ba9c409184"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiPackManifest.kt",
@@ -3931,7 +3931,7 @@
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextUiDocument.kt",
-      "sha256": "480b9182511f6507"
+      "sha256": "d20b3e0e93f220ac"
     },
     {
       "path": "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextUpdateScene.kt",
@@ -4031,18 +4031,15 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "903884f3b61b",
+  "source_snapshot": "ce599ad1b242",
   "observed_delta": {
-    "baseline": "2bcfea1ec89d",
-    "added_production_files": [
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiMarkdown.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextRichMessage.kt"
-    ],
+    "baseline": "903884f3b61b",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalReplySuggestionsUiAdapter.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/components/Markdown.kt",
-      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextConversationUiPack.kt"
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalComposerInvocationPicker.kt",
+      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiMarkdown.kt",
+      "ui-pack-next/src/main/kotlin/com/labteto/dshmobile/uipack/next/NextUiDocument.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
