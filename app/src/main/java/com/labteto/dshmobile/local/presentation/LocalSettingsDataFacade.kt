@@ -11,6 +11,15 @@ import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.DeepSeekPricingRepository
 import com.labteto.dshmobile.local.model.DeepSeekPricingState
+import com.labteto.dshmobile.local.model.DeepSeekBillingSchedule
+import com.labteto.dshmobile.uicontract.UiProviderPricingSnapshot
+import com.labteto.dshmobile.uicontract.UiProviderPriceModel
+import com.labteto.dshmobile.uicontract.UiProviderPriceTier
+import com.labteto.dshmobile.uicontract.PricingUiPort
+import com.labteto.dshmobile.uicontract.PricingUiReceipt
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.CancellationException
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,8 +32,20 @@ class LocalSettingsDataFacade @Inject internal constructor(
     private val memoryManager: MemoryManager,
     private val chatMemoryProjection: LocalChatMemoryProjectionPort,
     private val pricing: DeepSeekPricingRepository,
-) : com.labteto.dshmobile.uicontract.MemoryUiPort {
+) : com.labteto.dshmobile.uicontract.MemoryUiPort, PricingUiPort {
     internal val deepSeekPricing: StateFlow<DeepSeekPricingState> = pricing.state
+    override val snapshots: Flow<UiProviderPricingSnapshot> = pricing.state.map {
+        it.asUiProviderPricing()
+    }
+    override fun snapshot(): UiProviderPricingSnapshot = pricing.state.value.asUiProviderPricing()
+    override suspend fun refreshOfficial(): PricingUiReceipt = try {
+        pricing.refreshFromOfficial()
+        pricing.state.value.error?.let(PricingUiReceipt::Failed) ?: PricingUiReceipt.Completed
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Exception) {
+        PricingUiReceipt.Failed(failure.message)
+    }
     internal suspend fun refreshDeepSeekPricing() = pricing.refreshFromOfficial()
 
     override fun memoryPage(query: com.labteto.dshmobile.local.memory.MemoryManagementQuery) = memoryStore.managementPage(query)
@@ -63,11 +84,32 @@ class LocalSettingsDataFacade @Inject internal constructor(
         memoryStore.listActiveFromMessage(sessionId, messageId)
 }
 
+private fun DeepSeekPricingState.asUiProviderPricing() = UiProviderPricingSnapshot(
+    models = models.map { model ->
+        UiProviderPriceModel(
+            modelId = model.modelId,
+            displayName = model.displayName,
+            version = model.version,
+            peak = UiProviderPriceTier(model.peak.cacheHitCnyPerMillion,
+                model.peak.cacheMissCnyPerMillion, model.peak.outputCnyPerMillion),
+            offPeak = UiProviderPriceTier(model.offPeak.cacheHitCnyPerMillion,
+                model.offPeak.cacheMissCnyPerMillion, model.offPeak.outputCnyPerMillion),
+        )
+    },
+    sourceUrl = sourceUrl,
+    lastUpdatedAt = lastUpdatedAt,
+    refreshing = refreshing,
+    activePeriod = DeepSeekBillingSchedule.periodAt(System.currentTimeMillis()).name,
+    error = error,
+)
+
 @dagger.Module
 @dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
 abstract class LocalMemoryUiBindings {
     @dagger.Binds @Singleton
     abstract fun memory(implementation: LocalSettingsDataFacade): com.labteto.dshmobile.uicontract.MemoryUiPort
+    @dagger.Binds @Singleton
+    abstract fun providerPricing(implementation: LocalSettingsDataFacade): PricingUiPort
 }
 
 private class MemoryCleanupPendingException(message: String, cause: Throwable) : IllegalStateException(message, cause)
