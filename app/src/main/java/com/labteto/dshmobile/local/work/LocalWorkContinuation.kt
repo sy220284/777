@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.agent.QueuedAgentInputKind
+import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.LocalModelException
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.buildJsonObject
@@ -66,20 +68,31 @@ internal fun queueAutomaticWorkContinuation(
         index = binding.automaticContinuationCount + 1,
         sourceMessageId = sourceMessageId,
     )
-    val accepted = binding.runHandle.pendingInputs.offer(command.toQueueInput()) {
-        // Commit the source/checkpoint identity before exposing the queued continuation.
-        binding.eventLog.append("turn/continuation-queued", buildJsonObject {
-            put("source_run_id", command.sourceRunId)
-            put("reason", command.failureCode)
-            put("failure_kind", com.labteto.dshmobile.local.model.modelFailureKind(error))
-            put("continuation_id", command.id)
-            put("continuation_index", command.index)
-            put("checkpoint_sequence", command.checkpointSequence)
-            put("source_message_id", command.sourceMessageId)
-            put("origin", "WORK_CONTINUATION")
-        })
+    val queued = command.toQueueInput()
+    val accepted = binding.runHandle.pendingInputs.offer(queued) {
+        // One authoritative inbox snapshot is committed while the queue is locked.
+        // A process restart can reconstruct the typed continuation before running it.
+        binding.eventLog.append(
+            LOCAL_AGENT_INBOX_EVENT_TYPE,
+            encodeLocalAgentInboxEvent(
+                action = "work-continuation-queued",
+                pending = binding.runHandle.pendingInputs.snapshot(),
+                affected = listOf(queued),
+            ),
+        )
     }
     if (!accepted) return false
+    // Additional lifecycle annotation; the inbox event above owns durable recovery.
+    binding.eventLog.append("turn/continuation-queued", buildJsonObject {
+        put("source_run_id", command.sourceRunId)
+        put("reason", command.failureCode)
+        put("failure_kind", com.labteto.dshmobile.local.model.modelFailureKind(error))
+        put("continuation_id", command.id)
+        put("continuation_index", command.index)
+        put("checkpoint_sequence", command.checkpointSequence)
+        put("source_message_id", command.sourceMessageId)
+        put("origin", "WORK_CONTINUATION")
+    })
 
     binding.automaticContinuationCount = command.index
     binding.continuationParentRunId = command.sourceRunId
