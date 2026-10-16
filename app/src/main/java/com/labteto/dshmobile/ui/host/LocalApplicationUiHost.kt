@@ -43,6 +43,7 @@ import com.labteto.dshmobile.uipack.next.NextApplicationFeaturePorts
 import com.labteto.dshmobile.uipack.next.NextApplicationScenePack
 import com.labteto.dshmobile.uipack.v6.V6ApplicationScenePack
 import com.labteto.dshmobile.uipack.v6.V6ConversationPorts
+import com.labteto.dshmobile.uipack.v6.V6SecondaryPorts
 import kotlinx.coroutines.flow.map
 
 /** The original shipped screen is an explicit compatibility mode, never a fake complete UiPack. */
@@ -79,12 +80,24 @@ internal object LocalApplicationPackInstallations {
                     workReads = owner.workReadUiPort,
                     workPolicy = owner.workPolicyUiPort,
                     workTeam = owner.workTeamUiPort,
+                    replySuggestions = owner.replySuggestionsUiPort,
                     workMode = { owner.shellState.value.usageMode == LocalUsageMode.WORK },
                     workModeUpdates = owner.shellState.map { it.usageMode == LocalUsageMode.WORK },
                 ),
                 usageOwner = owner.usageUiPort,
                 updateStatus = updateStatus,
                 checkForUpdate = checkForUpdate,
+                secondary = V6SecondaryPorts(
+                    tools = owner.toolsUiPort, files = owner.filesUiPort,
+                    media = owner.mediaUiPort, settings = owner.settingsUiPort,
+                    sessionId = { owner.shellState.value.sessionId },
+                    automation = owner.automationUiPort, sessions = owner.sessionUiPort,
+                    transcript = owner.messageHistoryUiPort,
+                    memory = owner.memoryUiPort, diary = owner.diaryUiPort,
+                    authoring = owner.personaAuthoringUiPort,
+                    currentPersona = owner.currentPersonaUiPort,
+                    replySuggestions = owner.replySuggestionsUiPort,
+                ),
             ),
             NextApplicationScenePack(NextApplicationFeaturePorts(
             chat = owner.chatUiPort, work = owner.workConversationUiPort,
