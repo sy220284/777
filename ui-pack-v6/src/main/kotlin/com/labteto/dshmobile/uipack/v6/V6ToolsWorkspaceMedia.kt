@@ -256,8 +256,11 @@ fun V6ToolsManagementScene(
                     work != null && drafts != null) {
                     val ability = owner.capabilityCatalogue().firstOrNull { it.name == selectedCapability }
                     val schema = ability?.parameterSchema
-                    val form = remember(schema) {
-                        schema?.let { runCatching { v6ToolFormFields(it) } }
+                    val form: Result<List<V6ToolFormField>>? = remember(schema) {
+                        schema?.let {
+                            try { Result.success(v6ToolFormFields(it)) }
+                            catch (error: IllegalArgumentException) { Result.failure(error) }
+                        }
                     }
                     SyGlassCard(Modifier.fillMaxWidth()) {
                         Text("使用能力：" + selectedCapability)
