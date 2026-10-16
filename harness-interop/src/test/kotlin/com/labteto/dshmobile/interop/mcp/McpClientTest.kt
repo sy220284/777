@@ -31,6 +31,20 @@ import org.junit.Test
 
 class McpClientTest {
     @Test
+    fun pingChecksRemoteResponseWithoutListingOrCallingTools() = runTest {
+        val requests = mutableListOf<String>()
+        val transport = object : McpTransport {
+            override suspend fun request(method: String, params: JsonObject): JsonObject {
+                requests += method
+                return buildJsonObject { put("result", buildJsonObject { }) }
+            }
+            override fun close() = Unit
+        }
+        McpClient(transport).ping()
+        assertEquals(listOf("ping"), requests)
+    }
+
+    @Test
     fun listsAndCallsToolsThroughTransport() = runTest {
         val requests = mutableListOf<Pair<String, JsonObject>>()
         val transport = object : McpTransport {
