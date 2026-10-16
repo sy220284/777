@@ -182,6 +182,21 @@ class V6ApplicationScenePack(
                     V6PortraitScene(gallery, portraits, onBack = { scope.onBack(); Unit })
                 })
             }
+            if (owners.gallery != null) owners.diary?.let { diary ->
+                extraDiaryScenes.forEach { id ->
+                    put(id, UiSceneRenderer { scope ->
+                        V6DiaryScene(owners.gallery, diary,
+                            onBack = { scope.onBack(); Unit })
+                    })
+                }
+            }
+            val memories = owners.memory
+            val config = owners.settings
+            if (memories != null && config != null)
+                put(UiSceneId("settings.memory_management"), UiSceneRenderer { scope ->
+                    V6MemoryManagementScene(memories, config,
+                        onBack = { scope.onBack(); Unit })
+                })
             owners.automation?.let { tasks ->
                 secondaryAutomations.forEach { id ->
                     put(id, UiSceneRenderer { scope ->
