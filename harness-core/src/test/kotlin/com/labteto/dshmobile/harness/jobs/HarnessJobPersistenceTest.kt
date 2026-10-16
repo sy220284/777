@@ -218,7 +218,8 @@ class HarnessJobPersistenceTest {
         assertTrue(resumed.contains("已恢复"))
         runCurrent()
         assertEquals("dormant", restored.snapshots().single().status)
-        assertEquals("已完成", restored.output(id))
+        assertEquals("已完成", restored.snapshots().single().output)
+        assertEquals("$id [dormant] 预算边界\n已完成", restored.output(id))
     }
 
     @Test
