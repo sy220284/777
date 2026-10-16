@@ -299,7 +299,7 @@ Host 的 `ConversationShellUiPort` 接入重命名与显式置顶；原偏好 St
 - 新增 `:ui-pack-v6/V6ApplicationScenePack`，外观、通知、系统权限三项各有真实 Compose Renderer，不复用 App 原 Shell 页面。页面通过原 `HostPreferencesUiPort` 读取和提交设置，系统权限跳转仍由 Host 处理；V6 组件沿用 `Sy*`，不强制 Next 继承。
 - `LocalApplicationPackInstallations.fromOwners` 注册迁移中 V6 候选包，保持既有 `legacy-v6-shell` 为稳定模式。生产 Host 仍以 **75 个必要 Scene** 和真实 Renderer 双重门禁判断准入；当前 V6 候选只有 **3/75**，不能启用或作为完成证明。
 - 新增独立 V6 场景测试源码：三项真实注册、生产完整目录拒绝和限定三场景准入。不把测试源码视为运行通过，也未做 Android 16/17 设备验收。
-- S3-01、S3-03、S3-05 仍是 `CODE_PARTIAL`。下一代码优先工作是从 App Shell 迁出会话导航、Composer、时间线、二级页、原业务回调，并逐项保持现有完整行为；S0 动作映射仍为 75/173，恢复 E2E 仍待验收。
+- S3-01、S3-03、S3-05 仍是 `CODE_PARTIAL`。下一代码优先工作是从 App Shell 迁出会话导航、Composer、时间线、二级页、原业务回调，并逐项保持现有完整行为；S0 动作映射在本次场景增加时仍为 75/173；其后完成三项设置 Owner 端口对应，现为 78/173，恢复 E2E 仍待验收。
 
 
 ## 2026-10-16 接续 V6 独立移包：会话与聊天设置
@@ -307,3 +307,6 @@ Host 的 `ConversationShellUiPort` 接入重命名与显式置顶；原偏好 St
 - `:ui-pack-v6` 新增 `V6ChatSettingsScene.kt`，基于 `SettingsUiPort.state` 真正读取业务状态，旧 `settings.chat` 的风格开关、自定义过滤词增删、人物规则只读视图和命中记录清理经原 Settings Owner 命令与回执实现，继续使用 50 条/32 字限制。并新增 `settings.session` 独立入口，由 Host 导航进入聊天设置；旧 App Shell 回调不进入 UI 包。
 - 生产组合根为 `V6ApplicationScenePack` 注入现行 `SettingsUiPort`，独立 V6 Renderer 增至 **5/75**，剩余 **70**。补充五场景覆盖与全应用不完整候选拒绝的测试源码；未向使用者开放未完成的独立 V6 包，也未移走或破坏稳定 Legacy V6。
 - R4 仍为 35 项，其中代码部分实现 26 项、代码已实现未验收 4 项、专门验收待完成 5 项。173 项全量 E2E/恢复没有签收，不因本批新增源码虚增动作证据。继续优先做 V6 Composer/时间线/导航及旧 Shell 退场。
+
+
+- 本批同步了三项真实设置操作的端口/回执源码证据：外观、通知、聊天规则。S0 源码映射由 **75/173 → 78/173**，尚余 **95**；173 项真实 E2E/恢复证据仍全部缺失（没有把新代码直接改成 VERIFIED）。
