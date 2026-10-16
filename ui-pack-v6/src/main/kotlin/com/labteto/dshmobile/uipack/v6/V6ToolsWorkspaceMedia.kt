@@ -506,7 +506,17 @@ fun V6MediaScene(media: MediaUiPort, settings: SettingsUiPort,
                 result.description?.let { Text(it) }
                 val asset = sessionId?.let { media.assetForSession(result.id, it) }
                 asset?.textOutput?.let { Text(it) }
-                Text(if (asset?.localPath != null) "设备本地已保存" else "尚无此会话可访问的本地资产")
+                if (asset?.localPath != null && asset.kind != null && sessionId != null) {
+                    // The same scoped Owner and native renderer serve chat documents and the
+                    // media archive; the archive never decodes a foreign-session filesystem path.
+                    V6DocumentMediaNode(
+                        UiDocumentNode.Media("archive-" + result.id, result.id, asset.kind,
+                            "预览并导出本地媒体"), sessionId, media)
+                } else if (asset?.localPath != null) {
+                    Text("本地媒体类型尚未通过 Owner 标注，无法安全预览")
+                } else {
+                    Text("此会话尚无授权的本地文件；远端地址不会自动下载")
+                }
                 SyButton("删除成果", { deletion = result.id },
                     enabled = !pending, style = SyButtonStyle.DANGER)
             }
