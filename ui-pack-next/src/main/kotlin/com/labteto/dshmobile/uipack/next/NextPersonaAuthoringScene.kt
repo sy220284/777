@@ -33,6 +33,8 @@ internal fun NextPersonaAuthoringScene(
     var dirty by rememberSaveable(galleryId) { mutableStateOf(false) }
     var confirmClose by remember { mutableStateOf(false) }
     var confirmReload by remember { mutableStateOf(false) }
+    var editGeneration by remember(galleryId) { mutableStateOf(0L) }
+    var reload by remember(galleryId) { mutableStateOf(0) }
     fun close() { if (dirty) confirmClose = true else onBack() }
     BackHandler { if (!busy) close() }
     if (confirmClose) AlertDialog(onDismissRequest = { confirmClose = false },
@@ -52,8 +54,6 @@ internal fun NextPersonaAuthoringScene(
         dismissButton = { TextButton(onClick = { confirmReload = false }) { Text("保留草稿") } })
     var loading by remember(galleryId) { mutableStateOf(galleryId != null) }
     var feedback by remember(galleryId) { mutableStateOf<String?>(null) }
-    var editGeneration by remember(galleryId) { mutableStateOf(0L) }
-    var reload by remember(galleryId) { mutableStateOf(0) }
     fun reloadLatest() {
         if (dirty) confirmReload = true
         else { initialized = false; editGeneration++; reload++ }
