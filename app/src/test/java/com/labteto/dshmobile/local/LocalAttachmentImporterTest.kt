@@ -71,6 +71,19 @@ class LocalAttachmentImporterTest {
         } finally { root.deleteRecursively() }
     }
 
+    @Test fun attachmentInspectorRejectsAnExternalHardLinkAlias() {
+        val root = kotlin.io.path.createTempDirectory("attachment-hardlink-alias").toFile()
+        try {
+            val item = stored(root, "immutable content")
+            val original = File(root, item.relativePath).toPath()
+            val alias = File(root, "unauthorized-alias.txt").toPath()
+            Files.createLink(alias, original)
+            assertTrue(inspectImportedAttachmentFile(root, item) is UiAttachmentInspectionReceipt.Unavailable)
+            Files.delete(alias)
+            assertTrue(inspectImportedAttachmentFile(root, item) is UiAttachmentInspectionReceipt.Ready)
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun largeTextPreviewIsBoundedAndFullHashVerified() {
         val root = kotlin.io.path.createTempDirectory("attachment-preview-long").toFile()
         try {

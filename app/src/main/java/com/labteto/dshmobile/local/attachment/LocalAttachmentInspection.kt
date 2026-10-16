@@ -34,6 +34,12 @@ internal fun inspectImportedAttachmentFile(root: File, item: LocalImportedAttach
         if (Files.isSymbolicLink(hidden) || Files.isSymbolicLink(folder) ||
             !Files.isRegularFile(candidate, LinkOption.NOFOLLOW_LINKS))
             return unavailable("附件文件不可安全读取")
+        // A second hard link is an independent writer to the same inode. Do not
+        // promise a content-addressed immutable attachment while an alias exists.
+        fun uniquelyOwned(): Boolean =
+            (Files.getAttribute(candidate, "unix:nlink", LinkOption.NOFOLLOW_LINKS) as Number)
+                .toLong() == 1L
+        if (!uniquelyOwned()) return unavailable("附件 inode 存在硬链接别名，无法保证内容不可变")
         val actualLength = Files.size(candidate)
         if (actualLength != item.bytes) return unavailable("附件文件大小与导入记录不一致")
 
@@ -63,8 +69,9 @@ internal fun inspectImportedAttachmentFile(root: File, item: LocalImportedAttach
                     }
             }
         }
-        if (bytesRead != actualLength || Files.size(candidate) != actualLength)
-            return unavailable("附件读取期间大小发生变化")
+        if (bytesRead != actualLength || Files.size(candidate) != actualLength ||
+            !uniquelyOwned())
+            return unavailable("附件读取期间文件已变化或新增硬链接别名")
         val actualDigest = hash.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
         if (actualDigest != digestName) return unavailable("附件内容完整性核验失败")
         val previewData = sample.toByteArray()

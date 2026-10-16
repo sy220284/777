@@ -2,6 +2,8 @@ package com.labteto.dshmobile.uihost
 
 import com.labteto.dshmobile.uicontract.UiSceneId
 import java.nio.charset.StandardCharsets
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
 import java.util.Base64
 
 /**
@@ -43,7 +45,11 @@ object UiSceneNavigationSnapshotCodec {
             if (raw.isEmpty()) return null
             val bytes = Base64.getUrlDecoder().decode(raw)
             if (bytes.isEmpty() || bytes.size > limit || bytes.any { it == 0.toByte() }) return null
-            String(bytes, StandardCharsets.UTF_8).takeIf { it.isNotBlank() }
+            if (Base64.getUrlEncoder().withoutPadding().encodeToString(bytes) != raw) return null
+            StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes)).toString().takeIf { it.isNotBlank() }
         }.getOrNull()
         val packId = item(parts[1], MAX_PACK_BYTES) ?: return null
         val scenes = parts.drop(2).map { item(it, MAX_SCENE_BYTES) ?: return null }

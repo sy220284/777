@@ -130,14 +130,20 @@ internal fun V6DocumentCard(
     val key = remember(doc.documentId, doc.revision, doc.source.sessionId) {
         UiDocumentFormKey(doc.source.sessionId, doc.documentId, doc.revision)
     }
+    var retentionReady by remember(forms, key, doc) { mutableStateOf(false) }
     LaunchedEffect(forms, key, doc) {
         forms.bindRetention(key, doc.fieldRetention())
+        retentionReady = true
     }
     DisposableEffect(forms, key) {
         onDispose { forms.releaseRetention(key) }
     }
     val persisted by forms.values.collectAsStateWithLifecycle()
-    val values = remember(doc, persisted) { doc.initialFields() + persisted[key].orEmpty() }
+    // An old SavedState may contain a field newly declared MEMORY_ONLY. Its plaintext
+    // cannot be painted even for one frame before the Host has scrubbed restored entries.
+    val values = remember(doc, persisted, retentionReady) {
+        doc.initialFields() + if (retentionReady) persisted[key].orEmpty() else emptyMap()
+    }
     var feedback by remember(doc.documentId, doc.revision) { mutableStateOf<String?>(null) }
     var pendingConfirm by remember(doc.documentId, doc.revision) {
         mutableStateOf<Pair<UiDocumentAction, UiDocumentActionRequest>?>(null)
@@ -207,7 +213,7 @@ internal fun V6DocumentCard(
         identity.sessionId == doc.source.sessionId &&
         identity.contextGeneration == doc.source.contextGeneration &&
         identity.profileId == doc.source.profileId &&
-        identity.projectId == doc.source.projectId
+        identity.projectId == doc.source.projectId && retentionReady
 
     fun dispatch(request: UiDocumentActionRequest) {
         if (!validIdentity || !identityIsCurrent()) {
