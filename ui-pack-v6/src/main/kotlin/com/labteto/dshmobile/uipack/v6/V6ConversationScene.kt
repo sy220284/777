@@ -709,14 +709,15 @@ fun V6ConversationScene(
         }
         if (part == V6ConversationPart.FULL || part == V6ConversationPart.COMPOSER) {
         imported.forEach { file ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column(Modifier.weight(1f)) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(Modifier.fillMaxWidth()) {
                     Text(file.name)
                     val dimensions = if (file.width != null && file.height != null)
                         " · ${file.width}×${file.height}" else ""
                     Text("${file.mediaType} · ${file.bytes} 字节$dimensions",
                         style = MaterialTheme.typography.labelSmall)
                 }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (ports.attachments != null) SyButton(
                     if (inspectionPath == file.relativePath) "检查中" else "检查/预览", {
                         val target = identity ?: return@SyButton
@@ -742,6 +743,7 @@ fun V6ConversationScene(
                 SyButton("移除", {
                     identity?.let { ports.drafts.removeAttachment(it.sessionId, file.relativePath) }
                 }, style = SyButtonStyle.GHOST)
+                }
             }
         }
         SyInput(draft, { value ->
