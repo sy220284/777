@@ -99,18 +99,20 @@ class V6ConversationMigrationTest {
             UiAccessibility.entries.toSet(), false,
         )
 
-    @Test fun independentV6RegistersActualSettingsAndConversationEntryPoints() {
+    @Test fun independentV6RegistersRealConversationPagesAndFourDistinctSlots() {
         val candidate = pack()
         val expected = setOf(
             "settings.appearance", "settings.notifications", "settings.permissions",
             "settings.session", "settings.chat",
             "route.home", "conversation.chat", "conversation.work",
+            "conversation.header", "conversation.timeline", "conversation.composer",
+            "conversation.reply_status",
         ).map(::UiSceneId).toSet()
         assertEquals(expected, candidate.manifest.scenes)
         assertEquals(expected, candidate.renderers.keys)
     }
 
-    @Test fun scopedEightScenePackPassesContractWithoutExecutingOwners() {
+    @Test fun scopedTwelveScenePackPassesContractWithoutExecutingOwners() {
         val candidate = pack()
         assertTrue(UiApplicationPackRegistry(listOf(candidate)).select(
             candidate.manifest.id, requirements(candidate.manifest, onlyDeclared = true),
@@ -125,7 +127,7 @@ class V6ConversationMigrationTest {
         val problem = (rejected as LocalApplicationUiDecision.Unavailable).rejection
         assertTrue(problem is UiApplicationPackAdmission.Incompatible)
         val missing = (problem as UiApplicationPackAdmission.Incompatible).compatibility.missingScenes
-        assertTrue(UiSceneId("conversation.composer") in missing)
+        assertTrue(UiSceneId("conversation.ui_document") in missing)
         assertTrue(UiSceneId("route.settings") in missing)
     }
 }
