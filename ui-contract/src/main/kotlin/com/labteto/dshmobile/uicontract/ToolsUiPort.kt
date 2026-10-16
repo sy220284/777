@@ -21,7 +21,14 @@ enum class UiPluginLifecycleState { INSTALLING, ACTIVE, REPLACING, UNINSTALLING,
 data class UiPluginLifecycle(val id: String, val state: UiPluginLifecycleState)
 
 data class UiToolCapabilitySnapshot(val name: String, val family: String, val access: String,
-    val approval: String, val requirements: List<String>)
+    val approval: String, val requirements: List<String>,
+    /** Exact registry-owned parameter schema for a read-only input form; not an invocation grant. */
+    val parameterSchema: kotlinx.serialization.json.JsonObject? = null)
+
+sealed interface UiToolDraftValidation {
+    data object Valid : UiToolDraftValidation
+    data class Rejected(val reason: String) : UiToolDraftValidation
+}
 data class UiSkillSnapshot(val name: String, val description: String, val modelInvocable: Boolean,
     val displayName: String = name)
 data class UiPresetSkillSnapshot(val id: String, val title: String, val description: String, val installed: Boolean)
@@ -35,6 +42,11 @@ interface ToolsUiPort {
     suspend fun checkServerHealth(serverId: String): UiMcpHealth = UiMcpHealth.UNSUPPORTED
     suspend fun githubConfigured(): Boolean
     fun capabilityCatalogue(): List<UiToolCapabilitySnapshot>
+    /** Revalidate against current registry registration; NEVER executes or authorizes tools. */
+    fun validateCapabilityDraft(
+        name: String, expectedSchema: kotlinx.serialization.json.JsonObject,
+        argumentsJson: String,
+    ): UiToolDraftValidation
     fun pluginLifecycleSnapshots(): List<UiPluginLifecycle> = emptyList()
     suspend fun recoverFailedPlugin(id: String): List<String> =
         error("当前工具 Owner 不支持插件恢复")
