@@ -79,6 +79,9 @@ class LocalWorkEvidenceUiAdapter @Inject internal constructor(
             }
             val prepared = work.prepareRequirementEvidenceForUi(command.identity.sessionId, command.requirementIndex,
                 command.expectedRequirement, command.artifact) ?: return@withContext UiCommandReceipt.NotAdmitted
+            // Do the second potentially large file hash outside the foreground mutation lock.
+            // A file changed after the user's selection must not receive a stale evidence link.
+            if (!work.preparedEvidenceStillCurrent(prepared)) return@withContext UiCommandReceipt.NotAdmitted
             currentCoroutineContext().ensureActive()
             synchronized(state.foregroundRunHandle.lock) {
                 if (!current(command.identity) ||
