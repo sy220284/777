@@ -65,7 +65,7 @@ internal object LocalUiDocumentCodec {
                 "text" -> mapOf("text" to text)
                 "media" -> mapOf("assetId" to text, "kind" to text, "label" to text)
                 "table" -> mapOf("headers" to strings, "rows" to stringRows)
-                "bar_chart" -> mapOf("title" to text, "unit" to text, "points" to objects)
+                "bar_chart", "line_chart" -> mapOf("title" to text, "unit" to text, "points" to objects)
                 "bound_text" -> mapOf("label" to text, "binding" to text)
                 "column", "row" -> mapOf("children" to objects)
                 "disclosure" -> mapOf("title" to text, "children" to objects)
@@ -84,12 +84,16 @@ internal object LocalUiDocumentCodec {
                     UiDocumentMediaKind.valueOf(value.string("kind")), value.string("label"))
                 "table" -> UiDocumentNode.Table(id, value.array("headers").map { it.jsonPrimitive.content },
                     value.array("rows").map { row -> row.jsonArray.map { it.jsonPrimitive.content } })
-                "bar_chart" -> UiDocumentNode.BarChart(id, value.string("title"), value.string("unit"),
-                    value.array("points").map { point ->
+                "bar_chart", "line_chart" -> {
+                    val points = value.array("points").map { point ->
                         val item = point.jsonObject
                         checkSchema(item, chartPointSchema)
                         UiChartPoint(item.string("label"), item.getValue("value").jsonPrimitive.double)
-                    })
+                    }
+                    if (kind == "line_chart") UiDocumentNode.LineChart(
+                        id, value.string("title"), value.string("unit"), points)
+                    else UiDocumentNode.BarChart(id, value.string("title"), value.string("unit"), points)
+                }
                 "bound_text" -> UiDocumentNode.BoundText(id, value.string("label"), UiDocumentBinding.valueOf(value.string("binding")))
                 "column" -> UiDocumentNode.Column(id, children())
                 "row" -> UiDocumentNode.Row(id, children())
@@ -139,9 +143,16 @@ internal object LocalUiDocumentCodec {
                     put("headers", JsonArray(value.headers.map(::JsonPrimitive)))
                     put("rows", JsonArray(value.rows.map { row -> JsonArray(row.map(::JsonPrimitive)) }))
                 }
-                is UiDocumentNode.BarChart -> {
-                    put("type", "bar_chart"); put("title", value.title); put("unit", value.unit)
-                    put("points", JsonArray(value.points.map { point -> buildJsonObject {
+                is UiDocumentNode.BarChart, is UiDocumentNode.LineChart -> {
+                    val points = when (value) {
+                        is UiDocumentNode.BarChart -> value.points
+                        is UiDocumentNode.LineChart -> value.points
+                        else -> emptyList()
+                    }
+                    put("type", if (value is UiDocumentNode.LineChart) "line_chart" else "bar_chart")
+                    put("title", if (value is UiDocumentNode.LineChart) value.title else (value as UiDocumentNode.BarChart).title)
+                    put("unit", if (value is UiDocumentNode.LineChart) value.unit else (value as UiDocumentNode.BarChart).unit)
+                    put("points", JsonArray(points.map { point -> buildJsonObject {
                         put("label", point.label); put("value", point.value)
                     } }))
                 }

@@ -54,6 +54,15 @@ class LocalUiDocumentCodecTest {
         assertTrue(decode(raw("""{"id":"chart","type":"bar_chart","title":"调用","unit":"","points":[{"label":"x","value":1.0,"action":"approve"}]}""")).isFailure)
     }
 
+    @Test fun lineChartIsBoundedReadOnlyAndRoundTrips() {
+        val chart = decode(raw("""{"id":"trend","type":"line_chart","title":"会话指标","unit":"次","points":[{"label":"周一","value":1.0},{"label":"周二","value":2.0}]}""")).getOrThrow()
+        assertTrue(chart.actions.isEmpty())
+        assertEquals(chart, decode(LocalUiDocumentCodec.encode(chart).toString()).getOrThrow())
+        assertTrue(decode(raw("""{"id":"trend","type":"line_chart","title":"bad","unit":"次","points":[{"label":"a","value":-2.0}]}""")).isFailure)
+        assertTrue(decode(raw("""{"id":"trend","type":"line_chart","title":"bad","unit":"次","points":[{"label":"a","value":2.0,"call":"tool"}]}""")).isFailure)
+        assertTrue(decode(raw("""{"id":"trend","type":"line_chart","title":"bad","unit":"次","points":[{"label":"a","value":1.0},{"label":"a","value":2.0}]}""")).isFailure)
+    }
+
     @Test fun oversizedInputFailsBeforeParsingRatherThanSilentlyTruncating() {
         val value = raw("""{"id":"text","type":"text","text":"${"x".repeat(4096)}"}""")
         val result = decode(value)

@@ -2,6 +2,8 @@ package com.labteto.dshmobile.uipack.v6
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +24,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.uicontract.*
@@ -264,6 +270,26 @@ private fun V6DocumentNode(
                     progress = { if (max > 0.0) (point.value / max).toFloat().coerceIn(0f, 1f) else 0f },
                     modifier = Modifier.fillMaxWidth())
             }
+        }
+        is UiDocumentNode.LineChart -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(node.title, style = MaterialTheme.typography.titleSmall)
+            val tint = MaterialTheme.colorScheme.primary
+            val values = node.points.map { it.value }
+            val low = values.minOrNull() ?: 0.0
+            val high = values.maxOrNull() ?: 0.0
+            val spread = (high - low).takeIf { it > 0.0 } ?: 1.0
+            Canvas(Modifier.fillMaxWidth().height(108.dp)
+                .semantics { contentDescription = "折线趋势图：${node.title}" }) {
+                val curve = Path()
+                node.points.forEachIndexed { index, point ->
+                    val x = size.width * (if (node.points.size == 1) 0.5f
+                        else index.toFloat() / (node.points.size - 1))
+                    val y = size.height * (1f - ((point.value - low) / spread).toFloat().coerceIn(0f, 1f))
+                    if (index == 0) curve.moveTo(x, y) else curve.lineTo(x, y)
+                }
+                drawPath(curve, tint, style = Stroke(width = 2.dp.toPx()))
+            }
+            node.points.forEach { point -> Text("${point.label}：${point.value} ${node.unit}") }
         }
         is UiDocumentNode.BoundText -> {
             val value = when (val bound = snapshot.bindings[node.binding]) {
