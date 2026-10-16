@@ -58,7 +58,9 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
     var confirmDeletion by remember(document.documentId, document.revision) { mutableStateOf(false) }
     var deleting by remember(document.documentId, document.revision) { mutableStateOf(false) }
     var deletionNotice by remember(document.documentId, document.revision) { mutableStateOf<String?>(null) }
-    var pendingSend by remember(document.documentId, document.revision) {
+    // A pending confirmation is bound to the exact active Owner activation.
+    // Switching chats, modes or reactivating a session invalidates the old modal.
+    var pendingSend by remember(document.documentId, document.revision, identity) {
         mutableStateOf<Pair<UiSessionIdentity, UiDocumentActionRequest>?>(null)
     }
     val scope = rememberCoroutineScope()
@@ -97,7 +99,13 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
             onDismiss = { pendingSend = null },
             onConfirm = {
                 pendingSend = null
-                scope.launch { receipt = port.submit(ownerIdentity, request.copy(confirmed = true)) }
+                if (identity != ownerIdentity) {
+                    receipt = UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                } else {
+                    scope.launch {
+                        receipt = port.submit(ownerIdentity, request.copy(confirmed = true))
+                    }
+                }
             })
     }
     if (confirmDeletion) ConfirmDialog(
