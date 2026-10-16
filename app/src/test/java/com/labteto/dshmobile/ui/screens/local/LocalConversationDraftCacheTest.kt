@@ -4,8 +4,24 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 class LocalConversationDraftCacheTest {
+    @Test fun restoredAttachmentDraftRejectsPathTraversalWithoutDiscardingValidEntries() {
+        val valid = com.labteto.dshmobile.local.attachment.LocalImportedAttachment(
+            "photo", ".dsh/attachments/photo.png", "image/png", 9, "valid-id")
+        val traversal = valid.copy(relativePath = "../secrets.txt")
+        val absolute = valid.copy(relativePath = "/tmp/external.txt")
+        val doubled = valid.copy(relativePath = ".dsh//attachment.png")
+        val windows = valid.copy(relativePath = "C:/Users/private.txt")
+        val legacySavedState = Json.encodeToString(listOf(valid, traversal, absolute, doubled, windows))
+        val cache = LocalSessionDraftCache()
+        cache.restoreAttachments(listOf("session-1", legacySavedState))
+        assertEquals(listOf(valid), cache.attachments.value.getValue("session-1"))
+        assertEquals(listOf("session-1", Json.encodeToString(listOf(valid))), cache.saveAttachments())
+    }
+
     @Test fun attachmentDraftsSurvivePackSwitchAndSavedStateWithoutMixingSessions() {
         val owner = LocalSessionDraftCache()
         val attachment = com.labteto.dshmobile.local.attachment.LocalImportedAttachment("file", ".dsh/attachments/id.txt", "text/plain", 12, "id")
