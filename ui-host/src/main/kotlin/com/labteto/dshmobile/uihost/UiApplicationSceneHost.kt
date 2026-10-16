@@ -7,6 +7,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 
 /**
  * A renderer callback is only a navigation proposal. Commit it against the live
@@ -69,6 +71,15 @@ fun UiApplicationPackAdmission.Admitted.RenderHostedScene(
     // as well so an asynchronous callback from the first A cannot act in the new A.
     var transitionEpoch by rememberSaveable(pack.manifest.id, navigationStateScope) {
         mutableStateOf(0L)
+    }
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    // The Host owns focus/IME boundaries across real scene and session transitions.
+    // Reset only when the validated navigation snapshot or session scope changes;
+    // ordinary composer edits and unchanged render recompositions keep their focus.
+    LaunchedEffect(encoded, navigationStateScope) {
+        focusManager.clearFocus(force = true)
+        keyboard?.hide()
     }
     val restored = navigation.restoreEncodedSnapshot(encoded)
     if (restored !is UiSceneNavigationResult.Changed) {
