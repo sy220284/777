@@ -12,6 +12,10 @@ import java.security.MessageDigest
 import java.io.FilterInputStream
 import java.io.InputStream
 import java.util.zip.GZIPInputStream
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -45,6 +49,11 @@ class LocalSessionEventLog(
         onSegmentRotated = { LocalSessionArchiveMaintenance.request(file, json) },
     )
 
+    // The durable log is the only publisher of committed event revisions.
+    // Consumers receive the current revision immediately, then each successful append/reset.
+    private val mutableChanges = MutableStateFlow(0L)
+    internal val changes: StateFlow<Long> = mutableChanges.asStateFlow()
+
     internal val historyInstanceIdentity: String = java.util.UUID.randomUUID().toString()
 
     private val checkpoints = LocalSessionProjectionCheckpoints(file, json)
@@ -71,8 +80,11 @@ class LocalSessionEventLog(
         checkpoints.write(name, LocalSessionProjectionCheckpoint(version, projectionIdentity(), throughSequence, payload))
     }
 
-    fun append(type: String, data: JsonObject): Event =
-        delegate.append(type, data).toLocalEvent()
+    fun append(type: String, data: JsonObject): Event {
+        val committed = delegate.append(type, data).toLocalEvent()
+        mutableChanges.update { it + 1L }
+        return committed
+    }
 
     fun snapshot(): List<Event> = delegate.snapshot().map { event ->
         event.toLocalEvent()
@@ -91,6 +103,7 @@ class LocalSessionEventLog(
         isClosed = true
         resetGeneration += 1L
         delegate.close()
+        mutableChanges.update { it + 1L }
     }
 
     fun snapshotAfter(sequenceExclusive: Long): List<Event> = delegate.snapshotAfter(sequenceExclusive).map { event ->
@@ -214,6 +227,7 @@ class LocalSessionEventLog(
         resetGeneration += 1L
         checkpointIdentity = null
         checkpoints.clear()
+        mutableChanges.update { it + 1L }
     }
 
     private fun com.labteto.dshmobile.harness.session.SessionEvent.toLocalEvent() = Event(
