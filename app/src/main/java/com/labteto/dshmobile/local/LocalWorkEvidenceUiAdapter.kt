@@ -50,12 +50,13 @@ class LocalWorkEvidenceUiAdapter @Inject internal constructor(
             }
             val artifacts = work.artifactsForUi(identity.sessionId)
             val references = work.requirementEvidenceForUi(identity.sessionId)
+            val reviews = work.requirementEvidenceReviewsForUi(identity.sessionId)
             currentCoroutineContext().ensureActive()
             synchronized(state.foregroundRunHandle.lock) {
                 if (!current(identity) || state.state.value.work.goal?.id != goalId ||
                     state.state.value.work.todos.mapIndexed { index, todo -> UiWorkRequirement(index, todo.content, todo.status) } != requirements)
                     UiWorkEvidenceReadReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
-                else UiWorkEvidenceReadReceipt.Available(UiWorkEvidenceSnapshot(identity, requirements, artifacts, references, goalId))
+                else UiWorkEvidenceReadReceipt.Available(UiWorkEvidenceSnapshot(identity, requirements, artifacts, references, goalId, reviews))
             }
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) { UiWorkEvidenceReadReceipt.Failed(failure.message) }
@@ -81,6 +82,32 @@ class LocalWorkEvidenceUiAdapter @Inject internal constructor(
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) { UiWorkArtifactInspectionReceipt.Failed(failure.message) }
     }
+    override suspend fun review(command: com.labteto.dshmobile.uicontract.ReviewWorkEvidenceCommand):
+        UiCommandReceipt = withContext(Dispatchers.IO) {
+        try {
+            synchronized(state.foregroundRunHandle.lock) {
+                if (!current(command.identity) || state.state.value.work.goal?.id != command.goalId ||
+                    state.state.value.work.todos.getOrNull(command.requirementIndex)?.content != command.expectedRequirement)
+                    return@withContext UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+            }
+            val prepared = work.prepareRequirementEvidenceReviewForUi(
+                command.identity.sessionId, command.goalId, command.requirementIndex,
+                command.expectedRequirement, command.artifactPath, command.linkSequence, command.sha256,
+            ) ?: return@withContext UiCommandReceipt.NotAdmitted
+            if (!work.preparedReviewVersionStillCurrent(prepared))
+                return@withContext UiCommandReceipt.NotAdmitted
+            currentCoroutineContext().ensureActive()
+            synchronized(state.foregroundRunHandle.lock) {
+                if (!current(command.identity) || state.state.value.work.goal?.id != command.goalId ||
+                    state.state.value.work.todos.getOrNull(command.requirementIndex)?.content != command.expectedRequirement)
+                    return@synchronized UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                if (work.commitRequirementEvidenceReviewForUi(prepared, command.approved))
+                    UiCommandReceipt.Accepted else UiCommandReceipt.NotAdmitted
+            }
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) { UiCommandReceipt.Failed(failure.message ?: "人工核验未保存") }
+    }
+
     override suspend fun submit(command: LinkWorkEvidenceReferenceCommand): UiCommandReceipt = withContext(Dispatchers.IO) {
         try {
             synchronized(state.foregroundRunHandle.lock) {
