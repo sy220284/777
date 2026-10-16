@@ -288,8 +288,15 @@ internal class LocalPluginComposition(
             (plugin as? GitHubConnectorPlugin ?: error("GitHub 插件管理接口不兼容")).validateCredential(token)
         }
 
-    /** Includes in-flight MCP reservations for status rendering; not a health or permission grant. */
-    suspend fun mcpServers(): List<McpServerSnapshot> = withMcp { plugin, _ -> plugin.lifecycleSnapshots() }
+    /**
+     * Read-only status must remain responsive while MCP connect/reconnect holds the command lock.
+     * No permission is granted, and "registered" does not imply a healthy remote endpoint.
+     */
+    suspend fun mcpServers(): List<McpServerSnapshot> =
+        pluginManager.observeActivePlugin("mcp-bridge") { plugin ->
+            (plugin as? McpToolBridgePlugin
+                ?: error("MCP 插件管理接口不兼容")).lifecycleSnapshots()
+        }
 
     suspend fun connectMcpHttp(serverId: String, endpoint: String): String = withMcp { plugin, active ->
         plugin.connectHttpFromUi(active, serverId, endpoint)
