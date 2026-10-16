@@ -7,6 +7,24 @@ import org.junit.Test
 
 class DiagnosticReportTest {
     @Test
+    fun persistedStackFramesSurviveNewFormatAndOlderEventsRemainReadable() {
+        val frame = "androidx.compose.ui.node.NodeCoordinator#findCommonAncestor(NodeCoordinator.kt:123)"
+        val diagnostic = AppLogEntry(
+            timestampMillis = 1234L,
+            level = "E",
+            tag = "UncaughtException",
+            message = "operation=uncaught_exception",
+            throwableType = "IllegalArgumentException",
+            throwableFrames = frame,
+        )
+        val encoded = AppLog.encodeEntry(diagnostic)
+        assertEquals(frame, AppLog.decodeEntry(encoded)?.throwableFrames)
+        assertEquals(null, AppLog.decodeEntry(encoded.substringBeforeLast("\t"))?.throwableFrames)
+        val report = DiagnosticReport.build(listOf(diagnostic), environment = "test", androidApi = 37)
+        assertTrue(report.contains("frames=" + frame))
+    }
+
+    @Test
     fun exportedReportIncludesRedactedLogsAndOmitsPrivateEnvironmentPaths() {
         val report = DiagnosticReport.build(
             entries = listOf(

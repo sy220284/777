@@ -44,6 +44,7 @@ object DiagnosticReport {
                 append(" ").append(sanitizeDiagnosticText(entry.message).replace("\n", " ").take(800))
                 entry.eventId?.let { append(" event_id=").append(it) }
                 entry.throwableCauseChain?.let { append(" cause_chain=").append(sanitizeDiagnosticText(it).replace("\n", " ").take(1_000)) }
+                entry.throwableFrames?.let { append(" frames=").append(sanitizeDiagnosticText(it).replace("\n", " ").take(4_096)) }
                 appendLine()
             }
 
@@ -95,6 +96,9 @@ object DiagnosticReport {
                 }
                 entry.throwableCauseChain?.let { chain ->
                     append(" cause_chain=").append(sanitizeDiagnosticText(chain).replace("\n", " ").take(1_000))
+                }
+                entry.throwableFrames?.let { frames ->
+                    append(" frames=").append(sanitizeDiagnosticText(frames).replace("\n", " ").take(4_096))
                 }
                 entry.eventId?.let { append(" event_id=").append(it) }
                 append(" build=").append(entry.appVersion ?: "legacy/unknown")

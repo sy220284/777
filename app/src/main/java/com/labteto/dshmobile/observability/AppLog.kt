@@ -24,6 +24,8 @@ data class AppLogEntry(
     val processStartedAtMillis: Long? = null,
     val throwableCauseChain: String? = null,
     val eventId: String? = null,
+    /** Structured stack frame identifiers only; never persist raw exception output or arguments. */
+    val throwableFrames: String? = null,
 )
 
 /**
@@ -322,6 +324,7 @@ object AppLog {
             processInstanceId = processInstanceId,
             processStartedAtMillis = processStartedAtMillis,
             throwableCauseChain = throwable?.let(::summarizeCauseChain),
+            throwableFrames = throwable?.let(::summarizeStackFrames),
             eventId = "$processInstanceId:${eventSequence.incrementAndGet()}",
         )
         synchronized(lock) {
@@ -339,6 +342,20 @@ object AppLog {
         } else if (persistentFile != null) {
             pendingWrites.offer(QueuedEntry(generation, entry))
         }
+    }
+
+    private fun summarizeStackFrames(error: Throwable): String? {
+        val frames = generateSequence(error) { it.cause }.take(3)
+            .flatMap { cause -> cause.stackTrace.asSequence().take(48) }
+            .map { frame ->
+                val owner = frame.className.filter { it.isLetterOrDigit() || it in "._\$" }.take(140)
+                val method = frame.methodName.filter { it.isLetterOrDigit() || it in "_\$<>" }.take(80)
+                val file = frame.fileName.orEmpty().filter { it.isLetterOrDigit() || it in "._-" }.take(80)
+                "$owner#$method($file:${frame.lineNumber})"
+            }
+            .take(72)
+            .toList()
+        return frames.joinToString(" | ").take(4_096).takeIf(String::isNotBlank)
     }
 
     private fun summarizeCauseChain(error: Throwable): String =
@@ -447,11 +464,12 @@ object AppLog {
         entry.processStartedAtMillis?.toString().orEmpty(),
         encode(entry.throwableCauseChain.orEmpty()),
         encode(entry.eventId.orEmpty()),
+        encode(entry.throwableFrames.orEmpty()),
     ).joinToString("\t")
 
     internal fun decodeEntry(line: String): AppLogEntry? {
         val parts = line.split('\t')
-        if (parts.size != 6 && parts.size != 10 && parts.size != 11 && parts.size != 12) return null
+        if (parts.size !in setOf(6, 10, 11, 12, 13)) return null
         return runCatching {
             AppLogEntry(
                 timestampMillis = parts[0].toLong(),
@@ -466,6 +484,7 @@ object AppLog {
                 processStartedAtMillis = parts.getOrNull(9)?.toLongOrNull(),
                 throwableCauseChain = parts.getOrNull(10)?.let(::decode)?.takeIf(String::isNotBlank),
                 eventId = parts.getOrNull(11)?.let(::decode)?.takeIf(String::isNotBlank),
+                throwableFrames = parts.getOrNull(12)?.let(::decode)?.takeIf(String::isNotBlank),
             )
         }.getOrNull()
     }
