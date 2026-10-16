@@ -801,7 +801,7 @@ private fun InlineSpeechPlayer(file: File, onLongClick: () -> Unit) {
                 runCatching { player?.release() }
                 player = null
             }
-    
+
         }
     }
     val heights = intArrayOf(7, 13, 19, 11, 23, 16, 9, 20, 14, 25, 12, 18, 9, 22, 14, 19, 8, 14, 20, 10)
