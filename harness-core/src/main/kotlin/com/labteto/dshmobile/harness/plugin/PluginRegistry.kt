@@ -166,6 +166,15 @@ class PluginRegistry(
                             error.message ?: error::class.java.simpleName,
                         )
                     }
+                    // A previously staged plugin may have failed its compensating cleanup
+                    // even when another plugin triggered batch rollback. Expose every leaked
+                    // lifecycle as FAILED so a user can recover it explicitly.
+                    pendingCleanup.keys.forEach { pendingId ->
+                        lifecycle[pendingId] = PluginLifecycleSnapshot(
+                            pendingId, PluginLifecycleState.FAILED,
+                            "批量安装中断后的插件资源清理尚未完成",
+                        )
+                    }
                 }
                 if (pendingCleanup.isNotEmpty()) context.tools.markLifecycleSafe(false)
                 throw error
