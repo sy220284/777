@@ -142,6 +142,7 @@ class LocalRequirementEvidenceProjectionTest {
         })
         assertEquals(21L, projectRequirementEvidenceLinks(sequenceOf(scoped), todos, "goal-a").single().eventSequence)
         assertTrue(projectRequirementEvidenceLinks(sequenceOf(scoped), todos, "goal-b").isEmpty())
-        assertEquals(20L, projectRequirementEvidenceLinks(sequenceOf(legacy), todos, "goal-b").single().eventSequence)
+        assertTrue(projectRequirementEvidenceLinks(sequenceOf(legacy), todos, "goal-b").isEmpty())
+        assertEquals(20L, projectRequirementEvidenceLinks(sequenceOf(legacy), todos, null).single().eventSequence)
     }
 }
