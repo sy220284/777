@@ -14,6 +14,14 @@ import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import com.labteto.dshmobile.local.session.LocalSessionFilesRuntime
 import java.io.File
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.Dispatchers
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -154,30 +162,44 @@ class LocalWorkRuntime @Inject internal constructor(
     internal fun requirementEvidenceChangesForUi(sessionId: String): kotlinx.coroutines.flow.StateFlow<Long> =
         eventLogs.get(sessionId).changes
 
-    override fun requirementEvidenceForUi(sessionId: String): List<LocalRequirementEvidenceLink> {
+    /** Exact file edits are surfaced by Android's event notifier, never a display timer. */
+    internal fun requirementEvidenceFileChangesForUi(sessionId: String): kotlinx.coroutines.flow.Flow<Unit> =
+        channelFlow {
+            // Re-arm file-inode watches after external rename/create, in addition to
+            // re-arming for newly linked evidence from the original EventLog.
+            val rearm = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+            merge(requirementEvidenceChangesForUi(sessionId).map { Unit }, rearm)
+                .collectLatest {
+                    watchLocalWorkEvidenceFiles(
+                        File(sessionFiles.workspace.path),
+                        requirementEvidenceIndexForUi(sessionId).links,
+                    ).collect {
+                        send(Unit)
+                        rearm.tryEmit(Unit)
+                    }
+                }
+        }.flowOn(Dispatchers.IO)
+
+    /** Exactly one authoritative projection for links and manual conclusions. */
+    internal fun requirementEvidenceIndexForUi(sessionId: String): IndexedRequirementEvidence {
         val snapshot = runtimeStateStore.state.value
         if (sessionId != runtimeStateStore.currentSessionId ||
-            snapshot.sessionId != sessionId || snapshot.usageMode != LocalUsageMode.WORK
-        ) return emptyList()
-        return checkRequirementEvidenceVersions(
-            File(sessionFiles.workspace.path),
-            eventLogs.get(sessionId).withEvents {
-                projectRequirementEvidenceLinks(it, snapshot.work.todos, snapshot.work.goal?.id)
-            },
+            snapshot.sessionId != sessionId || snapshot.usageMode != LocalUsageMode.WORK)
+            return IndexedRequirementEvidence(emptyList(), emptyList(), 0)
+        val indexed = indexedRequirementEvidence(
+            eventLogs.get(sessionId), snapshot.work.todos, snapshot.work.goal?.id,
         )
+        return indexed.copy(links = checkRequirementEvidenceVersions(
+            File(sessionFiles.workspace.path), indexed.links,
+        ))
     }
 
+    override fun requirementEvidenceForUi(sessionId: String): List<LocalRequirementEvidenceLink> =
+        requirementEvidenceIndexForUi(sessionId).links
+
     /** Manual review is a separate, user-owned event and never a Work completion claim. */
-    internal fun requirementEvidenceReviewsForUi(sessionId: String): List<LocalRequirementEvidenceReview> {
-        val snapshot = runtimeStateStore.state.value
-        val goalId = snapshot.work.goal?.id ?: return emptyList()
-        if (sessionId != runtimeStateStore.currentSessionId || snapshot.sessionId != sessionId ||
-            snapshot.usageMode != LocalUsageMode.WORK) return emptyList()
-        val links = requirementEvidenceForUi(sessionId)
-        return eventLogs.get(sessionId).withEvents {
-            projectRequirementEvidenceReviews(it, links, goalId)
-        }
-    }
+    internal fun requirementEvidenceReviewsForUi(sessionId: String): List<LocalRequirementEvidenceReview> =
+        requirementEvidenceIndexForUi(sessionId).reviews
 
     internal fun prepareRequirementEvidenceReviewForUi(
         sessionId: String, goalId: String, requirementIndex: Int, expectedRequirement: String,

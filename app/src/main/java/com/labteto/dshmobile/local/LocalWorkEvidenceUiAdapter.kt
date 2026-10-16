@@ -36,8 +36,11 @@ class LocalWorkEvidenceUiAdapter @Inject internal constructor(
             Triple(state.uiBindingIdentity(snapshot), snapshot.work.goal?.id,
                 snapshot.work.todos.map { it.content to it.status })
         }.distinctUntilChanged()
-        return kotlinx.coroutines.flow.combine(workBinding,
-            work.requirementEvidenceChangesForUi(identity.sessionId)) { _, _ -> Unit }
+        return kotlinx.coroutines.flow.merge(
+            workBinding.map { Unit },
+            work.requirementEvidenceChangesForUi(identity.sessionId).map { Unit },
+            work.requirementEvidenceFileChangesForUi(identity.sessionId),
+        )
     }
 
     override suspend fun read(identity: UiSessionIdentity): UiWorkEvidenceReadReceipt = withContext(Dispatchers.IO) {
@@ -49,8 +52,9 @@ class LocalWorkEvidenceUiAdapter @Inject internal constructor(
                 } to state.state.value.work.goal?.id
             }
             val artifacts = work.artifactsForUi(identity.sessionId)
-            val references = work.requirementEvidenceForUi(identity.sessionId)
-            val reviews = work.requirementEvidenceReviewsForUi(identity.sessionId)
+            val evidence = work.requirementEvidenceIndexForUi(identity.sessionId)
+            val references = evidence.links
+            val reviews = evidence.reviews
             currentCoroutineContext().ensureActive()
             synchronized(state.foregroundRunHandle.lock) {
                 if (!current(identity) || state.state.value.work.goal?.id != goalId ||
