@@ -269,6 +269,11 @@ fun V6ToolsManagementScene(
                     Text(server.id + " · " + server.transport)
                     Text("登记：" + server.registration.name +
                         " · 连接：" + server.connection.name)
+                    Text("Composer 选用：" + when (server.selection) {
+                        UiToolSelection.SELECTED -> "已选用（仍需逐次授权）"
+                        UiToolSelection.NOT_SELECTED -> "未选用"
+                        UiToolSelection.UNKNOWN -> "当前不可确认"
+                    })
                     Text("每次工具调用均须独立授权：" + server.authorization.name)
                     Text("声明工具：" + server.tools.joinToString(", ").take(1000))
                     healthResults[server.id]?.let { health ->
