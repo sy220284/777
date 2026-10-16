@@ -71,8 +71,13 @@ internal fun decodeLocalAgentInboxPending(data: JsonObject): List<QueuedAgentInp
             val failureCode = stringValue(ref, "failure_code") ?: return null
             val index = (ref["index"] as? JsonPrimitive)?.intOrNull
                 ?.takeIf { it > 0 } ?: return null
+            val goalId = stringValue(ref, "goal_id")
+            val goalFingerprint = stringValue(ref, "goal_fingerprint")
+            // Both identity fields must be present together. Old failure continuations use neither.
+            if ((goalId == null) != (goalFingerprint == null)) return null
+            if (goalId != null && (goalId.isBlank() || goalFingerprint.isNullOrBlank())) return null
             AgentContinuationRef(sourceRunId, sequence, failureCode, index,
-                stringValue(ref, "source_message_id"))
+                stringValue(ref, "source_message_id"), goalId, goalFingerprint)
         }
         if ((kind == QueuedAgentInputKind.WORK_CONTINUATION) != (continuation != null)) return null
         decoded += QueuedAgentInput(
@@ -99,6 +104,8 @@ private fun encodeQueuedAgentInput(input: QueuedAgentInput): JsonObject = buildJ
             put("failure_code", ref.failureCode)
             put("index", ref.index)
             ref.sourceMessageId?.let { put("source_message_id", it) }
+            ref.goalId?.let { put("goal_id", it) }
+            ref.goalFingerprint?.let { put("goal_fingerprint", it) }
         })
     }
     input.modelMessage?.let { put("model_message", it) }
