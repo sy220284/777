@@ -4,7 +4,9 @@ import com.labteto.dshmobile.local.agent.DEFAULT_AGENT_CONTINUATION_POLICY
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import java.io.File
+import java.security.MessageDigest
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.json.Json
 
 /**
  * Work-owned, bounded follow-through after a real tool-progress turn. No new goal ledger.
@@ -45,6 +47,36 @@ internal fun canAutomaticallyFollowUpWorkGoal(
         conditions.steeringUnchanged &&
         conditions.completedContinuations < DEFAULT_AGENT_CONTINUATION_POLICY.maxContinuations
 }
+
+/** Content-addressed identity for a Work goal including its acceptance contract. */
+internal fun localWorkGoalFingerprint(goal: LocalGoal): String {
+    val content = Json.encodeToString(LocalGoal.serializer(), goal)
+    return MessageDigest.getInstance("SHA-256")
+        .digest(content.toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it) }
+}
+
+/** Re-check after durable inbox replay and before any model/tool action can start. */
+internal fun isCurrentWorkGoalContinuation(
+    continuation: com.labteto.dshmobile.harness.agent.AgentContinuationRef?,
+    work: LocalWorkState,
+): Boolean {
+    if (continuation?.failureCode != WORK_GOAL_PROGRESS_CONTINUATION) return true
+    val goal = work.goal ?: return false
+    return !work.planMode && goal.status == "active" &&
+        continuation.goalId?.isNotBlank() == true &&
+        continuation.goalId == goal.id &&
+        continuation.goalFingerprint?.isNotBlank() == true &&
+        continuation.goalFingerprint == localWorkGoalFingerprint(goal) &&
+        work.pendingApproval == null && work.pendingQuestion == null &&
+        !work.team.rebuilding && work.team.failure.isNullOrBlank() &&
+        work.team.activeMemberCountForContinuation() == 0
+}
+
+private fun LocalAgentTeamUiState.activeMemberCountForContinuation(): Int =
+    members.count { it.phase == "provisioning" || it.activity in setOf("running", "stopping") } +
+        pendingMessageCount + members.sumOf { it.pendingMessageCount } +
+        members.count { it.awaitingReview }
 
 internal const val WORK_GOAL_PROGRESS_CONTINUATION = "WORK_GOAL_PROGRESS"
 
@@ -98,6 +130,8 @@ internal fun queueWorkGoalProgressFollowUp(
         index = binding.automaticContinuationCount + 1,
         sourceMessageId = sourceMessageId,
         prompt = INTERNAL_WORK_GOAL_PROGRESS_PROMPT,
+        goalId = requireNotNull(goal).id,
+        goalFingerprint = localWorkGoalFingerprint(goal),
     )
     val input = resume.toQueueInput()
     val accepted = binding.runHandle.pendingInputs.offerIfEmpty(input) {
