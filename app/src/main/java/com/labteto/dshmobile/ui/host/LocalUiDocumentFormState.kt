@@ -47,6 +47,7 @@ internal class LocalUiDocumentFormState(
     override val values = mutableValues.asStateFlow()
 
     init {
+        var scrubLegacySecrets = false
         if (saved.firstOrNull() == FORMAT_V2) {
             saved.asSequence().drop(1)
                 .take(MAX_RETAINED_DOCUMENTS * MAX_FIELDS_PER_DOCUMENT * 5)
@@ -54,7 +55,8 @@ internal class LocalUiDocumentFormState(
                 val revision = entry[2].toLongOrNull() ?: return@forEach
                 if (revision < 0 || entry[0].isBlank() || entry[1].isBlank() || entry[3].isBlank()) return@forEach
                 val key = UiDocumentFormKey(entry[0], entry[1], revision)
-                if (!sensitiveField(entry[3])) putWithinBudget(key, entry[3], entry[4])
+                if (sensitiveField(entry[3])) scrubLegacySecrets = true
+                else putWithinBudget(key, entry[3], entry[4])
             }
         } else {
             saved.asSequence()
@@ -62,10 +64,15 @@ internal class LocalUiDocumentFormState(
                 .chunked(4).filter { it.size == 4 }.forEach { entry ->
                 if (entry[0].isBlank() || entry[1].isBlank() || entry[2].isBlank()) return@forEach
                 val key = UiDocumentFormKey(entry[0], entry[1])
-                if (!sensitiveField(entry[2])) putWithinBudget(key, entry[2], entry[3])
+                if (sensitiveField(entry[2])) scrubLegacySecrets = true
+                else putWithinBudget(key, entry[2], entry[3])
             }
         }
         mutableValues.value = fields.toMap()
+        // Rewrite legacy snapshots as soon as secrets are detected. Simply omitting
+        // them from the in-memory projection would leave old plaintext in the Host
+        // saved-state backing collection until a later user edit.
+        if (scrubLegacySecrets) publish()
     }
 
     /**
