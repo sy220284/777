@@ -8,6 +8,8 @@ import com.labteto.dshmobile.local.session.LocalUiDocumentSessionStore
 import com.labteto.dshmobile.uicontract.UiSceneId
 import com.labteto.dshmobile.uicontract.UiSessionIdentity
 import com.labteto.dshmobile.uicontract.UiDocumentUiPort
+import com.labteto.dshmobile.uicontract.DeleteUiDocumentCommand
+import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.UiDocumentsSceneSnapshot
 import com.labteto.dshmobile.uicontract.ConversationDraftUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentSnapshot
@@ -230,19 +232,53 @@ internal class LocalUiDocumentUiAdapter(
             catch (failure: Exception) { UiDocumentReceipt.Failed(failure.message) }
         }
 
-    override fun submit(identity: UiSessionIdentity, request: UiDocumentActionRequest): UiDocumentReceipt {
-        return synchronized(state.foregroundRunHandle.lock) {
-            if (conversations.identitySnapshot() != identity) return UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
-            val workMode = state.state.value.usageMode == LocalUsageMode.WORK
-            // Rendering is asynchronous. Admission must read the current Session definition,
-            // including message removal and same-card revision replacement.
-            val current = state.state.value
-            val authoritative = try {
-                store.read(identity.sessionId, current.messages.map { it.id }.toSet(), generation.budget, knownScenes)
-                    .firstOrNull { it.document.documentId == request.documentId }
+    /** Explicit user deletion, not a model-generated action; the EventLog owns the tombstone. */
+    override suspend fun delete(command: DeleteUiDocumentCommand): UiDocumentReceipt =
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
+            val eligible = synchronized(state.foregroundRunHandle.lock) {
+                val current = state.state.value
+                !state.sessionTransitioning &&
+                    state.uiBindingIdentity(current) == command.identity &&
+                    command.source.sessionId == command.identity.sessionId &&
+                    (current.usageMode == LocalUsageMode.WORK) == command.source.workMode &&
+                    current.messages.any { it.id == command.source.messageId }
+            }
+            if (!eligible) return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+            try {
+                val record = store.latestDocument(command.source.sessionId, command.source.messageId,
+                    command.documentId, generation.budget, knownScenes)
+                    ?: return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                if (record.recoveryNotice != null || record.document.revision != command.revision ||
+                    record.document.source != command.source)
+                    return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                if (store.delete(record.document, generation.budget, knownScenes))
+                    UiDocumentReceipt.Deleted
+                else UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { return UiDocumentReceipt.Failed(failure.message) }
-                ?: return UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+            catch (failure: Exception) { UiDocumentReceipt.Failed(failure.message) }
+        }
+
+    override fun submit(identity: UiSessionIdentity, request: UiDocumentActionRequest): UiDocumentReceipt {
+        if (request.source.sessionId != identity.sessionId || request.source.messageId.isBlank() ||
+            request.documentId.isBlank() || request.documentId.length > 200)
+            return UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+        // The Session EventLog may need disk IO. Do not hold the foreground run
+        // handle lock during the indexed exact-card lookup.
+        val authoritative = try {
+            store.latestDocument(identity.sessionId, request.source.messageId,
+                request.documentId, generation.budget, knownScenes)
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) { return UiDocumentReceipt.Failed(failure.message) }
+            ?: return UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+        return synchronized(state.foregroundRunHandle.lock) {
+            if (conversations.identitySnapshot() != identity || state.sessionTransitioning)
+                return UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+            val current = state.state.value
+            val workMode = current.usageMode == LocalUsageMode.WORK
+            // Retain the old active-transcript fence and recheck identity AFTER
+            // the IO: expired or historical cards cannot dispatch privileged actions.
+            if (current.messages.none { it.id == request.source.messageId })
+                return UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
             if (authoritative.recoveryNotice != null) return UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
             val record = authoritative.document
             if (record.revision != request.revision || record.source != request.source || !sourceMatches(record.source, identity, workMode))

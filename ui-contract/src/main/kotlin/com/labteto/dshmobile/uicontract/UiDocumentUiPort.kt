@@ -28,9 +28,19 @@ data class GenerateUiDocumentCommand(
     val acknowledgedAdditionalModelRequest: Boolean,
 )
 
+/** Closed user intent; documents themselves cannot embed or invoke deletion. */
+data class DeleteUiDocumentCommand(
+    val identity: UiSessionIdentity,
+    val documentId: String,
+    val revision: Long,
+    val source: UiDocumentSource,
+)
+
 sealed interface UiDocumentReceipt {
     data object AdditionalRequestConsentRequired : UiDocumentReceipt
     data class Published(val documentId: String) : UiDocumentReceipt
+    /** An Owner-persisted deletion event, not merely permission to attempt deletion. */
+    data object Deleted : UiDocumentReceipt
     /** The user must confirm the prepared text with the normal composer Send action. */
     data object DraftPrepared : UiDocumentReceipt
     data object NavigationRequested : UiDocumentReceipt
@@ -46,5 +56,6 @@ interface UiDocumentUiPort {
     fun snapshot(): UiDocumentsSceneSnapshot
     suspend fun generateLocal(command: GenerateLocalUiDocumentCommand): UiDocumentReceipt
     suspend fun generate(command: GenerateUiDocumentCommand): UiDocumentReceipt
+    suspend fun delete(command: DeleteUiDocumentCommand): UiDocumentReceipt
     fun submit(identity: UiSessionIdentity, request: UiDocumentActionRequest): UiDocumentReceipt
 }

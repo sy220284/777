@@ -22,6 +22,7 @@ import kotlinx.serialization.json.long
 import kotlinx.serialization.json.boolean
 
 internal const val UI_DOCUMENT_EVENT = "ui.document.published"
+internal const val UI_DOCUMENT_DELETED_EVENT = "ui.document.deleted"
 internal data class LocalUiDocumentRecord(val document: UiDocument, val provenance: UiDocumentProvenance,
     val recoveryNotice: String? = null)
 
@@ -33,7 +34,14 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
     // One active, already bounded transcript query. No history-sized cache or second definition store.
     private data class ReadKey(val instance: String, val reset: Long, val revision: Long,
         val sessionId: String, val messageIds: Set<String>, val budget: UiDocumentBudget, val scenes: Set<UiSceneId>)
-    private data class ReadCache(val key: ReadKey, val records: List<LocalUiDocumentRecord>)
+    // Only the current visible message set is indexed. No parallel persisted document store.
+    // The projection is reconstructed from the Session EventLog, then advanced by sequence.
+    private data class ReadCache(
+        val key: ReadKey,
+        val throughSequence: Long,
+        val latestByDocument: Map<Pair<String, String>, LocalSessionEventLog.Event>,
+        val records: List<LocalUiDocumentRecord>,
+    )
     @Volatile private var lastRead: ReadCache? = null
     private val mutableRevision = MutableStateFlow(0L)
     val revision = mutableRevision.asStateFlow()
@@ -43,8 +51,13 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
     fun publish(document: UiDocument, provenance: UiDocumentProvenance, pendingApprovalId: String?,
         expected: UiDocument?, budget: UiDocumentBudget, knownScenes: Set<UiSceneId>): Boolean {
         val source = document.source
-        val occupied = latestDocument(source.sessionId, source.messageId,
-            document.documentId, budget, knownScenes)
+        // An explicit user tombstone is final for this ID. A delayed Work tool
+        // callback must not resurrect a card that the user already deleted.
+        val latest = latestDocumentEvent(source.sessionId, source.messageId, document.documentId)
+        if (latest?.type == UI_DOCUMENT_DELETED_EVENT) return false
+        val occupied = latest?.let {
+            decodeEvent(it, source.sessionId, setOf(source.messageId), budget, knownScenes)
+        }
         if (occupied?.recoveryNotice != null || occupied?.document?.source?.let { it != source } == true)
             return false
         val current = occupied?.document
@@ -76,46 +89,109 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
         knownScenes: Set<UiSceneId>): List<LocalUiDocumentRecord> {
         if (messageIds.isEmpty()) return emptyList()
         val log = logs.get(sessionId)
-        val key = ReadKey(log.historyInstanceIdentity, log.resetGeneration, mutableRevision.value,
+        val revision = mutableRevision.value
+        val key = ReadKey(log.historyInstanceIdentity, log.resetGeneration, revision,
             sessionId, messageIds.toSet(), budget, knownScenes.toSet())
-        lastRead?.takeIf { it.key == key }?.let { return it.records }
-        // A user design, media summary and Work progress may share the same message.
-        // Stream durable facts without creating a second persisted document authority.
-        val found = log.withEvents { stream ->
-            val newest = LinkedHashMap<Pair<String, String>, LocalSessionEventLog.Event>()
-            stream.forEach { event ->
-                if (event.type != UI_DOCUMENT_EVENT) return@forEach
-                val anchor = runCatching {
-                    event.data["source"]?.jsonObject?.get("messageId")?.jsonPrimitive?.content
-                }.getOrNull() ?: return@forEach
-                if (anchor !in messageIds) return@forEach
-                val documentId = runCatching {
-                    event.data["definition"]?.jsonObject?.get("documentId")?.jsonPrimitive?.content
-                }.getOrNull() ?: "malformed:${event.sequence}"
-                newest[anchor to documentId] = event
+        lastRead?.takeIf { it.key == key && it.throughSequence == log.latestSequence() }
+            ?.let { return it.records }
+
+        // Pin the durable sequence before opening any snapshot. An append racing this
+        // projection is re-read on the next revision instead of being silently skipped.
+        val checkpoint = log.latestSequence()
+        val candidate = lastRead?.takeIf { old ->
+            old.key.copy(revision = revision) == key && old.throughSequence <= checkpoint
+        }
+        fun indexKey(event: LocalSessionEventLog.Event): Pair<String, String>? {
+            if (event.type != UI_DOCUMENT_EVENT && event.type != UI_DOCUMENT_DELETED_EVENT) return null
+            val anchor = runCatching {
+                event.data["source"]?.jsonObject?.get("messageId")?.jsonPrimitive?.content
+            }.getOrNull()?.takeIf { it in messageIds } ?: return null
+            val documentId = runCatching {
+                if (event.type == UI_DOCUMENT_DELETED_EVENT)
+                    event.data["documentId"]?.jsonPrimitive?.content
+                else event.data["definition"]?.jsonObject?.get("documentId")?.jsonPrimitive?.content
+            }.getOrNull() ?: "malformed:${event.sequence}"
+            return anchor to documentId
+        }
+        val indexed: Map<Pair<String, String>, LocalSessionEventLog.Event> =
+            if (candidate != null) {
+                // A single visible window normally survives hundreds of Work tool events.
+                // Catch up from the last observed EventLog cursor, not from the first event.
+                val next = LinkedHashMap(candidate.latestByDocument)
+                var cursor = candidate.throughSequence
+                var continuity = true
+                while (cursor < checkpoint) {
+                    val page = log.pageAfter(cursor, limit = 128)
+                    if (page.isEmpty() || page.last().sequence <= cursor) {
+                        continuity = false
+                        break
+                    }
+                    page.forEach { event -> indexKey(event)?.let { next[it] = event } }
+                    cursor = page.last().sequence
+                }
+                if (continuity) next else log.withEvents { stream ->
+                    val rebuild = LinkedHashMap<Pair<String, String>, LocalSessionEventLog.Event>()
+                    stream.forEach { event -> indexKey(event)?.let { rebuild[it] = event } }
+                    rebuild
+                }
+            } else log.withEvents { stream ->
+                // An uncached/after-restart read is exact, including historical revisions.
+                // Only the latest event for each visible (message, document) is retained.
+                val rebuild = LinkedHashMap<Pair<String, String>, LocalSessionEventLog.Event>()
+                stream.forEach { event -> indexKey(event)?.let { rebuild[it] = event } }
+                rebuild
             }
-            newest.values.sortedBy { it.sequence }
-        }
-        val records = found.mapNotNull { event ->
-            decodeEvent(event, sessionId, messageIds, budget, knownScenes)
-        }
-        if (!log.isClosed && log.resetGeneration == key.reset && mutableRevision.value == key.revision) {
-            lastRead = ReadCache(key, records)
+
+        val records = indexed.values.asSequence()
+            .filter { it.type == UI_DOCUMENT_EVENT }
+            .sortedBy { it.sequence }
+            .mapNotNull { event -> decodeEvent(event, sessionId, messageIds, budget, knownScenes) }
+            .toList()
+        if (!log.isClosed && log.resetGeneration == key.reset && mutableRevision.value == revision) {
+            lastRead = ReadCache(key, checkpoint, indexed, records)
         }
         return records
     }
-    /** Indexed CAS lookup for one document, avoiding full Session history scans on every tool. */
+    /** Explicit user deletion is a versioned event in the same Session authority. */
+    @Synchronized
+    fun delete(document: UiDocument, budget: UiDocumentBudget,
+        knownScenes: Set<UiSceneId>): Boolean {
+        val source = document.source
+        val current = latestDocument(source.sessionId, source.messageId,
+            document.documentId, budget, knownScenes)
+            ?.takeIf { it.recoveryNotice == null }?.document ?: return false
+        if (current != document) return false
+        logs.get(source.sessionId).append(UI_DOCUMENT_DELETED_EVENT, buildJsonObject {
+            put("source", buildJsonObject {
+                put("sessionId", source.sessionId)
+                put("messageId", source.messageId)
+                put("contextGeneration", source.contextGeneration)
+            })
+            put("documentId", document.documentId)
+            put("deletedRevision", document.revision)
+        })
+        mutableRevision.update { it + 1L }
+        return true
+    }
+
+    private fun latestDocumentEvent(sessionId: String, messageId: String,
+        documentId: String): LocalSessionEventLog.Event? =
+        logs.get(sessionId).latestMatching(setOf(UI_DOCUMENT_EVENT, UI_DOCUMENT_DELETED_EVENT)) { data ->
+            runCatching {
+                data["source"]?.jsonObject?.get("messageId")?.jsonPrimitive?.content == messageId &&
+                    (data["documentId"]?.jsonPrimitive?.content
+                        ?: data["definition"]?.jsonObject?.get("documentId")?.jsonPrimitive?.content) == documentId
+            }.getOrDefault(false)
+        }
+
+    /** Indexed CAS lookup for one document, honoring durable user tombstones. */
     fun latestDocument(
         sessionId: String, messageId: String, documentId: String,
         budget: UiDocumentBudget, knownScenes: Set<UiSceneId>,
     ): LocalUiDocumentRecord? {
         if (sessionId.isBlank() || messageId.isBlank() || documentId.isBlank()) return null
-        val event = logs.get(sessionId).latestMatching(setOf(UI_DOCUMENT_EVENT)) { data ->
-            runCatching {
-                data["source"]?.jsonObject?.get("messageId")?.jsonPrimitive?.content == messageId &&
-                    data["definition"]?.jsonObject?.get("documentId")?.jsonPrimitive?.content == documentId
-            }.getOrDefault(false)
-        } ?: return null
+        val event = latestDocumentEvent(sessionId, messageId, documentId) ?: return null
+        if (event.type == UI_DOCUMENT_DELETED_EVENT) return null
         return decodeEvent(event, sessionId, setOf(messageId), budget, knownScenes)
     }
 
@@ -125,7 +201,7 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
     ): LocalUiDocumentRecord? {
             val anchorId = runCatching { event.data["source"]?.jsonObject?.get("messageId")?.jsonPrimitive?.content }
                 .getOrNull()?.takeIf { it in messageIds } ?: return null
-            try {
+            return try {
                 val value = event.data
                 val anchor = value.getValue("source").jsonObject
                 val source = UiDocumentSource(anchor.getValue("sessionId").jsonPrimitive.content,

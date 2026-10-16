@@ -41,4 +41,19 @@ class LocalUiDocumentFormStateTest {
         assertEquals("safe", forms.values.value[UiDocumentFormKey("real", "doc", 2)]?.get("reply"))
         assertTrue(UiDocumentFormKey("s", "d", 0) !in forms.values.value)
     }
+    @Test fun deletedDocumentDraftsCannotReturnFromSavedState() {
+        var saved = arrayListOf<String>()
+        val forms = LocalUiDocumentFormState(emptyList()) { saved = it }
+        val deleted = UiDocumentFormKey("session", "private-document", 3)
+        val other = UiDocumentFormKey("session", "other-document", 1)
+        forms.update(deleted, "secret", "sensitive draft")
+        forms.update(other, "ordinary", "keep")
+        forms.forgetDocument(deleted)
+        assertFalse(forms.values.value.containsKey(deleted))
+        assertEquals("keep", forms.values.value[other]?.get("ordinary"))
+        val restored = LocalUiDocumentFormState(saved) {}
+        assertFalse(restored.values.value.containsKey(deleted))
+        assertEquals("keep", restored.values.value[other]?.get("ordinary"))
+    }
+
 }

@@ -184,15 +184,30 @@ private fun LocalDocumentMediaExport(media: MediaUiPort, node: UiDocumentNode.Me
                         media.exportToSessionAsset(node.assetId, sessionId, stream)
                     } ?: MediaUiReceipt.Failed(failed)
                 }
-                result = when (receipt) {
-                    MediaUiReceipt.Applied -> exported
-                    is MediaUiReceipt.Failed -> receipt.message?.takeIf(String::isNotBlank) ?: failed
-                    else -> failed
+                if (receipt == MediaUiReceipt.Applied) result = exported
+                else {
+                    // SAF CreateDocument creates a new target. Never leave a partial
+                    // export silently presented as a saved file.
+                    val discarded = withContext(Dispatchers.IO) {
+                        runCatching { context.contentResolver.delete(uri, null, null) > 0 }
+                            .getOrDefault(false)
+                    }
+                    val reason = (receipt as? MediaUiReceipt.Failed)?.message
+                        ?.takeIf(String::isNotBlank) ?: failed
+                    result = reason + if (discarded) "（已移除未完成文件）"
+                        else "（目标文件可能不完整，请检查并删除）"
                 }
             } catch (cancelledException: CancellationException) {
+                withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
+                    runCatching { context.contentResolver.delete(uri, null, null) }
+                }
                 throw cancelledException
             } catch (failure: Exception) {
-                result = failure.message?.takeIf(String::isNotBlank) ?: failed
+                val discarded = withContext(Dispatchers.IO) {
+                    runCatching { context.contentResolver.delete(uri, null, null) > 0 }.getOrDefault(false)
+                }
+                result = (failure.message?.takeIf(String::isNotBlank) ?: failed) +
+                    if (discarded) "（已移除未完成文件）" else "（目标文件可能不完整，请手动清理）"
             }
         }
     }

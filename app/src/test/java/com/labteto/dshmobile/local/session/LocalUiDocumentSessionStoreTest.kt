@@ -94,4 +94,46 @@ class LocalUiDocumentSessionStoreTest {
         } finally { directory.deleteRecursively() }
     }
 
+    @Test fun deletingOneCardLeavesOtherCardsAndCannotBeResurrectedByLateWorkEvents() {
+        val directory = Files.createTempDirectory("ui-doc-tombstone").toFile()
+        try {
+            val registry = LocalSessionEventLogRegistry(directory, Json)
+            val store = LocalUiDocumentSessionStore(registry)
+            val designed = document("same")
+            val progress = designed.copy(documentId = "work-live:same", actions = emptyList())
+            assertTrue(store.publish(designed, provenance, null, null, budget, emptySet()))
+            assertTrue(store.publish(progress, provenance, null, null, budget, emptySet()))
+            assertEquals(2, store.read("session", setOf("same"), budget, emptySet()).size)
+            assertTrue(store.delete(progress, budget, emptySet()))
+            assertFalse(store.delete(progress, budget, emptySet()))
+            assertFalse(store.publish(progress, provenance, null, null, budget, emptySet()))
+            assertFalse(store.publish(progress.copy(revision = 1), provenance, null,
+                progress, budget, emptySet()))
+            assertEquals(designed, store.read("session", setOf("same"), budget,
+                emptySet()).single().document)
+            assertNull(store.latestDocument("session", "same", progress.documentId,
+                budget, emptySet()))
+            assertEquals(designed, LocalUiDocumentSessionStore(registry)
+                .read("session", setOf("same"), budget, emptySet()).single().document)
+            registry.clearAndEvict(setOf("session"))
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test fun incrementalReplayReadsNewCardsWithoutDroppingExistingVisibleCards() {
+        val directory = Files.createTempDirectory("ui-doc-incremental").toFile()
+        try {
+            val registry = LocalSessionEventLogRegistry(directory, Json)
+            val store = LocalUiDocumentSessionStore(registry)
+            val one = document("one")
+            val two = document("two")
+            assertTrue(store.publish(one, provenance, null, null, budget, emptySet()))
+            assertEquals(setOf(one), store.read("session", setOf("one", "two"),
+                budget, emptySet()).map { it.document }.toSet())
+            assertTrue(store.publish(two, provenance, null, null, budget, emptySet()))
+            assertEquals(setOf(one, two), store.read("session", setOf("one", "two"),
+                budget, emptySet()).map { it.document }.toSet())
+            registry.clearAndEvict(setOf("session"))
+        } finally { directory.deleteRecursively() }
+    }
+
 }

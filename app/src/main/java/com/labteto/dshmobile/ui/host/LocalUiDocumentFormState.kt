@@ -53,6 +53,12 @@ internal class LocalUiDocumentFormState(
         publish()
     }
 
+    override fun forgetDocument(key: UiDocumentFormKey) {
+        fields.keys.filter { it.sessionId == key.sessionId && it.documentId == key.documentId }
+            .forEach(fields::remove)
+        publish()
+    }
+
     fun forgetSessions(ids: Set<String>) {
         fields.keys.filter { it.sessionId in ids }.forEach(fields::remove)
         publish()

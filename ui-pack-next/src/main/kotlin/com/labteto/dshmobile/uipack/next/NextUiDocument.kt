@@ -10,6 +10,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -53,6 +54,7 @@ import com.labteto.dshmobile.uicontract.UiExecutionPhase
 import com.labteto.dshmobile.uicontract.UiDocumentActionRequest
 import com.labteto.dshmobile.uicontract.UiDocumentUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentReceipt
+import com.labteto.dshmobile.uicontract.DeleteUiDocumentCommand
 import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.UiCommandRejection
 import com.labteto.dshmobile.uicontract.UiMessageEditOutcome
@@ -71,6 +73,10 @@ internal fun NextUiDocument(snapshot: UiDocumentSnapshot, identity: UiSessionIde
     val defaults = remember(document) { document.initialFields() }
     val values = defaults + allValues[key].orEmpty()
     var receipt by remember(document.documentId, document.revision) { mutableStateOf<UiDocumentReceipt?>(null) }
+    var confirmDeletion by remember(document.documentId, document.revision) { mutableStateOf(false) }
+    var deleting by remember(document.documentId, document.revision) { mutableStateOf(false) }
+    var deletionNotice by remember(document.documentId, document.revision) { mutableStateOf<String?>(null) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     Surface(Modifier.fillMaxWidth(), tonalElevation = 2.dp) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (snapshot.recoveryNotice != null) Text(stringResource(R.string.next_document_history_incomplete))
@@ -89,9 +95,39 @@ internal fun NextUiDocument(snapshot: UiDocumentSnapshot, identity: UiSessionIde
                             document.source, action, values))
                     } })
             }
+            if (identity != null && snapshot.recoveryNotice == null)
+                TextButton(enabled = !deleting, onClick = { confirmDeletion = true }) { Text("删除文档") }
+            deletionNotice?.let { Text(it) }
             receipt?.let { result -> NextDocumentActionFeedback(result) }
         }
     }
+    if (confirmDeletion) AlertDialog(
+        onDismissRequest = { if (!deleting) confirmDeletion = false },
+        title = { Text("确认删除文档") },
+        text = { Text("仅删除当前文档，不删除所属消息或其他文档。") },
+        confirmButton = { TextButton(enabled = !deleting, onClick = {
+            val ownerIdentity = identity ?: return@TextButton
+            confirmDeletion = false
+            deleting = true
+            scope.launch {
+                try {
+                    val response = port.delete(DeleteUiDocumentCommand(ownerIdentity, document.documentId,
+                        document.revision, document.source))
+                    deletionNotice = when (response) {
+                        UiDocumentReceipt.Deleted -> {
+                            forms.forgetDocument(key); "文档已删除"
+                        }
+                        is UiDocumentReceipt.Rejected -> "文档版本已变化：${response.reason}"
+                        is UiDocumentReceipt.Failed -> response.message ?: "删除失败"
+                        else -> "删除未完成"
+                    }
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (failure: Exception) { deletionNotice = failure.message ?: "删除失败" }
+                finally { deleting = false }
+            }
+        }) { Text("删除") } },
+        dismissButton = { TextButton(onClick = { confirmDeletion = false }) { Text("取消") } },
+    )
 }
 
 @Composable
@@ -179,6 +215,7 @@ private fun NextDocumentActionFeedback(result: UiDocumentReceipt) {
             }
         }
         is UiDocumentReceipt.Published -> stringResource(R.string.next_document_owner_receipt)
+        UiDocumentReceipt.Deleted -> "文档已删除"
         is UiDocumentReceipt.Fallback -> stringResource(R.string.next_document_unavailable)
     }
     Text(label)
@@ -307,13 +344,28 @@ private fun NextDocumentMediaSaveButton(media: MediaUiPort?, node: UiDocumentNod
                         media?.exportToSessionAsset(node.assetId, sessionId, stream)
                     } ?: MediaUiReceipt.Failed("目标位置无法写入")
                 }
-                result = when (receipt) {
-                    MediaUiReceipt.Applied -> "媒体已保存"
-                    is MediaUiReceipt.Failed -> receipt.message ?: "保存失败，目标文件可能不完整"
-                    else -> "保存尚未确认，请检查目标文件"
+                if (receipt == MediaUiReceipt.Applied) result = "媒体已保存"
+                else {
+                    val discarded = withContext(Dispatchers.IO) {
+                        runCatching { context.contentResolver.delete(uri, null, null) > 0 }
+                            .getOrDefault(false)
+                    }
+                    val reason = (receipt as? MediaUiReceipt.Failed)?.message ?: "保存未完成"
+                    result = reason + if (discarded) "（已清理目标文件）"
+                        else "（目标文件可能不完整，请手动清理）"
                 }
-            } catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { result = failure.message ?: "保存失败，目标文件可能不完整" }
+            } catch (cancelled: CancellationException) {
+                withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
+                    runCatching { context.contentResolver.delete(uri, null, null) }
+                }
+                throw cancelled
+            } catch (failure: Exception) {
+                val discarded = withContext(Dispatchers.IO) {
+                    runCatching { context.contentResolver.delete(uri, null, null) > 0 }.getOrDefault(false)
+                }
+                result = (failure.message ?: "保存失败") +
+                    if (discarded) "（已清理目标文件）" else "（目标文件可能不完整，请手动清理）"
+            }
         }
     }
     TextButton(onClick = { launcher.launch("media-${node.assetId.take(24)}.$extension") }) {

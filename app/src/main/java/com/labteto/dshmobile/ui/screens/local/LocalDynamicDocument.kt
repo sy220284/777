@@ -5,10 +5,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -26,6 +29,9 @@ import com.labteto.dshmobile.uicontract.UiExecutionPhase
 import com.labteto.dshmobile.uicontract.UiDocumentActionRequest
 import com.labteto.dshmobile.uicontract.UiDocumentUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentReceipt
+import com.labteto.dshmobile.uicontract.DeleteUiDocumentCommand
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import com.labteto.dshmobile.uicontract.UiSessionIdentity
 import com.labteto.dshmobile.uicontract.initialFields
 import com.labteto.dshmobile.ui.shenyan.SyButton
@@ -45,6 +51,10 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
     val defaults = remember(document) { document.initialFields() }
     val values = defaults + allValues[key].orEmpty()
     var receipt by remember(document.documentId, document.revision) { mutableStateOf<UiDocumentReceipt?>(null) }
+    var confirmDeletion by remember(document.documentId, document.revision) { mutableStateOf(false) }
+    var deleting by remember(document.documentId, document.revision) { mutableStateOf(false) }
+    var deletionNotice by remember(document.documentId, document.revision) { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     SyGlassCard(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
         if (snapshot.recoveryNotice != null) Text(stringResource(R.string.ui_document_history_incomplete))
         Text(document.title, Modifier.semantics { heading() })
@@ -62,6 +72,10 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
                         document.source, action, values))
                 } })
         }
+        if (identity != null && snapshot.recoveryNotice == null)
+            SyButton(text = "删除文档", onClick = { confirmDeletion = true },
+                enabled = !deleting, variant = SyButtonVariant.Ghost)
+        deletionNotice?.let { Text(it) }
         receipt?.let { result ->
             if (result is UiDocumentReceipt.InvalidFields) {
                 Text(stringResource(R.string.ui_document_invalid_fields, result.fieldIds.joinToString()))
@@ -75,6 +89,33 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
             }
         }
     }
+    if (confirmDeletion) AlertDialog(
+        onDismissRequest = { if (!deleting) confirmDeletion = false },
+        title = { Text("确认删除文档") },
+        text = { Text("仅删除这条消息下的当前文档，不删除消息或其他成果。") },
+        confirmButton = { TextButton(enabled = !deleting, onClick = {
+            val ownerIdentity = identity ?: return@TextButton
+            confirmDeletion = false
+            deleting = true
+            scope.launch {
+                try {
+                    val result = port.delete(DeleteUiDocumentCommand(ownerIdentity, document.documentId,
+                        document.revision, document.source))
+                    deletionNotice = when (result) {
+                        UiDocumentReceipt.Deleted -> {
+                            forms.forgetDocument(key); "已删除文档"
+                        }
+                        is UiDocumentReceipt.Rejected -> "文档版本已变化：${result.reason}"
+                        is UiDocumentReceipt.Failed -> result.message ?: "删除失败"
+                        else -> "删除未完成"
+                    }
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (failure: Exception) { deletionNotice = failure.message ?: "删除失败" }
+                finally { deleting = false }
+            }
+        }) { Text("删除") } },
+        dismissButton = { TextButton(onClick = { confirmDeletion = false }) { Text("取消") } },
+    )
 }
 
 @Composable

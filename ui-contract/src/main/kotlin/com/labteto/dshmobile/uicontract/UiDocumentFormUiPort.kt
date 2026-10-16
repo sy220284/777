@@ -9,6 +9,8 @@ data class UiDocumentFormKey(val sessionId: String, val documentId: String, val 
 interface UiDocumentFormUiPort {
     val values: StateFlow<Map<UiDocumentFormKey, Map<String, String>>>
     fun update(key: UiDocumentFormKey, fieldId: String, value: String)
+    /** Explicit deletion clears all revision drafts for this document. */
+    fun forgetDocument(key: UiDocumentFormKey)
 }
 
 /** Local form defaults are user data. They never enter model/system context automatically. */
