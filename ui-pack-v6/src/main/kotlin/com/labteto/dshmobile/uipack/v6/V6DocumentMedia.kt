@@ -66,7 +66,7 @@ internal fun V6DocumentMediaNode(node: UiDocumentNode.Media, sessionId: String, 
         if (path == null || media == null) {
             Text("此会话的媒体文件尚未保存在设备上，或当前访问未获授权。")
         } else {
-            V6MediaExport(node, sessionId, media)
+            V6MediaExport(node, sessionId, media, path)
             when (node.kind) {
                 UiDocumentMediaKind.IMAGE -> {
                     val bitmap by produceState<ImageBitmap?>(null, path) {
@@ -96,7 +96,8 @@ internal fun V6DocumentMediaNode(node: UiDocumentNode.Media, sessionId: String, 
 
 /** Export is a user-granted SAF write; the owner rechecks the asset and session before copying. */
 @Composable
-private fun V6MediaExport(node: UiDocumentNode.Media, sessionId: String, media: MediaUiPort) {
+private fun V6MediaExport(node: UiDocumentNode.Media, sessionId: String, media: MediaUiPort,
+    localPath: String) {
     val resolver = LocalContext.current.contentResolver
     val scope = rememberCoroutineScope()
     var exporting by remember(node.assetId, sessionId) { mutableStateOf(false) }
@@ -106,16 +107,21 @@ private fun V6MediaExport(node: UiDocumentNode.Media, sessionId: String, media: 
         UiDocumentMediaKind.AUDIO -> "audio/*"
         UiDocumentMediaKind.VIDEO -> "video/*"
     }
+    // The source file may be JPEG/WEBP, WAV or MOV. Do not relabel bytes as PNG/MP3/MP4.
+    val extension = java.io.File(localPath).extension.lowercase().let { ext ->
+        val supported = when (node.kind) {
+            UiDocumentMediaKind.IMAGE -> setOf("jpg", "jpeg", "png", "webp", "gif")
+            UiDocumentMediaKind.AUDIO -> setOf("mp3", "wav", "aac", "m4a", "ogg", "opus")
+            UiDocumentMediaKind.VIDEO -> setOf("mp4", "mov", "webm", "mkv")
+        }
+        ext.takeIf { it in supported }
+    }
     val filename = when (node.kind) {
         UiDocumentMediaKind.IMAGE -> "image"
         UiDocumentMediaKind.AUDIO -> "audio"
         UiDocumentMediaKind.VIDEO -> "video"
     } + "-" + node.assetId.take(24).replace(Regex("[^a-zA-Z0-9_-]"), "_") +
-        when (node.kind) {
-            UiDocumentMediaKind.IMAGE -> ".png"
-            UiDocumentMediaKind.AUDIO -> ".mp3"
-            UiDocumentMediaKind.VIDEO -> ".mp4"
-        }
+        (extension?.let { "." + it } ?: "")
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mime)) { uri ->
         if (uri == null) result = "已取消保存"
         else {
