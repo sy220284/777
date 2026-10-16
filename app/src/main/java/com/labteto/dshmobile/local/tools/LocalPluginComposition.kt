@@ -297,6 +297,8 @@ internal class LocalPluginComposition(
      * Read-only status must remain responsive while MCP connect/reconnect holds the command lock.
      * No permission is granted, and "registered" does not imply a healthy remote endpoint.
      */
+    fun mcpLifecycleRevisions(): kotlinx.coroutines.flow.StateFlow<Long> = mcpPlugin.lifecycleRevisions
+
     suspend fun mcpServers(): List<McpServerSnapshot> =
         pluginManager.observeActivePlugin("mcp-bridge") { plugin ->
             (plugin as? McpToolBridgePlugin
