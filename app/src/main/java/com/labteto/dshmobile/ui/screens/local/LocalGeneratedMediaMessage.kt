@@ -147,6 +147,7 @@ internal fun LocalCreationJobMessageRow(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun LocalGeneratedMediaResultRow(
     result: LocalMediaResult,
