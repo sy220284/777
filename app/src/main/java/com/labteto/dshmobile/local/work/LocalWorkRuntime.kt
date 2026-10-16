@@ -122,6 +122,12 @@ class LocalWorkRuntime @Inject internal constructor(
             sourceCallId, version, log.historyInstanceIdentity, generation, snapshot.work.goal?.id)
     }
 
+    /** Must run outside the foreground lock; a stale prepared hash cannot be accepted as current. */
+    internal fun preparedEvidenceStillCurrent(prepared: LocalPreparedRequirementEvidence): Boolean =
+        preparedRequirementEvidenceVersionMatches(
+            File(sessionFiles.workspace.path), prepared.artifact.reference, prepared.version,
+        )
+
     /** Sole reference writer. Caller freezes binding; Work rechecks its own requirement/log facts. */
     internal fun commitRequirementEvidenceForUi(prepared: LocalPreparedRequirementEvidence): Boolean {
         val current = runtimeStateStore.state.value
