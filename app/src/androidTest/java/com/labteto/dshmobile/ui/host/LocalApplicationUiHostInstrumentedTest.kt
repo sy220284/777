@@ -23,7 +23,7 @@ import org.junit.Test
 
 /**
  * Real AppRoot Host rendering and SharedPreferences switching.
- * Packs are synthetic UI fixtures, not an assertion that production V6/Next have 78 renderers.
+ * Fixtures exercise Host restoration, not proof of the independent V6 pack's feature parity.
  */
 class LocalApplicationUiHostInstrumentedTest {
     @get:Rule val compose = createComposeRule()
@@ -40,7 +40,6 @@ class LocalApplicationUiHostInstrumentedTest {
 
     private fun clearHostPreferences() {
         preference.edit().remove("selected_pack")
-            .remove(localNavigationSnapshotKey("fixture-next", null))
             .remove(localNavigationSnapshotKey("fixture-v6", null)).commit()
     }
 
@@ -64,7 +63,7 @@ class LocalApplicationUiHostInstrumentedTest {
     }
 
     @Test fun externalSceneRequestNavigatesThroughFullPackAndReportsActualResult() {
-        val next = fullFixture("fixture-next", "Next full-pack home")
+        val next = fullFixture("fixture-v6", "Independent V6 home")
         preference.edit().putString("selected_pack", next.manifest.id).commit()
         val acknowledgements = mutableListOf<String>()
         compose.setContent {
@@ -83,7 +82,7 @@ class LocalApplicationUiHostInstrumentedTest {
         compose.onNodeWithText("settings.models").assertExists()
         compose.runOnIdle {
             assertEquals(listOf("settings.models"), acknowledgements)
-            val saved = preference.getString(localNavigationSnapshotKey("fixture-next", null), null)
+            val saved = preference.getString(localNavigationSnapshotKey("fixture-v6", null), null)
             assertEquals(UiSceneId("settings.models"),
                 com.labteto.dshmobile.uihost.UiSceneNavigationSnapshotCodec
                     .decodeOrNull(saved)?.stack?.last())
@@ -91,12 +90,12 @@ class LocalApplicationUiHostInstrumentedTest {
     }
 
     @Test fun coldStartRestoresOnlyValidatedPackOwnedNavigationState() {
-        val next = fullFixture("fixture-next", "Next full-pack home")
+        val next = fullFixture("fixture-v6", "Independent V6 home")
         val snapshot = com.labteto.dshmobile.uihost.UiSceneNavigationSnapshotCodec.encode(
             com.labteto.dshmobile.uihost.UiSceneNavigationState(
                 next.manifest.id, listOf(UiSceneId("route.home"), UiSceneId("settings.models"))))
         preference.edit().putString("selected_pack", next.manifest.id)
-            .putString(localNavigationSnapshotKey("fixture-next", null), snapshot).commit()
+            .putString(localNavigationSnapshotKey("fixture-v6", null), snapshot).commit()
         compose.setContent {
             MaterialTheme {
                 LocalApplicationUiHost(
@@ -105,16 +104,16 @@ class LocalApplicationUiHostInstrumentedTest {
             }
         }
         compose.onNodeWithText("settings.models").assertExists()
-        compose.onNodeWithText("Next full-pack home").assertDoesNotExist()
+        compose.onNodeWithText("Independent V6 home").assertDoesNotExist()
     }
 
     @Test fun corruptSavedPackHistoryRequiresExplicitRecovery() {
-        val next = fullFixture("fixture-next", "Next full-pack home")
+        val next = fullFixture("fixture-v6", "Independent V6 home")
         val foreign = com.labteto.dshmobile.uihost.UiSceneNavigationSnapshotCodec.encode(
             com.labteto.dshmobile.uihost.UiSceneNavigationState(
                 "old-pack", listOf(UiSceneId("route.home"))))
         preference.edit().putString("selected_pack", next.manifest.id)
-            .putString(localNavigationSnapshotKey("fixture-next", null), foreign).commit()
+            .putString(localNavigationSnapshotKey("fixture-v6", null), foreign).commit()
         compose.setContent {
             MaterialTheme {
                 LocalApplicationUiHost(
@@ -123,36 +122,30 @@ class LocalApplicationUiHostInstrumentedTest {
             }
         }
         compose.onNodeWithText(context.getString(R.string.ui_pack_incompatible)).assertExists()
-        compose.onNodeWithText("Next full-pack home").assertDoesNotExist()
+        compose.onNodeWithText("Independent V6 home").assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.ui_pack_back_to_stable)).performClick()
         compose.onNodeWithText("Explicit legacy screen").assertExists()
         compose.runOnIdle {
-            assertEquals(null, preference.getString(localNavigationSnapshotKey("fixture-next", null), null))
+            assertEquals(null, preference.getString(localNavigationSnapshotKey("fixture-v6", null), null))
         }
     }
 
-    @Test fun changingDurableSelectionActuallySwapsTwoWholeApplicationRenderers() {
-        val first = fullFixture("fixture-v6", "V6 full-pack home")
-        val second = fullFixture("fixture-next", "Next full-pack home")
+    @Test fun invalidChoiceIsRejectedWithoutChangingTheV6RecoveryRule() {
+        val v6 = fullFixture("fixture-v6", "Independent V6 home")
         compose.setContent {
             MaterialTheme {
                 LocalApplicationUiHost(
-                    installedPacks = listOf(first, second),
+                    installedPacks = listOf(v6),
                     availableCapabilities = emptySet(),
                 ) { Text("Explicit legacy screen") }
             }
         }
         compose.onNodeWithText("Explicit legacy screen").assertExists()
         compose.runOnIdle { preference.edit().putString("selected_pack", "fixture-v6").commit() }
-        compose.onNodeWithText("V6 full-pack home").assertExists()
-        compose.runOnIdle { preference.edit().putString("selected_pack", "fixture-next").commit() }
-        compose.onNodeWithText("Next full-pack home").assertExists()
-        compose.onNodeWithText("V6 full-pack home").assertDoesNotExist()
-
-        // An invalid saved ID is reported, not silently routed into V6.
+        compose.onNodeWithText("Independent V6 home").assertExists()
         compose.runOnIdle { preference.edit().putString("selected_pack", "missing-pack").commit() }
         compose.onNodeWithText(context.getString(R.string.ui_pack_incompatible)).assertExists()
-        compose.onNodeWithText("Explicit legacy screen").assertDoesNotExist()
+        compose.onNodeWithText("Independent V6 home").assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.ui_pack_back_to_stable)).performClick()
         compose.onNodeWithText("Explicit legacy screen").assertExists()
     }

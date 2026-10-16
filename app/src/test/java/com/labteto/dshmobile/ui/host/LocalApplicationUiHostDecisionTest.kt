@@ -46,8 +46,8 @@ class LocalApplicationUiHostDecisionTest {
     }
 
     @Test fun conversationSliceCannotEnterWholeApplicationHost() {
-        val slice = pack("next", setOf(UiSceneId("conversation.chat")), setOf(UiSceneId("conversation.chat")))
-        val result = decideApplicationUi("next", listOf(slice), requirements)
+        val slice = pack("v6-migrating", setOf(UiSceneId("conversation.chat")), setOf(UiSceneId("conversation.chat")))
+        val result = decideApplicationUi("v6-migrating", listOf(slice), requirements)
         assertTrue(result is LocalApplicationUiDecision.Unavailable)
         val rejection = (result as LocalApplicationUiDecision.Unavailable).rejection
         assertTrue(rejection is UiApplicationPackAdmission.Incompatible)
@@ -57,7 +57,7 @@ class LocalApplicationUiHostDecisionTest {
 
     @Test fun aManifestAdvertisingAllScenesButMissingOneRendererIsNotAdmitted() {
         val missing = renderableScenes - UiSceneId("route.settings")
-        val result = decideApplicationUi("next", listOf(pack("next", renderableScenes, missing)), requirements)
+        val result = decideApplicationUi("v6-migrating", listOf(pack("v6-migrating", renderableScenes, missing)), requirements)
         assertTrue(result is LocalApplicationUiDecision.Unavailable)
         val rejection = (result as LocalApplicationUiDecision.Unavailable).rejection
         assertTrue(rejection is UiApplicationPackAdmission.Incomplete)
@@ -66,8 +66,8 @@ class LocalApplicationUiHostDecisionTest {
     }
 
     @Test fun fullCatalogWithIndependentRenderersMayEnterProductionHost() {
-        val full = pack("next", renderableScenes, renderableScenes)
-        val result = decideApplicationUi("next", listOf(full), requirements)
+        val full = pack("v6-migrating", renderableScenes, renderableScenes)
+        val result = decideApplicationUi("v6-migrating", listOf(full), requirements)
         assertTrue(result is LocalApplicationUiDecision.Hosted)
         assertEquals(full, (result as LocalApplicationUiDecision.Hosted).admission.pack)
         assertEquals(7, renderableScenes.count { it.value.startsWith("route.") })
@@ -80,16 +80,16 @@ class LocalApplicationUiHostDecisionTest {
 
     @Test fun twoSeparateFullCatalogPacksCannotReuseEachOthersNavigationState() {
         val v6 = pack("full-v6", renderableScenes, renderableScenes)
-        val next = pack("full-next", renderableScenes, renderableScenes)
-        val packs = listOf(v6, next)
+        val candidate = pack("future-candidate", renderableScenes, renderableScenes)
+        val packs = listOf(v6, candidate)
         val first = decideApplicationUi("full-v6", packs, requirements)
-        val second = decideApplicationUi("full-next", packs, requirements)
+        val second = decideApplicationUi("future-candidate", packs, requirements)
         assertTrue(first is LocalApplicationUiDecision.Hosted)
         assertTrue(second is LocalApplicationUiDecision.Hosted)
         val firstNav = com.labteto.dshmobile.uihost.UiHostSceneNavigation(
             required, v6.manifest, UiSceneId("route.home"))
         val secondNav = com.labteto.dshmobile.uihost.UiHostSceneNavigation(
-            required, next.manifest, UiSceneId("route.home"))
+            required, candidate.manifest, UiSceneId("route.home"))
         val settings = firstNav.navigate(firstNav.initial, UiSceneId("route.settings"))
         assertTrue(settings is com.labteto.dshmobile.uihost.UiSceneNavigationResult.Changed)
         val foreign = (settings as com.labteto.dshmobile.uihost.UiSceneNavigationResult.Changed).state
@@ -133,7 +133,7 @@ class LocalApplicationUiHostDecisionTest {
     }
 
     @Test fun internalSceneRequestsUseHostWhitelistAndCanNavigateSettings() {
-        val full = pack("next", renderableScenes, renderableScenes)
+        val full = pack("v6-migrating", renderableScenes, renderableScenes)
         val navigation = com.labteto.dshmobile.uihost.UiHostSceneNavigation(
             required, full.manifest, UiSceneId("route.home"),
             deepLinks = LocalApplicationSceneDeepLinks.targets,

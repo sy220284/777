@@ -51,20 +51,20 @@ class UiApplicationPackSelectionTest {
     @Test fun selectsOnlyVerifiedSceneCoverageAndPersistsOneChoice() {
         val prefs = Preference("stable")
         val host = UiApplicationPackSelection(
-            UiApplicationPackRegistry(listOf(pack("stable"), pack("next"))), prefs, "stable")
-        val selected = host.choose("next", requirements) as UiApplicationPackSelectionResult.Selected
-        assertEquals("next", selected.admission.pack.manifest.id)
-        assertEquals("next", prefs.saved)
-        assertEquals("next", (host.restore(requirements) as UiApplicationPackSelectionResult.Selected).admission.pack.manifest.id)
+            UiApplicationPackRegistry(listOf(pack("stable"), pack("candidate"))), prefs, "stable")
+        val selected = host.choose("candidate", requirements) as UiApplicationPackSelectionResult.Selected
+        assertEquals("candidate", selected.admission.pack.manifest.id)
+        assertEquals("candidate", prefs.saved)
+        assertEquals("candidate", (host.restore(requirements) as UiApplicationPackSelectionResult.Selected).admission.pack.manifest.id)
         assertEquals(1, prefs.writes)
     }
 
     @Test fun rejectsIncompleteAndUnknownPackWithoutChangingPersistedSelection() {
         val prefs = Preference("stable")
         val host = UiApplicationPackSelection(
-            UiApplicationPackRegistry(listOf(pack("stable"), pack("next", actualRenderer = false))),
+            UiApplicationPackRegistry(listOf(pack("stable"), pack("candidate", actualRenderer = false))),
             prefs, "stable")
-        val invalid = host.choose("next", requirements) as UiApplicationPackSelectionResult.Rejected
+        val invalid = host.choose("candidate", requirements) as UiApplicationPackSelectionResult.Rejected
         assertTrue(invalid.reason is UiApplicationPackAdmission.Incomplete)
         assertEquals("stable", invalid.stableOption?.pack?.manifest?.id)
         val unknown = host.choose("uninstalled", requirements) as UiApplicationPackSelectionResult.Rejected
@@ -74,21 +74,21 @@ class UiApplicationPackSelectionTest {
     }
 
     @Test fun stalePersistedSelectionIsReportedAndNeverSilentlyRendersStablePack() {
-        val prefs = Preference("retired-next")
+        val prefs = Preference("retired-candidate")
         val host = UiApplicationPackSelection(
             UiApplicationPackRegistry(listOf(pack("stable"))), prefs, "stable")
         val result = host.restore(requirements) as UiApplicationPackSelectionResult.Rejected
-        assertEquals("retired-next", result.requestedId)
+        assertEquals("retired-candidate", result.requestedId)
         assertEquals("stable", result.stableOption?.pack?.manifest?.id)
-        assertEquals("retired-next", prefs.saved)
+        assertEquals("retired-candidate", prefs.saved)
         assertEquals(0, prefs.writes)
     }
 
     @Test fun failedDurableWriteDoesNotClaimSelectionSuccess() {
         val prefs = Preference("stable").apply { fail = true }
         val host = UiApplicationPackSelection(
-            UiApplicationPackRegistry(listOf(pack("stable"), pack("next"))), prefs, "stable")
-        assertTrue(host.choose("next", requirements) is UiApplicationPackSelectionResult.PersistenceFailed)
+            UiApplicationPackRegistry(listOf(pack("stable"), pack("candidate"))), prefs, "stable")
+        assertTrue(host.choose("candidate", requirements) is UiApplicationPackSelectionResult.PersistenceFailed)
         assertEquals("stable", prefs.saved)
         assertEquals(1, prefs.writes)
     }
