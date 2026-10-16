@@ -24,6 +24,9 @@ def errors(matrix, catalog):
         if identity in actual:
             issues.append(f"duplicate catalog scene: {identity}")
         actual[identity] = (kind, owner.strip(), host == "true")
+    # Every named Scene must point to a real, in-repository source, including
+    # hidden overlays and SYSTEM entry points. A plausible Owner string is not proof
+    # of an existing implementation file.
     documented = {}
     for scene in scenes:
         sid = scene.get("id")
@@ -50,6 +53,11 @@ def errors(matrix, catalog):
             continue
         if not scene.get("source") or not scene.get("recovery") or not scene.get("acceptance"):
             issues.append(f"missing source/recovery/acceptance: {sid}")
+        source = scene.get("source")
+        if isinstance(source, str) and source.strip():
+            source_file = (ROOT / source).resolve()
+            if not source_file.is_relative_to(ROOT) or not source_file.is_file():
+                issues.append(f"missing/out-of-repository Scene source: {sid}/{source}")
         for name, record in proof.items():
             if not isinstance(record, dict):
                 issues.append(f"invalid action evidence: {sid}/{name}")
@@ -76,6 +84,27 @@ def errors(matrix, catalog):
         issues.append("settings destination drift: required 21")
     if sum(host for _, _, host in actual.values()) != 3:
         issues.append("host-only scene drift: required 3")
+    # Current route and settings inventories are sourced from native Feature
+    # owners. Checking only counts could let a renamed/retired entry silently pass.
+    features = (ROOT / "app/src/main/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalog.kt").read_text(encoding="utf-8")
+    settings = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt").read_text(encoding="utf-8")
+    native_routes = re.search(r"internal enum class LocalFeatureRoute\\s*\\{([^}]+)\\}", features, re.S)
+    native_settings = re.search(r"enum class SettingsDestination\\s*\\{([^}]+)\\}", settings, re.S)
+    def names(match):
+        return set(re.findall(r"^\\s*([A-Z][A-Z_]+)\\s*(?:,|$)", match.group(1), re.M)) if match else set()
+    route_ids = {"route." + name.lower() for name in names(native_routes)}
+    settings_ids = {"settings." + name.lower() for name in names(native_settings)}
+    documented_routes = {sid for sid in documented if sid.startswith("route.")}
+    documented_settings = {sid for sid, scene in documented.items()
+                           if sid.startswith("settings.") and scene.get("kind") == "PAGE"}
+    if len(route_ids) != 7 or documented_routes != route_ids:
+        issues.append("native route identities differ from the Scene matrix")
+    if len(settings_ids) != 21 or documented_settings != settings_ids:
+        issues.append("native SettingsDestination identities differ from the Scene matrix")
+    for scene in scenes:
+        route = scene.get("route")
+        if route not in {name.upper() for name in names(native_routes)}:
+            issues.append(f"Scene routed to retired/unknown feature: {scene.get('id')}/{route}")
     for scene in scenes:
         for name, record in scene.get("actionProof", {}).items():
             if not isinstance(record, dict):
@@ -112,6 +141,12 @@ def main():
         tampered = copy.deepcopy(data)
         tampered["scenes"].pop()
         assert any("scene count drift" in x for x in errors(tampered, catalog))
+        tampered = copy.deepcopy(data)
+        tampered["scenes"][0]["source"] = "/invalid/outside/project.kt"
+        assert any("missing/out-of-repository Scene source" in x for x in errors(tampered, catalog))
+        tampered = copy.deepcopy(data)
+        tampered["scenes"][0]["route"] = "RUN_CENTER"
+        assert any("retired/unknown feature" in x for x in errors(tampered, catalog))
         print("UI R4 S0 scene guard self-tests OK")
         return
     issues = errors(data, catalog)
