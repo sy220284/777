@@ -332,6 +332,32 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun missingCommandExit127CarriesStderrAndConcreteRuntimeDiagnosis() = runBlocking {
+        val isolated = LocalWorkspace(root = root, shellExecutable = "/bin/sh")
+        val result = isolated.shellResult("this_777_command_does_not_exist", 5)
+        assertTrue(result.isError)
+        assertEquals(127, result.processExitCode)
+        assertEquals("PROCESS_EXIT_127", result.errorCode)
+        assertTrue(result.content.contains("标准错误："))
+        assertTrue(result.content.contains("PATH"))
+        assertTrue(result.recoveryHint.orEmpty().contains("内置运行时"))
+    }
+
+    @Test
+    fun nonExecutableFileExit126PreservesPermissionEvidence() = runBlocking {
+        val isolated = LocalWorkspace(root = root, shellExecutable = "/bin/sh")
+        val result = isolated.shellResult(
+            "printf 'echo ready\\n' > ./not_executable.sh; chmod 0644 ./not_executable.sh; ./not_executable.sh",
+            5,
+        )
+        assertTrue(result.isError)
+        assertEquals(126, result.processExitCode)
+        assertEquals("PROCESS_EXIT_126", result.errorCode)
+        assertTrue(result.content.contains("标准错误："))
+        assertTrue(result.recoveryHint.orEmpty().contains("执行权限"))
+    }
+
+    @Test
     fun backgroundShellFailureModeRejectsNonZeroExit() = runBlocking {
         val isolated = LocalWorkspace(root = root, shellExecutable = "/bin/sh")
 

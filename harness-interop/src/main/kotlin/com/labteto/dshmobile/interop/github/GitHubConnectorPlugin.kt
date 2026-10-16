@@ -12,7 +12,9 @@ import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.tools.functionToolSchema
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLPeerUnverifiedException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
@@ -245,19 +247,31 @@ class GitHubConnectorPlugin(
             val failed = response.status !in 200..299
             val failureCode = when {
                 !failed -> null
+                response.status == 400 -> "GITHUB_BAD_REQUEST"
                 response.status == 401 -> "GITHUB_AUTH_INVALID"
-                response.status == 403 && response.headers["X-RateLimit-Remaining"] == "0" -> "GITHUB_RATE_LIMITED"
+                response.status == 403 && (response.headers["X-RateLimit-Remaining"] == "0" ||
+                    response.headers["Retry-After"] != null ||
+                    response.body.contains("secondary rate limit", ignoreCase = true)) -> "GITHUB_RATE_LIMITED"
                 response.status == 403 -> "GITHUB_PERMISSION_DENIED"
                 response.status == 404 -> "GITHUB_RESOURCE_NOT_FOUND"
+                response.status == 409 -> "GITHUB_CONFLICT"
+                response.status == 412 -> "GITHUB_PRECONDITION_FAILED"
+                response.status == 415 -> "GITHUB_UNSUPPORTED_MEDIA"
+                response.status == 422 -> "GITHUB_VALIDATION_FAILED"
                 response.status == 429 -> "GITHUB_RATE_LIMITED"
                 response.status >= 500 -> "GITHUB_REMOTE_UNAVAILABLE"
-                else -> "GITHUB_HTTP_FAILED"
+                else -> "GITHUB_HTTP_${response.status}"
             }
             val hint = when (failureCode) {
                 "GITHUB_AUTH_INVALID" -> "GitHub 凭据过期或无效，请在工具页重新验证并配置。"
                 "GITHUB_PERMISSION_DENIED" -> "检查 GitHub 安装范围、仓库授权及令牌权限。"
                 "GITHUB_RATE_LIMITED" -> "GitHub 已限流，等待配额恢复后查询状态。"
                 "GITHUB_RESOURCE_NOT_FOUND" -> "核对资源路径，以及是否有该仓库的访问权限。"
+                "GITHUB_BAD_REQUEST" -> "核对 REST API 请求参数、查询字段及请求体结构。"
+                "GITHUB_VALIDATION_FAILED" -> "GitHub 拒绝了请求字段或仓库当前状态；按响应的 errors 字段逐项修改。"
+                "GITHUB_CONFLICT", "GITHUB_PRECONDITION_FAILED" ->
+                    "目标资源版本或状态已改变；先读取远端当前版本，再决定后续操作。"
+                "GITHUB_UNSUPPORTED_MEDIA" -> "GitHub 不支持该请求内容格式；核对 API 版本及请求体。"
                 else -> if (mutation) "写入结果可能已经生效，先查询远端状态，禁止自动重放。"
                     else "检查 GitHub 网络及 API 状态后再试。"
             }
@@ -266,18 +280,32 @@ class GitHubConnectorPlugin(
                 isError = failed,
                 errorCode = failureCode,
                 retryable = failed && !mutation && response.status >= 500,
-                recoveryHint = if (failed) hint else null,
+                recoveryHint = if (failed) "HTTP ${response.status}：$hint" else null,
             )
         }.getOrElse { error ->
             if (error is CancellationException) throw error
+            val code = when (error) {
+                is GitHubResponseTooLargeException -> "GITHUB_RESPONSE_TOO_LARGE"
+                is IllegalArgumentException -> "GITHUB_INVALID_REQUEST"
+                is UnknownHostException -> "GITHUB_DNS_FAILED"
+                is SocketTimeoutException -> "GITHUB_TRANSPORT_TIMEOUT"
+                is IOException -> "GITHUB_TRANSPORT_ERROR"
+                else -> throw error
+            }
             ToolResult(
-                content = "[GITHUB_REQUEST_FAILED] ${error.message ?: error::class.java.simpleName}",
+                content = "[$code] ${error.javaClass.simpleName}: " + when (code) {
+                    "GITHUB_RESPONSE_TOO_LARGE" -> "GitHub 响应超过 2 MiB 上限"
+                    "GITHUB_INVALID_REQUEST" -> "API 路径或请求参数违反工具契约"
+                    else -> "GitHub 传输未完成，未取得完整 HTTP 响应"
+                },
                 isError = true,
-                errorCode = "GITHUB_REQUEST_FAILED",
-                recoveryHint = if (mutation) {
-                    "写请求结果未知时先检查 GitHub 当前状态，不要直接重试。"
-                } else {
-                    "检查网络、限流与请求范围后再重试。"
+                errorCode = code,
+                retryable = !mutation && error is IOException,
+                recoveryHint = when {
+                    code == "GITHUB_RESPONSE_TOO_LARGE" -> "缩小查询范围或使用 GitHub REST API 分页。"
+                    code == "GITHUB_INVALID_REQUEST" -> "按 GitHub 工具参数与已开放的 API 路径重新构建请求。"
+                    mutation -> "写请求是否生效未知；核查远端状态后再决定，禁止直接重放。"
+                    else -> "查询失败；保留原错误类型，核对网络并缩小请求范围。"
                 },
             )
         }
@@ -313,9 +341,14 @@ class GitHubConnectorPlugin(
         attempts: Int,
         mutation: Boolean,
     ): GitHubApiResponse = withContext(Dispatchers.IO) {
+        // Three read attempts must fit the outer 35s tool budget; writes admit once.
+        val perAttemptLimit = if (mutation) WRITE_CALL_DEADLINE_MILLIS else READ_CALL_DEADLINE_MILLIS
+        val configuredLimit = http.callTimeoutMillis.toLong().takeIf { it > 0L }
+        val callLimit = configuredLimit?.coerceAtMost(perAttemptLimit) ?: perAttemptLimit
+        val boundedClient = http.newBuilder().callTimeout(callLimit, TimeUnit.MILLISECONDS).build()
         repeat(attempts.coerceAtLeast(1)) { index ->
             try {
-                http.newCall(request).execute().use { response ->
+                boundedClient.newCall(request).execute().use { response ->
                     val body = response.body?.byteStream()?.let(::readBounded).orEmpty()
                     val result = GitHubApiResponse(
                         status = response.code,
@@ -393,14 +426,14 @@ class GitHubConnectorPlugin(
                 val read = stream.read(buffer)
                 if (read < 0) break
                 total += read
-                require(total <= MAX_RESPONSE_BYTES) {
-                    "GitHub API 响应超过 ${MAX_RESPONSE_BYTES} 字节上限，请缩小查询范围或使用分页"
-                }
+                if (total > MAX_RESPONSE_BYTES) throw GitHubResponseTooLargeException()
                 output.write(buffer, 0, read)
             }
         }
         return output.toString(Charsets.UTF_8.name())
     }
+
+    private class GitHubResponseTooLargeException : IllegalStateException()
 
     private data class GitHubApiResponse(
         val status: Int,
@@ -436,6 +469,8 @@ class GitHubConnectorPlugin(
         const val RETRY_BACKOFF_MILLIS = 200L
         const val READ_TIMEOUT_MILLIS = 35_000L
         const val WRITE_TIMEOUT_MILLIS = 45_000L
+        const val READ_CALL_DEADLINE_MILLIS = 10_000L
+        const val WRITE_CALL_DEADLINE_MILLIS = 42_000L
         const val MAX_RESPONSE_BYTES = 2 * 1024 * 1024
         const val MAX_PATH_CHARS = 4_096
         const val MIN_TOKEN_CHARS = 16

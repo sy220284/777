@@ -511,9 +511,11 @@ class LocalWorkspace(
         onProgress: ((String) -> Unit)? = null,
     ): com.labteto.dshmobile.harness.tools.ToolResult = withContext(Dispatchers.IO) {
         require(command.isNotBlank()) { "命令不能为空" }
+        // Retain stdout and stderr as separate evidence. Shell 126/127 cannot be
+        // diagnosed from their numeric exit status without the command's stderr.
         val builder = ProcessBuilder(shellExecutable, "-c", command)
             .directory(canonicalRoot)
-            .redirectErrorStream(true)
+            .redirectErrorStream(false)
         builder.environment().apply {
             putAll(environmentProvider())
             val inheritedPath = get("PATH").orEmpty()
@@ -535,14 +537,33 @@ class LocalWorkspace(
             maxChars = MAX_SHELL_CHARS,
             onProgress = onProgress,
         )
+        val diagnosis = when {
+            result.timedOut -> "命令超时，进程组已终止；写入操作是否生效需核实"
+            result.exitCode == 126 -> "shell 找到了命令但无法执行；检查文件执行权限、解释器、挂载选项和 Android SELinux 限制"
+            result.exitCode == 127 -> "shell 无法定位命令；检查实际命令拼写、PATH、内置运行时状态和脚本解释器"
+            else -> null
+        }
+        val stdout = result.stdout.take(MAX_SHELL_CHARS)
+        val stderr = result.stderr.take(MAX_SHELL_CHARS)
+        val content = buildString {
+            appendLine("退出码：${result.exitCode}")
+            appendLine("超时：${result.timedOut}")
+            if (stdout.isNotBlank()) appendLine(stdout)
+            if (stderr.isNotBlank()) {
+                appendLine("标准错误：")
+                appendLine(stderr)
+            }
+            diagnosis?.let {
+                appendLine("诊断：$it")
+            }
+        }.trimEnd()
         com.labteto.dshmobile.harness.tools.ToolResult(
-            content = if (result.timedOut) {
-                "[shell][TOOL_TIMEOUT] 命令执行超时，已终止进程组。\n已产生输出：\n${result.stdout}"
-            } else "退出码：${result.exitCode}\n${result.stdout}",
+            content = content,
             isError = result.timedOut || result.exitCode != 0,
             errorCode = if (result.timedOut) "TOOL_TIMEOUT" else
                 result.exitCode.takeIf { it != 0 }?.let { "PROCESS_EXIT_$it" },
             processExitCode = result.exitCode.takeUnless { result.timedOut },
+            recoveryHint = diagnosis,
         )
     }
 

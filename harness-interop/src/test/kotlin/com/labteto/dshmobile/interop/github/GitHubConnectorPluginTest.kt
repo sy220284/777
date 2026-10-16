@@ -19,6 +19,91 @@ import org.junit.Test
 
 class GitHubConnectorPluginTest {
     @Test
+    fun githubHttpErrorsPreserveActionableStatusAndDoNotReplayMutations() = runBlocking {
+        val cases = listOf(
+            Triple(400, "GITHUB_BAD_REQUEST", "请求参数"),
+            Triple(409, "GITHUB_CONFLICT", "状态"),
+            Triple(412, "GITHUB_PRECONDITION_FAILED", "版本"),
+            Triple(422, "GITHUB_VALIDATION_FAILED", "errors"),
+        )
+        cases.forEach { (httpCode, expectedCode, hint) ->
+            var calls = 0
+            val http = OkHttpClient.Builder().addInterceptor { chain ->
+                calls += 1
+                Response.Builder()
+                    .request(chain.request()).protocol(Protocol.HTTP_1_1)
+                    .code(httpCode).message("test")
+                    .body("""{"message":"invalid","errors":[{"field":"title"}]}"""
+                        .toResponseBody(JSON_MEDIA)).build()
+            }.build()
+            val registry = PluginRegistry()
+            registry.install(GitHubConnectorPlugin(
+                http, Json, { "github_pat_test_secret_1234567890" },
+                "https://api.github.test",
+            ))
+            val result = registry.context.tools.execute(
+                "github_api_request", buildJsonObject {
+                    put("method", "POST")
+                    put("path", "/repos/owner/repo/issues")
+                    put("body", buildJsonObject { put("title", "test") })
+                }, context = ToolContext(approval = { true }),
+            )
+            assertTrue(result.isError)
+            assertEquals(expectedCode, result.errorCode)
+            assertTrue(result.content.contains("HTTP: $httpCode"))
+            assertTrue(result.recoveryHint.orEmpty().contains("HTTP $httpCode"))
+            assertTrue(result.recoveryHint.orEmpty().contains(hint))
+            assertFalse(result.retryable)
+            assertEquals(1, calls)
+        }
+    }
+
+    @Test
+    fun invalidApiPathIsAContractFailureWithoutNetworkAdmission() = runBlocking {
+        var calls = 0
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            calls++
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK").body("{}".toResponseBody(JSON_MEDIA)).build()
+        }.build()
+        val registry = PluginRegistry()
+        registry.install(GitHubConnectorPlugin(
+            http, Json, { "github_pat_test_secret_1234567890" },
+            "https://api.github.test",
+        ))
+        val result = registry.context.tools.execute(
+            "github_api_get",
+            buildJsonObject { put("path", "/forbidden/endpoint") },
+        )
+        assertTrue(result.isError)
+        assertEquals("GITHUB_INVALID_REQUEST", result.errorCode)
+        assertEquals(0, calls)
+        assertFalse(result.retryable)
+    }
+
+    @Test
+    fun secondaryGitHubRateLimitIsNotMisclassifiedAsPermissionFailure() = runBlocking {
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(403).message("Forbidden")
+                .header("X-RateLimit-Remaining", "59")
+                .header("Retry-After", "60")
+                .body("""{"message":"secondary rate limit"}""".toResponseBody(JSON_MEDIA))
+                .build()
+        }.build()
+        val registry = PluginRegistry()
+        registry.install(GitHubConnectorPlugin(
+            http, Json, { "github_pat_test_secret_1234567890" },
+            "https://api.github.test",
+        ))
+        val result = registry.context.tools.execute("github_api_get",
+            buildJsonObject { put("path", "/repos/owner/repo") })
+        assertEquals("GITHUB_RATE_LIMITED", result.errorCode)
+        assertTrue(result.recoveryHint.orEmpty().contains("HTTP 403"))
+        assertFalse(result.retryable)
+    }
+
+    @Test
     fun distinguishesExpiredCredentialAndRateLimitWithoutRetryingWrites() = runBlocking {
         for ((httpCode, remaining, expectedCode) in listOf(
             Triple(401, "60", "GITHUB_AUTH_INVALID"),
