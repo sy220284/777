@@ -133,6 +133,37 @@ class LocalRequirementEvidenceProjectionTest {
         assertTrue(projectRequirementEvidenceLinks(listOf(link(1, 0, "交付", "madeup")), tasks).isEmpty())
     }
 
+    @Test fun userReviewColdRestoresWithoutPromotingRequirementToCompleted() {
+        val root = temp.newFolder("manual-work-review")
+        val file = File(root, "session.events.jsonl")
+        val json = kotlinx.serialization.json.Json
+        val log = LocalSessionEventLog(file, json)
+        val digest = "a".repeat(64)
+        val link = log.append("work/requirement-evidence", buildJsonObject {
+            put("goal_id", "goal-a"); put("requirement_index", 0)
+            put("requirement", "报告"); put("artifact_path", "report.md")
+            put("origin_sequence", 0L); put("source_call_id", "call-a")
+            put("sha256", digest); put("assertion", "user_selected_reference_only")
+        })
+        log.append("work/requirement-evidence-review", buildJsonObject {
+            put("goal_id", "goal-a"); put("requirement_index", 0)
+            put("requirement", "报告"); put("artifact_path", "report.md")
+            put("link_sequence", link.sequence); put("sha256", digest)
+            put("approved_by_user", true); put("assertion", "manual_content_review_only")
+        })
+        log.close()
+        val restored = LocalSessionEventLog(file, json)
+        try {
+            val tasks = listOf(LocalTodoItem("报告", "pending"))
+            val links = restored.withEvents { projectRequirementEvidenceLinks(it, tasks, "goal-a") }
+            val reviews = restored.withEvents { projectRequirementEvidenceReviews(it, links, "goal-a") }
+            assertEquals("pending", tasks.single().status)
+            assertEquals(link.sequence, reviews.single().linkSequence)
+            assertTrue(reviews.single().approvedByUser)
+            assertTrue(restored.withEvents { projectRequirementEvidenceReviews(it, links, "goal-b") }.isEmpty())
+        } finally { restored.close() }
+    }
+
     @Test fun manualReviewRequiresExactGoalLinkRevisionAndDigest() {
         val digest = "a".repeat(64)
         val tasks = listOf(LocalTodoItem("交付报告", "completed"))
