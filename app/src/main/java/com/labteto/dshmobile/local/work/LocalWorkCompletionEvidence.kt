@@ -112,3 +112,67 @@ internal fun LocalWorkCompletionEvidence.toDiagnosticJson(): JsonObject = buildJ
     put("delivery_missing", JsonArray(deliveryEvidence?.missing.orEmpty().map(::JsonPrimitive)))
     put("user_reasons", JsonArray(userReasons.map(::JsonPrimitive)))
 }
+
+/**
+ * Typed Work-only goal disposition, derived from the current authoritative Work snapshot.
+ *
+ * A model turn ending does not imply a delivered goal. READY_FOR_SETTLEMENT indicates that
+ * known obligations are clear, but Work has not yet committed the goal's completed status.
+ * This is a read-only projection, not another persisted goal, scheduler or execution owner.
+ * Unknown side effects are handled by Shared Tool/Run settlement, not guessed here.
+ */
+internal enum class LocalWorkGoalDisposition {
+    NO_GOAL,
+    PAUSED,
+    BLOCKED,
+    WAITING_APPROVAL,
+    WAITING_USER,
+    WAITING_TEAM,
+    NEEDS_EXECUTION,
+    READY_FOR_SETTLEMENT,
+    COMPLETED,
+}
+
+internal data class LocalWorkGoalAssessment(
+    val disposition: LocalWorkGoalDisposition,
+    val goalId: String?,
+    val goalStatus: String?,
+    val evidence: LocalWorkCompletionEvidence,
+) {
+    /** Candidate for a future GoalDriver; admission must still verify current run ownership. */
+    val hasRunnableRemainingWork: Boolean
+        get() = disposition == LocalWorkGoalDisposition.NEEDS_EXECUTION
+
+    fun toTurnEventFields(): JsonObject = buildJsonObject {
+        put("goal_disposition", disposition.name.lowercase())
+        goalId?.let { put("goal_id", it) }
+        goalStatus?.let { put("goal_status", it) }
+        put("goal_outstanding_count", evidence.userReasons.size)
+        put("goal_ready_for_settlement",
+            disposition == LocalWorkGoalDisposition.READY_FOR_SETTLEMENT ||
+                disposition == LocalWorkGoalDisposition.COMPLETED)
+    }
+}
+
+internal fun assessLocalWorkGoal(
+    work: LocalWorkState,
+    evidence: LocalWorkCompletionEvidence = localWorkCompletionEvidence(work),
+): LocalWorkGoalAssessment {
+    val goal = work.goal
+    val team = work.team
+    val disposition = when {
+        goal == null -> LocalWorkGoalDisposition.NO_GOAL
+        goal.status == "paused" -> LocalWorkGoalDisposition.PAUSED
+        goal.status == "blocked" || !team.failure.isNullOrBlank() ->
+            LocalWorkGoalDisposition.BLOCKED
+        work.pendingApproval != null -> LocalWorkGoalDisposition.WAITING_APPROVAL
+        work.pendingQuestion != null -> LocalWorkGoalDisposition.WAITING_USER
+        team.rebuilding || evidence.activeTeamMembers > 0 ||
+            evidence.pendingTeamMessages > 0 || evidence.awaitingReviewMembers > 0 ->
+            LocalWorkGoalDisposition.WAITING_TEAM
+        !evidence.readyForGoalCompletion -> LocalWorkGoalDisposition.NEEDS_EXECUTION
+        goal.status == "completed" -> LocalWorkGoalDisposition.COMPLETED
+        else -> LocalWorkGoalDisposition.READY_FOR_SETTLEMENT
+    }
+    return LocalWorkGoalAssessment(disposition, goal?.id, goal?.status, evidence)
+}
