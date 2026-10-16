@@ -160,6 +160,27 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
     fun result(id: String): LocalMediaResult? = operation {
         initialize(); database.get(id)?.takeUnless { it.deleted }?.result
     }
+    /** Atomically attach a downloaded original image, rejecting deletion or changed provenance. */
+    @Synchronized
+    fun attachDownloadedImage(id: String, sessionId: String, expectedUrl: String, file: File): Boolean = operation {
+        initialize()
+        require(file.isFile && file.canonicalFile.parentFile == directory.canonicalFile) {
+            "下载图片不在媒体存储目录"
+        }
+        var attached = false
+        database.transaction {
+            val row = database.get(id)?.takeUnless { it.deleted } ?: return@transaction
+            val original = row.result ?: return@transaction
+            if (original.kind != LocalMediaKind.IMAGE.name || original.sessionId != sessionId ||
+                original.remoteUrl != expectedUrl || this@LocalMediaStore.file(original.fileName) != null)
+                return@transaction
+            database.put(row.copy(result = original.copy(fileName = file.name, remoteUrl = null)))
+            attached = true
+        }
+        if (attached) changed()
+        attached
+    }
+
     fun file(name: String?): File? = managedFile(name)?.takeIf(File::isFile)
     private fun managedFile(name: String?): File? = name?.takeIf { it.matches(Regex("[A-Za-z0-9._-]{1,180}")) && it !in setOf(".", "..") }
         ?.let { File(directory, it).takeIf { f -> f.canonicalFile.parentFile == directory.canonicalFile } }
