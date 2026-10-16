@@ -31,6 +31,7 @@ fun V6SettingsSuiteScene(
     onBack: () -> Unit,
     updateStatus: kotlinx.coroutines.flow.StateFlow<String?>? = null,
     checkForUpdate: (() -> Unit)? = null,
+    performance: ModelPerformanceUiPort? = null,
 ) {
     val state by settings.state.collectAsStateWithLifecycle(initialValue = settings.initialState)
     val scope = rememberCoroutineScope()
@@ -84,7 +85,7 @@ fun V6SettingsSuiteScene(
     val name = when(scene.value) {
         "route.settings","settings.root" -> "设置中心"
         "settings.models","conversation.model_picker" -> "模型管理"
-        "settings.model_performance" -> "模型请求分析"
+        "settings.model_performance" -> "模型性能与推理"
         "settings.pricing" -> "费用估算"
         "settings.usage","settings.model_usage" -> "模型额度与用量"
         "settings.usage_log" -> "请求日志"
@@ -113,7 +114,7 @@ fun V6SettingsSuiteScene(
                     "settings.models" to "模型配置",
                     "settings.account" to "账户授权",
                     "settings.minimax_quota" to "MiniMax 查询",
-                    "settings.model_performance" to "请求分析",
+                    "settings.model_performance" to "模型性能",
                     "settings.pricing" to "费用",
                     "settings.appearance" to "外观",
                     "settings.notifications" to "通知",
@@ -174,6 +175,10 @@ fun V6SettingsSuiteScene(
                 }, enabled = !busy && !state.loading &&
                     modelName.isNotBlank() && modelUrl.isNotBlank())
             }
+            "settings.model_performance" -> {
+                if (performance == null) SyNote("模型性能 Owner 未连接，当前不能修改全局参数")
+                else V6ModelPerformanceScene(performance, onBack)
+            }
             "settings.minimax_quota" -> {
                 val profile = state.miniMaxQuotaProfile
                 if (profile == null) SyNote("当前无可查询的 MiniMax 模型账户")
@@ -213,7 +218,7 @@ fun V6SettingsSuiteScene(
                     a in 1..10000 && b in 1..10000 && c in 1..100)
             }
             "settings.usage","settings.model_usage","settings.usage_log",
-            "settings.usage_detail","settings.model_performance","settings.pricing" -> {
+            "settings.usage_detail","settings.pricing" -> {
                 val owner = usage
                 if (owner == null) SyNote("请求台账 Owner 不可用")
                 else {
@@ -230,8 +235,7 @@ fun V6SettingsSuiteScene(
                     Text("台账预估成本（人民币）：${active.tracked.estimatedCostCny}")
                     if (active.tracked.unreportedRequestCount > 0)
                         SyNote("部分请求缺少供应商用量回执，费用可能不完整")
-                    if (scene.value == "settings.model_performance")
-                        Text("聊天请求：${active.chat.aggregate.requestCount}；Work 请求：${active.work.aggregate.requestCount}")
+                    Text("聊天请求：${active.chat.aggregate.requestCount}；Work 请求：${active.work.aggregate.requestCount}")
                     Text("费用与额度以服务商账单为准；这里仅显示本地请求账本。")
                     if (figures.byModel.isNotEmpty()) {
                         Text("切换账本模型", style = MaterialTheme.typography.titleMedium)
@@ -253,7 +257,7 @@ fun V6SettingsSuiteScene(
                         }
                     }
                     if (scene.value in setOf("settings.usage_log","settings.usage_detail",
-                            "settings.model_performance","settings.model_usage")) {
+                            "settings.model_usage")) {
                         val records = figures.recentRecords.filter {
                             usageModelFilter == null || it.model == usageModelFilter
                         }
