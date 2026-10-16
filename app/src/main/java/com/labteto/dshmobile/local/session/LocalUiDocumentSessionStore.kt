@@ -126,8 +126,10 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
                         continuity = false
                         break
                     }
-                    page.forEach { event -> indexKey(event)?.let { next[it] = event } }
-                    cursor = page.last().sequence
+                    val admitted = page.takeWhile { it.sequence <= checkpoint }
+                    admitted.forEach { event -> indexKey(event)?.let { next[it] = event } }
+                    cursor = admitted.lastOrNull()?.sequence ?: checkpoint
+                    if (admitted.size < page.size) break
                 }
                 if (continuity) next else log.withEvents { stream ->
                     val rebuild = LinkedHashMap<Pair<String, String>, LocalSessionEventLog.Event>()
