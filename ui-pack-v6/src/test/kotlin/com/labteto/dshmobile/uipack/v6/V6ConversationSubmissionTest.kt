@@ -175,6 +175,21 @@ class V6ConversationSubmissionTest {
         assertEquals(1, calls)
     }
 
+    @Test fun v6AttachmentAdmissionRejectsDuplicateAndTwentyFirstImage() {
+        val image = LocalImportedAttachment("1.png", ".dsh/attachments/1.png", "image/png", 5, "hash-1")
+        assertEquals(V6AttachmentDecision.ACCEPT, v6AttachmentDecision(emptyList(), image))
+        assertEquals(V6AttachmentDecision.DUPLICATE, v6AttachmentDecision(listOf(image), image))
+        val existing = (0 until 20).map { n ->
+            image.copy(name = "${n}.png", relativePath = ".dsh/attachments/${n}.png",
+                attachmentId = "hash-${n}")
+        }
+        assertEquals(V6AttachmentDecision.IMAGE_LIMIT,
+            v6AttachmentDecision(existing, image.copy(relativePath = ".dsh/attachments/new.png",
+                attachmentId = "new")))
+        val doc = LocalImportedAttachment("readme.txt", ".dsh/attachments/r.txt", "text/plain", 10)
+        assertEquals(V6AttachmentDecision.ACCEPT, v6AttachmentDecision(existing, doc))
+    }
+
     @Test fun anAttachmentWithoutTextStillGoesToTheExistingChatOwner() {
         val item = LocalImportedAttachment("photo.png", "session/photo.png", "image/png", 42)
         val result = submitV6ConversationDraft(ports(), false, identity, "", listOf(item))
