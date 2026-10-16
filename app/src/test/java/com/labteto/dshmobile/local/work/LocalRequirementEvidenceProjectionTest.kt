@@ -49,6 +49,21 @@ class LocalRequirementEvidenceProjectionTest {
         assertEquals(null, selectedRequirementEvidenceVersion(root, source, refreshed))
     }
 
+    @Test fun evidencePreparedAgainstOlderBytesIsRejectedBeforeOwnerCommit() {
+        val root = temp.newFolder("evidence-final-check")
+        val file = File(root, "report.md").apply { writeText("version A") }
+        val selectedVersion = localWorkFileSha256(root, "report.md")!!
+        assertTrue(preparedRequirementEvidenceVersionMatches(root, "report.md", selectedVersion))
+
+        // Simulate an external tool updating the file while the user is choosing a requirement.
+        file.writeText("version B")
+        assertFalse(preparedRequirementEvidenceVersionMatches(root, "report.md", selectedVersion))
+        assertFalse(preparedRequirementEvidenceVersionMatches(root, "../escape", selectedVersion))
+        assertFalse(preparedRequirementEvidenceVersionMatches(root, "report.md", "not-a-hash"))
+        assertTrue(preparedRequirementEvidenceVersionMatches(root, "report.md",
+            localWorkFileSha256(root, "report.md")!!))
+    }
+
     @Test fun archivedEvidenceReadsCurrentFileWithoutRecentArtifactProjection() {
         val root = temp.newFolder("workspace")
         val file = File(root, "reports/one.md").also { it.parentFile.mkdirs() }
