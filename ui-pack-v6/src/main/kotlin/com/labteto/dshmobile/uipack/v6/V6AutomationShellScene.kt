@@ -43,6 +43,10 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
         initialValue = owner.snapshot())
     val onlyChat = page.value == "automation.persona_interaction"
     var editor by remember(page) { mutableStateOf(page.value == "automation.editor") }
+    // Capture the activation at editor entry: a reused draft must never create in a new chat.
+    var editorIdentity by remember(page, owner) {
+        mutableStateOf(owner.snapshot().context.identity)
+    }
     var editing by remember(page) { mutableStateOf<AutomationTask?>(null) }
     var remove by remember(page) { mutableStateOf<AutomationTask?>(null) }
     var prompt by remember(page) { mutableStateOf("") }
@@ -96,6 +100,7 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
         notify = true
     }
     fun select(task: AutomationTask) {
+        editorIdentity = snapshot.context.identity
         editing = task; prompt = task.prompt; mode = task.mode
         firstMinutes = ((task.nextRunAt - System.currentTimeMillis()).coerceAtLeast(60_000L) /
             60_000L).toString()
@@ -123,6 +128,7 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
         if (!editor) {
             SyButton("新建任务", {
                 prompt = ""; firstMinutes = "60"; editing = null
+                editorIdentity = owner.snapshot().context.identity
                 resetScheduleForm(); editor = true
             }, enabled = !busy)
             snapshot.tasks.filter { !onlyChat || it.mode == AutomationMode.CHAT }.forEach { task ->
@@ -230,10 +236,20 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
                     (!quietEnabled || (qsh in 0..23 && qsm in 0..59 &&
                         qeh in 0..23 && qem in 0..59)))
             val chatAllowed = snapshot.context.canPlanChat && snapshot.context.identity != null
+            val sameEditorChat = snapshot.context.identity == editorIdentity
             if (mode == AutomationMode.CHAT && editing == null && !chatAllowed)
                 SyNote("人物互动任务只允许在当前有效单人聊天中创建")
+            if (mode == AutomationMode.CHAT && editing == null && !sameEditorChat)
+                SyNote("编辑任务期间聊天已切换；请取消后在当前会话重新新建任务")
             SyButton(if (editing == null) "创建任务" else "更新任务", {
                 val t = editing
+                if (t == null && mode == AutomationMode.CHAT) {
+                    val current = owner.snapshot().context
+                    if (!current.canPlanChat || current.identity != editorIdentity) {
+                        feedback = "聊天上下文已变化，未创建自动任务；请在新会话重新开始"
+                        return@SyButton
+                    }
+                }
                 val delay = minutes ?: return@SyButton
                 val timestamp = System.currentTimeMillis() + delay * 60_000
                 val actualMode = t?.mode ?: mode
@@ -248,11 +264,12 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
                     qsh ?: 23, qsm ?: 0, qeh ?: 8, qem ?: 0,
                     gap ?: 60, unanswered ?: 2, notify)
                 send(if (t == null) AutomationUiCommand.Create(
-                    if (mode == AutomationMode.CHAT) snapshot.context.identity else null, schedule)
+                    if (mode == AutomationMode.CHAT) editorIdentity else null, schedule)
                 else AutomationUiCommand.Update(t.id, t.scheduleGeneration, schedule))
             }, enabled = !busy && prompt.isNotBlank() && minutes != null &&
                 scheduleValid && policyValid &&
-                (editing != null || mode != AutomationMode.CHAT || chatAllowed))
+                (editing != null || mode != AutomationMode.CHAT ||
+                    (chatAllowed && sameEditorChat)))
             SyButton("取消", { editing = null; editor = false }, style = SyButtonStyle.GHOST)
         }
     }
