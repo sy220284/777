@@ -20,6 +20,20 @@ interface UiDocumentFormUiPort {
     fun forgetDocument(key: UiDocumentFormKey)
 }
 
+/** Source-authored retention is independent of field names, including nested controls. */
+fun UiDocument.fieldRetention(): Map<String, UiFieldRetention> = buildMap {
+    fun visit(node: UiDocumentNode) {
+        when (node) {
+            is UiDocumentNode.Field -> put(node.id, node.retention)
+            is UiDocumentNode.Column -> node.children.forEach(::visit)
+            is UiDocumentNode.Row -> node.children.forEach(::visit)
+            is UiDocumentNode.Disclosure -> node.children.forEach(::visit)
+            else -> Unit
+        }
+    }
+    nodes.forEach(::visit)
+}
+
 /** Local form defaults are user data. They never enter model/system context automatically. */
 fun UiDocument.initialFields(): Map<String, String> = buildMap {
     fun visit(node: UiDocumentNode) {
