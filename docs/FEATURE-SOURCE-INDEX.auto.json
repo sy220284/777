@@ -3834,7 +3834,7 @@
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
-      "sha256": "9b82153b57b4b93d"
+      "sha256": "030c057facf71913"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6AutomationShellScene.kt",
@@ -3978,13 +3978,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "c4be20968f02",
+  "source_snapshot": "21463b7c1df3",
   "observed_delta": {
-    "baseline": "994f6fed4fdb",
+    "baseline": "c4be20968f02",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ReadableContent.kt"
+      "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
