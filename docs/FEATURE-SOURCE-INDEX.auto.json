@@ -1,8 +1,8 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1691,
-  "production_source_count": 983,
+  "repository_code_file_count": 1693,
+  "production_source_count": 985,
   "test_code_file_count": 568,
   "workflow_files": [
     ".github/workflows/capture-readme-ui.yml",
@@ -1638,7 +1638,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiDocumentUiAdapter.kt",
-      "sha256": "e4a711b1d5a6c555"
+      "sha256": "94a35e09d552efe2"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiRuntime.kt",
@@ -3754,7 +3754,7 @@
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiDocument.kt",
-      "sha256": "5e98c61f05da1302"
+      "sha256": "917ff32576bd75e1"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiDocumentFormUiPort.kt",
@@ -3762,7 +3762,7 @@
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiDocumentUiPort.kt",
-      "sha256": "0490f24245ffb88d"
+      "sha256": "ea9064e055101d16"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiMarkdown.kt",
@@ -3834,11 +3834,11 @@
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
-      "sha256": "18c8257029e338ef"
+      "sha256": "9cb35200e2127e11"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6AutomationShellScene.kt",
-      "sha256": "00dc1d377802d699"
+      "sha256": "03d1ecc30bea8316"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ChatSettingsScene.kt",
@@ -3849,8 +3849,12 @@
       "sha256": "b7c98f6ac6f79d3b"
     },
     {
+      "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationEntries.kt",
+      "sha256": "810df0b862e162c0"
+    },
+    {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationScene.kt",
-      "sha256": "6167b484a6b745dd"
+      "sha256": "f70a21be77870300"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6DiaryMemoryScenes.kt",
@@ -3867,6 +3871,10 @@
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6LineChart.kt",
       "sha256": "3373aac2c5a60b93"
+    },
+    {
+      "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6MessageContextSheet.kt",
+      "sha256": "5d6e5a14d347e400"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ModelPerformanceScene.kt",
@@ -3902,19 +3910,19 @@
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ScenePresentation.kt",
-      "sha256": "0012faec6330fa81"
+      "sha256": "7a1c335b440bccb0"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6SettingsSuiteScene.kt",
-      "sha256": "c8d499486fa6a221"
+      "sha256": "ae515bd8f347850f"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ToolsWorkspaceMedia.kt",
-      "sha256": "a1160b1c950e5cd0"
+      "sha256": "740d0b51f3ad14d1"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6UiDocumentScene.kt",
-      "sha256": "c1c6134e26c71bda"
+      "sha256": "8c10bb8ac0da486b"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6WorkEvidencePanel.kt",
@@ -3994,14 +4002,16 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "074fa4ba9c4b",
+  "source_snapshot": "3d92f562b2b5",
   "observed_delta": {
-    "baseline": "357331abe02a",
+    "baseline": "a1c6a3a40ca1",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalHostPreferencesUiAdapter.kt",
-      "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiDocumentUiAdapter.kt",
+      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiDocument.kt",
+      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiDocumentUiPort.kt",
+      "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6UiDocumentScene.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

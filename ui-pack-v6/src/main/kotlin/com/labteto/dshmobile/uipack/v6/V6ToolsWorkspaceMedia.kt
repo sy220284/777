@@ -87,6 +87,7 @@ fun V6ToolsManagementScene(
     var newSkillInstructions by remember(key) { mutableStateOf("") }
     var editSkillId by remember(key) { mutableStateOf<String?>(null) }
     var selectedCapability by remember(key) { mutableStateOf<String?>(null) }
+    var manageConnections by remember(key) { mutableStateOf(false) }
     var capabilityInstructions by remember(key) { mutableStateOf("") }
     var editSkillDocument by remember(key) { mutableStateOf("") }
     var githubToken by remember(key) { mutableStateOf("") }
@@ -213,52 +214,66 @@ fun V6ToolsManagementScene(
         feedback?.let { SyNote(it) }
         SyButton("刷新工具状态", { revision++ }, enabled = !busy && !loading,
             style = SyButtonStyle.SECONDARY)
+        if (page == "route.tools") Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SyButton("可用能力", { manageConnections = false },
+                style = if (manageConnections) SyButtonStyle.GHOST else SyButtonStyle.PRIMARY)
+            SyButton("连接与技能", { manageConnections = true },
+                style = if (manageConnections) SyButtonStyle.PRIMARY else SyButtonStyle.GHOST)
+        }
         if (page == "route.tools" || page == "work.capabilities") {
-            listOf("tools.mcp" to "MCP 服务","tools.plugins" to "插件与技能",
-                "tools.github" to "GitHub").forEach { (id,title) ->
-                SyButton(title, {
-                    val result = onNavigate(UiSceneId(id))
-                    if (result !is UiSceneNavigationResult.Changed) feedback = "无法打开：" + title
-                }, style = SyButtonStyle.SECONDARY)
+            if (page == "route.tools" && manageConnections) {
+                listOf("tools.mcp" to "MCP 服务","tools.plugins" to "插件与技能",
+                    "tools.github" to "GitHub").forEach { (id,title) ->
+                    SyButton(title, {
+                        val result = onNavigate(UiSceneId(id))
+                        if (result !is UiSceneNavigationResult.Changed) feedback = "无法打开：" + title
+                    }, style = SyButtonStyle.SECONDARY)
+                }
+                Text("已登记服务器：" + servers.size + " · 本地技能：" + skills.size)
             }
-            Text("已登记服务器：" + servers.size + " · 本地技能：" + skills.size)
-            owner.capabilityCatalogue().forEach { ability ->
-                SyGlassCard(Modifier.fillMaxWidth()) {
-                    Text(ability.name + " · " + ability.family)
-                    Text("访问：" + ability.access + " · 授权：" + ability.approval)
-                    ability.requirements.forEach { Text(it) }
-                    if (page == "work.capabilities" && work != null && drafts != null) {
-                        SyButton("在 Work 中使用此能力", {
-                            selectedCapability = ability.name
-                        }, style = SyButtonStyle.SECONDARY)
+            if (!manageConnections) {
+                if (page == "route.tools" && work != null && drafts != null) SyButton("选择工作能力", {
+                    if (onNavigate(UiSceneId("work.capabilities")) !is UiSceneNavigationResult.Changed)
+                        feedback = "工作能力选择暂时无法打开"
+                }, style = SyButtonStyle.SECONDARY)
+                owner.capabilityCatalogue().forEach { ability ->
+                    SyGlassCard(Modifier.fillMaxWidth()) {
+                        Text(ability.name + " · " + ability.family)
+                        Text("访问：" + ability.access + " · 授权：" + ability.approval)
+                        ability.requirements.forEach { Text(it) }
+                        if (page == "work.capabilities" && work != null && drafts != null) {
+                            SyButton("在 Work 中使用此能力", {
+                                selectedCapability = ability.name
+                            }, style = SyButtonStyle.SECONDARY)
+                        }
                     }
                 }
-            }
-            if (page == "work.capabilities" && selectedCapability != null &&
-                work != null && drafts != null) {
-                SyGlassCard(Modifier.fillMaxWidth()) {
-                    Text("使用能力：" + selectedCapability)
-                    SyInput(capabilityInstructions, { capabilityInstructions = it },
-                        label = "需要完成的具体任务（由你确认后发送）", singleLine = false)
-                    SyButton("填写到 Work 草稿", {
-                        val identity = work.snapshot().identity
-                        if (identity == null || capabilityInstructions.isBlank()) {
-                            feedback = "当前没有有效 Work 会话，或缺少任务要求"
-                        } else {
-                            val target = selectedCapability
-                            val message = "使用 ${target}：${capabilityInstructions.trim()}"
-                            drafts.updateDraft(identity.sessionId, message)
-                            val nav = onNavigate(UiSceneId("conversation.work"))
-                            feedback = if (nav is UiSceneNavigationResult.Changed)
-                                "已填写 Work 草稿，发送前仍可编辑；实际工具调用需经原 Work Owner 审批"
-                            else "已保存 Work 草稿，但该会话页面暂不可达"
-                            selectedCapability = null
-                            capabilityInstructions = ""
-                        }
-                    }, enabled = capabilityInstructions.isNotBlank(),
-                        style = SyButtonStyle.SECONDARY)
-                    SyButton("取消", { selectedCapability = null },
-                        style = SyButtonStyle.GHOST)
+                if (page == "work.capabilities" && selectedCapability != null &&
+                    work != null && drafts != null) {
+                    SyGlassCard(Modifier.fillMaxWidth()) {
+                        Text("使用能力：" + selectedCapability)
+                        SyInput(capabilityInstructions, { capabilityInstructions = it },
+                            label = "需要完成的具体任务（由你确认后发送）", singleLine = false)
+                        SyButton("填写到 Work 草稿", {
+                            val identity = work.snapshot().identity
+                            if (identity == null || capabilityInstructions.isBlank()) {
+                                feedback = "当前没有有效 Work 会话，或缺少任务要求"
+                            } else {
+                                val target = selectedCapability
+                                val message = "使用 ${target}：${capabilityInstructions.trim()}"
+                                drafts.updateDraft(identity.sessionId, message)
+                                val nav = onNavigate(UiSceneId("conversation.work"))
+                                feedback = if (nav is UiSceneNavigationResult.Changed)
+                                    "已填写 Work 草稿，发送前仍可编辑；实际工具调用需经原 Work Owner 审批"
+                                else "已保存 Work 草稿，但该会话页面暂不可达"
+                                selectedCapability = null
+                                capabilityInstructions = ""
+                            }
+                        }, enabled = capabilityInstructions.isNotBlank(),
+                            style = SyButtonStyle.SECONDARY)
+                        SyButton("取消", { selectedCapability = null },
+                            style = SyButtonStyle.GHOST)
+                    }
                 }
             }
         }
@@ -452,7 +467,9 @@ fun V6ToolsManagementScene(
 fun V6WorkspaceScene(owner: FilesUiPort, previewFirst: Boolean, onBack: () -> Unit) {
     var files by remember(owner) { mutableStateOf(emptyList<LocalWorkspaceFile>()) }
     var selected by remember(owner) { mutableStateOf<String?>(null) }
+    var fileActions by remember(owner) { mutableStateOf<String?>(null) }
     var preview by remember(owner) { mutableStateOf<LocalWorkspaceFilePreview?>(null) }
+    var previewError by remember(owner) { mutableStateOf<String?>(null) }
     var filter by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var refresh by remember { mutableIntStateOf(0) }
@@ -533,10 +550,11 @@ fun V6WorkspaceScene(owner: FilesUiPort, previewFirst: Boolean, onBack: () -> Un
     }
     LaunchedEffect(owner, selected, refresh) {
         preview = null
+        previewError = null
         val path = selected ?: return@LaunchedEffect
         try { preview = withContext(Dispatchers.IO) { owner.previewWorkspaceFile(path) } }
         catch (cancelled: CancellationException) { throw cancelled }
-        catch (failure: Exception) { feedback = failure.message ?: "文件预览失败" }
+        catch (failure: Exception) { previewError = failure.message ?: "文件预览失败" }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -555,23 +573,32 @@ fun V6WorkspaceScene(owner: FilesUiPort, previewFirst: Boolean, onBack: () -> Un
                 Text("字节：" + file.bytes)
                 SyButton("查看内容", { selected = file.path },
                     style = SyButtonStyle.SECONDARY)
-                SyButton("保存原文件", { exportFile(file.path, "save") },
-                    enabled = !exporting && !loading, style = SyButtonStyle.SECONDARY)
-                SyButton("保存并分享", { exportFile(file.path, "share") },
-                    enabled = !exporting && !loading, style = SyButtonStyle.GHOST)
-                SyButton("保存并用外部应用打开", { exportFile(file.path, "open") },
+                SyButton("文件操作", { fileActions = file.path },
                     enabled = !exporting && !loading, style = SyButtonStyle.GHOST)
             }
         }
-        selected?.let { path ->
-            SyGlassCard(Modifier.fillMaxWidth()) {
-                Text("预览：" + path)
-                preview?.let { item ->
-                    SelectionContainer { Text(item.text ?: "此文件没有可预览的文本") }
-                    if (item.truncated) SyNote("源文件过长，仅显示 Owner 允许的部分")
+        fileActions?.let { path ->
+            SyModalSheet(onDismiss = { fileActions = null }, title = path.substringAfterLast('/')) {
+                listOf("保存原文件" to "save", "保存并分享" to "share", "用外部应用打开" to "open").forEach { (title, action) ->
+                    SyButton(title, { fileActions = null; exportFile(path, action) },
+                        enabled = !exporting && !loading, style = SyButtonStyle.GHOST)
                 }
-                SyButton("关闭预览", { selected = null }, style = SyButtonStyle.GHOST)
             }
+        }
+        selected?.let { path ->
+            AlertDialog(onDismissRequest = { selected = null }, title = { Text(path.substringAfterLast('/')) },
+                text = {
+                    Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
+                        val item = preview
+                        if (previewError != null) Text(previewError.orEmpty())
+                        else if (item == null) Text("正在读取文件；读取结果将在此处显示")
+                        else {
+                            SelectionContainer { Text(item.text ?: "此文件没有可预览的文本") }
+                            if (item.truncated) SyNote("源文件过长，仅显示 Owner 允许的部分")
+                        }
+                        feedback?.let { SyNote(it) }
+                    }
+                }, confirmButton = { TextButton(onClick = { selected = null }) { Text("关闭预览") } })
         }
     }
 }
@@ -594,7 +621,7 @@ fun V6MediaScene(media: MediaUiPort, settings: SettingsUiPort,
     var videoText by rememberSaveable { mutableStateOf("") }
     var speechText by rememberSaveable { mutableStateOf("") }
     var showModels by rememberSaveable { mutableStateOf(false) }
-    var showArchive by rememberSaveable { mutableStateOf(!creation) }
+    var creating by rememberSaveable(sessionId) { mutableStateOf(creation) }
     var audioRouteId by remember { mutableStateOf<String?>(null) }
     var frozenRequest by remember { mutableStateOf<MediaUiCommand?>(null) }
     val prompt = when(kind) {
@@ -649,14 +676,20 @@ fun V6MediaScene(media: MediaUiPort, settings: SettingsUiPort,
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(if (creation) "媒体创作" else "媒体成果", style = MaterialTheme.typography.titleLarge)
+        Text("媒体", style = MaterialTheme.typography.titleLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SyButton("创作", { creating = true }, enabled = !pending,
+                style = if (creating) SyButtonStyle.PRIMARY else SyButtonStyle.GHOST)
+            SyButton("成果", { creating = false }, enabled = !pending,
+                style = if (creating) SyButtonStyle.GHOST else SyButtonStyle.PRIMARY)
+        }
         SyButton("返回", onBack, style = SyButtonStyle.GHOST)
         notice?.let { SyNote(it) }
         storageError?.let { SyNote("媒体存储异常：" + it) }
         if (storageError != null) SyButton("重新读取媒体存储", {
             submit(MediaUiCommand.RetryStorage)
         }, enabled = !pending)
-        if (creation) {
+        if (creating) {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(LocalMediaKind.IMAGE to "图片", LocalMediaKind.VIDEO to "视频",
@@ -734,9 +767,7 @@ fun V6MediaScene(media: MediaUiPort, settings: SettingsUiPort,
                     style = MaterialTheme.typography.labelSmall)
             }
         }
-        SyButton(if (showArchive) "收起历史成果 ▴" else "查看历史成果 ▾",
-            { showArchive = !showArchive }, style = SyButtonStyle.GHOST, compact = true)
-        if (showArchive) {
+        if (!creating) {
         entries.jobs.forEach { job ->
             SyGlassCard(Modifier.fillMaxWidth()) {
                 Text(job.kind + " · " + job.phase.name + " · " + job.model)

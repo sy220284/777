@@ -106,7 +106,7 @@ class V6SessionCreationInteractionTest {
         val owner = SessionOwner(identity)
         val destinations = mutableListOf<UiSceneId>()
         show(owner, destinations)
-        compose.onNodeWithText("CONTINUATION").performClick()
+        compose.onNodeWithText("承接上文").performClick()
         compose.onNodeWithText("创建本地会话").performClick()
         compose.runOnIdle {
             assertTrue(owner.submitted.isEmpty())
@@ -114,4 +114,18 @@ class V6SessionCreationInteractionTest {
         }
         compose.onNodeWithText("当前会话没有可复用的续聊摘要").assertExists()
     }
+    @Test fun browsingHistoryDoesNotCreateOrOpenASession() {
+        val owner = SessionOwner(identity)
+        val destinations = mutableListOf<UiSceneId>()
+        show(owner, destinations)
+        compose.onNodeWithText("历史会话").performClick()
+        compose.onNodeWithText("已保存会话：0").assertExists()
+        compose.runOnIdle {
+            assertEquals(emptyList<SessionUiCommand>(), owner.submitted)
+            assertEquals(emptyList<UiSceneId>(), destinations)
+        }
+        compose.onNodeWithText("新建").performClick()
+        compose.onNodeWithText("创建本地会话").assertExists()
+    }
+
 }

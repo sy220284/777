@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.uipack.v6
 
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
+import com.labteto.dshmobile.uicontract.SettingsUiPort
+import com.labteto.dshmobile.uicontract.SessionUiPort
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.horizontalScroll
@@ -50,7 +54,6 @@ import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.UiCommandRejection
 import com.labteto.dshmobile.uicontract.UiExecutionPhase
 import com.labteto.dshmobile.uicontract.UiMessageEditOutcome
-import com.labteto.dshmobile.uicontract.UiMessageRole
 import com.labteto.dshmobile.uicontract.UiMessageSnapshot
 import com.labteto.dshmobile.uicontract.UiReadingAnchor
 import com.labteto.dshmobile.uicontract.UiSceneStatus
@@ -176,6 +179,9 @@ fun V6ConversationScene(
     onBack: () -> Unit,
     part: V6ConversationPart = V6ConversationPart.FULL,
     onNavigate: ((UiSceneId) -> UiSceneNavigationResult)? = null,
+    modelSettings: SettingsUiPort? = null,
+    sessions: SessionUiPort? = null,
+    availableScenes: Set<UiSceneId>? = null,
 ) {
     val chat by ports.chat.snapshots.collectAsStateWithLifecycle(initialValue = ports.chat.snapshot())
     val work by ports.work.snapshots.collectAsStateWithLifecycle(initialValue = ports.work.snapshot())
@@ -242,7 +248,6 @@ fun V6ConversationScene(
     var editing by remember(identity) { mutableStateOf<UiMessageSnapshot?>(null) }
     var editText by remember(identity) { mutableStateOf("") }
     var editError by remember(identity) { mutableStateOf<String?>(null) }
-    var menuError by remember(identity) { mutableStateOf<String?>(null) }
     var attachmentsOpen by remember(identity) { mutableStateOf(false) }
     var questionText by remember(work.question?.pendingId) { mutableStateOf("") }
     var older by remember(identity) { mutableStateOf(emptyList<UiMessageSnapshot>()) }
@@ -564,64 +569,36 @@ fun V6ConversationScene(
         }
     }
 
-    var navigationExpanded by remember(identity) { mutableStateOf(false) }
+    var messageActionId by remember(identity) { mutableStateOf<String?>(null) }
+    val contextMessage = messages.firstOrNull { it.id == messageActionId }
+    if (messageActionId != null) {
+        V6MessageContextSheet(contextMessage,
+            canEdit = identity != null && phase == UiExecutionPhase.IDLE && status != UiSceneStatus.LOADING,
+            canRegenerate = identity != null && phase == UiExecutionPhase.IDLE &&
+                status != UiSceneStatus.LOADING && contextMessage?.id == messages.lastOrNull()?.id,
+            onDismiss = { messageActionId = null },
+            onEdit = { message ->
+                editing = message; editText = message.editableText.orEmpty(); editError = null
+                messageActionId = null
+            },
+            onRegenerate = { message ->
+                val target = identity
+                if (target != null && (if (workMode) ports.work.snapshot().identity else ports.chat.snapshot().identity) == target) {
+                    show(if (workMode) ports.work.submit(WorkConversationUiCommand.RegenerateReply(target, message.id))
+                        else ports.chat.submit(ChatUiCommand.RegenerateReply(target, message.id)))
+                }
+                messageActionId = null
+            })
+    }
     BoxWithConstraints(Modifier.fillMaxSize().imePadding().padding(12.dp)) {
     val composerLines = when { maxHeight < 360.dp -> 1; maxHeight < 480.dp -> 2; else -> 5 }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(if (workMode) "工作" else "聊天", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-            if (onNavigate != null) SyButton("更多", { menuError = null; navigationExpanded = true }, style = SyButtonStyle.GHOST)
+        if (onNavigate != null) V6ConversationEntries(ports, modelSettings, sessions, availableScenes,
+            workMode, identity, chat.group != null, maxHeight < 480.dp, onBack, onNavigate)
+        else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(if (workMode) "工作" else "聊天", style = MaterialTheme.typography.titleLarge)
             SyButton("返回", onBack, style = SyButtonStyle.GHOST)
-        }
-        if (onNavigate != null) {
-            if (navigationExpanded) {
-                val groups = buildList {
-                    add(V6DestinationGroup("会话", listOf(
-                        V6Destination("shell.new_session", "新建会话"),
-                        V6Destination("shell.search", "搜索历史"),
-                        V6Destination("conversation.message_actions", "消息操作"),
-                        V6Destination("conversation.reader", "完整阅读"))))
-                    if (workMode) add(V6DestinationGroup("工作", buildList {
-                        add(V6Destination("route.workspace", "工作文件"))
-                        if (identity != null && ports.workReads != null && ports.workPolicy != null)
-                            add(V6Destination("work.plan_review", "计划审阅"))
-                        if (identity != null && ports.workTeam != null)
-                            add(V6Destination("work.team", "团队成员"))
-                    })) else add(V6DestinationGroup("人物与故事", buildList {
-                        if (ports.gallery != null && ports.selection != null) {
-                            add(V6Destination("route.persona_gallery", "人物档案与故事"))
-                            if (identity != null) add(V6Destination("chat.persona_picker", "选择人物"))
-                        }
-                        add(V6Destination("route.diary", "人物日记"))
-                        add(V6Destination("chat.persona_editor", "编辑人物"))
-                        add(V6Destination("chat.character_tuning", "人物微调"))
-                        add(V6Destination("chat.world_book", "世界书"))
-                        add(V6Destination("chat.reply_suggestions", "回复建议"))
-                        if (identity != null && ports.groups != null) {
-                            add(V6Destination("chat.group_members", "群聊成员"))
-                            add(V6Destination("chat.group_announcement", "群聊公告"))
-                        }
-                    }))
-                    add(V6DestinationGroup("创作与扩展", buildList {
-                        add(V6Destination("media.creation", "媒体创作"))
-                        add(V6Destination("media.result", "媒体成果"))
-                        if (!workMode) add(V6Destination("route.workspace", "工作文件"))
-                        add(V6Destination("route.tools", "工具与插件"))
-                        add(V6Destination("route.tasks", "自动任务"))
-                        if (docOwner != null && formOwner != null)
-                            add(V6Destination("conversation.ui_document", "互动文档"))
-                    }))
-                    add(V6DestinationGroup("设置", listOf(
-                        V6Destination("settings.memory_management", "记忆管理"),
-                        V6Destination("route.settings", "应用设置"))))
-                }
-                V6ConversationMenu(groups, error = menuError, onDismiss = { navigationExpanded = false }) { entry ->
-                    val result = onNavigate(UiSceneId(entry.id))
-                    if (result is UiSceneNavigationResult.Changed) navigationExpanded = false
-                    else menuError = "暂时无法打开“${entry.title}”，请稍后再试"
-                }
-            }
         }
         if (identity == null || status == UiSceneStatus.LOADING) {
             SyNote("正在加载会话，请稍候")
@@ -651,10 +628,15 @@ fun V6ConversationScene(
                     message.id !in it && message.id in seen
                 } == true) {
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        V6MessageBody(message, workMode,
-                            onOpenFile = if (ports.files != null && identity != null) {
-                                { path -> readingFile = path }
-                            } else null)
+                        Box(Modifier.fillMaxWidth().combinedClickable(
+                            onClick = {}, onLongClickLabel = "消息操作",
+                            onLongClick = { messageActionId = message.id })) {
+                            V6MessageBody(message, workMode,
+                                onOpenFile = if (ports.files != null && identity != null) {
+                                    { path -> readingFile = path }
+                                } else null)
+                        }
+                        SyButton("操作", { messageActionId = message.id }, style = SyButtonStyle.GHOST, compact = true)
                         val documentState = docSnapshot
                         if (docOwner != null && formOwner != null && identity != null &&
                             documentState != null && documentState.sessionId == identity.sessionId) {
@@ -688,18 +670,6 @@ fun V6ConversationScene(
                         }
                         val actionReady = identity != null && phase == UiExecutionPhase.IDLE &&
                             status != UiSceneStatus.LOADING
-                        if (message.role == UiMessageRole.USER && message.editableText != null &&
-                            actionReady) SyButton("修改", {
-                                editing = message; editText = message.editableText.orEmpty(); editError = null
-                            }, style = SyButtonStyle.GHOST)
-                        if (message.role == UiMessageRole.ASSISTANT && !message.proactive &&
-                            message.id == messages.lastOrNull()?.id && actionReady) {
-                            SyButton("重新生成", {
-                                show(if (workMode) ports.work.submit(
-                                    WorkConversationUiCommand.RegenerateReply(identity, message.id))
-                                else ports.chat.submit(ChatUiCommand.RegenerateReply(identity, message.id)))
-                            }, style = SyButtonStyle.GHOST)
-                        }
                         val branch = message.branch
                         if (!workMode && branch != null && branch.count > 1 && actionReady) {
                             Text("版本 ${branch.index + 1}/${branch.count}",
@@ -796,6 +766,13 @@ fun V6ConversationScene(
         }, label = "输入消息", enabled = identity != null, singleLine = false, maxLines = composerLines)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.weight(1f).horizontalScroll(rememberScrollState())) {
+                if (!workMode && ports.replySuggestions != null && onNavigate != null &&
+                    (availableScenes == null || UiSceneId("chat.reply_suggestions") in availableScenes)) {
+                    SyButton("回复建议", {
+                        if (onNavigate(UiSceneId("chat.reply_suggestions")) !is UiSceneNavigationResult.Changed)
+                            feedback = "回复建议暂时无法打开，请稍后重试"
+                    }, style = SyButtonStyle.GHOST, compact = true)
+                }
                 SyAnimatedReveal(imported.isNotEmpty()) {
                     SyButton("附件（${imported.size}）", {
                         feedback = null

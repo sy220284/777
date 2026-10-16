@@ -21,16 +21,13 @@ internal data class V6DestinationGroup(val title: String, val entries: List<V6De
 internal val v6SettingsGroups = listOf(
     V6DestinationGroup("模型与账户", listOf(
         V6Destination("settings.models", "模型配置", "选择模型与连接方式"),
-        V6Destination("settings.account", "账户授权"),
+        V6Destination("settings.account", "ChatGPT 账户"),
         V6Destination("settings.model_performance", "模型性能", "推理与运行偏好"),
-        V6Destination("settings.usage", "用量"),
-        V6Destination("settings.minimax_quota", "MiniMax 官方额度"),
-        V6Destination("settings.pricing", "费用估算"))),
+        V6Destination("settings.usage", "用量与额度"))),
     V6DestinationGroup("使用偏好", listOf(
         V6Destination("settings.appearance", "外观"),
         V6Destination("settings.chat", "聊天设置"),
         V6Destination("settings.memory", "记忆与个性化"),
-        V6Destination("settings.memory_management", "记忆管理"),
         V6Destination("settings.notifications", "通知"))),
     V6DestinationGroup("应用与数据", listOf(
         V6Destination("settings.permissions", "系统权限"),
@@ -47,20 +44,6 @@ internal fun V6DestinationSection(group: V6DestinationGroup, onSelect: (V6Destin
         SyEntrance("destination:${entry.id}", order = index) {
             SyCategoryRow(title = entry.title, subtitle = entry.summary,
                 onClick = { onSelect(entry) })
-        }
-    }
-}
-
-@Composable
-internal fun V6ConversationMenu(groups: List<V6DestinationGroup>, error: String?, onDismiss: () -> Unit,
-    onSelect: (V6Destination) -> Unit) {
-    SyModalSheet(onDismiss = onDismiss, title = "会话功能") {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
-            .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            error?.let { Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                color = LocalSyColors.current.dangerInk) }
-            groups.forEach { V6DestinationSection(it, onSelect) }
         }
     }
 }

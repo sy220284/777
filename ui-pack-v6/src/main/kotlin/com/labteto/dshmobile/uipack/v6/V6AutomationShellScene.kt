@@ -59,6 +59,7 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
     }
     var editing by remember(page) { mutableStateOf<AutomationTask?>(null) }
     var remove by remember(page) { mutableStateOf<AutomationTask?>(null) }
+    var taskActions by remember(page) { mutableStateOf<String?>(null) }
     var prompt by remember(page) { mutableStateOf("") }
     var firstMinutes by remember(page) { mutableStateOf("60") }
     var scheduleType by remember(page) { mutableStateOf(AutomationScheduleType.ONCE) }
@@ -162,18 +163,25 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
                     task.lastError?.let { SyNote(it) }
                     task.lastResult?.let { Text(it) }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SyButton("编辑", { select(task) }, style = SyButtonStyle.SECONDARY)
+                        SyButton("任务操作", { taskActions = task.id }, style = SyButtonStyle.SECONDARY)
                         SyButton(if (task.status == AutomationStatus.PAUSED) "恢复" else "暂停", {
                             send(if (task.status == AutomationStatus.PAUSED)
                                 AutomationUiCommand.Resume(task.id)
                             else AutomationUiCommand.Pause(task.id))
                         }, enabled = !busy, style = SyButtonStyle.GHOST)
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SyButton("立即执行", { send(AutomationUiCommand.RunNow(task.id)) },
-                            enabled = !busy, style = SyButtonStyle.SECONDARY)
-                        SyButton("删除", { remove = task }, enabled = !busy,
-                            style = SyButtonStyle.DANGER)
+
+                }
+            }
+            taskActions?.let { id ->
+                SyModalSheet(onDismiss = { taskActions = null }, title = "任务操作") {
+                    val task = snapshot.tasks.firstOrNull { it.id == id }
+                    if (task == null) SyNote("此任务已不在当前列表")
+                    else {
+                        SyButton("编辑任务", { taskActions = null; select(task) }, enabled = !busy, style = SyButtonStyle.GHOST)
+                        SyButton("立即执行", { taskActions = null; send(AutomationUiCommand.RunNow(task.id)) },
+                            enabled = !busy, style = SyButtonStyle.GHOST)
+                        SyButton("删除任务", { taskActions = null; remove = task }, enabled = !busy, style = SyButtonStyle.DANGER)
                     }
                 }
             }
@@ -324,6 +332,7 @@ fun V6SessionShellScene(
     var deletion by remember { mutableStateOf<String?>(null) }
     var mode by remember { mutableStateOf(LocalConversationMode.INDEPENDENT) }
     var summary by remember { mutableStateOf<String?>(null) }
+    var creatingSession by remember(page) { mutableStateOf(page.value != "shell.empty") }
     var loading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     fun create() {
@@ -363,7 +372,7 @@ fun V6SessionShellScene(
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(when(page.value) {
-            "shell.new_session" -> "创建会话"
+            "shell.new_session" -> "会话"
             "shell.onboarding" -> "开始使用"
             "shell.empty" -> "尚无会话"
             else -> "会话管理"
@@ -374,47 +383,64 @@ fun V6SessionShellScene(
         if (state.loading) SyNote("正在读取真实会话")
         if (page.value == "shell.onboarding") Text("选择聊天或工作模式，创建本地会话后开始。")
         if (page.value == "shell.empty" && state.sessions.isEmpty()) Text("当前没有已保存会话")
-        val current = state.usageMode
-        SyButton("聊天模式", {
-            feedback = describeV6ConversationReceipt(
-                sessions.submit(SessionUiCommand.SelectMode(LocalUsageMode.CHAT)))
-        }, style = if (current == LocalUsageMode.CHAT) SyButtonStyle.PRIMARY else SyButtonStyle.SECONDARY)
-        SyButton("Work 模式", {
-            feedback = describeV6ConversationReceipt(
-                sessions.submit(SessionUiCommand.SelectMode(LocalUsageMode.WORK)))
-        }, style = if (current == LocalUsageMode.WORK) SyButtonStyle.PRIMARY else SyButtonStyle.SECONDARY)
-        LocalConversationMode.entries.forEach { candidate ->
-            SyButton(candidate.name, { mode = candidate },
-                style = if (candidate == mode) SyButtonStyle.PRIMARY else SyButtonStyle.GHOST)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SyButton("新建", { creatingSession = true },
+                style = if (creatingSession) SyButtonStyle.PRIMARY else SyButtonStyle.GHOST)
+            SyButton("历史会话", { creatingSession = false },
+                style = if (creatingSession) SyButtonStyle.GHOST else SyButtonStyle.PRIMARY)
+            SyButton("搜索", {
+                if (onNavigate(UiSceneId("shell.search")) !is UiSceneNavigationResult.Changed)
+                    feedback = "历史搜索暂时无法打开"
+            }, style = SyButtonStyle.GHOST)
         }
-        SyButton("创建本地会话", { create() }, enabled = !state.loading)
-        Text("已保存会话：" + state.sessions.size)
-        state.sessions.forEach { session ->
-            SyGlassCard(Modifier.fillMaxWidth()) {
-                Text(session.title)
-                SyButton("打开会话", {
-                    val receipt = sessions.submit(SessionUiCommand.Open(session.id))
-                    feedback = describeV6ConversationReceipt(receipt)
-                    if (receipt == UiCommandReceipt.Accepted ||
-                        receipt == UiCommandReceipt.Queued) {
-                        loading = true
-                        scope.launch {
-                            try {
-                                val opened = withTimeoutOrNull(15_000L) {
-                                    sessions.snapshots.first { !it.loading && it.identity?.sessionId == session.id }
-                                }
-                                if (opened != null) {
-                                    if (onNavigate(UiSceneId("route.home")) !is UiSceneNavigationResult.Changed)
-                                        feedback = "会话已打开，但聊天首页暂不可达"
-                                } else feedback = "尚未确认打开目标会话，请刷新目录后重试"
-                            } catch (cancelled: CancellationException) { throw cancelled }
-                            catch (failure: Exception) { feedback = failure.message ?: "会话打开失败" }
-                            finally { loading = false }
+        val current = state.usageMode
+        if (creatingSession) {
+            SyButton("聊天模式", {
+                feedback = describeV6ConversationReceipt(
+                    sessions.submit(SessionUiCommand.SelectMode(LocalUsageMode.CHAT)))
+            }, style = if (current == LocalUsageMode.CHAT) SyButtonStyle.PRIMARY else SyButtonStyle.SECONDARY)
+            SyButton("工作模式", {
+                feedback = describeV6ConversationReceipt(
+                    sessions.submit(SessionUiCommand.SelectMode(LocalUsageMode.WORK)))
+            }, style = if (current == LocalUsageMode.WORK) SyButtonStyle.PRIMARY else SyButtonStyle.SECONDARY)
+            LocalConversationMode.entries.forEach { candidate ->
+                SyButton(when (candidate) {
+                    LocalConversationMode.INDEPENDENT -> "独立会话"
+                    LocalConversationMode.PROJECT -> "项目会话"
+                    LocalConversationMode.CONTINUATION -> "承接上文"
+                }, { mode = candidate },
+                    style = if (candidate == mode) SyButtonStyle.PRIMARY else SyButtonStyle.GHOST)
+            }
+            SyButton("创建本地会话", { create() }, enabled = !state.loading)
+        } else {
+            Text("已保存会话：" + state.sessions.size)
+            state.sessions.forEach { session ->
+                SyGlassCard(Modifier.fillMaxWidth()) {
+                    Text(session.title)
+                    SyButton("打开会话", {
+                        val receipt = sessions.submit(SessionUiCommand.Open(session.id))
+                        feedback = describeV6ConversationReceipt(receipt)
+                        if (receipt == UiCommandReceipt.Accepted ||
+                            receipt == UiCommandReceipt.Queued) {
+                            loading = true
+                            scope.launch {
+                                try {
+                                    val opened = withTimeoutOrNull(15_000L) {
+                                        sessions.snapshots.first { !it.loading && it.identity?.sessionId == session.id }
+                                    }
+                                    if (opened != null) {
+                                        if (onNavigate(UiSceneId("route.home")) !is UiSceneNavigationResult.Changed)
+                                            feedback = "会话已打开，但聊天首页暂不可达"
+                                    } else feedback = "尚未确认打开目标会话，请刷新目录后重试"
+                                } catch (cancelled: CancellationException) { throw cancelled }
+                                catch (failure: Exception) { feedback = failure.message ?: "会话打开失败" }
+                                finally { loading = false }
+                            }
                         }
-                    }
-                }, enabled = !state.loading, style = SyButtonStyle.SECONDARY)
-                SyButton("删除此会话", { deletion = session.id },
-                    enabled = !state.loading, style = SyButtonStyle.DANGER)
+                    }, enabled = !state.loading, style = SyButtonStyle.SECONDARY)
+                    SyButton("删除此会话", { deletion = session.id },
+                        enabled = !state.loading, style = SyButtonStyle.DANGER)
+                }
             }
         }
     }

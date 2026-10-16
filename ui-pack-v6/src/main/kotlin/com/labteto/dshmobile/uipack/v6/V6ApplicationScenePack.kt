@@ -327,15 +327,15 @@ class V6ApplicationScenePack(
                     ?.collectAsStateWithLifecycle(initialValue = owners.workMode())?.value
                     ?: owners.workMode()
                 V6ConversationScene(owners, workMode, onBack = { scope.onBack(); Unit },
-                    onNavigate = scope.onNavigate)
+                    onNavigate = scope.onNavigate, modelSettings = settings, sessions = secondary?.sessions, availableScenes = renderers.keys)
             })
             put(UiSceneId("conversation.chat"), UiSceneRenderer { scope ->
                 V6ConversationScene(owners, workMode = false, onBack = { scope.onBack(); Unit },
-                    onNavigate = scope.onNavigate)
+                    onNavigate = scope.onNavigate, modelSettings = settings, sessions = secondary?.sessions, availableScenes = renderers.keys)
             })
             put(UiSceneId("conversation.work"), UiSceneRenderer { scope ->
                 V6ConversationScene(owners, workMode = true, onBack = { scope.onBack(); Unit },
-                    onNavigate = scope.onNavigate)
+                    onNavigate = scope.onNavigate, modelSettings = settings, sessions = secondary?.sessions, availableScenes = renderers.keys)
             })
             val planOwner = owners.workReads
             val policyOwner = owners.workPolicy
@@ -397,7 +397,7 @@ class V6ApplicationScenePack(
                         ?.collectAsStateWithLifecycle(initialValue = owners.workMode())?.value
                         ?: owners.workMode()
                     V6ConversationScene(owners, mode, onBack = { scope.onBack(); Unit }, part = part,
-                        onNavigate = scope.onNavigate)
+                        onNavigate = scope.onNavigate, modelSettings = settings, sessions = secondary?.sessions, availableScenes = renderers.keys)
                 })
             }
         }

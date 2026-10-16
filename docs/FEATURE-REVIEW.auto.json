@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "snapshot": "074fa4ba9c4b",
+  "snapshot": "3d92f562b2b5",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
-  "code_files_scanned": 1691,
-  "production_sources_scanned": 983,
+  "code_files_scanned": 1693,
+  "production_sources_scanned": 985,
   "feature_nodes": 533,
   "functional_leaves": 440,
   "existing_executable_test_mappings": 125,
@@ -9198,12 +9198,14 @@
   "followup_production_or_compatibility": 10,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "357331abe02a",
+    "baseline": "a1c6a3a40ca1",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalHostPreferencesUiAdapter.kt",
-      "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiDocumentUiAdapter.kt",
+      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiDocument.kt",
+      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiDocumentUiPort.kt",
+      "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6UiDocumentScene.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

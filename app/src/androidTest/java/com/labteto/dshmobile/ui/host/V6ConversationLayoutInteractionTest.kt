@@ -10,6 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.test.assertDoesNotExist
+import org.junit.Assert.assertEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -28,6 +30,7 @@ import org.junit.Test
 
 class V6ConversationLayoutInteractionTest {
     @get:Rule val compose = createComposeRule()
+    private val workCommands = mutableListOf<WorkConversationUiCommand>()
     private val identity = UiSessionIdentity("work", "active", 1L, null, null)
     private fun ports(withAttachments: Boolean): V6ConversationPorts {
         val chat = object : ChatUiPort {
@@ -41,7 +44,10 @@ class V6ConversationLayoutInteractionTest {
                 UiExecutionPhase.IDLE, listOf(UiMessageSnapshot("m", UiMessageRole.ASSISTANT, "可继续阅读的工作内容", 1L)),
                 0, UiActionAvailability(true), null, null))
             override fun snapshot() = snapshots.value
-            override fun submit(command: WorkConversationUiCommand) = UiCommandReceipt.Accepted
+            override fun submit(command: WorkConversationUiCommand): UiCommandReceipt {
+                workCommands.add(command)
+                return UiCommandReceipt.Accepted
+            }
         }
         val drafts = object : ConversationDraftUiPort {
             override val drafts = MutableStateFlow(mapOf(identity.sessionId to (1..50).joinToString("\n") { "第${it}行草稿" }))
@@ -90,7 +96,40 @@ class V6ConversationLayoutInteractionTest {
     @Test fun deniedNavigationShowsFeedbackInsideOpenSheet() {
         show(V6ConversationPart.HEADER)
         compose.onNodeWithText("更多").performClick()
-        compose.onNodeWithText("新建会话").performClick()
-        compose.onNodeWithText("暂时无法打开“新建会话”，请稍后再试").assertIsDisplayed()
+        compose.onNodeWithText("应用设置").performClick()
+        compose.onNodeWithText("暂时无法打开“应用设置”，请稍后再试").assertIsDisplayed()
     }
+    @Test fun messageMenuRegeneratesExactlyTheTappedMessage() {
+        show(V6ConversationPart.TIMELINE)
+        compose.onNodeWithText("操作").performClick()
+        compose.onNodeWithText("重新生成这条回复").performClick()
+        compose.runOnIdle {
+            assertEquals(listOf(WorkConversationUiCommand.RegenerateReply(identity, "m")), workCommands)
+        }
+    }
+
+    @Test fun messageMenuRemovesActionsWhenMessageDisappears() {
+        val owner = ports(false)
+        compose.setContent {
+            MaterialTheme { V6ConversationScene(owner, true, {}, part = V6ConversationPart.TIMELINE) }
+        }
+        compose.onNodeWithText("操作").performClick()
+        compose.runOnIdle {
+            val state = owner.work.snapshots as MutableStateFlow<WorkConversationSceneSnapshot>
+            state.value = state.value.copy(messages = emptyList())
+        }
+        compose.onNodeWithText("这条消息已不在当前列表，请返回后重新选择").assertIsDisplayed()
+        compose.onNodeWithText("重新生成这条回复").assertDoesNotExist()
+        assertEquals(0, workCommands.size)
+    }
+
+    @Test fun sessionMenuKeepsNewAndHistoryEntryOutsideMore() {
+        show(V6ConversationPart.HEADER)
+        compose.onNodeWithText("会话").performClick()
+        compose.onNodeWithText("新建与管理会话").assertIsDisplayed()
+        compose.onNodeWithText("搜索历史").assertIsDisplayed()
+        compose.onNodeWithText("新建与管理会话").performClick()
+        compose.onNodeWithText("暂时无法打开“新建与管理会话”，请稍后再试").assertIsDisplayed()
+    }
+
 }

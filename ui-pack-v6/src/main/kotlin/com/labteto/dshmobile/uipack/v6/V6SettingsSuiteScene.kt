@@ -85,7 +85,8 @@ fun V6SettingsSuiteScene(
     }
     val name = when(scene.value) {
         "route.settings","settings.root" -> "设置中心"
-        "settings.models","conversation.model_picker" -> "模型管理"
+        "settings.models" -> "模型管理"
+        "conversation.model_picker" -> "选择模型"
         "settings.model_performance" -> "模型性能与推理"
         "settings.pricing" -> "费用估算"
         "settings.usage","settings.model_usage" -> "模型额度与用量"
@@ -130,6 +131,7 @@ fun V6SettingsSuiteScene(
                 }
             }
             "settings.models","conversation.model_picker" -> {
+                val picking = scene.value == "conversation.model_picker"
                 Text("当前模型：" + state.model)
                 state.modelProfiles.forEach { profile ->
                     SyGlassCard(Modifier.fillMaxWidth()) {
@@ -138,36 +140,42 @@ fun V6SettingsSuiteScene(
                             submit(SettingsUiCommand.SelectModel(profile.id))
                         }, enabled = !state.loading && !busy &&
                             state.modelSelection.activeProfileId != profile.id)
-                        SyButton("删除该配置", { selectedModel = profile.id },
+                        if (!picking) SyButton("删除该配置", { selectedModel = profile.id },
                             enabled = !state.loading && !busy, style = SyButtonStyle.GHOST)
                     }
                 }
-                SyInput(modelName, { modelName = it }, label = "模型 ID")
-                SyInput(modelUrl, { modelUrl = it }, label = "API 基础地址")
-                androidx.compose.material3.OutlinedTextField(
-                    modelKey, { modelKey = it }, modifier = Modifier.fillMaxWidth(),
-                    label = { Text("API Key（仅临时输入）") },
-                    visualTransformation = PasswordVisualTransformation(), singleLine = true)
-                SyButton("保存模型配置", onClick = {
-                    if (busy) return@SyButton
-                    val secret = modelKey
-                    modelKey = ""
-                    busy = true
-                    scope.launch {
-                        try {
-                            feedback = when (val result = settings.save(
-                                SettingsUiCommand.SaveModel(secret, modelName.trim(), modelUrl.trim()))) {
-                                SettingsUiReceipt.Applied -> "模型配置已保存"
-                                SettingsUiReceipt.Submitted -> "模型配置已提交"
-                                SettingsUiReceipt.Rejected -> "模型配置未被接受"
-                                is SettingsUiReceipt.Failed -> result.message ?: "保存失败"
-                            }
-                        } catch (cancelled: CancellationException) { throw cancelled }
-                        catch (failure: Exception) { feedback = failure.message ?: "保存模型失败" }
-                        finally { busy = false }
-                    }
-                }, enabled = !busy && !state.loading &&
-                    modelName.isNotBlank() && modelUrl.isNotBlank())
+                if (picking) SyButton("管理模型配置", {
+                    if (onNavigate(UiSceneId("settings.models")) !is UiSceneNavigationResult.Changed)
+                        feedback = "模型管理暂时无法打开"
+                }, style = SyButtonStyle.GHOST)
+                if (!picking) {
+                    SyInput(modelName, { modelName = it }, label = "模型 ID")
+                    SyInput(modelUrl, { modelUrl = it }, label = "API 基础地址")
+                    androidx.compose.material3.OutlinedTextField(
+                        modelKey, { modelKey = it }, modifier = Modifier.fillMaxWidth(),
+                        label = { Text("API Key（仅临时输入）") },
+                        visualTransformation = PasswordVisualTransformation(), singleLine = true)
+                    SyButton("保存模型配置", onClick = {
+                        if (busy) return@SyButton
+                        val secret = modelKey
+                        modelKey = ""
+                        busy = true
+                        scope.launch {
+                            try {
+                                feedback = when (val result = settings.save(
+                                    SettingsUiCommand.SaveModel(secret, modelName.trim(), modelUrl.trim()))) {
+                                    SettingsUiReceipt.Applied -> "模型配置已保存"
+                                    SettingsUiReceipt.Submitted -> "模型配置已提交"
+                                    SettingsUiReceipt.Rejected -> "模型配置未被接受"
+                                    is SettingsUiReceipt.Failed -> result.message ?: "保存失败"
+                                }
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (failure: Exception) { feedback = failure.message ?: "保存模型失败" }
+                            finally { busy = false }
+                        }
+                    }, enabled = !busy && !state.loading &&
+                        modelName.isNotBlank() && modelUrl.isNotBlank())
+                }
             }
             "settings.model_performance" ->
                 SyNote("模型性能设置暂不可用，请稍后再试")
@@ -213,6 +221,14 @@ fun V6SettingsSuiteScene(
             }
             "settings.usage","settings.model_usage","settings.usage_log",
             "settings.usage_detail" -> {
+                if (state.miniMaxQuotaProfile != null) SyButton("MiniMax 账户额度", {
+                    if (onNavigate(UiSceneId("settings.minimax_quota")) !is UiSceneNavigationResult.Changed)
+                        feedback = "账户额度暂时无法打开"
+                }, style = SyButtonStyle.GHOST)
+                SyButton("费用估算", {
+                    if (onNavigate(UiSceneId("settings.pricing")) !is UiSceneNavigationResult.Changed)
+                        feedback = "费用估算暂时无法打开"
+                }, style = SyButtonStyle.GHOST)
                 val owner = usage
                 if (owner == null) SyNote("请求记录暂不可用")
                 else {
