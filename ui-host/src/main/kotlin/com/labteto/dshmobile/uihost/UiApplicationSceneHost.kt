@@ -57,14 +57,19 @@ fun UiApplicationPackAdmission.Admitted.RenderHostedScene(
     onDeepLinkProcessed: (String, UiSceneNavigationResult) -> Unit = { _, _ -> },
     persistedNavigationSnapshot: String? = null,
     onNavigationSnapshotUpdated: (String) -> Unit = {},
+    // Pure Host-supplied identity, never a UI-pack or model-provided navigation key.
+    // Changing sessions must replace the saveable stack as well as the resolver.
+    navigationStateScope: String = pack.manifest.id,
 ): UiSceneRenderAccess {
-    var encoded by rememberSaveable(pack.manifest.id) {
+    var encoded by rememberSaveable(pack.manifest.id, navigationStateScope) {
         mutableStateOf(persistedNavigationSnapshot ?:
             UiSceneNavigationSnapshotCodec.encode(navigation.initial))
     }
     // A->B->A restores the same encoded stack: track a monotonic transition epoch
     // as well so an asynchronous callback from the first A cannot act in the new A.
-    var transitionEpoch by rememberSaveable(pack.manifest.id) { mutableStateOf(0L) }
+    var transitionEpoch by rememberSaveable(pack.manifest.id, navigationStateScope) {
+        mutableStateOf(0L)
+    }
     val restored = navigation.restoreEncodedSnapshot(encoded)
     if (restored !is UiSceneNavigationResult.Changed) {
         return UiSceneRenderAccess.Rejected(UiSceneRenderRejection.INVALID_HISTORY)
