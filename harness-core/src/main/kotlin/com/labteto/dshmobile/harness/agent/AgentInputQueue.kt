@@ -12,6 +12,9 @@ data class AgentContinuationRef(
     val failureCode: String,
     val index: Int,
     val sourceMessageId: String?,
+    /** Present only for Goal progress continuation: binds a resume to one immutable goal contract. */
+    val goalId: String? = null,
+    val goalFingerprint: String? = null,
 ) {
     init {
         require(sourceRunId.isNotBlank() && checkpointSequence >= 0 && index > 0)
