@@ -504,7 +504,8 @@ fun V6MediaScene(media: MediaUiPort, settings: SettingsUiPort,
     sessionId: String?, creation: Boolean, onBack: () -> Unit) {
     val config by settings.state.collectAsStateWithLifecycle(initialValue = settings.initialState)
     val offers = remember(config.modelProfiles) { media.offers(config.modelProfiles) }
-    val entries by remember(media, sessionId) { media.observe(sessionId, media.pageSize * 4) }
+    var historyLimit by rememberSaveable(sessionId) { mutableIntStateOf(media.pageSize) }
+    val entries by remember(media, sessionId, historyLimit) { media.observe(sessionId, historyLimit) }
         .collectAsStateWithLifecycle(initialValue = LocalMediaPage())
     val storageError by media.storageError.collectAsStateWithLifecycle()
     var chosenKind by rememberSaveable { mutableStateOf(LocalMediaKind.IMAGE.name) }
@@ -722,7 +723,9 @@ fun V6MediaScene(media: MediaUiPort, settings: SettingsUiPort,
             }
         }
         if (entries.unavailable) SyNote("媒体记录暂不可读取")
-        if (entries.hasMore) SyNote("更多旧记录尚未全部加载")
+        if (entries.hasMore) SyButton("加载更早成果", {
+            historyLimit = (historyLimit + media.pageSize).coerceAtMost(10_000)
+        }, enabled = !pending && historyLimit < 10_000, style = SyButtonStyle.GHOST, compact = true)
         }
     }
     frozenRequest?.let { fixed -> AlertDialog(onDismissRequest = { frozenRequest = null },
