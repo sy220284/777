@@ -53,6 +53,16 @@ class AgentInputQueue(
         }
     }
 
+    /**
+     * Internal autonomous follow-ups are opportunistic. A user input or any other
+     * already-admitted command always wins: never append a background continuation
+     * behind a newer request. Admission and durability share the same queue lock.
+     */
+    fun offerIfEmpty(input: QueuedAgentInput, commit: () -> Unit = {}): Boolean =
+        synchronized(lock) {
+            if (items.isNotEmpty()) false else offer(input, commit)
+        }
+
     fun drain(): List<QueuedAgentInput> = synchronized(lock) {
         if (items.isEmpty()) return@synchronized emptyList()
         buildList(items.size) {
