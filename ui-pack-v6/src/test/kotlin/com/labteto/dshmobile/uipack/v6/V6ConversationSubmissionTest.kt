@@ -11,6 +11,12 @@ import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.UiCommandRejection
 import com.labteto.dshmobile.uicontract.UiExecutionPhase
 import com.labteto.dshmobile.uicontract.UiReadingAnchor
+import com.labteto.dshmobile.uicontract.UiMessageHistoryPort
+import com.labteto.dshmobile.uicontract.UiMessagePage
+import com.labteto.dshmobile.uicontract.UiMessageRole
+import com.labteto.dshmobile.uicontract.UiMessageSnapshot
+import com.labteto.dshmobile.uicontract.UiTranscriptCursor
+import kotlinx.coroutines.runBlocking
 import com.labteto.dshmobile.uicontract.UiSceneStatus
 import com.labteto.dshmobile.uicontract.UiSessionIdentity
 import com.labteto.dshmobile.uicontract.WorkConversationSceneSnapshot
@@ -69,6 +75,66 @@ class V6ConversationSubmissionTest {
     private val chat = ChatOwner()
     private val work = WorkOwner()
     private fun ports() = V6ConversationPorts(chat, work, drafts, reading, workMode = { false })
+
+    private data class TestCursor(val page: Int) : UiTranscriptCursor
+    private fun message(id: String) = UiMessageSnapshot(id, UiMessageRole.USER, id, 1L)
+
+    @Test fun historicSearchAnchorLoadsOnlyOwnerPagesUntilExactMessage() = runBlocking {
+        var calls = 0
+        val owner = object : UiMessageHistoryPort {
+            override suspend fun messagePage(
+                sessionId: String, cursor: UiTranscriptCursor?, limit: Int,
+            ): UiMessagePage {
+                assertEquals("s1", sessionId)
+                assertEquals(100, limit)
+                calls++
+                return when ((cursor as? TestCursor)?.page ?: 0) {
+                    0 -> UiMessagePage(listOf(message("recent-old")), TestCursor(1))
+                    1 -> UiMessagePage(listOf(message("actual-hit")), TestCursor(2))
+                    else -> error("Must stop after target found")
+                }
+            }
+        }
+        val loaded = locateV6HistoryAnchor(owner, "s1", listOf(message("hot")),
+            null, true, "actual-hit", 25)
+        assertTrue(loaded.found)
+        assertEquals(listOf("actual-hit", "recent-old", "hot"), loaded.messages.map { it.id })
+        assertEquals(2, calls)
+        assertTrue(loaded.hasOlder)
+    }
+
+    @Test fun historyAnchorBudgetDoesNotPretendTargetWasFound() = runBlocking {
+        var calls = 0
+        val owner = object : UiMessageHistoryPort {
+            override suspend fun messagePage(sessionId: String, cursor: UiTranscriptCursor?,
+                limit: Int): UiMessagePage {
+                calls++
+                return UiMessagePage(listOf(message("older-$calls")), TestCursor(calls))
+            }
+        }
+        val loaded = locateV6HistoryAnchor(owner, "s1", listOf(message("hot")),
+            null, true, "not-in-budget", 2)
+        assertFalse(loaded.found)
+        assertEquals(2, calls)
+        assertTrue(loaded.hasOlder)
+        assertEquals(TestCursor(2), loaded.nextCursor)
+    }
+
+    @Test fun emptyUnchangingHistoryCursorStopsInsteadOfLoopingForever() = runBlocking {
+        var calls = 0
+        val owner = object : UiMessageHistoryPort {
+            override suspend fun messagePage(sessionId: String, cursor: UiTranscriptCursor?,
+                limit: Int): UiMessagePage {
+                calls++
+                return UiMessagePage(emptyList(), cursor)
+            }
+        }
+        val loaded = locateV6HistoryAnchor(owner, "s1", listOf(message("hot")),
+            null, true, "missing", 100)
+        assertFalse(loaded.found)
+        assertFalse(loaded.hasOlder)
+        assertEquals(1, calls)
+    }
 
     @Test fun anAttachmentWithoutTextStillGoesToTheExistingChatOwner() {
         val item = LocalImportedAttachment("photo.png", "session/photo.png", "image/png", 42)
