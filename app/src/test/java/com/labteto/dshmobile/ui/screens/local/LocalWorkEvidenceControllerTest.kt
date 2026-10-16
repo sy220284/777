@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.presentation.LocalWorkHistoryCursor
+import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
+import com.labteto.dshmobile.local.presentation.LocalRequirementUiTarget
+import kotlinx.coroutines.CompletableDeferred
 import com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi
 import com.labteto.dshmobile.local.presentation.LocalWorkHistoryRecord
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
@@ -13,7 +16,10 @@ import org.junit.Test
 
 class LocalWorkEvidenceControllerTest {
     private fun actions(page: (String, LocalWorkHistoryCursor?) -> LocalWorkHistoryPageUi,
-        linksFail: Boolean = false) = LocalWorkFeatureUiActions(
+        linksFail: Boolean = false,
+        link: suspend (String, LocalRequirementUiTarget, LocalArtifactUiItem) -> Boolean =
+            { _, _, _ -> false },
+    ) = LocalWorkFeatureUiActions(
         evidence = object : com.labteto.dshmobile.uicontract.WorkEvidenceUiPort {
             override suspend fun read(identity: com.labteto.dshmobile.uicontract.UiSessionIdentity) =
                 com.labteto.dshmobile.uicontract.UiWorkEvidenceReadReceipt.Rejected(
@@ -31,7 +37,7 @@ class LocalWorkEvidenceControllerTest {
         refreshArtifactFiles = { _, items -> items }, inspectArtifact = { _, item -> item },
         historyPage = page, toolActivities = { emptyList() }, toolEvidence = { _, _, _ -> null },
         requirementEvidence = { if (linksFail) throw IOException("link read failed") else emptyList() },
-        linkRequirementEvidence = { _, _, _ -> false },
+        linkRequirementEvidence = link,
     )
     private fun record(n: Long) = LocalWorkHistoryRecord(n, "tool/result", "write", "result", "call-$n", emptyList())
 
@@ -85,6 +91,47 @@ class LocalWorkEvidenceControllerTest {
             val recovered = controller.state.first { !it.loading && !it.failed && it.records.size == 2 }
             assertEquals(listOf(30L, 10L), recovered.records.map { it.sequence })
             assertEquals(2, attempts)
+        } finally { controller.close() }
+    }
+
+    @Test fun staleEvidenceCompletionCannotClearNewerLinkBusyState() = runTest {
+        val firstStarted = CompletableDeferred<Unit>()
+        val secondStarted = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        val releaseSecond = CompletableDeferred<Unit>()
+        var callCount = 0
+        val controller = LocalWorkEvidenceController(this, "session",
+            actions(page = { _, _ -> LocalWorkHistoryPageUi(emptyList(), null) },
+                link = { _, _, _ ->
+                    callCount++
+                    if (callCount == 1) {
+                        firstStarted.complete(Unit)
+                        releaseFirst.await()
+                    } else {
+                        secondStarted.complete(Unit)
+                        releaseSecond.await()
+                    }
+                    false
+                }))
+        val artifact = LocalArtifactUiItem(
+            reference = "report.md", category = "file", sourceCallId = "call-1",
+            asOfSequence = 1L, currentlyAvailable = true,
+        )
+        val target = LocalRequirementUiTarget(0, "交付报告", null)
+        try {
+            controller.link(target, artifact)
+            firstStarted.await()
+            controller.refresh()
+            controller.state.first { !it.loading }
+            assertFalse(controller.state.value.linking)
+            controller.link(target, artifact)
+            secondStarted.await()
+            releaseFirst.complete(Unit)
+            // The previous request has been invalidated by refresh and may not unlock this one.
+            kotlinx.coroutines.yield()
+            assertTrue(controller.state.value.linking)
+            releaseSecond.complete(Unit)
+            controller.state.first { !it.linking }
         } finally { controller.close() }
     }
 
