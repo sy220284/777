@@ -24,6 +24,8 @@ import com.shenyan.designsystem.components.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 
 /** Calendar cadence needs non-null recurring metadata so WorkManager never treats it as once. */
@@ -310,9 +312,22 @@ fun V6SessionShellScene(
             SessionUiCommand.Create(target, mode, state.usageMode, handoff))
         feedback = describeV6ConversationReceipt(receipt)
         if (receipt == UiCommandReceipt.Accepted || receipt == UiCommandReceipt.Queued) {
-            val navigation = onNavigate(UiSceneId("route.home"))
-            if (navigation !is UiSceneNavigationResult.Changed)
-                feedback = "会话创建请求已提交，聊天首页暂不可达；请从会话列表进入"
+            // Queued is not an active session. Never show the old story as the new one.
+            val previousSessionId = target?.sessionId
+            loading = true
+            scope.launch {
+                try {
+                    val active = withTimeoutOrNull(15_000L) {
+                        sessions.snapshots.first { !it.loading && it.identity != null &&
+                            it.identity.sessionId != previousSessionId }
+                    }
+                    if (active == null) feedback = "新会话尚未确认激活，请从会话列表查看真实创建结果"
+                    else if (onNavigate(UiSceneId("route.home")) !is UiSceneNavigationResult.Changed)
+                        feedback = "新会话已激活，但聊天首页暂不可达"
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (failure: Exception) { feedback = failure.message ?: "无法确认新会话" }
+                finally { loading = false }
+            }
         }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -351,8 +366,22 @@ fun V6SessionShellScene(
                     val receipt = sessions.submit(SessionUiCommand.Open(session.id))
                     feedback = describeV6ConversationReceipt(receipt)
                     if (receipt == UiCommandReceipt.Accepted ||
-                        receipt == UiCommandReceipt.Queued)
-                        onNavigate(UiSceneId("route.home"))
+                        receipt == UiCommandReceipt.Queued) {
+                        loading = true
+                        scope.launch {
+                            try {
+                                val opened = withTimeoutOrNull(15_000L) {
+                                    sessions.snapshots.first { !it.loading && it.identity?.sessionId == session.id }
+                                }
+                                if (opened != null) {
+                                    if (onNavigate(UiSceneId("route.home")) !is UiSceneNavigationResult.Changed)
+                                        feedback = "会话已打开，但聊天首页暂不可达"
+                                } else feedback = "尚未确认打开目标会话，请刷新目录后重试"
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (failure: Exception) { feedback = failure.message ?: "会话打开失败" }
+                            finally { loading = false }
+                        }
+                    }
                 }, enabled = !state.loading, style = SyButtonStyle.SECONDARY)
                 SyButton("删除此会话", { deletion = session.id },
                     enabled = !state.loading, style = SyButtonStyle.DANGER)
