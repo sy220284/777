@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.attachment.copyAttachmentCancellably
 import com.labteto.dshmobile.local.attachment.commitImportedAttachmentFile
 import java.io.File
+import java.nio.file.Files
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
@@ -37,7 +38,8 @@ class LocalAttachmentImporterTest {
         try {
             val incoming = File(dir, ".incoming").apply { writeText("new contents") }
             val existing = File(dir, "digest.txt").apply { writeText("existing") }
-            commitImportedAttachmentFile(incoming, existing)
+            val failed = runCatching { commitImportedAttachmentFile(incoming, existing) }
+            assertTrue("Conflicting shared hash must fail closed", failed.isFailure)
             assertEquals("existing", existing.readText())
             // Caller owns this temporary file even when a duplicate target exists.
             assertEquals("new contents", incoming.readText())
@@ -52,8 +54,38 @@ class LocalAttachmentImporterTest {
             val target = File(dir, "digest.txt")
             commitImportedAttachmentFile(incoming, target)
             assertEquals("complete attachment", target.readText())
-            assertFalse(incoming.exists())
+            // Caller cleanup owns the original temporary file; the published inode is stable.
+            assertTrue(incoming.exists())
             assertTrue(dir.listFiles().orEmpty().none { it.name.startsWith(".commit-") })
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test
+    fun publishingSameHashTwiceReusesOnlyIdenticalCompleteContent() {
+        val dir = kotlin.io.path.createTempDirectory("attachment-same-bytes").toFile()
+        try {
+            val first = File(dir, ".incoming-a").apply { writeText("same bytes") }
+            val second = File(dir, ".incoming-b").apply { writeText("same bytes") }
+            val target = File(dir, "content-addressed.txt")
+            commitImportedAttachmentFile(first, target)
+            commitImportedAttachmentFile(second, target)
+            assertEquals("same bytes", target.readText())
+            second.writeText("DIFFERENT")
+            assertTrue(runCatching { commitImportedAttachmentFile(second, target) }.isFailure)
+            assertEquals("same bytes", target.readText())
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test
+    fun symlinkAtAnExistingDigestCannotBeAcceptedAsAnAttachment() {
+        val dir = kotlin.io.path.createTempDirectory("attachment-symlink").toFile()
+        try {
+            val outside = File(dir, "other.txt").apply { writeText("same bytes") }
+            val target = File(dir, "digest.txt")
+            Files.createSymbolicLink(target.toPath(), outside.toPath())
+            val source = File(dir, ".incoming").apply { writeText("same bytes") }
+            assertTrue(runCatching { commitImportedAttachmentFile(source, target) }.isFailure)
+            assertEquals("same bytes", outside.readText())
         } finally { dir.deleteRecursively() }
     }
 

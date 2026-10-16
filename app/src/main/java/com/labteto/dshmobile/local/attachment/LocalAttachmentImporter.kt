@@ -16,6 +16,9 @@ import com.labteto.dshmobile.local.files.LocalWorkspace
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
+import java.nio.file.FileAlreadyExistsException
+import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -280,21 +283,52 @@ internal suspend fun copyAttachmentCancellably(
 }
 
 /**
- * Publish only a complete attachment. Cross-volume fallback copies into a private temporary
- * staging path before a same-directory rename, so a cancelled/failed copy never exposes a
- * truncated file under its content-addressed final name. Existing shared hashes are retained.
- * Caller owns and cleans the source temporary file in all cases.
+ * Commit a content-addressed attachment without ever replacing an existing target. A private
+ * temp file is fully written first; createLink atomically publishes a *complete* inode and
+ * fails if another import has already published the same digest. This also prevents an Android
+ * rename race from overwriting an existing attachment. If hard links are unsupported, refuse
+ * the import rather than exposing a partially copied public target.
+ *
+ * The caller owns and always cleans the source temporary file.
  */
 internal fun commitImportedAttachmentFile(source: File, target: File) {
-    if (target.exists()) return
-    if (source.renameTo(target)) return
-    val pending = File(target.parentFile, ".commit-${UUID.randomUUID()}")
+    require(Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+        "附件临时文件不存在或不是普通文件"
+    }
+    val sameDirectory = source.parentFile.canonicalFile == target.parentFile.canonicalFile
+    val staged = if (sameDirectory) source
+        else File(target.parentFile, ".commit-${UUID.randomUUID()}")
     try {
-        source.copyTo(pending, overwrite = false)
-        if (!target.exists() && !pending.renameTo(target)) {
-            error("附件保存失败")
+        if (!sameDirectory) source.copyTo(staged, overwrite = false)
+        try {
+            Files.createLink(target.toPath(), staged.toPath())
+        } catch (_: FileAlreadyExistsException) {
+            // Shared hashes are immutable: a conflicting or symlinked destination is a
+            // failed import, never a silent acceptance or replacement.
+            require(Files.isRegularFile(target.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+                sameImportedAttachmentContent(staged, target)) {
+                "同名附件内容不匹配或目标文件无效，已拒绝覆盖"
+            }
         }
     } finally {
-        pending.delete()
+        if (!sameDirectory) staged.delete()
     }
+}
+
+/** Compare existing duplicate bytes without trusting its name or loading the file into RAM. */
+private fun sameImportedAttachmentContent(first: File, second: File): Boolean {
+    if (first.length() != second.length()) return false
+    fun digest(file: File): ByteArray {
+        val sha = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(32 * 1024)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                sha.update(buffer, 0, read)
+            }
+        }
+        return sha.digest()
+    }
+    return MessageDigest.isEqual(digest(first), digest(second))
 }
