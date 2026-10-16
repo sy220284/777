@@ -1,5 +1,8 @@
 # R4 S1 / S2：群聊成员 Port 真正接入 Next（2026-10-14）
 
+> **历史快照，停止执行（2026-10-16）**：本文保留当时提交与审计证据，不是当前 R4 任务或现有代码清单。所述 Next 包/切片已经从 #705 删除，原双 UI 切换/双包验收已取消；不得据此恢复 Next 或重新创建待办。**现行执行唯一依据**：[R4 34 项任务清单](R4-CODE-TASKS.json)及[当前 R4 方案](PLAN-R4.zh-CN.md)。
+
+
 ## 既有基础（非本次新增）
 
 现有 `LocalChatRuntime.configureGroupChatMembers` 和 `LocalGroupChatMembershipCoordinator` 仍是唯一业务执行者，现有 V6 群聊成员选择器和图库主档照旧，Chat/Work 基础 Port 与 Next 会话独立包也已存在。本次**不重写成员持久化/决策/记忆，也不新增第二业务 Owner**。

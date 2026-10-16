@@ -96,7 +96,7 @@ Chat / Work / Project / Automation / Tools / Settings 的既有业务 Owner
 
 `packId / packVersion / minContractVersion / supportedScenes / requiredCapabilities / supportedWindowClasses / accessibilityCapabilities / fallbackPolicy`。
 
-**UI 包不得引用另一个 UI 包的专用页面/组件或业务私有实现。** 例如全新 Next 包不得依赖 V6 的 `LocalConversationSurface`、`SyButton`、`SyMaterialSurface` 才能完成核心功能。所有 UI 都应在相同业务插座下得到同样的真实回执。
+**UI 包不得引用另一个 UI 包的专用页面/组件或业务私有实现。** 例如未来新包不得依赖 V6 的 `LocalConversationSurface`、`SyButton`、`SyMaterialSurface` 才能完成核心功能。所有 UI 都应在相同业务插座下得到同样的真实回执。
 
 ## 4. 三种替换等级与发布边界
 
@@ -104,9 +104,9 @@ Chat / Work / Project / Automation / Tools / Settings 的既有业务 Owner
 |---|---|---|---|
 | 视觉资源包 | 配色、字体角色、图标、背景、标准动效参数 | 已内置或通过受控资源配置切换 | 不能宣称已更换完整交互布局 |
 | 安全声明式布局包 | 已有语义 Scene 的布局、导航排列、组件组合与支持的动效 | 必须先有经过验证的受限协议与渲染器 | 未支持的复杂交互须扩展协议或 UI 包实现，不能执行任意脚本 |
-| **完整原生 Compose UI 包** | **页面结构、导航、组件、交互方式和完整视觉语言** | 预装双包可直接切换；全新包随 APK/AAB 发版 | 不把任意 Kotlin、HTML/JS 或未知 APK 当成可信配置热执行 |
+| **完整原生 Compose UI 包** | **页面结构、导航、组件、交互方式和完整视觉语言** | 未来若预装多个包可按准入切换；全新包随 APK/AAB 发版，R4 不实施第二包 | 不把任意 Kotlin、HTML/JS 或未知 APK 当成可信配置热执行 |
 
-**目标验收级别是“完整原生 UI 包可替换”。** 资源换肤和声明式布局是辅助能力，不能替代双 UI 行为测试。
+**目标验收级别是“完整原生 UI 包可替换”。** 资源换肤和声明式布局是辅助能力，不能替代 R4 的独立 V6 真实业务行为验证。
 
 ## 5. 跨包统一的交互与事实语义
 
@@ -197,7 +197,7 @@ V6 独立包必须完成 75 个必需场景与 173 项动作的真实等价验�
 5. 接入 AI 动态文档、事件驱动渐进回复和成果证据，并由不同 UI 包分别绘制；
 6. 最后通过编译模块/静态门禁证明 UI 包隔离，再把一次性兼容层清理干净。
 
-建议的未来模块组织 `:ui-contract`、`:ui-host`、`:ui-pack-v6`、`:ui-pack-next` **仅是建议结构**，现行主线尚未实现，不能为满足目录名而制造无意义空模块。
+当前 R4 已建立 `:ui-contract`、`:ui-host`、`:ui-pack-v6` 的代码模块；未来新增 UI 包另行立项，不能将已取消的 `:ui-pack-next` 视为必需模块。
 
 ## 11. 规范治理与冲突处理
 
@@ -209,4 +209,4 @@ V6 独立包必须完成 75 个必需场景与 173 项动作的真实等价验�
 
 ## 12. 当前执行状态
 
-**规范已定义；底座首批迁移中，尚未完成。** 当前首条切片提供独立契约、Host SDK、Chat/Work 文本与审批端口，以及仅 Debug 可打开的独立会话验证包；V6 仍是生产默认界面，未全量移包。双包真实业务、草稿/阅读恢复及全应用覆盖尚未通过，不代表已可完整替换。阶段、源码和实际验证结果见 [实施台账](../UI-3.0-IMPLEMENTATION.zh-CN.md)。本规范仍是新 UI 改造的第一查阅入口，旧方案仅供追溯。
+**规范已定义；R4 独立 V6 迁移仍未完成。** 中立契约、Host SDK、Owner 端口与独立 V6 场景登记已落地，但 Legacy Shell 仍是生产稳定入口，`v6.migration.accepted` 未开放。Next 模块及调试入口已移除；R4 不要求第二套界面。V6 必需场景的真实业务、草稿/阅读和进程恢复、Android16/17/无障碍仍待正式验收。阶段、源码和实际验证结果见 [实施台账](../UI-3.0-IMPLEMENTATION.zh-CN.md)。本规范仍是新 UI 改造的第一查阅入口，旧方案仅供追溯。
