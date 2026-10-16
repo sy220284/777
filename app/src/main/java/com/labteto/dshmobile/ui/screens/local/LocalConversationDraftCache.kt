@@ -38,12 +38,33 @@ internal class LocalSessionDraftCache(
         onSaveAttachments(saveAttachments())
     }
     fun saveAttachments(): List<String> = attachmentValues.flatMap { (session, entries) -> listOf(session, Json.encodeToString(entries)) }
+
+    /**
+     * SavedState can outlive imported files, and malformed older state must never reintroduce
+     * an absolute/traversal reference into the composer. File existence and actual permission
+     * remain decisions of the Session/File Owner when the attachment is consumed.
+     */
+    private fun safeSavedAttachment(attachment: LocalImportedAttachment): Boolean {
+        val path = attachment.relativePath
+        return path.length in 1..2048 &&
+            !path.startsWith('/') && !path.contains('\\') &&
+            !path.contains(':') && !path.contains('\\u0000') &&
+            path.split('/').all { it.isNotBlank() && it != "." && it != ".." } &&
+            attachment.bytes >= 0L &&
+            attachment.name.isNotBlank() &&
+            attachment.mediaType.isNotBlank()
+    }
+
     fun restoreAttachments(saved: List<String>, onSave: (List<String>) -> Unit = {}) {
         attachmentValues.clear()
         saved.chunked(2).forEach { pair ->
             if (pair.size == 2) {
                 val entries = runCatching { Json.decodeFromString<List<LocalImportedAttachment>>(pair[1]) }.getOrNull().orEmpty()
-                if (entries.isNotEmpty()) { attachmentValues.remove(pair[0]); attachmentValues[pair[0]] = entries.distinctBy { it.relativePath } }
+                val valid = entries.filter(::safeSavedAttachment).distinctBy { it.relativePath }
+                if (pair[0].isNotBlank() && valid.isNotEmpty()) {
+                    attachmentValues.remove(pair[0])
+                    attachmentValues[pair[0]] = valid
+                }
             }
         }
         while (attachmentValues.size > MAX_LOCAL_SESSION_PRESENTATION_STATES) attachmentValues.remove(attachmentValues.keys.first())
