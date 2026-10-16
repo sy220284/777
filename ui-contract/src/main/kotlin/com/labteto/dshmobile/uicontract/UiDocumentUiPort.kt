@@ -50,6 +50,17 @@ data class EditUiDocumentTableCellCommand(
     val replacementText: String,
 )
 
+/** User correction of one existing bar/line chart value; no new chart or action authority. */
+data class EditUiDocumentChartPointCommand(
+    val identity: UiSessionIdentity,
+    val documentId: String,
+    val revision: Long,
+    val source: UiDocumentSource,
+    val chartNodeId: String,
+    val pointIndex: Int,
+    val value: Double,
+)
+
 /** Closed user intent; documents themselves cannot embed or invoke deletion. */
 data class DeleteUiDocumentCommand(
     val identity: UiSessionIdentity,
@@ -82,6 +93,8 @@ interface UiDocumentUiPort {
     suspend fun replaceText(command: EditUiDocumentTextCommand): UiDocumentReceipt =
         UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
     suspend fun replaceTableCell(command: EditUiDocumentTableCellCommand): UiDocumentReceipt =
+        UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+    suspend fun replaceChartPoint(command: EditUiDocumentChartPointCommand): UiDocumentReceipt =
         UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
     fun submit(identity: UiSessionIdentity, request: UiDocumentActionRequest): UiDocumentReceipt
 }
