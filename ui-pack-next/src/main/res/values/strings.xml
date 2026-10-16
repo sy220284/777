@@ -330,4 +330,6 @@
     <string name="next_document_audio_retry">重新加载音频</string>
     <string name="next_document_audio_play">播放音频</string>
     <string name="next_document_audio_pause">暂停音频</string>
+    <string name="next_document_local_tool_counts">工具调用统计图</string>
+    <string name="next_document_local_work_evidence">需求来源关联卡</string>
 </resources>

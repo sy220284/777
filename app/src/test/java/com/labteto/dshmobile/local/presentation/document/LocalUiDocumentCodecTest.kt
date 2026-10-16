@@ -46,6 +46,14 @@ class LocalUiDocumentCodecTest {
         assertTrue(decode(raw("""{"id":"table","type":"table","headers":["field"],"rows":[["x"]],"script":"execute"}""")).isFailure)
     }
 
+    @Test fun chartRoundTripsWithoutGrantingActionsOrAllowingExtraFields() {
+        val chart = decode(raw("""{"id":"chart","type":"bar_chart","title":"工具调用","unit":"次","points":[{"label":"甲","value":3.0},{"label":"乙","value":0.0}]}""")).getOrThrow()
+        assertTrue(chart.actions.isEmpty())
+        assertEquals(chart, decode(LocalUiDocumentCodec.encode(chart).toString()).getOrThrow())
+        assertTrue(decode(raw("""{"id":"chart","type":"bar_chart","title":"调用","unit":"","points":[{"label":"x","value":-1.0}]}""")).isFailure)
+        assertTrue(decode(raw("""{"id":"chart","type":"bar_chart","title":"调用","unit":"","points":[{"label":"x","value":1.0,"action":"approve"}]}""")).isFailure)
+    }
+
     @Test fun oversizedInputFailsBeforeParsingRatherThanSilentlyTruncating() {
         val value = raw("""{"id":"text","type":"text","text":"${"x".repeat(4096)}"}""")
         val result = decode(value)

@@ -145,6 +145,17 @@ private fun NextDocumentNode(node: UiDocumentNode, values: Map<String, String>, 
             }
             if (node.rows.isEmpty()) Text(stringResource(R.string.next_document_table_empty))
         }
+        is UiDocumentNode.BarChart -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(node.title)
+            val maximum = node.points.maxOfOrNull { it.value } ?: 0.0
+            node.points.forEach { point ->
+                Text("${point.label}: ${point.value} ${node.unit}".trim())
+                androidx.compose.material3.LinearProgressIndicator(
+                    progress = { if (maximum > 0.0) (point.value / maximum).toFloat() else 0f },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
         is UiDocumentNode.BoundText -> {
             val value = when (val bound = snapshot.bindings[node.binding]) {
                 is UiDocumentBoundValue.Text -> bound.value

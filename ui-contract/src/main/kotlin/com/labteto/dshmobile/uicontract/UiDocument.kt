@@ -29,6 +29,8 @@ sealed interface UiDocumentBoundValue {
     data object Unavailable : UiDocumentBoundValue
 }
 enum class UiDocumentMediaKind { IMAGE, AUDIO, VIDEO }
+/** Read-only typed numbers, never authority or a verified progress claim. */
+data class UiChartPoint(val label: String, val value: Double)
 
 sealed interface UiDocumentNode {
     val id: String
@@ -38,6 +40,8 @@ sealed interface UiDocumentNode {
         val label: String) : UiDocumentNode
     /** Read-only presentation data. A table never authorizes tools, payment or progress claims. */
     data class Table(override val id: String, val headers: List<String>, val rows: List<List<String>>) : UiDocumentNode
+    data class BarChart(override val id: String, val title: String, val unit: String,
+        val points: List<UiChartPoint>) : UiDocumentNode
     data class BoundText(override val id: String, val label: String, val binding: UiDocumentBinding) : UiDocumentNode
     data class Column(override val id: String, val children: List<UiDocumentNode>) : UiDocumentNode
     data class Row(override val id: String, val children: List<UiDocumentNode>) : UiDocumentNode
@@ -110,6 +114,19 @@ fun UiDocument.validate(
                     node.rows.any { it.size != node.headers.size }) problems += "table_shape"
                 textChars += node.headers.sumOf { it.length.toLong() } +
                     node.rows.sumOf { row -> row.sumOf { it.length.toLong() } }
+            }
+            is UiDocumentNode.BarChart -> {
+                val nextCount = count.toLong() + node.points.size
+                if (nextCount > budget.maxNodes) problems += "chart_budget"
+                count = nextCount.coerceAtMost(budget.maxNodes.toLong() + 1).toInt()
+                textChars += node.title.length.toLong() + node.unit.length +
+                    node.points.sumOf { it.label.length.toLong() }
+                if (node.title.isBlank() || node.title.length > 120 || node.unit.length > 24 ||
+                    node.points.isEmpty() || node.points.size > 12 ||
+                    node.points.any { it.label.isBlank() || it.label.length > 120 ||
+                        !it.value.isFinite() || it.value < 0.0 || it.value > 1.0e12 } ||
+                    node.points.map { it.label }.distinct().size != node.points.size)
+                    problems += "chart_values"
             }
             is UiDocumentNode.BoundText -> textChars += node.label.length
             is UiDocumentNode.Column -> node.children.forEach { walk(it, depth + 1) }

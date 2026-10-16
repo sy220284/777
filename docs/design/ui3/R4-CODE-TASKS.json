@@ -210,7 +210,9 @@
       "id": "S4-03",
       "task": "动态证据有效性/核验卡",
       "codeStatus": "CODE_PARTIAL",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "implemented": " 2026-10-16：V6/Next 可从原 WorkReadUiPort 的真实 requirementEvidenceForUi 快照生成只读来源关联卡，区分关联时/当前文件版本相同、已变化及不可判定；显式标注未核验，不将来源关联伪报通过；同模板原位 revision 版本更新。",
+      "remaining": "实际核验执行及授权结论、证据变动主动订阅、重启后真实重核与双包设备验收仍未完成。"
     },
     {
       "id": "S4-04",
@@ -231,7 +233,9 @@
       "id": "S4-06",
       "task": "必要图表/数据选择/操作组合",
       "codeStatus": "CODE_PARTIAL",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "implemented": " 2026-10-16：UiDocument 新增封闭 BarChart/UiChartPoint 只读数值节点、节点/数值/文字预算及严格 JSON schema，V6/Next 原生进度比例绘制并显示精确数据标签；用户可选 Work Owner 工具调用统计本地模板，无额外模型请求、不假定通过，补协议/Codec/Builder 用例。",
+      "remaining": "其他必要图表、字段筛选/选择和真实操作组合、数据事实自动更新及完整跨包/设备验收仍未完成；工具调用统计不等于完成统计。"
     },
     {
       "id": "S4-07",

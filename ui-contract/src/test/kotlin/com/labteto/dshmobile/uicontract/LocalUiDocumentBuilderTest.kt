@@ -38,6 +38,32 @@ class LocalUiDocumentBuilderTest {
             input.copy(rows = listOf(listOf("bad"))), budget, emptySet()).isFailure)
     }
 
+    @Test fun typedOwnerMetricsBecomeReadOnlyChartWithoutModelCall() {
+        val built = LocalUiDocumentBuilder.build("metrics", source, 0,
+            UiLocalDocumentData.ChartData("调用次数", "次",
+                listOf(UiChartPoint("甲", 4.0), UiChartPoint("乙", 2.0))),
+            budget, emptySet()).getOrThrow()
+        assertTrue(built.actions.isEmpty())
+        assertTrue(built.nodes.single() is UiDocumentNode.BarChart)
+        assertTrue(built.validate(budget, emptySet(), null).valid)
+    }
+
+    @Test fun evidenceReferencesAreNotVerificationAndCannotCreateActions() {
+        val evidence = listOf(
+            com.labteto.dshmobile.local.work.LocalRequirementEvidenceLink(
+                0, "需求甲", "report.txt", 12, "tool-id", "hash-old", 15, "hash-new"),
+            com.labteto.dshmobile.local.work.LocalRequirementEvidenceLink(
+                1, "需求乙", "missing.txt", 16, "tool-2", "hash", 17, null),
+        )
+        val built = LocalUiDocumentBuilder.build("evidence", source, 0,
+            UiLocalDocumentData.EvidenceLinks(evidence), budget, emptySet()).getOrThrow()
+        assertTrue(built.actions.isEmpty())
+        val rows = (built.nodes.last() as UiDocumentNode.Table).rows
+        assertTrue(rows[0][2].contains("旧关联失效"))
+        assertTrue(rows[1][2].contains("未知"))
+        assertTrue(built.title.contains("未核验"))
+    }
+
     @Test fun replyFormsOnlyPrepareInputAndOversizedDataIsRejectedWithoutTruncation() {
         val document = LocalUiDocumentBuilder.build("id", source, 0,
             UiLocalDocumentData.ReplyForm(""), budget, emptySet()).getOrThrow()

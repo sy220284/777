@@ -2462,5 +2462,7 @@
     <string name="ui_document_delete_title">确认删除文档</string>
     <string name="ui_document_delete_body">仅删除这条消息下的当前文档，不删除消息或其他成果。</string>
     <string name="ui_document_delete_confirm">删除</string>
+    <string name="ui_document_local_tool_counts">工具调用统计图</string>
+    <string name="ui_document_local_work_evidence">需求来源关联卡</string>
 </resources>
 

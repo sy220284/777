@@ -8,6 +8,7 @@ import com.labteto.dshmobile.uicontract.UiDocumentBudget
 import com.labteto.dshmobile.uicontract.UiSceneId
 import com.labteto.dshmobile.uicontract.UiDocumentNode
 import com.labteto.dshmobile.uicontract.UiDocumentMediaKind
+import com.labteto.dshmobile.uicontract.UiChartPoint
 import com.labteto.dshmobile.uicontract.UiDocumentBinding
 import com.labteto.dshmobile.uicontract.UiDocumentAction
 import kotlinx.serialization.json.Json
@@ -20,6 +21,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.double
 import kotlinx.serialization.json.long
 import kotlinx.serialization.json.boolean
 
@@ -33,6 +35,8 @@ internal object LocalUiDocumentCodec {
     }
     private val text = buildJsonObject { put("type", "string") }
     private val boolean = buildJsonObject { put("type", "boolean") }
+    private val number = buildJsonObject { put("type", "number") }
+    private val chartPointSchema = schema(listOf("label", "value"), mapOf("label" to text, "value" to number))
     private val integer = buildJsonObject { put("type", "integer"); put("minimum", 0) }
     private val objects = buildJsonObject { put("type", "array"); put("items", buildJsonObject { put("type", "object") }) }
     private val strings = buildJsonObject { put("type", "array"); put("items", text) }
@@ -61,6 +65,7 @@ internal object LocalUiDocumentCodec {
                 "text" -> mapOf("text" to text)
                 "media" -> mapOf("assetId" to text, "kind" to text, "label" to text)
                 "table" -> mapOf("headers" to strings, "rows" to stringRows)
+                "bar_chart" -> mapOf("title" to text, "unit" to text, "points" to objects)
                 "bound_text" -> mapOf("label" to text, "binding" to text)
                 "column", "row" -> mapOf("children" to objects)
                 "disclosure" -> mapOf("title" to text, "children" to objects)
@@ -79,6 +84,12 @@ internal object LocalUiDocumentCodec {
                     UiDocumentMediaKind.valueOf(value.string("kind")), value.string("label"))
                 "table" -> UiDocumentNode.Table(id, value.array("headers").map { it.jsonPrimitive.content },
                     value.array("rows").map { row -> row.jsonArray.map { it.jsonPrimitive.content } })
+                "bar_chart" -> UiDocumentNode.BarChart(id, value.string("title"), value.string("unit"),
+                    value.array("points").map { point ->
+                        val item = point.jsonObject
+                        checkSchema(item, chartPointSchema)
+                        UiChartPoint(item.string("label"), item.getValue("value").jsonPrimitive.double)
+                    })
                 "bound_text" -> UiDocumentNode.BoundText(id, value.string("label"), UiDocumentBinding.valueOf(value.string("binding")))
                 "column" -> UiDocumentNode.Column(id, children())
                 "row" -> UiDocumentNode.Row(id, children())
@@ -127,6 +138,12 @@ internal object LocalUiDocumentCodec {
                     put("type", "table")
                     put("headers", JsonArray(value.headers.map(::JsonPrimitive)))
                     put("rows", JsonArray(value.rows.map { row -> JsonArray(row.map(::JsonPrimitive)) }))
+                }
+                is UiDocumentNode.BarChart -> {
+                    put("type", "bar_chart"); put("title", value.title); put("unit", value.unit)
+                    put("points", JsonArray(value.points.map { point -> buildJsonObject {
+                        put("label", point.label); put("value", point.value)
+                    } }))
                 }
                 is UiDocumentNode.BoundText -> { put("type", "bound_text"); put("label", value.label); put("binding", value.binding.name) }
                 is UiDocumentNode.Column -> { put("type", "column"); put("children", JsonArray(value.children.map(::node))) }

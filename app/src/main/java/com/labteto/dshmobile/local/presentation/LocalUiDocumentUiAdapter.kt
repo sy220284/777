@@ -186,6 +186,34 @@ internal class LocalUiDocumentUiAdapter(
                         }
                         com.labteto.dshmobile.uicontract.UiLocalDocumentData.MediaResults(assets)
                     }
+                    com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.WORK_TOOL_COUNTS -> {
+                        if (!command.workMode)
+                            return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+                        // These counts reflect only the Owner-returned tool activity window.
+                        // Tool calls are not claimed to have passed, finished or been verified.
+                        val counts = workReads.toolActivitiesForUi(source.sessionId)
+                            .groupingBy { it.name.take(100).ifBlank { "未命名工具" } }.eachCount()
+                            .toList()
+                            .sortedWith(compareByDescending<Pair<String, Int>> { it.second }.thenBy { it.first })
+                            .take(12)
+                        if (counts.isEmpty()) {
+                            com.labteto.dshmobile.uicontract.UiLocalDocumentData.ListItems(
+                                listOf("当前会话暂无可展示的工具调用事件。"))
+                        } else {
+                            com.labteto.dshmobile.uicontract.UiLocalDocumentData.ChartData(
+                                "工具调用次数（当前 Owner 返回窗口，未经核验）", "次",
+                                counts.map { (name, count) ->
+                                    com.labteto.dshmobile.uicontract.UiChartPoint(name, count.toDouble())
+                                },
+                            )
+                        }
+                    }
+                    com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.WORK_EVIDENCE -> {
+                        if (!command.workMode)
+                            return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+                        com.labteto.dshmobile.uicontract.UiLocalDocumentData.EvidenceLinks(
+                            workReads.requirementEvidenceForUi(source.sessionId))
+                    }
                     com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.WORK_TOOL_RESULT -> {
                         if (!command.workMode) return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
                         val activity = workReads.toolActivitiesForUi(source.sessionId)

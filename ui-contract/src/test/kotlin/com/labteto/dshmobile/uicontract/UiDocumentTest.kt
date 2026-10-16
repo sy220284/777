@@ -54,6 +54,20 @@ class UiDocumentTest {
         assertTrue(combined.validate(budget, emptySet(), null).problems.contains("table_budget"))
     }
 
+    @Test fun chartsRequireFiniteBoundedNumbersAndCannotGrantActions() {
+        val chart = document(listOf(UiDocumentNode.BarChart("chart", "次数", "次",
+            listOf(UiChartPoint("成功", 3.0), UiChartPoint("失败", 1.0)))), emptyList())
+        assertTrue(chart.validate(budget, emptySet(), null).valid)
+        for (invalid in listOf(Double.NaN, Double.POSITIVE_INFINITY, -1.0, 1.0e13)) {
+            assertTrue(chart.copy(nodes = listOf(UiDocumentNode.BarChart("chart", "次数", "",
+                listOf(UiChartPoint("异常", invalid))))).validate(budget, emptySet(), null)
+                .problems.contains("chart_values"))
+        }
+        assertTrue(chart.copy(nodes = listOf(UiDocumentNode.BarChart("chart", "次数", "",
+            List(13) { UiChartPoint("p$it", it.toDouble()) }))).validate(budget, emptySet(), null)
+            .problems.contains("chart_values"))
+    }
+
     @Test fun patchesCannotCrossMessagesOrApplyToAnOldRevision() {
         val current = document(listOf(UiDocumentNode.Text("text", "old")), emptyList())
         val updated = current.copy(revision = 1, nodes = listOf(UiDocumentNode.Text("text", "new")))
