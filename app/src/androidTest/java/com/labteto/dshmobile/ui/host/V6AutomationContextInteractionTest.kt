@@ -88,6 +88,9 @@ class V6AutomationContextInteractionTest {
         compose.runOnIdle { owner.change(second) }
         compose.onNodeWithText("创建任务").assertIsNotEnabled()
         compose.onNodeWithText("取消").performClick()
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithText("新建任务").fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithText("新建任务").performClick()
         compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("属于新会话的计划")
         compose.onNodeWithText("创建任务").assertIsEnabled()
