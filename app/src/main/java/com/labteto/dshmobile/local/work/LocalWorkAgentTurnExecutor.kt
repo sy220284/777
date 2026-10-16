@@ -132,7 +132,7 @@ internal class LocalWorkAgentTurnExecutor(
             sourceMessageId, resolveWorkUiDocumentSource(binding.eventLog, sourceMessageId),
             binding.state.value.messages.lastOrNull { it.role == "user" }?.id,
         )
-        var foregroundLease: LocalExecutionService.TurnLease? = null
+        var foregroundLease: LocalExecutionService.Companion.TurnLease? = null
         var serviceReleased = false
         try {
             LocalSessionRuntimeRegistry.withOwner(
