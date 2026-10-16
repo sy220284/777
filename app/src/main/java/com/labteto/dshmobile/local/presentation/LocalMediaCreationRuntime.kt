@@ -94,7 +94,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         val original = try { store.result(id) }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { return MediaUiReceipt.Failed(failure.message) }
-        if (original?.sessionId != sessionId || original.kind != LocalMediaKind.IMAGE.name)
+        if (original == null || original.sessionId != sessionId || original.kind != LocalMediaKind.IMAGE.name)
             return MediaUiReceipt.Failed("原图片不存在或不属于当前会话")
         val flight = synchronized(imageDownloads) {
             imageDownloads[id]?.takeUnless { it.isCompleted } ?: scope.async(start = CoroutineStart.LAZY) {
