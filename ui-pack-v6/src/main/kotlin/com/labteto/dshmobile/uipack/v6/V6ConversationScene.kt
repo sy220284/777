@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.uipack.v6
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import com.labteto.dshmobile.uicontract.SettingsUiPort
@@ -172,6 +173,7 @@ internal fun submitV6ConversationDraft(
  * Owner commands; a UI receipt never pretends to prove completion.
  * More advanced tool/media/document scenes are intentionally NOT registered yet.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun V6ConversationScene(
     ports: V6ConversationPorts,
