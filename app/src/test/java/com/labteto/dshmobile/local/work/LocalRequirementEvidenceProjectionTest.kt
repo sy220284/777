@@ -133,6 +133,53 @@ class LocalRequirementEvidenceProjectionTest {
         assertTrue(projectRequirementEvidenceLinks(listOf(link(1, 0, "交付", "madeup")), tasks).isEmpty())
     }
 
+    @Test fun manualReviewRequiresExactGoalLinkRevisionAndDigest() {
+        val digest = "a".repeat(64)
+        val tasks = listOf(LocalTodoItem("交付报告", "completed"))
+        fun goalLink(sequence: Long, path: String = "reports/one.md") = link(
+            sequence, 0, "交付报告", digest,
+        ).copy(data = buildJsonObject {
+            put("requirement_index", 0)
+            put("requirement", "交付报告")
+            put("artifact_path", path)
+            put("origin_sequence", 10L)
+            put("source_call_id", "call-1")
+            put("sha256", digest)
+            put("goal_id", "goal-a")
+        })
+        fun review(sequence: Long, linkSequence: Long = 20L, goal: String = "goal-a",
+            sha: String = digest, approved: Boolean = true,
+        ) = LocalSessionEventLog.Event(sequence, "work/requirement-evidence-review", sequence,
+            buildJsonObject {
+                put("goal_id", goal)
+                put("requirement_index", 0)
+                put("requirement", "交付报告")
+                put("artifact_path", "reports/one.md")
+                put("link_sequence", linkSequence)
+                put("sha256", sha)
+                put("approved_by_user", approved)
+            })
+        val selected = projectRequirementEvidenceLinks(sequenceOf(goalLink(20L)), tasks, "goal-a")
+        assertEquals(1, selected.size)
+        val accepted = projectRequirementEvidenceReviews(
+            sequenceOf(review(21L), review(22L, goal = "other"), review(23L, sha = "b".repeat(64))),
+            selected, "goal-a")
+        assertTrue(accepted.single().approvedByUser)
+        assertEquals(21L, accepted.single().reviewSequence)
+        val withdrawn = projectRequirementEvidenceReviews(
+            sequenceOf(review(21L), review(24L, approved = false)), selected, "goal-a")
+        assertFalse(withdrawn.single().approvedByUser)
+        assertEquals(24L, withdrawn.single().reviewSequence)
+        assertTrue(projectRequirementEvidenceReviews(sequenceOf(review(25L)), selected, "goal-b").isEmpty())
+        // A new reference supersedes its old event ID even if the file path and task text repeat.
+        val newer = projectRequirementEvidenceLinks(
+            sequenceOf(goalLink(20L), goalLink(26L)), tasks, "goal-a")
+        assertEquals(26L, newer.single().eventSequence)
+        assertTrue(projectRequirementEvidenceReviews(sequenceOf(review(27L)), newer, "goal-a").isEmpty())
+        assertTrue(projectRequirementEvidenceReviews(
+            sequenceOf(review(20L)), selected, "goal-a").isEmpty())
+    }
+
     @Test fun scopedLinksCannotMoveToAnotherGoalAndLegacyReferencesRemainReadable() {
         val todos = listOf(LocalTodoItem("交付", "completed"))
         val legacy = link(20, 0, "交付", "a".repeat(64))
