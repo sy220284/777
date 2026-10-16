@@ -12,3 +12,14 @@ data class LocalRequirementEvidenceLink(
     /** SHA-256 of the actual current file, null when unreadable or removed. */
     val versionNow: String? = null,
 )
+
+/** Explicit user content review bound to one immutable evidence link, not automatic proof. */
+data class LocalRequirementEvidenceReview(
+    val requirementIndex: Int,
+    val requirement: String,
+    val artifactPath: String,
+    val linkSequence: Long,
+    val version: String,
+    val reviewSequence: Long,
+    val approvedByUser: Boolean,
+)
