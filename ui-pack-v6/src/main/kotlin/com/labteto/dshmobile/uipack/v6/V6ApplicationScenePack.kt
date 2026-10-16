@@ -401,7 +401,8 @@ class V6ApplicationScenePack(
                         onNavigate = scope.onNavigate,
                         onBack = { scope.onBack(); Unit },
                         updateStatus = updateStatus, checkForUpdate = checkForUpdate,
-                        performance = secondary?.modelPerformance)
+                        performance = secondary?.modelPerformance,
+                        providerPricing = secondary?.pricing)
                 })
             }
             put(UiSceneId("settings.chat"), UiSceneRenderer { scope ->
