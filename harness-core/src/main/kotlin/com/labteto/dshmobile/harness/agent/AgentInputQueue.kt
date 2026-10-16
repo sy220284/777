@@ -2,11 +2,15 @@ package com.labteto.dshmobile.harness.agent
 
 import kotlinx.serialization.json.JsonObject
 
+/** Execution origin is part of the durable queue contract, not encoded in ID prefixes. */
+enum class QueuedAgentInputKind { USER, WORK_CONTINUATION }
+
 data class QueuedAgentInput(
     val content: String,
     val memoryInput: String = content,
     val modelMessage: JsonObject? = null,
     val id: String = "",
+    val kind: QueuedAgentInputKind = QueuedAgentInputKind.USER,
 )
 
 class AgentInputQueue(

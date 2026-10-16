@@ -790,7 +790,7 @@ internal class LocalWorkAgentTurnExecutor(
                 foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
                 val modelError = error as? LocalModelException
                 val queued = if (modelError != null) {
-                    queueAutomaticWorkContinuation(binding, runContext.runId, modelError)
+                    queueAutomaticWorkContinuation(binding, runContext.runId, modelError, uiSourceMessageId)
                 } else {
                     false
                 }

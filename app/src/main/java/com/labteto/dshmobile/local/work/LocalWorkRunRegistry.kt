@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.work
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import android.content.Context
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.harness.agent.QueuedAgentInputKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.local.LocalHarnessState
@@ -216,7 +217,7 @@ class LocalWorkRunRegistry internal constructor(
             if (next == null) return@synchronized null
             // A separate user input is a fresh task allowance. Only internal continuation
             // inputs retain the bounded count for their original interrupted task.
-            if (!next.id.startsWith("continuation-")) {
+            if (next.kind != QueuedAgentInputKind.WORK_CONTINUATION) {
                 binding.automaticContinuationCount = 0
                 binding.continuationParentRunId = null
             }

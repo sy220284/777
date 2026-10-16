@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.harness.agent.QueuedAgentInputKind
 import com.labteto.dshmobile.local.agent.decodeLocalAgentInboxPending
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import kotlinx.serialization.json.buildJsonObject
@@ -37,6 +38,38 @@ class LocalAgentInboxPersistenceTest {
         )
 
         assertEquals(pending, decodeLocalAgentInboxPending(encoded))
+    }
+
+    @Test
+    fun internalWorkContinuationSurvivesQueueEventRecovery() {
+        val input = QueuedAgentInput(
+            content = "resume",
+            memoryInput = "",
+            modelMessage = buildJsonObject {
+                put("role", "system")
+                put("content", "resume")
+            },
+            id = "continuation-run-1",
+            kind = QueuedAgentInputKind.WORK_CONTINUATION,
+        )
+        val encoded = encodeLocalAgentInboxEvent("queued", listOf(input))
+        assertEquals(listOf(input), decodeLocalAgentInboxPending(encoded))
+        assertEquals(QueuedAgentInputKind.WORK_CONTINUATION,
+            decodeLocalAgentInboxPending(encoded)?.single()?.kind)
+    }
+
+    @Test
+    fun malformedInputKindDoesNotBecomeUserRequest() {
+        val payload = buildJsonObject {
+            put("version", 1)
+            put("action", "queued")
+            put("pending", kotlinx.serialization.json.JsonArray(listOf(buildJsonObject {
+                put("id", "continuation-unknown")
+                put("content", "resume")
+                put("kind", "UNKNOWN_EXECUTION_ORIGIN")
+            })))
+        }
+        assertNull(decodeLocalAgentInboxPending(payload))
     }
 
     @Test

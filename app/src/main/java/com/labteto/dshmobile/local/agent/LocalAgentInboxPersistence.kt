@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.agent
 
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.harness.agent.QueuedAgentInputKind
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import kotlinx.serialization.json.JsonArray
@@ -53,11 +54,17 @@ internal fun decodeLocalAgentInboxPending(data: JsonObject): List<QueuedAgentInp
         val content = stringValue(item, "content") ?: return null
         val memoryInput = stringValue(item, "memory_input") ?: content
         val modelMessage = item["model_message"] as? JsonObject
+        val kind = when (stringValue(item, "kind")) {
+            null, "USER" -> QueuedAgentInputKind.USER
+            "WORK_CONTINUATION" -> QueuedAgentInputKind.WORK_CONTINUATION
+            else -> return null
+        }
         decoded += QueuedAgentInput(
             content = content,
             memoryInput = memoryInput,
             modelMessage = modelMessage,
             id = id,
+            kind = kind,
         )
     }
     return decoded
@@ -67,6 +74,7 @@ private fun encodeQueuedAgentInput(input: QueuedAgentInput): JsonObject = buildJ
     put("id", input.id)
     put("content", input.content)
     put("memory_input", input.memoryInput)
+    put("kind", input.kind.name)
     input.modelMessage?.let { put("model_message", it) }
 }
 
