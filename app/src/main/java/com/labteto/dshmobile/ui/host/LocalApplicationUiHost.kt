@@ -69,6 +69,8 @@ internal object LocalApplicationPackInstallations {
                     drafts = owner.conversationDraftUiPort,
                     reading = owner.conversationReadingUiPort,
                     attachments = owner.attachmentUiPort, history = owner.messageHistoryUiPort,
+                    documents = owner.nextUiDocumentUiPort, forms = owner.uiDocumentFormPort,
+                    media = owner.mediaUiPort,
                     workMode = { owner.shellState.value.usageMode == LocalUsageMode.WORK },
                     workModeUpdates = owner.shellState.map { it.usageMode == LocalUsageMode.WORK },
                 ),
