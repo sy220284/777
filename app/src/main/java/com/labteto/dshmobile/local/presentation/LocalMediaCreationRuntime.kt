@@ -124,6 +124,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
             is MediaUiCommand.PollVideo -> { refreshVideo(command.offer, command.taskId); MediaUiReceipt.Applied }
             is MediaUiCommand.RetryLocalVideoSave -> { retryVideoSave(command.id); MediaUiReceipt.Applied }
             is MediaUiCommand.RemoveResult -> { removeResult(command.id); MediaUiReceipt.Applied }
+            is MediaUiCommand.RemoveRevisionFamily -> { removeMediaFamily(command.id); MediaUiReceipt.Applied }
             is MediaUiCommand.DismissJob -> { dismissCreationJob(command.id); MediaUiReceipt.Applied }
             MediaUiCommand.RetryStorage -> { retryStorage(); MediaUiReceipt.Applied }
         }
@@ -139,6 +140,10 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     suspend fun removeResult(id: String) {
         synchronized(downloads) { downloads[id] }?.cancelAndJoin()
         withContext(Dispatchers.IO) { store.remove(id) }
+    }
+    suspend fun removeMediaFamily(id: String) {
+        synchronized(downloads) { downloads[id] }?.cancelAndJoin()
+        withContext(Dispatchers.IO) { store.removeRevisionFamily(id) }
     }
     suspend fun dismissCreationJob(id: String) = removeResult(id)
     suspend fun retryStorage() = withContext(Dispatchers.IO) { store.retryStorage() }
