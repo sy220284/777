@@ -69,6 +69,51 @@ class LocalRequirementEvidenceIndexTest {
         } finally { reopened.close() }
     }
 
+    @Test fun machineAssertionColdRestoresByExactLinkAndInvalidatesOnReplacement() {
+        val file = File(temporary.root, "machine-check-events.jsonl")
+        val log = LocalSessionEventLog(file, Json)
+        fun machine(linkId: Long, matches: Boolean) = log.append(
+            "work/requirement-evidence-text-check", buildJsonObject {
+                put("goal_id", "goal-a")
+                put("requirement_index", 0)
+                put("artifact_path", "report.md")
+                put("link_sequence", linkId)
+                put("sha256", digest)
+                put("condition_sha256", "b".repeat(64))
+                put("contains_required_text", matches)
+                put("assertion", "utf8_contains_only_not_work_completion")
+            },
+        )
+        val first = link(log, "report.md")
+        machine(first.sequence, true)
+        assertTrue(indexedRequirementEvidence(log, work, "goal-a")
+            .textChecks.single().containsRequiredText)
+        assertEquals(0, indexedRequirementEvidence(log, work, "goal-a").replayedEvents)
+        log.close()
+        val restored = LocalSessionEventLog(file, Json)
+        try {
+            val fresh = indexedRequirementEvidence(restored, work, "goal-a")
+            assertEquals(0, fresh.replayedEvents)
+            assertTrue(fresh.textChecks.single().containsRequiredText)
+            restored.append("work/requirement-evidence-text-check", buildJsonObject {
+                put("goal_id", "goal-a")
+                put("requirement_index", 0)
+                put("artifact_path", "report.md")
+                put("link_sequence", first.sequence)
+                put("sha256", digest)
+                put("condition_sha256", "b".repeat(64))
+                put("contains_required_text", false)
+            })
+            val failed = indexedRequirementEvidence(restored, work, "goal-a")
+            assertEquals(1, failed.replayedEvents)
+            assertFalse(failed.textChecks.single().containsRequiredText)
+            link(restored, "report.md")
+            val replaced = indexedRequirementEvidence(restored, work, "goal-a")
+            assertTrue(replaced.textChecks.isEmpty())
+            assertEquals("pending", work.single().status)
+        } finally { restored.close() }
+    }
+
     @Test fun replacingAnExactReferenceRetiresTheEarlierManualDecision() {
         val log = LocalSessionEventLog(File(temporary.root, "replacement.jsonl"), Json)
         try {

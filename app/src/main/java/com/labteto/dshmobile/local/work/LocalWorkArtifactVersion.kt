@@ -87,7 +87,23 @@ internal fun inspectLocalWorkEvidenceText(
         LinkOption.NOFOLLOW_LINKS)
     val before = stamp()
     if (!before.isRegularFile || before.size() > 1024 * 1024L) return null
-    val bytes = Files.readAllBytes(target)
+    // The source may grow after the first stat. Cap actual consumed bytes as well as
+    // the initial stat, rather than allocating the whole mutable file into memory.
+    val memory = java.io.ByteArrayOutputStream(before.size().toInt())
+    java.nio.file.Files.newByteChannel(target, setOf<java.nio.file.OpenOption>(
+        java.nio.file.StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS,
+    )).use { handle ->
+        java.nio.channels.Channels.newInputStream(handle).use { input ->
+            val buffer = ByteArray(32 * 1024)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                if (memory.size() + count > 1024 * 1024) return null
+                memory.write(buffer, 0, count)
+            }
+        }
+    }
+    val bytes = memory.toByteArray()
     val after = stamp()
     if (before.fileKey() != after.fileKey() || before.size() != after.size() ||
         before.lastModifiedTime() != after.lastModifiedTime()) return null
