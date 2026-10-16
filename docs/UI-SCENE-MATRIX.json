@@ -2051,8 +2051,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "SettingsUiPort.environmentInfo() / diagnosticReport() / diagnoseNetwork(userTarget)",
+          "receiptType": "suspend String result; Owner-thrown errors rendered explicitly",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
