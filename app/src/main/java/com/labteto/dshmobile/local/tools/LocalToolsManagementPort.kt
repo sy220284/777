@@ -5,6 +5,7 @@ import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 /** ToolsFeature management contract for the one process-wide plugin composition. */
 internal interface LocalToolsManagementPort {
     suspend fun servers(): List<McpServerSnapshot>
+    suspend fun checkMcpHealth(serverId: String): com.labteto.dshmobile.interop.mcp.McpServerHealth
 
     fun installedPluginIds(): List<String>
     fun capabilityCatalogue(): List<LocalToolCatalogueEntry> = emptyList()
