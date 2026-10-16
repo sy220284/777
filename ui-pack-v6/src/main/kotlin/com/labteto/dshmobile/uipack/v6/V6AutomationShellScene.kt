@@ -40,6 +40,12 @@ internal fun v6AutomationRecurrence(type: AutomationScheduleType, interval: Long
         else -> null
     }
 
+/** An asynchronous result can update editor state only for its original activation. */
+internal fun v6AutomationResultMatchesEditor(
+    admitted: UiSessionIdentity?,
+    current: UiSessionIdentity?,
+): Boolean = admitted == current
+
 /** One scheduler Owner, four real task workflows; list, edit, chat-scoped and global route. */
 @Composable
 fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Unit) {
@@ -80,10 +86,15 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
     LaunchedEffect(editor) { editorScroll.scrollTo(0) }
     fun send(command: AutomationUiCommand) {
         if (busy) return
+        val admittedIdentity = owner.snapshot().context.identity
         busy = true
         scope.launch {
             try {
                 val result = withContext(Dispatchers.IO) { owner.submit(command) }
+                if (!v6AutomationResultMatchesEditor(admittedIdentity, owner.snapshot().context.identity)) {
+                    feedback = "任务操作来自之前的会话，请在任务列表确认结果"
+                    return@launch
+                }
                 feedback = when (result) {
                     is AutomationUiReceipt.Applied -> {
                         editor = false; editing = null
@@ -93,8 +104,11 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
                     is AutomationUiReceipt.Failed -> result.message ?: "任务操作失败"
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { feedback = failure.message ?: "任务操作失败" }
-            finally { busy = false }
+            catch (failure: Exception) {
+                feedback = if (v6AutomationResultMatchesEditor(admittedIdentity, owner.snapshot().context.identity))
+                    failure.message ?: "任务操作失败"
+                else "旧会话的任务操作失败，请检查任务列表"
+            } finally { busy = false }
         }
     }
     fun resetScheduleForm() {
