@@ -98,3 +98,15 @@ JVM 回归新增：
 - `LocalWorkGoalContinuationTest`：真正工具回执、有无进展、失败、取消、steer、排队、目标替换、暂停/完成/等待、计划模式、连续续轮上限，以及 queue codec 恢复提示词与身份。
 
 **本阶段边界**：工具成功回执只是启动下一轮进一步核查的准入信号，**不等于已证明用户目标有效进展**；尚未实现跨无限长任务的动态进度度量、不确定外部副作用的查询/核销、严格持久 Goal revision 与全面多进程恢复。AE4V3-11 只能标 `in_progress`；最终 Kotlin 编译/单测必须以最新 SHA 的 CI 为准。App Shell/ChatFeature 业务未改动，本次新增 Shared/Work 行为不会自动变更 R4 UI 交付状态。
+
+
+## 10. 第四批：持久 Goal 版本栅栏与用户输入优先（代码待 CI）
+
+此批在**原有队列及 Work Run Owner**上增强恢复语义，不额外建立任务执行器。
+
+1. `AgentContinuationRef` 新增可选 `goalId`、`goalFingerprint`，旧式模型失败续轮不需要两字段；`LocalAgentInboxPersistence` 对两字段执行成对验证、原队列事件版本不变。
+2. Work Goal 指纹使用 `LocalGoal` 的可序列化完整合同 SHA-256（目标 ID、描述、状态、note、startedAtSequence、产物和验收命令均参与），首次入队和恢复后出队重新比较。仅凭同一个 `runId` 或目标名称不允许继续旧任务。
+3. `LocalWorkRunRegistry` 消费持久输入时执行 `shouldDiscardWorkGoalContinuation`；合同过期、待处理审批/提问、团队仍在活动，或已有之后到达的用户输入，均通过 `agent/inbox/spliced` 原子记录弃用，并且不向模型历史追加过时续轮提示词。失败续轮仍走旧兼容机制。
+4. 新增 Work Goal 测试覆盖身份变化、验收命令变化、暂停、用户队列抢占、团队阻塞、持久编解码；另测格式只存在 goal ID 而缺 SHA 时 fail-closed。
+
+**仍未实现**：Work 的跨进程自动接管与主动重试完整事务、真正增量进度的持久证据模型、UNKNOWN_SIDE_EFFECT 外部核销。此批不提高 AE4V3-11 完成度、不变更 ChatFeature 与 App Shell 业务。构建/单测结果仅以最新 SHA 的 CI 判定。
