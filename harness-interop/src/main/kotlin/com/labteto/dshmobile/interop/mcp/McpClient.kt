@@ -104,6 +104,11 @@ class McpClient(
             },
         ).requireResult()
 
+    /** MCP-standard read-only liveness request. Success does not grant any tool authorization. */
+    suspend fun ping() {
+        transport.request("ping").requireResult()
+    }
+
     suspend fun discover(): JsonObject =
         transport.request("server/discover").requireResult()
 
