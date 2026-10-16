@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -310,6 +313,8 @@ fun V6ConversationScene(
             navigationExpanded = !navigationExpanded
         }, style = SyButtonStyle.GHOST)
         if (navigationExpanded && onNavigate != null) {
+            Column(Modifier.fillMaxWidth().heightIn(max = 260.dp)
+                .verticalScroll(rememberScrollState())) {
             val destinations = listOf(
                 "shell.new_session" to "新建会话",
                 "shell.search" to "搜索历史",
@@ -334,6 +339,7 @@ fun V6ConversationScene(
                     if (result !is UiSceneNavigationResult.Changed)
                         feedback = "无法打开：" + label
                 }, style = SyButtonStyle.SECONDARY)
+            }
             }
         }
         if (navigationExpanded && workMode && identity != null &&
