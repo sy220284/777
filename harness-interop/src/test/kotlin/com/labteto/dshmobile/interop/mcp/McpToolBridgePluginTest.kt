@@ -25,6 +25,60 @@ import org.junit.Test
 
 class McpToolBridgePluginTest {
     @Test
+    fun explicitHealthPingDoesNotExecuteToolsOrClaimRemoteAuthorization() = runTest {
+        val requests = mutableListOf<String>()
+        val plugin = McpToolBridgePlugin(
+            http = OkHttpClient(),
+            json = Json,
+            transportFactory = {
+                object : McpTransport {
+                    override suspend fun request(method: String, params: JsonObject): JsonObject {
+                        requests += method
+                        return when (method) {
+                            "tools/list" -> buildJsonObject {
+                                put("result", buildJsonObject { put("tools", buildJsonArray { }) })
+                            }
+                            "ping" -> buildJsonObject { put("result", buildJsonObject { }) }
+                            else -> error("Health must never call $method")
+                        }
+                    }
+                    override fun close() = Unit
+                }
+            },
+        )
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        assertEquals(McpServerHealth.NOT_CONNECTED, plugin.checkServerHealthFromUi("health"))
+        plugin.connectHttpFromUi(registry.context, "health", "https://example.com/mcp")
+        assertEquals(McpServerHealth.RESPONDED, plugin.checkServerHealthFromUi("health"))
+        assertEquals(listOf("tools/list", "ping"), requests)
+        plugin.uninstall(registry.context)
+    }
+
+    @Test
+    fun rejectedHealthProbeIsUnconfirmedNotAFalseAuthorizationClaim() = runTest {
+        val plugin = McpToolBridgePlugin(
+            http = OkHttpClient(),
+            json = Json,
+            transportFactory = {
+                object : McpTransport {
+                    override suspend fun request(method: String, params: JsonObject): JsonObject =
+                        if (method == "tools/list") buildJsonObject {
+                            put("result", buildJsonObject { put("tools", buildJsonArray { }) })
+                        } else throw java.io.IOException("health endpoint unreachable")
+                    override fun close() = Unit
+                }
+            },
+        )
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        plugin.connectHttpFromUi(registry.context, "unconfirmed", "https://example.com/mcp")
+        assertEquals(McpServerHealth.UNCONFIRMED,
+            plugin.checkServerHealthFromUi("unconfirmed"))
+        plugin.uninstall(registry.context)
+    }
+
+    @Test
     fun oversizedToolResultIsBoundedBeforeEnteringHarnessHistory() {
         val result = buildJsonObject {
             put("content", "x".repeat(MAX_MCP_TOOL_RESULT_CHARS * 2))
