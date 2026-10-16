@@ -18,6 +18,8 @@ class LocalToolsRuntime @Inject internal constructor(
     internal suspend fun configureGitHub(token: String) = githubCredentials.configure(token)
     internal suspend fun clearGitHub() = githubCredentials.clear()
     internal fun capabilityCatalogue() = management.capabilityCatalogue()
+    internal fun validateCapabilityDraft(name: String, schema: kotlinx.serialization.json.JsonObject, input: String) =
+        management.validateCapabilityDraft(name, schema, input)
     internal fun installedPluginIds(): List<String> = management.installedPluginIds()
     internal fun pluginLifecycleSnapshots() = management.pluginLifecycleSnapshots()
     internal suspend fun recoverFailedPlugin(id: String) = management.recoverFailedPlugin(id)
