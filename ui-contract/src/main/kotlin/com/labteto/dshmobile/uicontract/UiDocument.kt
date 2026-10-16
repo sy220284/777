@@ -180,6 +180,44 @@ fun UiDocumentPatch.matches(current: UiDocument): Boolean = documentId == curren
 
 
 /**
+ * A user can correct one existing chart point. Both chart types share the same immutable
+ * point contract; the Session Owner still validates source, permissions, budget and revision CAS.
+ * This changes only presentation data, never the Work evidence or tool result behind it.
+ */
+fun UiDocument.withUserEditedChartPoint(
+    chartId: String, index: Int, value: Double,
+): UiDocument? {
+    if (chartId.isBlank() || index < 0 || !value.isFinite() ||
+        value !in 0.0..1.0e12 || revision == Long.MAX_VALUE ||
+        documentId.startsWith("work-live:")) return null
+    var changed = 0
+    fun rewrite(node: UiDocumentNode): UiDocumentNode = when (node) {
+        is UiDocumentNode.BarChart -> if (node.id == chartId && index in node.points.indices) {
+            changed++
+            node.copy(points = node.points.mapIndexed { at, point ->
+                if (at == index) point.copy(value = value) else point
+            })
+        } else node
+        is UiDocumentNode.LineChart -> if (node.id == chartId && index in node.points.indices) {
+            changed++
+            node.copy(points = node.points.mapIndexed { at, point ->
+                if (at == index) point.copy(value = value) else point
+            })
+        } else node
+        is UiDocumentNode.Column -> node.copy(children = node.children.map(::rewrite))
+        is UiDocumentNode.Row -> node.copy(children = node.children.map(::rewrite))
+        is UiDocumentNode.Disclosure -> node.copy(children = node.children.map(::rewrite))
+        else -> node
+    }
+    val rewritten = nodes.map(::rewrite)
+    return if (changed == 1) copy(
+        revision = revision + 1,
+        nodes = rewritten,
+        fallbackText = "此文档包含用户修正的图表数据，内容尚未经业务核验",
+    ) else null
+}
+
+/**
  * A user may correct one table display cell without changing its shape, controls or action
  * definitions. The replacement remains user-edited presentation data, not verified evidence.
  * The Session Owner must independently enforce revision CAS and UI budget on publication.
