@@ -42,6 +42,7 @@ import com.labteto.dshmobile.ui.screens.local.LocalHarnessViewModel
 import com.labteto.dshmobile.uipack.next.NextApplicationFeaturePorts
 import com.labteto.dshmobile.uipack.next.NextApplicationScenePack
 import com.labteto.dshmobile.uipack.v6.V6ApplicationScenePack
+import com.labteto.dshmobile.uipack.v6.V6ConversationPorts
 import kotlinx.coroutines.flow.map
 
 /** The original shipped screen is an explicit compatibility mode, never a fake complete UiPack. */
@@ -58,9 +59,20 @@ internal object LocalApplicationPackInstallations {
         checkForUpdate: (() -> Unit)? = null,
     ): List<UiApplicationScenePack> =
         listOf(
-            // Migrating V6 has only real settings renderers. Full-application Host denies it
+            // Migrating V6 has only actual settings and conversation renderers; Host denies it
             // until every required Scene exists, so current users stay on legacy stable V6.
-            V6ApplicationScenePack(owner.hostPreferencesUiPort, owner.settingsUiPort),
+            V6ApplicationScenePack(
+                owner.hostPreferencesUiPort,
+                owner.settingsUiPort,
+                V6ConversationPorts(
+                    chat = owner.chatUiPort, work = owner.workConversationUiPort,
+                    drafts = owner.conversationDraftUiPort,
+                    reading = owner.conversationReadingUiPort,
+                    attachments = owner.attachmentUiPort, history = owner.messageHistoryUiPort,
+                    workMode = { owner.shellState.value.usageMode == LocalUsageMode.WORK },
+                    workModeUpdates = owner.shellState.map { it.usageMode == LocalUsageMode.WORK },
+                ),
+            ),
             NextApplicationScenePack(NextApplicationFeaturePorts(
             chat = owner.chatUiPort, work = owner.workConversationUiPort,
             drafts = owner.conversationDraftUiPort, reading = owner.conversationReadingUiPort,
