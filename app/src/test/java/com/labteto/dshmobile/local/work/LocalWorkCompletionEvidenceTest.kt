@@ -112,4 +112,53 @@ class LocalWorkCompletionEvidenceTest {
         )
         assertTrue(localWorkCompletionEvidence(work).readyForGoalCompletion)
     }
+
+    @Test
+    fun turnCompletionAndGoalCompletionRemainDistinct() {
+        val goal = LocalGoal("修复并验证", id = "g1", status = "active")
+        val open = LocalWorkState(goal = goal, todos = listOf(LocalTodoItem("跑测试", "pending")))
+        val assessment = assessLocalWorkGoal(open)
+        assertTrue(assessment.hasRunnableRemainingWork)
+        assertTrue(assessment.disposition == LocalWorkGoalDisposition.NEEDS_EXECUTION)
+        assertTrue(assessment.toTurnEventFields()["goal_disposition"].toString().contains("needs_execution"))
+        assertTrue(assessment.toTurnEventFields()["goal_outstanding_count"].toString() == "1")
+
+        val cleared = open.copy(todos = listOf(LocalTodoItem("跑测试", "completed")))
+        val ready = assessLocalWorkGoal(cleared)
+        assertTrue(ready.disposition == LocalWorkGoalDisposition.READY_FOR_SETTLEMENT)
+        assertFalse(ready.hasRunnableRemainingWork)
+        assertTrue(assessLocalWorkGoal(cleared.copy(goal = goal.copy(status = "completed")))
+            .disposition == LocalWorkGoalDisposition.COMPLETED)
+    }
+
+    @Test
+    fun goalDispositionDoesNotAutoRunWhilePausedOrWaitingForApproval() {
+        val goal = LocalGoal("准备构建", id = "g2")
+        val open = LocalWorkState(goal = goal, todos = listOf(LocalTodoItem("执行构建", "pending")))
+        assertTrue(assessLocalWorkGoal(open.copy(goal = goal.copy(status = "paused")))
+            .disposition == LocalWorkGoalDisposition.PAUSED)
+        assertTrue(assessLocalWorkGoal(open.copy(goal = goal.copy(status = "blocked")))
+            .disposition == LocalWorkGoalDisposition.BLOCKED)
+        val waitingTeam = open.copy(team = LocalAgentTeamUiState(
+            members = listOf(teamMember("running"))))
+        assertTrue(assessLocalWorkGoal(waitingTeam).disposition == LocalWorkGoalDisposition.WAITING_TEAM)
+        assertFalse(assessLocalWorkGoal(waitingTeam).hasRunnableRemainingWork)
+    }
+
+    @Test
+    fun goalDispositionCannotCompleteOnStaleArtifactOrNoGoal() {
+        val legacy = LocalWorkState(todos = listOf(LocalTodoItem("旧任务", "pending")))
+        assertTrue(assessLocalWorkGoal(legacy).disposition == LocalWorkGoalDisposition.NO_GOAL)
+        val work = LocalWorkState(goal = LocalGoal("构建", status = "completed", id = "g3"))
+        val delivery = LocalWorkDeliveryEvidence(
+            needsArtifact = true,
+            needsTest = true,
+            unmetRequirements = listOf("验收命令对应的文件版本已改变"),
+        )
+        val snapshot = localWorkCompletionEvidence(work, delivery)
+        val disposition = assessLocalWorkGoal(work, snapshot)
+        assertTrue(disposition.disposition == LocalWorkGoalDisposition.NEEDS_EXECUTION)
+        assertFalse(disposition.toTurnEventFields()["goal_ready_for_settlement"].toString().toBoolean())
+    }
+
 }
