@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1681,
-  "production_source_count": 979,
-  "test_code_file_count": 562,
+  "repository_code_file_count": 1685,
+  "production_source_count": 980,
+  "test_code_file_count": 565,
   "workflow_files": [
     ".github/workflows/capture-readme-ui.yml",
     ".github/workflows/ci.yml",
@@ -378,7 +378,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/attachment/LocalAttachmentInspection.kt",
-      "sha256": "935a57bc9e1cf10a"
+      "sha256": "122b202eaf8889e6"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/attachment/LocalAttachmentMaintenance.kt",
@@ -1662,7 +1662,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/document/LocalUiDocumentCodec.kt",
-      "sha256": "ca09b654ee66dabb"
+      "sha256": "d6cfb112cd2b40e0"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/profile/UserProfileStore.kt",
@@ -2766,7 +2766,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalDynamicDocument.kt",
-      "sha256": "697d600608674043"
+      "sha256": "1293539a9117b6e6"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureAnimatedHost.kt",
@@ -3754,7 +3754,7 @@
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiDocument.kt",
-      "sha256": "c62afb7b2d5bca0e"
+      "sha256": "99a1353b5338c975"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiDocumentFormUiPort.kt",
@@ -3850,7 +3850,7 @@
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationScene.kt",
-      "sha256": "d909ed5d3aee58f9"
+      "sha256": "16a6a51002a09508"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6DiaryMemoryScenes.kt",
@@ -3861,12 +3861,16 @@
       "sha256": "f911138bfc368410"
     },
     {
+      "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6LineChart.kt",
+      "sha256": "22690afab81d0bcc"
+    },
+    {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ModelPerformanceScene.kt",
       "sha256": "e06e308c443084aa"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6PersonaArchiveScene.kt",
-      "sha256": "c4ad6855d954ddea"
+      "sha256": "0a5f27b2d2a67ec2"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6PersonaGroupScenes.kt",
@@ -3886,15 +3890,15 @@
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ReadableContent.kt",
-      "sha256": "180354400d61942f"
+      "sha256": "98377b4ab3c4fdd6"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ScenePresentation.kt",
-      "sha256": "5735aa09ae1d49dd"
+      "sha256": "e97905059d225997"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6SettingsSuiteScene.kt",
-      "sha256": "9213cebeffb39b65"
+      "sha256": "c8d499486fa6a221"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ToolsWorkspaceMedia.kt",
@@ -3902,7 +3906,7 @@
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6UiDocumentScene.kt",
-      "sha256": "a63d0804c5e5cf24"
+      "sha256": "c91055ab77e901be"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6WorkEvidencePanel.kt",
@@ -3914,7 +3918,7 @@
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanBasics.kt",
-      "sha256": "95fca2ff77a55b21"
+      "sha256": "d3bbb0793ceae53d"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanChrome.kt",
@@ -3978,14 +3982,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "21463b7c1df3",
+  "source_snapshot": "0f1b635d354a",
   "observed_delta": {
-    "baseline": "c4be20968f02",
+    "baseline": "925519904be8",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],

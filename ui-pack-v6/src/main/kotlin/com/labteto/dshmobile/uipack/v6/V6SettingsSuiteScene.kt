@@ -113,7 +113,7 @@ fun V6SettingsSuiteScene(
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(name, style = MaterialTheme.typography.titleLarge)
+            Text(name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
             SyButton("返回", onBack, style = SyButtonStyle.GHOST)
         }
         if (state.loading) SyNote("正在加载设置")

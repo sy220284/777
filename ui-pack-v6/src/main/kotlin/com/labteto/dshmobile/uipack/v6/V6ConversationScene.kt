@@ -2,6 +2,7 @@ package com.labteto.dshmobile.uipack.v6
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -164,6 +165,7 @@ internal fun submitV6ConversationDraft(
  * Owner commands; a UI receipt never pretends to prove completion.
  * More advanced tool/media/document scenes are intentionally NOT registered yet.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun V6ConversationScene(
     ports: V6ConversationPorts,
@@ -236,6 +238,9 @@ fun V6ConversationScene(
 
     var editing by remember(identity) { mutableStateOf<UiMessageSnapshot?>(null) }
     var editText by remember(identity) { mutableStateOf("") }
+    var editError by remember(identity) { mutableStateOf<String?>(null) }
+    var menuError by remember(identity) { mutableStateOf<String?>(null) }
+    var attachmentsOpen by remember(identity) { mutableStateOf(false) }
     var questionText by remember(work.question?.pendingId) { mutableStateOf("") }
     var older by remember(identity) { mutableStateOf(emptyList<UiMessageSnapshot>()) }
     var cursor by remember(identity) { mutableStateOf<UiTranscriptCursor?>(null) }
@@ -470,7 +475,12 @@ fun V6ConversationScene(
     if (editing != null) AlertDialog(
         onDismissRequest = { editing = null },
         title = { Text("修改用户消息") },
-        text = { SyInput(editText, { editText = it }, label = "修改内容", singleLine = false) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SyInput(editText, { editText = it; editError = null }, label = "修改内容", singleLine = false, maxLines = 8)
+                editError?.let { Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
+            }
+        },
         confirmButton = { TextButton(onClick = {
             val target = identity ?: return@TextButton
             val source = editing ?: return@TextButton
@@ -481,9 +491,71 @@ fun V6ConversationScene(
             if (result is UiCommandReceipt.MessageEdited &&
                 result.result in setOf(UiMessageEditOutcome.SENT, UiMessageEditOutcome.COMMITTED_NOT_STARTED))
                 editing = null
+            else editError = describeV6ConversationReceipt(result)
         }, enabled = identity != null && editText.isNotBlank()) { Text("保存并重新发送") } },
         dismissButton = { TextButton(onClick = { editing = null }) { Text("取消") } },
     )
+
+    @Composable
+    fun WorkInteractionContent() {
+        if (workMode && identity != null &&
+            (part == V6ConversationPart.FULL || part == V6ConversationPart.WORK_QUESTION ||
+                part == V6ConversationPart.WORK_APPROVAL)) {
+            if (part == V6ConversationPart.FULL || part == V6ConversationPart.WORK_QUESTION)
+            work.question?.let { question ->
+                SyGlassCard(Modifier.fillMaxWidth()) {
+                    Text(question.question, style = MaterialTheme.typography.titleSmall)
+                    question.options.forEach { option ->
+                        SyButton(option, { show(ports.work.submit(
+                            WorkConversationUiCommand.AnswerQuestion(identity, question.pendingId, option))) })
+                    }
+                    SyInput(questionText, { questionText = it }, label = "回答问题")
+                    SyButton("发送答案", { show(ports.work.submit(
+                        WorkConversationUiCommand.AnswerQuestion(identity, question.pendingId, questionText))) },
+                        enabled = questionText.isNotBlank())
+                    SyButton("不回答", { show(ports.work.submit(
+                        WorkConversationUiCommand.AnswerQuestion(identity, question.pendingId, null))) },
+                        style = SyButtonStyle.GHOST)
+                }
+            }
+            if (part == V6ConversationPart.FULL || part == V6ConversationPart.WORK_APPROVAL)
+            work.approval?.let { approval ->
+                SyGlassCard(Modifier.fillMaxWidth()) {
+                    Text("需要明确授权 · ${approval.toolName}",
+                        style = MaterialTheme.typography.titleSmall)
+                    Text(approval.summary)
+                    Text(approval.arguments)
+                    Text("风险级别：${v6ApprovalLabel(approval.impact)}")
+                    SyButton("查看并批准", { approvalConfirmation = approval.pendingId })
+                    if (approvalConfirmation == approval.pendingId) AlertDialog(
+                        onDismissRequest = { approvalConfirmation = null },
+                        title = { Text("确认仅批准当前工具调用") },
+                        text = {
+                            Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(approval.toolName)
+                                Text(approval.summary)
+                                Text(approval.arguments)
+                                Text("影响等级：" + v6ApprovalLabel(approval.impact))
+                            }
+                        },
+                        confirmButton = { TextButton(onClick = {
+                            approvalConfirmation = null
+                            show(ports.work.submit(WorkConversationUiCommand.AnswerApproval(
+                                identity, approval.pendingId, true)))
+                        }) { Text("仅批准此次调用") } },
+                        dismissButton = { TextButton(onClick = {
+                            approvalConfirmation = null
+                        }) { Text("取消") } },
+                    )
+                    SyButton("拒绝", {
+                        show(ports.work.submit(WorkConversationUiCommand.AnswerApproval(
+                            identity, approval.pendingId, false)))
+                    }, style = SyButtonStyle.SECONDARY)
+                }
+            }
+        }
+    }
 
     var navigationExpanded by remember(identity) { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().imePadding().padding(12.dp),
@@ -494,7 +566,7 @@ fun V6ConversationScene(
             SyButton("返回", onBack, style = SyButtonStyle.GHOST)
         }
         if (onNavigate != null) {
-            SyButton("更多", { navigationExpanded = true }, style = SyButtonStyle.GHOST)
+            SyButton("更多", { menuError = null; navigationExpanded = true }, style = SyButtonStyle.GHOST)
             if (navigationExpanded) {
                 val groups = buildList {
                     add(V6DestinationGroup("会话", listOf(
@@ -536,10 +608,10 @@ fun V6ConversationScene(
                         V6Destination("settings.memory_management", "记忆管理"),
                         V6Destination("route.settings", "应用设置"))))
                 }
-                V6ConversationMenu(groups, onDismiss = { navigationExpanded = false }) { entry ->
+                V6ConversationMenu(groups, error = menuError, onDismiss = { navigationExpanded = false }) { entry ->
                     val result = onNavigate(UiSceneId(entry.id))
                     if (result is UiSceneNavigationResult.Changed) navigationExpanded = false
-                    else feedback = "暂时无法打开“${entry.title}”，请稍后再试"
+                    else menuError = "暂时无法打开“${entry.title}”，请稍后再试"
                 }
             }
         }
@@ -606,7 +678,7 @@ fun V6ConversationScene(
                         status != UiSceneStatus.LOADING
                     if (message.role == UiMessageRole.USER && message.editableText != null &&
                         actionReady) SyButton("修改", {
-                            editing = message; editText = message.editableText.orEmpty()
+                            editing = message; editText = message.editableText.orEmpty(); editError = null
                         }, style = SyButtonStyle.GHOST)
                     if (message.role == UiMessageRole.ASSISTANT && !message.proactive &&
                         message.id == messages.lastOrNull()?.id && actionReady) {
@@ -635,67 +707,18 @@ fun V6ConversationScene(
             }
             if (messages.isEmpty() && status == UiSceneStatus.EMPTY)
                 item(key = "empty") { SyNote("当前会话还没有消息") }
-        }
-        if (workMode && identity != null &&
-            (part == V6ConversationPart.FULL || part == V6ConversationPart.WORK_QUESTION ||
-                part == V6ConversationPart.WORK_APPROVAL)) {
-            if (part == V6ConversationPart.FULL || part == V6ConversationPart.WORK_QUESTION)
-            work.question?.let { question ->
-                SyGlassCard(Modifier.fillMaxWidth()) {
-                    Text(question.question, style = MaterialTheme.typography.titleSmall)
-                    question.options.forEach { option ->
-                        SyButton(option, { show(ports.work.submit(
-                            WorkConversationUiCommand.AnswerQuestion(identity, question.pendingId, option))) })
-                    }
-                    SyInput(questionText, { questionText = it }, label = "回答问题")
-                    SyButton("发送答案", { show(ports.work.submit(
-                        WorkConversationUiCommand.AnswerQuestion(identity, question.pendingId, questionText))) },
-                        enabled = questionText.isNotBlank())
-                    SyButton("不回答", { show(ports.work.submit(
-                        WorkConversationUiCommand.AnswerQuestion(identity, question.pendingId, null))) },
-                        style = SyButtonStyle.GHOST)
-                }
-            }
-            if (part == V6ConversationPart.FULL || part == V6ConversationPart.WORK_APPROVAL)
-            work.approval?.let { approval ->
-                SyGlassCard(Modifier.fillMaxWidth()) {
-                    Text("需要明确授权 · ${approval.toolName}",
-                        style = MaterialTheme.typography.titleSmall)
-                    Text(approval.summary)
-                    Text(approval.arguments)
-                    Text("风险级别：${v6ApprovalLabel(approval.impact)}")
-                    SyButton("查看并批准", { approvalConfirmation = approval.pendingId })
-                    if (approvalConfirmation == approval.pendingId) AlertDialog(
-                        onDismissRequest = { approvalConfirmation = null },
-                        title = { Text("确认仅批准当前工具调用") },
-                        text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(approval.toolName)
-                                Text(approval.summary)
-                                Text(approval.arguments)
-                                Text("影响等级：" + v6ApprovalLabel(approval.impact))
-                            }
-                        },
-                        confirmButton = { TextButton(onClick = {
-                            approvalConfirmation = null
-                            show(ports.work.submit(WorkConversationUiCommand.AnswerApproval(
-                                identity, approval.pendingId, true)))
-                        }) { Text("仅批准此次调用") } },
-                        dismissButton = { TextButton(onClick = {
-                            approvalConfirmation = null
-                        }) { Text("取消") } },
-                    )
-                    SyButton("拒绝", {
-                        show(ports.work.submit(WorkConversationUiCommand.AnswerApproval(
-                            identity, approval.pendingId, false)))
-                    }, style = SyButtonStyle.SECONDARY)
+            if (part == V6ConversationPart.FULL && workMode && identity != null) {
+                item(key = "work-interaction") { WorkInteractionContent() }
+                ports.evidence?.let { evidence ->
+                    item(key = "work-evidence") { V6WorkEvidencePanel(evidence, identity) }
                 }
             }
         }
-        if (part == V6ConversationPart.FULL && workMode && identity != null)
-            ports.evidence?.let { evidence ->
-                V6WorkEvidencePanel(evidence, identity)
+        if (part == V6ConversationPart.WORK_QUESTION || part == V6ConversationPart.WORK_APPROVAL) {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                WorkInteractionContent()
             }
+        }
         if (part == V6ConversationPart.FULL || part == V6ConversationPart.REPLY_STATUS) {
             ownerError?.let { SyNote(it) }
             feedback?.let { Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
@@ -706,6 +729,15 @@ fun V6ConversationScene(
             }
         }
         if (part == V6ConversationPart.FULL || part == V6ConversationPart.COMPOSER) {
+        if (imported.isNotEmpty()) SyButton("附件（${imported.size}）", {
+            feedback = null
+            attachmentsOpen = true
+        }, style = SyButtonStyle.GHOST)
+        if (attachmentsOpen) com.shenyan.designsystem.components.SyModalSheet(
+            onDismiss = { attachmentsOpen = false }, title = "待发送附件（${imported.size}）") {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                feedback?.let { Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
         imported.forEach { file ->
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Column(Modifier.fillMaxWidth()) {
@@ -744,10 +776,13 @@ fun V6ConversationScene(
                 }
             }
         }
+            }
+        }
         SyInput(draft, { value ->
             identity?.let { ports.drafts.updateDraft(it.sessionId, value) }
-        }, label = "输入消息", enabled = identity != null, singleLine = false)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        }, label = "输入消息", enabled = identity != null, singleLine = false, maxLines = 5)
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (ports.attachments != null) SyButton("添加附件", {
                 pickerIdentity = identity
                 picker()

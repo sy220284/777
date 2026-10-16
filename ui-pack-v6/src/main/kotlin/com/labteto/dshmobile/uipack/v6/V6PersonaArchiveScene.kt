@@ -16,6 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -77,17 +79,29 @@ fun V6PersonaArchiveScene(
     val selected by selection.snapshots.collectAsStateWithLifecycle(
         initialValue = remember(selection) { selection.snapshot() })
     var entries by remember(gallery) { mutableStateOf<List<UiPersonaGalleryEntry>>(emptyList()) }
-    var activeGallery by remember(gallery) { mutableStateOf<String?>(null) }
-    var activeStory by remember(gallery) { mutableStateOf<String?>(null) }
+    var activeGallery by rememberSaveable(gallery) { mutableStateOf<String?>(null) }
+    var activeStory by rememberSaveable(gallery) { mutableStateOf<String?>(null) }
     var history by remember(activeGallery, activeStory) { mutableStateOf<List<UiMessageSnapshot>>(emptyList()) }
     var pageCursor by remember(activeGallery, activeStory) { mutableStateOf<String?>(null) }
     var historyLoaded by remember(activeGallery, activeStory) { mutableStateOf(false) }
     var loading by remember(gallery) { mutableStateOf(false) }
     var pending by remember(gallery) { mutableStateOf(false) }
     var notice by remember(gallery) { mutableStateOf<String?>(null) }
-    var rename by remember(activeGallery, activeStory) { mutableStateOf("") }
-    var notes by remember(activeGallery, activeStory) { mutableStateOf("") }
-    var stage by remember(activeGallery, activeStory) { mutableStateOf("") }
+    val chosen = entries.firstOrNull { it.id == activeGallery }
+    val story = chosen?.stories?.firstOrNull { it.id == activeStory }
+    var rename by rememberSaveable(activeGallery, activeStory) { mutableStateOf(story?.title.orEmpty()) }
+    var notes by rememberSaveable(activeGallery, activeStory) { mutableStateOf(story?.notes.orEmpty()) }
+    var stage by rememberSaveable(activeGallery, activeStory) { mutableStateOf(story?.storyStage.orEmpty()) }
+    val dirty = story != null && (rename != story.title || notes != story.notes || stage != story.storyStage)
+    var pendingDeparture by remember(gallery) { mutableStateOf<(() -> Unit)?>(null) }
+    var departureError by remember(gallery) { mutableStateOf<String?>(null) }
+    fun requestDeparture(action: () -> Unit) {
+        if (pending || loading) return
+        if (dirty) { departureError = null; pendingDeparture = action } else action()
+    }
+    BackHandler(enabled = dirty || pending || pendingDeparture != null) {
+        if (!pending) requestDeparture(onBack)
+    }
     var deleteTarget by remember(activeGallery, activeStory) { mutableStateOf<Pair<String, String?>?>(null) }
     var inspection by remember(activeGallery, activeStory) { mutableStateOf<UiPersonaInspection?>(null) }
     var suggestionIndices by remember(activeGallery, activeStory) { mutableStateOf<Set<Int>>(emptySet()) }
@@ -128,9 +142,6 @@ fun V6PersonaArchiveScene(
     }
     fun chooseStory(story: UiPersonaGalleryStory) {
         activeStory = story.id
-        rename = story.title
-        notes = story.notes
-        stage = story.storyStage
         historyLoaded = false
         notice = null
     }
@@ -194,8 +205,6 @@ fun V6PersonaArchiveScene(
         finally { loading = false }
     }
 
-    val chosen = entries.firstOrNull { it.id == activeGallery }
-    val story = chosen?.stories?.firstOrNull { it.id == activeStory }
     val currentIdentity: UiSessionIdentity? = selected.identity
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -205,7 +214,7 @@ fun V6PersonaArchiveScene(
             V6PersonaArchivePart.DELETE -> "档案清理"
         }, style = MaterialTheme.typography.titleLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SyButton("返回", onBack, style = SyButtonStyle.GHOST)
+            SyButton("返回", { requestDeparture(onBack) }, enabled = !pending, style = SyButtonStyle.GHOST)
             SyButton("刷新人物库", { refresh() }, enabled = !loading && !pending,
                 style = SyButtonStyle.SECONDARY)
         }
@@ -214,11 +223,12 @@ fun V6PersonaArchiveScene(
         notice?.let { SyNote(it) }
         if (entries.isEmpty() && !loading) SyNote("当前没有已保存人物档案")
         if (chosen != null && part != V6PersonaArchivePart.DELETE)
-            SyButton("切换人物", { activeGallery = null; activeStory = null }, style = SyButtonStyle.GHOST)
+            SyButton("切换人物", { requestDeparture { activeGallery = null; activeStory = null } },
+                enabled = !pending, style = SyButtonStyle.GHOST)
         if (chosen == null || part == V6PersonaArchivePart.DELETE) entries.forEach { person ->
             Column(Modifier.fillMaxWidth()) {
                 com.shenyan.designsystem.components.SyCategoryRow(title = person.name,
-                    subtitle = "${person.stories.size} 段故事", onClick = { chooseGallery(person.id) })
+                    subtitle = "${person.stories.size} 段故事", onClick = { requestDeparture { chooseGallery(person.id) } })
                 if (part == V6PersonaArchivePart.DELETE && deletion != null)
                     SyButton("删除此人物及其档案", {
                         deleteTarget = person.id to null
@@ -229,20 +239,33 @@ fun V6PersonaArchiveScene(
             V6PersonaHero(chosen, portraits)
             if (currentIdentity != null && selected.canStartStory) {
                 SyButton("开始新故事", {
-                    val expected = currentIdentity
-                    write({
-                        val receipt = selection.submit(PersonaSelectionUiCommand.StartStory(
-                            expected, chosen.id, storyId = null, freshStory = true))
-                        describeV6ConversationReceipt(receipt)
-                    })
+                    requestDeparture {
+                        val expected = currentIdentity
+                        write({
+                            val receipt = selection.submit(PersonaSelectionUiCommand.StartStory(
+                                expected, chosen.id, storyId = null, freshStory = true))
+                            describeV6ConversationReceipt(receipt)
+                        })
+                    }
                 }, enabled = !pending, style = SyButtonStyle.SECONDARY)
             }
-            chosen.stories.forEach { item ->
+            if (story != null) {
+                Text(story.title, style = MaterialTheme.typography.titleMedium)
+                SyButton("切换故事", { requestDeparture { activeStory = null } },
+                    enabled = !pending, style = SyButtonStyle.GHOST)
+                if (currentIdentity != null && selected.canStartStory) SyButton("继续这段故事", {
+                    requestDeparture {
+                        write({ describeV6ConversationReceipt(selection.submit(
+                            PersonaSelectionUiCommand.StartStory(currentIdentity, chosen.id, story.id, freshStory = false))) })
+                    }
+                }, enabled = !pending)
+            }
+            if (story == null) chosen.stories.forEach { item ->
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     com.shenyan.designsystem.components.SyCategoryRow(title = item.title,
                         subtitle = "${item.messageCount} 条消息" +
                             item.storyStage.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty(),
-                        onClick = { chooseStory(item) })
+                        onClick = { requestDeparture { chooseStory(item) } })
                     if (currentIdentity != null && selected.canStartStory)
                         SyButton("继续这段故事", {
                             write({
@@ -262,8 +285,8 @@ fun V6PersonaArchiveScene(
         } else if (chosen != null && story != null) {
             Text("故事信息：" + story.title, style = MaterialTheme.typography.titleMedium)
             if (stories != null) {
-                SyInput(notes, { notes = it }, label = "故事备注", singleLine = false)
-                SyInput(stage, { stage = it }, label = "故事阶段")
+                SyInput(notes, { notes = it }, label = "故事备注", singleLine = false, enabled = !pending, maxLines = 8)
+                SyInput(stage, { stage = it }, label = "故事阶段", enabled = !pending)
                 SyButton("保存故事资料", {
                     val id = chosen.id
                     val sid = story.id
@@ -274,7 +297,7 @@ fun V6PersonaArchiveScene(
                     }, afterSuccess = true)
                 }, enabled = !pending, style = SyButtonStyle.SECONDARY)
             }
-            SyInput(rename, { rename = it }, label = "故事标题")
+            SyInput(rename, { rename = it }, label = "故事标题", enabled = !pending)
             SyButton("保存标题", {
                 val id = chosen.id
                 val sid = story.id
@@ -353,6 +376,69 @@ fun V6PersonaArchiveScene(
                     enabled = !pending)
             }
         }
+    }
+    if (pendingDeparture != null) {
+        AlertDialog(
+            onDismissRequest = { if (!pending) pendingDeparture = null },
+            title = { Text("还有未保存的修改") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("保存后离开，或放弃本次修改。继续编辑会保留当前内容。")
+                    departureError?.let { Text(it, color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk) }
+                    SyButton("保存并离开", {
+                        val person = chosen ?: return@SyButton
+                        val source = story ?: return@SyButton
+                        val action = pendingDeparture ?: return@SyButton
+                        val expected = selected.identity
+                        val titleToSave = rename
+                        val notesToSave = notes
+                        val stageToSave = stage
+                        if (pending || titleToSave.isBlank()) return@SyButton
+                        pending = true
+                        departureError = null
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    if (notesToSave != source.notes || stageToSave != source.storyStage) {
+                                        val owner = stories ?: error("故事资料暂时无法保存，请继续编辑")
+                                        when (val result = owner.submit(PersonaStoryUiCommand.SaveDetails(
+                                            expected, person.id, source.id, notesToSave, stageToSave))) {
+                                            is UiPersonaStoryReceipt.Saved -> Unit
+                                            UiPersonaStoryReceipt.Missing -> error("故事已不存在，请先保留修改内容")
+                                            is UiPersonaStoryReceipt.Failed -> error(result.message ?: "故事资料保存失败")
+                                        }
+                                    }
+                                    if (titleToSave != source.title) {
+                                        val result = gallery.submit(PersonaGalleryUiCommand.RenameStory(
+                                            person.id, source.id, titleToSave))
+                                        if (result !is UiCommandReceipt.Accepted)
+                                            error(describeV6ConversationReceipt(result))
+                                    }
+                                }
+                                readGallery(clearNotice = false)
+                                val saved = entries.firstOrNull { it.id == person.id }?.stories?.firstOrNull { it.id == source.id }
+                                if (saved != null && saved.title == titleToSave && saved.notes == notesToSave && saved.storyStage == stageToSave) {
+                                    pendingDeparture = null
+                                    pending = false
+                                    action()
+                                } else departureError = "保存结果尚未确认，修改内容已保留，请稍后再试"
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (failure: Exception) { departureError = failure.message ?: "保存失败，修改内容已保留" }
+                            finally { pending = false }
+                        }
+                    }, enabled = !pending && rename.isNotBlank())
+                }
+            },
+            confirmButton = { TextButton(onClick = {
+                val action = pendingDeparture
+                rename = story?.title.orEmpty()
+                notes = story?.notes.orEmpty()
+                stage = story?.storyStage.orEmpty()
+                pendingDeparture = null
+                action?.invoke()
+            }, enabled = !pending) { Text("放弃修改") } },
+            dismissButton = { TextButton(onClick = { pendingDeparture = null }, enabled = !pending) { Text("继续编辑") } },
+        )
     }
     if (confirmSuggestions) {
         val examined = inspection

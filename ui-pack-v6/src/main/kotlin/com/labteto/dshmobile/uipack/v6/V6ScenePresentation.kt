@@ -6,6 +6,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.uicontract.*
 import com.shenyan.designsystem.components.*
@@ -47,12 +50,14 @@ internal fun V6DestinationSection(group: V6DestinationGroup, onSelect: (V6Destin
 }
 
 @Composable
-internal fun V6ConversationMenu(groups: List<V6DestinationGroup>, onDismiss: () -> Unit,
+internal fun V6ConversationMenu(groups: List<V6DestinationGroup>, error: String?, onDismiss: () -> Unit,
     onSelect: (V6Destination) -> Unit) {
     SyModalSheet(onDismiss = onDismiss, title = "会话功能") {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
-            .padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
+            .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            error?.let { Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                color = LocalSyColors.current.dangerInk) }
             groups.forEach { V6DestinationSection(it, onSelect) }
         }
     }

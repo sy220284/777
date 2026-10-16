@@ -136,9 +136,10 @@ fun SyGlassCard(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null,
 
 @Composable
 fun SyInput(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier,
-            label: String = "", error: String? = null, enabled: Boolean = true, singleLine: Boolean = true) {
+            label: String = "", error: String? = null, enabled: Boolean = true, singleLine: Boolean = true,
+            maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE) {
     SyTextField(value = value, onValueChange = onValueChange, modifier = modifier.fillMaxWidth().heightIn(min = SyMetric.touch),
-        enabled = enabled, singleLine = singleLine, isError = error != null,
+        enabled = enabled, singleLine = singleLine, maxLines = maxLines, isError = error != null,
         label = if (label.isEmpty()) null else ({ Text(label) }),
         supportingText = if (error == null) null else ({ Text(error) }),
         shape = RoundedCornerShape(SyMetric.radiusControl))

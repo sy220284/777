@@ -7,6 +7,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -98,6 +101,27 @@ private fun V6InlineText(text: String, style: TextStyle, modifier: Modifier = Mo
     onOpenFile: ((String) -> Unit)? = null, align: TextAlign = TextAlign.Start) {
     val colors = LocalSyColors.current
     val uriHandler = LocalUriHandler.current
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    var failedUrl by remember(text) { mutableStateOf<String?>(null) }
+    failedUrl?.let { url ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { failedUrl = null },
+            title = { Text("暂时无法打开链接") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("可以重试，或复制链接后使用浏览器打开。")
+                    SelectionContainer { Text(url) }
+                    SyButton("重试", {
+                        runCatching { uriHandler.openUri(url) }.onSuccess { failedUrl = null }
+                    }, style = SyButtonStyle.GHOST)
+                }
+            },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = {
+                clipboard.setText(AnnotatedString(url)); failedUrl = null
+            }) { Text("复制链接") } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { failedUrl = null }) { Text("关闭") } },
+        )
+    }
     val annotated = buildAnnotatedString {
         parseUiMarkdownInline(text).forEach { part ->
             when (part) {
@@ -113,7 +137,7 @@ private fun V6InlineText(text: String, style: TextStyle, modifier: Modifier = Mo
                         withLink(LinkAnnotation.Url(url,
                             styles = TextLinkStyles(SpanStyle(color = colors.text,
                                 textDecoration = TextDecoration.Underline)),
-                            linkInteractionListener = { runCatching { uriHandler.openUri(url) } })) { append(part.text) }
+                            linkInteractionListener = { runCatching { uriHandler.openUri(url) }.onFailure { failedUrl = url } })) { append(part.text) }
                     } else if (onOpenFile != null && isV6ReadableFileLink(url)) {
                         withLink(LinkAnnotation.Clickable(url,
                             styles = TextLinkStyles(SpanStyle(color = colors.text,

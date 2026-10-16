@@ -271,26 +271,7 @@ private fun V6DocumentNode(
                     modifier = Modifier.fillMaxWidth())
             }
         }
-        is UiDocumentNode.LineChart -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(node.title, style = MaterialTheme.typography.titleSmall)
-            val tint = MaterialTheme.colorScheme.primary
-            val values = node.points.map { it.value }
-            val low = values.minOrNull() ?: 0.0
-            val high = values.maxOrNull() ?: 0.0
-            val spread = (high - low).takeIf { it > 0.0 } ?: 1.0
-            Canvas(Modifier.fillMaxWidth().height(108.dp)
-                .semantics { contentDescription = "折线趋势图：${node.title}" }) {
-                val curve = Path()
-                node.points.forEachIndexed { index, point ->
-                    val x = size.width * (if (node.points.size == 1) 0.5f
-                        else index.toFloat() / (node.points.size - 1))
-                    val y = size.height * (1f - ((point.value - low) / spread).toFloat().coerceIn(0f, 1f))
-                    if (index == 0) curve.moveTo(x, y) else curve.lineTo(x, y)
-                }
-                drawPath(curve, tint, style = Stroke(width = 2.dp.toPx()))
-            }
-            node.points.forEach { point -> Text("${point.label}：${point.value} ${node.unit}") }
-        }
+        is UiDocumentNode.LineChart -> V6LineChart(node)
         is UiDocumentNode.BoundText -> {
             val value = when (val bound = snapshot.bindings[node.binding]) {
                 is UiDocumentBoundValue.Text -> bound.value
