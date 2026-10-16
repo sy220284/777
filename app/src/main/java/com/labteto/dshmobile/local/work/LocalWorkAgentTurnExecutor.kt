@@ -128,8 +128,10 @@ internal class LocalWorkAgentTurnExecutor(
     ) {
         val ownerJob = currentCoroutineContext()[Job]
         // Preserve the Work turn's origin even when the live transcript window is compacted.
-        val uiSourceMessageId = resolveWorkUiDocumentSource(binding.eventLog, sourceMessageId)
-            ?: binding.state.value.messages.lastOrNull { it.role == "user" }?.id
+        val uiSourceMessageId = workDocumentSourceOrLastUser(
+            sourceMessageId, resolveWorkUiDocumentSource(binding.eventLog, sourceMessageId),
+            binding.state.value.messages.lastOrNull { it.role == "user" }?.id,
+        )
         var heldSession: String? = null
         var serviceReleased = false
         try {
