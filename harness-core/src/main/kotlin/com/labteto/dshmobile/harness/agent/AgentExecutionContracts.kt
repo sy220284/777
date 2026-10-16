@@ -162,4 +162,3 @@ fun interface AgentEventSink {
 fun interface AgentStepLimitExtender {
     fun extend(currentLimit: Int, stepsUsed: Int): Int?
 }
-
