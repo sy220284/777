@@ -87,10 +87,10 @@
     {
       "id": "S1-06",
       "task": "Shell 重命名/置顶/删除/搜索/定位",
-      "codeStatus": "CODE_PARTIAL",
+      "codeStatus": "CODE_IMPLEMENTED_UNVERIFIED",
       "verification": "DEFERRED",
-      "implemented": "重命名、置顶、两包删除及Host清理已接线。V6已有实际会话标题搜索，本批不重复开发。原Session分页接口新增中立消息检索：不另建索引，按同一Owner的授权/日志实例/重置代次逐页检索当前会话，命中后保留该有界历史页，用户可继续查更早批次；查询变化不能重用旧游标，关闭窗口取消扫描。 本轮补跨会话搜索目标真实激活后阅读锚点与 Session Owner 有界历史分页定位；处理空热窗口、跨模块身份类型、重复游标和检索预算。 本轮 V6 时间线新增继续定位：当首次25页预算耗尽时，沿原 Owner opaque cursor 再读取一批并在精确消息命中后滚动；防止临时操作行变更造成索引偏移。",
-      "remaining": "跨进程重启后的未完成分页游标持久化、搜索主时间线超长会话的用户体验/完整设备回归仍缺；每次扫描受预算限制，不能宣称已读取全部历史。"
+      "implemented": "重命名、置顶、两包删除及Host清理已接线。V6已有实际会话标题搜索，本批不重复开发。原Session分页接口新增中立消息检索：不另建索引，按同一Owner的授权/日志实例/重置代次逐页检索当前会话，命中后保留该有界历史页，用户可继续查更早批次；查询变化不能重用旧游标，关闭窗口取消扫描。 本轮补跨会话搜索目标真实激活后阅读锚点与 Session Owner 有界历史分页定位；处理空热窗口、跨模块身份类型、重复游标和检索预算。 本轮 V6 时间线新增继续定位：当首次25页预算耗尽时，沿原 Owner opaque cursor 再读取一批并在精确消息命中后滚动；防止临时操作行变更造成索引偏移。 2026-10-16 续：V6 历史续查将目标消息 ID 放入 rememberSaveable，进程恢复时由 Host 的已保存 UiReadingAnchor 重新获取原 Session Owner 的 opaque 游标，禁止持久化/复用已失效的执行游标；重复分页与未命中有明确回执。LocalConversationReadingState 对损坏的 session/message/offset SavedState 做长度和范围约束，增加跨进程重建、数据污染与目标身份回归源码测试。",
+      "remaining": "代码路径已闭合，待当前 SHA 的 JVM/Android16/17 验证：尤其进程杀死后 Host SavedState 与逐页续查、跨会话超长历史滚动/失败结果、不混入其他会话消息。保存目标消息 ID，故意不持久化 Session Owner 非序列化游标；冷恢复安全地重新分页。173 项正式 E2E/恢复仍待签收。"
     },
     {
       "id": "S1-07",
