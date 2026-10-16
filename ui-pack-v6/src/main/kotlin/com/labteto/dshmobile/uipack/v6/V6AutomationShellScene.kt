@@ -37,6 +37,19 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
     var remove by remember(page) { mutableStateOf<AutomationTask?>(null) }
     var prompt by remember(page) { mutableStateOf("") }
     var firstMinutes by remember(page) { mutableStateOf("60") }
+    var scheduleType by remember(page) { mutableStateOf(AutomationScheduleType.ONCE) }
+    var repeatMinutes by remember(page) { mutableStateOf("1440") }
+    var silenceMinutes by remember(page) { mutableStateOf("60") }
+    var windowStart by remember(page) { mutableStateOf("1200") }
+    var windowEnd by remember(page) { mutableStateOf("1320") }
+    var quietEnabled by remember(page) { mutableStateOf(false) }
+    var quietStartHour by remember(page) { mutableStateOf("23") }
+    var quietStartMinute by remember(page) { mutableStateOf("0") }
+    var quietEndHour by remember(page) { mutableStateOf("8") }
+    var quietEndMinute by remember(page) { mutableStateOf("0") }
+    var proactiveGap by remember(page) { mutableStateOf("60") }
+    var maxUnanswered by remember(page) { mutableStateOf("2") }
+    var notify by remember(page) { mutableStateOf(true) }
     var mode by remember(page) {
         mutableStateOf(if (onlyChat) AutomationMode.CHAT else AutomationMode.WORK)
     }
@@ -62,10 +75,33 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
             finally { busy = false }
         }
     }
+    fun resetScheduleForm() {
+        scheduleType = AutomationScheduleType.ONCE
+        repeatMinutes = "1440"; silenceMinutes = "60"
+        windowStart = "1200"; windowEnd = "1320"
+        quietEnabled = false
+        quietStartHour = "23"; quietStartMinute = "0"
+        quietEndHour = "8"; quietEndMinute = "0"
+        proactiveGap = "60"; maxUnanswered = "2"
+        notify = true
+    }
     fun select(task: AutomationTask) {
         editing = task; prompt = task.prompt; mode = task.mode
         firstMinutes = ((task.nextRunAt - System.currentTimeMillis()).coerceAtLeast(60_000L) /
             60_000L).toString()
+        scheduleType = task.scheduleType
+        repeatMinutes = (task.recurringMinutes ?: 1440L).toString()
+        silenceMinutes = (task.silenceMinutes ?: 60L).toString()
+        windowStart = (task.windowStartMinuteOfDay ?: 1200).toString()
+        windowEnd = (task.windowEndMinuteOfDay ?: 1320).toString()
+        quietEnabled = task.quietHoursEnabled
+        quietStartHour = task.quietStartHour.toString()
+        quietStartMinute = task.quietStartMinute.toString()
+        quietEndHour = task.quietEndHour.toString()
+        quietEndMinute = task.quietEndMinute.toString()
+        proactiveGap = task.proactiveMinGapMinutes.toString()
+        maxUnanswered = task.proactiveMaxUnanswered.toString()
+        notify = task.notify
         editor = true
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -76,7 +112,8 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
         feedback?.let { SyNote(it) }
         if (!editor) {
             SyButton("新建任务", {
-                prompt = ""; firstMinutes = "60"; editing = null; editor = true
+                prompt = ""; firstMinutes = "60"; editing = null
+                resetScheduleForm(); editor = true
             }, enabled = !busy)
             snapshot.tasks.filter { !onlyChat || it.mode == AutomationMode.CHAT }.forEach { task ->
                 SyGlassCard(Modifier.fillMaxWidth()) {
@@ -112,7 +149,76 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
             SyInput(prompt, { prompt = it }, label = "任务指令", singleLine = false)
             SyInput(firstMinutes, { firstMinutes = it.filter(Char::isDigit).take(8) },
                 label = "距离下一次执行的分钟数")
+            Text("排程类型", style = MaterialTheme.typography.titleMedium)
+            listOf(
+                AutomationScheduleType.ONCE to "单次",
+                AutomationScheduleType.INTERVAL to "固定间隔",
+                AutomationScheduleType.DAILY to "每天",
+                AutomationScheduleType.WEEKLY to "每周",
+                AutomationScheduleType.MONTHLY to "每月",
+                AutomationScheduleType.SILENCE to "用户静默触发",
+                AutomationScheduleType.WINDOW to "限定时间窗",
+            ).forEach { (type, label) ->
+                SyButton(label, { scheduleType = type },
+                    style = if (scheduleType == type) SyButtonStyle.PRIMARY
+                        else SyButtonStyle.GHOST)
+            }
+            if (scheduleType == AutomationScheduleType.INTERVAL ||
+                scheduleType == AutomationScheduleType.SILENCE) {
+                if (scheduleType == AutomationScheduleType.INTERVAL) {
+                    SyInput(repeatMinutes, { repeatMinutes = it.filter(Char::isDigit).take(8) },
+                        label = "重复间隔（分钟，至少 15）")
+                } else {
+                    SyInput(silenceMinutes, { silenceMinutes = it.filter(Char::isDigit).take(8) },
+                        label = "未收到用户消息持续多久后触发（分钟）")
+                }
+            }
+            if (scheduleType == AutomationScheduleType.WINDOW) {
+                SyInput(windowStart, { windowStart = it.filter(Char::isDigit).take(4) },
+                    label = "每日时间窗开始（从零点起算的分钟）")
+                SyInput(windowEnd, { windowEnd = it.filter(Char::isDigit).take(4) },
+                    label = "每日时间窗结束（从零点起算的分钟）")
+            }
+            SySwitch("通知任务结果", notify, { notify = it })
+            if (mode == AutomationMode.CHAT) {
+                SySwitch("启用静默时段", quietEnabled, { quietEnabled = it })
+                if (quietEnabled) {
+                    SyInput(quietStartHour, { quietStartHour = it.filter(Char::isDigit).take(2) },
+                        label = "静默开始小时（0–23）")
+                    SyInput(quietStartMinute, { quietStartMinute = it.filter(Char::isDigit).take(2) },
+                        label = "静默开始分钟（0–59）")
+                    SyInput(quietEndHour, { quietEndHour = it.filter(Char::isDigit).take(2) },
+                        label = "静默结束小时（0–23）")
+                    SyInput(quietEndMinute, { quietEndMinute = it.filter(Char::isDigit).take(2) },
+                        label = "静默结束分钟（0–59）")
+                }
+                SyInput(proactiveGap, { proactiveGap = it.filter(Char::isDigit).take(8) },
+                    label = "主动接话最短间隔（分钟）")
+                SyInput(maxUnanswered, { maxUnanswered = it.filter(Char::isDigit).take(4) },
+                    label = "连续未回应最多次数")
+            }
             val minutes = firstMinutes.toLongOrNull()?.takeIf { it in 1..525600 }
+            val repeat = repeatMinutes.toLongOrNull()
+            val silence = silenceMinutes.toLongOrNull()
+            val start = windowStart.toIntOrNull()
+            val end = windowEnd.toIntOrNull()
+            val qsh = quietStartHour.toIntOrNull()
+            val qsm = quietStartMinute.toIntOrNull()
+            val qeh = quietEndHour.toIntOrNull()
+            val qem = quietEndMinute.toIntOrNull()
+            val gap = proactiveGap.toLongOrNull()
+            val unanswered = maxUnanswered.toIntOrNull()
+            val scheduleValid = when (scheduleType) {
+                AutomationScheduleType.INTERVAL -> repeat != null && repeat >= 15
+                AutomationScheduleType.SILENCE -> silence != null && silence >= 1
+                AutomationScheduleType.WINDOW -> start != null && end != null &&
+                    start in 0..1439 && end in 0..1439 && start != end
+                else -> true
+            }
+            val policyValid = mode != AutomationMode.CHAT ||
+                (gap != null && gap >= 0 && unanswered != null && unanswered >= 0 &&
+                    (!quietEnabled || (qsh in 0..23 && qsm in 0..59 &&
+                        qeh in 0..23 && qem in 0..59)))
             val chatAllowed = snapshot.context.canPlanChat && snapshot.context.identity != null
             if (mode == AutomationMode.CHAT && editing == null && !chatAllowed)
                 SyNote("人物互动任务只允许在当前有效单人聊天中创建")
@@ -120,18 +226,22 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
                 val t = editing
                 val delay = minutes ?: return@SyButton
                 val timestamp = System.currentTimeMillis() + delay * 60_000
-                val schedule = if (t == null) UiAutomationSchedule(
-                    prompt.trim(), timestamp, null, mode, AutomationScheduleType.ONCE)
-                else UiAutomationSchedule(prompt.trim(), timestamp, t.recurringMinutes,
-                    t.mode, t.scheduleType, t.silenceMinutes,
-                    t.windowStartMinuteOfDay, t.windowEndMinuteOfDay,
-                    t.quietHoursEnabled, t.quietStartHour, t.quietStartMinute,
-                    t.quietEndHour, t.quietEndMinute,
-                    t.proactiveMinGapMinutes, t.proactiveMaxUnanswered, t.notify)
+                val actualMode = t?.mode ?: mode
+                val schedule = UiAutomationSchedule(
+                    prompt.trim(), timestamp,
+                    if (scheduleType == AutomationScheduleType.INTERVAL) repeat else null,
+                    actualMode, scheduleType,
+                    if (scheduleType == AutomationScheduleType.SILENCE) silence else null,
+                    if (scheduleType == AutomationScheduleType.WINDOW) start else null,
+                    if (scheduleType == AutomationScheduleType.WINDOW) end else null,
+                    actualMode == AutomationMode.CHAT && quietEnabled,
+                    qsh ?: 23, qsm ?: 0, qeh ?: 8, qem ?: 0,
+                    gap ?: 60, unanswered ?: 2, notify)
                 send(if (t == null) AutomationUiCommand.Create(
                     if (mode == AutomationMode.CHAT) snapshot.context.identity else null, schedule)
                 else AutomationUiCommand.Update(t.id, t.scheduleGeneration, schedule))
             }, enabled = !busy && prompt.isNotBlank() && minutes != null &&
+                scheduleValid && policyValid &&
                 (editing != null || mode != AutomationMode.CHAT || chatAllowed))
             SyButton("取消", { editing = null; editor = false }, style = SyButtonStyle.GHOST)
         }
