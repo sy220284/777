@@ -35,9 +35,9 @@ internal class LocalWorkUiDocumentPublisher @Inject constructor(
         val snapshot = binding.state.value
         // The authenticated Work turn already captured its source message before execution.
         // A long tool-only transcript may evict that user message from the in-memory window.
-        val sourceMessageId = originatingMessageId?.takeIf(String::isNotBlank)
-            ?: snapshot.messages.lastOrNull { it.role == "user" }?.id
-            ?: return
+        // Only the Run Owner may bind a progress card to an original user message.
+        // A missing continuation source must not attach results to another turn.
+        val sourceMessageId = originatingMessageId?.takeIf(String::isNotBlank) ?: return
         // Only the current session's actual identity can grant live actions or bindings.
         val identity = synchronized(runtime.foregroundRunHandle.lock) {
             val current = runtime.state.value
