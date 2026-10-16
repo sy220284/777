@@ -41,6 +41,45 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun speechRevisionUsesOriginalSlotDuringGenerationAndAfterSuccess() {
+        val first = com.labteto.dshmobile.local.model.LocalMediaResult(
+            id = "first", model = "speech", provider = "MINIMAX", kind = "SPEECH",
+            createdAtMillis = 100, fileName = "first.mp3", sessionId = "session")
+        val job = com.labteto.dshmobile.local.model.LocalMediaCreationJob(
+            id = "next", sessionId = "session", kind = "SPEECH", provider = "MINIMAX",
+            model = "speech", prompt = "你好", createdAtMillis = 140, revisionOf = "first")
+        val pending = mergeLocalMediaTimeline(emptyList(), "session", listOf(first), emptyList(), listOf(job))
+        assertEquals(listOf("media-result:first"), pending.map { it.key })
+        assertEquals("first", (pending.single() as LocalTranscriptItem.MediaResult).result.id)
+        assertEquals("next", (pending.single() as LocalTranscriptItem.MediaResult).revisionJob?.id)
+        val next = first.copy(id = "next", fileName = "next.mp3", createdAtMillis = 180, revisionOf = "first")
+        val complete = mergeLocalMediaTimeline(emptyList(), "session", listOf(first, next), emptyList(), listOf(job))
+        assertEquals(pending.map { it.key }, complete.map { it.key })
+        assertEquals("next", (complete.single() as LocalTranscriptItem.MediaResult).result.id)
+    }
+
+    @Test
+    fun differentMediaTypesNeverReplaceEachOther() {
+        val voice = com.labteto.dshmobile.local.model.LocalMediaResult(
+            id = "voice", model = "speech", provider = "MINIMAX", kind = "SPEECH",
+            createdAtMillis = 10, fileName = "voice.mp3", sessionId = "session")
+        val image = voice.copy(id = "image", kind = "IMAGE", fileName = "image.png", revisionOf = "voice", createdAtMillis = 20)
+        assertEquals(2, mergeLocalMediaTimeline(emptyList(), "session", listOf(voice, image), emptyList()).size)
+    }
+
+    @Test
+    fun videoRevisionHasOneStableSlot() {
+        val first = com.labteto.dshmobile.local.model.LocalMediaVideoTask(
+            id = "old", offerId = "offer", routeFingerprint = "route", provider = "MINIMAX",
+            model = "Hailuo", profileId = "p", startedAtMillis = 10, updatedAtMillis = 10,
+            phase = com.labteto.dshmobile.local.model.LocalMediaVideoPhase.SUCCEEDED, sessionId = "session")
+        val next = first.copy(id = "new", startedAtMillis = 50, updatedAtMillis = 50, revisionOf = "old")
+        val visible = mergeLocalMediaTimeline(emptyList(), "session", emptyList(), listOf(first, next))
+        assertEquals(listOf("media-video:old"), visible.map { it.key })
+        assertEquals("new", (visible.single() as LocalTranscriptItem.VideoTask).task.id)
+    }
+
+    @Test
     fun workArtifactsAppearInConversationWithoutDuplicateFiles() {
         val transcript = listOf(LocalTranscriptItem.Message(
             LocalHarnessMessage("answer", "assistant", "文件已生成", createdAt = 10L),

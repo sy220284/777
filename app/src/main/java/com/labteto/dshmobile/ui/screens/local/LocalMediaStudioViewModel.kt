@@ -41,6 +41,7 @@ class LocalMediaStudioViewModel @Inject constructor(private val creation: LocalM
     fun resultFile(item: LocalMediaResult) = creation.resultFile(item)
     fun videoFile(task: LocalMediaVideoTask) = creation.videoFile(task)
     suspend fun removeResult(id: String) = creation.removeResult(id)
+    suspend fun removeMediaFamily(id: String) = creation.removeMediaFamily(id)
     suspend fun retryVideoSave(id: String) = creation.retryVideoSave(id)
     suspend fun voices(route: LocalMediaOffer) = creation.voices(route)
     suspend fun createVideo(route: LocalMediaOffer, prompt: String, sessionId: String? = null, sourceMessageId: String? = null, revisionOf: String? = null) = creation.createVideo(route, prompt, sessionId, sourceMessageId, revisionOf)

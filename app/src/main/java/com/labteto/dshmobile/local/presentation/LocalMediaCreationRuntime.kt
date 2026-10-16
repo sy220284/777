@@ -61,6 +61,10 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         synchronized(downloads) { downloads[id] }?.cancelAndJoin()
         withContext(Dispatchers.IO) { store.remove(id) }
     }
+    suspend fun removeMediaFamily(id: String) {
+        synchronized(downloads) { downloads[id] }?.cancelAndJoin()
+        withContext(Dispatchers.IO) { store.removeRevisionFamily(id) }
+    }
     suspend fun dismissCreationJob(id: String) = removeResult(id)
     suspend fun retryStorage() = withContext(Dispatchers.IO) { store.retryStorage() }
 
