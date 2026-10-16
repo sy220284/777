@@ -79,6 +79,16 @@ class V6ConversationSubmissionTest {
     private data class TestCursor(val page: Int) : UiTranscriptCursor
     private fun message(id: String) = UiMessageSnapshot(id, UiMessageRole.USER, id, 1L)
 
+    @Test fun historyContinuationAfterProcessRestoreUsesOnlyTheSavedSessionAnchor() {
+        val target = UiReadingAnchor("historical-id", 73, false)
+        assertEquals("historical-id", recoverableV6PendingAnchor("historical-id", target))
+        assertEquals(null, recoverableV6PendingAnchor("from-other-story", target))
+        assertEquals(null, recoverableV6PendingAnchor("historical-id", null))
+        assertEquals(null, recoverableV6PendingAnchor("historical-id",
+            UiReadingAnchor("historical-id", 0, true)))
+        assertEquals(null, recoverableV6PendingAnchor("x".repeat(257), target))
+    }
+
     @Test fun historyAnchorOnAnEmptyHotWindowUsesActualOwnerMessages() = runBlocking {
         val owner = object : UiMessageHistoryPort {
             override suspend fun messagePage(sessionId: String, cursor: UiTranscriptCursor?,
