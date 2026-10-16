@@ -163,10 +163,11 @@
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkContinuation.kt",
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistry.kt",
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentInboxPersistence.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentInboxPersistence.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistryTest.kt"
       ],
       "tests_verified": [],
-      "notes": "已接入生产 Turn 终态→Work Run Owner onIdle→持久 agent/inbox→自动下一轮的安全 Goal 进度续轮；仅在已存在身份明确的 active Goal、真实成功工具回执、无工具错误、无用户新输入/steer/取消、无持久化错误、现有证据仍为 NEEDS_EXECUTION 时准入；复用已有最多 2 次续轮预算和 checkpoint；新增 8 个 JVM 场景但最终 SHA 编译/CI 未验证。仍缺多轮动态进度证明、跨进程目标 revision/fencing、工具未知结算与完整 GoalDriver。 新增 Goal 合同 SHA-256 存储于可选 AgentContinuationRef 字段，持久恢复前重验；用户指令若比续轮后到，出队时仍可优先，过期续轮通过 inbox 事件原子丢弃、不进入模型历史；已补相关测试，CI 仍待最新提交验收。"
+      "notes": "已接入生产 Turn 终态→Work Run Owner onIdle→持久 agent/inbox→自动下一轮的安全 Goal 进度续轮；仅在已存在身份明确的 active Goal、真实成功工具回执、无工具错误、无用户新输入/steer/取消、无持久化错误、现有证据仍为 NEEDS_EXECUTION 时准入；复用已有最多 2 次续轮预算和 checkpoint；新增 8 个 JVM 场景但最终 SHA 编译/CI 未验证。仍缺多轮动态进度证明、跨进程目标 revision/fencing、工具未知结算与完整 GoalDriver。 新增 Goal 合同 SHA-256 存储于可选 AgentContinuationRef 字段，持久恢复前重验；用户指令若比续轮后到，出队时仍可优先，过期续轮通过 inbox 事件原子丢弃、不进入模型历史；已补相关测试，CI 仍待最新提交验收。 本批新增持久 Goal ID/验收合同 SHA-256 栅栏、Work Run Owner pollCommitted 出队时校验并将过期续轮持久登记丢弃，保留用户队列；LocalWorkAgentTurnExecutor.run 在懒协程模型启动前再次校验，避免出队与启动之间目标变更。新增 Work Run Registry JVM 用例；须等最新 CI。"
     },
     {
       "id": "AE4V3-12",
@@ -360,22 +361,23 @@
   "status": "first incremental implementation, not entire refactor",
   "current_slice": {
     "date": "2026-10-16",
-    "component": "AE4 Work Goal restore fencing and user precedence",
+    "component": "Work Goal safe continuation fence",
     "status": "code_committed_ci_pending",
     "pr": 705,
-    "description": "Persist goal contract fingerprint in existing queue; revalidate at durable consumption, discard stale continuation, user input prevails; still not a full autonomous GoalDriver.",
+    "description": "Goal ID + complete acceptance-contract fingerprint persists with queued continuations, stale commands are discarded at owner handoff and rechecked just before Work model execution; no User/Chat business changes.",
     "code_evidence": [
       "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentInputQueue.kt",
       "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
       "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkContinuation.kt",
       "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistry.kt",
       "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentInboxPersistence.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentInboxPersistence.kt",
+      "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistryTest.kt"
     ],
     "tests": [
-      "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuationTest.kt",
-      "app/src/test/java/com/labteto/dshmobile/local/LocalAgentInboxPersistenceTest.kt"
+      "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistryTest.kt",
+      "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuationTest.kt"
     ],
-    "ci": "await latest branch SHA"
+    "ci": "Latest #705 head CI pending; full recovery auto-resume and unknown side-effect reconciliation remain unimplemented."
   }
 }
