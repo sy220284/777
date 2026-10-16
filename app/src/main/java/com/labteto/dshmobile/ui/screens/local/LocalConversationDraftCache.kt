@@ -48,7 +48,7 @@ internal class LocalSessionDraftCache(
         val path = attachment.relativePath
         return path.length in 1..2048 &&
             !path.startsWith('/') && !path.contains('\\') &&
-            !path.contains(':') && !path.contains('\\u0000') &&
+            !path.contains(':') && path.none { it.code == 0 } &&
             path.split('/').all { it.isNotBlank() && it != "." && it != ".." } &&
             attachment.bytes >= 0L &&
             attachment.name.isNotBlank() &&
