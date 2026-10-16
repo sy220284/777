@@ -202,6 +202,8 @@ internal class LocalWorkAgentTurnExecutor(
             var workPromptContext = LocalWorkTurnPromptContext()
             var projectedSteeringRevision = binding.steeringRevision.value
             val runSnapshot = runState.value
+            val goalAtTurnStart = runSnapshot.work.goal
+            val steeringRevisionAtTurnStart = binding.steeringRevision.value
             val runToolSurface = LocalRunToolSurface(
                 runSnapshot.modelState.modelSelection.activeProfile?.toRunModelSurface(),
             )
@@ -248,6 +250,9 @@ internal class LocalWorkAgentTurnExecutor(
             var activeStep: Int? = null
             var activeToolCalls = emptyList<AgentToolCall>()
             val completedToolCallIds = linkedSetOf<String>()
+            var hadSuccessfulToolReceipt = false
+            var hadToolFailure = false
+            var completedGoalTurn = false
 
             fun settlePendingTools(reason: String) {
                 val actuallyStarted = startedToolCallIdsForActiveStep(runEventLog, activeToolCalls)
@@ -620,6 +625,8 @@ internal class LocalWorkAgentTurnExecutor(
                             })
                             runHistory.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention))
                             completedToolCallIds += event.call.id
+                            // Count only real tool receipts after their authoritative event is durable.
+                            if (event.isError) hadToolFailure = true else hadSuccessfulToolReceipt = true
                             workModelHistoryRuntime.updateContextMetrics(binding)
                             runTranscript.applyMessages(listOf(transcriptMessage), toolEvent.sequence)
                             workModelHistoryRuntime.persist(binding)
@@ -650,6 +657,7 @@ internal class LocalWorkAgentTurnExecutor(
                             })
                             workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/completed")
                             workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_completed_turn")
+                            completedGoalTurn = true
                         }
                         is AgentEvent.TurnStepLimit -> {
                             val transcriptMessage = runTranscript.newMessage(
@@ -789,7 +797,20 @@ internal class LocalWorkAgentTurnExecutor(
                         try { lease.release(foregroundOutcome) }
                         finally { serviceReleased = true }
                     } finally {
-                        workRunRegistry.finishTurn(binding, completedJob) { next, ownedBinding ->
+                        workRunRegistry.finishTurn(binding, completedJob, onIdle = {
+                            if (completedGoalTurn) {
+                                queueWorkGoalProgressFollowUp(
+                                    binding = binding,
+                                    originalGoal = goalAtTurnStart,
+                                    sourceRunId = runContext.runId,
+                                    sourceMessageId = uiSourceMessageId,
+                                    originalSteeringRevision = steeringRevisionAtTurnStart,
+                                    hadSuccessfulTool = hadSuccessfulToolReceipt,
+                                    hadToolFailure = hadToolFailure,
+                                    workspaceRoot = File(workspacePath),
+                                )
+                            }
+                        }) { next, ownedBinding ->
                             scope.launch(start = CoroutineStart.LAZY) {
                                 run(
                                     input = next.content,
