@@ -28,6 +28,7 @@ import com.labteto.dshmobile.uicontract.initialFields
 import com.labteto.dshmobile.uicontract.preparedInput
 import com.labteto.dshmobile.uicontract.invalidInputFields
 import com.labteto.dshmobile.uicontract.withUserEditedText
+import com.labteto.dshmobile.uicontract.withUserEditedTableCell
 import com.labteto.dshmobile.local.uiBindingIdentity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -332,8 +333,8 @@ internal class LocalUiDocumentUiAdapter(
                 doc.actions.any { it is UiDocumentAction.AnswerApproval } ||
                 doc.documentId.startsWith("work-live:"))
                 return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
-            val replacement = com.labteto.dshmobile.uicontract.withUserEditedTableCell(
-                doc, command.tableNodeId, command.rowIndex, command.columnIndex,
+            val replacement = doc.withUserEditedTableCell(
+                command.tableNodeId, command.rowIndex, command.columnIndex,
                 command.replacementText,
             ) ?: return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
             synchronized(state.foregroundRunHandle.lock) {
