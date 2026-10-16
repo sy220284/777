@@ -148,7 +148,11 @@ class PluginRegistry(
             } catch (error: Throwable) {
                 withContext(NonCancellable) {
                     installedByBatch.asReversed().forEach { plugin ->
-                        runCatching { plugin.uninstall(staged) }.exceptionOrNull()?.let(error::addSuppressed)
+                        val cleanupContext = staged.fork()
+                        runCatching { plugin.uninstall(staged) }.exceptionOrNull()?.let { failure ->
+                            error.addSuppressed(failure)
+                            pendingCleanup[plugin.id] = PendingPluginCleanup(plugin, cleanupContext)
+                        }
                     }
                 }
                 synchronized(this) {
@@ -163,6 +167,7 @@ class PluginRegistry(
                         )
                     }
                 }
+                if (pendingCleanup.isNotEmpty()) context.tools.markLifecycleSafe(false)
                 throw error
             }
         }
@@ -177,6 +182,14 @@ class PluginRegistry(
      */
     suspend fun replace(plugin: HarnessPlugin) = lifecycleMutex.withLock {
         context.tools.lifecycleTransition { replaceLocked(plugin) }
+    }
+
+    /**
+     * Retry leaked external-resource cleanup from a failed install without publishing
+     * tools or pretending the plugin is healthy. The manager performs a fresh install next.
+     */
+    suspend fun cleanupFailed(id: String) = lifecycleMutex.withLock {
+        context.tools.lifecycleTransition { retryPendingCleanupLocked(id) }
     }
 
     suspend fun uninstall(id: String): Boolean = lifecycleMutex.withLock {
@@ -340,6 +353,8 @@ class PluginRegistry(
                 installed[plugin.id] = plugin
                 lifecycle[plugin.id] = PluginLifecycleSnapshot(plugin.id, PluginLifecycleState.ACTIVE)
             }
+            context.tools.markLifecycleSafe(pendingCleanup.isEmpty() &&
+                installed.keys.none { lifecycle[it]?.state == PluginLifecycleState.FAILED })
         }
     }
 
@@ -354,10 +369,17 @@ class PluginRegistry(
         try {
             plugin.install(staged)
         } catch (error: Throwable) {
+            var cleanupFailure: Throwable? = null
             withContext(NonCancellable) {
-                runCatching { plugin.uninstall(staged) }.exceptionOrNull()?.let(error::addSuppressed)
+                val cleanupContext = staged.fork()
+                cleanupFailure = runCatching { plugin.uninstall(staged) }.exceptionOrNull()
+                cleanupFailure?.let {
+                    error.addSuppressed(it)
+                    pendingCleanup[plugin.id] = PendingPluginCleanup(plugin, cleanupContext)
+                }
             }
             staged.restoreRegistries(registryBefore)
+            if (cleanupFailure != null) context.tools.markLifecycleSafe(false)
             synchronized(this) {
                 lifecycle[plugin.id] = PluginLifecycleSnapshot(
                     id = plugin.id,
