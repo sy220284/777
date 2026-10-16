@@ -3850,7 +3850,7 @@
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationEntries.kt",
-      "sha256": "53acc2d7fb426f00"
+      "sha256": "ac58584c5ae35709"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationScene.kt",
@@ -4002,13 +4002,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "30cec8fd2b3f",
+  "source_snapshot": "6e2e0f2a5f4d",
   "observed_delta": {
-    "baseline": "b040b3ed8a1a",
+    "baseline": "30cec8fd2b3f",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationScene.kt"
+      "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationEntries.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

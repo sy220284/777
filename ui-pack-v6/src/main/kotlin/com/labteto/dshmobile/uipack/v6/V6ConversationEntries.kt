@@ -7,6 +7,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -64,7 +67,7 @@ internal fun V6ConversationEntries(
         else -> "更多功能"
     }) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            error?.let { SyNote(it) }
+            error?.let { Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
             if (panel == "sessions" && sessions != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(LocalUsageMode.CHAT to "聊天", LocalUsageMode.WORK to "工作").forEach { (mode, title) ->

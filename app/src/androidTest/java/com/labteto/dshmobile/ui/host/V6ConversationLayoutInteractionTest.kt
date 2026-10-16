@@ -96,7 +96,7 @@ class V6ConversationLayoutInteractionTest {
     @Test fun deniedNavigationShowsFeedbackInsideOpenSheet() {
         show(V6ConversationPart.HEADER)
         compose.onNodeWithText("更多").performClick()
-        compose.onNodeWithText("应用设置").performClick()
+        compose.onNodeWithText("应用设置").performScrollTo().performClick()
         compose.onNodeWithText("暂时无法打开“应用设置”，请稍后再试").assertIsDisplayed()
     }
     @Test fun messageMenuRegeneratesExactlyTheTappedMessage() {
