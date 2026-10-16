@@ -347,7 +347,7 @@ fun V6MediaScene(media: MediaUiPort, settings: SettingsUiPort,
         }
         entries.jobs.forEach { job ->
             SyGlassCard(Modifier.fillMaxWidth()) {
-                Text(job.kind.name + " · " + job.phase.name + " · " + job.model)
+                Text(job.kind + " · " + job.phase.name + " · " + job.model)
                 job.error?.let { SyNote(it) }
                 SyButton("移除任务提示", { submit(MediaUiCommand.DismissJob(job.id)) },
                     enabled = !pending, style = SyButtonStyle.GHOST)
