@@ -63,6 +63,28 @@ def errors(matrix, catalog):
             ):
                 issues.append(f"claimed verified without owner/receipt/recovery proof: {sid}/{name}")
     issues.extend(f"undocumented required scene: {sid}" for sid in sorted(actual.keys() - documented.keys()))
+    # R4 final scope: only V6, seven owned routes, 21 Settings destinations,
+    # 78 scene contracts, 75 Pack renderers and three Host-native system scenes.
+    if len(scenes) != 78 or len(actual) != 78:
+        issues.append(f"scene count drift: matrix={len(scenes)}, catalog={len(actual)} (expected 78)")
+    if sum(len(scene.get("actions", [])) for scene in scenes) != 173:
+        issues.append("action count drift: required 173")
+    if len({scene.get("route") for scene in scenes}) != 7:
+        issues.append("top-level route drift: required 7")
+    if sum(scene.get("id", "").startswith("settings.") and
+           scene.get("kind") == "PAGE" for scene in scenes) != 21:
+        issues.append("settings destination drift: required 21")
+    if sum(host for _, _, host in actual.values()) != 3:
+        issues.append("host-only scene drift: required 3")
+    for scene in scenes:
+        for name, record in scene.get("actionProof", {}).items():
+            if not isinstance(record, dict):
+                continue
+            for field in ("ownerPort", "receiptType"):
+                if not isinstance(record.get(field), str) or not record[field].strip():
+                    issues.append(f"missing source mapped {field}: {scene.get('id')}/{name}")
+            if "[Next]" in str(record.get("ownerPort", "")):
+                issues.append(f"retired Next owner mapping: {scene.get('id')}/{name}")
     return issues
 
 def main():
@@ -81,6 +103,15 @@ def main():
         first = tampered["scenes"][0]["actions"][0]
         tampered["scenes"][0]["actionProof"][first]["status"] = "VERIFIED"
         assert any("claimed verified" in x for x in errors(tampered, catalog))
+        tampered = copy.deepcopy(data)
+        tampered["scenes"][0]["actionProof"][first]["ownerPort"] = ""
+        assert any("missing source mapped ownerPort" in x for x in errors(tampered, catalog))
+        tampered = copy.deepcopy(data)
+        tampered["scenes"][0]["actionProof"][first]["ownerPort"] = "Old [Next]"
+        assert any("retired Next owner" in x for x in errors(tampered, catalog))
+        tampered = copy.deepcopy(data)
+        tampered["scenes"].pop()
+        assert any("scene count drift" in x for x in errors(tampered, catalog))
         print("UI R4 S0 scene guard self-tests OK")
         return
     issues = errors(data, catalog)
