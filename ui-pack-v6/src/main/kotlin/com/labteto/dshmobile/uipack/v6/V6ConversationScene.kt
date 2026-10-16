@@ -106,6 +106,7 @@ data class V6ConversationPorts(
     val workPolicy: WorkPolicyUiPort? = null,
     val workTeam: WorkTeamUiPort? = null,
     val replySuggestions: ReplySuggestionsUiPort? = null,
+    val files: com.labteto.dshmobile.uicontract.FilesUiPort? = null,
     val workMode: () -> Boolean,
     val workModeUpdates: Flow<Boolean>? = null,
 )
@@ -197,6 +198,42 @@ fun V6ConversationScene(
             initialValue = remember(owner) { owner.snapshot() }).value
     }
     var feedback by remember(identity) { mutableStateOf<String?>(null) }
+    var readingFile by remember(identity) { mutableStateOf<String?>(null) }
+    var filePreview by remember(identity, readingFile) {
+        mutableStateOf<com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview?>(null)
+    }
+    var fileError by remember(identity, readingFile) { mutableStateOf<String?>(null) }
+    LaunchedEffect(identity, readingFile, ports.files) {
+        val path = readingFile ?: return@LaunchedEffect
+        val files = ports.files ?: return@LaunchedEffect
+        try {
+            filePreview = withContext(Dispatchers.IO) { files.previewWorkspaceFile(path) }
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) { fileError = failure.message ?: "暂时无法预览文件" }
+    }
+    readingFile?.let { path ->
+        AlertDialog(onDismissRequest = { readingFile = null },
+            title = { Text(path.substringAfterLast('/')) },
+            text = {
+                Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val preview = filePreview
+                    when {
+                        fileError != null -> Text(fileError.orEmpty())
+                        preview == null -> Text("正在读取文件")
+                        else -> {
+                            androidx.compose.foundation.text.selection.SelectionContainer {
+                                Text(preview.text ?: "此文件暂不支持文本预览，可到工作文件中打开")
+                            }
+                            if (preview.truncated) SyNote("文件较长，当前显示部分内容")
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { readingFile = null }) { Text("关闭") } },
+        )
+    }
+
     var editing by remember(identity) { mutableStateOf<UiMessageSnapshot?>(null) }
     var editText by remember(identity) { mutableStateOf("") }
     var questionText by remember(work.question?.pendingId) { mutableStateOf("") }
@@ -533,7 +570,10 @@ fun V6ConversationScene(
             }
             items(messages, key = { "message:${it.id}" }) { message ->
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    V6MessageBody(message, workMode)
+                    V6MessageBody(message, workMode,
+                        onOpenFile = if (ports.files != null && identity != null) {
+                            { path -> readingFile = path }
+                        } else null)
                     val documentState = docSnapshot
                     if (docOwner != null && formOwner != null && identity != null &&
                         documentState != null && documentState.sessionId == identity.sessionId) {

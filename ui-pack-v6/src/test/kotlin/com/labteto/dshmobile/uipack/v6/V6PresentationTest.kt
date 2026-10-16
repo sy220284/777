@@ -31,6 +31,9 @@ class V6PresentationTest {
     @Test fun onlyExplicitWebLinksAndOwnerMediatedPathsCanBeInteractive() {
         assertTrue(isV6ReadableFileLink("results/报告.md"))
         assertTrue(isV6ReadableFileLink("/workspace/results/a.txt"))
+        assertEquals("/workspace/results/a b.txt", v6ReadableFilePath("file:///workspace/results/a%20b.txt"))
+        assertEquals("results/10:20.md", v6ReadableFilePath("results/10:20.md#part"))
+        assertNull(v6ReadableFilePath("file://remotehost/secret"))
         listOf("javascript:alert(1)", "data:text/html,test", "content://private/file",
             "intent:launch", "mailto:a@b.com", "#section", "").forEach {
             assertFalse(it, isV6ReadableFileLink(it))

@@ -50,14 +50,19 @@ internal fun V6ReadableContent(text: String, preserveLines: Boolean = false,
                     }
                     is UiMarkdownBlock.Code -> V6CodeBlock(block)
                     is UiMarkdownBlock.MdList -> {
-                        var number = 0
+                        val counters = IntArray(7)
                         block.items.forEachIndexed { index, item ->
                             val ordered = block.numbered.getOrElse(index) { block.ordered }
-                            if (ordered) number++ else number = 0
+                            val level = block.levels.getOrElse(index) { 0 }.coerceIn(0, 6)
+                            val marker = if (ordered) {
+                                counters[level]++
+                                for (next in level + 1 until counters.size) counters[next] = 0
+                                "${counters[level]}."
+                            } else "•"
                             Row(Modifier.fillMaxWidth().padding(start =
-                                (block.levels.getOrElse(index) { 0 } * 14).dp),
+                                (level * 14).dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(if (ordered) "$number." else "•", color = colors.textSecondary)
+                                Text(marker, color = colors.textSecondary)
                                 Box(Modifier.weight(1f)) { V6InlineText(item,
                                     MaterialTheme.typography.bodyLarge, onOpenFile = onOpenFile) }
                             }
@@ -113,7 +118,7 @@ private fun V6InlineText(text: String, style: TextStyle, modifier: Modifier = Mo
                         withLink(LinkAnnotation.Clickable(url,
                             styles = TextLinkStyles(SpanStyle(color = colors.text,
                                 textDecoration = TextDecoration.Underline)),
-                            linkInteractionListener = { onOpenFile(url) })) { append(part.text) }
+                            linkInteractionListener = { v6ReadableFilePath(url)?.let(onOpenFile) })) { append(part.text) }
                     } else append(part.text)
                 }
             }
@@ -123,8 +128,18 @@ private fun V6InlineText(text: String, style: TextStyle, modifier: Modifier = Mo
 }
 
 /** File opening still passes through the workspace Owner; no arbitrary URI schemes. */
-internal fun isV6ReadableFileLink(url: String): Boolean =
-    url.isNotBlank() && !url.startsWith("#") && !url.contains(':')
+internal fun isV6ReadableFileLink(url: String): Boolean = v6ReadableFilePath(url) != null
+
+internal fun v6ReadableFilePath(url: String): String? {
+    val raw = url.trim().removeSurrounding("<", ">")
+    if (raw.isBlank() || raw.startsWith("#")) return null
+    if (raw.startsWith("file://")) return runCatching {
+        val uri = java.net.URI(raw)
+        uri.path.takeIf { uri.authority.isNullOrEmpty() && !it.isNullOrBlank() }
+    }.getOrNull()
+    if (Regex("^[A-Za-z][A-Za-z0-9+.-]*:").containsMatchIn(raw)) return null
+    return raw.substringBefore('#')
+}
 
 @Composable
 private fun V6CodeBlock(block: UiMarkdownBlock.Code) {

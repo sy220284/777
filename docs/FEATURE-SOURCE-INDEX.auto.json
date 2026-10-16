@@ -2614,7 +2614,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalApplicationUiHost.kt",
-      "sha256": "51b554f0a2386f08"
+      "sha256": "7bfdb744c2a15181"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalHostPreferencesUiAdapter.kt",
@@ -3850,7 +3850,7 @@
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationScene.kt",
-      "sha256": "b848b83618ffb5a2"
+      "sha256": "d909ed5d3aee58f9"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6DiaryMemoryScenes.kt",
@@ -3886,11 +3886,11 @@
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ReadableContent.kt",
-      "sha256": "8d8e440b2be2b735"
+      "sha256": "180354400d61942f"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ScenePresentation.kt",
-      "sha256": "66afa1ab873f3aba"
+      "sha256": "5735aa09ae1d49dd"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6SettingsSuiteScene.kt",
@@ -3978,12 +3978,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "561c13169545",
+  "source_snapshot": "c4be20968f02",
   "observed_delta": {
-    "baseline": "23b61859df50",
+    "baseline": "994f6fed4fdb",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ReadableContent.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],

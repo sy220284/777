@@ -107,6 +107,7 @@ internal object LocalApplicationPackInstallations {
                     workPolicy = owner.workPolicyUiPort,
                     workTeam = owner.workTeamUiPort,
                     replySuggestions = owner.replySuggestionsUiPort,
+                    files = owner.filesUiPort,
                     workMode = { owner.shellState.value.usageMode == LocalUsageMode.WORK },
                     workModeUpdates = owner.shellState.map { it.usageMode == LocalUsageMode.WORK },
                 ),

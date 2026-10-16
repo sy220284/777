@@ -100,15 +100,16 @@ internal fun v6ApprovalLabel(impact: UiApprovalImpact): String = when (impact) {
 
 /** Message chrome follows its role; actions stay outside the reading surface. */
 @Composable
-internal fun V6MessageBody(message: UiMessageSnapshot, workMode: Boolean) {
+internal fun V6MessageBody(message: UiMessageSnapshot, workMode: Boolean,
+    onOpenFile: ((String) -> Unit)? = null) {
     val colors = LocalSyColors.current
     when (message.role) {
         UiMessageRole.USER -> SyUserBubble(message.text)
         UiMessageRole.ASSISTANT -> {
-            if (workMode) V6ReadableContent(message.text)
+            if (workMode) V6ReadableContent(message.text, onOpenFile = onOpenFile)
             else SyMaterialSurface(Modifier.fillMaxWidth(.91f), shadowElevation = 0.dp) {
                 Box(Modifier.padding(horizontal = 16.dp, vertical = 13.dp)) {
-                    V6ReadableContent(message.text, preserveLines = true)
+                    V6ReadableContent(message.text, preserveLines = true, onOpenFile = onOpenFile)
                 }
             }
         }
@@ -117,7 +118,7 @@ internal fun V6MessageBody(message: UiMessageSnapshot, workMode: Boolean) {
             verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(if (message.role == UiMessageRole.TOOL) "执行记录" else "会话提示",
                 style = MaterialTheme.typography.labelMedium, color = colors.textSecondary)
-            V6ReadableContent(message.text, preserveLines = true)
+            V6ReadableContent(message.text, preserveLines = true, onOpenFile = onOpenFile)
         }
     }
 }
