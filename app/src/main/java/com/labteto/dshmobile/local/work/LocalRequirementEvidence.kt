@@ -67,6 +67,16 @@ internal fun selectedRequirementEvidenceVersion(
         ?.takeIf { it == displayedVersion }
 }
 
+/**
+ * Recheck the exact selected bytes immediately before committing the reference. Preparation may
+ * perform expensive hashing outside the foreground lock, during which the workspace can change.
+ * This is a rejection gate, not a declaration that a requirement has passed verification.
+ */
+internal fun preparedRequirementEvidenceVersionMatches(
+    workspaceRoot: File, artifactPath: String, preparedVersion: String,
+): Boolean = preparedVersion.matches(Regex("[a-f0-9]{64}")) &&
+    localWorkFileSha256(workspaceRoot, artifactPath) == preparedVersion
+
 /** Check exact file bytes; historic evidence may be absent from the recent artifact window. */
 internal fun checkRequirementEvidenceVersions(
     workspaceRoot: File,
