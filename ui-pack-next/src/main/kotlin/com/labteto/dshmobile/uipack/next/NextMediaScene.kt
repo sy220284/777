@@ -62,7 +62,6 @@ internal fun NextMediaScene(
     var voices by remember { mutableStateOf<List<LocalMediaVoice>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
-    var confirmCreation by remember { mutableStateOf(false) }
     var removeId by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val available = offers.filter { it.kind == activeKind }
@@ -174,7 +173,14 @@ internal fun NextMediaScene(
                     Button(enabled = !busy && !sessionId.isNullOrBlank() && prompt.isNotBlank() &&
                         (activeKind != LocalMediaKind.SPEECH ||
                             (voice.isNotBlank() && voices.any { it.id == voice })),
-                        onClick = { confirmCreation = true }) {
+                        onClick = {
+                            pendingRequest = when (activeKind) {
+                                LocalMediaKind.IMAGE -> MediaUiCommand.Image(selected, imagePrompt, ratio, sessionId!!)
+                                LocalMediaKind.VIDEO -> MediaUiCommand.Video(selected, videoPrompt, sessionId)
+                                LocalMediaKind.SPEECH -> MediaUiCommand.Speech(selected, speechText, voice, sessionId!!)
+                                LocalMediaKind.TRANSCRIBE -> null
+                            }
+                        }) {
                         Text(when(activeKind) {
                             LocalMediaKind.IMAGE -> "生成图片"
                             LocalMediaKind.VIDEO -> "生成视频"
@@ -267,27 +273,6 @@ internal fun NextMediaScene(
             if (archive.unavailable) item { Text("媒体存储当前不可读取") }
             if (archive.hasMore) item { Text("还有更早的媒体记录，当前显示有界列表") }
         }
-    }
-    if (confirmCreation) {
-        val offer = selected
-        AlertDialog(onDismissRequest = { confirmCreation = false },
-            title = { Text("确认媒体请求") },
-            text = { Text("该请求可能产生费用。即使响应中断，服务商也可能已执行。") },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmCreation = false
-                    if (offer != null && !sessionId.isNullOrBlank()) {
-                        pendingRequest = when (offer.kind) {
-                            LocalMediaKind.IMAGE -> MediaUiCommand.Image(offer, imagePrompt, ratio, sessionId)
-                            LocalMediaKind.VIDEO -> MediaUiCommand.Video(offer, videoPrompt, sessionId)
-                            LocalMediaKind.SPEECH -> MediaUiCommand.Speech(offer, speechText, voice, sessionId)
-                            LocalMediaKind.TRANSCRIBE -> null
-                        }
-                    }
-                }) { Text("确认提交") }
-            }, dismissButton = {
-                TextButton(onClick = { confirmCreation = false }) { Text("取消") }
-            })
     }
     pendingRequest?.let { command ->
         AlertDialog(onDismissRequest = { pendingRequest = null },
