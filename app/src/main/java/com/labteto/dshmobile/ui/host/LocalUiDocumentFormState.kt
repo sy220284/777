@@ -17,7 +17,14 @@ internal class LocalUiDocumentFormState(
     saved: List<String>,
     private val save: (ArrayList<String>) -> Unit,
 ) : UiDocumentFormUiPort {
-    companion object { private const val FORMAT_V2 = "ui-document-form-v2" }
+    companion object {
+        private const val FORMAT_V2 = "ui-document-form-v2"
+        private const val MAX_RETAINED_DOCUMENTS = 24
+        private const val MAX_FIELDS_PER_DOCUMENT = 32
+        private const val MAX_FIELD_CHARS = 16_384
+        private const val MAX_FIELD_ID_CHARS = 160
+        private const val MAX_STATE_CHARS = 65_536
+    }
 
     private val fields = linkedMapOf<UiDocumentFormKey, Map<String, String>>()
     private val mutableValues = MutableStateFlow<Map<UiDocumentFormKey, Map<String, String>>>(emptyMap())
@@ -29,28 +36,53 @@ internal class LocalUiDocumentFormState(
                 val revision = entry[2].toLongOrNull() ?: return@forEach
                 if (revision < 0 || entry[0].isBlank() || entry[1].isBlank() || entry[3].isBlank()) return@forEach
                 val key = UiDocumentFormKey(entry[0], entry[1], revision)
-                fields[key] = fields[key].orEmpty() + (entry[3] to entry[4])
+                putWithinBudget(key, entry[3], entry[4])
             }
         } else {
             saved.chunked(4).filter { it.size == 4 }.forEach { entry ->
                 if (entry[0].isBlank() || entry[1].isBlank() || entry[2].isBlank()) return@forEach
                 val key = UiDocumentFormKey(entry[0], entry[1])
-                fields[key] = fields[key].orEmpty() + (entry[2] to entry[3])
+                putWithinBudget(key, entry[2], entry[3])
             }
         }
         mutableValues.value = fields.toMap()
     }
 
+    /**
+     * Android saved-state is an unencrypted IPC-sized payload. Reject new state before
+     * mutating revisions when the size, field or document budget would be exceeded.
+     * This is not a durable vault: deletion and session disposal still purge drafts.
+     */
+    private fun putWithinBudget(key: UiDocumentFormKey, fieldId: String, value: String): Boolean {
+        if (fieldId.isBlank() || fieldId.length > MAX_FIELD_ID_CHARS ||
+            key.sessionId.length > 200 || key.documentId.length > 200 ||
+            value.length > MAX_FIELD_CHARS) return false
+        val older = fields.keys.filter {
+            it.sessionId == key.sessionId && it.documentId == key.documentId &&
+                it.revision != key.revision
+        }
+        // A late renderer cannot recreate stale fields after a newer revision exists.
+        if (older.any { it.revision > key.revision }) return false
+        val candidate = linkedMapOf<UiDocumentFormKey, Map<String, String>>()
+        fields.forEach { (existing, entries) -> if (existing !in older) candidate[existing] = entries }
+        val next = candidate[key].orEmpty() + (fieldId to value)
+        if (next.size > MAX_FIELDS_PER_DOCUMENT) return false
+        candidate[key] = next
+        if (candidate.size > MAX_RETAINED_DOCUMENTS) return false
+        val chars = candidate.entries.sumOf { (form, entries) ->
+            entries.entries.sumOf { (id, data) ->
+                form.sessionId.length.toLong() + form.documentId.length +
+                    form.revision.toString().length + id.length + data.length + 5L
+            }
+        }
+        if (chars > MAX_STATE_CHARS) return false
+        fields.clear()
+        fields.putAll(candidate)
+        return true
+    }
+
     override fun update(key: UiDocumentFormKey, fieldId: String, value: String) {
-        if (fieldId.isBlank()) return
-        // A delayed edit from an older renderer cannot erase the newer revision's draft.
-        if (fields.keys.any { it.sessionId == key.sessionId && it.documentId == key.documentId &&
-                it.revision > key.revision }) return
-        // A replacement revision invalidates drafts for the prior definition only.
-        fields.keys.filter { it.sessionId == key.sessionId && it.documentId == key.documentId &&
-            it.revision != key.revision }.forEach { fields.remove(it) }
-        fields[key] = fields[key].orEmpty() + (fieldId to value)
-        publish()
+        if (putWithinBudget(key, fieldId, value)) publish()
     }
 
     override fun forgetDocument(key: UiDocumentFormKey) {
