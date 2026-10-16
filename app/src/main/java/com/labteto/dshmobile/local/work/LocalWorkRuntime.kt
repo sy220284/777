@@ -150,6 +150,10 @@ class LocalWorkRuntime @Inject internal constructor(
     }
 
     /** Same authoritative EventLog across app restarts; source version checked on display. */
+    /** The authoritative Session event stream; evidence cards never poll a timer. */
+    internal fun requirementEvidenceChangesForUi(sessionId: String): kotlinx.coroutines.flow.StateFlow<Long> =
+        eventLogs.get(sessionId).changes
+
     override fun requirementEvidenceForUi(sessionId: String): List<LocalRequirementEvidenceLink> {
         val snapshot = runtimeStateStore.state.value
         if (sessionId != runtimeStateStore.currentSessionId ||
