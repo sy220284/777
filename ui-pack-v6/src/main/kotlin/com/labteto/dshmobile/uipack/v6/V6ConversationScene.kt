@@ -76,7 +76,7 @@ data class V6ConversationPorts(
 )
 
 /** The four slots are distinct executable scenes, not aliases for the whole page. */
-enum class V6ConversationPart { FULL, HEADER, TIMELINE, COMPOSER, REPLY_STATUS }
+enum class V6ConversationPart { FULL, HEADER, TIMELINE, COMPOSER, REPLY_STATUS, WORK_APPROVAL, WORK_QUESTION }
 
 internal fun describeV6ConversationReceipt(receipt: UiCommandReceipt): String = when (receipt) {
     UiCommandReceipt.Accepted -> "请求已受理，尚不代表执行完成"
@@ -333,7 +333,10 @@ fun V6ConversationScene(
             if (messages.isEmpty() && status == UiSceneStatus.EMPTY)
                 item(key = "empty") { SyNote("当前会话还没有消息") }
         }
-        if (part == V6ConversationPart.FULL && workMode && identity != null) {
+        if (workMode && identity != null &&
+            (part == V6ConversationPart.FULL || part == V6ConversationPart.WORK_QUESTION ||
+                part == V6ConversationPart.WORK_APPROVAL)) {
+            if (part == V6ConversationPart.FULL || part == V6ConversationPart.WORK_QUESTION)
             work.question?.let { question ->
                 SyGlassCard(Modifier.fillMaxWidth()) {
                     Text(question.question, style = MaterialTheme.typography.titleSmall)
@@ -350,6 +353,7 @@ fun V6ConversationScene(
                         style = SyButtonStyle.GHOST)
                 }
             }
+            if (part == V6ConversationPart.FULL || part == V6ConversationPart.WORK_APPROVAL)
             work.approval?.let { approval ->
                 SyGlassCard(Modifier.fillMaxWidth()) {
                     Text("需要明确授权 · ${approval.toolName}",
