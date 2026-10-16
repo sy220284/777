@@ -5,6 +5,8 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.session.LocalSessionFilesRuntime
 import com.labteto.dshmobile.uicontract.AttachmentUiPort
 import com.labteto.dshmobile.uicontract.ImportUiAttachmentCommand
+import com.labteto.dshmobile.uicontract.InspectUiAttachmentCommand
+import com.labteto.dshmobile.uicontract.UiAttachmentInspectionReceipt
 import com.labteto.dshmobile.uicontract.UiAttachmentReceipt
 import com.labteto.dshmobile.uicontract.UiCommandRejection
 import javax.inject.Inject
@@ -23,6 +25,16 @@ class LocalAttachmentUiPortComposition @Inject internal constructor(
 ) : AttachmentUiPort {
     private fun current(command: ImportUiAttachmentCommand) = synchronized(state.foregroundRunHandle.lock) {
         !state.sessionTransitioning && state.uiBindingIdentity(state.state.value) == command.identity
+    }
+
+    override suspend fun inspect(command: InspectUiAttachmentCommand): UiAttachmentInspectionReceipt {
+        val request = ImportUiAttachmentCommand(command.identity, "")
+        if (!current(request))
+            return UiAttachmentInspectionReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+        val result = files.inspectAttachment(command.attachment)
+        if (!current(request))
+            return UiAttachmentInspectionReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+        return result
     }
 
     override suspend fun import(command: ImportUiAttachmentCommand): UiAttachmentReceipt {
