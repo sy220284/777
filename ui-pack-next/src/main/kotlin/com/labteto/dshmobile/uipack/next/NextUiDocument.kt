@@ -285,7 +285,8 @@ private fun NextDocumentMediaNode(node: UiDocumentNode.Media, sessionId: String)
         media?.observe(sessionId, media.pageSize) ?: flowOf(LocalMediaPage())
     }
     val mediaPage by mediaUpdates.collectAsStateWithLifecycle(initialValue = LocalMediaPage())
-    val asset = remember(media, sessionId, node.assetId, node.kind, mediaPage) {
+    var assetRefresh by remember(node.assetId, sessionId) { mutableStateOf(0) }
+    val asset = remember(media, sessionId, node.assetId, node.kind, mediaPage, assetRefresh) {
         media?.assetForSession(node.assetId, sessionId)?.takeIf { it.kind == node.kind }
     }
     val scope = rememberCoroutineScope()
@@ -305,7 +306,7 @@ private fun NextDocumentMediaNode(node: UiDocumentNode.Media, sessionId: String)
                             restoreNotice = when (val receipt = withContext(Dispatchers.IO) {
                                 media.retrySessionImageDownload(node.assetId, sessionId)
                             }) {
-                                MediaUiReceipt.Applied -> "原图片已重新保存到本机"
+                                MediaUiReceipt.Applied -> { assetRefresh++; "原图片已重新保存到本机" }
                                 is MediaUiReceipt.Failed -> receipt.message ?: "原图片下载失败"
                                 else -> "图片恢复结果未知，请刷新原成果记录"
                             }
