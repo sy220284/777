@@ -5,6 +5,7 @@ import com.labteto.dshmobile.uicontract.UiHostPreferences
 import com.labteto.dshmobile.uicontract.UiHostPreferencesCommand
 import com.labteto.dshmobile.uicontract.SettingsUiPort
 import com.labteto.dshmobile.uicontract.UiSceneId
+import com.labteto.dshmobile.uicontract.UiCapabilityId
 import com.labteto.dshmobile.uicontract.UiSceneRequirement
 import com.labteto.dshmobile.uicontract.UI_CONTRACT_VERSION
 import com.labteto.dshmobile.uicontract.UiWindowClass
@@ -41,8 +42,9 @@ class V6MigratingApplicationPackTest {
         }
     } as SettingsUiPort
     private fun productionCandidate() = V6ApplicationScenePack(port, settings)
-    private fun requirements(scenes: List<UiSceneRequirement>) = UiPackAdmissionRequirements(
-        UI_CONTRACT_VERSION, scenes, emptySet(), UiWindowClass.COMPACT,
+    private fun requirements(scenes: List<UiSceneRequirement>,
+        capabilities: Set<UiCapabilityId> = emptySet()) = UiPackAdmissionRequirements(
+        UI_CONTRACT_VERSION, scenes, capabilities, UiWindowClass.COMPACT,
         UiAccessibility.entries.toSet(), false,
     )
 
@@ -54,15 +56,23 @@ class V6MigratingApplicationPackTest {
         assertTrue(UiSceneId("route.home") !in pack().renderers)
     }
 
-    @Test fun productionCompositionRegistersFiveRealSettingsRenderers() {
+    @Test fun productionCompositionRegistersTwentyTwoRealSettingsRenderers() {
         val candidate = productionCandidate()
         val ids = setOf("settings.appearance", "settings.notifications",
-            "settings.permissions", "settings.chat", "settings.session").map(::UiSceneId).toSet()
+            "settings.permissions", "settings.chat", "settings.session",
+            "settings.root", "route.settings", "settings.models",
+            "conversation.model_picker", "settings.account", "settings.minimax_quota",
+            "settings.model_performance", "settings.pricing",
+            "settings.usage", "settings.model_usage", "settings.usage_log",
+            "settings.usage_detail", "settings.memory", "settings.memory_settings",
+            "settings.advanced", "settings.session_storage", "settings.diagnostics"
+        ).map(::UiSceneId).toSet()
         assertEquals(ids, candidate.manifest.scenes)
         assertEquals(ids, candidate.renderers.keys)
         val selected = LocalUiSceneCatalog.requirements.filter { it.id in ids }
         assertTrue(UiApplicationPackRegistry(listOf(candidate))
-            .select(candidate.manifest.id, requirements(selected)) is UiApplicationPackAdmission.Admitted)
+            .select(candidate.manifest.id, requirements(selected,
+                candidate.manifest.requiredCapabilities)) is UiApplicationPackAdmission.Admitted)
     }
 
     @Test fun productionHostRefusesIncompleteV6Migration() {
@@ -82,7 +92,8 @@ class V6MigratingApplicationPackTest {
         val v6 = pack()
         val sceneRequirements = LocalUiSceneCatalog.requirements.filter { it.id in v6.manifest.scenes }
         val result = UiApplicationPackRegistry(listOf(v6))
-            .select(v6.manifest.id, requirements(sceneRequirements))
+            .select(v6.manifest.id, requirements(sceneRequirements,
+                v6.manifest.requiredCapabilities))
         assertTrue(result is UiApplicationPackAdmission.Admitted)
     }
 }
