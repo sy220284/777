@@ -36,34 +36,18 @@ import com.labteto.dshmobile.uicontract.UiDocumentMediaKind
 import com.labteto.dshmobile.uicontract.UiDocumentNode
 import com.labteto.dshmobile.local.model.LocalMediaPage
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dagger.hilt.EntryPoint
-import dagger.hilt.InstallIn
-import dagger.hilt.android.EntryPointAccessors
-import dagger.hilt.components.SingletonComponent
-import kotlinx.coroutines.CancellationException
+ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** V6 resolves the same Media Owner as Next; never trust file paths from document nodes. */
-@EntryPoint
-@InstallIn(SingletonComponent::class)
-internal interface LocalDocumentMediaEntryPoint {
-    fun mediaUiPort(): MediaUiPort
-}
-
+/** V6 consumes the Media Port supplied by its composition root. */
 /**
  * Only media belonging to the document session may render. Remote-only media is not
  * downloaded automatically; export always requires the user's SAF destination choice.
  */
 @Composable
-internal fun LocalDocumentMediaNode(node: UiDocumentNode.Media, sessionId: String) {
-    val context = LocalContext.current
-    val media = remember(context.applicationContext) {
-        EntryPointAccessors.fromApplication(
-            context.applicationContext, LocalDocumentMediaEntryPoint::class.java
-        ).mediaUiPort()
-    }
+internal fun LocalDocumentMediaNode(node: UiDocumentNode.Media, sessionId: String, media: MediaUiPort) {
     val pageFlow = remember(media, sessionId) { media.observe(sessionId, media.pageSize) }
     val page by pageFlow.collectAsStateWithLifecycle(initialValue = LocalMediaPage())
     // Media Owner's persistent archive invalidates a previously missing file or download.

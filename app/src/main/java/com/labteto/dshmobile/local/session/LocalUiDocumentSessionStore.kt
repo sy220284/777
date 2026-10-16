@@ -43,8 +43,8 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
     fun publish(document: UiDocument, provenance: UiDocumentProvenance, pendingApprovalId: String?,
         expected: UiDocument?, budget: UiDocumentBudget, knownScenes: Set<UiSceneId>): Boolean {
         val source = document.source
-        val occupied = read(source.sessionId, setOf(source.messageId), budget, knownScenes)
-            .firstOrNull { it.document.documentId == document.documentId }
+        val occupied = latestDocument(source.sessionId, source.messageId,
+            document.documentId, budget, knownScenes)
         if (occupied?.recoveryNotice != null || occupied?.document?.source?.let { it != source } == true)
             return false
         val current = occupied?.document
@@ -97,8 +97,34 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
             newest.values.sortedBy { it.sequence }
         }
         val records = found.mapNotNull { event ->
+            decodeEvent(event, sessionId, messageIds, budget, knownScenes)
+        }
+        if (!log.isClosed && log.resetGeneration == key.reset && mutableRevision.value == key.revision) {
+            lastRead = ReadCache(key, records)
+        }
+        return records
+    }
+    /** Indexed CAS lookup for one document, avoiding full Session history scans on every tool. */
+    fun latestDocument(
+        sessionId: String, messageId: String, documentId: String,
+        budget: UiDocumentBudget, knownScenes: Set<UiSceneId>,
+    ): LocalUiDocumentRecord? {
+        if (sessionId.isBlank() || messageId.isBlank() || documentId.isBlank()) return null
+        val event = logs.get(sessionId).latestMatching(setOf(UI_DOCUMENT_EVENT)) { data ->
+            runCatching {
+                data["source"]?.jsonObject?.get("messageId")?.jsonPrimitive?.content == messageId &&
+                    data["definition"]?.jsonObject?.get("documentId")?.jsonPrimitive?.content == documentId
+            }.getOrDefault(false)
+        } ?: return null
+        return decodeEvent(event, sessionId, setOf(messageId), budget, knownScenes)
+    }
+
+    private fun decodeEvent(
+        event: LocalSessionEventLog.Event, sessionId: String,
+        messageIds: Set<String>, budget: UiDocumentBudget, knownScenes: Set<UiSceneId>,
+    ): LocalUiDocumentRecord? {
             val anchorId = runCatching { event.data["source"]?.jsonObject?.get("messageId")?.jsonPrimitive?.content }
-                .getOrNull()?.takeIf { it in messageIds } ?: return@mapNotNull null
+                .getOrNull()?.takeIf { it in messageIds } ?: return null
             try {
                 val value = event.data
                 val anchor = value.getValue("source").jsonObject
@@ -107,7 +133,7 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
                     anchor.getValue("contextGeneration").jsonPrimitive.long,
                     anchor["profileId"]?.jsonPrimitive?.content, anchor["projectId"]?.jsonPrimitive?.content,
                     anchor["workMode"]?.jsonPrimitive?.boolean ?: false)
-                if (source.sessionId != sessionId) return@mapNotNull null
+                if (source.sessionId != sessionId) return null
                 val definition = value.getValue("definition")
                 val decoded = LocalUiDocumentCodec.decode(definition.toString(), source,
                     budget, knownScenes, value["admittedApprovalId"]?.jsonPrimitive?.content)
@@ -138,10 +164,6 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
                     if (fallback.isBlank()) emptyList() else listOf(UiDocumentNode.Text("fallback", fallback)), emptyList(), ""),
                     UiDocumentProvenance(null, "", false, com.labteto.dshmobile.uicontract.UiDocumentOrigin.UNKNOWN), "ui_document_history_incomplete")
             }
-        }
-        if (!log.isClosed && log.resetGeneration == key.reset && mutableRevision.value == key.revision) {
-            lastRead = ReadCache(key, records)
-        }
-        return records
     }
+
 }

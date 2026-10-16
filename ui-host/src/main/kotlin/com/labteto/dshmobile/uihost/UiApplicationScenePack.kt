@@ -54,6 +54,17 @@ sealed interface UiApplicationPackAdmission {
     data class Incomplete(val id: String, val coverage: UiSceneRendererCoverage) : UiApplicationPackAdmission
 }
 
+data class UiArchitectureProbeReport(
+    val id: String,
+    val compatibility: UiPackCompatibility,
+    val coverage: UiSceneRendererCoverage,
+    val unknownOrHostScenes: Set<UiSceneId>,
+    val checkedScenes: Int,
+) {
+    val structurallyValid: Boolean get() = compatibility.compatible &&
+        coverage.complete && unknownOrHostScenes.isEmpty() && checkedScenes > 0
+}
+
 /**
  * A full-application admission must prove BOTH the manifest and the concrete
  * per-scene renderers. Conversation-only packs are deliberately not accepted.
@@ -67,6 +78,35 @@ class UiApplicationPackRegistry(packs: Collection<UiApplicationScenePack>) {
             "Duplicate application UI pack identities"
         }
         registered = packs.associateBy { it.manifest.id }
+    }
+
+    /** Development-only evidence. This never admits a partial pack to production. */
+    fun inspectArchitectureSlice(
+        id: String,
+        admission: UiPackAdmissionRequirements,
+    ): UiArchitectureProbeReport? {
+        val pack = registered[id] ?: return null
+        val byId = admission.requiredScenes.associateBy { it.id }
+        val probeScenes = pack.manifest.scenes
+        val invalid = probeScenes.filterTo(linkedSetOf()) {
+            byId[it] == null || byId[it]?.hostProvided == true
+        }
+        val selected = admission.requiredScenes.filter { it.id in probeScenes }
+        val compatibility = pack.manifest.checkCompatibility(
+            contractVersion = admission.contractVersion, requiredScenes = selected,
+            availableCapabilities = admission.availableCapabilities,
+            windowClass = admission.windowClass,
+            requiredAccessibility = admission.requiredAccessibility,
+            dark = admission.dark,
+        )
+        val rendered = pack.renderers.keys
+        val coverage = UiSceneRendererCoverage(
+            missingRenderers = probeScenes - rendered,
+            undeclaredRenderers = rendered - probeScenes,
+            hostServiceRenderers = rendered.filterTo(linkedSetOf()) { byId[it]?.hostProvided == true },
+            unknownRenderers = rendered.filterTo(linkedSetOf()) { it !in byId },
+        )
+        return UiArchitectureProbeReport(id, compatibility, coverage, invalid, probeScenes.size)
     }
 
     fun select(

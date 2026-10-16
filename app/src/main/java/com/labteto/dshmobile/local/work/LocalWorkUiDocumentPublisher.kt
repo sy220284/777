@@ -46,9 +46,9 @@ internal class LocalWorkUiDocumentPublisher @Inject constructor(
             else null
         }
         val docId = "work-live:${sourceMessageId}"
-        val records = documents.read(binding.sessionId, setOf(sourceMessageId), budget, scenes)
-        // Work progress has its own identity, independent of user/model cards on this message.
-        val existing = records.firstOrNull { it.document.documentId == docId }
+        // A stable Work card ID never overwrites user or model cards on the same message.
+        val existing = documents.latestDocument(
+            binding.sessionId, sourceMessageId, docId, budget, scenes)
         if (existing?.recoveryNotice != null) return
         val previous = existing?.document
         // Preserve the source provenance across foreground/background transitions.
@@ -60,23 +60,61 @@ internal class LocalWorkUiDocumentPublisher @Inject constructor(
             projectId = identity?.projectId ?: snapshot.projectId,
             workMode = true,
         )
-        val history = binding.eventLog.pageBeforeChronological(limit = 120)
-        val toolRows = history.asSequence().filter { it.type == "tool/result" }.toList().takeLast(24)
-            .map { event ->
-                val data = event.data
-                val name = data["name"]?.jsonPrimitive?.contentOrNull.orEmpty().take(120)
+        // Tool events from other turns in the SAME session must never appear on this card.
+        // The original source message ID is emitted together with each durable Work event.
+        // Read a bounded newest-first window, then restore chronological row order.
+        val window = binding.eventLog.pageBeforeNewestFirst(limit = 256)
+        fun isCurrentTurn(event: com.labteto.dshmobile.local.session.LocalSessionEventLog.Event): Boolean =
+            event.data["source_message_id"]?.jsonPrimitive?.contentOrNull == sourceMessageId
+        // Reconcile the durable started/result pair, keyed by tool call ID.
+        // A pending call must not be presented as a successful result, and a result
+        // without a visible start remains a result rather than being fabricated away.
+        val toolFacts = LinkedHashMap<String, List<String>>()
+        window.asReversed().forEach { event ->
+            if (!isCurrentTurn(event) || event.type !in setOf("tool/call", "tool/result"))
+                return@forEach
+            val data = event.data
+            val callId = data["id"]?.jsonPrimitive?.contentOrNull
+                ?.takeIf(String::isNotBlank) ?: return@forEach
+            val name = data["name"]?.jsonPrimitive?.contentOrNull.orEmpty().take(120)
+            val row = if (event.type == "tool/call") {
+                listOf(name, "已记录工具调用；等待实际回执", "", "")
+            } else {
                 val failed = data["is_error"]?.jsonPrimitive?.booleanOrNull
                 val code = data["error_code"]?.jsonPrimitive?.contentOrNull.orEmpty().take(100)
+                val artifact = data["artifact_path"]?.jsonPrimitive?.contentOrNull
+                    ?.take(150).orEmpty()
+                val artifactHash = data["artifact_sha256"]?.jsonPrimitive?.contentOrNull
+                    ?.take(64).orEmpty()
                 listOf(name, when (failed) {
                     true -> "执行报错"
                     false -> "工具已返回（未核验）"
                     null -> "返回状态未知"
-                }, code)
-            }.toList()
+                }, code, if (artifact.isNotEmpty() && artifactHash.isNotEmpty())
+                    "$artifact (事件时 SHA256：$artifactHash，未复核文件当前版本)" else "")
+            }
+            toolFacts[callId] = row
+        }
+        val toolRows = toolFacts.values.toList().takeLast(24)
+        val endReason = window.firstOrNull { it.type == "turn/end" && isCurrentTurn(it) }
+            ?.data?.get("reason")?.jsonPrimitive?.contentOrNull
+        val endLabel = when (endReason) {
+            "completed" -> "本轮已记录结束；输出质量尚未验收"
+            "step_limit" -> "本轮因步数上限暂停；进度已保留"
+            "error" -> "本轮执行失败；保留已完成工具回执"
+            "aborted" -> "本轮已终止"
+            "budget_exhausted_continuation", "stream_interrupted_continuation" ->
+                "本轮中断后进入自动续跑；等待后续真实结果"
+            null -> "本轮还未记录结束事件"
+            else -> "本轮结束原因：${endReason.take(80)}"
+        }
         val nodes = listOf(
-            UiDocumentNode.BoundText("work_phase", "实时执行阶段", UiDocumentBinding.EXECUTION_PHASE),
+            UiDocumentNode.BoundText("work_phase", "前台实时阶段", UiDocumentBinding.EXECUTION_PHASE),
+            UiDocumentNode.Text("work_turn_status", endLabel),
+            UiDocumentNode.Text("work_scope",
+                "最近 256 条事件窗口内，本轮最多 24 个工具调用与回执；不代表全部历史结果。"),
             UiDocumentNode.Table("work_events",
-                listOf("工具", "真实回执", "错误代码"), toolRows),
+                listOf("工具", "真实回执", "错误代码", "事件时文件版本（未经复核）"), toolRows),
             UiDocumentNode.Text("work_warning",
                 "此处仅表示工具事件已经记录；实际文件有效性、完成质量与审批需单独确认。"),
         )

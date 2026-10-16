@@ -1134,7 +1134,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                     transcriptItem.message.id, transcriptItem.message.content, documents, allowAiDesign = !state.running)
                             }
                             documentSnapshot.documents.filter { it.document.source.messageId == transcriptItem.message.id }.forEach {
-                                LocalDynamicDocument(it, documentIdentity, documents, documentForms)
+                                LocalDynamicDocument(it, documentIdentity, documents, documentForms, mediaStudioViewModel.mediaPort)
                             }
                             if (state.usageMode == LocalUsageMode.CHAT && transcriptItem.message.role == "user") {
                                 turnUsage.summaries[transcriptItem.message.id]?.let { aggregate ->

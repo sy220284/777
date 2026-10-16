@@ -24,6 +24,8 @@ import javax.inject.Inject
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class LocalMediaStudioViewModel @Inject constructor(private val creation: MediaUiPort) : ViewModel() {
+    /** A single Owner-backed media entry point for the full V6 conversation. */
+    val mediaPort: MediaUiPort get() = creation
     val storageError get() = creation.storageError
     private val archiveLimit = MutableStateFlow(creation.pageSize)
     val archive = archiveLimit.flatMapLatest { creation.observe(null, it) }

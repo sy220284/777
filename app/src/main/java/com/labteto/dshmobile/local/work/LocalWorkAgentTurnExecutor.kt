@@ -126,6 +126,9 @@ internal class LocalWorkAgentTurnExecutor(
         preownedLease: LocalSessionRuntimeLease? = null,
     ) {
         val ownerJob = currentCoroutineContext()[Job]
+        // Preserve the Work turn's origin even when the live transcript window is compacted.
+        val uiSourceMessageId = sourceMessageId?.takeIf(String::isNotBlank)
+            ?: binding.state.value.messages.lastOrNull { it.role == "user" }?.id
         var heldSession: String? = null
         var serviceReleased = false
         try {
@@ -488,6 +491,7 @@ internal class LocalWorkAgentTurnExecutor(
                     when (event) {
                         is AgentEvent.TurnStarted -> {
                             runEventLog.append("turn/start", buildJsonObject {
+                                put("source_message_id", uiSourceMessageId)
                                 put("model", runState.value.modelState.model)
                             })
                         }
@@ -531,6 +535,7 @@ internal class LocalWorkAgentTurnExecutor(
                         }
                         is AgentEvent.ToolStarted -> {
                             runEventLog.append("tool/call", buildJsonObject {
+                                put("source_message_id", uiSourceMessageId)
                                 put("goal_id", binding.workState.snapshot().goal?.id ?: "")
                                 put("step", event.step)
                                 put("id", event.call.id)
@@ -538,6 +543,13 @@ internal class LocalWorkAgentTurnExecutor(
                                 put("arguments", event.call.arguments)
                                 put("execution_started", false)
                             })
+                            // Pending tool status is durable before the Work card observes it.
+                            try {
+                                workUiDocumentPublisher.onToolResult(binding, uiSourceMessageId)
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (failure: Exception) {
+                                AppLog.failure("WorkUiDocument", "publish_tool_started", failure)
+                            }
                         }
                         is AgentEvent.ToolFinished -> {
                             progressTracker.recordToolResult(event.call, event.output, event.isError)
@@ -567,6 +579,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 java.io.File(sessionStorage.files.workspace.path), event.call.name, event.output,
                             ) else null
                             val toolEvent = runEventLog.append("tool/result", buildJsonObject {
+                                put("source_message_id", uiSourceMessageId)
                                 event.executionId?.let { put("execution_id", it) }
                                 event.processExitCode?.let { put("process_exit_code", it) }
                                 put("file_versions", kotlinx.serialization.json.JsonObject(event.fileVersions.mapValues { kotlinx.serialization.json.JsonPrimitive(it.value) }))
@@ -601,7 +614,7 @@ internal class LocalWorkAgentTurnExecutor(
                             // Event is durable before exposing a UI snapshot. A broken card must
                             // never abort a completed tool or alter its execution result.
                             try {
-                                workUiDocumentPublisher.onToolResult(binding, sourceMessageId)
+                                workUiDocumentPublisher.onToolResult(binding, uiSourceMessageId)
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
                             } catch (failure: Exception) {
@@ -619,11 +632,18 @@ internal class LocalWorkAgentTurnExecutor(
                         is AgentEvent.TurnCompleted -> {
                             recordWorkCompletionQuality(event.answer, runState.value, runEventLog, File(workspacePath))
                             runEventLog.append("turn/end", buildJsonObject {
+                                    put("source_message_id", uiSourceMessageId)
                                 put("reason", "completed")
                                 put("steps", event.steps)
                                 put("messages", runState.value.transcriptIndex.totalMessageCount)
                             })
                             workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/completed")
+                            try {
+                                workUiDocumentPublisher.onToolResult(binding, uiSourceMessageId)
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (failure: Exception) {
+                                AppLog.failure("WorkUiDocument", "publish_completed_turn", failure)
+                            }
                         }
                         is AgentEvent.TurnStepLimit -> {
                             val transcriptMessage = runTranscript.newMessage(
@@ -631,6 +651,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 "当前任务已无法继续扩展执行预算，已在第 ${event.steps} 步暂停；已有进度已保留。",
                             )
                             val turnEnd = runEventLog.append("turn/end", buildJsonObject {
+                                    put("source_message_id", uiSourceMessageId)
                                 put("reason", "step_limit")
                                 put("steps", event.steps)
                                 put("messages", runState.value.transcriptIndex.totalMessageCount + 1L)
@@ -639,6 +660,12 @@ internal class LocalWorkAgentTurnExecutor(
                             runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
                             workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/step-limit")
                             workModelHistoryRuntime.persist(binding)
+                            try {
+                                workUiDocumentPublisher.onToolResult(binding, uiSourceMessageId)
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (failure: Exception) {
+                                AppLog.failure("WorkUiDocument", "publish_step_limit", failure)
+                            }
                         }
                         is AgentEvent.TurnFailed -> {
                             settlePendingTools("failed")
@@ -651,6 +678,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 )
                             if (continuationEligible) {
                                 runEventLog.append("turn/end", buildJsonObject {
+                                    put("source_message_id", uiSourceMessageId)
                                     put("reason", if (lastModelError?.code == "WORK_BUDGET_EXHAUSTED") {
                                         "budget_exhausted_continuation"
                                     } else {
@@ -665,6 +693,7 @@ internal class LocalWorkAgentTurnExecutor(
                             } else {
                                 val transcriptMessage = runTranscript.newMessage("system", "执行失败：$detail")
                                 val turnEnd = runEventLog.append("turn/end", buildJsonObject {
+                                    put("source_message_id", uiSourceMessageId)
                                     put("reason", "error")
                                     put("detail", detail)
                                     put("messages", runState.value.transcriptIndex.totalMessageCount + 1L)
@@ -674,11 +703,18 @@ internal class LocalWorkAgentTurnExecutor(
                                 workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/failed")
                             }
                             workModelHistoryRuntime.persist(binding)
+                            try {
+                                workUiDocumentPublisher.onToolResult(binding, uiSourceMessageId)
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (failure: Exception) {
+                                AppLog.failure("WorkUiDocument", "publish_failed_turn", failure)
+                            }
                         }
                         is AgentEvent.TurnCancelled -> {
                             settlePendingTools("cancelled")
                             val transcriptMessage = runTranscript.newMessage("system", "本轮已停止。")
                             val turnEnd = runEventLog.append("turn/end", buildJsonObject {
+                                    put("source_message_id", uiSourceMessageId)
                                 put("reason", "aborted")
                                 put("messages", runState.value.transcriptIndex.totalMessageCount + 1L)
                                 put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
@@ -686,6 +722,12 @@ internal class LocalWorkAgentTurnExecutor(
                             runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
                             workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/cancelled")
                             workModelHistoryRuntime.persist(binding)
+                            try {
+                                workUiDocumentPublisher.onToolResult(binding, uiSourceMessageId)
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (failure: Exception) {
+                                AppLog.failure("WorkUiDocument", "publish_cancelled_turn", failure)
+                            }
                         }
                     }
                     agentRunCoordinator.recordEvent(runContext, event)

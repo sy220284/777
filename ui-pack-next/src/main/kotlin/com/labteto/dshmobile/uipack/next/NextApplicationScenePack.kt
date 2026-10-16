@@ -163,14 +163,8 @@ class NextApplicationScenePack(private val ports: NextApplicationFeaturePorts) :
         requiredCapabilities = buildSet {
             addAll(setOf("chat.send_text", "work.send_text", "chat.gallery_archive", "chat.persona_selection"))
             if (ports.files != null) add("files.read")
-            if (ports.memory != null && ports.settings != null) add("memory.manage")
-            if (ports.authoring != null) add("chat.persona_authoring")
-            if (ports.currentPersona != null) add("chat.current_persona")
-            if (ports.automation != null) add("automation.manage")
-            if (ports.media != null) add("media.create")
-            if (ports.usage != null) add("usage.read")
-            if (ports.diary != null) add("chat.diary_manage")
-            if (ports.sessions != null && ports.transcript != null) add("session.transcript_read")
+            // The independent Next probe does not require unreleased business UI
+            // capabilities that are outside its small architecture-verification slice.
         }.map(::UiCapabilityId).toSet(),
         windowClasses = UiWindowClass.entries.toSet(),
         accessibility = UiAccessibility.entries.toSet(),

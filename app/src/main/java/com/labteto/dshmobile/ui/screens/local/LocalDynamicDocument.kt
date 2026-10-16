@@ -20,6 +20,7 @@ import com.labteto.dshmobile.uicontract.UiDocumentSnapshot
 import com.labteto.dshmobile.uicontract.UiDocumentFormKey
 import com.labteto.dshmobile.uicontract.UiDocumentFormUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentNode
+import com.labteto.dshmobile.uicontract.MediaUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentBoundValue
 import com.labteto.dshmobile.uicontract.UiExecutionPhase
 import com.labteto.dshmobile.uicontract.UiDocumentActionRequest
@@ -37,7 +38,7 @@ import com.shenyan.designsystem.foundation.SyMetric
 /** V6 owns its native controls; the shared document protocol contains no V6 visual types. */
 @Composable
 internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSessionIdentity?,
-    port: UiDocumentUiPort, forms: UiDocumentFormUiPort) {
+    port: UiDocumentUiPort, forms: UiDocumentFormUiPort, media: MediaUiPort) {
     val document = snapshot.document
     val allValues by forms.values.collectAsStateWithLifecycle()
     val key = UiDocumentFormKey(document.source.sessionId, document.documentId, document.revision)
@@ -54,7 +55,7 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
             if (!snapshot.provenance.usageReported) Text(stringResource(R.string.ui_document_usage_unknown))
         } else { Text(stringResource(R.string.ui_document_history_incomplete)) }
         document.nodes.forEach { node ->
-            LocalDocumentNode(node, values, snapshot, identity != null,
+            LocalDocumentNode(node, values, snapshot, identity != null, media,
                 update = { id, text -> forms.update(key, id, text) },
                 submit = { action -> identity?.let {
                     receipt = port.submit(it, UiDocumentActionRequest(document.documentId, document.revision,
@@ -78,10 +79,11 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
 
 @Composable
 private fun LocalDocumentNode(node: UiDocumentNode, values: Map<String, String>, snapshot: UiDocumentSnapshot,
-    active: Boolean, update: (String, String) -> Unit, submit: (String) -> Unit) {
+    active: Boolean, media: MediaUiPort,
+    update: (String, String) -> Unit, submit: (String) -> Unit) {
     when (node) {
         is UiDocumentNode.Text -> Text(node.text)
-        is UiDocumentNode.Media -> LocalDocumentMediaNode(node, snapshot.document.source.sessionId)
+        is UiDocumentNode.Media -> LocalDocumentMediaNode(node, snapshot.document.source.sessionId, media)
         is UiDocumentNode.Table -> Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             node.rows.forEachIndexed { index, row ->
                 Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
@@ -105,10 +107,10 @@ private fun LocalDocumentNode(node: UiDocumentNode, values: Map<String, String>,
             Text(stringResource(R.string.ui_document_binding_value, node.label, value))
         }
         is UiDocumentNode.Column -> Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-            node.children.forEach { LocalDocumentNode(it, values, snapshot, active, update, submit) }
+            node.children.forEach { LocalDocumentNode(it, values, snapshot, active, media, update, submit) }
         }
         is UiDocumentNode.Row -> FlowRow(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-            node.children.forEach { LocalDocumentNode(it, values, snapshot, active, update, submit) }
+            node.children.forEach { LocalDocumentNode(it, values, snapshot, active, media, update, submit) }
         }
         is UiDocumentNode.Field -> SyTextField(value = values[node.id].orEmpty(),
             onValueChange = { update(node.id, it) }, label = { Text(node.label) },
@@ -127,7 +129,7 @@ private fun LocalDocumentNode(node: UiDocumentNode, values: Map<String, String>,
             var expanded by remember(snapshot.document.documentId, node.id) { mutableStateOf(false) }
             Column {
                 SyButton(node.title, { expanded = !expanded }, variant = SyButtonVariant.Ghost)
-                if (expanded) node.children.forEach { LocalDocumentNode(it, values, snapshot, active, update, submit) }
+                if (expanded) node.children.forEach { LocalDocumentNode(it, values, snapshot, active, media, update, submit) }
             }
         }
     }
