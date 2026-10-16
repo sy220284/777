@@ -445,6 +445,46 @@ class LocalWorkspace(
     }
 
     /**
+     * Stream a file from the *app-owned workspace* into a user-selected SAF destination.
+     *
+     * The general tool sandbox also permits user-selected shared roots. An export operation
+     * deliberately narrows this to [canonicalRoot] so a UI path cannot reveal arbitrary
+     * shared files, session metadata, or an external symlink target.
+     */
+    fun exportFileForUi(relativePath: String, output: java.io.OutputStream): Long {
+        require(relativePath.isNotBlank() && !File(relativePath).isAbsolute) {
+            "只能导出工作区内的相对文件路径"
+        }
+        val source = File(canonicalRoot, relativePath)
+        val canonical = source.canonicalFile
+        require(canonical.path.startsWith(canonicalRoot.path + File.separator) &&
+            canonical.isFile) { "拒绝导出工作区外文件或不存在的文件" }
+
+        // Reject symlinked paths even if the final target remains inside the workspace.
+        val relative = canonicalRoot.toPath().relativize(source.toPath().normalize())
+        var current = canonicalRoot.toPath()
+        for (component in relative) {
+            current = current.resolve(component)
+            require(!Files.isSymbolicLink(current)) { "拒绝通过符号链接导出文件" }
+        }
+
+        var total = 0L
+        java.nio.channels.Channels.newInputStream(Files.newByteChannel(
+            source.toPath(), setOf(java.nio.file.StandardOpenOption.READ,
+                java.nio.file.LinkOption.NOFOLLOW_LINKS),
+        )).use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                output.write(buffer, 0, count)
+                total += count
+            }
+        }
+        return total
+    }
+
+    /**
      * Execute Android's system shell with a hard timeout.
      *
      * Enforcement here is the kernel's, not this class's. `directory(canonicalRoot)` sets the
