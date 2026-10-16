@@ -71,14 +71,18 @@ class LocalAttachmentImporterTest {
         } finally { root.deleteRecursively() }
     }
 
-    @Test fun largeTextPreviewStaysBoundedWithoutFalseDigestClaim() {
+    @Test fun largeTextPreviewIsBoundedAndFullHashVerified() {
         val root = kotlin.io.path.createTempDirectory("attachment-preview-long").toFile()
         try {
             val item = stored(root, "A".repeat(9 * 1024 * 1024))
             val result = inspectImportedAttachmentFile(root, item) as UiAttachmentInspectionReceipt.Ready
-            assertFalse(result.value.digestVerified)
+            assertTrue(result.value.digestVerified)
             assertTrue(result.value.truncated)
             assertEquals(16_384, result.value.preview?.length)
+            // File size is unchanged, but bytes no longer match the content-addressed identity.
+            val storedFile = File(root, item.relativePath)
+            java.io.RandomAccessFile(storedFile, "rw").use { it.seek(8L * 1024L * 1024L); it.writeByte('B'.code) }
+            assertTrue(inspectImportedAttachmentFile(root, item) is UiAttachmentInspectionReceipt.Unavailable)
         } finally { root.deleteRecursively() }
     }
 
