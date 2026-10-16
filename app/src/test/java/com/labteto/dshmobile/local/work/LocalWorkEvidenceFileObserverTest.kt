@@ -26,8 +26,30 @@ class LocalWorkEvidenceFileObserverTest {
             item("../other/secret.md"), item("/tmp/not-in-workspace"),
         ))
         assertEquals(setOf("one.md", "two.md"), selection.getValue(reports.canonicalFile))
-        assertEquals(1, selection.size)
+        assertEquals(setOf("reports"), selection.getValue(root.canonicalFile))
+        assertEquals(2, selection.size)
         assertFalse(selection.containsKey(outside.canonicalFile))
+    }
+
+    @Test fun reCreatedNestedDirectoriesCanBeObservedWithoutPolling() {
+        val root = files.newFolder("nested-ancestor")
+        val intermediate = File(root, "reports").apply { mkdirs() }
+        val nested = File(intermediate, "build").apply { mkdirs() }
+        val target = listOf(item("reports/build/result.txt"))
+        assertEquals(
+            mapOf(root.canonicalFile to setOf("reports"),
+                intermediate.canonicalFile to setOf("build"),
+                nested.canonicalFile to setOf("result.txt")),
+            workEvidenceWatchTargets(root, target),
+        )
+        nested.delete()
+        assertEquals(
+            mapOf(root.canonicalFile to setOf("reports"),
+                intermediate.canonicalFile to setOf("build")),
+            workEvidenceWatchTargets(root, target),
+        )
+        nested.mkdir()
+        assertTrue(workEvidenceWatchTargets(root, target).containsKey(nested.canonicalFile))
     }
 
     @Test fun missingOrCrossBoundaryArtifactIsNotRegisteredForExternalNotifications() {
@@ -36,8 +58,9 @@ class LocalWorkEvidenceFileObserverTest {
         val outside = File(external, "target.md").apply { writeText("private") }
         val link = File(root, "link")
         java.nio.file.Files.createSymbolicLink(link.toPath(), external.toPath())
-        assertTrue(workEvidenceWatchTargets(root,
-            listOf(item("link/target.md"), item("missing/target.md"))).isEmpty())
+        val targets = workEvidenceWatchTargets(root,
+            listOf(item("link/target.md"), item("missing/target.md")))
+        assertEquals(mapOf(root.canonicalFile to setOf("missing")), targets)
         assertTrue(outside.isFile)
     }
 }

@@ -16,16 +16,45 @@ internal fun workEvidenceWatchTargets(
     links: List<LocalRequirementEvidenceLink>,
 ): Map<File, Set<String>> {
     val root = workspace.canonicalFile
-    return links.mapNotNull { link ->
-        val path = link.artifactPath
-        if (File(path).isAbsolute) return@mapNotNull null
-        val actual = File(root, path).canonicalFile
-        if (actual == root || !actual.toPath().startsWith(root.toPath())) return@mapNotNull null
-        val parent = actual.parentFile
-        if (!parent.isDirectory || parent.canonicalFile != parent) return@mapNotNull null
-        parent to actual.name
-    }.groupBy({ it.first }, { it.second })
-        .mapValues { (_, names) -> names.toSet() }
+    if (!root.isDirectory) return emptyMap()
+    val rootPath = root.toPath()
+    val watches = linkedMapOf<File, MutableSet<String>>()
+    for (link in links) {
+        val relative = link.artifactPath
+        if (relative.isBlank() || relative.startsWith('/') ||
+            relative.contains('\\') || relative.contains(':')) continue
+        val parts = relative.split('/')
+        if (parts.any { it.isBlank() || it == "." || it == ".." }) continue
+
+        // First validate the entire *existing* path. A symlink resolving back into the
+        // workspace is still not an authoritative evidence path.
+        var parent = root
+        var valid = true
+        for (part in parts) {
+            val next = File(parent, part)
+            if (java.nio.file.Files.isSymbolicLink(next.toPath())) {
+                valid = false
+                break
+            }
+            if (next.exists() && !next.canonicalFile.toPath().startsWith(rootPath)) {
+                valid = false
+                break
+            }
+            parent = next
+        }
+        if (!valid) continue
+
+        // Observe every existing parent directory from the workspace root down. A
+        // missing intermediate folder is watched by its nearest existing ancestor,
+        // so an external CREATE/MOVED_TO can re-arm watchers for the new child.
+        parent = root
+        for (part in parts) {
+            if (!parent.isDirectory) break
+            watches.getOrPut(parent.canonicalFile) { linkedSetOf() } += part
+            parent = File(parent, part)
+        }
+    }
+    return watches.mapValues { (_, names) -> names.toSet() }
 }
 
 /** Single Android-native filesystem event subscription; no polling or second file status store. */
