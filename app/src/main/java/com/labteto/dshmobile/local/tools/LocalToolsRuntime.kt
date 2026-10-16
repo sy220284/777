@@ -11,6 +11,7 @@ class LocalToolsRuntime @Inject internal constructor(
     private val githubCredentials: LocalGitHubCredentialManager,
 ) {
     internal suspend fun servers(): List<McpServerSnapshot> = management.servers()
+    internal fun serverChanges(): kotlinx.coroutines.flow.Flow<Unit> = management.serverChanges()
     internal suspend fun checkMcpHealth(serverId: String) = management.checkMcpHealth(serverId)
     internal fun selectedConnectorIds(): Set<String> = management.selectedConnectorIds()
     internal suspend fun githubConfigured(): Boolean = githubCredentials.configured()
