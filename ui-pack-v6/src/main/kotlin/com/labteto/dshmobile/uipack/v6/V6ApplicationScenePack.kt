@@ -6,6 +6,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -16,6 +17,7 @@ import com.labteto.dshmobile.uicontract.UiHostPreferences
 import com.labteto.dshmobile.uicontract.UiHostPreferencesCommand
 import com.labteto.dshmobile.uicontract.UiPackManifest
 import com.labteto.dshmobile.uicontract.UiSceneId
+import com.labteto.dshmobile.uicontract.UiCapabilityId
 import com.labteto.dshmobile.uicontract.SettingsUiPort
 import com.labteto.dshmobile.uicontract.UiWindowClass
 import com.labteto.dshmobile.uihost.UiApplicationScenePack
@@ -37,6 +39,7 @@ import kotlinx.coroutines.launch
 class V6ApplicationScenePack(
     private val preferences: HostPreferencesUiPort,
     private val settings: SettingsUiPort? = null,
+    private val conversations: V6ConversationPorts? = null,
 ) : UiApplicationScenePack {
     private val pages = mapOf(
         UiSceneId("settings.appearance") to V6PreferencesPage.APPEARANCE,
@@ -46,10 +49,18 @@ class V6ApplicationScenePack(
     private val sessionSettings = if (settings == null) emptySet() else
         setOf(UiSceneId("settings.session"), UiSceneId("settings.chat"))
 
+    private val conversationScenes = if (conversations == null) emptySet() else
+        setOf("route.home", "conversation.chat", "conversation.work").map(::UiSceneId).toSet()
+
     override val manifest = UiPackManifest(
         id = "v6-application-migrating", version = 1,
         minContractVersion = UI_CONTRACT_VERSION, maxContractVersion = UI_CONTRACT_VERSION,
-        scenes = pages.keys + sessionSettings, requiredCapabilities = emptySet(),
+        scenes = pages.keys + sessionSettings + conversationScenes,
+        requiredCapabilities = if (conversations == null) emptySet() else
+            setOf("chat.send_text", "work.send_text", "chat.edit", "chat.regenerate",
+                "chat.select_variant", "chat.stop", "work.edit", "work.regenerate",
+                "work.stop", "work.answer_question", "work.answer_approval")
+                .map(::UiCapabilityId).toSet(),
         windowClasses = UiWindowClass.entries.toSet(),
         accessibility = UiAccessibility.entries.toSet(), supportsDark = true,
     )
@@ -57,6 +68,20 @@ class V6ApplicationScenePack(
         pages.forEach { (id, page) ->
             put(id, UiSceneRenderer { scope ->
                 V6PreferencesScene(page, preferences, onBack = { scope.onBack(); Unit })
+            })
+        }
+        conversations?.let { owners ->
+            put(UiSceneId("route.home"), UiSceneRenderer { scope ->
+                val workMode = owners.workModeUpdates
+                    ?.collectAsStateWithLifecycle(initialValue = owners.workMode())?.value
+                    ?: owners.workMode()
+                V6ConversationScene(owners, workMode, onBack = { scope.onBack(); Unit })
+            })
+            put(UiSceneId("conversation.chat"), UiSceneRenderer { scope ->
+                V6ConversationScene(owners, workMode = false, onBack = { scope.onBack(); Unit })
+            })
+            put(UiSceneId("conversation.work"), UiSceneRenderer { scope ->
+                V6ConversationScene(owners, workMode = true, onBack = { scope.onBack(); Unit })
             })
         }
         settings?.let { owner ->
