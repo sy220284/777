@@ -430,6 +430,8 @@ fun V6GlobalHistorySearchScene(
     var feedback by remember { mutableStateOf<String?>(null) }
     var scanning by remember { mutableStateOf(false) }
     var limited by remember { mutableStateOf(false) }
+    var openingSession by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     LaunchedEffect(sessions, history, submitted, revision) {
         if (submitted.isBlank()) return@LaunchedEffect
         scanning = true; results = emptyList(); limited = false; feedback = null
@@ -484,11 +486,34 @@ fun V6GlobalHistorySearchScene(
                 Text(result.title + " · " + result.message.role.name)
                 SelectionContainer { Text(result.message.text.take(3000)) }
                 SyButton("打开所属会话", {
-                    val receipt = sessions.submit(SessionUiCommand.Open(result.sessionId))
-                    feedback = describeV6ConversationReceipt(receipt)
-                    if (receipt == UiCommandReceipt.Accepted || receipt == UiCommandReceipt.Queued)
-                        onOpen()
-                }, style = SyButtonStyle.SECONDARY)
+                    if (openingSession == null) {
+                        val target = result.sessionId
+                        val receipt = sessions.submit(SessionUiCommand.Open(target))
+                        feedback = describeV6ConversationReceipt(receipt)
+                        if (receipt == UiCommandReceipt.Accepted || receipt == UiCommandReceipt.Queued) {
+                            openingSession = target
+                            scope.launch {
+                                try {
+                                    val activated = withTimeoutOrNull(15_000L) {
+                                        sessions.snapshots.first {
+                                            !it.loading && it.identity?.sessionId == target
+                                        }
+                                    }
+                                    if (openingSession == target) {
+                                        if (activated != null) onOpen()
+                                        else feedback = "会话切换尚未生效，请从会话列表确认后重试"
+                                    }
+                                } catch (cancelled: CancellationException) { throw cancelled }
+                                catch (failure: Exception) {
+                                    if (openingSession == target)
+                                        feedback = failure.message ?: "会话打开失败"
+                                } finally {
+                                    if (openingSession == target) openingSession = null
+                                }
+                            }
+                        }
+                    }
+                }, enabled = openingSession == null, style = SyButtonStyle.SECONDARY)
             }
         }
     }
