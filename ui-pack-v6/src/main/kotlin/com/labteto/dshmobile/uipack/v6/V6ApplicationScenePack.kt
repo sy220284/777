@@ -40,6 +40,9 @@ class V6ApplicationScenePack(
     private val preferences: HostPreferencesUiPort,
     private val settings: SettingsUiPort? = null,
     private val conversations: V6ConversationPorts? = null,
+    private val usageOwner: com.labteto.dshmobile.uicontract.UsageUiPort? = null,
+    private val updateStatus: kotlinx.coroutines.flow.StateFlow<String?>? = null,
+    private val checkForUpdate: (() -> Unit)? = null,
 ) : UiApplicationScenePack {
     private val pages = mapOf(
         UiSceneId("settings.appearance") to V6PreferencesPage.APPEARANCE,
@@ -71,13 +74,25 @@ class V6ApplicationScenePack(
         setOf(UiSceneId("work.plan_review")) else emptySet()
     private val teamScene = if (conversations?.workTeam != null)
         setOf(UiSceneId("work.team")) else emptySet()
+    private val settingsSuite = if (settings == null) emptySet() else setOf(
+        "settings.root", "route.settings",
+        "settings.models", "conversation.model_picker",
+        "settings.account", "settings.minimax_quota",
+        "settings.model_performance", "settings.pricing",
+        "settings.usage", "settings.model_usage", "settings.usage_log",
+        "settings.usage_detail", "settings.memory", "settings.memory_settings",
+        "settings.advanced", "settings.session_storage", "settings.diagnostics",
+    ).map(::UiSceneId).toSet()
+    private val updateScene = if (settings != null && checkForUpdate != null &&
+        updateStatus != null) setOf(UiSceneId("settings.update")) else emptySet()
+
 
     override val manifest = UiPackManifest(
         id = "v6-application-migrating", version = 1,
         minContractVersion = UI_CONTRACT_VERSION, maxContractVersion = UI_CONTRACT_VERSION,
         scenes = pages.keys + sessionSettings + conversationScenes + documentScenes +
             evidenceScene + personaScene + groupScenes + archiveScenes +
-            planScene + teamScene,
+            planScene + teamScene + settingsSuite + updateScene,
         requiredCapabilities = buildSet {
             if (conversations != null) {
                 addAll(setOf("chat.send_text", "work.send_text", "chat.edit", "chat.regenerate",
@@ -216,6 +231,14 @@ class V6ApplicationScenePack(
             }
         }
         settings?.let { owner ->
+            (settingsSuite + updateScene).forEach { id ->
+                put(id, UiSceneRenderer { scope ->
+                    V6SettingsSuiteScene(id, owner, usageOwner,
+                        onNavigate = scope.onNavigate,
+                        onBack = { scope.onBack(); Unit },
+                        updateStatus = updateStatus, checkForUpdate = checkForUpdate)
+                })
+            }
             put(UiSceneId("settings.chat"), UiSceneRenderer { scope ->
                 V6ChatStyleSettingsScene(owner, onBack = { scope.onBack(); Unit })
             })
