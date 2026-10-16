@@ -28,7 +28,6 @@ class MainActivity : AppCompatActivity() {
 
     private val requestedLocalSession = mutableStateOf<String?>(null)
     private val requestedExternalScene = mutableStateOf<String?>(null)
-    private val requestedConversationUiSlice = mutableStateOf(false)
     private var appliedApplicationNightMode: Int? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -39,7 +38,6 @@ class MainActivity : AppCompatActivity() {
             DshApplication.applicationNightModeFor(storedTheme, uiModeManager.nightMode)
         requestedLocalSession.value = savedInstanceState?.getString("pending_local_session")
             ?: notificationLocalSession(intent)
-        requestedConversationUiSlice.value = BuildConfig.DEBUG && intent.getStringExtra("ui_pack") == "next-conversation-slice"
         // A saved null means the previous VIEW request was consumed; do not replay it.
         requestedExternalScene.value = if (savedInstanceState?.containsKey("pending_ui_scene") == true)
             savedInstanceState.getString("pending_ui_scene") else externalSceneFromIntent(intent)
@@ -58,15 +56,10 @@ class MainActivity : AppCompatActivity() {
         setContent {
             AppRoot(
                 requestedLocalSessionId = requestedLocalSession.value,
-                openConversationUiSlice = requestedConversationUiSlice.value,
                 requestedExternalSceneKey = requestedExternalScene.value,
                 onExternalSceneRequestConsumed = {
                     requestedExternalScene.value = null
                     intent.data = null
-                },
-                onConversationUiSliceRequestConsumed = {
-                    requestedConversationUiSlice.value = false
-                    intent.removeExtra("ui_pack")
                 },
                 onLocalSessionRequestConsumed = {
                     requestedLocalSession.value = null
@@ -97,7 +90,6 @@ class MainActivity : AppCompatActivity() {
         setIntent(intent)
         requestedLocalSession.value = notificationLocalSession(intent)
         requestedExternalScene.value = externalSceneFromIntent(intent)
-        requestedConversationUiSlice.value = BuildConfig.DEBUG && intent.getStringExtra("ui_pack") == "next-conversation-slice"
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

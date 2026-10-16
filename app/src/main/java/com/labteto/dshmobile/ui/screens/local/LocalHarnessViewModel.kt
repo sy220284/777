@@ -192,12 +192,6 @@ class LocalHarnessViewModel @Inject constructor(
     val uiDocumentUiPort: com.labteto.dshmobile.uicontract.UiDocumentUiPort = documentsFactory.create(
         viewModelScope, conversationDraftUiPort, documentNavigationScenes,
     ) { scene -> savedStateHandle["ui_scene_request"] = scene.value }
-    // The independent conversation slice cannot navigate to unimplemented pages.
-    // It reads the same historical documents but explicitly disables those actions.
-    val nextUiDocumentUiPort: com.labteto.dshmobile.uicontract.UiDocumentUiPort = documentsFactory.create(
-        viewModelScope, conversationDraftUiPort, documentNavigationScenes, navigationScenes = emptySet(),
-    ) { _ -> error("No navigation scenes are registered for this slice") }
-
     private val conversationUiState = LocalConversationUiStateStore(appContext, businessSessions)
     val pinnedSessionIds = conversationUiState.pinnedSessionIds
     val sessionTitleOverrides = conversationUiState.sessionTitleOverrides
@@ -298,7 +292,7 @@ class LocalHarnessViewModel @Inject constructor(
     }
     fun createSingleChatSession() = runtime.chat.createSingleChatSession()
     fun configureGroupChatMembers(ids: List<String>, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Boolean {
-        // V6 and Next now submit the same closed intent to the original Chat Owner.
+        // V6 now submits the same closed intent to the original Chat Owner.
         val identity = expected ?: return false
         val receipt = chatGroupUiPort.submit(
             com.labteto.dshmobile.uicontract.ChatGroupUiCommand.ConfigureMembers(identity, ids)
@@ -463,7 +457,7 @@ class LocalHarnessViewModel @Inject constructor(
 }
 
 /**
- * V6 compatibility only. Next uses the neutral UiMessageEditOutcome and does not import
+ * V6 compatibility uses the neutral UiMessageEditOutcome and does not import
  * the Session-domain enum. Exhaustive translation preserves durable-edit partial success.
  */
 private fun com.labteto.dshmobile.uicontract.UiMessageEditOutcome.toLegacyMessageEditResult():

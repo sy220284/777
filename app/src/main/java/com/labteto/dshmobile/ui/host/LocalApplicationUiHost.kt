@@ -48,8 +48,6 @@ import com.labteto.dshmobile.uihost.RenderHostedScene
 import com.labteto.dshmobile.uihost.UiSceneRenderAccess
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.ui.screens.local.LocalHarnessViewModel
-import com.labteto.dshmobile.uipack.next.NextApplicationFeaturePorts
-import com.labteto.dshmobile.uipack.next.NextApplicationScenePack
 import com.labteto.dshmobile.uipack.v6.V6ApplicationScenePack
 import com.labteto.dshmobile.uipack.v6.V6ConversationPorts
 import com.labteto.dshmobile.uipack.v6.V6SecondaryPorts
@@ -79,7 +77,7 @@ internal fun localNavigationSnapshotKey(packId: String, sessionId: String?): Str
 /**
  * Installed packages are candidates, not admitted packages. The production Host
  * checks the COMPLETE scene catalog and real renderers before executing a package.
- * The incremental Next pack is intentionally incomplete and cannot replace V6 yet.
+ * Only the V6 migration candidate is installed; legacy UI remains stable until verified.
  */
 internal object LocalApplicationPackInstallations {
     fun fromOwners(owner: LocalHarnessViewModel,
@@ -97,7 +95,7 @@ internal object LocalApplicationPackInstallations {
                     drafts = owner.conversationDraftUiPort,
                     reading = owner.conversationReadingUiPort,
                     attachments = owner.attachmentUiPort, history = owner.messageHistoryUiPort,
-                    documents = owner.nextUiDocumentUiPort, forms = owner.uiDocumentFormPort,
+                    documents = owner.uiDocumentUiPort, forms = owner.uiDocumentFormPort,
                     media = owner.mediaUiPort, evidence = owner.workEvidenceUiPort,
                     gallery = owner.personaGalleryUiPort,
                     selection = owner.personaSelectionUiPort,
@@ -132,31 +130,7 @@ internal object LocalApplicationPackInstallations {
                     pricing = owner.memoryUiPort as? com.labteto.dshmobile.uicontract.PricingUiPort,
                 ),
             ),
-            NextApplicationScenePack(NextApplicationFeaturePorts(
-            chat = owner.chatUiPort, work = owner.workConversationUiPort,
-            drafts = owner.conversationDraftUiPort, reading = owner.conversationReadingUiPort,
-            gallery = owner.personaGalleryUiPort, selection = owner.personaSelectionUiPort,
-            workMode = { owner.shellState.value.usageMode == LocalUsageMode.WORK },
-            workModeUpdates = owner.shellState.map { it.usageMode == LocalUsageMode.WORK },
-            documents = owner.nextUiDocumentUiPort, forms = owner.uiDocumentFormPort,
-            attachments = owner.attachmentUiPort, sessions = owner.sessionUiPort,
-            transcript = owner.messageHistoryUiPort, policy = owner.workPolicyUiPort,
-            workReads = owner.workReadUiPort, files = owner.filesUiPort,
-            evidence = owner.workEvidenceUiPort, shell = owner.conversationShellUiPort,
-            team = owner.workTeamUiPort, groups = owner.chatGroupUiPort,
-            tools = owner.toolsUiPort, invocations = owner.composerInvocationUiPort,
-            authoring = owner.personaAuthoringUiPort, currentPersona = owner.currentPersonaUiPort,
-            memory = owner.memoryUiPort, settings = owner.settingsUiPort,
-            automation = owner.automationUiPort, media = owner.mediaUiPort,
-            usage = owner.usageUiPort, activeSessionId = { owner.shellState.value.sessionId },
-            diary = owner.diaryUiPort,
-            hostPreferences = owner.hostPreferencesUiPort,
-            replySuggestions = owner.replySuggestionsUiPort,
-            updateStatus = updateStatus, checkForUpdate = checkForUpdate,
-            personaTransfer = owner.personaTransferUiPort,
-            stories = owner.personaStoryUiPort, galleryDeletion = owner.personaGalleryDeletionUiPort,
-            gallerySave = owner.personaGallerySaveUiPort, portraits = owner.personaPortraitUiPort,
-        )))
+        )
 }
 
 internal sealed interface LocalApplicationUiDecision {
