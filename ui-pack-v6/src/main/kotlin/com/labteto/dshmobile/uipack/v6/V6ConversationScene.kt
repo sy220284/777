@@ -50,6 +50,9 @@ import com.labteto.dshmobile.uicontract.UiDocumentUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentFormUiPort
 import com.labteto.dshmobile.uicontract.MediaUiPort
 import com.labteto.dshmobile.uicontract.WorkEvidenceUiPort
+import com.labteto.dshmobile.uicontract.PersonaGalleryUiPort
+import com.labteto.dshmobile.uicontract.PersonaSelectionUiPort
+import com.labteto.dshmobile.uicontract.ChatGroupUiPort
 import com.labteto.dshmobile.uicontract.UiTranscriptCursor
 import com.labteto.dshmobile.uicontract.WorkConversationUiCommand
 import com.labteto.dshmobile.uicontract.WorkConversationUiPort
@@ -81,6 +84,9 @@ data class V6ConversationPorts(
     val forms: UiDocumentFormUiPort? = null,
     val media: MediaUiPort? = null,
     val evidence: WorkEvidenceUiPort? = null,
+    val gallery: PersonaGalleryUiPort? = null,
+    val selection: PersonaSelectionUiPort? = null,
+    val groups: ChatGroupUiPort? = null,
     val workMode: () -> Boolean,
     val workModeUpdates: Flow<Boolean>? = null,
 )
@@ -286,6 +292,28 @@ fun V6ConversationScene(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(if (workMode) "Work" else "聊天", style = MaterialTheme.typography.titleLarge)
             SyButton("返回", onBack, style = SyButtonStyle.GHOST)
+        }
+        if (!workMode && identity != null &&
+            (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) &&
+            onNavigate != null) {
+            if (ports.gallery != null && ports.selection != null)
+                SyButton("选择人物", onClick = {
+                    val result = onNavigate(UiSceneId("chat.persona_picker"))
+                    if (result !is UiSceneNavigationResult.Changed)
+                        feedback = "人物选择界面暂不可达"
+                }, style = SyButtonStyle.SECONDARY)
+            if (ports.groups != null) {
+                SyButton("群聊成员", onClick = {
+                    val result = onNavigate(UiSceneId("chat.group_members"))
+                    if (result !is UiSceneNavigationResult.Changed)
+                        feedback = "群聊成员界面暂不可达"
+                }, style = SyButtonStyle.SECONDARY)
+                SyButton("群聊公告", onClick = {
+                    val result = onNavigate(UiSceneId("chat.group_announcement"))
+                    if (result !is UiSceneNavigationResult.Changed)
+                        feedback = "群聊公告界面暂不可达"
+                }, style = SyButtonStyle.GHOST)
+            }
         }
         if (docOwner != null && formOwner != null &&
             (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) &&
