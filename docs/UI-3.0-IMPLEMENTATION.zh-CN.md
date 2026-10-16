@@ -332,3 +332,12 @@ Host 的 `ConversationShellUiPort` 接入重命名与显式置顶；原偏好 St
 - 消息可发送普通文字或纯附件；只在原 Owner 接受/排队，且当前身份未变化时清空草稿；拒绝或结果未知不丢草稿。补齐异步历史失败的身份校验、列表阅读锚点和加载状态变化恢复，阻止连续切换会话串写反馈；审批须明确二次确认、展示源 Owner 工具参数及影响等级。
 - 增加 `V6ConversationSubmissionTest` 的 4 个 Owner 命令测试及 `V6ConversationMigrationTest` 的 12 场景门禁断言。**仅提交了测试源码，未宣称 CI/真机已通过。**
 - 下阶段仍需独立 V6 全部动态文档/媒体、聊天人物和群聊子场景、Work 计划/证据/团队及原有导航 Shell 的行为等价。其余 **61 个**必需场景尚未完整独立；当前 Legacy V6 保留。
+
+
+## 2026-10-16 继续移包：V6 动态文档、原生媒体与 Work 需求证据
+
+- 新增 `V6UiDocumentScene.kt`：V6 独立渲染 `UiDocument` 的 Text、Media、Table、BarChart、BoundText、Column、Row、Field、Select、Switch、Button、Disclosure 全部节点。Form 值按会话、文档 ID 和修订版交原 `UiDocumentFormUiPort` 持久状态处理；动作可用性以 `UiDocumentUiPort` 的 Owner 结果为准，模型文本不可授予额外操作权限。
+- `V6DocumentMedia.kt` 只使用 Media Owner 的 `assetForSession` 会话校验资产；支持缩采样图片、带生命周期释放的音频播放、原生视频播放、Android 用户选择目标位置后调用 `exportToSessionAsset`。远程素材不会被静默下载，导出时保留已知源文件格式，媒体节点不保存任意路径。
+- `V6ConversationScene` 的聊天/Work 消息时间线现在按真实来源消息 ID 直接渲染所属动态文档；同时提供 Host 导航的“查看文档”和“从消息生成结构化内容”入口。新增本地有类型模板生成，以及显式确认额外模型请求后的 AI 设计入口；动作包括输入发送和批准等需确认的操作、按文档版本删除及回执展示。
+- 将已有 `V6WorkEvidencePanel` 正式以原 `WorkEvidenceUiPort` 注入并登记独立 `work.requirement_evidence` 场景；在 Work 主会话有入口，关联文件的版本信息为 Owner 数据，不声称关联等于完成或验收。
+- V6 独立候选累计 **17/75** 个真正登记的场景，还差 **58** 个。新增文档/生成与 Work Evidence 三个场景的局部准入/整包拒绝测试，以及媒体会话作用域和操作回执的 4 个单测；均未获得 CI 或 Android 设备验收回执，不计为已验证。生产继续使用 `legacy-v6-shell`。
