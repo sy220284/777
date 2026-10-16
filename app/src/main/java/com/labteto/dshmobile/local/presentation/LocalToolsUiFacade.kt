@@ -35,6 +35,17 @@ class LocalToolsUiFacade @Inject internal constructor(
         com.labteto.dshmobile.uicontract.UiMcpServerSnapshot(it.id, it.transport, it.target, it.tools,
             registration = registration, connection = connection)
     }
+    override suspend fun checkServerHealth(serverId: String): com.labteto.dshmobile.uicontract.UiMcpHealth =
+        when (tools.checkMcpHealth(serverId)) {
+            com.labteto.dshmobile.interop.mcp.McpServerHealth.RESPONDED ->
+                com.labteto.dshmobile.uicontract.UiMcpHealth.RESPONDED
+            com.labteto.dshmobile.interop.mcp.McpServerHealth.BUSY ->
+                com.labteto.dshmobile.uicontract.UiMcpHealth.BUSY
+            com.labteto.dshmobile.interop.mcp.McpServerHealth.NOT_CONNECTED ->
+                com.labteto.dshmobile.uicontract.UiMcpHealth.NOT_CONNECTED
+            com.labteto.dshmobile.interop.mcp.McpServerHealth.UNCONFIRMED ->
+                com.labteto.dshmobile.uicontract.UiMcpHealth.UNCONFIRMED
+        }
     override suspend fun githubConfigured() = tools.githubConfigured()
     /** Work handoff UI projection; capability hints do not grant execution permissions. */
     internal fun workHandoffCapabilityReadiness(
