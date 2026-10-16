@@ -217,7 +217,9 @@ fun V6ConversationScene(
     val messages = older.filterNot { it.id in seen } + hot
     val ids = messages.map { it.id }.toSet()
     var anchorRestored by remember(identity) { mutableStateOf(false) }
-    var pendingAnchorId by remember(identity) { mutableStateOf<String?>(null) }
+    // Persist the requested message identity only. Owner cursors are opaque and must be
+    // reconstructed after process death from the restored Session reading anchor.
+    var pendingAnchorId by rememberSaveable(identity?.sessionId) { mutableStateOf<String?>(null) }
     var anchorScrollInProgress by remember(identity) { mutableStateOf(false) }
 
     fun show(receipt: UiCommandReceipt) { feedback = describeV6ConversationReceipt(receipt) }
@@ -252,6 +254,12 @@ fun V6ConversationScene(
         if (anchorRestored || status == UiSceneStatus.LOADING) return@LaunchedEffect
         val anchor = ports.reading.anchor(target.sessionId)
         val targetMessageId = anchor?.messageId
+        // If a process-restored pending request belongs to an old/changed target, drop it.
+        // The Session's saved anchor is the only valid recovery identity.
+        if (pendingAnchorId != null &&
+            (anchor?.followingTail != false || pendingAnchorId != targetMessageId)) {
+            pendingAnchorId = null
+        }
         val historyOwner = ports.history
         if (messages.isEmpty() && (targetMessageId == null || historyOwner == null)) return@LaunchedEffect
         var restored = messages
@@ -272,11 +280,10 @@ fun V6ConversationScene(
                 restored = lookup.messages
                 restoreCursor = lookup.nextCursor
                 more = lookup.hasOlder
-                if (restored != messages) {
-                    older = restored.filterNot { it.id in seen }
-                    cursor = restoreCursor
-                    hasOlder = more
-                }
+                if (restored != messages) older = restored.filterNot { it.id in seen }
+                // Cursors can advance even when a page is empty or duplicate-only.
+                cursor = restoreCursor
+                hasOlder = more
                 if (restored.none { it.id == targetMessageId }) {
                     if (more) {
                         pendingAnchorId = targetMessageId
@@ -344,11 +351,9 @@ fun V6ConversationScene(
                 val active = if (workMode) ports.work.snapshot().identity else ports.chat.snapshot().identity
                 if (active != target || pendingAnchorId != messageId) return@launch
                 val nextMessages = loaded.messages
-                if (nextMessages != messages) {
-                    older = nextMessages.filterNot { it.id in seen }
-                    cursor = loaded.nextCursor
-                    hasOlder = loaded.hasOlder
-                }
+                if (nextMessages != messages) older = nextMessages.filterNot { it.id in seen }
+                cursor = loaded.nextCursor
+                hasOlder = loaded.hasOlder
                 if (loaded.found) {
                     // Suppress the visible-position observer while removing the temporary
                     // "continue" row, then scroll using the final list's actual header count.
