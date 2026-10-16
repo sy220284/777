@@ -1,11 +1,26 @@
 package com.labteto.dshmobile.uipack.v6
 
 import com.labteto.dshmobile.automation.AutomationScheduleType
+import com.labteto.dshmobile.uicontract.UiSessionIdentity
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 class V6AutomationRecurrenceTest {
+    @Test fun anOldAutomationCompletionCannotMutateTheNewConversationEditor() {
+        val previous = UiSessionIdentity("chat-a", "activation-1", 10L, null, null)
+        val next = UiSessionIdentity("chat-b", "activation-2", 11L, null, null)
+        assertTrue(v6AutomationResultMatchesEditor(previous, previous))
+        assertFalse(v6AutomationResultMatchesEditor(previous, next))
+        assertFalse(v6AutomationResultMatchesEditor(previous, null))
+        assertTrue(v6AutomationResultMatchesEditor(null, null))
+        // Re-opening the same session increments the Owner's activation generation.
+        val reactivated = previous.copy(contextGeneration = 12L)
+        assertFalse(v6AutomationResultMatchesEditor(previous, reactivated))
+    }
+
     @Test fun calendarCadencesAlwaysProvideRecurrenceMetadata() {
         assertEquals(1440L, v6AutomationRecurrence(AutomationScheduleType.DAILY, null))
         assertEquals(10080L, v6AutomationRecurrence(AutomationScheduleType.WEEKLY, null))
