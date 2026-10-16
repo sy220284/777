@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.flowOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -287,12 +288,34 @@ private fun NextDocumentMediaNode(node: UiDocumentNode.Media, sessionId: String)
     val asset = remember(media, sessionId, node.assetId, node.kind, mediaPage) {
         media?.assetForSession(node.assetId, sessionId)?.takeIf { it.kind == node.kind }
     }
+    val scope = rememberCoroutineScope()
+    var restoring by remember(node.assetId, sessionId) { mutableStateOf(false) }
+    var restoreNotice by remember(node.assetId, sessionId) { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(node.label)
         val path = asset?.localPath
         if (path != null) NextDocumentMediaSaveButton(media, node, sessionId, path)
         if (path == null) {
             Text("媒体尚未保存在本机，或无权访问这条会话的媒体成果")
+            if (media != null && asset?.remoteUrl != null && node.kind == UiDocumentMediaKind.IMAGE) {
+                TextButton(enabled = !restoring, onClick = {
+                    restoring = true
+                    scope.launch {
+                        try {
+                            restoreNotice = when (val receipt = withContext(Dispatchers.IO) {
+                                media.retrySessionImageDownload(node.assetId, sessionId)
+                            }) {
+                                MediaUiReceipt.Applied -> "原图片已重新保存到本机"
+                                is MediaUiReceipt.Failed -> receipt.message ?: "原图片下载失败"
+                                else -> "图片恢复结果未知，请刷新原成果记录"
+                            }
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (failure: Exception) { restoreNotice = failure.message ?: "原图片下载失败" }
+                        finally { restoring = false }
+                    }
+                }) { Text(if (restoring) "正在下载原图片…" else "重新下载已生成图片（不重新生成）") }
+                restoreNotice?.let { Text(it) }
+            }
         } else when (node.kind) {
             UiDocumentMediaKind.IMAGE -> {
                 val bitmap by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(
