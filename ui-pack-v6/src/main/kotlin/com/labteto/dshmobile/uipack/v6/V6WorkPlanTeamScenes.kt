@@ -134,6 +134,7 @@ fun V6WorkTeamScene(
     var feedback by remember(identity) { mutableStateOf<String?>(null) }
     var output by remember(identity, selected) { mutableStateOf<String?>(null) }
     var confirming by remember(identity) { mutableStateOf<Pair<String,String>?>(null) }
+    var confirmTeamStop by remember(identity) { mutableStateOf(false) }
     var pending by remember(identity) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val member = snapshot.members.firstOrNull { it.id == selected }
@@ -171,6 +172,9 @@ fun V6WorkTeamScene(
         snapshot.failure?.let { SyNote(it) }
         feedback?.let { SyNote(it) }
         if (snapshot.members.isEmpty()) SyNote("当前没有运行中的团队任务")
+        if (identity != null && snapshot.members.isNotEmpty())
+            SyButton("停止全部团队任务", { confirmTeamStop = true },
+                enabled = !snapshot.rebuilding && !pending, style = SyButtonStyle.DANGER)
         snapshot.members.forEach { item ->
             SyGlassCard(Modifier.fillMaxWidth()) {
                 SyButton(item.name, { selected = item.id; output = null },
@@ -210,6 +214,20 @@ fun V6WorkTeamScene(
             }, style = SyButtonStyle.DANGER, enabled = !pending && !snapshot.rebuilding)
         }
     }
+    if (confirmTeamStop && identity != null) AlertDialog(
+        onDismissRequest = { if (!pending) confirmTeamStop = false },
+        title = { Text("确认停止整个 Work 团队") },
+        text = { Text("将由 Work Owner 检查全部成员任务身份后停止。此操作可能中断正在进行的工具调用。") },
+        confirmButton = { TextButton(onClick = {
+            confirmTeamStop = false
+            val latest = team.snapshot()
+            if (latest.identity == identity && latest.members.isNotEmpty()) {
+                submit(WorkTeamUiCommand.StopTeam(identity,
+                    latest.members.map { it.jobId }.toSet()))
+            } else feedback = "Work 团队任务已变化，请重新检查"
+        }) { Text("确认停止全部") } },
+        dismissButton = { TextButton(onClick = { confirmTeamStop = false }) { Text("取消") } },
+    )
     confirming?.let { (memberId, jobId) ->
         AlertDialog(onDismissRequest = { if (!pending) confirming = null },
             title = { Text("确认停止团队成员") },
