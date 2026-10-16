@@ -203,7 +203,7 @@ class LocalRequirementEvidenceProjectionTest {
             emptyList(), "goal").isEmpty())
     }
 
-    @Test fun manualReviewRequiresExactGoalLinkRevisionAndDigest() { {
+    @Test fun manualReviewRequiresExactGoalLinkRevisionAndDigest() {
         val digest = "a".repeat(64)
         val tasks = listOf(LocalTodoItem("交付报告", "completed"))
         fun goalLink(sequence: Long, path: String = "reports/one.md") = link(
