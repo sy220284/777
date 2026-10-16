@@ -49,6 +49,7 @@ import com.labteto.dshmobile.uicontract.UiMessageHistoryPort
 import com.labteto.dshmobile.uicontract.UiDocumentUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentFormUiPort
 import com.labteto.dshmobile.uicontract.MediaUiPort
+import com.labteto.dshmobile.uicontract.WorkEvidenceUiPort
 import com.labteto.dshmobile.uicontract.UiTranscriptCursor
 import com.labteto.dshmobile.uicontract.WorkConversationUiCommand
 import com.labteto.dshmobile.uicontract.WorkConversationUiPort
@@ -79,6 +80,7 @@ data class V6ConversationPorts(
     val documents: UiDocumentUiPort? = null,
     val forms: UiDocumentFormUiPort? = null,
     val media: MediaUiPort? = null,
+    val evidence: WorkEvidenceUiPort? = null,
     val workMode: () -> Boolean,
     val workModeUpdates: Flow<Boolean>? = null,
 )
@@ -440,6 +442,10 @@ fun V6ConversationScene(
                 }
             }
         }
+        if (part == V6ConversationPart.FULL && workMode && identity != null)
+            ports.evidence?.let { evidence ->
+                V6WorkEvidencePanel(evidence, identity)
+            }
         if (part == V6ConversationPart.FULL || part == V6ConversationPart.REPLY_STATUS) {
             ownerError?.let { SyNote(it) }
             feedback?.let { Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
