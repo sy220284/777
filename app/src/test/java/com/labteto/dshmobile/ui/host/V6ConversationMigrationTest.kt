@@ -11,6 +11,9 @@ import com.labteto.dshmobile.uicontract.SettingsUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentFormUiPort
 import com.labteto.dshmobile.uicontract.WorkEvidenceUiPort
+import com.labteto.dshmobile.uicontract.WorkReadUiPort
+import com.labteto.dshmobile.uicontract.WorkPolicyUiPort
+import com.labteto.dshmobile.uicontract.WorkTeamUiPort
 import com.labteto.dshmobile.uicontract.PersonaGalleryUiPort
 import com.labteto.dshmobile.uicontract.PersonaSelectionUiPort
 import com.labteto.dshmobile.uicontract.ChatGroupUiPort
@@ -129,6 +132,24 @@ class V6ConversationMigrationTest {
             forms = formPort, evidence = evidencePort, gallery = galleryPort,
             selection = selectionPort, groups = groupPort, workMode = { false }),
     )
+    private val workReadPort = java.lang.reflect.Proxy.newProxyInstance(
+        WorkReadUiPort::class.java.classLoader, arrayOf(WorkReadUiPort::class.java)
+    ) { _, method, _ -> error("Work Plan queried during renderer registration: ${method.name}") } as WorkReadUiPort
+    private val workPolicyPort = java.lang.reflect.Proxy.newProxyInstance(
+        WorkPolicyUiPort::class.java.classLoader, arrayOf(WorkPolicyUiPort::class.java)
+    ) { _, method, _ -> error("Work Policy queried during renderer registration: ${method.name}") } as WorkPolicyUiPort
+    private val workTeamPort = java.lang.reflect.Proxy.newProxyInstance(
+        WorkTeamUiPort::class.java.classLoader, arrayOf(WorkTeamUiPort::class.java)
+    ) { _, method, _ -> error("Work Team queried during renderer registration: ${method.name}") } as WorkTeamUiPort
+    private fun fullBusinessCandidate() = V6ApplicationScenePack(
+        preferences, settings,
+        V6ConversationPorts(chat, work, drafts, reading, documents = documentPort,
+            forms = formPort, evidence = evidencePort, gallery = galleryPort,
+            selection = selectionPort, groups = groupPort, stories = null,
+            workReads = workReadPort, workPolicy = workPolicyPort,
+            workTeam = workTeamPort, workMode = { true }),
+    )
+
 
     private fun requirements(manifest: UiPackManifest, onlyDeclared: Boolean) =
         UiPackAdmissionRequirements(
@@ -207,6 +228,21 @@ class V6ConversationMigrationTest {
             UiSceneId("chat.gallery"), UiSceneId("route.persona_gallery"),
             UiSceneId("chat.gallery_profile"), UiSceneId("chat.gallery_delete"),
         )
+        assertEquals(expected, candidate.manifest.scenes)
+        assertEquals(expected, candidate.renderers.keys)
+        assertTrue(UiApplicationPackRegistry(listOf(candidate)).select(
+            candidate.manifest.id,
+            requirements(candidate.manifest, onlyDeclared = true),
+        ) is UiApplicationPackAdmission.Admitted)
+        assertTrue(decideApplicationUi(candidate.manifest.id, listOf(candidate),
+            requirements(candidate.manifest, onlyDeclared = false))
+            is LocalApplicationUiDecision.Unavailable)
+    }
+
+    @Test fun workPlanAndTeamHaveRealConditionalRenderers() {
+        val candidate = fullBusinessCandidate()
+        val expected = personaAndGroupCandidate().manifest.scenes +
+            setOf(UiSceneId("work.plan_review"), UiSceneId("work.team"))
         assertEquals(expected, candidate.manifest.scenes)
         assertEquals(expected, candidate.renderers.keys)
         assertTrue(UiApplicationPackRegistry(listOf(candidate)).select(
