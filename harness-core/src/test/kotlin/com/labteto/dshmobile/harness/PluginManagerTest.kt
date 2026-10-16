@@ -418,6 +418,38 @@ class PluginManagerTest {
     }
 
     @Test
+    fun batchRollbackExposesEveryPluginWhoseCleanupFailed() = runTest {
+        var cleanupAttempts = 0
+        val registry = PluginRegistry()
+        val manager = manager(
+            definition("leaky-provider",
+                onInstall = { it.events.register("provider", "staged") },
+                onUninstall = {
+                    if (++cleanupAttempts == 1) error("resource teardown unavailable")
+                    it.events.unregister("provider")
+                }),
+            definition("dependent-broken",
+                dependencies = listOf(PluginDependency("leaky-provider")),
+                onInstall = { error("dependent setup failed") },
+            ),
+            registry = registry,
+        )
+        assertTrue(runCatching { manager.install("dependent-broken") }.isFailure)
+        assertEquals(PluginLifecycleState.FAILED,
+            manager.lifecycleSnapshot("leaky-provider")?.state)
+        assertEquals(PluginLifecycleState.FAILED,
+            manager.lifecycleSnapshot("dependent-broken")?.state)
+        val blocked = registry.context.tools.execute(
+            "unregistered", kotlinx.serialization.json.buildJsonObject { },
+        )
+        assertEquals("TOOL_LIFECYCLE_UNAVAILABLE", blocked.errorCode)
+        assertEquals(listOf("leaky-provider"), manager.recoverFailed("leaky-provider"))
+        assertEquals(2, cleanupAttempts)
+        assertEquals(PluginLifecycleState.ACTIVE,
+            manager.lifecycleSnapshot("leaky-provider")?.state)
+    }
+
+    @Test
     fun failedInstallCleanupBlocksToolsUntilRecoveryRetriesExternalCleanup() = runTest {
         val registry = PluginRegistry()
         var installs = 0
