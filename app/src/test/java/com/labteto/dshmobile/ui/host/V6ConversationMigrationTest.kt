@@ -201,7 +201,7 @@ class V6ConversationMigrationTest {
         assertTrue(rejection is LocalApplicationUiDecision.Unavailable)
         val incompatible = (rejection as LocalApplicationUiDecision.Unavailable).rejection
         assertTrue(incompatible is UiApplicationPackAdmission.Incompatible)
-        assertTrue(UiSceneId("route.settings") in
+        assertTrue(UiSceneId("automation.tasks") in
             (incompatible as UiApplicationPackAdmission.Incompatible).compatibility.missingScenes)
     }
 
@@ -263,6 +263,6 @@ class V6ConversationMigrationTest {
         assertTrue(problem is UiApplicationPackAdmission.Incompatible)
         val missing = (problem as UiApplicationPackAdmission.Incompatible).compatibility.missingScenes
         assertTrue(UiSceneId("conversation.ui_document") in missing)
-        assertTrue(UiSceneId("route.settings") in missing)
+        assertTrue(UiSceneId("automation.tasks") in missing)
     }
 }
