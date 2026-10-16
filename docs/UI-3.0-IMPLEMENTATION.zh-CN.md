@@ -372,3 +372,14 @@ Host 的 `ConversationShellUiPort` 接入重命名与显式置顶；原偏好 St
 **重要安全边界：** 一个 Scene 名称已经登记，说明有实际 Composable/业务 Owner 接线，但 UI 功能等价、权限、状态恢复、可访问性/材质/响应式质量仍需逐项验证。为避免新包在未验收时自动替换现有稳定界面，V6 全包的 `requiredCapabilities` 现增加独立 `v6.migration.accepted`，生产 Host 在未验收前不得授予，继续使用 `legacy-v6-shell`。注册覆盖 100% 不能直接推导发布就绪或可以合并。
 
 **后续阻断与验收：** 最新完整 CI 必须有 Debug/Optimized Kotlin 编译、JVM 单测、Android16/17 仪表与 ARM64 构建成功；真实 Owner 操作需要 E2E 验证，尤其 Session 切换、模型与媒体消费、第三方工具、工作区跨进程恢复；全部质量签收后才允许解除门禁。当前仍记录未通过或未取得证明的验收项，保持 Draft。
+
+
+## 2026-10-16 源码动作矩阵清零与原 UI 核心等价修复
+
+- **动作矩阵：** 保留 LocalUiSceneCatalog 78 Scene、173 Action 原总数；173 条现在均在 `docs/UI-SCENE-MATRIX.json` 指向源码中的 Host/Feature Owner 与具体回执。发现 7 条只读费用/用量页面被机械标记为 `edit_owner_configuration`，已纠正为真实的查看/筛选/刷新动作。**173 条全部保持 PENDING_EVIDENCE；没有 Android E2E + 重启恢复可验证证据，VERIFIED=0**。
+- **原功能等价专项：** `settings.model_performance` 不能被用量页替代。现有 `ModelPerformanceUiPort` + 原 App `LocalModelPerformanceControls/Store` 提供 CUSTOM/DEFAULT/FAST/LOW/DEEP/MAX 推理上限和 1.00–2.00 温度上限，独立 V6 Render、双向写入；`settings.pricing` 使用 `PricingUiPort` + 原 `LocalSettingsDataFacade/DeepSeekPricingRepository` 显示官方峰谷费率、缓存更新时间、网络刷新错误，未改写真实计费流水。新增对应纯 JVM 测试。
+- **工作区导出：** `FilesUiPort.exportWorkspaceFile` 由原 `LocalSessionFilesRuntime` 与 `LocalWorkspace` 负责流复制，严格限在 workspace canonicalRoot，拒绝绝对、遍历和 symlink 路径。V6 Workspace 使用 Android SAF `CreateDocument` 保存后允许用户主动分享或打开 URI，绝不将原 App 私有文件路径直接传递外部应用。新增文件字节一致性与路径拒绝三项 JVM 回归。
+- **通知会话回到聊天：** MainActivity 原 `EXTRA_LOCAL_SESSION_ID` 经 AppRoot 转交 Host。在完整 UI Pack 激活时等待非加载 Session Owner 目录，验证本地目标存在，调用 `SessionUiCommand.Open`，然后导航 `route.home`；错误时明确提示，不重发消息或工具。Legacy 未改变。注意 UI Host 整包仍有 `v6.migration.accepted` 门禁。
+- **此前完整 CI #38853500175：** JVM/ARM64/x86 因 V6 `send.enabled` / `UiMediaAsset.kind` Kotlin 错误失败，已按 Owner API 修复。Android 16/17 该批未验证 App 业务，不能签收。最新 HEAD 的完整 Actions 结果仍需另核，不用旧批次绿色误报。
+
+**仍未签收：** 单包全场景能力等价、旧 Legacy Shell 薄化/退场、173 条动作真实 E2E 与跨进程恢复、Android16/17、视觉/无障碍、媒体/文件分享授权，均按原 R4 门禁进行；不能因源码目录全覆盖直接解除生产隔离。
