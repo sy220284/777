@@ -100,6 +100,15 @@ class V6ApplicationScenePack(
         setOf(UiSceneId("route.workspace"),UiSceneId("workspace.preview")) else emptySet()
     private val secondaryMedia = if (secondary?.media != null && secondary.settings != null)
         setOf(UiSceneId("media.creation"),UiSceneId("media.result")) else emptySet()
+    private val secondaryAutomations = if (secondary?.automation != null)
+        setOf("route.tasks","automation.tasks","automation.editor",
+            "automation.persona_interaction").map(::UiSceneId).toSet() else emptySet()
+    private val secondaryShell = if (secondary?.sessions != null)
+        setOf("shell.new_session","shell.onboarding","shell.empty").map(::UiSceneId).toSet() else emptySet()
+    private val secondarySearch = if (secondary?.sessions != null && secondary.transcript != null)
+        setOf(UiSceneId("shell.search")) else emptySet()
+    private val shellErrorScene = if (conversations != null)
+        setOf(UiSceneId("shell.error")) else emptySet()
 
 
     override val manifest = UiPackManifest(
@@ -109,7 +118,8 @@ class V6ApplicationScenePack(
             evidenceScene + personaScene + groupScenes + archiveScenes +
             planScene + teamScene + settingsSuite + updateScene +
             messageActionScenes + suggestionsScenes + steeringScene +
-            secondaryTools + secondaryWorkspace + secondaryMedia,
+            secondaryTools + secondaryWorkspace + secondaryMedia +
+            secondaryAutomations + secondaryShell + secondarySearch + shellErrorScene,
         requiredCapabilities = buildSet {
             if (conversations != null) {
                 addAll(setOf("chat.send_text", "work.send_text", "chat.edit", "chat.regenerate",
@@ -137,6 +147,28 @@ class V6ApplicationScenePack(
             })
         }
         secondary?.let { owners ->
+            owners.automation?.let { tasks ->
+                secondaryAutomations.forEach { id ->
+                    put(id, UiSceneRenderer { scope ->
+                        V6AutomationScene(tasks, id, onBack = { scope.onBack(); Unit })
+                    })
+                }
+            }
+            owners.sessions?.let { sessions ->
+                secondaryShell.forEach { id ->
+                    put(id, UiSceneRenderer { scope ->
+                        V6SessionShellScene(id, sessions, onNavigate = scope.onNavigate,
+                            onBack = { scope.onBack(); Unit })
+                    })
+                }
+                owners.transcript?.let { transcript ->
+                    put(UiSceneId("shell.search"), UiSceneRenderer { scope ->
+                        V6GlobalHistorySearchScene(sessions, transcript,
+                            onOpen = { scope.onNavigate(UiSceneId("route.home")); Unit },
+                            onBack = { scope.onBack(); Unit })
+                    })
+                }
+            }
             owners.tools?.let { tools ->
                 secondaryTools.forEach { id ->
                     put(id, UiSceneRenderer { scope ->
@@ -166,6 +198,11 @@ class V6ApplicationScenePack(
                 }
         }
         conversations?.let { owners ->
+            put(UiSceneId("shell.error"), UiSceneRenderer { scope ->
+                V6ShellErrorScene(owners,
+                    onDiagnostics = { scope.onNavigate(UiSceneId("settings.diagnostics")) },
+                    onBack = { scope.onBack(); Unit })
+            })
             listOf(
                 "conversation.message_actions" to V6MessageOperation.ACTIONS,
                 "conversation.edit" to V6MessageOperation.EDIT,
