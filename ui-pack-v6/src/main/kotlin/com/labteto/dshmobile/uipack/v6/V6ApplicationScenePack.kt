@@ -227,7 +227,9 @@ class V6ApplicationScenePack(
                     put(id, UiSceneRenderer { scope ->
                         V6ToolsManagementScene(id, tools,
                             onNavigate = scope.onNavigate,
-                            onBack = { scope.onBack(); Unit })
+                            onBack = { scope.onBack(); Unit },
+                            work = conversations?.work,
+                            drafts = conversations?.drafts)
                     })
                 }
             }
