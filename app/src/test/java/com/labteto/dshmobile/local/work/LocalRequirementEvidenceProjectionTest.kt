@@ -64,6 +64,16 @@ class LocalRequirementEvidenceProjectionTest {
             localWorkFileSha256(root, "report.md")!!))
     }
 
+    @Test fun evidenceReferenceCanNeverResolveThroughAnAlias() {
+        val root = temp.newFolder("evidence-link-alias")
+        val actual = File(root, "source.txt").apply { writeText("trusted") }
+        val alias = File(root, "reference.txt")
+        java.nio.file.Files.createSymbolicLink(alias.toPath(), actual.toPath())
+        val digest = localWorkFileSha256(root, "source.txt")!!
+        assertFalse(preparedRequirementEvidenceVersionMatches(root, "reference.txt", digest))
+        assertTrue(preparedRequirementEvidenceVersionMatches(root, "source.txt", digest))
+    }
+
     @Test fun archivedEvidenceReadsCurrentFileWithoutRecentArtifactProjection() {
         val root = temp.newFolder("workspace")
         val file = File(root, "reports/one.md").also { it.parentFile.mkdirs() }
