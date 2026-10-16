@@ -83,6 +83,30 @@ class UiDocumentTest {
             .problems.contains("chart_values"))
     }
 
+    @Test fun userTextEditVersionsNestedTextWithoutModifyingActionsOrApprovals() {
+        val actions = listOf(UiDocumentAction.SendUserInput("send", "Question", emptyList()))
+        val original = document(listOf(
+            UiDocumentNode.Column("container", listOf(
+                UiDocumentNode.Disclosure("details", "Details",
+                    listOf(UiDocumentNode.Text("editable", "old"))),
+                UiDocumentNode.Button("button", "Action", "send"),
+            )),
+        ), actions)
+        val changed = original.withUserEditedText("editable", "user-written")
+        assertTrue(changed != null)
+        assertTrue(changed!!.revision == 1L)
+        assertTrue(changed.actions == original.actions)
+        assertTrue(changed.fallbackText.contains("用户修改"))
+        val column = changed.nodes.single() as UiDocumentNode.Column
+        val disclosure = column.children.first() as UiDocumentNode.Disclosure
+        assertTrue((disclosure.children.single() as UiDocumentNode.Text).text == "user-written")
+        assertTrue(original.withUserEditedText("button", "cannot-rewrite-button") == null)
+        assertTrue(original.withUserEditedText("missing", "x") == null)
+        assertTrue(original.withUserEditedText("editable", "x".repeat(16_385)) == null)
+        assertTrue(original.copy(documentId = "work-live:run").withUserEditedText("editable", "x") == null)
+        assertTrue(original.copy(revision = Long.MAX_VALUE).withUserEditedText("editable", "x") == null)
+    }
+
     @Test fun patchesCannotCrossMessagesOrApplyToAnOldRevision() {
         val current = document(listOf(UiDocumentNode.Text("text", "old")), emptyList())
         val updated = current.copy(revision = 1, nodes = listOf(UiDocumentNode.Text("text", "new")))
