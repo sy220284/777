@@ -32,6 +32,8 @@ class LocalWorkEvidenceControllerTest {
             ) = com.labteto.dshmobile.uicontract.UiWorkArtifactInspectionReceipt.Failed(null)
             override suspend fun submit(command: com.labteto.dshmobile.uicontract.LinkWorkEvidenceReferenceCommand) =
                 com.labteto.dshmobile.uicontract.UiCommandReceipt.NotAdmitted
+            override suspend fun review(command: com.labteto.dshmobile.uicontract.ReviewWorkEvidenceCommand) =
+                com.labteto.dshmobile.uicontract.UiCommandReceipt.NotAdmitted
         },
         workState = MutableStateFlow(LocalWorkUiState(sessionId = "session")),
         workspaceFiles = { emptyList() }, conversationFiles = { error("not used") }, previewWorkspaceFile = { error("not used") },
