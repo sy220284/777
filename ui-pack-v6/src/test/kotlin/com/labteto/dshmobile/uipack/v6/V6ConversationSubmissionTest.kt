@@ -115,6 +115,33 @@ class V6ConversationSubmissionTest {
         assertTrue(loaded.hasOlder)
     }
 
+    @Test fun remainingHistoryCanResumeFromTheOwnerIssuedCursor() = runBlocking {
+        var calls = 0
+        val owner = object : UiMessageHistoryPort {
+            override suspend fun messagePage(sessionId: String, cursor: UiTranscriptCursor?,
+                limit: Int): UiMessagePage {
+                calls++
+                return when ((cursor as? TestCursor)?.page ?: 0) {
+                    0 -> UiMessagePage(listOf(message("older-1")), TestCursor(1))
+                    1 -> UiMessagePage(listOf(message("older-2")), TestCursor(2))
+                    2 -> UiMessagePage(listOf(message("exact")), null)
+                    else -> error("Unexpected pagination beyond target")
+                }
+            }
+        }
+        val first = locateV6HistoryAnchor(owner, "s1", listOf(message("hot")),
+            null, true, "exact", 2)
+        assertFalse(first.found)
+        assertEquals(TestCursor(2), first.nextCursor)
+        val continued = locateV6HistoryAnchor(owner, "s1", first.messages,
+            first.nextCursor, first.hasOlder, "exact", 2)
+        assertTrue(continued.found)
+        assertFalse(continued.hasOlder)
+        assertEquals(listOf("exact", "older-2", "older-1", "hot"),
+            continued.messages.map { it.id })
+        assertEquals(3, calls)
+    }
+
     @Test fun historyAnchorBudgetDoesNotPretendTargetWasFound() = runBlocking {
         var calls = 0
         val owner = object : UiMessageHistoryPort {

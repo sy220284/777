@@ -193,6 +193,7 @@ fun V6ConversationScene(
     val messages = older.filterNot { it.id in seen } + hot
     val ids = messages.map { it.id }.toSet()
     var anchorRestored by remember(identity) { mutableStateOf(false) }
+    var pendingAnchorId by remember(identity) { mutableStateOf<String?>(null) }
 
     fun show(receipt: UiCommandReceipt) { feedback = describeV6ConversationReceipt(receipt) }
 
@@ -251,8 +252,14 @@ fun V6ConversationScene(
                     cursor = restoreCursor
                     hasOlder = more
                 }
-                if (restored.none { it.id == targetMessageId })
-                    feedback = "目标消息超出单次历史定位范围或已失效，请使用更精确的检索"
+                if (restored.none { it.id == targetMessageId }) {
+                    if (more) {
+                        pendingAnchorId = targetMessageId
+                        feedback = "目标消息超过首批历史定位预算，可选择继续定位"
+                    } else {
+                        feedback = "未找到原消息，可能已被删除或版本已变化"
+                    }
+                }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { feedback = failure.message ?: "无法读取目标历史消息" }
             finally { loadingHistory = false }
@@ -277,11 +284,11 @@ fun V6ConversationScene(
         )
         anchorRestored = true
     }
-    LaunchedEffect(identity?.sessionId, anchorRestored, messages, part) {
+    LaunchedEffect(identity?.sessionId, anchorRestored, messages, part, pendingAnchorId) {
         if (part != V6ConversationPart.FULL && part != V6ConversationPart.TIMELINE)
             return@LaunchedEffect
         val sid = identity?.sessionId ?: return@LaunchedEffect
-        if (!anchorRestored) return@LaunchedEffect
+        if (!anchorRestored || pendingAnchorId != null) return@LaunchedEffect
         snapshotFlow {
             val msg = list.layoutInfo.visibleItemsInfo.firstOrNull { item ->
                 (item.key as? String)?.removePrefix("message:") in ids &&
@@ -295,6 +302,44 @@ fun V6ConversationScene(
         }.collect { anchor ->
             if (anchor.messageId != null || anchor.followingTail)
                 ports.reading.rememberAnchor(sid, anchor)
+        }
+    }
+
+    fun continueAnchorSearch() {
+        val target = identity ?: return
+        val messageId = pendingAnchorId ?: return
+        val owner = ports.history ?: return
+        if (loadingHistory || !hasOlder) return
+        loadingHistory = true
+        scope.launch {
+            try {
+                val loaded = locateV6HistoryAnchor(owner, target.sessionId, messages,
+                    cursor, hasOlder, messageId, 25)
+                val active = if (workMode) ports.work.snapshot().identity else ports.chat.snapshot().identity
+                if (active != target || pendingAnchorId != messageId) return@launch
+                val nextMessages = loaded.messages
+                if (nextMessages != messages) {
+                    older = nextMessages.filterNot { it.id in seen }
+                    cursor = loaded.nextCursor
+                    hasOlder = loaded.hasOlder
+                }
+                if (loaded.found) {
+                    // Do not clear the pending anchor until after scrolling: otherwise
+                    // the viewport observer could overwrite it with the previous position.
+                    androidx.compose.runtime.withFrameNanos { }
+                    val offset = if (loaded.hasOlder) 1 else 0
+                    list.scrollToItem(nextMessages.indexOfFirst { it.id == messageId } + offset)
+                    pendingAnchorId = null
+                    feedback = null
+                } else if (!loaded.hasOlder) {
+                    pendingAnchorId = null
+                    feedback = "已检索可用历史，目标消息不存在或已失效"
+                } else {
+                    feedback = "仍未定位到目标；可继续读取下一批历史"
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { feedback = failure.message ?: "继续定位失败" }
+            finally { loadingHistory = false }
         }
     }
 
@@ -452,6 +497,12 @@ fun V6ConversationScene(
                 else Modifier.fillMaxSize()).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (pendingAnchorId != null && hasOlder) item(key = "anchor-search") {
+                SyButton("继续定位原消息", { continueAnchorSearch() },
+                    enabled = !loadingHistory && identity != null,
+                    style = SyButtonStyle.SECONDARY)
+                SyNote("长历史按批次读取，不会把未命中的消息冒充已定位")
+            }
             if (ports.history != null && hasOlder) item(key = "older") {
                 SyButton(if (loadingHistory) "读取中" else "加载更早消息",
                     { loadOlder() }, enabled = !loadingHistory && identity != null,
