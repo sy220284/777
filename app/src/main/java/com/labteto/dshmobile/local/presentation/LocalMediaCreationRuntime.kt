@@ -183,7 +183,10 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     fun videoFile(task: LocalMediaVideoTask): File? = store.file(task.fileName)
     suspend fun removeResult(id: String) {
         synchronized(downloads) { downloads[id] }?.cancelAndJoin()
-        withContext(Dispatchers.IO) { store.remove(id) }
+        withContext(Dispatchers.IO) {
+            store.remove(id)
+            api.forgetGeneratedVideoProgress(id)
+        }
     }
     suspend fun removeMediaFamily(id: String) {
         synchronized(downloads) { downloads[id] }?.cancelAndJoin()
@@ -375,7 +378,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         var downloaded: File? = null
         var committed = false
         try {
-            downloaded = api.downloadGeneratedVideo(url)
+            downloaded = api.downloadGeneratedVideo(url, id)
             val file = downloaded
             store.updateVideo(id) { it.copy(fileName = file.name, deliveryPhase = LocalMediaDeliveryPhase.SAVED, lastError = null) }
             committed = true

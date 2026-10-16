@@ -208,8 +208,8 @@
       "task": "动态图片/音频/视频状态/预览/保存",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "MEDIA_RESULTS 本地模板从真实 Media Owner 构造文档节点。\n2026-10-16 本轮源代码：V6 的媒体卡现在都监听 Media Owner 状态变化；音频异步 prepare、播放器销毁释放；导出沿用原文件实际已识别的后缀。\n2026-10-16 功能代码补充：原 V6 经 SAF CreateDocument 导出媒体时失败/取消后尝试移除新建的不完整目标文件；清理失败显式提示，避免损坏文件被误报为已保存。\n2026-10-16 审计修复：V6 音频分开准备、真实失败和显式重新加载，释放替换播放器。 最终 SHA CI 待核对，仍不视为完整验收。\n2026-10-16 交互回复与渐进成果闭环代码：V6 补齐 MEDIA_RESULTS 本地入口，与  共用原 Media Owner 实际结果及受控导出。 2026-10-16 续：V6MediaScene 现复用 V6DocumentMediaNode 与 MediaUiPort.assetForSession/exportToSessionAsset，在媒体成果页显示真实图片音频视频与 Android 用户选择位置的安全导出。不支持未获会话归属的远程资产自动下载。仍需远程合法下载及中断恢复验收。 2026-10-16：工作区文件经 Android SAF 导出并分享/外部打开；文件读取只由 Files Owner 在本地 Workspace 沙箱根内流式处理，防止借用共享存储白名单外泄。",
-      "remaining": "仍缺 Media Owner 授权远程成果下载、断点/版本恢复和更多容器播放的代码与状态持久化回归；不得自动重发可能付费的生成。"
+      "implemented": "MEDIA_RESULTS 本地模板从真实 Media Owner 构造文档节点。\n2026-10-16 本轮源代码：V6 的媒体卡现在都监听 Media Owner 状态变化；音频异步 prepare、播放器销毁释放；导出沿用原文件实际已识别的后缀。\n2026-10-16 功能代码补充：原 V6 经 SAF CreateDocument 导出媒体时失败/取消后尝试移除新建的不完整目标文件；清理失败显式提示，避免损坏文件被误报为已保存。\n2026-10-16 审计修复：V6 音频分开准备、真实失败和显式重新加载，释放替换播放器。 最终 SHA CI 待核对，仍不视为完整验收。\n2026-10-16 交互回复与渐进成果闭环代码：V6 补齐 MEDIA_RESULTS 本地入口，与  共用原 Media Owner 实际结果及受控导出。 2026-10-16 续：V6MediaScene 现复用 V6DocumentMediaNode 与 MediaUiPort.assetForSession/exportToSessionAsset，在媒体成果页显示真实图片音频视频与 Android 用户选择位置的安全导出。不支持未获会话归属的远程资产自动下载。仍需远程合法下载及中断恢复验收。 2026-10-16：工作区文件经 Android SAF 导出并分享/外部打开；文件读取只由 Files Owner 在本地 Workspace 沙箱根内流式处理，防止借用共享存储白名单外泄。\n2026-10-16 本批：Media Owner 下载已生成视频改为同任务 ID 的非计费 HTTPS GET，持久片段+URL SHA256+强 ETag 在进程重建后读取并用 Range/If-Range 断点续传；HTTP 206 严核 Content-Range/总长度/版本；HTTP 200 改版时从零覆盖旧片段，流式取消/超限/短体保留可核对断点，成功后同目录原子提交到唯一文件。删除媒体时清理下载片段，原付费任务只查状态绝不重发。新增冷恢复、强版本校验、无效 Range/全量更新 JVM 测试源码。",
+      "remaining": "视频断点续传和恢复字节校验已写入代码，仍待编译/单测、更多视频容器解码以及远端媒体交付/权限双向版本核验；不能仅以请求 206 即认作成功。"
     },
     {
       "id": "S4-03",

@@ -11,6 +11,8 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -163,40 +165,84 @@ internal class LocalMediaApiClient @Inject constructor(
         }
     }
 
-    suspend fun downloadGeneratedVideo(link: String): File = withContext(Dispatchers.IO) {
+
+    /**
+     * Download an already billed, completed provider result. Reuses the exact immutable provider
+     * task identity; the first request and every resumed request are GET only.
+     * A strong ETag + byte Content-Range are mandatory for append. Changed versions start anew.
+     */
+    suspend fun downloadGeneratedVideo(link: String, taskId: String): File = withContext(Dispatchers.IO) {
         val uri = java.net.URI(link)
         require(uri.scheme.equals("https", true) && uri.userInfo == null &&
             !uri.host.isNullOrBlank() && uri.port == -1) { "仅支持安全 HTTPS 视频地址" }
-        val request = Request.Builder().url(link).get().build()
+        require(taskId.matches(Regex("[A-Za-z0-9_-]{1,128}"))) { "视频任务身份无效" }
+        val directory = File(context.filesDir, "media-studio").apply { mkdirs() }
+        val partial = File(directory, ".video-$taskId.part")
+        val checkpoint = File(directory, ".video-$taskId.checkpoint")
+        val fingerprint = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(link.toByteArray()).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        val resume = localVideoResumeCheckpoint(partial, checkpoint, fingerprint)
+        val request = Request.Builder().url(link).get().apply {
+            if (resume != null) {
+                header("Range", "bytes=${resume.offset}-")
+                header("If-Range", resume.etag)
+            }
+        }.build()
         withCancellableHttpResponse(mediaHttp.newCall(request)) { response ->
-            check(response.isSuccessful && response.request.url.isHttps) { "视频下载失败" }
-            val body = response.body ?: error("视频下载响应为空")
-            val mime = body.contentType()?.toString()?.substringBefore(';')?.lowercase()
+            check(response.request.url.isHttps) { "视频下载重定向不安全" }
+            val mime = response.body?.contentType()?.toString()?.substringBefore(';')?.lowercase()
             require(mime == null || mime in setOf("video/mp4", "application/octet-stream")) {
-                "生成视频返回了不支持的格式"
+                "视频响应类型不匹配"
             }
-            require(body.contentLength() <= 200_000_000L) { "视频超过本地保存上限" }
-            val file = outputFile("mp4")
-            try {
-                var count = 0L
-                body.byteStream().use { input ->
-                    file.outputStream().use { output ->
-                        val buffer = ByteArray(16_384)
-                        while (true) {
-                            val n = input.read(buffer)
-                            if (n < 0) break
-                            count += n
-                            require(count <= 200_000_000L) { "视频超过本地保存上限" }
-                            output.write(buffer, 0, n)
-                        }
+            val body = response.body ?: error("视频下载响应为空")
+            val transfer = localVideoTransferPlan(
+                resume, response.code, response.header("ETag"),
+                response.header("Content-Range"), body.contentLength(),
+            )
+            if (!transfer.append) {
+                if (partial.exists()) check(partial.delete()) { "旧视频片段无法删除，已中止保存" }
+                if (checkpoint.exists()) check(checkpoint.delete()) { "旧视频断点无法删除" }
+            }
+            if (transfer.etag != null) {
+                checkpoint.writeText("$fingerprint\n${transfer.etag}\n")
+            } else if (checkpoint.exists()) {
+                check(checkpoint.delete()) { "不可验证的视频断点元数据无法清除" }
+            }
+            var downloaded = if (transfer.append) resume!!.offset else 0L
+            body.byteStream().use { input ->
+                java.io.FileOutputStream(partial, transfer.append).use { output ->
+                    val buffer = ByteArray(16_384)
+                    while (true) {
+                        currentCoroutineContext().ensureActive()
+                        val n = input.read(buffer)
+                        if (n < 0) break
+                        downloaded += n
+                        require(downloaded <= 200_000_000L) { "视频超过本地保存上限" }
+                        output.write(buffer, 0, n)
                     }
+                    output.fd.sync()
                 }
-                require(file.length() > 0) { "视频下载为空" }
-                file
-            } catch (error: Throwable) {
-                file.delete()
-                throw error
             }
+            check(downloaded > 0L) { "视频下载为空" }
+            check(transfer.expectedLength == null || downloaded == transfer.expectedLength) {
+                "视频字节长度不完整，原断点保留，未生成可见成果"
+            }
+            val target = outputFile("mp4")
+            java.nio.file.Files.move(
+                partial.toPath(), target.toPath(), java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+            )
+            if (checkpoint.exists()) check(checkpoint.delete()) { "已完成视频的断点元数据清理失败" }
+            target
+        }
+    }
+
+    /** User deletion invalidates a persisted transfer; it never starts another provider call. */
+    fun forgetGeneratedVideoProgress(taskId: String) {
+        require(taskId.matches(Regex("[A-Za-z0-9_-]{1,128}")))
+        val directory = File(context.filesDir, "media-studio")
+        listOf(".video-$taskId.part", ".video-$taskId.checkpoint").forEach { name ->
+            val file = File(directory, name)
+            if (file.exists()) check(file.delete()) { "视频临时成果无法清理：$name" }
         }
     }
 
