@@ -441,10 +441,11 @@ fun V6ConversationScene(
                     SyNote(if (info.digestVerified) "当前文件完整性已校验"
                         else "附件完整性尚未确认，请重新检查")
                     val preview = info.preview
+                    val verifiedMedia = info.media?.takeIf { info.digestVerified }
                     when {
-                        info.media != null && info.digestVerified ->
+                        verifiedMedia != null ->
                             UiAttachmentMediaViewer(
-                                media = info.media,
+                                media = verifiedMedia,
                                 modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp),
                             )
                         preview != null -> Text(preview)
