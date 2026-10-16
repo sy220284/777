@@ -266,6 +266,7 @@ internal fun LocalApplicationUiHost(
             var notificationError by remember(packId) {
                 mutableStateOf<String?>(null)
             }
+            val notificationUnconfirmed = stringResource(R.string.notification_session_open_unconfirmed)
             LaunchedEffect(packId, notificationSessions, notificationSessionId) {
                 val target = notificationSessionId
                 val sessions = notificationSessions
@@ -288,7 +289,7 @@ internal fun LocalApplicationUiHost(
                             sessions.snapshots.first { !it.loading && it.identity?.sessionId == target }
                         }
                         if (opened != null) notificationHomeTarget = target
-                        else notificationError = "通知会话切换未确认，请从会话列表重新打开"
+                        else notificationError = notificationUnconfirmed
                     } else {
                         notificationError = "当前无法打开通知指定的本地会话"
                     }
