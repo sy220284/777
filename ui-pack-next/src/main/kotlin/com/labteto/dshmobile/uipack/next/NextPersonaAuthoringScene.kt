@@ -34,10 +34,6 @@ internal fun NextPersonaAuthoringScene(
     var confirmClose by remember { mutableStateOf(false) }
     var confirmReload by remember { mutableStateOf(false) }
     fun close() { if (dirty) confirmClose = true else onBack() }
-    fun reloadLatest() {
-        if (dirty) confirmReload = true
-        else { initialized = false; editGeneration++; reload++ }
-    }
     BackHandler { if (!busy) close() }
     if (confirmClose) AlertDialog(onDismissRequest = { confirmClose = false },
         title = { Text(stringResource(R.string.next_persona_discard)) },
@@ -58,6 +54,10 @@ internal fun NextPersonaAuthoringScene(
     var feedback by remember(galleryId) { mutableStateOf<String?>(null) }
     var editGeneration by remember(galleryId) { mutableStateOf(0L) }
     var reload by remember(galleryId) { mutableStateOf(0) }
+    fun reloadLatest() {
+        if (dirty) confirmReload = true
+        else { initialized = false; editGeneration++; reload++ }
+    }
     val scope = rememberCoroutineScope()
     val failed = stringResource(R.string.next_persona_save_failed)
     val stale = stringResource(R.string.next_persona_stale)
