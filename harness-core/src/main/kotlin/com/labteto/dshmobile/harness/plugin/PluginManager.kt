@@ -67,6 +67,9 @@ class PluginManager(
         // A failed replacement can still own old resources; explicitly remove them first.
         // A failed installation has no installed instance and can proceed to a new install.
         if (registry.isInstalled(id)) registry.uninstall(id)
+        // Failed installation may leave externally-owned resources after an unsuccessful
+        // compensating uninstall. Retrying that cleanup is mandatory before fresh admission.
+        else registry.cleanupFailed(id)
         val plan = catalog.resolveInstallOrder(listOf(id), installedVersions(), apiVersion)
         val plugins = plan.map(PluginDefinition::create)
         registry.installAll(plugins)
