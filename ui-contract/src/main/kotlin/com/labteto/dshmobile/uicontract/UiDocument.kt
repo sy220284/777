@@ -123,7 +123,7 @@ fun UiDocument.validate(
             is UiDocumentNode.BarChart, is UiDocumentNode.LineChart -> {
                 val chart = when (node) {
                     is UiDocumentNode.BarChart -> Triple(node.title, node.unit, node.points)
-                    is UiDocumentNode.LineChart -> Triple(title, unit, points)
+                    is UiDocumentNode.LineChart -> Triple(node.title, node.unit, node.points)
                     else -> error("unreachable")
                 }
                 val (title, unit, points) = chart
