@@ -68,6 +68,21 @@ class UiDocumentTest {
             .problems.contains("chart_values"))
     }
 
+    @Test fun lineChartsRejectNonfiniteNumbersAndBudgetOverruns() {
+        val trend = document(listOf(UiDocumentNode.LineChart("trend", "观察窗口", "次",
+            listOf(UiChartPoint("早", 1.0), UiChartPoint("晚", 3.0)))), emptyList())
+        assertTrue(trend.validate(budget, emptySet(), null).valid)
+        assertTrue(trend.copy(nodes = listOf(UiDocumentNode.LineChart("trend", "观察窗口", "次",
+            listOf(UiChartPoint("坏", Double.NaN))))).validate(budget, emptySet(), null)
+            .problems.contains("chart_values"))
+        assertTrue(trend.copy(nodes = listOf(UiDocumentNode.LineChart("trend", "观察窗口", "次",
+            List(13) { UiChartPoint("点$it", it.toDouble()) }))).validate(budget, emptySet(), null)
+            .problems.contains("chart_budget"))
+        assertTrue(trend.copy(nodes = listOf(UiDocumentNode.LineChart("trend", "观察窗口", "次",
+            listOf(UiChartPoint("重复", 1.0), UiChartPoint("重复", 2.0))))).validate(budget, emptySet(), null)
+            .problems.contains("chart_values"))
+    }
+
     @Test fun patchesCannotCrossMessagesOrApplyToAnOldRevision() {
         val current = document(listOf(UiDocumentNode.Text("text", "old")), emptyList())
         val updated = current.copy(revision = 1, nodes = listOf(UiDocumentNode.Text("text", "new")))
