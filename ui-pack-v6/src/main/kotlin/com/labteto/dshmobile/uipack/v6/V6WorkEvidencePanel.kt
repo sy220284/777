@@ -14,9 +14,9 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.uicontract.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.collectLatest
 
 /**
  * A change in goal, task list or active Owner binding invalidates any selected requirement.
@@ -68,19 +68,18 @@ fun V6WorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSessionIdentity,
             refresh()
         }
     }
-    // Only while visible: refresh the authoritative Work projection after other tools edit
-    // files, without manufacturing a "verified" result or keeping a background poll alive.
+    // Subscribe only while visible to the original Work/Session Owners. No timer and
+    // no stale health/verification claim from a cached projection.
     LaunchedEffect(port, identity, open) {
         if (!open) return@LaunchedEffect
-        while (true) {
-            delay(30_000L)
-            if (pending) continue
+        port.changes(identity).collectLatest {
+            if (!open || pending) return@collectLatest
             val observedGeneration = generation
             val result = try {
                 withContext(Dispatchers.IO) { port.read(identity) }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { UiWorkEvidenceReadReceipt.Failed(null) }
-            if (!open || pending || observedGeneration != generation) continue
+            catch (failure: Exception) { UiWorkEvidenceReadReceipt.Failed(failure.message) }
+            if (!open || pending || observedGeneration != generation) return@collectLatest
             when (result) {
                 is UiWorkEvidenceReadReceipt.Available -> {
                     if (v6EvidenceSelectionObsolete(snapshot, result.snapshot)) {
@@ -89,7 +88,7 @@ fun V6WorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSessionIdentity,
                         feedback = "Work 目标或任务已变更，已取消旧证据选择"
                     } else if (snapshot?.artifacts != result.snapshot.artifacts ||
                         snapshot?.references != result.snapshot.references) {
-                        inspected = null // Any previously inspected file version is now stale.
+                        inspected = null
                     }
                     snapshot = result.snapshot
                 }
@@ -99,9 +98,8 @@ fun V6WorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSessionIdentity,
                     snapshot = null
                     feedback = "当前会话身份已失效，请返回 Work 后重新打开"
                 }
-                is UiWorkEvidenceReadReceipt.Failed -> {
+                is UiWorkEvidenceReadReceipt.Failed ->
                     feedback = result.message ?: "证据状态无法刷新，现有显示可能已过期"
-                }
             }
         }
     }
