@@ -63,13 +63,13 @@ fun V6WorkPlanScene(
         scope.launch {
             try {
                 val snapshot = withContext(Dispatchers.IO) { read.planForUi(target.sessionId) }
-                if (settings.identity == target) {
+                if (policy.snapshot().identity == target) {
                     plan = snapshot
                     feedback = null
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) {
-                if (settings.identity == target) feedback = failure.message ?: "无法读取工作计划"
+                if (policy.snapshot().identity == target) feedback = failure.message ?: "无法读取工作计划"
             } finally { reading = false }
         }
     }
@@ -134,7 +134,7 @@ fun V6WorkTeamScene(
     var feedback by remember(identity) { mutableStateOf<String?>(null) }
     var output by remember(identity, selected) { mutableStateOf<String?>(null) }
     var confirming by remember(identity) { mutableStateOf<Pair<String,String>?>(null) }
-    var confirmTeamStop by remember(identity) { mutableStateOf(false) }
+    var confirmTeamStop by remember(identity) { mutableStateOf<Set<String>?>(null) }
     var pending by remember(identity) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val member = snapshot.members.firstOrNull { it.id == selected }
@@ -173,7 +173,9 @@ fun V6WorkTeamScene(
         feedback?.let { SyNote(it) }
         if (snapshot.members.isEmpty()) SyNote("当前没有运行中的团队任务")
         if (identity != null && snapshot.members.isNotEmpty())
-            SyButton("停止全部团队任务", { confirmTeamStop = true },
+            SyButton("停止全部团队任务", {
+                confirmTeamStop = snapshot.members.map { it.jobId }.toSet()
+            },
                 enabled = !snapshot.rebuilding && !pending, style = SyButtonStyle.DANGER)
         snapshot.members.forEach { item ->
             SyGlassCard(Modifier.fillMaxWidth()) {
@@ -193,9 +195,27 @@ fun V6WorkTeamScene(
                     latest.members.none { it.id == member.id && it.jobId == member.jobId }) {
                     feedback = "成员任务已变化，请刷新"
                 } else {
-                    val result = team.readOutput(identity, member.id, member.jobId)
-                    feedback = describeV6ConversationReceipt(result.receipt)
-                    output = result.message
+                    val target = identity
+                    val memberId = member.id
+                    val jobId = member.jobId
+                    pending = true
+                    scope.launch {
+                        try {
+                            val result = withContext(Dispatchers.IO) {
+                                team.readOutput(target, memberId, jobId)
+                            }
+                            val current = team.snapshot()
+                            if (current.identity == target &&
+                                current.members.any { it.id == memberId && it.jobId == jobId }) {
+                                feedback = describeV6ConversationReceipt(result.receipt)
+                                output = result.message
+                            }
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (failure: Exception) {
+                            if (team.snapshot().identity == target)
+                                feedback = failure.message ?: "读取团队成员输出失败"
+                        } finally { pending = false }
+                    }
                 }
             }, style = SyButtonStyle.SECONDARY, enabled = !snapshot.rebuilding && !pending)
             output?.let { SyGlassCard(Modifier.fillMaxWidth()) { Text(it) } }
@@ -214,20 +234,22 @@ fun V6WorkTeamScene(
             }, style = SyButtonStyle.DANGER, enabled = !pending && !snapshot.rebuilding)
         }
     }
-    if (confirmTeamStop && identity != null) AlertDialog(
-        onDismissRequest = { if (!pending) confirmTeamStop = false },
-        title = { Text("确认停止整个 Work 团队") },
-        text = { Text("将由 Work Owner 检查全部成员任务身份后停止。此操作可能中断正在进行的工具调用。") },
-        confirmButton = { TextButton(onClick = {
-            confirmTeamStop = false
-            val latest = team.snapshot()
-            if (latest.identity == identity && latest.members.isNotEmpty()) {
-                submit(WorkTeamUiCommand.StopTeam(identity,
-                    latest.members.map { it.jobId }.toSet()))
-            } else feedback = "Work 团队任务已变化，请重新检查"
-        }) { Text("确认停止全部") } },
-        dismissButton = { TextButton(onClick = { confirmTeamStop = false }) { Text("取消") } },
-    )
+    confirmTeamStop?.let { expectedJobs ->
+        if (identity != null) AlertDialog(
+            onDismissRequest = { if (!pending) confirmTeamStop = null },
+            title = { Text("确认停止整个 Work 团队") },
+            text = { Text("确认停止当前 ${expectedJobs.size} 个任务。此操作可能中断正在进行的工具调用。") },
+            confirmButton = { TextButton(onClick = {
+                confirmTeamStop = null
+                val latest = team.snapshot()
+                if (latest.identity == identity &&
+                    latest.members.map { it.jobId }.toSet() == expectedJobs) {
+                    submit(WorkTeamUiCommand.StopTeam(identity, expectedJobs))
+                } else feedback = "Work 团队任务已变化，请重新确认后再停止"
+            }) { Text("确认停止全部") } },
+            dismissButton = { TextButton(onClick = { confirmTeamStop = null }) { Text("取消") } },
+        )
+    }
     confirming?.let { (memberId, jobId) ->
         AlertDialog(onDismissRequest = { if (!pending) confirming = null },
             title = { Text("确认停止团队成员") },
