@@ -8,6 +8,7 @@ import android.os.LocaleList
 import com.labteto.dshmobile.connection.HostsStore
 import androidx.work.WorkManager
 import com.labteto.dshmobile.local.runtime.LocalRuntimeKernel
+import com.labteto.dshmobile.local.presentation.LocalModelPerformanceControls
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.update.UpdateCache
 import dagger.hilt.android.HiltAndroidApp
@@ -36,6 +37,9 @@ class DshApplication : Application() {
         super.onCreate()
         AppLog.configurePersistence(File(filesDir, "diagnostics/app-log.tsv"))
         AppLog.installUnhandledExceptionLogger()
+        // Load the existing on-device Model Owner policy before either Legacy or V6 Pack
+        // renders settings. This is idempotent and does not create a second store.
+        LocalModelPerformanceControls.attach(this)
         clearRetiredApplicationLocale()
         val uiModeManager = getSystemService(UiModeManager::class.java)
         uiModeManager.setApplicationNightMode(
