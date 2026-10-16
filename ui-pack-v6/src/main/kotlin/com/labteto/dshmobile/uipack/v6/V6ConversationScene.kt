@@ -52,6 +52,8 @@ import com.labteto.dshmobile.uicontract.MediaUiPort
 import com.labteto.dshmobile.uicontract.UiTranscriptCursor
 import com.labteto.dshmobile.uicontract.WorkConversationUiCommand
 import com.labteto.dshmobile.uicontract.WorkConversationUiPort
+import com.labteto.dshmobile.uihost.UiSceneNavigationResult
+import com.labteto.dshmobile.uicontract.UiSceneId
 import com.labteto.dshmobile.uihost.rememberUiAttachmentPicker
 import com.shenyan.designsystem.components.SyButton
 import com.shenyan.designsystem.components.SyButtonStyle
@@ -126,6 +128,7 @@ fun V6ConversationScene(
     workMode: Boolean,
     onBack: () -> Unit,
     part: V6ConversationPart = V6ConversationPart.FULL,
+    onNavigate: ((UiSceneId) -> UiSceneNavigationResult)? = null,
 ) {
     val chat by ports.chat.snapshots.collectAsStateWithLifecycle(initialValue = ports.chat.snapshot())
     val work by ports.work.snapshots.collectAsStateWithLifecycle(initialValue = ports.work.snapshot())
@@ -282,6 +285,15 @@ fun V6ConversationScene(
             Text(if (workMode) "Work" else "聊天", style = MaterialTheme.typography.titleLarge)
             SyButton("返回", onBack, style = SyButtonStyle.GHOST)
         }
+        if (docOwner != null && formOwner != null &&
+            (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) &&
+            onNavigate != null) {
+            SyButton("查看会话结构化文档", onClick = {
+                val result = onNavigate(UiSceneId("conversation.ui_document"))
+                if (result !is UiSceneNavigationResult.Changed)
+                    feedback = "文档界面暂不可达，请保留当前消息"
+            }, style = SyButtonStyle.SECONDARY)
+        }
         if (identity == null || status == UiSceneStatus.LOADING) {
             SyNote("会话正在切换，等待 Owner 完成载入")
         } else {
@@ -327,6 +339,16 @@ fun V6ConversationScene(
                                     })
                             }
                         }
+                    }
+                    if (docOwner != null && formOwner != null && onNavigate != null &&
+                        identity != null && message.id == messages.lastOrNull()?.id &&
+                        phase == UiExecutionPhase.IDLE &&
+                        part == V6ConversationPart.FULL) {
+                        SyButton("从这条消息生成结构化内容", onClick = {
+                            val result = onNavigate(UiSceneId("conversation.ui_document_generate"))
+                            if (result !is UiSceneNavigationResult.Changed)
+                                feedback = "结构化文档生成界面暂不可达"
+                        }, style = SyButtonStyle.SECONDARY)
                     }
                     val actionReady = identity != null && phase == UiExecutionPhase.IDLE &&
                         status != UiSceneStatus.LOADING
