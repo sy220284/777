@@ -17,6 +17,19 @@ private const val LOCAL_SUBAGENT_INBOX_CLAIM_VERSION = 1
 private const val MAX_CLAIMED_MESSAGE_IDS = 256
 private const val MAX_TERMINAL_OUTPUT_CHARS = 65_536
 
+/** Only the root run can open a new request slice for waiting children. */
+internal fun canResumeSubagentAtRootSlice(
+    status: String,
+    rootSliceAdmitted: Boolean,
+): Boolean = status != "waiting_slice" || rootSliceAdmitted
+
+/** Writable tools need Lead verification after a crash, never after a pre-admission slice pause. */
+internal fun requiresLeadVerificationForSubagentResume(
+    teamManaged: Boolean,
+    allowMutation: Boolean,
+    status: String,
+): Boolean = teamManaged && allowMutation && status != "waiting_slice"
+
 internal fun localPersistentSubagentId(jobId: String): String =
     "sa-" + jobId.removePrefix("job-").take(24)
 

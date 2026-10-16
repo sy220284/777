@@ -265,7 +265,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
     private fun resumePass(targetSession: String, resumeSlicePaused: Boolean = false) {
         jobs.resumableSnapshots().forEach { snapshot ->
             // Startup/UI rehydration cannot grant new model request slots.
-            if (snapshot.status == "waiting_slice" && !resumeSlicePaused) return@forEach
+            if (!canResumeSubagentAtRootSlice(snapshot.status, resumeSlicePaused)) return@forEach
             val payload = decodePayload(snapshot, targetSession) ?: return@forEach
             val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull ?: targetSession
             if (sessionId != targetSession || jobs.availableSlots() <= 0) return@forEach
@@ -378,8 +378,9 @@ internal class LocalPersistentJobRecoveryCoordinator(
         // to inspect it before reassigning work. A typed local request-slice boundary is
         // reached before provider admission, after the last completed tool checkpoint.
         // The latter resumes only with a newly admitted root Work slice.
-        if (capabilities.teamManaged && capabilities.allowMutation &&
-            snapshot.status != "waiting_slice"
+        if (requiresLeadVerificationForSubagentResume(
+                capabilities.teamManaged, capabilities.allowMutation, snapshot.status,
+            )
         ) {
             jobs.failResumable(
                 snapshot.id,
