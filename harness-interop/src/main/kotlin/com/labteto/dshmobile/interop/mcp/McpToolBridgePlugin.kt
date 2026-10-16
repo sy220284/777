@@ -19,6 +19,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -88,6 +89,9 @@ data class McpServerSnapshot(
     val tools: List<String>,
     val lifecycle: McpServerLifecycle = McpServerLifecycle.REGISTERED,
 )
+
+/** Exact on-demand ping result; never a tool permission or continuous-health claim. */
+enum class McpServerHealth { RESPONDED, BUSY, NOT_CONNECTED, UNCONFIRMED }
 
 /**
  * Bridges HTTP and stdio MCP servers into the native Harness Tool Registry.
@@ -396,6 +400,24 @@ class McpToolBridgePlugin(
 
     suspend fun disconnectFromUi(context: HarnessContext, serverId: String): String =
         disconnect(context, serverId)
+
+    /**
+     * Check a registered server on user request only. The active-call lease prevents
+     * uninstall closing its transport mid-ping. A timeout/remote protocol error is
+     * unconfirmed, not proof of disconnection or permission denial.
+     */
+    suspend fun checkServerHealthFromUi(serverId: String): McpServerHealth {
+        val binding = mutex.withLock { servers[serverId] } ?: return McpServerHealth.NOT_CONNECTED
+        if (!binding.beginCall()) return McpServerHealth.BUSY
+        return try {
+            val received = withTimeoutOrNull(8_000L) { binding.client.ping(); true } == true
+            if (!binding.isAcceptingCalls()) McpServerHealth.BUSY
+            else if (received) McpServerHealth.RESPONDED
+            else McpServerHealth.UNCONFIRMED
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { McpServerHealth.UNCONFIRMED }
+        finally { binding.endCall() }
+    }
 
     suspend fun serverSnapshots(): List<McpServerSnapshot> = mutex.withLock {
         servers.values.map { binding ->
