@@ -179,7 +179,7 @@ fun V6ConversationScene(
         }
     }
 
-    LaunchedEffect(identity?.sessionId, hot.firstOrNull()?.id, anchorRestored, part) {
+    LaunchedEffect(identity, messages.lastOrNull()?.id, status, anchorRestored, part) {
         if (part != V6ConversationPart.FULL && part != V6ConversationPart.TIMELINE)
             return@LaunchedEffect
         val sid = identity?.sessionId ?: return@LaunchedEffect
