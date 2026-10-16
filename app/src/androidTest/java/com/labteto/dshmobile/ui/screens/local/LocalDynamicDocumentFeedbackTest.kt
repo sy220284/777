@@ -81,10 +81,23 @@ class LocalDynamicDocumentFeedbackTest {
             }
         } as MediaUiPort
         val forms = LocalUiDocumentFormState(emptyList()) {}
-        compose.setContent { LocalDynamicDocument(snapshot, UiSessionIdentity("s", "activation", 0, null, null), port, forms, media) }
+        val activeIdentity = mutableStateOf(UiSessionIdentity("s", "activation", 0, null, null))
+        compose.setContent { LocalDynamicDocument(snapshot, activeIdentity.value, port, forms, media) }
         compose.onNodeWithText("Submit choice").performClick()
         compose.onNodeWithText("Continue\nchoice: actual input").assertExists()
         compose.runOnIdle { assertTrue(sent.isEmpty()) }
+
+        // A session activation change must dismiss the old confirmation before it can
+        // dispatch a request against its stale Owner identity.
+        compose.runOnIdle {
+            activeIdentity.value = UiSessionIdentity("s", "reactivated", 1, null, null)
+        }
+        compose.onNodeWithText("Continue\nchoice: actual input").assertDoesNotExist()
+        compose.runOnIdle { assertTrue(sent.isEmpty()) }
+
+        // A fresh confirmation against the new activation still works normally.
+        compose.onNodeWithText("Submit choice").performClick()
+        compose.onNodeWithText("Continue\nchoice: actual input").assertExists()
         compose.onNodeWithText(context.getString(R.string.ui_document_send_confirm)).performClick()
         compose.runOnIdle {
             assertEquals(1, sent.size)
