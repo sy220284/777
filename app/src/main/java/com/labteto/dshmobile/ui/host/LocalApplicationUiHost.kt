@@ -97,6 +97,9 @@ internal object LocalApplicationPackInstallations {
                     authoring = owner.personaAuthoringUiPort,
                     currentPersona = owner.currentPersonaUiPort,
                     replySuggestions = owner.replySuggestionsUiPort,
+                    gallery = owner.personaGalleryUiPort,
+                    selection = owner.personaSelectionUiPort,
+                    portraits = owner.personaPortraitUiPort,
                 ),
             ),
             NextApplicationScenePack(NextApplicationFeaturePorts(
