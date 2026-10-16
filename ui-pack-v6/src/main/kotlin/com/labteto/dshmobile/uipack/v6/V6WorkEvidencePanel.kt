@@ -118,6 +118,48 @@ fun V6WorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSessionIdentity,
                         reference.versionNow != reference.versionAtLink -> R.string.v6_artifact_changed
                         else -> R.string.v6_evidence_source_current
                     }))
+                    val reviewed = snapshot?.reviews?.firstOrNull { it.linkSequence == reference.eventSequence }
+                    Text(when {
+                        reference.versionNow != reference.versionAtLink -> "文件版本已变化，原人工核验不再有效"
+                        reviewed == null -> "尚未进行人工内容核验"
+                        reviewed.approvedByUser -> "用户已确认内容符合（不代表自动测试通过）"
+                        else -> "用户已标记内容不符合要求"
+                    })
+                    if (snapshot?.goalId?.isNotBlank() == true &&
+                        reference.versionNow == reference.versionAtLink) {
+                        listOf(true to "确认内容符合要求", false to "标记内容不符合").forEach { (approved, title) ->
+                            TextButton(onClick = {
+                                if (!pending) {
+                                    val request = ++generation
+                                    pending = true
+                                    scope.launch {
+                                        try {
+                                            val result = port.review(ReviewWorkEvidenceCommand(
+                                                identity, requireNotNull(snapshot?.goalId),
+                                                requirement.index, requirement.text,
+                                                reference.artifactPath, reference.eventSequence,
+                                                reference.versionAtLink, approved,
+                                            ))
+                                            if (request != generation) return@launch
+                                            feedback = when (result) {
+                                                UiCommandReceipt.Accepted -> "已记录用户人工核验，请注意文件后续修改会使该核验失效"
+                                                is UiCommandReceipt.Failed -> result.message ?: unavailable
+                                                else -> "核验未被接受，文件或任务可能已变化"
+                                            }
+                                            if (result == UiCommandReceipt.Accepted) {
+                                                val reread = port.read(identity)
+                                                if (request == generation && reread is UiWorkEvidenceReadReceipt.Available)
+                                                    snapshot = reread.snapshot
+                                            }
+                                        } catch (cancelled: CancellationException) { throw cancelled }
+                                        catch (failure: Exception) {
+                                            if (request == generation) feedback = failure.message ?: unavailable
+                                        } finally { if (request == generation) pending = false }
+                                    }
+                                }
+                            }, enabled = !pending) { Text(title) }
+                        }
+                    }
                 }
             }
             selected?.let { requirement ->
