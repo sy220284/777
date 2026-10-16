@@ -145,6 +145,46 @@ class TaskGraphExecutorTest {
     }
 
     @Test
+    fun failedProgressPersistenceAfterSuccessfulExecutionNeverRetriesTheTool() = runTest {
+        var invocations = 0
+        val failure = runCatching {
+            graph.run(
+                listOf(TaskGraphNode("a", "只读子任务")),
+                maxAttempts = 3,
+                retrySafe = true,
+                onProgress = { event ->
+                    if (event.stage == "验收中") error("durable event append failed")
+                },
+            ) { _, _ ->
+                invocations++
+                "真实执行已成功"
+            }
+        }.exceptionOrNull()
+        assertEquals("durable event append failed", failure?.message)
+        assertEquals(1, invocations)
+    }
+
+    @Test
+    fun failedCompletedEventPersistenceDoesNotReplaySettledNode() = runTest {
+        var invocations = 0
+        val failure = runCatching {
+            graph.run(
+                listOf(TaskGraphNode("a", "已结算工作")),
+                maxAttempts = 3,
+                retrySafe = true,
+                onProgress = { event ->
+                    if (event.stage == "已完成") error("completion event append failed")
+                },
+            ) { _, _ ->
+                invocations++
+                "结果"
+            }
+        }.exceptionOrNull()
+        assertEquals("completion event append failed", failure?.message)
+        assertEquals(1, invocations)
+    }
+
+    @Test
     fun parallelBranchesStayIndependentAndProgressTracksAllSettlements() = runTest {
         val steps = mutableListOf<TaskGraphProgress>()
         val r = graph.run(listOf(TaskGraphNode("one", "一"),

@@ -169,26 +169,37 @@ class TaskGraphExecutor(
                 if (attempt == 1) "执行中" else "重新指派",
                 completed.get(), total, feedback,
             ))
-            try {
-                val prompt = if (attempt == 1) ctx.node.task
-                    else "${ctx.node.task}\n\n上次失败或验收未通过：$feedback。请核查并补足证据。"
-                val output = execute(ctx, prompt)
-                onProgress(TaskGraphProgress(ctx.index, ctx.node.task, "验收中", completed.get(), total))
-                val verdict = accept(ctx, output)
-                if (verdict.accepted) {
-                    val count = completed.incrementAndGet()
-                    onProgress(TaskGraphProgress(ctx.index, ctx.node.task, "已完成", count, total))
-                    return TaskGraphNodeResult(ctx.node, ctx.index, TaskGraphOutcome.COMPLETED,
-                        output = output, attempts = attempt)
-                }
-                feedback = verdict.feedback.ifBlank { "验收未通过" }.take(500)
+            val prompt = if (attempt == 1) ctx.node.task
+                else "${ctx.node.task}\n\n上次失败或验收未通过：$feedback。请核查并补足证据。"
+            val output = try {
+                execute(ctx, prompt)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                // Terminal errors (including unknown side effects) must escape immediately.
                 if (!retrySafe || !shouldRetryError(error)) throw error
                 feedback = (error.message ?: error::class.java.simpleName).take(500)
+                continue
             }
+            // Progress is written to Work's authoritative EventLog. A failed
+            // durable append is a terminal persistence error, never a reason
+            // to re-execute a tool that may have already succeeded.
+            onProgress(TaskGraphProgress(ctx.index, ctx.node.task, "验收中", completed.get(), total))
+            val verdict = try {
+                accept(ctx, output)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (!retrySafe || !shouldRetryError(error)) throw error
+                feedback = (error.message ?: error::class.java.simpleName).take(500)
+                continue
+            }
+            if (verdict.accepted) {
+                val count = completed.incrementAndGet()
+                onProgress(TaskGraphProgress(ctx.index, ctx.node.task, "已完成", count, total))
+                return TaskGraphNodeResult(ctx.node, ctx.index, TaskGraphOutcome.COMPLETED,
+                    output = output, attempts = attempt)
+            }
+            feedback = verdict.feedback.ifBlank { "验收未通过" }.take(500)
         }
         val count = completed.incrementAndGet()
         onProgress(TaskGraphProgress(ctx.index, ctx.node.task, "受阻", count, total, feedback))
