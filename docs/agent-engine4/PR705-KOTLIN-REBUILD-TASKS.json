@@ -1,0 +1,350 @@
+{
+  "title": "777 Agent Engine 4.0 / #705 Kotlin 重构执行台账",
+  "based_on_v3": "docs/agent-engine4/PR705-KOTLIN-REBUILD-EXECUTION-20261016.md",
+  "baseline": {
+    "pr": 705,
+    "branch": "feat/ui-r4-pluggable",
+    "head_at_planning": "cd0dbc0604996cf0b64fee8fd5a484dbbed42b85",
+    "base_at_planning": "e03573fed4a3a77f9f6db850fb0522e367a678d2"
+  },
+  "rules": {
+    "protected": [
+      "App Shell/V6 UI",
+      "ChatFeature domain logic",
+      "user data, credentials and history"
+    ],
+    "backend": "Kotlin native",
+    "tests": "JVM/Compose/contract/CI; no manual device validation milestone",
+    "status_definition": "仅实际生产代码、测试、最终SHA验证后记为完成"
+  },
+  "tasks": [
+    {
+      "id": "AE4V3-01",
+      "title": "范围冻结与保护域基线",
+      "area": "docs/ARCHITECTURE.md, Feature public Ports",
+      "depends_on": [],
+      "status": "in_progress",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": "完成PR基线/边界核查并修复工作流准入缺陷，架构完整审计仍待继续"
+    },
+    {
+      "id": "AE4V3-02",
+      "title": "真实入口与旧实现去留盘点",
+      "area": "Work/Auto/Tools/Settings/Shared/Platform",
+      "depends_on": [
+        "AE4V3-01"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-03",
+      "title": "复杂任务行为基准",
+      "area": "Task trace, tools, recovery, chat regression",
+      "depends_on": [
+        "AE4V3-01",
+        "AE4V3-02"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-04",
+      "title": "Run/Turn/Goal/Tool typed contract",
+      "area": "harness-core and shared API",
+      "depends_on": [
+        "AE4V3-02",
+        "AE4V3-03"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-05",
+      "title": "Session/EventLog/持久化重构",
+      "area": "harness-core/session, app/local/session",
+      "depends_on": [
+        "AE4V3-04"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-06",
+      "title": "Run Owner/Kernel/RecoveryLease",
+      "area": "app/local/runtime",
+      "depends_on": [
+        "AE4V3-04",
+        "AE4V3-05"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-07",
+      "title": "Model adapters/streaming/retry/account",
+      "area": "app/local/model",
+      "depends_on": [
+        "AE4V3-04",
+        "AE4V3-06"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-08",
+      "title": "Kotlin Turn/Step/Steering",
+      "area": "harness-core/agent, app/local/work",
+      "depends_on": [
+        "AE4V3-05",
+        "AE4V3-06",
+        "AE4V3-07"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-09",
+      "title": "Tool admission/execution/settlement",
+      "area": "harness-core/tools, LocalToolExecutionCoordinator",
+      "depends_on": [
+        "AE4V3-05",
+        "AE4V3-06",
+        "AE4V3-08"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-10",
+      "title": "ToolsFeature/MCP/Skill management",
+      "area": "app/local/tools",
+      "depends_on": [
+        "AE4V3-09"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-11",
+      "title": "GoalDriver+Verifier 任务闭环",
+      "area": "app/local/work, shared Agent",
+      "depends_on": [
+        "AE4V3-08",
+        "AE4V3-09"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-12",
+      "title": "WorkFeature 全域业务",
+      "area": "app/local/work",
+      "depends_on": [
+        "AE4V3-11"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-13",
+      "title": "Context/Memory/Compaction",
+      "area": "app/local/model, app/local/context, app/local/memory",
+      "depends_on": [
+        "AE4V3-05",
+        "AE4V3-07",
+        "AE4V3-11"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-14",
+      "title": "TaskGraph/Agent Team",
+      "area": "app/local/work/LocalAgentTeamRuntime",
+      "depends_on": [
+        "AE4V3-09",
+        "AE4V3-11",
+        "AE4V3-12",
+        "AE4V3-13"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-15",
+      "title": "Resource/Jobs/Interaction",
+      "area": "harness-core/resource, app/local/jobs",
+      "depends_on": [
+        "AE4V3-06",
+        "AE4V3-09",
+        "AE4V3-14"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-16",
+      "title": "Automation 任务与结算",
+      "area": "app/automation",
+      "depends_on": [
+        "AE4V3-11",
+        "AE4V3-12",
+        "AE4V3-15"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-17",
+      "title": "Settings 配置与身份治理",
+      "area": "settings + shared config",
+      "depends_on": [
+        "AE4V3-07",
+        "AE4V3-10",
+        "AE4V3-15"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-18",
+      "title": "Usage/Event/Diagnostics",
+      "area": "usage, session and diagnostics",
+      "depends_on": [
+        "AE4V3-05",
+        "AE4V3-07",
+        "AE4V3-09",
+        "AE4V3-16"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-19",
+      "title": "Files/Git/Shell/Process",
+      "area": "harness-runtime-android and platform tools",
+      "depends_on": [
+        "AE4V3-09",
+        "AE4V3-15"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-20",
+      "title": "MCP/LSP/Network/Device",
+      "area": "harness-interop, harness-device-android",
+      "depends_on": [
+        "AE4V3-09",
+        "AE4V3-15",
+        "AE4V3-19"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-21",
+      "title": "705 V6 Port 与 Chat 保护适配",
+      "area": "app/local/* ports, no Chat business rewrite",
+      "depends_on": [
+        "AE4V3-12",
+        "AE4V3-14",
+        "AE4V3-16",
+        "AE4V3-17",
+        "AE4V3-18",
+        "AE4V3-20"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-22",
+      "title": "历史迁移/异常恢复",
+      "area": "storage/codecs/recovery",
+      "depends_on": [
+        "AE4V3-05",
+        "AE4V3-12",
+        "AE4V3-16",
+        "AE4V3-21"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-23",
+      "title": "旧路径/重复机制退场",
+      "area": "production DI, feature index, obsolete docs",
+      "depends_on": [
+        "AE4V3-21",
+        "AE4V3-22"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    },
+    {
+      "id": "AE4V3-24",
+      "title": "最终自动化任务/CI闭环",
+      "area": "unit/contract/architecture/build and adversarial cases",
+      "depends_on": [
+        "AE4V3-23"
+      ],
+      "status": "not_started",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": ""
+    }
+  ],
+  "first_verified_fix": {
+    "component": "HarnessWorkflowRunner",
+    "reason": "blank/over-capacity work was silently dropped",
+    "behavior": "atomic rejection before execution; all valid admitted work retained; bounded concurrency unchanged",
+    "pr_head_before_commit": "cd0dbc0604996cf0b64fee8fd5a484dbbed42b85"
+  },
+  "status": "first incremental implementation, not entire refactor"
+}

@@ -114,4 +114,49 @@ class HarnessWorkflowRunnerTest {
         val result = HarnessWorkflowRunner().run(listOf("任务"), HarnessWorkflowMode.PARALLEL) { _, _, _ -> "" }
         assertFalse(result.single().succeeded)
     }
+    @Test
+    fun overCapacityAdmissionRejectsAtomicallyWithoutExecutingAnyTask() = runTest {
+        val visited = mutableListOf<String>()
+        val error = runCatching {
+            HarnessWorkflowRunner(maxTasks = 4, maxParallelism = 2).run(
+                tasks = listOf("一", "二", "三", "四", "五"),
+                mode = HarnessWorkflowMode.PARALLEL,
+            ) { _, task, _ ->
+                visited += task
+                "完成"
+            }
+        }.exceptionOrNull()
+        assertTrue(error is IllegalArgumentException)
+        assertTrue(error?.message.orEmpty().contains("未启动任何子任务"))
+        assertTrue(visited.isEmpty())
+    }
+
+    @Test
+    fun blankTaskRejectsAtomicallyRatherThanShiftingTaskIndices() = runTest {
+        val visited = mutableListOf<String>()
+        val error = runCatching {
+            HarnessWorkflowRunner(maxTasks = 4).run(
+                tasks = listOf("一", "  ", "三"),
+                mode = HarnessWorkflowMode.PIPELINE,
+            ) { _, task, _ ->
+                visited += task
+                "完成"
+            }
+        }.exceptionOrNull()
+        assertTrue(error is IllegalArgumentException)
+        assertTrue(visited.isEmpty())
+    }
+
+    @Test
+    fun admittedTasksAreNotTruncatedAndKeepTheirOriginalOrder() = runTest {
+        val tasks = (1..6).map { "任务-$it" }
+        val result = HarnessWorkflowRunner(maxTasks = 6, maxParallelism = 2).run(
+            tasks = tasks,
+            mode = HarnessWorkflowMode.PARALLEL,
+        ) { _, task, _ -> "执行-$task" }
+        assertEquals(tasks, result.map { it.task })
+        assertEquals(tasks.map { "执行-$it" }, result.map { it.output })
+        assertTrue(result.all { it.succeeded })
+    }
+
 }

@@ -68,11 +68,15 @@ class HarnessWorkflowRunner(
         execute: suspend (index: Int, task: String, previousOutput: String?) -> String,
     ): List<HarnessWorkflowTaskResult> {
         require(maxAttempts in 1..3) { "工作流尝试次数必须在 1..3 之间" }
-        val clean = tasks
-            .map(String::trim)
-            .filter(String::isNotEmpty)
-            .take(maxTasks)
+        // Admission is atomic: never silently drop blank or over-capacity tasks.
+        // A future persistent queue may provide a larger capacity; until then callers must
+        // receive a clear rejection before *any* delegated task starts.
+        val clean = tasks.map(String::trim)
         require(clean.isNotEmpty()) { "工作流至少需要一个子任务" }
+        require(clean.all(String::isNotEmpty)) { "工作流含有空子任务，不能静默省略" }
+        require(clean.size <= maxTasks) {
+            "工作流提交了 ${clean.size} 个子任务，超过当前允许的 ${maxTasks} 个；未启动任何子任务"
+        }
         return when (mode) {
             HarnessWorkflowMode.PARALLEL -> runParallel(clean, execute, accept, maxAttempts, onProgress, shouldRetryError)
             HarnessWorkflowMode.PIPELINE -> runPipeline(clean, execute, accept, maxAttempts, onProgress, shouldRetryError)
