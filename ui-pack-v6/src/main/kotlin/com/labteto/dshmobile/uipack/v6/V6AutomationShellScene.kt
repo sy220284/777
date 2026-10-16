@@ -278,7 +278,14 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
                 scheduleValid && policyValid &&
                 (editing != null || mode != AutomationMode.CHAT ||
                     (chatAllowed && sameEditorChat)))
-            SyButton("取消", { editing = null; editor = false }, style = SyButtonStyle.GHOST)
+            SyButton("取消", {
+                // An abandoned task draft from the previous conversation must not survive
+                // a user-requested cancel into another session's editor.
+                editing = null
+                prompt = ""
+                editorIdentity = owner.snapshot().context.identity
+                editor = false
+            }, style = SyButtonStyle.GHOST)
         }
     }
     remove?.let { task -> AlertDialog(onDismissRequest = { remove = null },
