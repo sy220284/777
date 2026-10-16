@@ -353,9 +353,10 @@ fun V6ConversationScene(
                     }, style = MaterialTheme.typography.labelMedium,
                         color = LocalSyColors.current.textSecondary)
                     Text(message.text)
-                    if (docOwner != null && formOwner != null &&
-                        docSnapshot?.sessionId == identity?.sessionId && identity != null) {
-                        val related = docSnapshot.documents.filter {
+                    val documentState = docSnapshot
+                    if (docOwner != null && formOwner != null && identity != null &&
+                        documentState != null && documentState.sessionId == identity.sessionId) {
+                        val related = documentState.documents.filter {
                             it.document.source.sessionId == identity.sessionId &&
                                 it.document.source.messageId == message.id
                         }
@@ -384,7 +385,7 @@ fun V6ConversationScene(
                         status != UiSceneStatus.LOADING
                     if (message.role == UiMessageRole.USER && message.editableText != null &&
                         actionReady) SyButton("修改", {
-                            editing = message; editText = message.editableText
+                            editing = message; editText = message.editableText.orEmpty()
                         }, style = SyButtonStyle.GHOST)
                     if (message.role == UiMessageRole.ASSISTANT && !message.proactive &&
                         message.id == messages.lastOrNull()?.id && actionReady) {
