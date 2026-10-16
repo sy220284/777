@@ -19,7 +19,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class LocalTurnForegroundLeaseAndroidTest {
     @Test
-    fun deniedForegroundStartNeverExecutesTurnAndReturnsRejectedResult() = runBlocking {
+    fun rejectedForegroundStartDoesNotExecuteProtectedTurn() = runBlocking {
         val rejected = object : ContextWrapper(InstrumentationRegistry.getInstrumentation().targetContext) {
             override fun getApplicationContext(): Context = this
             override fun startForegroundService(service: Intent): ComponentName {
