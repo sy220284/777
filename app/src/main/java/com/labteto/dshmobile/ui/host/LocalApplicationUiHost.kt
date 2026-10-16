@@ -230,16 +230,17 @@ internal fun LocalApplicationUiHost(
             }
             // Notification session IDs are only local selectors, never arbitrary scene URLs.
             // Validate the target against the Session Owner catalog before opening it.
-            var notificationHomePending by remember(packId, notificationSessionId) {
+            var notificationHomePending by remember(packId) {
                 mutableStateOf(false)
             }
-            var notificationError by remember(packId, notificationSessionId) {
+            var notificationError by remember(packId) {
                 mutableStateOf<String?>(null)
             }
             LaunchedEffect(packId, notificationSessions, notificationSessionId) {
                 val target = notificationSessionId
                 val sessions = notificationSessions
                 if (target == null || sessions == null) return@LaunchedEffect
+                notificationError = null
                 try {
                     require(target.length <= 256 && target.isNotBlank() &&
                         target.none(Char::isISOControl)) { "无效的会话通知目标" }
