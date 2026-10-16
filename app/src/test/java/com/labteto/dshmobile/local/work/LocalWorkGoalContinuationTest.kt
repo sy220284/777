@@ -20,6 +20,9 @@ import kotlinx.serialization.json.put
 class LocalWorkGoalContinuationTest {
     @get:Rule val files = TemporaryFolder()
 
+    // These synthetic logs start at sequence 0, while the fixture Goal starts at sequence 12.
+    private val goalFromStartOfTestLog: LocalGoal get() = goal.copy(startedAtSequence = -1L)
+
     private fun toolLog(): LocalSessionEventLog = LocalSessionEventLog(
         file = File(files.root, "work-${System.nanoTime()}.events.jsonl"),
         json = Json { ignoreUnknownKeys = true },
@@ -85,14 +88,14 @@ class LocalWorkGoalContinuationTest {
         try {
             log.goalToolCall("write-1")
             log.goalToolStarted("write-1")
-            assertTrue(hasUnresolvedWorkGoalToolEffects(log, goal))
+            assertTrue(hasUnresolvedWorkGoalToolEffects(log, goalFromStartOfTestLog))
             log.goalToolResult("write-1", isError = true, unknown = true)
-            assertTrue(hasUnresolvedWorkGoalToolEffects(log, goal))
+            assertTrue(hasUnresolvedWorkGoalToolEffects(log, goalFromStartOfTestLog))
             // A subsequent successful tool cannot prove an earlier unknown mutation is safe.
             log.goalToolCall("read-2")
             log.goalToolStarted("read-2")
             log.goalToolResult("read-2")
-            assertTrue(hasUnresolvedWorkGoalToolEffects(log, goal))
+            assertTrue(hasUnresolvedWorkGoalToolEffects(log, goalFromStartOfTestLog))
         } finally {
             log.close()
         }
@@ -107,11 +110,11 @@ class LocalWorkGoalContinuationTest {
                 put("id", "other-1")
                 put("attributes", buildJsonObject { put("goal_id", "other-goal") })
             })
-            assertFalse(hasUnresolvedWorkGoalToolEffects(log, goal))
+            assertFalse(hasUnresolvedWorkGoalToolEffects(log, goalFromStartOfTestLog))
             log.goalToolCall("write-ok")
             log.goalToolStarted("write-ok")
             log.goalToolResult("write-ok")
-            assertFalse(hasUnresolvedWorkGoalToolEffects(log, goal))
+            assertFalse(hasUnresolvedWorkGoalToolEffects(log, goalFromStartOfTestLog))
         } finally {
             log.close()
         }
@@ -122,7 +125,7 @@ class LocalWorkGoalContinuationTest {
         val log = toolLog()
         try {
             log.goalToolCall("unstarted")
-            assertFalse(hasUnresolvedWorkGoalToolEffects(log, goal))
+            assertFalse(hasUnresolvedWorkGoalToolEffects(log, goalFromStartOfTestLog))
         } finally {
             log.close()
         }
