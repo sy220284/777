@@ -298,6 +298,9 @@ internal class LocalPluginComposition(
                 ?: error("MCP 插件管理接口不兼容")).lifecycleSnapshots()
         }
 
+    suspend fun checkMcpHealth(serverId: String): com.labteto.dshmobile.interop.mcp.McpServerHealth =
+        withMcp { plugin, _ -> plugin.checkServerHealthFromUi(serverId) }
+
     suspend fun connectMcpHttp(serverId: String, endpoint: String): String = withMcp { plugin, active ->
         plugin.connectHttpFromUi(active, serverId, endpoint)
     }
