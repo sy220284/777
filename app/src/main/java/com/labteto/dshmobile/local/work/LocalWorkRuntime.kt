@@ -167,6 +167,78 @@ class LocalWorkRuntime @Inject internal constructor(
         )
     }
 
+    /** Manual review is a separate, user-owned event and never a Work completion claim. */
+    internal fun requirementEvidenceReviewsForUi(sessionId: String): List<LocalRequirementEvidenceReview> {
+        val snapshot = runtimeStateStore.state.value
+        val goalId = snapshot.work.goal?.id ?: return emptyList()
+        if (sessionId != runtimeStateStore.currentSessionId || snapshot.sessionId != sessionId ||
+            snapshot.usageMode != LocalUsageMode.WORK) return emptyList()
+        val links = requirementEvidenceForUi(sessionId)
+        return eventLogs.get(sessionId).withEvents {
+            projectRequirementEvidenceReviews(it, links, goalId)
+        }
+    }
+
+    internal fun prepareRequirementEvidenceReviewForUi(
+        sessionId: String, goalId: String, requirementIndex: Int, expectedRequirement: String,
+        artifactPath: String, linkSequence: Long, version: String,
+    ): LocalPreparedRequirementEvidenceReview? {
+        val current = runtimeStateStore.state.value
+        if (goalId.isBlank() || current.sessionId != sessionId ||
+            sessionId != runtimeStateStore.currentSessionId ||
+            current.usageMode != LocalUsageMode.WORK || current.work.goal?.id != goalId ||
+            current.work.todos.getOrNull(requirementIndex)?.content != expectedRequirement)
+            return null
+        val log = eventLogs.get(sessionId)
+        val logIdentity = log.historyInstanceIdentity
+        val generation = log.resetGeneration
+        val links = requirementEvidenceForUi(sessionId)
+        val link = links.singleOrNull {
+            it.eventSequence == linkSequence && it.requirementIndex == requirementIndex &&
+                it.requirement == expectedRequirement && it.artifactPath == artifactPath &&
+                it.versionAtLink == version && it.versionNow == version
+        } ?: return null
+        val observedSequence = log.latestSequence()
+        if (log.isClosed || generation != log.resetGeneration) return null
+        return LocalPreparedRequirementEvidenceReview(
+            sessionId, goalId, requirementIndex, expectedRequirement,
+            link.artifactPath, link.eventSequence, link.versionAtLink,
+            logIdentity, generation, observedSequence,
+        )
+    }
+
+    internal fun preparedReviewVersionStillCurrent(prepared: LocalPreparedRequirementEvidenceReview): Boolean =
+        preparedRequirementEvidenceVersionMatches(
+            File(sessionFiles.workspace.path), prepared.artifactPath, prepared.version,
+        )
+
+    /** Caller holds the foreground binding lock; log version fences other edits/relinks. */
+    internal fun commitRequirementEvidenceReviewForUi(
+        prepared: LocalPreparedRequirementEvidenceReview, approved: Boolean,
+    ): Boolean {
+        val current = runtimeStateStore.state.value
+        if (current.sessionId != prepared.sessionId ||
+            runtimeStateStore.currentSessionId != prepared.sessionId ||
+            current.usageMode != LocalUsageMode.WORK || current.work.goal?.id != prepared.goalId ||
+            current.work.todos.getOrNull(prepared.requirementIndex)?.content != prepared.requirement)
+            return false
+        val log = eventLogs.get(prepared.sessionId)
+        if (log.isClosed || log.historyInstanceIdentity != prepared.logIdentity ||
+            log.resetGeneration != prepared.generation ||
+            log.latestSequence() != prepared.observedSequence) return false
+        log.append("work/requirement-evidence-review", buildJsonObject {
+            put("goal_id", prepared.goalId)
+            put("requirement_index", prepared.requirementIndex)
+            put("requirement", prepared.requirement)
+            put("artifact_path", prepared.artifactPath)
+            put("link_sequence", prepared.linkSequence)
+            put("sha256", prepared.version)
+            put("approved_by_user", approved)
+            put("assertion", "manual_content_review_only")
+        })
+        return true
+    }
+
     override fun planForUi(sessionId: String): com.labteto.dshmobile.uicontract.UiWorkPlanSnapshot? {
         val current = runtimeStateStore.state.value
         if (current.sessionId != sessionId || current.usageMode != LocalUsageMode.WORK) return null
@@ -295,6 +367,13 @@ internal fun localWorkArtifactFileAvailable(root: File, relative: String): Boole
     val target = File(root, relative).canonicalFile.toPath()
     target != canonicalRoot && target.startsWith(canonicalRoot) && java.nio.file.Files.isRegularFile(target)
 }.getOrDefault(false)
+
+internal data class LocalPreparedRequirementEvidenceReview(
+    val sessionId: String, val goalId: String, val requirementIndex: Int,
+    val requirement: String, val artifactPath: String, val linkSequence: Long,
+    val version: String, val logIdentity: String, val generation: Long,
+    val observedSequence: Long,
+)
 
 internal data class LocalPreparedRequirementEvidence(val sessionId: String, val requirementIndex: Int,
     val requirement: String, val artifact: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem,
