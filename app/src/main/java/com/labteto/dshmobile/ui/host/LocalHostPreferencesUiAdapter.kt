@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.ui.host
 
+import android.Manifest
 import android.app.NotificationManager
+import android.content.pm.PackageManager
+import android.os.Build
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -11,6 +14,14 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.map
+
+/**
+ * Android 13+ requires both the OS runtime grant and app-level notification allowance.
+ * Reading one flag alone can falsely claim that notifications are available.
+ */
+internal fun hostNotificationPermissionEffective(
+    apiLevel: Int, runtimePermissionGranted: Boolean, notificationsEnabled: Boolean,
+): Boolean = notificationsEnabled && (apiLevel < 33 || runtimePermissionGranted)
 
 /** Existing DataStore remains the only durable application preferences writer. */
 @Singleton
@@ -65,7 +76,14 @@ internal class LocalHostPreferencesUiAdapter @Inject constructor(
 
     override fun notificationPermissionGranted(): Boolean? =
         runCatching {
-            context.getSystemService(NotificationManager::class.java)?.areNotificationsEnabled()
+            val notifications = context.getSystemService(NotificationManager::class.java)
+                ?: return@runCatching null
+            val granted = Build.VERSION.SDK_INT < 33 ||
+                context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+                    PackageManager.PERMISSION_GRANTED
+            hostNotificationPermissionEffective(
+                Build.VERSION.SDK_INT, granted, notifications.areNotificationsEnabled(),
+            )
         }.getOrNull()
 
     override fun openSystemPermissions(): Boolean = open(
