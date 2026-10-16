@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.host
 import com.labteto.dshmobile.uicontract.HostPreferencesUiPort
 import com.labteto.dshmobile.uicontract.UiHostPreferences
 import com.labteto.dshmobile.uicontract.UiHostPreferencesCommand
+import com.labteto.dshmobile.uicontract.SettingsUiPort
 import com.labteto.dshmobile.uicontract.UiSceneId
 import com.labteto.dshmobile.uicontract.UiSceneRequirement
 import com.labteto.dshmobile.uicontract.UI_CONTRACT_VERSION
@@ -27,6 +28,19 @@ class V6MigratingApplicationPackTest {
         override fun openSystemNotifications() = true
     }
     private fun pack() = V6ApplicationScenePack(port)
+    // The registry must not execute a business Owner merely to enumerate renderers.
+    private val settings = java.lang.reflect.Proxy.newProxyInstance(
+        SettingsUiPort::class.java.classLoader,
+        arrayOf(SettingsUiPort::class.java),
+    ) { _, method, _ ->
+        when (method.name) {
+            "toString" -> "unrendered-settings-owner"
+            "hashCode" -> 42
+            "equals" -> false
+            else -> error("Scene registration must not call Settings Owner: ${method.name}")
+        }
+    } as SettingsUiPort
+    private fun productionCandidate() = V6ApplicationScenePack(port, settings)
     private fun requirements(scenes: List<UiSceneRequirement>) = UiPackAdmissionRequirements(
         UI_CONTRACT_VERSION, scenes, emptySet(), UiWindowClass.COMPACT,
         UiAccessibility.entries.toSet(), false,
@@ -40,8 +54,19 @@ class V6MigratingApplicationPackTest {
         assertTrue(UiSceneId("route.home") !in pack().renderers)
     }
 
+    @Test fun productionCompositionRegistersFiveRealSettingsRenderers() {
+        val candidate = productionCandidate()
+        val ids = setOf("settings.appearance", "settings.notifications",
+            "settings.permissions", "settings.chat", "settings.session").map(::UiSceneId).toSet()
+        assertEquals(ids, candidate.manifest.scenes)
+        assertEquals(ids, candidate.renderers.keys)
+        val selected = LocalUiSceneCatalog.requirements.filter { it.id in ids }
+        assertTrue(UiApplicationPackRegistry(listOf(candidate))
+            .select(candidate.manifest.id, requirements(selected)) is UiApplicationPackAdmission.Admitted)
+    }
+
     @Test fun productionHostRefusesIncompleteV6Migration() {
-        val v6 = pack()
+        val v6 = productionCandidate()
         val result = decideApplicationUi(v6.manifest.id, listOf(v6),
             requirements(LocalUiSceneCatalog.requirements))
         assertTrue(result is LocalApplicationUiDecision.Unavailable)
