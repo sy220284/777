@@ -86,6 +86,38 @@ internal class LocalHostPreferencesUiAdapter @Inject constructor(
             )
         }.getOrNull()
 
+    override fun mediaPermissionSnapshot(): UiHostMediaPermissionSnapshot? =
+        runCatching {
+            fun granted(permission: String): Boolean =
+                context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+            when {
+                Build.VERSION.SDK_INT >= 34 -> {
+                    val image = granted(Manifest.permission.READ_MEDIA_IMAGES)
+                    val video = granted(Manifest.permission.READ_MEDIA_VIDEO)
+                    UiHostMediaPermissionSnapshot(
+                        images = image, videos = video,
+                        audio = granted(Manifest.permission.READ_MEDIA_AUDIO),
+                        selectedVisualOnly = granted(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) &&
+                            !image && !video,
+                        usesScopedMediaPermissions = true,
+                    )
+                }
+                Build.VERSION.SDK_INT >= 33 -> UiHostMediaPermissionSnapshot(
+                    images = granted(Manifest.permission.READ_MEDIA_IMAGES),
+                    videos = granted(Manifest.permission.READ_MEDIA_VIDEO),
+                    audio = granted(Manifest.permission.READ_MEDIA_AUDIO),
+                    selectedVisualOnly = false, usesScopedMediaPermissions = true,
+                )
+                else -> {
+                    val storage = granted(Manifest.permission.READ_EXTERNAL_STORAGE)
+                    UiHostMediaPermissionSnapshot(
+                        images = storage, videos = storage, audio = storage,
+                        selectedVisualOnly = false, usesScopedMediaPermissions = false,
+                    )
+                }
+            }
+        }.getOrNull()
+
     override fun openSystemPermissions(): Boolean = open(
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
             Uri.fromParts("package", context.packageName, null))
