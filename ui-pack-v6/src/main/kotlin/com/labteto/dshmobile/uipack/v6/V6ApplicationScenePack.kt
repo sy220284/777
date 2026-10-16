@@ -16,6 +16,7 @@ import com.labteto.dshmobile.uicontract.UiHostPreferences
 import com.labteto.dshmobile.uicontract.UiHostPreferencesCommand
 import com.labteto.dshmobile.uicontract.UiPackManifest
 import com.labteto.dshmobile.uicontract.UiSceneId
+import com.labteto.dshmobile.uicontract.SettingsUiPort
 import com.labteto.dshmobile.uicontract.UiWindowClass
 import com.labteto.dshmobile.uihost.UiApplicationScenePack
 import com.labteto.dshmobile.uihost.UiSceneRenderer
@@ -33,22 +34,40 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 /** First independent V6 application scenes; never claims that all 75 have migrated. */
-class V6ApplicationScenePack(private val preferences: HostPreferencesUiPort) : UiApplicationScenePack {
+class V6ApplicationScenePack(
+    private val preferences: HostPreferencesUiPort,
+    private val settings: SettingsUiPort? = null,
+) : UiApplicationScenePack {
     private val pages = mapOf(
         UiSceneId("settings.appearance") to V6PreferencesPage.APPEARANCE,
         UiSceneId("settings.notifications") to V6PreferencesPage.NOTIFICATIONS,
         UiSceneId("settings.permissions") to V6PreferencesPage.PERMISSIONS,
     )
+    private val sessionSettings = if (settings == null) emptySet() else
+        setOf(UiSceneId("settings.session"), UiSceneId("settings.chat"))
+
     override val manifest = UiPackManifest(
         id = "v6-application-migrating", version = 1,
         minContractVersion = UI_CONTRACT_VERSION, maxContractVersion = UI_CONTRACT_VERSION,
-        scenes = pages.keys, requiredCapabilities = emptySet(),
+        scenes = pages.keys + sessionSettings, requiredCapabilities = emptySet(),
         windowClasses = UiWindowClass.entries.toSet(),
         accessibility = UiAccessibility.entries.toSet(), supportsDark = true,
     )
-    override val renderers: Map<UiSceneId, UiSceneRenderer> = pages.mapValues { (_, page) ->
-        UiSceneRenderer { scope ->
-            V6PreferencesScene(page, preferences, onBack = { scope.onBack(); Unit })
+    override val renderers: Map<UiSceneId, UiSceneRenderer> = buildMap {
+        pages.forEach { (id, page) ->
+            put(id, UiSceneRenderer { scope ->
+                V6PreferencesScene(page, preferences, onBack = { scope.onBack(); Unit })
+            })
+        }
+        settings?.let { owner ->
+            put(UiSceneId("settings.chat"), UiSceneRenderer { scope ->
+                V6ChatStyleSettingsScene(owner, onBack = { scope.onBack(); Unit })
+            })
+            put(UiSceneId("settings.session"), UiSceneRenderer { scope ->
+                V6SessionSettingsScene(owner,
+                    onNavigate = scope.onNavigate,
+                    onBack = { scope.onBack(); Unit })
+            })
         }
     }
 }
