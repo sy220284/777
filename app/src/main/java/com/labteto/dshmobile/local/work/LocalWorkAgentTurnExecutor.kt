@@ -636,12 +636,17 @@ internal class LocalWorkAgentTurnExecutor(
                             completedToolCallIds.clear()
                         }
                         is AgentEvent.TurnCompleted -> {
-                            recordWorkCompletionQuality(event.answer, runState.value, runEventLog, File(workspacePath))
+                            val goalAssessment = recordWorkCompletionQuality(
+                                event.answer, runState.value, runEventLog, File(workspacePath))
                             runEventLog.append("turn/end", buildJsonObject {
-                                    put("source_message_id", uiSourceMessageId)
+                                put("source_message_id", uiSourceMessageId)
+                                // The model finished this turn; Work goal completion is independent.
                                 put("reason", "completed")
                                 put("steps", event.steps)
                                 put("messages", runState.value.transcriptIndex.totalMessageCount)
+                                goalAssessment?.toTurnEventFields()?.forEach { (key, value) ->
+                                    put(key, value)
+                                }
                             })
                             workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/completed")
                             workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_completed_turn")
