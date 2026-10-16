@@ -1,7 +1,7 @@
 {
   "schema": "777.ui-r4.code-tasks/1",
   "asOf": "2026-10-16",
-  "baseline": "2026-10-16 R4 按优先级推进：V6 外观、通知、系统权限 3 个真实设置 Scene 在 :ui-pack-v6 独立实现，Host 生产注册但整包严格拒绝缺少必要 Scene；保留当前 Legacy V6 稳定运行。此前 Session 与 Work 增量不回退。未完成全量移包与验收。",
+  "baseline": "2026-10-16 按优先级推进：V6 原生独立场景从 3 扩至 5，新增 settings.session/settings.chat 的真实 Settings Owner 行为及状态，原三个 Host 偏好页面保留；当前 Legacy V6 仍稳定运行。后续要实现其余 70 个 UI 场景及全链路恢复，CI/设备验收仍未签收。",
   "scope": "整个 R4，非单一功能",
   "verificationPolicy": "当前 HEAD 基础 CI 可通过不代表 R4 交付验收；新增提交需自身 CI，真实双包使用/进程恢复/设备矩阵按 S2/S5 单独验证。",
   "sceneCount": 78,
@@ -129,8 +129,8 @@
       "task": "全应用 UiPack Scene Renderer API",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "新增独立 :ui-host 全应用 UiApplicationScenePack 逐 Scene Compose Renderer 契约、实际 renderer 覆盖与 manifest 双门禁、Host 历史/包身份准入的场景调度与 JVM 测试源码。 AppRoot 现接入真实全应用 UiApplicationScenePack 准入/Compose Renderer 路径，拒绝缺失 Scene/实际 Renderer 的包；当前注册表有意为空，不能宣称整包完工。 Next 独立 ui-pack-next 模块新增 NextApplicationScenePack：8 个真实 Compose Renderer（route.home、conversation.chat、conversation.work、route.persona_gallery、chat.gallery），包含实际 Chat/Work/图库选择 Port 调用。 本批Next增加route.workspace与settings.memory_management两个实际Owner驱动Renderer；全量接线时共10场景，工作区预览在本页实际弹层呈现，未重复登记为独立完成Scene。\n2026-10-16 本轮源代码：在 NextApplicationScenePack 中只把实际架构验证切片列入 manifest 且过滤 renderer，阻止共用简化页面被生产 Host 当作完整替代。 2026-10-16 增量：新增 V6ApplicationScenePack，真实注册 settings.appearance、settings.notifications、settings.permissions 三个独立可执行 Renderer，均使用 V6 原生 Sy* 材质控件，通过 HostPreferencesUiPort 读取现有 DataStore 与提交设置、系统权限跳转；全应用注册表纳入候选包，不修改业务 Owner，也不冒报完整 75 Scene。",
-      "remaining": "V6 独立包目前仅 3/75 个真实 Scene Renderer，尚缺 72 个；Next 只承担架构探针，不要求复刻 V6 全量业务。完整替换仍不具备生产准入资格。"
+      "implemented": "新增独立 :ui-host 全应用 UiApplicationScenePack 逐 Scene Compose Renderer 契约、实际 renderer 覆盖与 manifest 双门禁、Host 历史/包身份准入的场景调度与 JVM 测试源码。 AppRoot 现接入真实全应用 UiApplicationScenePack 准入/Compose Renderer 路径，拒绝缺失 Scene/实际 Renderer 的包；当前注册表有意为空，不能宣称整包完工。 Next 独立 ui-pack-next 模块新增 NextApplicationScenePack：8 个真实 Compose Renderer（route.home、conversation.chat、conversation.work、route.persona_gallery、chat.gallery），包含实际 Chat/Work/图库选择 Port 调用。 本批Next增加route.workspace与settings.memory_management两个实际Owner驱动Renderer；全量接线时共10场景，工作区预览在本页实际弹层呈现，未重复登记为独立完成Scene。\n2026-10-16 本轮源代码：在 NextApplicationScenePack 中只把实际架构验证切片列入 manifest 且过滤 renderer，阻止共用简化页面被生产 Host 当作完整替代。 2026-10-16 增量：新增 V6ApplicationScenePack，真实注册 settings.appearance、settings.notifications、settings.permissions 三个独立可执行 Renderer，均使用 V6 原生 Sy* 材质控件，通过 HostPreferencesUiPort 读取现有 DataStore 与提交设置、系统权限跳转；全应用注册表纳入候选包，不修改业务 Owner，也不冒报完整 75 Scene。 2026-10-16 继续 R4 V6 实际移包：新增 settings.session 与 settings.chat 两个独立场景。会话设置由 Host 场景导航进入聊天规则，聊天页面接入原 SettingsUiPort 的状态流、风格过滤开关、自定义短语受限增删、人物独立规则只读显示及命中日志清理；保持 50 条/32 字原业务限制及 Owner 回执，登录信息/业务状态不复制。生产组合根注入 Settings Owner，新增独立五场景准入/整包拒绝测试源码。",
+      "remaining": "V6 独立包已登记 5/75 个原生场景 Renderer，仍缺 70 个；Next 只用于独立架构插拔验证，不要求完整复刻 V6。"
     },
     {
       "id": "S3-02",
@@ -145,8 +145,8 @@
       "task": "完整 V6 页面/导航/Composer/时间线/设置移包",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "remaining": "已迁出外观/通知/系统权限 3 个真实二级场景（候选不可单独发布）；V6 应用级导航、其余 72 个 Scene，尤其 Composer、消息时间线、全部路由/设置/弹层与 Legacy Shell 仍需继续移入独立 :ui-pack-v6。不可通过复用 App 内旧页面充数。",
-      "implemented": "\n2026-10-15 本次增量：本次不借用 App Shell 老页面冒充 V6 独立包；新增 Next 入口不等于 V6 功能移包。\n2026-10-16 本轮源代码：在仍在 App 的 V6 会话动态文档路径补齐真实 IMAGE/AUDIO/VIDEO 媒体消费：按 Session 的 Media Owner 读本地文件、异步音频播放、平台文件选址保存，避免新节点编译阻塞。 2026-10-16 增量：新增 V6ApplicationScenePack，真实注册 settings.appearance、settings.notifications、settings.permissions 三个独立可执行 Renderer，均使用 V6 原生 Sy* 材质控件，通过 HostPreferencesUiPort 读取现有 DataStore 与提交设置、系统权限跳转；全应用注册表纳入候选包，不修改业务 Owner，也不冒报完整 75 Scene。"
+      "remaining": "外观、通知、权限、会话设置、聊天过滤 5 个场景已独立迁出；V6 应用级导航、Composer、时间线、其余 70 个 Scene 与 Legacy Shell/业务回调退场尚未完成。本增量候选包不能作为全应用生产替换。",
+      "implemented": "\n2026-10-15 本次增量：本次不借用 App Shell 老页面冒充 V6 独立包；新增 Next 入口不等于 V6 功能移包。\n2026-10-16 本轮源代码：在仍在 App 的 V6 会话动态文档路径补齐真实 IMAGE/AUDIO/VIDEO 媒体消费：按 Session 的 Media Owner 读本地文件、异步音频播放、平台文件选址保存，避免新节点编译阻塞。 2026-10-16 增量：新增 V6ApplicationScenePack，真实注册 settings.appearance、settings.notifications、settings.permissions 三个独立可执行 Renderer，均使用 V6 原生 Sy* 材质控件，通过 HostPreferencesUiPort 读取现有 DataStore 与提交设置、系统权限跳转；全应用注册表纳入候选包，不修改业务 Owner，也不冒报完整 75 Scene。 2026-10-16 继续 R4 V6 实际移包：新增 settings.session 与 settings.chat 两个独立场景。会话设置由 Host 场景导航进入聊天规则，聊天页面接入原 SettingsUiPort 的状态流、风格过滤开关、自定义短语受限增删、人物独立规则只读显示及命中日志清理；保持 50 条/32 字原业务限制及 Owner 回执，登录信息/业务状态不复制。生产组合根注入 Settings Owner，新增独立五场景准入/整包拒绝测试源码。"
     },
     {
       "id": "S3-04",
@@ -161,8 +161,8 @@
       "task": "生产级包选择/注册/持久恢复",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "新增 Host 持久选择协调器：只有通过全应用真实 renderer 与 manifest 双门禁的包才能写入选择；过期/缺失选择仅返回显式稳定包选项，不暗中回退 V6；持久写失败拒绝报成功。含 JVM 回归源码。 AppRoot 使用本地 SharedPreferences 持久选包，实时观察其变更，只有通过 Host manifest+Renderer+已接 Feature Owner 能力校验的已登记整包可渲染，非法/缺失选择显式失败且必须点击恢复 Legacy；新增合成完整双包 Compose 切换 instrumentation 测试源码。 将 AppRoot 真实 Feature Owner 依赖注入 NextApplicationScenePack 增量候选包；保留完整全应用 Scene Renderer 双门禁，缺页候选即使安装也不得替换 V6。 2026-10-15 增量：整包 Host 导航栈现按 UI 包 ID 独立写 SharedPreferences，冷启动从保存的版本化快照恢复；保存前验证本包目录和真实 Renderer，不合法的异包/损坏历史显式拒绝，用户明确选回稳定模式时清除该包坏历史；补真实 Host Compose 仪器化测试源码。\n2026-10-15 本次增量：Next 当前 75 个非 Host 场景在源码中登记真实渲染入口；生产整包依然依赖 Host 的场景、契约、能力和 Renderer 准入门禁，不直接修改默认 V6 模式。\n2026-10-16 本轮源代码：生产包 admission 仍要求全目录，Next 新的 manifest 只声明 10 个架构切片，阻止误入生产。 2026-10-16：迁移中 V6 候选已进入真实安装注册表，但完整 Host 准入仍会拒绝只含 3 Scene 的候选。新增单测覆盖三场景可执行 Renderer、完整 75 Scene 缺失拒绝以及针对三场景的准入；稳定 Legacy V6 不受影响。",
-      "remaining": "V6 75 Scene 的整包迁移、真实可用的生产选包及跨版本业务恢复仍未完成；当前候选的 3 Scene 仅能做局部架构验收，不能取代 Legacy V6。"
+      "implemented": "新增 Host 持久选择协调器：只有通过全应用真实 renderer 与 manifest 双门禁的包才能写入选择；过期/缺失选择仅返回显式稳定包选项，不暗中回退 V6；持久写失败拒绝报成功。含 JVM 回归源码。 AppRoot 使用本地 SharedPreferences 持久选包，实时观察其变更，只有通过 Host manifest+Renderer+已接 Feature Owner 能力校验的已登记整包可渲染，非法/缺失选择显式失败且必须点击恢复 Legacy；新增合成完整双包 Compose 切换 instrumentation 测试源码。 将 AppRoot 真实 Feature Owner 依赖注入 NextApplicationScenePack 增量候选包；保留完整全应用 Scene Renderer 双门禁，缺页候选即使安装也不得替换 V6。 2026-10-15 增量：整包 Host 导航栈现按 UI 包 ID 独立写 SharedPreferences，冷启动从保存的版本化快照恢复；保存前验证本包目录和真实 Renderer，不合法的异包/损坏历史显式拒绝，用户明确选回稳定模式时清除该包坏历史；补真实 Host Compose 仪器化测试源码。\n2026-10-15 本次增量：Next 当前 75 个非 Host 场景在源码中登记真实渲染入口；生产整包依然依赖 Host 的场景、契约、能力和 Renderer 准入门禁，不直接修改默认 V6 模式。\n2026-10-16 本轮源代码：生产包 admission 仍要求全目录，Next 新的 manifest 只声明 10 个架构切片，阻止误入生产。 2026-10-16：迁移中 V6 候选已进入真实安装注册表，但完整 Host 准入仍会拒绝只含 3 Scene 的候选。新增单测覆盖三场景可执行 Renderer、完整 75 Scene 缺失拒绝以及针对三场景的准入；稳定 Legacy V6 不受影响。 2026-10-16 继续 R4 V6 实际移包：新增 settings.session 与 settings.chat 两个独立场景。会话设置由 Host 场景导航进入聊天规则，聊天页面接入原 SettingsUiPort 的状态流、风格过滤开关、自定义短语受限增删、人物独立规则只读显示及命中日志清理；保持 50 条/32 字原业务限制及 Owner 回执，登录信息/业务状态不复制。生产组合根注入 Settings Owner，新增独立五场景准入/整包拒绝测试源码。",
+      "remaining": "V6 当前仍为 5/75 个独立 Scene，真实全应用选包与跨版本恢复尚未完成；严格拒绝不完整包。"
     },
     {
       "id": "S3-06",
