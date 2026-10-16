@@ -88,6 +88,7 @@ fun V6ToolsManagementScene(
     var newSkillInstructions by remember(key) { mutableStateOf("") }
     var editSkillId by remember(key) { mutableStateOf<String?>(null) }
     var selectedCapability by remember(key) { mutableStateOf<String?>(null) }
+    var capabilityFieldValues by remember(key) { mutableStateOf<Map<String, String>>(emptyMap()) }
     var manageConnections by remember(key) { mutableStateOf(false) }
     var capabilityInstructions by remember(key) { mutableStateOf("") }
     var editSkillDocument by remember(key) { mutableStateOf("") }
@@ -246,35 +247,97 @@ fun V6ToolsManagementScene(
                         if (page == "work.capabilities" && work != null && drafts != null) {
                             SyButton("在 Work 中使用此能力", {
                                 selectedCapability = ability.name
+                                capabilityFieldValues = emptyMap()
                             }, style = SyButtonStyle.SECONDARY)
                         }
                     }
                 }
                 if (page == "work.capabilities" && selectedCapability != null &&
                     work != null && drafts != null) {
+                    val ability = owner.capabilityCatalogue().firstOrNull { it.name == selectedCapability }
+                    val schema = ability?.parameterSchema
+                    val form = remember(schema) {
+                        schema?.let { runCatching { v6ToolFormFields(it) } }
+                    }
                     SyGlassCard(Modifier.fillMaxWidth()) {
                         Text("使用能力：" + selectedCapability)
+                        SyNote("先检查当前注册工具字段；仅填写 Work 草稿，不直接执行或授予权限")
+                        when {
+                            ability == null -> SyNote("工具已经从注册表移除，请重新选择")
+                            schema == null -> SyNote("工具未提供可信的参数 Schema")
+                            form?.isFailure == true -> SyNote("工具字段无法呈现：" +
+                                (form.exceptionOrNull()?.message ?: "不受支持的 Schema"))
+                            else -> {
+                                form?.getOrThrow().orEmpty().forEach { field ->
+                                    val display = field.label + (if (field.required) "（必填）" else "（可选）") +
+                                        " · " + field.type
+                                    if (field.type == "boolean") {
+                                        SySwitch(display, capabilityFieldValues[field.name] == "true", {
+                                            capabilityFieldValues = capabilityFieldValues + (field.name to it.toString())
+                                        })
+                                    } else {
+                                        SyInput(capabilityFieldValues[field.name].orEmpty(), {
+                                            capabilityFieldValues = capabilityFieldValues + (field.name to it.take(4_096))
+                                        }, label = display, singleLine = field.type !in setOf("array", "object"))
+                                    }
+                                    if (field.description.isNotBlank()) Text(field.description)
+                                    if (field.choices.isNotEmpty()) {
+                                        Text("限定取值：" + field.choices.joinToString("、"))
+                                        field.choices.forEach { choice ->
+                                            SyButton(choice, {
+                                                capabilityFieldValues = capabilityFieldValues + (field.name to choice)
+                                            }, style = SyButtonStyle.GHOST)
+                                        }
+                                    }
+                                    if (field.type in setOf("array", "object"))
+                                        SyNote("填写对应的 JSON 数组/对象；保存时由原工具注册表核验")
+                                }
+                            }
+                        }
                         SyInput(capabilityInstructions, { capabilityInstructions = it },
                             label = "需要完成的具体任务（由你确认后发送）", singleLine = false)
-                        SyButton("填写到 Work 草稿", {
+                        SyButton("校验参数并写入 Work 草稿", {
                             val identity = work.snapshot().identity
-                            if (identity == null || capabilityInstructions.isBlank()) {
-                                feedback = "当前没有有效 Work 会话，或缺少任务要求"
+                            if (identity == null || capabilityInstructions.isBlank() || ability == null ||
+                                schema == null || form?.isSuccess != true) {
+                                feedback = "请先选择可用能力并完整填写任务要求"
                             } else {
-                                val target = selectedCapability
-                                val message = "使用 ${target}：${capabilityInstructions.trim()}"
-                                drafts.updateDraft(identity.sessionId, message)
-                                val nav = onNavigate(UiSceneId("conversation.work"))
-                                feedback = if (nav is UiSceneNavigationResult.Changed)
-                                    "已填写 Work 草稿，发送前仍可编辑；实际工具调用需经原 Work Owner 审批"
-                                else "已保存 Work 草稿，但该会话页面暂不可达"
-                                selectedCapability = null
-                                capabilityInstructions = ""
+                                val encoded = try {
+                                    v6ToolArgumentsJson(schema, capabilityFieldValues)
+                                } catch (error: IllegalArgumentException) {
+                                    feedback = error.message ?: "工具参数输入有误"
+                                    null
+                                }
+                                if (encoded != null) {
+                                    when (val validation = owner.validateCapabilityDraft(
+                                        ability.name, schema, encoded)) {
+                                        is UiToolDraftValidation.Rejected -> feedback = validation.reason
+                                        UiToolDraftValidation.Valid -> {
+                                            if (work.snapshot().identity != identity) {
+                                                feedback = "Work 会话已切换，请重新确认"
+                                            } else {
+                                                val message = "使用工具「${ability.name}」完成：" +
+                                                    capabilityInstructions.trim() +
+                                                    "\n用户填写的参数（仅供 Work Owner 核对）：" + encoded
+                                                drafts.updateDraft(identity.sessionId, message)
+                                                val nav = onNavigate(UiSceneId("conversation.work"))
+                                                feedback = if (nav is UiSceneNavigationResult.Changed)
+                                                    "已填写 Work 草稿；发送和每次工具授权仍需原 Owner 确认"
+                                                else "参数已校验、草稿已保存；Work 页面暂不可达"
+                                                selectedCapability = null
+                                                capabilityInstructions = ""
+                                                capabilityFieldValues = emptyMap()
+                                            }
+                                        }
+                                    }
+                                }
                             }
-                        }, enabled = capabilityInstructions.isNotBlank(),
-                            style = SyButtonStyle.SECONDARY)
-                        SyButton("取消", { selectedCapability = null },
-                            style = SyButtonStyle.GHOST)
+                        }, enabled = capabilityInstructions.isNotBlank() && schema != null &&
+                            form?.isSuccess == true, style = SyButtonStyle.SECONDARY)
+                        SyButton("取消", {
+                            selectedCapability = null
+                            capabilityFieldValues = emptyMap()
+                        }, style = SyButtonStyle.GHOST)
                     }
                 }
             }
