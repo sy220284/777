@@ -67,12 +67,17 @@ class V6ApplicationScenePack(
         conversations.selection != null)
         setOf("chat.gallery", "route.persona_gallery", "chat.gallery_profile",
             "chat.gallery_delete").map(::UiSceneId).toSet() else emptySet()
+    private val planScene = if (conversations?.workReads != null && conversations.workPolicy != null)
+        setOf(UiSceneId("work.plan_review")) else emptySet()
+    private val teamScene = if (conversations?.workTeam != null)
+        setOf(UiSceneId("work.team")) else emptySet()
 
     override val manifest = UiPackManifest(
         id = "v6-application-migrating", version = 1,
         minContractVersion = UI_CONTRACT_VERSION, maxContractVersion = UI_CONTRACT_VERSION,
         scenes = pages.keys + sessionSettings + conversationScenes + documentScenes +
-            evidenceScene + personaScene + groupScenes + archiveScenes,
+            evidenceScene + personaScene + groupScenes + archiveScenes +
+            planScene + teamScene,
         requiredCapabilities = buildSet {
             if (conversations != null) {
                 addAll(setOf("chat.send_text", "work.send_text", "chat.edit", "chat.regenerate",
@@ -85,6 +90,9 @@ class V6ApplicationScenePack(
                 if (conversations.gallery != null && conversations.selection != null)
                     add("chat.persona_selection")
                 if (conversations.groups != null) add("chat.group_members")
+                if (conversations.workReads != null && conversations.workPolicy != null)
+                    add("work.plan_review")
+                if (conversations.workTeam != null) add("work.team")
             }
         }.map(::UiCapabilityId).toSet(),
         windowClasses = UiWindowClass.entries.toSet(),
@@ -143,6 +151,20 @@ class V6ApplicationScenePack(
                 V6ConversationScene(owners, workMode = true, onBack = { scope.onBack(); Unit },
                     onNavigate = scope.onNavigate)
             })
+            val planOwner = owners.workReads
+            val policyOwner = owners.workPolicy
+            if (planOwner != null && policyOwner != null)
+                put(UiSceneId("work.plan_review"), UiSceneRenderer { scope ->
+                    val active by owners.work.snapshots.collectAsStateWithLifecycle(
+                        initialValue = owners.work.snapshot())
+                    V6WorkPlanScene(planOwner, policyOwner, active.identity,
+                        onBack = { scope.onBack(); Unit })
+                })
+            owners.workTeam?.let { teamOwner ->
+                put(UiSceneId("work.team"), UiSceneRenderer { scope ->
+                    V6WorkTeamScene(teamOwner, onBack = { scope.onBack(); Unit })
+                })
+            }
             owners.evidence?.let { evidenceOwner ->
                 put(UiSceneId("work.requirement_evidence"), UiSceneRenderer { scope ->
                     val work by owners.work.snapshots.collectAsStateWithLifecycle(
