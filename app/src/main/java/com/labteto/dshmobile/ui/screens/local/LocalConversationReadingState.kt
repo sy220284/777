@@ -14,7 +14,11 @@ internal class LocalConversationReadingState(
         saved.chunked(4).filter { it.size == 4 }.forEach { row ->
             val offset = row[2].toIntOrNull() ?: return@forEach
             val following = row[3].toBooleanStrictOrNull() ?: return@forEach
-            anchors[row[0]] = UiReadingAnchor(row[1].ifEmpty { null }, offset, following)
+            val sessionId = row[0].takeIf { it.isNotBlank() && it.length <= 256 } ?: return@forEach
+            val messageId = row[1].takeIf { it.isNotEmpty() }
+            if (messageId != null && messageId.length > 256) return@forEach
+            if (offset !in 0..1_000_000) return@forEach
+            anchors[sessionId] = UiReadingAnchor(messageId, offset, following)
         }
         trim()
     }
@@ -22,9 +26,14 @@ internal class LocalConversationReadingState(
     override fun anchor(sessionId: String) = anchors[sessionId]
 
     override fun rememberAnchor(sessionId: String, anchor: UiReadingAnchor) {
-        if (anchors[sessionId] == anchor) return
+        // Presentation state is untrusted after process reconstruction; do not keep
+        // unlimited scroll offsets or an invalid cross-session message target.
+        if (sessionId.isBlank() || sessionId.length > 256 ||
+            (anchor.messageId?.length ?: 0) > 256) return
+        val safeAnchor = anchor.copy(offsetPx = anchor.offsetPx.coerceIn(0, 1_000_000))
+        if (anchors[sessionId] == safeAnchor) return
         anchors.remove(sessionId)
-        anchors[sessionId] = anchor
+        anchors[sessionId] = safeAnchor
         trim()
         onSave(anchors.flatMap { (id, value) ->
             listOf(id, value.messageId.orEmpty(), value.offsetPx.toString(), value.followingTail.toString())
