@@ -128,7 +128,7 @@ internal fun hasUnresolvedWorkGoalToolEffects(
     // consumed once, from this Goal's first persisted sequence onwards.
     val ledger = ToolAttemptLedger()
     val goalStartSequence = goal.startedAtSequence.takeIf { it >= 0L } ?: -1L
-    for (event in eventLog.snapshotAfter(goalStartSequence)) {
+    eventLog.forEachAfter(goalStartSequence) { event ->
         ledger.observe(event.type, event.data)
     }
     return ledger.hasUnresolvedExternalEffects(goal.id)

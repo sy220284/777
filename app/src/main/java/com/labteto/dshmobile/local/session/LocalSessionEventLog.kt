@@ -114,6 +114,11 @@ class LocalSessionEventLog(
         event.toLocalEvent()
     }
 
+    /** Streaming projection over committed Session facts. Never copy a whole historical tail. */
+    fun forEachAfter(sequenceExclusive: Long, visitor: (Event) -> Unit) {
+        delegate.forEachAfter(sequenceExclusive) { visitor(it.toLocalEvent()) }
+    }
+
     /** 按 sequence 递增返回旧事件页，适合 Projection / fold 等从旧到新的消费路径。 */
     fun pageBeforeChronological(
         sequenceExclusive: Long = Long.MAX_VALUE,

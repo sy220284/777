@@ -87,10 +87,11 @@
       "code_evidence": [
         "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt",
         "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt"
       ],
       "tests_verified": [],
-      "notes": "将 Work Goal 的工具副作用核验与 SessionRecovery 的异常工具补写统一到 harness-core/session/ToolAttemptLedger；读取原有 EventLog 不另立账本，原有历史兼容测试和新投影单测待最新 SHA CI。"
+      "notes": "将 Work Goal 的工具副作用核验与 SessionRecovery 的异常工具补写统一到 harness-core/session/ToolAttemptLedger；读取原有 EventLog 不另立账本，原有历史兼容测试和新投影单测待最新 SHA CI。；ToolAttemptLedger 的 Work 投影改为 Session EventLog 流式 forEachAfter，不再将长会话事件档案整体 materialize 到 Android 堆内存。"
     },
     {
       "id": "AE4V3-06",
@@ -393,15 +394,13 @@
   "status": "first incremental implementation, not entire refactor",
   "current_slice": {
     "date": "2026-10-16",
-    "component": "Session/ToolAttempt durable semantic consolidation",
-    "baseline_head": "2716b5f7db915d217a7e52636c390a6bdd0ecf75",
+    "component": "Incremental durable tool facts over long-lived Session history",
+    "baseline_head": "a41700f2cf1ea8506312ebb61ac4a86e33f7ded6",
     "status": "code_committed_ci_pending",
-    "paths": [
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt",
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
-      "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedgerTest.kt"
-    ],
-    "tests_verified": []
+    "testEvidence": [
+      "ToolAttemptLedgerTest",
+      "SessionRecoveryTest",
+      "LocalWorkGoalContinuationTest"
+    ]
   }
 }
