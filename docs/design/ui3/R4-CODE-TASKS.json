@@ -13,14 +13,16 @@
       "task": "实时 MCP 注册/选中/连接/授权观测",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "MCP 原 Harness 连接租约/工具 Registry 返回连接中、注册完成（不代表健康在线）、重连中、排空断开中事实；LocalPluginComposition → LocalToolsUiFacade → Tools 页面及插件列表透传生命周期，过渡期不计作已注册服务、不准触发断开/调用入口；McpToolBridgePluginTest 增加慢连接、重连、排空断开的异步断言。已增加用户主动触发的 MCP 标准 ping 健康检查，成功仅代表该次远端响应，不代表已授权或持续在线；普通注册状态仍不假装健康已验证。 ToolsViewModel 对用户主动发起的 MCP 连接/断开在操作持续时建立 300ms 短时生命周期观察协程；操作完成后自动停止，不将长握手排在同一个命令锁后读取。",
-      "remaining": "真实工具选中、逐次授权结果、自动掉线诊断及远端健康持续订阅、外部 Agent 发起改变的状态事件订阅仍缺；已提供主动 ping 检查，仍不宣称全量实时四维状态。"
+      "implemented": "MCP 原 Harness 连接租约/工具 Registry 返回连接中、注册完成（不代表健康在线）、重连中、排空断开中事实；LocalPluginComposition → LocalToolsUiFacade → Tools 页面及插件列表透传生命周期，过渡期不计作已注册服务、不准触发断开/调用入口；McpToolBridgePluginTest 增加慢连接、重连、排空断开的异步断言。已增加用户主动触发的 MCP 标准 ping 健康检查，成功仅代表该次远端响应，不代表已授权或持续在线；普通注册状态仍不假装健康已验证。 ToolsViewModel 对用户主动发起的 MCP 连接/断开在操作持续时建立 300ms 短时生命周期观察协程；操作完成后自动停止，不将长握手排在同一个命令锁后读取。 本轮在 V6 MCP 管理页打开期间按2秒刷新本地注册/连接生命周期，仅反映原 Plugin Owner 事实；主动 ping 结果随连接变化失效，不代表持续在线、工具已选中或授权。",
+      "remaining": "还缺工具真实选中、逐次授权结果及外部 Agent 主动状态事件订阅（目前为页面内本地轮询）；远端掉线无法无请求感知，缺真实设备弱网/重启验证。"
     },
     {
       "id": "S-1-02",
       "task": "插件故障隔离与恢复",
       "codeStatus": "CODE_PARTIAL",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "implemented": "原 PluginManager 单锁管理生命周期变更、并发替换及失败恢复；MCP 失败关闭逐个解绑工具，连接占位始终清理；已有插件并发/恢复源码测试。",
+      "remaining": "各插件运行中故障导致的真实进程级隔离、失败后业务回执与重启恢复仍需逐插件实测；不能把源码测试存在当作真机验收。"
     },
     {
       "id": "S0-01",
@@ -85,14 +87,16 @@
       "task": "Shell 重命名/置顶/删除/搜索/定位",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "重命名、置顶、两包删除及Host清理已接线。V6已有实际会话标题搜索，本批不重复开发。原Session分页接口新增中立消息检索：不另建索引，按同一Owner的授权/日志实例/重置代次逐页检索当前会话，命中后保留该有界历史页，用户可继续查更早批次；查询变化不能重用旧游标，关闭窗口取消扫描。",
-      "remaining": "跨会话搜索已在目标会话真正激活后写入阅读锚点，V6 时间线通过同一 Session Owner 受限分页向前查找；仍缺超过单次25页预算的继续定位、历史跨进程滚动恢复和真实 Android 设备验收。"
+      "implemented": "重命名、置顶、两包删除及Host清理已接线。V6已有实际会话标题搜索，本批不重复开发。原Session分页接口新增中立消息检索：不另建索引，按同一Owner的授权/日志实例/重置代次逐页检索当前会话，命中后保留该有界历史页，用户可继续查更早批次；查询变化不能重用旧游标，关闭窗口取消扫描。 本轮补跨会话搜索目标真实激活后阅读锚点与 Session Owner 有界历史分页定位；处理空热窗口、跨模块身份类型、重复游标和检索预算。",
+      "remaining": "超过单次25页检索预算的继续定位、复杂历史跨进程准确滚动恢复及 Android 16/17 真机验收待完成；不允许超预算后假装命中。"
     },
     {
       "id": "S1-07",
       "task": "附件多类型预览、状态与恢复",
       "codeStatus": "CODE_PARTIAL",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "implemented": "文件系统选择的 content URI 准入、原文件 Owner 取消感知导入、重复内容核验、同目录 inode 原子发布且不可覆盖现有路径，拒绝损坏同名文件及符号链接，附 JVM 回归测试源码。",
+      "remaining": "多类型预览与读取状态、Provider 授权撤销/跨进程系统文件选择器恢复、超大文件和不支持硬链接设备的真实行为验证仍缺；不宣称全功能闭环。"
     },
     {
       "id": "S1-08",
@@ -183,7 +187,7 @@
       "task": "设计入口与 Scene/组件/Owner 映射",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "remaining": "按最新 7 路由/21 设置目的地逐项关联设计入口、Scene/Action/Owner；新映射达 78/173，另 95 项仍未映射且 173 项均未做真实恢复验收。"
+      "remaining": "173/173 为 Action→Owner/Receipt 源码映射，旧文档的78/173、缺95项描述已经过时；设计资产/图标/入口对照（7路由、21设置目的地、78 Scene）的正式逐项核对及173项设备/恢复验收仍缺。"
     },
     {
       "id": "S4-01",
