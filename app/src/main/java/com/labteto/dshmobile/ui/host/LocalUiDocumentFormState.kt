@@ -108,6 +108,8 @@ internal class LocalUiDocumentFormState(
         if (chars > MAX_STATE_CHARS) return false
         fields.clear()
         fields.putAll(candidate)
+        retention.keys.removeAll(older.toSet())
+        restoredEntries.removeAll { (form, _) -> form in older }
         return true
     }
 
@@ -126,6 +128,15 @@ internal class LocalUiDocumentFormState(
             restoredEntries.removeAll(restoredSensitive.toSet())
         }
         publish() // Rewrites the actual Android saved-state backing, not only a filtered view.
+    }
+
+    override fun releaseRetention(key: UiDocumentFormKey) {
+        val policy = retention.remove(key) ?: return
+        val sensitiveIds = policy.filterValues { it == UiFieldRetention.MEMORY_ONLY }.keys
+        val remaining = fields[key].orEmpty() - sensitiveIds
+        if (remaining.isEmpty()) fields.remove(key) else fields[key] = remaining
+        restoredEntries.removeAll { (form, id) -> form == key && id in sensitiveIds }
+        publish()
     }
 
     override fun update(key: UiDocumentFormKey, fieldId: String, value: String) {
