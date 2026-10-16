@@ -11,6 +11,21 @@ class UiDocumentTest {
     private fun document(nodes: List<UiDocumentNode>, actions: List<UiDocumentAction>) =
         UiDocument(1, "document", source, 0, "Form", nodes, actions, "Text fallback")
 
+    @Test fun fieldRetentionIsAuthoredAcrossNestedControlsAndSensitiveDefaultsCannotPersist() {
+        val privateField = UiDocumentNode.Field(
+            "otp", "一次性码", "", true, false, UiFieldRetention.MEMORY_ONLY)
+        val publicField = UiDocumentNode.Field("comment", "备注", "", false, true)
+        val form = document(listOf(UiDocumentNode.Disclosure("group", "高级", listOf(
+            UiDocumentNode.Column("nested", listOf(privateField, publicField)),
+        ))), emptyList())
+        assertTrue(form.validate(budget, emptySet(), null).valid)
+        assertTrue(form.fieldRetention() == mapOf(
+            "otp" to UiFieldRetention.MEMORY_ONLY,
+            "comment" to UiFieldRetention.SAVED_STATE))
+        assertTrue(form.copy(nodes = listOf(privateField.copy(initial = "should-not-persist")))
+            .validate(budget, emptySet(), null).problems.contains("sensitive_field_default"))
+    }
+
     @Test fun typedInputsAndKnownNavigationAreAcceptedWithoutGrantingToolExecution() {
         val form = document(listOf(UiDocumentNode.Field("field", "Question", "", true, false),
             UiDocumentNode.Button("submit", "Prepare", "send"), UiDocumentNode.Button("navigate", "Project", "open")),
