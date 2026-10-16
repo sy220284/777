@@ -16,6 +16,7 @@ import java.security.MessageDigest
 /**
  * Explicit bounded read of an app-imported content-addressed file.
  * Never exposes generic workspace paths, follows symlinks, or treats a size check as SHA-256.
+ * Full integrity is checked as a stream even for large attachments (bounded 32 KiB buffer).
  */
 internal fun inspectImportedAttachmentFile(root: File, item: LocalImportedAttachment):
     UiAttachmentInspectionReceipt {
@@ -36,7 +37,8 @@ internal fun inspectImportedAttachmentFile(root: File, item: LocalImportedAttach
         val actualLength = Files.size(candidate)
         if (actualLength != item.bytes) return unavailable("附件文件大小与导入记录不一致")
 
-        val verifyFullHash = actualLength <= 8L * 1024L * 1024L
+        // Byte count alone cannot detect in-place tampering of a content-addressed file.
+        // Keep memory bounded regardless of attachment size; inspect runs on the File Owner IO dispatcher.
         val extension = item.relativePath.substringAfterLast('.', "").lowercase()
         val textType = extension in setOf(
             "txt", "md", "json", "csv", "xml", "html", "log",
@@ -44,7 +46,8 @@ internal fun inspectImportedAttachmentFile(root: File, item: LocalImportedAttach
         )
         val previewLimit = if (textType) 16_384 else 0
         val sample = ByteArrayOutputStream()
-        val hash = if (verifyFullHash) MessageDigest.getInstance("SHA-256") else null
+        val hash = MessageDigest.getInstance("SHA-256")
+        var bytesRead = 0L
         Files.newByteChannel(candidate, setOf<OpenOption>(
             StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS,
         )).use { channel ->
@@ -53,17 +56,17 @@ internal fun inspectImportedAttachmentFile(root: File, item: LocalImportedAttach
                 while (true) {
                     val size = input.read(buffer)
                     if (size < 0) break
-                    hash?.update(buffer, 0, size)
+                    hash.update(buffer, 0, size)
+                    bytesRead += size
                     if (sample.size() < previewLimit)
                         sample.write(buffer, 0, minOf(size, previewLimit - sample.size()))
-                    if (hash == null && sample.size() >= previewLimit) break
-                }
+                    }
             }
         }
-        if (hash != null) {
-            val actualDigest = hash.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
-            if (actualDigest != digestName) return unavailable("附件内容完整性核验失败")
-        }
+        if (bytesRead != actualLength || Files.size(candidate) != actualLength)
+            return unavailable("附件读取期间大小发生变化")
+        val actualDigest = hash.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        if (actualDigest != digestName) return unavailable("附件内容完整性核验失败")
         val previewData = sample.toByteArray()
         val text = if (previewData.isNotEmpty() && 0.toByte() !in previewData)
             runCatching {
@@ -73,7 +76,7 @@ internal fun inspectImportedAttachmentFile(root: File, item: LocalImportedAttach
         UiAttachmentInspectionReceipt.Ready(
             UiAttachmentInspection(
                 item.name.take(160), item.mediaType.take(100), actualLength,
-                verifyFullHash, text, text != null && actualLength > previewData.size,
+                true, text, text != null && actualLength > previewData.size,
             ),
         )
     } catch (_: Exception) {
