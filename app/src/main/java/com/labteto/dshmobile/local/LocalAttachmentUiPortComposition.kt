@@ -1,6 +1,12 @@
 package com.labteto.dshmobile.local
 
 import android.net.Uri
+import android.content.Context
+import androidx.core.content.FileProvider
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
+import com.labteto.dshmobile.uicontract.UiAttachmentMedia
+import com.labteto.dshmobile.uicontract.uiAttachmentMediaKind
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.session.LocalSessionFilesRuntime
 import com.labteto.dshmobile.uicontract.AttachmentUiPort
@@ -22,6 +28,7 @@ internal fun isSupportedPickerAttachmentUri(scheme: String?, authority: String?)
 class LocalAttachmentUiPortComposition @Inject internal constructor(
     private val state: LocalRuntimeStateStore,
     private val files: LocalSessionFilesRuntime,
+    @ApplicationContext private val context: Context,
 ) : AttachmentUiPort {
     private fun current(command: ImportUiAttachmentCommand) = synchronized(state.foregroundRunHandle.lock) {
         !state.sessionTransitioning && state.uiBindingIdentity(state.state.value) == command.identity
@@ -34,7 +41,22 @@ class LocalAttachmentUiPortComposition @Inject internal constructor(
         val result = files.inspectAttachment(command.attachment)
         if (!current(request))
             return UiAttachmentInspectionReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
-        return result
+        return if (result is UiAttachmentInspectionReceipt.Ready && result.value.digestVerified) {
+            val kind = uiAttachmentMediaKind(result.value.mediaType)
+            if (kind == null) result else {
+                // The file Owner has just verified exact on-disk SHA-256 and caller identity.
+                // A content:// grant never contains a raw workspace path or arbitrary URL.
+                val selected = File(files.workspace.path, command.attachment.relativePath)
+                val uri = FileProvider.getUriForFile(
+                    context, "${context.packageName}.files", selected,
+                )
+                if (!current(request))
+                    UiAttachmentInspectionReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                else UiAttachmentInspectionReceipt.Ready(
+                    result.value.copy(media = UiAttachmentMedia(kind, uri.toString())),
+                )
+            }
+        } else result
     }
 
     override suspend fun import(command: ImportUiAttachmentCommand): UiAttachmentReceipt {

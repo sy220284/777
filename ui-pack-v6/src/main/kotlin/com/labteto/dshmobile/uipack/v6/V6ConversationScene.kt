@@ -80,6 +80,7 @@ import com.labteto.dshmobile.uicontract.WorkConversationUiPort
 import com.labteto.dshmobile.uihost.UiSceneNavigationResult
 import com.labteto.dshmobile.uicontract.UiSceneId
 import com.labteto.dshmobile.uihost.rememberUiAttachmentPicker
+import com.labteto.dshmobile.uihost.UiAttachmentMediaViewer
 import com.shenyan.designsystem.components.SyButton
 import com.shenyan.designsystem.components.SyButtonStyle
 import com.shenyan.designsystem.components.SyGlassCard
@@ -440,8 +441,15 @@ fun V6ConversationScene(
                     SyNote(if (info.digestVerified) "当前文件完整性已校验"
                         else "附件完整性尚未确认，请重新检查")
                     val preview = info.preview
-                    if (preview != null) Text(preview)
-                    else SyNote("此类文件提供元数据与状态；二进制内容暂无直接播放器")
+                    when {
+                        info.media != null && info.digestVerified ->
+                            UiAttachmentMediaViewer(
+                                media = info.media,
+                                modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp),
+                            )
+                        preview != null -> Text(preview)
+                        else -> SyNote("当前格式支持元数据和完整性检查，暂无内置预览")
+                    }
                     if (info.truncated) SyNote("文本仅显示前16 KiB")
                 }
             }
