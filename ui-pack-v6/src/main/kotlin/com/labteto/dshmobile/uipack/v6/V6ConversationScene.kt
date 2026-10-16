@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,6 +37,7 @@ import com.labteto.dshmobile.uicontract.ConversationReadingUiPort
 import com.labteto.dshmobile.uicontract.ImportUiAttachmentCommand
 import com.labteto.dshmobile.uicontract.UiAttachmentReceipt
 import com.labteto.dshmobile.uicontract.UiCommandReceipt
+import com.labteto.dshmobile.uicontract.UiCommandRejection
 import com.labteto.dshmobile.uicontract.UiExecutionPhase
 import com.labteto.dshmobile.uicontract.UiMessageEditOutcome
 import com.labteto.dshmobile.uicontract.UiMessageRole
@@ -91,6 +92,20 @@ internal fun describeV6ConversationReceipt(receipt: UiCommandReceipt): String = 
 internal fun acceptedV6ConversationReceipt(receipt: UiCommandReceipt): Boolean =
     receipt == UiCommandReceipt.Accepted || receipt == UiCommandReceipt.Queued
 
+/** An attachment is a real message payload; accepted delivery is not completion. */
+internal fun submitV6ConversationDraft(
+    ports: V6ConversationPorts,
+    workMode: Boolean,
+    identity: UiSessionIdentity,
+    text: String,
+    files: List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment>,
+): UiCommandReceipt {
+    if (text.isBlank() && files.isEmpty())
+        return UiCommandReceipt.Rejected(UiCommandRejection.EMPTY_INPUT)
+    return if (workMode) ports.work.submit(WorkConversationUiCommand.SendMessage(identity, text, files))
+    else ports.chat.submit(ChatUiCommand.SendMessage(identity, text, files))
+}
+
 /**
  * V6-native conversation scene. Sends/edits/history/attachments/approvals remain
  * Owner commands; a UI receipt never pretends to prove completion.
@@ -127,7 +142,9 @@ fun V6ConversationScene(
     var loadingHistory by remember(identity) { mutableStateOf(false) }
     var importing by remember(identity) { mutableStateOf(false) }
     var pickerIdentity by remember(identity) { mutableStateOf<UiSessionIdentity?>(null) }
-    val list = rememberLazyListState()
+    var approvalConfirmation by remember(identity) { mutableStateOf<String?>(null) }
+    // Never reuse list position across a different Owner activation.
+    val list = remember(identity) { LazyListState() }
     val seen = hot.map { it.id }.toSet()
     val messages = older.filterNot { it.id in seen } + hot
     val ids = messages.map { it.id }.toSet()
@@ -150,7 +167,10 @@ fun V6ConversationScene(
                     hasOlder = page.nextCursor != null
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { feedback = failure.message ?: "历史读取失败" }
+            catch (failure: Exception) {
+                val active = (if (workMode) ports.work.snapshot().identity else ports.chat.snapshot().identity) == target
+                if (active) feedback = failure.message ?: "历史读取失败"
+            }
             finally { loadingHistory = false }
         }
     }
@@ -160,9 +180,11 @@ fun V6ConversationScene(
         if (!anchorRestored && status != UiSceneStatus.LOADING && messages.isNotEmpty()) {
             val anchor = ports.reading.anchor(sid)
             val index = messages.indexOfFirst { it.id == anchor?.messageId }
+            val historyHeader = if (ports.history != null && hasOlder) 1 else 0
             list.scrollToItem(
-                if (index >= 0 && anchor?.followingTail == false) index + 1
-                else messages.size, if (index >= 0 && anchor?.followingTail == false)
+                if (index >= 0 && anchor?.followingTail == false) index + historyHeader
+                else messages.lastIndex + historyHeader,
+                if (index >= 0 && anchor?.followingTail == false)
                     anchor.offsetPx.coerceAtLeast(0) else 0,
             )
             anchorRestored = true
@@ -206,7 +228,10 @@ fun V6ConversationScene(
                             feedback = result.message ?: "附件读取失败"
                     }
                 } catch (cancelled: CancellationException) { throw cancelled }
-                catch (failure: Exception) { feedback = failure.message ?: "附件导入失败" }
+                catch (failure: Exception) {
+                    val active = (if (workMode) ports.work.snapshot().identity else ports.chat.snapshot().identity) == target
+                    if (active) feedback = failure.message ?: "附件导入失败"
+                }
                 finally { importing = false }
             }
         }
@@ -262,11 +287,14 @@ fun V6ConversationScene(
                     }, style = MaterialTheme.typography.labelMedium,
                         color = LocalSyColors.current.textSecondary)
                     Text(message.text)
+                    val actionReady = identity != null && phase == UiExecutionPhase.IDLE &&
+                        status != UiSceneStatus.LOADING
                     if (message.role == UiMessageRole.USER && message.editableText != null &&
-                        identity != null) SyButton("修改", {
+                        actionReady) SyButton("修改", {
                             editing = message; editText = message.editableText
                         }, style = SyButtonStyle.GHOST)
-                    if (message.role == UiMessageRole.ASSISTANT && identity != null) {
+                    if (message.role == UiMessageRole.ASSISTANT && !message.proactive &&
+                        message.id == messages.lastOrNull()?.id && actionReady) {
                         SyButton("重新生成", {
                             show(if (workMode) ports.work.submit(
                                 WorkConversationUiCommand.RegenerateReply(identity, message.id))
@@ -274,18 +302,18 @@ fun V6ConversationScene(
                         }, style = SyButtonStyle.SECONDARY)
                     }
                     val branch = message.branch
-                    if (!workMode && branch != null && branch.count > 1 && identity != null) {
+                    if (!workMode && branch != null && branch.count > 1 && actionReady) {
                         Text("版本 ${branch.index + 1}/${branch.count}",
                             style = MaterialTheme.typography.labelMedium)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             SyButton("上一版", {
                                 show(ports.chat.submit(ChatUiCommand.SelectVariant(
                                     identity, message.id, branch.index - 1)))
-                            }, enabled = branch.index > 0, style = SyButtonStyle.GHOST)
+                            }, enabled = branch.index > 0 && actionReady, style = SyButtonStyle.GHOST)
                             SyButton("下一版", {
                                 show(ports.chat.submit(ChatUiCommand.SelectVariant(
                                     identity, message.id, branch.index + 1)))
-                            }, enabled = branch.index + 1 < branch.count, style = SyButtonStyle.GHOST)
+                            }, enabled = branch.index + 1 < branch.count && actionReady, style = SyButtonStyle.GHOST)
                         }
                     }
                 }
@@ -317,10 +345,27 @@ fun V6ConversationScene(
                     Text(approval.summary)
                     Text(approval.arguments)
                     Text("风险级别：${approval.impact.name}")
-                    SyButton("批准此次调用", {
-                        show(ports.work.submit(WorkConversationUiCommand.AnswerApproval(
-                            identity, approval.pendingId, true)))
-                    })
+                    SyButton("查看并批准", { approvalConfirmation = approval.pendingId })
+                    if (approvalConfirmation == approval.pendingId) AlertDialog(
+                        onDismissRequest = { approvalConfirmation = null },
+                        title = { Text("确认仅批准当前工具调用") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(approval.toolName)
+                                Text(approval.summary)
+                                Text(approval.arguments)
+                                Text("影响等级：" + approval.impact.name)
+                            }
+                        },
+                        confirmButton = { TextButton(onClick = {
+                            approvalConfirmation = null
+                            show(ports.work.submit(WorkConversationUiCommand.AnswerApproval(
+                                identity, approval.pendingId, true)))
+                        }) { Text("仅批准此次调用") } },
+                        dismissButton = { TextButton(onClick = {
+                            approvalConfirmation = null
+                        }) { Text("取消") } },
+                    )
                     SyButton("拒绝", {
                         show(ports.work.submit(WorkConversationUiCommand.AnswerApproval(
                             identity, approval.pendingId, false)))
@@ -353,15 +398,16 @@ fun V6ConversationScene(
             }, style = SyButtonStyle.SECONDARY)
             SyButton("发送", {
                 val target = identity ?: return@SyButton
-                val receipt = if (workMode)
-                    ports.work.submit(WorkConversationUiCommand.SendMessage(target, draft, imported))
-                else ports.chat.submit(ChatUiCommand.SendMessage(target, draft, imported))
+                if ((if (workMode) ports.work.snapshot().identity else ports.chat.snapshot().identity) != target)
+                    return@SyButton
+                val receipt = submitV6ConversationDraft(ports, workMode, target, draft, imported)
                 show(receipt)
-                if (acceptedV6ConversationReceipt(receipt)) {
+                if (acceptedV6ConversationReceipt(receipt) &&
+                    (if (workMode) ports.work.snapshot().identity else ports.chat.snapshot().identity) == target) {
                     ports.drafts.updateDraft(target.sessionId, "")
                     ports.drafts.clearAttachments(target.sessionId)
                 }
-            }, enabled = identity != null && available && draft.isNotBlank() && !importing)
+            }, enabled = identity != null && available && (draft.isNotBlank() || imported.isNotEmpty()) && !importing)
         }
         if (!available && rejection != null)
             Text("发送暂不可用：${rejection.name}", color = LocalSyColors.current.textSecondary)
