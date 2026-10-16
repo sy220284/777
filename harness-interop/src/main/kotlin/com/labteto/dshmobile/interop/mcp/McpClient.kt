@@ -15,6 +15,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -56,9 +59,16 @@ interface McpTransport : Closeable {
     suspend fun request(method: String, params: JsonObject = JsonObject(emptyMap())): JsonObject
 }
 
+/** Real long-lived streams/processes publish a terminal failure without an extra RPC or timer. */
+interface McpTerminationSource {
+    val terminalEvents: Flow<Throwable>
+}
+
 class McpClient(
     private val transport: McpTransport,
 ) : Closeable {
+    val terminalEvents: Flow<Throwable>? get() =
+        (transport as? McpTerminationSource)?.terminalEvents
     suspend fun listTools(): List<McpToolDefinition> {
         val tools = mutableListOf<McpToolDefinition>()
         val names = mutableSetOf<String>()
@@ -193,6 +203,8 @@ internal class McpLineProcess(
     private val environmentProvider: () -> Map<String, String> = { emptyMap() },
 ) : Closeable {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mutableTerminalEvents = MutableSharedFlow<Throwable>(replay = 1)
+    val terminalEvents: Flow<Throwable> = mutableTerminalEvents.asSharedFlow()
     private var process: Process? = null
     private data class QueuedLine(val value: String, val utf8Bytes: Int)
     private data class LineQueue(
@@ -246,9 +258,15 @@ internal class McpLineProcess(
                         }
                     }
                 }
-                queue.channel.close(IllegalStateException("MCP stdio 进程已结束"))
+                val failure = IllegalStateException("MCP stdio 子进程退出")
+                queue.channel.close(failure)
+                mutableTerminalEvents.tryEmit(failure)
+            } catch (cancelled: CancellationException) {
+                queue.channel.cancel(cancelled)
+                throw cancelled
             } catch (error: Throwable) {
                 queue.channel.close(error)
+                mutableTerminalEvents.tryEmit(error)
             }
         }
         return true

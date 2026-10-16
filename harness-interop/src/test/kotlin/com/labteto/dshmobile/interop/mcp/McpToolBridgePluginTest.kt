@@ -9,6 +9,8 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -24,6 +26,56 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class McpToolBridgePluginTest {
+    @Test
+    fun unsolicitedTransportExitRevokesOnlyThatServerWithoutReplayingItsTool() = runTest {
+        val termination = MutableSharedFlow<Throwable>(replay = 1)
+        var remoteCalls = 0
+        var closed = 0
+        val plugin = McpToolBridgePlugin(
+            http = OkHttpClient(), json = Json,
+            transportFactory = { endpoint ->
+                object : McpTransport, McpTerminationSource {
+                    override val terminalEvents = termination
+                    override suspend fun request(method: String, params: JsonObject): JsonObject = when (method) {
+                        "tools/list" -> buildJsonObject {
+                            put("result", buildJsonObject {
+                                put("tools", buildJsonArray {
+                                    add(buildJsonObject {
+                                        put("name", "write")
+                                        put("inputSchema", buildJsonObject { put("type", "object") })
+                                    })
+                                })
+                            })
+                        }
+                        "tools/call" -> {
+                            remoteCalls++
+                            buildJsonObject { put("result", buildJsonObject { put("isError", false) }) }
+                        }
+                        else -> error("unexpected call: $method")
+                    }
+                    override fun close() { closed++ }
+                }
+            },
+        )
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        plugin.connectHttpFromUi(registry.context, "server", "https://example.com/mcp")
+        val registered = plugin.serverSnapshots().single().tools
+        assertEquals(1, registered.size)
+        assertTrue(registry.context.tools.get(registered.single()) != null)
+        val revision = plugin.lifecycleRevisions.value
+        termination.emit(java.io.IOException("stream ended without a request"))
+        withTimeout(5_000) {
+            while (plugin.lifecycleSnapshots().singleOrNull()?.lifecycle != McpServerLifecycle.FAILED) yield()
+        }
+        assertTrue(plugin.lifecycleRevisions.value > revision)
+        assertNull(registry.context.tools.get(registered.single()))
+        assertEquals(McpServerLifecycle.FAILED, plugin.lifecycleSnapshots().single().lifecycle)
+        assertEquals(0, remoteCalls)
+        assertEquals(1, closed)
+        plugin.uninstall(registry.context)
+    }
+
     @Test
     fun explicitHealthPingDoesNotExecuteToolsOrClaimRemoteAuthorization() = runTest {
         val requests = mutableListOf<String>()

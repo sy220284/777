@@ -16,6 +16,13 @@ import java.net.URI
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -141,6 +148,7 @@ class McpToolBridgePlugin(
         private var activeCalls = 0
         private var drained: CompletableDeferred<Unit>? = null
         private var clientClosed = false
+        var watchJob: Job? = null
         private var failedTransport = false
         fun isTransportFailed(): Boolean = synchronized(this) { failedTransport }
         fun markTransportFailed(): DisconnectTicket = synchronized(this) {
@@ -190,11 +198,15 @@ class McpToolBridgePlugin(
                     true
                 }
             }
-            if (shouldClose) client.close()
+            if (shouldClose) {
+                watchJob?.cancel()
+                client.close()
+            }
         }
     }
 
     private val mutex = Mutex()
+    private val lifecycleScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     // The MCP owner publishes lifecycle invalidations at each committed state transition.
     // Readers subsequently obtain the actual registry snapshot under the same mutex.
     private val lifecycleRevision = MutableStateFlow(0L)
@@ -664,6 +676,28 @@ class McpToolBridgePlugin(
                 }
                 servers[serverId] = binding
                 releaseConnectionReservationLocked(serverId)
+                binding.watchJob = client.terminalEvents?.let { failures ->
+                    lifecycleScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                        failures.collect {
+                            // The transport may have died without any active tool invocation.
+                            // Keep FAILED visible for explicit user reconnect. Never replay calls.
+                            withContext(NonCancellable) {
+                                val ticket = mutex.withLock {
+                                    if (servers[serverId] !== binding || binding.isTransportFailed())
+                                        return@withLock null
+                                    binding.markTransportFailed().also { result ->
+                                        if (result.started) {
+                                            binding.toolNames.forEach(context.tools::unregister)
+                                            signalLifecycleChangedLocked()
+                                        }
+                                    }
+                                }
+                                ticket?.drained?.await()
+                                if (ticket != null) binding.closeClientOnce()
+                            }
+                        }
+                    }
+                }
             }
             return connectedMessage
         } catch (error: Exception) {

@@ -9,6 +9,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -153,9 +159,11 @@ class McpLegacyHttpSseTransport(
     private val json: Json,
     private val clientName: String = "777-android",
     private val clientVersion: String = "1",
-) : McpTransport {
+) : McpTransport, McpTerminationSource {
     private val ids = AtomicLong(1L)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mutableTerminalEvents = MutableSharedFlow<Throwable>(replay = 1)
+    override val terminalEvents: Flow<Throwable> = mutableTerminalEvents.asSharedFlow()
     private val connectMutex = Mutex()
     private val requestMutex = Mutex()
     private var endpoint = CompletableDeferred<String>()
@@ -217,10 +225,13 @@ class McpLegacyHttpSseTransport(
         scope.launch {
             try {
                 readSse(response.body?.byteStream() ?: error("MCP SSE 响应为空"))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 if (!endpoint.isCompleted) endpoint.completeExceptionally(error)
                 pending.values.forEach { it.completeExceptionally(error) }
                 pending.clear()
+                mutableTerminalEvents.tryEmit(error)
             } finally {
                 response.close()
                 sseResponse = null
@@ -345,7 +356,12 @@ class McpNegotiatingHttpTransport(
     endpoint: String,
     http: OkHttpClient,
     json: Json,
-) : McpTransport {
+) : McpTransport, McpTerminationSource {
+    // Modern request/response HTTP has no persistent stream to observe between calls.
+    // The legacy SSE variant has one and reports genuine transport termination.
+    override val terminalEvents: Flow<Throwable> = flow {
+        (selected as? McpTerminationSource)?.terminalEvents?.collect { emit(it) }
+    }
     private val modern = McpStreamableHttpTransport(endpoint, http, json)
     private val legacy = McpLegacyStreamableHttpTransport(endpoint, http, json)
     private val legacySse = McpLegacyHttpSseTransport(endpoint, http, json)
@@ -387,7 +403,7 @@ class McpLegacyStdioTransport(
     private val protocolVersion: String = LEGACY_MCP_PROTOCOL_VERSION,
     private val commandResolver: (List<String>) -> List<String> = { it },
     private val environmentProvider: () -> Map<String, String> = { emptyMap() },
-) : McpTransport {
+) : McpTransport, McpTerminationSource {
     private val ids = AtomicLong(1L)
     private val mutex = Mutex()
     private val lineProcess = McpLineProcess(
@@ -396,6 +412,7 @@ class McpLegacyStdioTransport(
         commandResolver = commandResolver,
         environmentProvider = environmentProvider,
     )
+    override val terminalEvents: Flow<Throwable> = lineProcess.terminalEvents
     private var initialized = false
 
     override suspend fun request(method: String, params: JsonObject): JsonObject = mutex.withLock {
@@ -476,7 +493,11 @@ class McpNegotiatingStdioTransport(
     workingDirectory: File? = null,
     commandResolver: (List<String>) -> List<String> = { it },
     environmentProvider: () -> Map<String, String> = { emptyMap() },
-) : McpTransport {
+) : McpTransport, McpTerminationSource {
+    override val terminalEvents: Flow<Throwable> = flow {
+        val stream = (selected as McpTerminationSource).terminalEvents
+        stream.collect { emit(it) }
+    }
     private val current = McpLegacyStdioTransport(
         command = command,
         json = json,
