@@ -60,7 +60,7 @@ internal object LocalApplicationPackInstallations {
         listOf(
             // Migrating V6 has only real settings renderers. Full-application Host denies it
             // until every required Scene exists, so current users stay on legacy stable V6.
-            V6ApplicationScenePack(owner.hostPreferencesUiPort),
+            V6ApplicationScenePack(owner.hostPreferencesUiPort, owner.settingsUiPort),
             NextApplicationScenePack(NextApplicationFeaturePorts(
             chat = owner.chatUiPort, work = owner.workConversationUiPort,
             drafts = owner.conversationDraftUiPort, reading = owner.conversationReadingUiPort,
