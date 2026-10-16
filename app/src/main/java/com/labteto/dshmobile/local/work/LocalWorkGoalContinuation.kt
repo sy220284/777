@@ -12,6 +12,10 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.put
 
 /**
  * Work-owned, bounded follow-through after a real tool-progress turn. No new goal ledger.
@@ -32,6 +36,8 @@ internal data class LocalWorkGoalFollowUpConditions(
     val pendingInputs: Int,
     val steeringUnchanged: Boolean,
     val completedContinuations: Int,
+    /** Consecutive turns with no change in Work-owned, verifiable task/artifact facts. */
+    val stalledRounds: Int = 0,
 )
 
 internal fun canAutomaticallyFollowUpWorkGoal(
@@ -50,7 +56,58 @@ internal fun canAutomaticallyFollowUpWorkGoal(
         !conditions.cancelled &&
         conditions.pendingInputs == 0 &&
         conditions.steeringUnchanged &&
-        conditions.completedContinuations < DEFAULT_AGENT_CONTINUATION_POLICY.maxContinuations
+        conditions.stalledRounds < DEFAULT_AGENT_CONTINUATION_POLICY.maxContinuations &&
+        conditions.completedContinuations < MAX_GOAL_CONTINUATION_ROUNDS
+}
+
+internal const val MAX_GOAL_CONTINUATION_ROUNDS = 96
+
+/**
+ * Work-domain progress proof: outstanding obligation identities, finished Team/Todo
+ * facts, and the *actual bytes* of declared artifact files. A new tool call ID,
+ * model answer or elapsed time cannot change this proof by itself.
+ *
+ * The proof is logged in the canonical Session EventLog's inbox admission fact.
+ * No separate mutable progress database or duplicate scheduler is created.
+ */
+internal fun workGoalProgressFingerprint(
+    work: LocalWorkState,
+    evidence: LocalWorkCompletionEvidence,
+    workspaceRoot: File,
+): String {
+    val goal = requireNotNull(work.goal)
+    val material = buildString {
+        append(goal.id)
+        append('|')
+        append(localWorkGoalFingerprint(goal))
+        append('|')
+        work.todos.forEach { append(it.toString()).append('\n') }
+        work.team.tasks.forEach { append(it.toString()).append('\n') }
+        work.team.members.forEach { append(it.phase).append(':').append(it.activity).append('\n') }
+        append(evidence.openTodos).append(':').append(evidence.openTeamTasks).append(':')
+            .append(evidence.activeTeamMembers).append(':').append(evidence.failedTeamMembers)
+        evidence.deliveryEvidence?.let {
+            append(it.artifactCallId).append(':').append(it.testCallId).append(':')
+            append(it.missing.joinToString("|"))
+        }
+        goal.artifactPaths.forEach { artifact ->
+            append(artifact).append('=')
+                .append(localWorkFileSha256(workspaceRoot, artifact) ?: "missing")
+                .append('\n')
+        }
+    }
+    return MessageDigest.getInstance("SHA-256")
+        .digest(material.toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it) }
+}
+
+internal fun nextGoalStalledRounds(
+    previousProof: String?,
+    previousStalledRounds: Int,
+    currentProof: String,
+): Int = when {
+    previousProof == null || previousProof != currentProof -> 0
+    else -> (previousStalledRounds + 1).coerceAtMost(MAX_GOAL_CONTINUATION_ROUNDS)
 }
 
 
@@ -178,6 +235,18 @@ internal fun queueWorkGoalProgressFollowUp(
             localWorkCompletionEvidence(work, localWorkDeliveryEvidence(binding.eventLog, it, workspaceRoot))
         } ?: localWorkCompletionEvidence(work),
     )
+    val proof = goal?.let { workGoalProgressFingerprint(work, assessment.evidence, workspaceRoot) }
+    val goalIdentity = goal?.let(::localWorkGoalFingerprint)
+    val previous = if (goal == null) null else binding.eventLog.latestMatching(
+        setOf(LOCAL_AGENT_INBOX_EVENT_TYPE),
+    ) { data ->
+        (data["action"] as? JsonPrimitive)?.contentOrNull == "work-goal-progress-queued" &&
+            (data["goal_id"] as? JsonPrimitive)?.contentOrNull == goal.id &&
+            (data["goal_fingerprint"] as? JsonPrimitive)?.contentOrNull == goalIdentity
+    }
+    val prevProof = (previous?.data?.get("goal_progress_proof") as? JsonPrimitive)?.contentOrNull
+    val prevStall = (previous?.data?.get("goal_stalled_rounds") as? JsonPrimitive)?.intOrNull ?: 0
+    val stalled = nextGoalStalledRounds(prevProof, prevStall, proof.orEmpty())
     val conditions = LocalWorkGoalFollowUpConditions(
         originalGoal = originalGoal,
         currentGoal = goal,
@@ -190,6 +259,7 @@ internal fun queueWorkGoalProgressFollowUp(
         pendingInputs = binding.runHandle.pendingInputs.size(),
         steeringUnchanged = binding.steeringRevision.value == originalSteeringRevision,
         completedContinuations = binding.automaticContinuationCount,
+        stalledRounds = stalled,
     )
     if (!canAutomaticallyFollowUpWorkGoal(conditions)) return false
     // Even a different, successful tool receipt cannot certify an older unknown mutation.
@@ -209,11 +279,17 @@ internal fun queueWorkGoalProgressFollowUp(
     val accepted = binding.runHandle.pendingInputs.offerIfEmpty(input) {
         binding.eventLog.append(
             LOCAL_AGENT_INBOX_EVENT_TYPE,
-            encodeLocalAgentInboxEvent(
-                action = "work-goal-progress-queued",
-                pending = binding.runHandle.pendingInputs.snapshot(),
-                affected = listOf(input),
-            ),
+            buildJsonObject {
+                encodeLocalAgentInboxEvent(
+                    action = "work-goal-progress-queued",
+                    pending = binding.runHandle.pendingInputs.snapshot(),
+                    affected = listOf(input),
+                ).forEach { (key, value) -> put(key, value) }
+                put("goal_id", requireNotNull(goal).id)
+                put("goal_fingerprint", requireNotNull(goalIdentity))
+                put("goal_progress_proof", requireNotNull(proof))
+                put("goal_stalled_rounds", stalled)
+            },
         )
     }
     if (!accepted) return false

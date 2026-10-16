@@ -169,9 +169,36 @@ class LocalWorkGoalContinuationTest {
     }
 
     @Test
-    fun sharedContinuationBoundPreventsRepeatedUnproductiveTurns() {
-        assertTrue(canAutomaticallyFollowUpWorkGoal(conditions().copy(completedContinuations = 1)))
-        assertFalse(canAutomaticallyFollowUpWorkGoal(conditions().copy(completedContinuations = 2)))
+    fun sustainedEvidenceProgressMayContinueButRepeatedStagnationStops() {
+        assertTrue(canAutomaticallyFollowUpWorkGoal(conditions().copy(completedContinuations = 2)))
+        assertTrue(canAutomaticallyFollowUpWorkGoal(conditions().copy(
+            completedContinuations = 12, stalledRounds = 1)))
+        assertFalse(canAutomaticallyFollowUpWorkGoal(conditions().copy(
+            completedContinuations = 13, stalledRounds = 2)))
+        assertFalse(canAutomaticallyFollowUpWorkGoal(conditions().copy(
+            completedContinuations = MAX_GOAL_CONTINUATION_ROUNDS)))
+        assertEquals(0, nextGoalStalledRounds(null, 10, "proof-a"))
+        assertEquals(1, nextGoalStalledRounds("proof-a", 0, "proof-a"))
+        assertEquals(2, nextGoalStalledRounds("proof-a", 1, "proof-a"))
+        assertEquals(0, nextGoalStalledRounds("proof-a", 2, "proof-b"))
+    }
+
+    @Test
+    fun realArtifactVersionChangesTheGoalProgressProof() {
+        val root = files.newFolder("project-progress")
+        val work = LocalWorkState(goal = goal, todos = listOf(LocalTodoItem("修复后验证", "pending")))
+        val evidence = localWorkCompletionEvidence(work)
+        val target = java.io.File(root, "src/Feature.kt")
+        target.parentFile.mkdirs()
+        target.writeText("first")
+        val before = workGoalProgressFingerprint(work, evidence, root)
+        assertEquals(before, workGoalProgressFingerprint(work, evidence, root))
+        target.writeText("second")
+        val after = workGoalProgressFingerprint(work, evidence, root)
+        assertFalse(before == after)
+        val finished = work.copy(todos = listOf(LocalTodoItem("修复后验证", "completed")))
+        assertFalse(workGoalProgressFingerprint(finished,
+            localWorkCompletionEvidence(finished), root) == after)
     }
 
     private fun pinnedGoalCommand(goal: LocalGoal = this.goal): LocalWorkResumeCommand =
