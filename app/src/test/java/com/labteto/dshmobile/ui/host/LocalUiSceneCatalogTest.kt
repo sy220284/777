@@ -10,12 +10,12 @@ import org.junit.Assert.assertFalse
 import com.labteto.dshmobile.uicontract.UiAccessibility
 import com.labteto.dshmobile.uicontract.UiWindowClass
 import com.labteto.dshmobile.uicontract.checkCompatibility
-import com.labteto.dshmobile.uipack.next.NextConversationUiPack
+import com.labteto.dshmobile.uicontract.UiPackManifest
 import org.junit.Test
 
 class LocalUiSceneCatalogTest {
     @Test fun verificationPackCannotBeSelectedAsACompleteApplicationPack() {
-        val pack = NextConversationUiPack.manifest
+        val pack = testConversationSliceManifest
         val result = pack.checkCompatibility(1, LocalUiSceneCatalog.requirements,
             pack.requiredCapabilities, UiWindowClass.COMPACT, UiAccessibility.entries.toSet(), false)
         assertFalse(result.compatible)
@@ -39,3 +39,22 @@ class LocalUiSceneCatalogTest {
         }.toSet(), settingPages)
     }
 }
+
+/**
+ * Pure contract fixture for navigation/compatibility tests.
+ * The discontinued Next module must not be compiled or reinstated as a product dependency.
+ */
+internal val testConversationSliceManifest = UiPackManifest(
+    id = "test-conversation-slice",
+    version = 1,
+    minContractVersion = 1,
+    maxContractVersion = 1,
+    scenes = setOf(
+        "conversation.chat", "conversation.work", "conversation.timeline",
+        "work.approval", "work.question",
+    ).map(::UiSceneId).toSet(),
+    requiredCapabilities = emptySet(),
+    windowClasses = UiWindowClass.entries.toSet(),
+    accessibility = UiAccessibility.entries.toSet(),
+    supportsDark = true,
+)
