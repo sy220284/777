@@ -75,6 +75,69 @@ class LocalWorkGoalContinuationTest {
         assertFalse(canAutomaticallyFollowUpWorkGoal(conditions().copy(completedContinuations = 2)))
     }
 
+    private fun pinnedGoalCommand(goal: LocalGoal = this.goal): LocalWorkResumeCommand =
+        LocalWorkResumeCommand(
+            sourceRunId = "run-restore",
+            checkpointSequence = 88L,
+            failureCode = WORK_GOAL_PROGRESS_CONTINUATION,
+            index = 1,
+            sourceMessageId = "original",
+            prompt = INTERNAL_WORK_GOAL_PROGRESS_PROMPT,
+            goalId = goal.id,
+            goalFingerprint = localWorkGoalFingerprint(goal),
+        )
+
+    @Test
+    fun durableGoalIdentitySurvivesQueueReplayAndDetectsChangedContract() {
+        val input = pinnedGoalCommand().toQueueInput()
+        val encoded = encodeLocalAgentInboxEvent("work-goal-progress-queued", listOf(input))
+        val restored = requireNotNull(decodeLocalAgentInboxPending(encoded)).single()
+        assertEquals(goal.id, restored.continuation?.goalId)
+        assertEquals(localWorkGoalFingerprint(goal), restored.continuation?.goalFingerprint)
+        assertTrue(isCurrentWorkGoalContinuation(restored.continuation, LocalWorkState(goal = goal)))
+        assertFalse(isCurrentWorkGoalContinuation(restored.continuation,
+            LocalWorkState(goal = goal.copy(note = "用户刚修改了目标"))))
+        assertFalse(isCurrentWorkGoalContinuation(restored.continuation,
+            LocalWorkState(goal = goal.copy(verificationCommands = listOf("different-check")))))
+        assertFalse(isCurrentWorkGoalContinuation(restored.continuation,
+            LocalWorkState(goal = goal.copy(id = "different-goal"))))
+        assertFalse(isCurrentWorkGoalContinuation(restored.continuation,
+            LocalWorkState(goal = goal.copy(status = "paused"))))
+        assertFalse(isCurrentWorkGoalContinuation(restored.continuation, LocalWorkState()))
+    }
+
+    @Test
+    fun newUserInputAndStaleCheckpointAreDiscardedBeforeModelHistoryCommit() {
+        val auto = pinnedGoalCommand().toQueueInput()
+        val user = com.labteto.dshmobile.harness.agent.QueuedAgentInput(
+            "按我最新要求执行", id = "user-2")
+        val work = LocalWorkState(goal = goal)
+        assertFalse(shouldDiscardWorkGoalContinuation(auto, emptyList(), work))
+        assertTrue(shouldDiscardWorkGoalContinuation(auto, listOf(user), work))
+        assertTrue(shouldDiscardWorkGoalContinuation(auto, emptyList(),
+            work.copy(goal = goal.copy(description = "新的执行目标"))))
+        // Internal provider-failure continuation retains the previous compatible contract.
+        val failure = LocalWorkResumeCommand(
+            "run-restore", 88L, "MODEL_TIMEOUT", 1, "original").toQueueInput()
+        assertFalse(shouldDiscardWorkGoalContinuation(failure, emptyList(), work))
+        assertFalse(shouldDiscardWorkGoalContinuation(user, emptyList(), work))
+    }
+
+    @Test
+    fun goalResumeNeverRestartsWhenApprovalOrTeamIsStillOutstanding() {
+        val auto = pinnedGoalCommand().toQueueInput()
+        val work = LocalWorkState(goal = goal)
+        val approval = com.labteto.dshmobile.local.interaction.LocalApproval(
+            callId = "wait", toolName = "bash", summary = "需要授权",
+            arguments = "{}", access = "write")
+        assertFalse(isCurrentWorkGoalContinuation(auto.continuation,
+            work.copy(pendingApproval = approval)))
+        assertFalse(isCurrentWorkGoalContinuation(auto.continuation,
+            work.copy(team = LocalAgentTeamUiState(rebuilding = true))))
+        assertFalse(isCurrentWorkGoalContinuation(auto.continuation,
+            work.copy(team = LocalAgentTeamUiState(pendingMessageCount = 2))))
+    }
+
     @Test
     fun goalFollowUpUsesExistingDurableResumeContractWithoutPretendingToBeUserInput() {
         val command = LocalWorkResumeCommand(
