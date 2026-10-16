@@ -128,6 +128,24 @@ internal fun describeV6ConversationReceipt(receipt: UiCommandReceipt): String = 
 internal fun acceptedV6ConversationReceipt(receipt: UiCommandReceipt): Boolean =
     receipt == UiCommandReceipt.Accepted || receipt == UiCommandReceipt.Queued
 
+/** Keep the independent V6 composer aligned with the legacy 20-image admission rule. */
+internal enum class V6AttachmentDecision { ACCEPT, DUPLICATE, IMAGE_LIMIT }
+
+internal fun v6AttachmentDecision(
+    existing: List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment>,
+    candidate: com.labteto.dshmobile.local.attachment.LocalImportedAttachment,
+    maxImages: Int = 20,
+): V6AttachmentDecision {
+    require(maxImages > 0)
+    if (existing.any { it.relativePath == candidate.relativePath ||
+            (candidate.attachmentId != null && it.attachmentId == candidate.attachmentId) })
+        return V6AttachmentDecision.DUPLICATE
+    if (candidate.mediaType.startsWith("image/") &&
+        existing.count { it.mediaType.startsWith("image/") } >= maxImages)
+        return V6AttachmentDecision.IMAGE_LIMIT
+    return V6AttachmentDecision.ACCEPT
+}
+
 /** An attachment is a real message payload; accepted delivery is not completion. */
 internal fun submitV6ConversationDraft(
     ports: V6ConversationPorts,
@@ -359,8 +377,17 @@ fun V6ConversationScene(
                     val result = importOwner.import(ImportUiAttachmentCommand(target, uri))
                     val active = (if (workMode) ports.work.snapshot().identity else ports.chat.snapshot().identity) == target
                     if (active) when (result) {
-                        is UiAttachmentReceipt.Imported ->
-                            ports.drafts.addAttachment(target.sessionId, result.attachment)
+                        is UiAttachmentReceipt.Imported -> {
+                            when (v6AttachmentDecision(ports.drafts.attachments.value[target.sessionId].orEmpty(),
+                                result.attachment)) {
+                                V6AttachmentDecision.ACCEPT ->
+                                    ports.drafts.addAttachment(target.sessionId, result.attachment)
+                                V6AttachmentDecision.DUPLICATE ->
+                                    feedback = "附件已经添加，无需重复导入"
+                                V6AttachmentDecision.IMAGE_LIMIT ->
+                                    feedback = "当前会话单次最多添加20张图片"
+                            }
+                        }
                         is UiAttachmentReceipt.Rejected ->
                             feedback = "附件导入未获准：${result.reason.name}"
                         is UiAttachmentReceipt.Failed ->
@@ -658,7 +685,13 @@ fun V6ConversationScene(
         if (part == V6ConversationPart.FULL || part == V6ConversationPart.COMPOSER) {
         imported.forEach { file ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(file.name, modifier = Modifier.weight(1f))
+                Column(Modifier.weight(1f)) {
+                    Text(file.name)
+                    val dimensions = if (file.width != null && file.height != null)
+                        " · ${file.width}×${file.height}" else ""
+                    Text("${file.mediaType} · ${file.bytes} 字节$dimensions",
+                        style = MaterialTheme.typography.labelSmall)
+                }
                 SyButton("移除", {
                     identity?.let { ports.drafts.removeAttachment(it.sessionId, file.relativePath) }
                 }, style = SyButtonStyle.GHOST)
