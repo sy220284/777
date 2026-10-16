@@ -10,7 +10,8 @@ class V6PersonaArchiveSceneTest {
     @Test fun committedArchiveUpdateDoesNotClaimForegroundSyncWhenDeferred() {
         val label = v6ArchiveSaveLabel(UiPersonaStoryReceipt.Saved(UiStorySessionSync.DEFERRED))
         assertTrue(label.contains("已保存"))
-        assertTrue(label.contains("DEFERRED"))
+        assertTrue(label.contains("暂未同步"))
+        assertFalse(label.contains("DEFERRED"))
         assertFalse(label.contains("前台已同步"))
     }
 

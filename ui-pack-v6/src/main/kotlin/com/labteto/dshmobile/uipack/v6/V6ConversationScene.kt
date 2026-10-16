@@ -115,15 +115,11 @@ enum class V6ConversationPart { FULL, HEADER, TIMELINE, COMPOSER, REPLY_STATUS, 
 
 internal fun describeV6ConversationReceipt(receipt: UiCommandReceipt): String = when (receipt) {
     UiCommandReceipt.Accepted -> "请求已受理，尚不代表执行完成"
-    UiCommandReceipt.Queued -> "请求已排队，等待原业务调度"
-    is UiCommandReceipt.Rejected -> "未执行：${receipt.reason.name}"
+    UiCommandReceipt.Queued -> "消息已排队，处理完当前消息后继续"
+    is UiCommandReceipt.Rejected -> v6RejectionLabel(receipt.reason)
     is UiCommandReceipt.Failed -> receipt.message
     UiCommandReceipt.NotAdmitted -> "当前操作未获准执行"
-    is UiCommandReceipt.MessageEdited -> when (receipt.result) {
-        UiMessageEditOutcome.SENT -> "修改已提交，新回复正在处理"
-        UiMessageEditOutcome.COMMITTED_NOT_STARTED -> "修改已保存，回复尚未启动"
-        else -> "消息修改未完成：${receipt.result.name}"
-    }
+    is UiCommandReceipt.MessageEdited -> v6MessageEditLabel(receipt.result)
     UiCommandReceipt.OutcomeUnknown -> "结果未确认，查看消息状态后再决定是否重试"
 }
 
@@ -420,7 +416,7 @@ fun V6ConversationScene(
                             }
                         }
                         is UiAttachmentReceipt.Rejected ->
-                            feedback = "附件导入未获准：${result.reason.name}"
+                            feedback = "附件未导入：${v6RejectionLabel(result.reason)}"
                         is UiAttachmentReceipt.Failed ->
                             feedback = result.message ?: "附件读取失败"
                     }
@@ -457,99 +453,63 @@ fun V6ConversationScene(
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(if (workMode) "Work" else "聊天", style = MaterialTheme.typography.titleLarge)
+            Text(if (workMode) "工作" else "聊天", style = MaterialTheme.typography.titleLarge)
             SyButton("返回", onBack, style = SyButtonStyle.GHOST)
         }
-        SyButton(if (navigationExpanded) "收起功能入口" else "功能与页面", {
-            navigationExpanded = !navigationExpanded
-        }, style = SyButtonStyle.GHOST)
-        if (navigationExpanded && onNavigate != null) {
-            Column(Modifier.fillMaxWidth().heightIn(max = 260.dp)
-                .verticalScroll(rememberScrollState())) {
-            val destinations = listOf(
-                "shell.new_session" to "新建会话",
-                "shell.search" to "搜索历史",
-                "route.settings" to "设置",
-                "route.tasks" to "自动任务",
-                "route.tools" to "工具与插件",
-                "route.workspace" to "本地工作区",
-                "media.creation" to "媒体创作",
-                "media.result" to "媒体成果",
-                "route.diary" to "人物日记",
-                "chat.persona_editor" to "编辑人物",
-                "chat.character_tuning" to "当前人物微调",
-                "chat.world_book" to "人物世界书",
-                "chat.reply_suggestions" to "回复建议",
-                "conversation.message_actions" to "消息操作",
-                "conversation.reader" to "完整阅读",
-                "settings.memory_management" to "记忆管理",
-            )
-            destinations.forEach { (id, label) ->
-                SyButton(label, onClick = {
-                    val result = onNavigate(UiSceneId(id))
-                    if (result !is UiSceneNavigationResult.Changed)
-                        feedback = "无法打开：" + label
-                }, style = SyButtonStyle.SECONDARY)
+        if (onNavigate != null) {
+            SyButton("更多", { navigationExpanded = true }, style = SyButtonStyle.GHOST)
+            if (navigationExpanded) {
+                val groups = buildList {
+                    add(V6DestinationGroup("会话", listOf(
+                        V6Destination("shell.new_session", "新建会话"),
+                        V6Destination("shell.search", "搜索历史"),
+                        V6Destination("conversation.message_actions", "消息操作"),
+                        V6Destination("conversation.reader", "完整阅读"))))
+                    if (workMode) add(V6DestinationGroup("工作", buildList {
+                        add(V6Destination("route.workspace", "工作文件"))
+                        if (identity != null && ports.workReads != null && ports.workPolicy != null)
+                            add(V6Destination("work.plan_review", "计划审阅"))
+                        if (identity != null && ports.workTeam != null)
+                            add(V6Destination("work.team", "团队成员"))
+                    })) else add(V6DestinationGroup("人物与故事", buildList {
+                        if (ports.gallery != null && ports.selection != null) {
+                            add(V6Destination("route.persona_gallery", "人物档案与故事"))
+                            if (identity != null) add(V6Destination("chat.persona_picker", "选择人物"))
+                        }
+                        add(V6Destination("route.diary", "人物日记"))
+                        add(V6Destination("chat.persona_editor", "编辑人物"))
+                        add(V6Destination("chat.character_tuning", "人物微调"))
+                        add(V6Destination("chat.world_book", "世界书"))
+                        add(V6Destination("chat.reply_suggestions", "回复建议"))
+                        if (identity != null && ports.groups != null) {
+                            add(V6Destination("chat.group_members", "群聊成员"))
+                            add(V6Destination("chat.group_announcement", "群聊公告"))
+                        }
+                    }))
+                    add(V6DestinationGroup("创作与扩展", buildList {
+                        add(V6Destination("media.creation", "媒体创作"))
+                        add(V6Destination("media.result", "媒体成果"))
+                        if (!workMode) add(V6Destination("route.workspace", "工作文件"))
+                        add(V6Destination("route.tools", "工具与插件"))
+                        add(V6Destination("route.tasks", "自动任务"))
+                        if (docOwner != null && formOwner != null)
+                            add(V6Destination("conversation.ui_document", "互动文档"))
+                    }))
+                    add(V6DestinationGroup("设置", listOf(
+                        V6Destination("settings.memory_management", "记忆管理"),
+                        V6Destination("route.settings", "应用设置"))))
+                }
+                V6ConversationMenu(groups, onDismiss = { navigationExpanded = false }) { entry ->
+                    val result = onNavigate(UiSceneId(entry.id))
+                    if (result is UiSceneNavigationResult.Changed) navigationExpanded = false
+                    else feedback = "暂时无法打开“${entry.title}”，请稍后再试"
+                }
             }
-            }
-        }
-        if (navigationExpanded && workMode && identity != null &&
-            (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) &&
-            onNavigate != null) {
-            if (ports.workReads != null && ports.workPolicy != null)
-                SyButton("Work 计划审阅", {
-                    val receipt = onNavigate(UiSceneId("work.plan_review"))
-                    if (receipt !is UiSceneNavigationResult.Changed)
-                        feedback = "当前无法打开 Work 计划"
-                }, style = SyButtonStyle.SECONDARY)
-            if (ports.workTeam != null)
-                SyButton("Work 团队成员", {
-                    val receipt = onNavigate(UiSceneId("work.team"))
-                    if (receipt !is UiSceneNavigationResult.Changed)
-                        feedback = "当前无法打开 Work 团队"
-                }, style = SyButtonStyle.SECONDARY)
-        }
-        if (navigationExpanded && !workMode && identity != null &&
-            (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) &&
-            onNavigate != null) {
-            if (ports.gallery != null && ports.selection != null)
-                SyButton("人物档案与故事", {
-                    val result = onNavigate(UiSceneId("route.persona_gallery"))
-                    if (result !is UiSceneNavigationResult.Changed)
-                        feedback = "人物档案馆暂不可达"
-                }, style = SyButtonStyle.SECONDARY)
-            if (ports.gallery != null && ports.selection != null)
-                SyButton("选择人物", onClick = {
-                    val result = onNavigate(UiSceneId("chat.persona_picker"))
-                    if (result !is UiSceneNavigationResult.Changed)
-                        feedback = "人物选择界面暂不可达"
-                }, style = SyButtonStyle.SECONDARY)
-            if (ports.groups != null) {
-                SyButton("群聊成员", onClick = {
-                    val result = onNavigate(UiSceneId("chat.group_members"))
-                    if (result !is UiSceneNavigationResult.Changed)
-                        feedback = "群聊成员界面暂不可达"
-                }, style = SyButtonStyle.SECONDARY)
-                SyButton("群聊公告", onClick = {
-                    val result = onNavigate(UiSceneId("chat.group_announcement"))
-                    if (result !is UiSceneNavigationResult.Changed)
-                        feedback = "群聊公告界面暂不可达"
-                }, style = SyButtonStyle.GHOST)
-            }
-        }
-        if (navigationExpanded && docOwner != null && formOwner != null &&
-            (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) &&
-            onNavigate != null) {
-            SyButton("查看会话结构化文档", onClick = {
-                val result = onNavigate(UiSceneId("conversation.ui_document"))
-                if (result !is UiSceneNavigationResult.Changed)
-                    feedback = "文档界面暂不可达，请保留当前消息"
-            }, style = SyButtonStyle.SECONDARY)
         }
         if (identity == null || status == UiSceneStatus.LOADING) {
-            SyNote("会话正在切换，等待 Owner 完成载入")
+            SyNote("正在加载会话，请稍候")
         } else {
-            Text("会话 ${identity.sessionId.take(12)} · ${phase.name} · 等待队列 $queued",
+            Text(v6PhaseLabel(phase, workMode) + if (queued > 0) " · $queued 条消息待处理" else "",
                 color = LocalSyColors.current.textSecondary,
                 style = MaterialTheme.typography.labelMedium)
         }
@@ -564,7 +524,7 @@ fun V6ConversationScene(
                 SyButton("继续定位原消息", { continueAnchorSearch() },
                     enabled = !loadingHistory && identity != null,
                     style = SyButtonStyle.SECONDARY)
-                SyNote("长历史按批次读取，不会把未命中的消息冒充已定位")
+                SyNote("还在查找原消息，你可以继续加载更早的记录")
             }
             if (ports.history != null && hasOlder) item(key = "older") {
                 SyButton(if (loadingHistory) "读取中" else "加载更早消息",
@@ -572,15 +532,8 @@ fun V6ConversationScene(
                     style = SyButtonStyle.SECONDARY)
             }
             items(messages, key = { "message:${it.id}" }) { message ->
-                SyGlassCard(Modifier.fillMaxWidth()) {
-                    Text(when (message.role) {
-                        UiMessageRole.USER -> "用户"
-                        UiMessageRole.ASSISTANT -> "助手"
-                        UiMessageRole.TOOL -> "工具"
-                        UiMessageRole.SYSTEM -> "系统"
-                    }, style = MaterialTheme.typography.labelMedium,
-                        color = LocalSyColors.current.textSecondary)
-                    Text(message.text)
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    V6MessageBody(message, workMode)
                     val documentState = docSnapshot
                     if (docOwner != null && formOwner != null && identity != null &&
                         documentState != null && documentState.sessionId == identity.sessionId) {
@@ -621,7 +574,7 @@ fun V6ConversationScene(
                             show(if (workMode) ports.work.submit(
                                 WorkConversationUiCommand.RegenerateReply(identity, message.id))
                             else ports.chat.submit(ChatUiCommand.RegenerateReply(identity, message.id)))
-                        }, style = SyButtonStyle.SECONDARY)
+                        }, style = SyButtonStyle.GHOST)
                     }
                     val branch = message.branch
                     if (!workMode && branch != null && branch.count > 1 && actionReady) {
@@ -670,7 +623,7 @@ fun V6ConversationScene(
                         style = MaterialTheme.typography.titleSmall)
                     Text(approval.summary)
                     Text(approval.arguments)
-                    Text("风险级别：${approval.impact.name}")
+                    Text("风险级别：${v6ApprovalLabel(approval.impact)}")
                     SyButton("查看并批准", { approvalConfirmation = approval.pendingId })
                     if (approvalConfirmation == approval.pendingId) AlertDialog(
                         onDismissRequest = { approvalConfirmation = null },
@@ -680,7 +633,7 @@ fun V6ConversationScene(
                                 Text(approval.toolName)
                                 Text(approval.summary)
                                 Text(approval.arguments)
-                                Text("影响等级：" + approval.impact.name)
+                                Text("影响等级：" + v6ApprovalLabel(approval.impact))
                             }
                         },
                         confirmButton = { TextButton(onClick = {
@@ -706,12 +659,11 @@ fun V6ConversationScene(
         if (part == V6ConversationPart.FULL || part == V6ConversationPart.REPLY_STATUS) {
             ownerError?.let { SyNote(it) }
             feedback?.let { Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
-            Text(when (phase) {
-                UiExecutionPhase.IDLE -> if (status == UiSceneStatus.LOADING) "正在加载" else "等待输入"
-                UiExecutionPhase.RUNNING -> "正在生成回复"
-                UiExecutionPhase.WAITING_FOR_USER -> "正在等待用户操作"
-            }, style = MaterialTheme.typography.labelMedium)
-            if (queued > 0) Text("队列中：" + queued)
+            if (part == V6ConversationPart.REPLY_STATUS) {
+                Text(if (status == UiSceneStatus.LOADING) "正在加载" else v6PhaseLabel(phase, workMode),
+                    style = MaterialTheme.typography.labelMedium)
+                if (queued > 0) Text("$queued 条消息待处理")
+            }
         }
         if (part == V6ConversationPart.FULL || part == V6ConversationPart.COMPOSER) {
         imported.forEach { file ->
@@ -739,7 +691,7 @@ fun V6ConversationScene(
                                     is UiAttachmentInspectionReceipt.Ready -> inspectedAttachment = result.value
                                     is UiAttachmentInspectionReceipt.Unavailable -> feedback = result.message
                                     is UiAttachmentInspectionReceipt.Rejected ->
-                                        feedback = "附件检查未获准：" + result.reason.name
+                                        feedback = "附件暂时无法查看：" + v6RejectionLabel(result.reason)
                                 }
                             } catch (cancelled: CancellationException) { throw cancelled }
                             catch (failure: Exception) { feedback = failure.message ?: "附件检查失败" }
@@ -779,7 +731,7 @@ fun V6ConversationScene(
             }, enabled = identity != null && available && (draft.isNotBlank() || imported.isNotEmpty()) && !importing)
         }
         if (!available && rejection != null)
-            Text("发送暂不可用：${rejection.name}", color = LocalSyColors.current.textSecondary)
+            Text(v6RejectionLabel(rejection), color = LocalSyColors.current.textSecondary)
         }
     }
 }

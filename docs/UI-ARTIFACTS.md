@@ -1,17 +1,19 @@
 # UI 效果图
 
-本目录保存当前 Android 界面的稳定视觉基准，用于设计复盘、回归比对和发布说明。
+本目录保存 Android 界面图片。图片的有效性以对应提交与实际页面核对结果为准。
+
+**2026-10-16 复查：下列 `current/*.png` 仍是历史截图，包含已移除的运行中心和旧人物调节结构，不能作为当前主线或 PR #705 的视觉验收依据。更新前只供历史追溯；本轮没有生成替代 Android 截图。**
 
 ## 当前文件
 
 | 文件 | 对应界面 |
 |---|---|
 | `docs/images/banner.jpg` | README 项目横幅 |
-| `docs/images/current/navigation.png` | 当前导航与会话 |
-| `docs/images/current/chat.png` | 当前角色聊天 |
-| `docs/images/current/work.png` | 当前工作执行 |
-| `docs/images/current/character-tuning.png` | 当前人物行为调节 |
-| `docs/images/current/usage.png` | 当前模型价格与消耗 |
+| `docs/images/current/navigation.png` | 历史导航与会话 |
+| `docs/images/current/chat.png` | 历史角色聊天 |
+| `docs/images/current/work.png` | 历史工作执行 |
+| `docs/images/current/character-tuning.png` | 历史人物行为调节 |
+| `docs/images/current/usage.png` | 历史模型价格与消耗 |
 
 ## 当前还应补齐的基准
 
@@ -24,7 +26,7 @@
 - 群聊成员管理。
 - Token 统计首页。
 - Token 请求日志 / 请求详情。
-- 运行中心。
+- 工作会话中的真实进度、审批、提问与成果。
 - 设置页。
 - Runtime 诊断。
 

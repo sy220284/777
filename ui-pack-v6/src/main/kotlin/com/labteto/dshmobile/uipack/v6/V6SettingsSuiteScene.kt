@@ -67,8 +67,8 @@ fun V6SettingsSuiteScene(
     fun submit(command: SettingsUiCommand) {
         if (busy || state.loading) return
         feedback = when (val result = settings.submit(command)) {
-            SettingsUiReceipt.Applied -> "请求已应用；以最新 Owner 设置为准"
-            SettingsUiReceipt.Submitted -> "请求已提交，等待 Owner 更新生效状态"
+            SettingsUiReceipt.Applied -> "设置已更新"
+            SettingsUiReceipt.Submitted -> "已提交，正在保存设置"
             SettingsUiReceipt.Rejected -> "请求被拒绝，设置未更新"
             is SettingsUiReceipt.Failed -> result.message ?: "设置修改失败"
         }
@@ -116,34 +116,17 @@ fun V6SettingsSuiteScene(
             Text(name, style = MaterialTheme.typography.titleLarge)
             SyButton("返回", onBack, style = SyButtonStyle.GHOST)
         }
-        if (state.loading) SyNote("设置正在从原 Owner 载入")
+        if (state.loading) SyNote("正在加载设置")
         state.error?.let { SyNote(it) }
         feedback?.let { SyNote(it) }
         when(scene.value) {
             "route.settings","settings.root" -> {
-                listOf(
-                    "settings.models" to "模型配置",
-                    "settings.account" to "账户授权",
-                    "settings.minimax_quota" to "MiniMax 查询",
-                    "settings.model_performance" to "模型性能",
-                    "settings.pricing" to "费用",
-                    "settings.appearance" to "外观",
-                    "settings.notifications" to "通知",
-                    "settings.permissions" to "系统权限",
-                    "settings.chat" to "聊天设置",
-                    "settings.memory" to "记忆与个性化",
-                    "settings.memory_management" to "记忆管理",
-                    "settings.advanced" to "高级参数",
-                    "settings.usage" to "用量",
-                    "settings.session_storage" to "数据管理",
-                    "settings.diagnostics" to "诊断",
-                    "settings.update" to "检查更新",
-                ).forEach { (id,title) ->
-                    SyButton(title, {
-                        val result = onNavigate(UiSceneId(id))
+                v6SettingsGroups.forEach { group ->
+                    V6DestinationSection(group) { entry ->
+                        val result = onNavigate(UiSceneId(entry.id))
                         if (result !is UiSceneNavigationResult.Changed)
-                            feedback = "当前无法进入：" + title
-                    }, style = SyButtonStyle.SECONDARY)
+                            feedback = "当前无法进入：" + entry.title
+                    }
                 }
             }
             "settings.models","conversation.model_picker" -> {
@@ -174,7 +157,7 @@ fun V6SettingsSuiteScene(
                         try {
                             feedback = when (val result = settings.save(
                                 SettingsUiCommand.SaveModel(secret, modelName.trim(), modelUrl.trim()))) {
-                                SettingsUiReceipt.Applied -> "模型配置已写入原 Owner"
+                                SettingsUiReceipt.Applied -> "模型配置已保存"
                                 SettingsUiReceipt.Submitted -> "模型配置已提交"
                                 SettingsUiReceipt.Rejected -> "模型配置未被接受"
                                 is SettingsUiReceipt.Failed -> result.message ?: "保存失败"
@@ -187,9 +170,9 @@ fun V6SettingsSuiteScene(
                     modelName.isNotBlank() && modelUrl.isNotBlank())
             }
             "settings.model_performance" ->
-                SyNote("模型性能 Owner 未连接，当前不能修改全局参数")
+                SyNote("模型性能设置暂不可用，请稍后再试")
             "settings.pricing" ->
-                SyNote("官方价格 Owner 未连接，请使用原设置页刷新真实费率")
+                SyNote("官方价格暂不可用，请稍后刷新")
             "settings.minimax_quota" -> {
                 val profile = state.miniMaxQuotaProfile
                 if (profile == null) SyNote("当前无可查询的 MiniMax 模型账户")
@@ -231,7 +214,7 @@ fun V6SettingsSuiteScene(
             "settings.usage","settings.model_usage","settings.usage_log",
             "settings.usage_detail" -> {
                 val owner = usage
-                if (owner == null) SyNote("请求台账 Owner 不可用")
+                if (owner == null) SyNote("请求记录暂不可用")
                 else {
                     val revision by owner.revision.collectAsStateWithLifecycle()
                     val figures = remember(owner, revision) { owner.snapshot() }
@@ -307,7 +290,7 @@ fun V6SettingsSuiteScene(
                 }
             }
             "settings.session_storage" -> {
-                SyNote("存储整理由原 Session Owner 执行，不得改变会话历史。")
+                SyNote("整理会话存储，保留已有消息记录。")
                 SyButton("读取当前存储状态", {
                     read { settings.sessionStorageStatus().toString() }
                 }, enabled = !busy)
@@ -319,7 +302,7 @@ fun V6SettingsSuiteScene(
                 SyButton("生成诊断报告", { read { settings.diagnosticReport() } },
                     enabled = !busy, style = SyButtonStyle.SECONDARY)
                 SyInput(diagnosticHost, { diagnosticHost = it.take(256) },
-                    label = "诊断目标（由原 Owner 校验地址）")
+                    label = "诊断目标地址")
                 SyButton("检查目标网络连接", {
                     read { settings.diagnoseNetwork(diagnosticHost.trim()) }
                 }, enabled = !busy && diagnosticHost.isNotBlank(),
@@ -347,7 +330,7 @@ fun V6SettingsSuiteScene(
     }
     if (confirmCompact) AlertDialog(onDismissRequest = { confirmCompact = false },
         title = { Text("确认整理本地会话存储") },
-        text = { Text("此操作由原 Session 存储 Owner 执行，建议先保留重要数据备份。") },
+        text = { Text("将整理会话存储，建议先备份重要数据。") },
         confirmButton = { TextButton(onClick = {
             confirmCompact = false
             read { settings.compactSessionStorage().toString() }
@@ -366,7 +349,7 @@ private fun V6AccountManagementSection(settings: SettingsUiPort) {
         if (busy) return
         busy = true
         scope.launch {
-            try { feedback = task() ?: "请求已交由账户 Owner；以最新账户状态为准" }
+            try { feedback = task() ?: "请求已提交，正在更新账户状态" }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { feedback = failure.message ?: "账户操作失败" }
             finally { busy = false }

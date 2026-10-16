@@ -57,7 +57,7 @@ import kotlinx.coroutines.withContext
 enum class V6PersonaArchivePart { GALLERY, PROFILE, DELETE }
 
 internal fun v6ArchiveSaveLabel(receipt: UiPersonaStoryReceipt): String = when (receipt) {
-    is UiPersonaStoryReceipt.Saved -> "故事已保存；当前会话同步状态：" + receipt.sessionSync.name
+    is UiPersonaStoryReceipt.Saved -> "故事已保存；" + v6StorySyncLabel(receipt.sessionSync)
     UiPersonaStoryReceipt.Missing -> "目标故事已经不存在，请刷新档案"
     is UiPersonaStoryReceipt.Failed -> receipt.message ?: "故事更新失败"
 }
@@ -70,6 +70,7 @@ fun V6PersonaArchiveScene(
     stories: PersonaStoryUiPort?,
     deletion: PersonaGalleryDeletionUiPort?,
     authoring: PersonaAuthoringUiPort? = null,
+    portraits: com.labteto.dshmobile.uicontract.PersonaPortraitUiPort? = null,
     part: V6PersonaArchivePart,
     onBack: () -> Unit,
 ) {
@@ -209,14 +210,15 @@ fun V6PersonaArchiveScene(
                 style = SyButtonStyle.SECONDARY)
         }
         if (loading) SyNote("正在读取档案")
-        if (pending) SyNote("正在与原档案 Owner 同步")
+        if (pending) SyNote("正在处理，请稍候")
         notice?.let { SyNote(it) }
         if (entries.isEmpty() && !loading) SyNote("当前没有已保存人物档案")
-        entries.forEach { person ->
-            SyGlassCard(Modifier.fillMaxWidth()) {
-                SyButton(person.name + "（${person.stories.size} 个故事）", {
-                    chooseGallery(person.id)
-                }, style = if (activeGallery == person.id) SyButtonStyle.PRIMARY else SyButtonStyle.SECONDARY)
+        if (chosen != null && part != V6PersonaArchivePart.DELETE)
+            SyButton("切换人物", { activeGallery = null; activeStory = null }, style = SyButtonStyle.GHOST)
+        if (chosen == null || part == V6PersonaArchivePart.DELETE) entries.forEach { person ->
+            Column(Modifier.fillMaxWidth()) {
+                com.shenyan.designsystem.components.SyCategoryRow(title = person.name,
+                    subtitle = "${person.stories.size} 段故事", onClick = { chooseGallery(person.id) })
                 if (part == V6PersonaArchivePart.DELETE && deletion != null)
                     SyButton("删除此人物及其档案", {
                         deleteTarget = person.id to null
@@ -224,23 +226,23 @@ fun V6PersonaArchiveScene(
             }
         }
         if (chosen != null && part != V6PersonaArchivePart.DELETE) {
-            Text(chosen.name, style = MaterialTheme.typography.titleMedium)
+            V6PersonaHero(chosen, portraits)
             if (currentIdentity != null && selected.canStartStory) {
-                SyButton("以此人物开始新故事", {
+                SyButton("开始新故事", {
                     val expected = currentIdentity
                     write({
                         val receipt = selection.submit(PersonaSelectionUiCommand.StartStory(
                             expected, chosen.id, storyId = null, freshStory = true))
                         describeV6ConversationReceipt(receipt)
                     })
-                }, enabled = !pending)
+                }, enabled = !pending, style = SyButtonStyle.SECONDARY)
             }
             chosen.stories.forEach { item ->
-                SyGlassCard(Modifier.fillMaxWidth()) {
-                    SyButton(item.title, { chooseStory(item) },
-                        style = if (activeStory == item.id) SyButtonStyle.PRIMARY
-                        else SyButtonStyle.SECONDARY)
-                    Text("历史消息：" + item.messageCount + " · 阶段：" + item.storyStage)
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    com.shenyan.designsystem.components.SyCategoryRow(title = item.title,
+                        subtitle = "${item.messageCount} 条消息" +
+                            item.storyStage.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty(),
+                        onClick = { chooseStory(item) })
                     if (currentIdentity != null && selected.canStartStory)
                         SyButton("继续这段故事", {
                             write({
@@ -248,7 +250,7 @@ fun V6PersonaArchiveScene(
                                     PersonaSelectionUiCommand.StartStory(
                                         currentIdentity, chosen.id, item.id, freshStory = false)))
                             })
-                        }, enabled = !pending, style = SyButtonStyle.GHOST)
+                        }, enabled = !pending, style = if (activeStory == item.id) SyButtonStyle.PRIMARY else SyButtonStyle.GHOST)
                 }
             }
         }
@@ -302,7 +304,7 @@ fun V6PersonaArchiveScene(
                                             notice = "检查返回 ${receipt.inspection.conflicts.size} 条冲突、${receipt.inspection.suggestions.size} 条建议；尚未更改人物档案"
                                         }
                                         UiPersonaInspectionReceipt.Rejected ->
-                                            notice = "原 Owner 拒绝检查请求"
+                                            notice = "当前无法检查，请稍后再试"
                                         is UiPersonaInspectionReceipt.Failed ->
                                             notice = receipt.message ?: "设定检查失败"
                                     }
@@ -345,10 +347,7 @@ fun V6PersonaArchiveScene(
             }, enabled = !pending, style = SyButtonStyle.SECONDARY)
             if (historyLoaded) {
                 history.forEach { message ->
-                    SyGlassCard(Modifier.fillMaxWidth()) {
-                        Text(message.role.name, style = MaterialTheme.typography.labelSmall)
-                        Text(message.text)
-                    }
+                    V6MessageBody(message, workMode = false)
                 }
                 if (pageCursor != null) SyButton("加载更早消息", { loadHistory(true) },
                     enabled = !pending)
@@ -360,7 +359,7 @@ fun V6PersonaArchiveScene(
         val owner = authoring
         AlertDialog(onDismissRequest = { if (!pending) confirmSuggestions = false },
             title = { Text("将检查建议写入人物档案？") },
-            text = { Text("只写入勾选的建议，由 Chat Owner 使用档案版本 ${examined?.revision} 再次校验。保存图库不会自动改变正在运行的角色。") },
+            text = { Text("只保存勾选的建议。保存前会核对档案是否已更新；当前会话中的人物需重新选择后才会应用。") },
             confirmButton = { TextButton(onClick = {
                 confirmSuggestions = false
                 val doc = examined ?: return@TextButton
@@ -385,7 +384,7 @@ fun V6PersonaArchiveScene(
                                     "所选建议已保存至人物图库，前台人物仍须显式重新选择"
                                 }
                                 is UiPersonaAuthoringReceipt.Rejected ->
-                                    "档案版本或权限已变化，未覆盖，请重新检查：" + receipt.reason.name
+                                    "档案版本或权限已变化，未覆盖，请重新检查"
                                 is UiPersonaAuthoringReceipt.Failed ->
                                     receipt.message ?: "建议写入失败"
                                 else -> "未收到图库保存确认，请重新检查"
@@ -405,7 +404,7 @@ fun V6PersonaArchiveScene(
         AlertDialog(
             onDismissRequest = { if (!pending) deleteTarget = null },
             title = { Text(if (storyId == null) "确认删除整个人物档案" else "确认删除故事") },
-            text = { Text("此操作会修改已保存档案，需要原 Owner 确认。删除后可能无法找回。") },
+            text = { Text("将删除已保存的档案内容，删除后可能无法找回。") },
             confirmButton = { TextButton(onClick = {
                 if (pending) return@TextButton
                 deleteTarget = null
@@ -414,7 +413,7 @@ fun V6PersonaArchiveScene(
                     write({
                         when (val result = owner.delete(DeletePersonaGalleryCommand(currentIdentity, galleryId))) {
                             is UiPersonaGalleryDeletionReceipt.Deleted ->
-                                "档案已删除；同步：" + result.sessionSync.name +
+                                "档案已删除；" + v6StorySyncLabel(result.sessionSync) +
                                     (result.portraitCleanupWarning?.let { "；图片清理：" + it } ?: "")
                             UiPersonaGalleryDeletionReceipt.Missing -> "档案已不存在"
                             is UiPersonaGalleryDeletionReceipt.Failed -> result.message ?: "档案删除失败"

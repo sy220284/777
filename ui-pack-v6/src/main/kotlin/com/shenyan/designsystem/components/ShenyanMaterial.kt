@@ -122,9 +122,9 @@ fun SyMaterialSurface(
         SyMaterialTier.L5_SOLID -> 0.dp
     }
     val elevation = when (resolved) {
-        SyMaterialTier.L1_SECTION, SyMaterialTier.L5_SOLID -> 1.dp
-        SyMaterialTier.L2_BAR -> 3.dp
-        SyMaterialTier.L3_CARD -> 7.dp
+        SyMaterialTier.L1_SECTION, SyMaterialTier.L5_SOLID -> 0.dp
+        SyMaterialTier.L2_BAR -> 1.dp
+        SyMaterialTier.L3_CARD -> 2.dp
         SyMaterialTier.L4_OVERLAY -> 16.dp
     }
     val rim = if (materialFill.alpha < 1f) BorderStroke(1.dp, Brush.linearGradient(
@@ -171,7 +171,7 @@ fun SyMaterialSurface(
         val next = IntOffset(point.x.roundToInt() + windowOnScreen[0], point.y.roundToInt() + windowOnScreen[1])
         if (materialOrigin != next) materialOrigin = next
         if (materialSize != coordinates.size) materialSize = coordinates.size
-    }.graphicsLayer { scaleX = press; scaleY = press }.shadow(shadowElevation ?: elevation, shape).clip(shape)
+    }.graphicsLayer { scaleX = press; scaleY = press }.shadow(shadowElevation ?: if (nested > 0) 0.dp else elevation, shape).clip(shape)
     if (onClick != null) {
         Surface(onClick = onClick, enabled = enabled, interactionSource = interaction, modifier = outer, color = Color.Transparent, shape = shape,
             contentColor = contentColor, tonalElevation = tonalElevation,
