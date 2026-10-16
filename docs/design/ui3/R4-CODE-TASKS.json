@@ -13,8 +13,8 @@
       "task": "实时 MCP 注册/选中/连接/授权观测",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "MCP 原 Harness 连接租约/工具 Registry 返回连接中、注册完成（不代表健康在线）、重连中、排空断开中事实；LocalPluginComposition → LocalToolsUiFacade → Tools 页面及插件列表透传生命周期，过渡期不计作已注册服务、不准触发断开/调用入口；McpToolBridgePluginTest 增加慢连接、重连、排空断开的异步断言。无工具健康探测，显示健康未检查。 ToolsViewModel 对用户主动发起的 MCP 连接/断开在操作持续时建立 300ms 短时生命周期观察协程；操作完成后自动停止，不将长握手排在同一个命令锁后读取。",
-      "remaining": "真实工具选中、授权结果、主动远端健康检查/掉线诊断、外部 Agent 发起改变的持续状态事件订阅仍缺；当前仅管理页刷新和用户主动操作期间的短时观察，不宣称全量实时四维状态。"
+      "implemented": "MCP 原 Harness 连接租约/工具 Registry 返回连接中、注册完成（不代表健康在线）、重连中、排空断开中事实；LocalPluginComposition → LocalToolsUiFacade → Tools 页面及插件列表透传生命周期，过渡期不计作已注册服务、不准触发断开/调用入口；McpToolBridgePluginTest 增加慢连接、重连、排空断开的异步断言。已增加用户主动触发的 MCP 标准 ping 健康检查，成功仅代表该次远端响应，不代表已授权或持续在线；普通注册状态仍不假装健康已验证。 ToolsViewModel 对用户主动发起的 MCP 连接/断开在操作持续时建立 300ms 短时生命周期观察协程；操作完成后自动停止，不将长握手排在同一个命令锁后读取。",
+      "remaining": "真实工具选中、逐次授权结果、自动掉线诊断及远端健康持续订阅、外部 Agent 发起改变的状态事件订阅仍缺；已提供主动 ping 检查，仍不宣称全量实时四维状态。"
     },
     {
       "id": "S-1-02",
@@ -86,7 +86,7 @@
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
       "implemented": "重命名、置顶、两包删除及Host清理已接线。V6已有实际会话标题搜索，本批不重复开发。原Session分页接口新增中立消息检索：不另建索引，按同一Owner的授权/日志实例/重置代次逐页检索当前会话，命中后保留该有界历史页，用户可继续查更早批次；查询变化不能重用旧游标，关闭窗口取消扫描。",
-      "remaining": "跨会话检索已新增受限独立页面，但主时间线消息锚点精准定位、全量无预算上限扫描和设备级恢复仍缺。"
+      "remaining": "跨会话搜索已在目标会话真正激活后写入阅读锚点，V6 时间线通过同一 Session Owner 受限分页向前查找；仍缺超过单次25页预算的继续定位、历史跨进程滚动恢复和真实 Android 设备验收。"
     },
     {
       "id": "S1-07",
