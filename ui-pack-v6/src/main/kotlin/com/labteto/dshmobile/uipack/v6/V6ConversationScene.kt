@@ -223,22 +223,25 @@ fun V6ConversationScene(
         if (part != V6ConversationPart.FULL && part != V6ConversationPart.TIMELINE)
             return@LaunchedEffect
         val target = identity ?: return@LaunchedEffect
-        if (anchorRestored || status == UiSceneStatus.LOADING || messages.isEmpty()) return@LaunchedEffect
+        if (anchorRestored || status == UiSceneStatus.LOADING) return@LaunchedEffect
         val anchor = ports.reading.anchor(target.sessionId)
+        val targetMessageId = anchor?.messageId
+        val historyOwner = ports.history
+        if (messages.isEmpty() && (targetMessageId == null || historyOwner == null)) return@LaunchedEffect
         var restored = messages
         var restoreCursor = cursor
         var more = hasOlder
         // A search result can be far older than the hot message window. Follow only the
         // Session owner's opaque history cursors; never guess a timeline position or issue
         // another Chat/Work command. Bound the scan to avoid an unresponsive UI on long logs.
-        if (anchor?.followingTail == false && anchor.messageId != null &&
-            restored.none { it.id == anchor.messageId } && ports.history != null) {
+        if (anchor?.followingTail == false && targetMessageId != null &&
+            restored.none { it.id == targetMessageId } && historyOwner != null) {
             loadingHistory = true
             try {
                 val lookup = locateV6HistoryAnchor(
-                    owner = ports.history, sessionId = target.sessionId,
+                    owner = historyOwner, sessionId = target.sessionId,
                     initial = restored, initialCursor = restoreCursor, initiallyHasOlder = more,
-                    targetMessageId = anchor.messageId, maxPages = 25,
+                    targetMessageId = targetMessageId, maxPages = 25,
                 )
                 restored = lookup.messages
                 restoreCursor = lookup.nextCursor
@@ -248,15 +251,24 @@ fun V6ConversationScene(
                     cursor = restoreCursor
                     hasOlder = more
                 }
-                if (restored.none { it.id == anchor.messageId })
+                if (restored.none { it.id == targetMessageId })
                     feedback = "目标消息超出单次历史定位范围或已失效，请使用更精确的检索"
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { feedback = failure.message ?: "无法读取目标历史消息" }
             finally { loadingHistory = false }
         }
+        if (restored.isEmpty()) {
+            anchorRestored = true
+            return@LaunchedEffect
+        }
         if (restored != messages) androidx.compose.runtime.withFrameNanos { }
-        val index = restored.indexOfFirst { it.id == anchor?.messageId }
+        val index = restored.indexOfFirst { it.id == targetMessageId }
         val historyHeader = if (ports.history != null && more) 1 else 0
+        if (targetMessageId != null && anchor?.followingTail == false && index < 0) {
+            // Do not jump to tail and silently turn a failed search into a false match.
+            anchorRestored = true
+            return@LaunchedEffect
+        }
         list.scrollToItem(
             if (index >= 0 && anchor?.followingTail == false) index + historyHeader
             else restored.lastIndex + historyHeader,

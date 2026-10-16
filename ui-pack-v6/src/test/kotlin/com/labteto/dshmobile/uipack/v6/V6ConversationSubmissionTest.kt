@@ -79,6 +79,18 @@ class V6ConversationSubmissionTest {
     private data class TestCursor(val page: Int) : UiTranscriptCursor
     private fun message(id: String) = UiMessageSnapshot(id, UiMessageRole.USER, id, 1L)
 
+    @Test fun historyAnchorOnAnEmptyHotWindowUsesActualOwnerMessages() = runBlocking {
+        val owner = object : UiMessageHistoryPort {
+            override suspend fun messagePage(sessionId: String, cursor: UiTranscriptCursor?,
+                limit: Int) = UiMessagePage(listOf(message("archived")), null)
+        }
+        val loaded = locateV6HistoryAnchor(owner, "s1", emptyList(), null,
+            true, "archived", 2)
+        assertTrue(loaded.found)
+        assertEquals(listOf("archived"), loaded.messages.map { it.id })
+        assertFalse(loaded.hasOlder)
+    }
+
     @Test fun historicSearchAnchorLoadsOnlyOwnerPagesUntilExactMessage() = runBlocking {
         var calls = 0
         val owner = object : UiMessageHistoryPort {

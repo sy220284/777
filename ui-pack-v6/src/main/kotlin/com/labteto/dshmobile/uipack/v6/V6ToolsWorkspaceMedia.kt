@@ -30,6 +30,7 @@ import com.shenyan.designsystem.components.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /** Each optional secondary Owner is the existing App singleton, never a copied runtime. */
@@ -161,6 +162,23 @@ fun V6ToolsManagementScene(
             } finally { busy = false }
         }
     }
+    // Observe lifecycle changes initiated by remote agents while this page is visible.
+    // This is an in-process registry poll, never a remote health/authorization subscription.
+    LaunchedEffect(owner, key.value) {
+        if (key.value != "tools.mcp") return@LaunchedEffect
+        while (true) {
+            delay(2_000L)
+            if (loading || busy) continue
+            val refreshed = try {
+                withContext(Dispatchers.IO) { owner.servers() }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { continue }
+            if (refreshed != servers) {
+                healthResults = emptyMap() // Never carry a previous ping through reconnect.
+                servers = refreshed
+            }
+        }
+    }
     fun execute(command: ToolsUiCommand) {
         if (busy) return
         busy = true
@@ -242,6 +260,7 @@ fun V6ToolsManagementScene(
             }
         }
         if (page == "tools.mcp") {
+            SyNote("正在观察本地连接生命周期；远端在线状态请手动检查，工具授权逐次确认。")
             servers.forEach { server ->
                 SyGlassCard(Modifier.fillMaxWidth()) {
                     Text(server.id + " · " + server.transport)
