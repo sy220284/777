@@ -24,6 +24,8 @@ data class LinkWorkEvidenceReferenceCommand(val identity: UiSessionIdentity, val
     val expectedGoalId: String? = null,
     val verifyGoalId: Boolean = false)
 interface WorkEvidenceUiPort {
+    /** Owner-published task/identity/evidence revisions; not a success or verification signal. */
+    fun changes(identity: UiSessionIdentity): kotlinx.coroutines.flow.Flow<Unit>
     suspend fun read(identity: UiSessionIdentity): UiWorkEvidenceReadReceipt
     suspend fun inspect(identity: UiSessionIdentity, artifact: LocalArtifactUiItem): UiWorkArtifactInspectionReceipt
     suspend fun submit(command: LinkWorkEvidenceReferenceCommand): UiCommandReceipt
