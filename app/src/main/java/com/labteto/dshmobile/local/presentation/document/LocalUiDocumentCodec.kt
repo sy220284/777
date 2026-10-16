@@ -98,7 +98,9 @@ internal object LocalUiDocumentCodec {
                 "column" -> UiDocumentNode.Column(id, children())
                 "row" -> UiDocumentNode.Row(id, children())
                 "disclosure" -> UiDocumentNode.Disclosure(id, value.string("title"), children())
-                "field", "textarea" -> UiDocumentNode.Field(id, value.string("label"), value.string("initial"), value.bool("required"), kind == "textarea")
+                "field", "textarea" -> UiDocumentNode.Field(id, value.string("label"), value.string("initial"), value.bool("required"), kind == "textarea",
+                    (value["retention"] as? JsonPrimitive)?.content?.let(com.labteto.dshmobile.uicontract.UiFieldRetention::valueOf)
+                        ?: com.labteto.dshmobile.uicontract.UiFieldRetention.SAVED_STATE)
                 "select" -> UiDocumentNode.Select(id, value.string("label"), value.array("options").map { it.jsonPrimitive.content }, value.string("initial"))
                 "switch" -> UiDocumentNode.Switch(id, value.string("label"), value.bool("initial"))
                 else -> UiDocumentNode.Button(id, value.string("label"), value.string("actionId"))
@@ -160,7 +162,7 @@ internal object LocalUiDocumentCodec {
                 is UiDocumentNode.Column -> { put("type", "column"); put("children", JsonArray(value.children.map(::node))) }
                 is UiDocumentNode.Row -> { put("type", "row"); put("children", JsonArray(value.children.map(::node))) }
                 is UiDocumentNode.Disclosure -> { put("type", "disclosure"); put("title", value.title); put("children", JsonArray(value.children.map(::node))) }
-                is UiDocumentNode.Field -> { put("type", if (value.multiline) "textarea" else "field"); put("label", value.label); put("initial", value.initial); put("required", value.required) }
+                is UiDocumentNode.Field -> { put("type", if (value.multiline) "textarea" else "field"); put("label", value.label); put("initial", value.initial); put("required", value.required); put("retention", value.retention.name) }
                 is UiDocumentNode.Select -> { put("type", "select"); put("label", value.label); put("options", JsonArray(value.options.map(::JsonPrimitive))); put("initial", value.initial) }
                 is UiDocumentNode.Switch -> { put("type", "switch"); put("label", value.label); put("initial", value.initial) }
                 is UiDocumentNode.Button -> { put("type", "button"); put("label", value.label); put("actionId", value.actionId) }
