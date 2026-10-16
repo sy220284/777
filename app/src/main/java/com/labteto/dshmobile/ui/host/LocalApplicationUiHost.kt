@@ -25,6 +25,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.security.MessageDigest
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.uicontract.UI_CONTRACT_VERSION
 import com.labteto.dshmobile.uicontract.UiAccessibility
@@ -54,6 +56,20 @@ import kotlinx.coroutines.flow.map
 
 /** The original shipped screen is an explicit compatibility mode, never a fake complete UiPack. */
 internal const val LEGACY_V6_APP_UI = "legacy-v6-shell"
+
+/**
+ * Persisted UI navigation is scoped to the actual locally-owned conversation.
+ * A digest avoids placing raw private session identifiers in preference key names.
+ * The absent-session scope is distinct from a real session named "none".
+ */
+internal fun localNavigationSnapshotKey(packId: String, sessionId: String?): String {
+    val scope = if (sessionId == null) "no-session" else "session:${sessionId.length}:$sessionId"
+    val digest = MessageDigest.getInstance("SHA-256")
+        .digest(scope.toByteArray(Charsets.UTF_8))
+        .take(16).joinToString("") { "%02x".format(it) }
+    return "navigation_snapshot.$packId.$digest"
+}
+
 
 /**
  * Installed packages are candidates, not admitted packages. The production Host
@@ -219,21 +235,30 @@ internal fun LocalApplicationUiHost(
         LocalApplicationUiDecision.Legacy -> legacyContent()
         is LocalApplicationUiDecision.Hosted -> {
             val packId = decision.admission.pack.manifest.id
-            val snapshotKey = "navigation_snapshot.$packId"
-            val persistedSnapshot = remember(preference, packId) {
+            // An old overlay or pending screen is not part of a different session.
+            // Never migrate a legacy global pack snapshot without a session identity.
+            val sessionState = notificationSessions?.let { sessions ->
+                val snapshot by sessions.snapshots.collectAsStateWithLifecycle(
+                    initialValue = remember(sessions) { sessions.snapshot() })
+                snapshot
+            }
+            val snapshotKey = remember(packId, sessionState?.identity?.sessionId) {
+                localNavigationSnapshotKey(packId, sessionState?.identity?.sessionId)
+            }
+            val persistedSnapshot = remember(preference, snapshotKey) {
                 preference.getString(snapshotKey, null)
             }
-            val nav = remember(packId) {
+            val nav = remember(packId, snapshotKey) {
                 UiHostSceneNavigation(LocalUiSceneCatalog.requirements,
                     decision.admission.pack.manifest, UiSceneId("route.home"),
                     deepLinks = LocalApplicationSceneDeepLinks.targets)
             }
             // Notification session IDs are only local selectors, never arbitrary scene URLs.
             // Validate the target against the Session Owner catalog before opening it.
-            var notificationHomePending by remember(packId) {
+            var notificationHomePending by remember(packId, snapshotKey) {
                 mutableStateOf(false)
             }
-            var notificationError by remember(packId) {
+            var notificationError by remember(packId, snapshotKey) {
                 mutableStateOf<String?>(null)
             }
             LaunchedEffect(packId, notificationSessions, notificationSessionId) {
@@ -275,6 +300,7 @@ internal fun LocalApplicationUiHost(
                 onNavigationSnapshotUpdated = { encoded ->
                     preference.edit().putString(snapshotKey, encoded).commit()
                 },
+                navigationStateScope = snapshotKey,
             )
             notificationError?.let { error ->
                 // Explicit failure is visible without treating the notification as an action grant.
