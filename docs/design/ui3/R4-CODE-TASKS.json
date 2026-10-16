@@ -198,8 +198,8 @@
       "task": "可信工具 Schema 与结构化结果适配",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "原 Work 工具结果按真实 callId/finishedSequence 读取，本地 JSON 对象/数组自动生成只读折叠和表格，普通文本原样显示；V6 单包入口，无模型调用。 2026-10-16 继续代码：新增 V6UiDocumentScene/V6DocumentMedia，接入现有 UiDocumentUiPort、UiDocumentFormUiPort、MediaUiPort，原生处理 Text/Media/Table/BarChart/BoundText/Column/Row/Field/Select/Switch/Button/Disclosure 全节点；按 documentId/revision 读取与更新表单，文档执行与删除只交原 Owner，并明确发送/授权确认；图片有界解码、音频生命周期、视频播放、会话隔离素材读取和 Android SAF 用户选址导出。消息时间线原位展示每条所属文档，添加生成/查看入口；生成可用本地实际 Owner 模板或显式同意的额外模型请求。注册 conversation.ui_document 与 conversation.ui_document_generate 两个 Scene。另将已有 V6WorkEvidencePanel 通过 WorkEvidenceUiPort 正式接入 work.requirement_evidence 真场景、读取核验需求和产物版本。新增源代码回归测试，均未冒报 CI/设备验收。",
-      "remaining": "可信 Schema 驱动的交互字段与真实动作绑定、更多业务结果适配仍待实现。"
+      "implemented": "原 Work 工具结果按真实 callId/finishedSequence 读取，本地 JSON 对象/数组自动生成只读折叠和表格，普通文本原样显示；V6 单包入口，无模型调用。 2026-10-16 继续代码：新增 V6UiDocumentScene/V6DocumentMedia，接入现有 UiDocumentUiPort、UiDocumentFormUiPort、MediaUiPort，原生处理 Text/Media/Table/BarChart/BoundText/Column/Row/Field/Select/Switch/Button/Disclosure 全节点；按 documentId/revision 读取与更新表单，文档执行与删除只交原 Owner，并明确发送/授权确认；图片有界解码、音频生命周期、视频播放、会话隔离素材读取和 Android SAF 用户选址导出。消息时间线原位展示每条所属文档，添加生成/查看入口；生成可用本地实际 Owner 模板或显式同意的额外模型请求。注册 conversation.ui_document 与 conversation.ui_document_generate 两个 Scene。另将已有 V6WorkEvidencePanel 通过 WorkEvidenceUiPort 正式接入 work.requirement_evidence 真场景、读取核验需求和产物版本。新增源代码回归测试，均未冒报 CI/设备验收。 2026-10-16 续：UiDocumentFormUiPort 的交互字段在契约/Owner 分别按单行4096、多行16384、最终发送32768字符校验；V6 同步限制输入并提示，超限无法由模型动作绕过；新增字段/组合预算测试。",
+      "remaining": "真实工具 Schema 自描述到交互控件的映射、更多工具业务结果适配仍待实现；目前仅支持封闭的 SendUserInput/导航/当前 Work 审批意图，不将模型描述直接作为工具权限。"
     },
     {
       "id": "S4-02",
@@ -246,16 +246,16 @@
       "task": "历史编辑/分页/删除/版本迁移与完整恢复",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "删除确认/副作用不自动恢复或重放；完整跨版本迁移、崩溃与V6 单包恢复验收仍缺。\n2026-10-16 本轮源代码：Session 文档读写按 (sourceMessageId, documentId) 维护独立最新版本；本地模板按身份与模板建立稳定 ID，模型生成仅更新模型起源卡，损坏记录不得覆盖；增加同消息并存与并发版本冲突测试源码。\n2026-10-16 功能代码补充：Session EventLog 增加同文档 ID 的版本化删除墓碑；删除前强制当前会话身份、原始消息、文档修订号及存储记录 CAS 比对。被删除文档不可由迟到的 Work 事件原 ID 再生；热缓存增量回放与冷恢复均隐藏墓碑。V6 删除确认调用原 UiDocumentUiPort，Owner 真实持久化后返回 Deleted；同步清除该文档所有版本的 SavedState 表单草稿，新增相关回归测试。\n2026-10-16 审计修复：复核并保留最新文档解析显式 return 修复和增量索引/删除能力。 最终 SHA CI 待核对，仍不视为完整验收。",
-      "remaining": "历史消息级检索/分页/批量整理、文档正文版本化编辑与更复杂的冲突恢复仍未完成；本次新增删除路径不能替代全部历史治理。"
+      "implemented": "删除确认/副作用不自动恢复或重放；完整跨版本迁移、崩溃与V6 单包恢复验收仍缺。\n2026-10-16 本轮源代码：Session 文档读写按 (sourceMessageId, documentId) 维护独立最新版本；本地模板按身份与模板建立稳定 ID，模型生成仅更新模型起源卡，损坏记录不得覆盖；增加同消息并存与并发版本冲突测试源码。\n2026-10-16 功能代码补充：Session EventLog 增加同文档 ID 的版本化删除墓碑；删除前强制当前会话身份、原始消息、文档修订号及存储记录 CAS 比对。被删除文档不可由迟到的 Work 事件原 ID 再生；热缓存增量回放与冷恢复均隐藏墓碑。V6 删除确认调用原 UiDocumentUiPort，Owner 真实持久化后返回 Deleted；同步清除该文档所有版本的 SavedState 表单草稿，新增相关回归测试。\n2026-10-16 审计修复：复核并保留最新文档解析显式 return 修复和增量索引/删除能力。 最终 SHA CI 待核对，仍不视为完整验收。 2026-10-16 续：新增显式 EditUiDocumentTextCommand，经原 Session EventLog CAS 对文本节点生成 revision+1；限制16384字符、会话/消息/版本身份及业务操作；Work live 卡和审批节点不允许编辑；V6 提供文本选择/修改/确认入口，来源标注用户编辑并同步安全 fallback，新增契约及 EventLog 重开/墓碑回归。",
+      "remaining": "历史消息批量整理、结构化文档非文本节点的编辑、老版本迁移和复杂并发崩溃恢复仍缺；当前文本 CAS 代码已提交，需 JVM/Android16/17 当前 SHA 确认后进入独立验收。"
     },
     {
       "id": "S4-08",
       "task": "敏感草稿/留存/节点/历史/重组预算",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "\n2026-10-16 本轮代码增量：Session UiDocumentStore 新增按 session/message/documentId 向原 EventLog 查询单份文档的版本准入；Work 高频活动更新不再为比较一个卡片而物化整段文档历史。\n2026-10-16 功能代码补充：Session 文档列表维持首次精准流式重建，随后对同一会话及消息窗口通过 EventLog sequence 游标增量追读；缓存只持有当前可见消息集的最近定义，无第二持久化权威。墓碑删除同步清理当前及各版本敏感表单草稿。",
-      "remaining": "首次冷恢复仍需扫描完整 Session EventLog；超长会话下旧历史页的独立有界索引、草稿敏感字段分级清理及跨进程完整恢复仍待补齐。"
+      "implemented": "\n2026-10-16 本轮代码增量：Session UiDocumentStore 新增按 session/message/documentId 向原 EventLog 查询单份文档的版本准入；Work 高频活动更新不再为比较一个卡片而物化整段文档历史。\n2026-10-16 功能代码补充：Session 文档列表维持首次精准流式重建，随后对同一会话及消息窗口通过 EventLog sequence 游标增量追读；缓存只持有当前可见消息集的最近定义，无第二持久化权威。墓碑删除同步清理当前及各版本敏感表单草稿。 2026-10-16 续：Host 表单草稿 SavedState 增加单字段16384字符、每文档32字段、最多24文档及65536字符总预算，拒绝超限不先清空旧 revision，受损/旧版恢复均复用同一准入；测试覆盖超限、恢复、跨版本保留。",
+      "remaining": "Session EventLog 冷恢复首次全量扫描、超长历史独立有界索引与用户敏感输入分级加密/清理仍未闭环；SavedState 预算不能被当作加密存储或持久化恢复验收。"
     },
     {
       "id": "S4-09",
