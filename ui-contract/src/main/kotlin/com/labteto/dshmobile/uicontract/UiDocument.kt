@@ -177,3 +177,26 @@ data class UiDocumentPatch(val documentId: String, val baseRevision: Long, val r
 fun UiDocumentPatch.matches(current: UiDocument): Boolean = documentId == current.documentId &&
     replacement.documentId == current.documentId && replacement.source == current.source &&
     baseRevision == current.revision && current.revision < Long.MAX_VALUE && replacement.revision == current.revision + 1
+
+/**
+ * Editing a text node changes only presentation content and increments one document revision.
+ * It cannot modify tool approvals, actions, media identities, or owner-verified Work facts.
+ * The Session store still performs the authoritative compare-and-swap before publication.
+ */
+fun UiDocument.withUserEditedText(nodeId: String, newText: String): UiDocument? {
+    if (nodeId.isBlank() || newText.length > 16_384 || revision == Long.MAX_VALUE ||
+        documentId.startsWith("work-live:")) return null
+    var replacements = 0
+    fun rewrite(node: UiDocumentNode): UiDocumentNode = when (node) {
+        is UiDocumentNode.Text -> if (node.id == nodeId) {
+            replacements++
+            node.copy(text = newText)
+        } else node
+        is UiDocumentNode.Column -> node.copy(children = node.children.map(::rewrite))
+        is UiDocumentNode.Row -> node.copy(children = node.children.map(::rewrite))
+        is UiDocumentNode.Disclosure -> node.copy(children = node.children.map(::rewrite))
+        else -> node
+    }
+    val rewritten = nodes.map(::rewrite)
+    return if (replacements == 1) copy(revision = revision + 1, nodes = rewritten) else null
+}
