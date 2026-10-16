@@ -118,7 +118,7 @@ internal fun NextGlobalSearchScene(
                         Text(hit.title, style = MaterialTheme.typography.titleSmall)
                         Text(hit.message.role.name)
                         SelectionContainer { Text(hit.message.text.take(2000)) }
-                        TextButton(onClick = {
+                        TextButton(enabled = awaitingOpen == null, onClick = {
                             when (val receipt = sessions.submit(SessionUiCommand.Open(hit.sessionId))) {
                                 UiCommandReceipt.Accepted -> {
                                     awaitingOpen = hit.sessionId
