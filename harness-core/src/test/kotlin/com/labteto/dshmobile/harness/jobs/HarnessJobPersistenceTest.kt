@@ -202,7 +202,18 @@ class HarnessJobPersistenceTest {
             scope = this, onChanged = { }, initialSnapshots = durable.get(),
         )
         assertEquals("waiting_slice", restored.snapshots().single().status)
+        assertTrue(restored.infos().single().canMessage)
         assertTrue(restored.resumableSnapshots().any { it.id == id })
+        val queued = restored.sendInput(
+            id, QueuedAgentInput("从当前检查点继续", id = "msg-continue"), ownerId = "session-A",
+        )
+        assertTrue(queued.accepted)
+        assertTrue(queued.requiresResume)
+        assertEquals("msg-continue", restored.snapshots().single().inbox.single().id)
+        val stopped = HarnessJobManager(scope = this, onChanged = { }, initialSnapshots = durable.get())
+        assertTrue(stopped.kill(id, ownerId = "session-A").contains("已"))
+        assertEquals("cancelled", stopped.snapshots().single().status)
+        assertTrue(stopped.resumableSnapshots().isEmpty())
         val resumed = restored.resumePersistent(id, ownerId = "session-A") { _, _ -> "已完成" }
         assertTrue(resumed.contains("已恢复"))
         runCurrent()
