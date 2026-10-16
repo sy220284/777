@@ -298,6 +298,7 @@ fun V6ConversationScene(
         dismissButton = { TextButton(onClick = { editing = null }) { Text("取消") } },
     )
 
+    var navigationExpanded by remember(identity) { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().imePadding().padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) {
@@ -305,7 +306,37 @@ fun V6ConversationScene(
             Text(if (workMode) "Work" else "聊天", style = MaterialTheme.typography.titleLarge)
             SyButton("返回", onBack, style = SyButtonStyle.GHOST)
         }
-        if (workMode && identity != null &&
+        SyButton(if (navigationExpanded) "收起功能入口" else "功能与页面", {
+            navigationExpanded = !navigationExpanded
+        }, style = SyButtonStyle.GHOST)
+        if (navigationExpanded && onNavigate != null) {
+            val destinations = listOf(
+                "shell.new_session" to "新建会话",
+                "shell.search" to "搜索历史",
+                "route.settings" to "设置",
+                "route.tasks" to "自动任务",
+                "route.tools" to "工具与插件",
+                "route.workspace" to "本地工作区",
+                "media.creation" to "媒体创作",
+                "media.result" to "媒体成果",
+                "route.diary" to "人物日记",
+                "chat.persona_editor" to "编辑人物",
+                "chat.character_tuning" to "当前人物微调",
+                "chat.world_book" to "人物世界书",
+                "chat.reply_suggestions" to "回复建议",
+                "conversation.message_actions" to "消息操作",
+                "conversation.reader" to "完整阅读",
+                "settings.memory_management" to "记忆管理",
+            )
+            destinations.forEach { (id, label) ->
+                SyButton(label, onClick = {
+                    val result = onNavigate(UiSceneId(id))
+                    if (result !is UiSceneNavigationResult.Changed)
+                        feedback = "无法打开：" + label
+                }, style = SyButtonStyle.SECONDARY)
+            }
+        }
+        if (navigationExpanded && workMode && identity != null &&
             (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) &&
             onNavigate != null) {
             if (ports.workReads != null && ports.workPolicy != null)
@@ -321,7 +352,7 @@ fun V6ConversationScene(
                         feedback = "当前无法打开 Work 团队"
                 }, style = SyButtonStyle.SECONDARY)
         }
-        if (!workMode && identity != null &&
+        if (navigationExpanded && !workMode && identity != null &&
             (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) &&
             onNavigate != null) {
             if (ports.gallery != null && ports.selection != null)
@@ -349,7 +380,7 @@ fun V6ConversationScene(
                 }, style = SyButtonStyle.GHOST)
             }
         }
-        if (docOwner != null && formOwner != null &&
+        if (navigationExpanded && docOwner != null && formOwner != null &&
             (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) &&
             onNavigate != null) {
             SyButton("查看会话结构化文档", onClick = {
