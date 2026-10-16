@@ -176,6 +176,38 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
         changed() // Logical removal of receipt + result is one commit, before any file deletion.
         cleanupDeleted()
     }
+    /** Remove a visible result and all same-kind revisions so old audio cannot reappear. */
+    @Synchronized
+    fun removeRevisionFamily(id: String) = operation {
+        initialize()
+        val target = database.get(id)?.takeUnless { it.deleted } ?: return@operation
+        val sessionId = target.sessionId ?: return@operation
+        val rows = database.activeForSession(sessionId)
+        val byId = rows.associateBy { it.id }
+        fun kind(row: LocalMediaRecord): String? = row.result?.kind ?: row.video?.let { "VIDEO" } ?: row.job?.kind
+        fun parent(row: LocalMediaRecord): String? =
+            row.result?.revisionOf ?: row.video?.revisionOf ?: row.job?.revisionOf
+        val mediaKind = kind(target)
+        fun root(row: LocalMediaRecord): String {
+            var current = row
+            val seen = mutableSetOf(row.id)
+            repeat(100) {
+                val prior = parent(current)?.let(byId::get) ?: return current.id
+                if (kind(prior) != mediaKind || !seen.add(prior.id)) return current.id
+                current = prior
+            }
+            return current.id
+        }
+        val rootId = root(target)
+        val family = rows.filter { kind(it) == mediaKind && root(it) == rootId }
+        require(family.none { row ->
+            row.job?.phase in setOf(LocalMediaCreationPhase.PREPARING, LocalMediaCreationPhase.SUBMITTING, LocalMediaCreationPhase.SAVING) ||
+                row.video?.phase in setOf(LocalMediaVideoPhase.SUBMITTING, LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING)
+        }) { "同一成果仍在生成中，请等待完成后删除" }
+        database.transaction { family.forEach { database.put(it.copy(deleted = true)) } }
+        changed()
+        cleanupDeleted()
+    }
     @Synchronized
     fun cleanupDeleted() = operation {
         initialize()
