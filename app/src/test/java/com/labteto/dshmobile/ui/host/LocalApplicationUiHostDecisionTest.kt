@@ -155,6 +155,23 @@ class LocalApplicationUiHostDecisionTest {
         )
     }
 
+    @Test fun notificationNavigationRequiresOwnerToActivateExactTargetSession() {
+        val old = com.labteto.dshmobile.uicontract.UiSessionsSnapshot(
+            com.labteto.dshmobile.uicontract.UiSessionIdentity(
+                "old-story", "activation-old", 1L, null, null),
+            com.labteto.dshmobile.local.LocalUsageMode.CHAT,
+            false, emptyList(), null,
+        )
+        val new = old.copy(identity = com.labteto.dshmobile.uicontract.UiSessionIdentity(
+            "new-story", "activation-new", 2L, null, null))
+        assertTrue(!localNotificationHomeReady("new-story", old))
+        assertTrue(!localNotificationHomeReady("new-story", old.copy(loading = true)))
+        assertTrue(!localNotificationHomeReady("new-story", new.copy(loading = true)))
+        assertTrue(!localNotificationHomeReady(null, new))
+        assertTrue(!localNotificationHomeReady("new-story", null))
+        assertTrue(localNotificationHomeReady("new-story", new))
+    }
+
     @Test fun staleSelectionMustNotSilentlyRenderOldV6() {
         val decision = decideApplicationUi("uninstalled", emptyList(), requirements)
         assertTrue(decision is LocalApplicationUiDecision.Unavailable)
