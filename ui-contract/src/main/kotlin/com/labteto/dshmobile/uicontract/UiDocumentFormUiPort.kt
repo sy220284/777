@@ -13,6 +13,8 @@ data class UiDocumentFormKey(val sessionId: String, val documentId: String, val 
 }
 interface UiDocumentFormUiPort {
     val values: StateFlow<Map<UiDocumentFormKey, Map<String, String>>>
+    /** Bind source-defined retention before accepting field edits or restoring saved values. */
+    fun bindRetention(key: UiDocumentFormKey, fields: Map<String, UiFieldRetention>)
     fun update(key: UiDocumentFormKey, fieldId: String, value: String)
     /** Explicit deletion clears all revision drafts for this document. */
     fun forgetDocument(key: UiDocumentFormKey)
