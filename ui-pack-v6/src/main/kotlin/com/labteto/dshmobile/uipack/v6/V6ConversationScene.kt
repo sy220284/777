@@ -382,7 +382,8 @@ fun V6ConversationScene(
                     Text(info.mediaType + " · " + info.bytes + " 字节")
                     SyNote(if (info.digestVerified) "当前文件完整性已校验"
                         else "大型文件仅确认存在及长度，尚未完整哈希核验")
-                    if (info.preview != null) Text(info.preview)
+                    val preview = info.preview
+                    if (preview != null) Text(preview)
                     else SyNote("此类文件提供元数据与状态；二进制内容暂无直接播放器")
                     if (info.truncated) SyNote("文本仅显示前16 KiB")
                 }
