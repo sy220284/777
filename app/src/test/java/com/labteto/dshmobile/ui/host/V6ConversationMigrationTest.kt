@@ -161,7 +161,7 @@ class V6ConversationMigrationTest {
             UiAccessibility.entries.toSet(), false,
         )
 
-    @Test fun independentV6RegistersRealConversationPagesAndFourDistinctSlots() {
+    @Test fun independentV6RegistersConversationPagesAndRealSettingsSuite() {
         val candidate = pack()
         val expected = setOf(
             "settings.appearance", "settings.notifications", "settings.permissions",
@@ -169,12 +169,18 @@ class V6ConversationMigrationTest {
             "route.home", "conversation.chat", "conversation.work",
             "conversation.header", "conversation.timeline", "conversation.composer",
             "conversation.reply_status", "work.approval", "work.question",
+            "settings.root", "route.settings",
+            "settings.models", "conversation.model_picker", "settings.account",
+            "settings.minimax_quota", "settings.model_performance", "settings.pricing",
+            "settings.usage", "settings.model_usage", "settings.usage_log",
+            "settings.usage_detail", "settings.memory", "settings.memory_settings",
+            "settings.advanced", "settings.session_storage", "settings.diagnostics",
         ).map(::UiSceneId).toSet()
         assertEquals(expected, candidate.manifest.scenes)
         assertEquals(expected, candidate.renderers.keys)
     }
 
-    @Test fun scopedFourteenScenePackPassesContractWithoutExecutingOwners() {
+    @Test fun scopedConversationAndSettingsPackPassesContractWithoutExecutingOwners() {
         val candidate = pack()
         assertTrue(UiApplicationPackRegistry(listOf(candidate)).select(
             candidate.manifest.id, requirements(candidate.manifest, onlyDeclared = true),
