@@ -84,3 +84,17 @@ PR #705 同时维护 510 个文件（此数字为核对时快照），为 V6 UI 
 - `READY_FOR_SETTLEMENT` 只意味着**当前已知义务清零**，不自动把 Goal 状态写为 `completed`；用户审批/提问、正在运行的团队成员及暂停/阻塞状态都禁止被当作需要立即再开模型请求。
 - 即使旧 Goal 状态为 `completed`，如文件证据过期仍投影 `NEEDS_EXECUTION`，不制造成功。
 - 新增有开放 Todo、有证据缺口、目标暂停、团队执行中及无 Goal 场景的 JVM 状态断言。此提交没有实现 GoalDriver 自动续轮、真实 SideEffect Unknown 状态裁决、Agent Team 统一 TaskGraph，不能把 AE4V3-04 / -11 判定完成。
+
+## 9. 第三批：Work Goal 有界进展续轮接入生产（代码待 CI）
+
+该切片在 `harness-core/agent/AgentInputQueue` 中新增 `offerIfEmpty`（内嵌原持久提交/失败回滚），让自动接续不能排在已受理用户指令之后；保留现有可取消的 `WORK_CONTINUATION` 和 `AgentContinuationRef` 持久格式，不引入新持久事实源。
+
+Work Run Owner 的 `finishTurn` 在本轮历史 checkpoint 成功、尚未取消、下一条用户输入尚未入队时调用受约束的 `onIdle`。真正生产中的 `LocalWorkAgentTurnExecutor` 记录 ToolFinished 的成功回执与错误，`TurnCompleted` 留存**清理临时审批之前**的 GoalDisposition；仅当本轮正常完结且 Goal 当时及当前均为 `NEEDS_EXECUTION`，由 `LocalWorkGoalContinuation` 对照冻结目标身份与验收合同，再使用原子空队列提交 `work-goal-progress-queued`。
+
+准入条件：明确非空 goalId 且目标未改变、status=active、非 Plan mode、真实成功工具回执、无工具失败、无取消、无持久化错误、用户输入队列为空、steer revision 未变；采用既有的最多两次内部自动续轮政策。目标待审批/待用户/待团队/已完成或仅凭模型空口答复均不得自动重开请求。对未知副作用、存储错误保持停止而非重放。
+
+JVM 回归新增：
+- `AgentInputQueueTest`：新用户输入优先、失败持久化提交回滚。
+- `LocalWorkGoalContinuationTest`：真正工具回执、有无进展、失败、取消、steer、排队、目标替换、暂停/完成/等待、计划模式、连续续轮上限，以及 queue codec 恢复提示词与身份。
+
+**本阶段边界**：工具成功回执只是启动下一轮进一步核查的准入信号，**不等于已证明用户目标有效进展**；尚未实现跨无限长任务的动态进度度量、不确定外部副作用的查询/核销、严格持久 Goal revision 与全面多进程恢复。AE4V3-11 只能标 `in_progress`；最终 Kotlin 编译/单测必须以最新 SHA 的 CI 为准。App Shell/ChatFeature 业务未改动，本次新增 Shared/Work 行为不会自动变更 R4 UI 交付状态。
