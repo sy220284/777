@@ -7,6 +7,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -426,6 +429,17 @@ fun V6PreferencesScene(page: V6PreferencesPage, owner: HostPreferencesUiPort, on
     var loadError by remember(owner) { mutableStateOf<String?>(null) }
     var feedback by remember(owner, page) { mutableStateOf<String?>(null) }
     var saving by remember(owner, page) { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var systemNotificationAccess by remember(owner) { mutableStateOf(owner.notificationPermissionGranted()) }
+    DisposableEffect(owner, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                systemNotificationAccess = owner.notificationPermissionGranted()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val scope = rememberCoroutineScope()
     LaunchedEffect(owner) {
         try {
@@ -464,6 +478,13 @@ fun V6PreferencesScene(page: V6PreferencesPage, owner: HostPreferencesUiPort, on
         }
         feedback?.let { SyNote(it) }
         loadError?.let { SyNote(it) }
+        if (page == V6PreferencesPage.NOTIFICATIONS || page == V6PreferencesPage.PERMISSIONS) {
+            SyNote(when (systemNotificationAccess) {
+                true -> "Android 系统通知：已允许"
+                false -> "Android 系统通知：未允许；应用通知偏好不会授予系统权限"
+                null -> "Android 系统通知：当前无法确认授权状态"
+            })
+        }
         val current = settings
         if (current == null) SyNote("尚未读取到真实设置，操作不可用")
         else when (page) {
