@@ -122,8 +122,9 @@ class LocalMediaCreationRuntime @Inject internal constructor(
                 var downloaded: File? = null
                 var committed = false
                 try {
-                    downloaded = api.downloadGeneratedImage(url)
-                    committed = store.attachDownloadedImage(id, sessionId, url, downloaded)
+                    val file = api.downloadGeneratedImage(url)
+                    downloaded = file
+                    committed = store.attachDownloadedImage(id, sessionId, url, file)
                     if (committed) MediaUiReceipt.Applied
                     else MediaUiReceipt.Failed("下载期间成果已删除、变更或由其他操作保存，请刷新")
                 } finally { if (!committed) downloaded?.delete() }
