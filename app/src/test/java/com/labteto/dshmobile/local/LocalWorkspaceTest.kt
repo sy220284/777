@@ -479,4 +479,49 @@ class LocalWorkspaceTest {
         }
     }
 
+    @Test
+    fun exportFileForUiStreamsRealBytesWithoutOpeningSharedOrParentDirectories() {
+        val original = ByteArray(300_000) { (it % 253).toByte() }
+        val nested = root.resolve("exports").apply { mkdirs() }
+        nested.resolve("large.bin").writeBytes(original)
+        val target = java.io.ByteArrayOutputStream()
+
+        assertEquals(original.size.toLong(),
+            workspace.exportFileForUi("exports/large.bin", target))
+        assertTrue(original.contentEquals(target.toByteArray()))
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.exportFileForUi("../other.txt", java.io.ByteArrayOutputStream())
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.exportFileForUi(root.resolve("exports/large.bin").absolutePath,
+                java.io.ByteArrayOutputStream())
+        }
+    }
+
+    @Test
+    fun exportFileForUiRejectsSymlinkEvenWhenTargetIsInsideWorkspace() {
+        root.resolve("original.txt").writeText("real-value")
+        Files.createSymbolicLink(root.resolve("alias.txt").toPath(),
+            root.resolve("original.txt").toPath())
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.exportFileForUi("alias.txt", java.io.ByteArrayOutputStream())
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.exportFileForUi("missing.bin", java.io.ByteArrayOutputStream())
+        }
+    }
+
+    @Test
+    fun exportFileForUiCannotReadOutsideSandboxThroughSymlink() {
+        external = Files.createTempDirectory("local-workspace-export-private").toFile().apply {
+            resolve("private.txt").writeText("do-not-export")
+        }
+        Files.createSymbolicLink(root.resolve("outside").toPath(), external!!.toPath())
+        val target = java.io.ByteArrayOutputStream()
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.exportFileForUi("outside/private.txt", target)
+        }
+        assertEquals(0, target.size())
+    }
+
 }
