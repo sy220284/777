@@ -63,11 +63,17 @@ class V6ApplicationScenePack(
         id = "v6-application-migrating", version = 1,
         minContractVersion = UI_CONTRACT_VERSION, maxContractVersion = UI_CONTRACT_VERSION,
         scenes = pages.keys + sessionSettings + conversationScenes + documentScenes + evidenceScene,
-        requiredCapabilities = if (conversations == null) emptySet() else
-            setOf("chat.send_text", "work.send_text", "chat.edit", "chat.regenerate",
-                "chat.select_variant", "chat.stop", "work.edit", "work.regenerate",
-                "work.stop", "work.answer_question", "work.answer_approval")
-                .map(::UiCapabilityId).toSet(),
+        requiredCapabilities = buildSet {
+            if (conversations != null) {
+                addAll(setOf("chat.send_text", "work.send_text", "chat.edit", "chat.regenerate",
+                    "chat.select_variant", "chat.stop", "work.edit", "work.regenerate",
+                    "work.stop", "work.answer_question", "work.answer_approval"))
+                if (conversations.documents != null && conversations.forms != null)
+                    addAll(setOf("ui_document.generate", "ui_document.generate_local",
+                        "ui_document.prepare_input"))
+                if (conversations.evidence != null) add("work.evidence_reference")
+            }
+        }.map(::UiCapabilityId).toSet(),
         windowClasses = UiWindowClass.entries.toSet(),
         accessibility = UiAccessibility.entries.toSet(), supportsDark = true,
     )
