@@ -229,7 +229,12 @@ class OpenAiResponsesClient @Inject constructor(
 
     internal fun validateRequestPayload(payload: JsonObject, planSharing: Boolean = false) {
         val input = payload["input"] as? JsonArray
-        if (input.isNullOrEmpty()) {
+        val hasExecutableInput = input?.any { element ->
+            val item = element as? JsonObject
+            item != null && item["type"]?.jsonPrimitive?.contentOrNull != "additional_tools" &&
+                item["role"]?.jsonPrimitive?.contentOrNull != "developer"
+        } == true
+        if (!hasExecutableInput) {
             throw LocalModelException(
                 code = "RESPONSES_INPUT_REQUIRED",
                 message = "Responses API 请求缺少 input；后台任务必须提供至少一条实际输入，不能只发送 instructions。",
@@ -312,7 +317,8 @@ class OpenAiResponsesClient @Inject constructor(
         // Do not trust caller opt-in: plan sharing never accepts image_generation.
         val nativeImageToolEnabled = enableImageGenerationTool && !planSharing
         put("model", model)
-        responseInstructions(messages).takeIf(String::isNotBlank)?.let { put("instructions", it) }
+        val systemInstructions = responseInstructions(messages)
+        if (!planSharing) systemInstructions.takeIf(String::isNotBlank)?.let { put("instructions", it) }
         put("store", false)
         put("stream", true)
         reasoningEffort?.let { effort ->
@@ -359,6 +365,19 @@ class OpenAiResponsesClient @Inject constructor(
                     put("id", "at_" + UUID.nameUUIDFromBytes(adaptedTools.toString().toByteArray(Charsets.UTF_8)))
                     put("role", "developer")
                     put("tools", adaptedTools)
+                })
+            }
+            if (planSharing && systemInstructions.isNotBlank()) {
+                add(buildJsonObject {
+                    put("type", "message")
+                    put("id", "msg_" + UUID.nameUUIDFromBytes(systemInstructions.toByteArray(Charsets.UTF_8)))
+                    put("role", "developer")
+                    put("content", buildJsonArray {
+                        add(buildJsonObject {
+                            put("type", "input_text")
+                            put("text", systemInstructions)
+                        })
+                    })
                 })
             }
             responseInput(messages).forEach(::add)

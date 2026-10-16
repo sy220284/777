@@ -486,7 +486,7 @@ class OpenAiResponsesClientTest {
             temperature = 0.9,
         )
 
-        assertEquals("保持人物连续性", payload["instructions"]?.jsonPrimitive?.content)
+        assertFalse("Responses Lite instructions must be developer input", "instructions" in payload)
         assertEquals(false, payload["store"]?.jsonPrimitive?.content?.toBoolean())
         assertEquals(true, payload["stream"]?.jsonPrimitive?.content?.toBoolean())
         assertFalse("temperature" in payload)
@@ -513,8 +513,11 @@ class OpenAiResponsesClientTest {
         }
 
         val input = payload["input"]!!.jsonArray
-        assertEquals(1, input.size)
-        assertEquals("user", input.single().jsonObject["role"]?.jsonPrimitive?.content)
+        assertEquals(2, input.size)
+        assertEquals("developer", input[0].jsonObject["role"]?.jsonPrimitive?.content)
+        assertEquals("保持人物连续性",
+            input[0].jsonObject["content"]!!.jsonArray.single().jsonObject["text"]?.jsonPrimitive?.content)
+        assertEquals("user", input[1].jsonObject["role"]?.jsonPrimitive?.content)
     }
 
     @Test
@@ -529,11 +532,12 @@ class OpenAiResponsesClientTest {
             )
             client.validateRequestPayload(payload)
 
-            assertTrue(payload["instructions"]?.jsonPrimitive?.content.orEmpty().isNotBlank())
+            assertFalse("instructions" in payload)
             val input = payload["input"]!!.jsonArray
-            assertEquals(1, input.size)
-            assertEquals("user", input.single().jsonObject["role"]?.jsonPrimitive?.content)
-            assertEquals(prompt, input.single().jsonObject["content"]?.jsonPrimitive?.content)
+            assertEquals(2, input.size)
+            assertEquals("developer", input[0].jsonObject["role"]?.jsonPrimitive?.content)
+            assertEquals("user", input[1].jsonObject["role"]?.jsonPrimitive?.content)
+            assertEquals(prompt, input[1].jsonObject["content"]?.jsonPrimitive?.content)
         }
     }
 
@@ -748,7 +752,10 @@ class OpenAiResponsesClientTest {
             temperature = null,
         )
 
-        assertEquals("规则一\n\n规则二", payload["instructions"]?.jsonPrimitive?.content)
+        assertFalse("instructions" in payload)
+        assertEquals("规则一\n\n规则二",
+            payload["input"]!!.jsonArray.first().jsonObject["content"]!!.jsonArray.single()
+                .jsonObject["text"]?.jsonPrimitive?.content)
     }
 
     @Test
