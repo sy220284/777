@@ -54,7 +54,7 @@ internal fun V6DocumentMediaNode(node: UiDocumentNode.Media, sessionId: String, 
     val path = asset?.localPath
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(node.label)
-        if (path == null) {
+        if (path == null || media == null) {
             Text("此会话的媒体文件尚未保存在设备上，或当前访问未获授权。")
         } else {
             V6MediaExport(node, sessionId, media)
