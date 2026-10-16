@@ -17,7 +17,8 @@ import kotlinx.coroutines.launch
 
 /** File versions and origin validity are returned by Work, never inferred from model text. */
 @Composable
-fun V6WorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSessionIdentity) {
+fun V6WorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSessionIdentity,
+    openOnEntry: Boolean = false) {
     var generation by remember(identity) { mutableStateOf(0L) }
     var open by remember(identity) { mutableStateOf(false) }
     var snapshot by remember(identity) { mutableStateOf<UiWorkEvidenceSnapshot?>(null) }
@@ -48,6 +49,12 @@ fun V6WorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSessionIdentity) {
         }
     }
     fun close() { generation++; open = false; pending = false; selected = null; inspected = null }
+    LaunchedEffect(identity, openOnEntry) {
+        if (openOnEntry) {
+            open = true
+            refresh()
+        }
+    }
     TextButton(onClick = { open = true; refresh() }, enabled = !pending) { Text(stringResource(R.string.v6_evidence)) }
     if (open) AlertDialog(onDismissRequest = { close() }, title = { Text(stringResource(R.string.v6_evidence)) },
         text = { LazyColumn(Modifier.heightIn(max = 360.dp)) {
