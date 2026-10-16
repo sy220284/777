@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +29,11 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.uicontract.UI_CONTRACT_VERSION
 import com.labteto.dshmobile.uicontract.UiAccessibility
 import com.labteto.dshmobile.uicontract.UiCapabilityId
+import com.labteto.dshmobile.uicontract.SessionUiPort
+import com.labteto.dshmobile.uicontract.SessionUiCommand
+import com.labteto.dshmobile.uicontract.UiCommandReceipt
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 import com.labteto.dshmobile.uicontract.UiSceneId
 import com.labteto.dshmobile.uicontract.UiWindowClass
 import com.labteto.dshmobile.uihost.UiApplicationPackAdmission
@@ -166,6 +172,9 @@ internal fun LocalApplicationUiHost(
     installedPacks: Collection<UiApplicationScenePack>,
     availableCapabilities: Set<UiCapabilityId>,
     requestedSceneKey: String? = null,
+    notificationSessionId: String? = null,
+    notificationSessions: SessionUiPort? = null,
+    onNotificationSessionProcessed: () -> Unit = {},
     onSceneRequestProcessed: (String, com.labteto.dshmobile.uihost.UiSceneNavigationResult) -> Unit = { _, _ -> },
     legacyContent: @Composable () -> Unit,
 ) {
@@ -219,15 +228,57 @@ internal fun LocalApplicationUiHost(
                     decision.admission.pack.manifest, UiSceneId("route.home"),
                     deepLinks = LocalApplicationSceneDeepLinks.targets)
             }
+            // Notification session IDs are only local selectors, never arbitrary scene URLs.
+            // Validate the target against the Session Owner catalog before opening it.
+            var notificationHomePending by remember(packId, notificationSessionId) {
+                mutableStateOf(false)
+            }
+            var notificationError by remember(packId, notificationSessionId) {
+                mutableStateOf<String?>(null)
+            }
+            LaunchedEffect(packId, notificationSessions, notificationSessionId) {
+                val target = notificationSessionId
+                val sessions = notificationSessions
+                if (target == null || sessions == null) return@LaunchedEffect
+                try {
+                    require(target.length <= 256 && target.isNotBlank() &&
+                        target.none(Char::isISOControl)) { "无效的会话通知目标" }
+                    val catalog = sessions.snapshots.first { !it.loading }
+                    require(catalog.sessions.any { it.id == target }) {
+                        "通知指向的本地会话不存在或已经删除"
+                    }
+                    val result = sessions.submit(SessionUiCommand.Open(target))
+                    if (result == UiCommandReceipt.Accepted ||
+                        result == UiCommandReceipt.Queued) {
+                        notificationHomePending = true
+                    } else {
+                        notificationError = "当前无法打开通知指定的本地会话"
+                    }
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (failure: Exception) {
+                    notificationError = failure.message ?: "通知会话恢复失败"
+                } finally {
+                    onNotificationSessionProcessed()
+                }
+            }
             val result = decision.admission.RenderHostedScene(
                 nav, onAtRootBack = { activity?.finish() },
-                requestedDeepLinkKey = requestedSceneKey,
-                onDeepLinkProcessed = onSceneRequestProcessed,
+                requestedDeepLinkKey = if (notificationHomePending) "route.home"
+                    else requestedSceneKey,
+                onDeepLinkProcessed = { key, receipt ->
+                    if (key == "route.home" && notificationHomePending)
+                        notificationHomePending = false
+                    else onSceneRequestProcessed(key, receipt)
+                },
                 persistedNavigationSnapshot = persistedSnapshot,
                 onNavigationSnapshotUpdated = { encoded ->
                     preference.edit().putString(snapshotKey, encoded).commit()
                 },
             )
+            notificationError?.let { error ->
+                // Explicit failure is visible without treating the notification as an action grant.
+                Text(error, color = MaterialTheme.colorScheme.error)
+            }
             // An invalid restored history must not turn the application into an empty screen.
             if (result is UiSceneRenderAccess.Rejected) {
                 UnavailablePackNotice {
