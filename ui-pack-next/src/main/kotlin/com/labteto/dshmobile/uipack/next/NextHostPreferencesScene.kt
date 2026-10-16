@@ -9,6 +9,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.labteto.dshmobile.uicontract.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -19,6 +22,17 @@ internal fun NextHostPreferencesScene(
     page: String, port: HostPreferencesUiPort, onBack: () -> Unit,
 ) {
     val state by port.snapshots.collectAsStateWithLifecycle(initialValue = UiHostPreferences())
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var systemNotificationAccess by remember(port) { mutableStateOf(port.notificationPermissionGranted()) }
+    DisposableEffect(port, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                systemNotificationAccess = port.notificationPermissionGranted()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     var theme by remember(state.theme) { mutableStateOf(state.theme) }
     var accent by remember(state.accent) { mutableStateOf(state.accent) }
     var scale by remember(state.textScale) { mutableFloatStateOf(state.textScale) }
@@ -57,6 +71,13 @@ internal fun NextHostPreferencesScene(
             else -> "系统权限"
         }, style = MaterialTheme.typography.titleLarge)
         TextButton(onClick = onBack) { Text("返回") }
+        if (page == "settings.notifications" || page == "settings.permissions") {
+            Text(when (systemNotificationAccess) {
+                true -> "Android 系统通知：已允许"
+                false -> "Android 系统通知：未允许，应用内通知开关不能代替系统授权"
+                null -> "Android 系统通知：当前无法确认授权状态"
+            })
+        }
         notice?.let { Text(it) }
         when (page) {
             "settings.appearance" -> {
