@@ -236,10 +236,10 @@
     {
       "id": "S4-06",
       "task": "必要图表/数据选择/操作组合",
-      "codeStatus": "CODE_PARTIAL",
+      "codeStatus": "CODE_IMPLEMENTED_UNVERIFIED",
       "verification": "DEFERRED",
-      "implemented": " 2026-10-16：UiDocument 新增封闭 BarChart/UiChartPoint 只读数值节点、节点/数值/文字预算及严格 JSON schema，V6 原生进度比例绘制并显示精确数据标签；用户可选 Work Owner 工具调用统计本地模板，无额外模型请求、不假定通过，补协议/Codec/Builder 用例。\n2026-10-16 交互回复与渐进成果闭环代码：新增 submit_user_input 封闭意图：V6 原生确认完整冻结文本，经原 Chat/Work SendText Owner 返回真实受理/排队/失败；未确认、旧身份/版本仍拒绝。旧 send_user_input 保持只准备草稿。V6 单包表格补齐 revision 隔离的本地文字筛选。",
-      "remaining": "复杂实时数据计算与更多图表、特定业务直达操作仍须对应 Owner 的显式能力，不能由模型声明授权；完整跨包设备验收未完成。工具统计不等于完成统计。"
+      "implemented": " 2026-10-16：UiDocument 新增封闭 BarChart/UiChartPoint 只读数值节点、节点/数值/文字预算及严格 JSON schema，V6 原生进度比例绘制并显示精确数据标签；用户可选 Work Owner 工具调用统计本地模板，无额外模型请求、不假定通过，补协议/Codec/Builder 用例。\n2026-10-16 交互回复与渐进成果闭环代码：新增 submit_user_input 封闭意图：V6 原生确认完整冻结文本，经原 Chat/Work SendText Owner 返回真实受理/排队/失败；未确认、旧身份/版本仍拒绝。旧 send_user_input 保持只准备草稿。V6 单包表格补齐 revision 隔离的本地文字筛选。 2026-10-16 补封闭 LineChart（点数/深度/数值/文字预算、无额外操作字段、Codec 往返、V6 原生趋势绘制及逐点数值可读）；原柱状图、表格修订隔离筛选、封闭确认输入/审批/场景导航继续复用已有 Owner 回执。模型不能声明新工具授权或调用未登记业务动作，Legacy 渲染只读兼容分支已同步，新增恶意字段、负值与重复标签测试源码。",
+      "remaining": "当前声明的有界图表、筛选与已注册 Owner 动作在源码层已具备，待最新最终 SHA 的编译/JVM、Android16/17、可访问性和身份/确认/拒绝/进程恢复 E2E 签收。复杂实时计算、通用复杂图表及额外业务直达按 R4 计划第19节后置；未登记真实 Owner 能力保持不支持，严禁把模型声明当授权。"
     },
     {
       "id": "S4-07",
