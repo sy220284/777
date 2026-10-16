@@ -90,18 +90,24 @@ class LocalUiDocumentFormStateTest {
     }
 
     @Test fun oldUntrustedSavedStateCannotReintroduceSensitiveCredentials() {
+        var sanitized = arrayListOf<String>()
         val records = listOf("ui-document-form-v2",
             "s", "doc", "1", "clientSecret", "secret-restored",
             "s", "doc", "1", "secretary", "valid-name",
             "s", "doc", "1", "tokenizer", "valid-code",
             "s", "doc", "1", "access_token", "secret-access",
             "s", "doc", "1", "ordinary", "safe")
-        val form = LocalUiDocumentFormState(records) {}
+        val form = LocalUiDocumentFormState(records) { sanitized = it }
+        assertFalse(sanitized.contains("secret-restored"))
+        assertFalse(sanitized.contains("secret-access"))
+        assertEquals("ui-document-form-v2", sanitized.first())
         assertEquals(mapOf("secretary" to "valid-name", "tokenizer" to "valid-code",
             "ordinary" to "safe"), form.values.value[UiDocumentFormKey("s", "doc", 1)])
+        var scrubbedLegacy = arrayListOf<String>()
         val legacy = LocalUiDocumentFormState(
             listOf("s", "doc", "password", "old-password",
-                "s", "doc", "ordinary", "safe")) {}
+                "s", "doc", "ordinary", "safe")) { scrubbedLegacy = it }
+        assertFalse(scrubbedLegacy.contains("old-password"))
         assertEquals(mapOf("ordinary" to "safe"),
             legacy.values.value[UiDocumentFormKey("s", "doc", 0)])
     }
