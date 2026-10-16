@@ -750,14 +750,14 @@
           "status": "PENDING_EVIDENCE"
         },
         "share": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "FilesUiPort.exportWorkspaceFile(relativePath, userSelectedSAFOutput) + Host Android ACTION_SEND with URI grant",
+          "receiptType": "Long bytes actually copied by original workspace Owner; explicit SAF picker grant; ACTION_SEND/VIEW host dispatch",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
         "open_artifact": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "FilesUiPort.exportWorkspaceFile(relativePath, userSelectedSAFOutput) + Host Android ACTION_VIEW with URI grant",
+          "receiptType": "Long bytes actually copied by original workspace Owner; explicit SAF picker grant; ACTION_SEND/VIEW host dispatch",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
