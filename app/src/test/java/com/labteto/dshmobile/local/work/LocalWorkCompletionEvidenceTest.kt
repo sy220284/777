@@ -5,6 +5,33 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalWorkCompletionEvidenceTest {
+
+    @Test
+    fun blockedWorkflowRejectsPrematureGoalCompletionAndPreventsAutonomousResume() {
+        val goal = LocalGoal("检查并交付", id = "goal-graph", status = "active")
+        val work = LocalWorkState(
+            goal = goal,
+            todos = listOf(LocalTodoItem("图结果已处理", "completed")),
+            workflowProgress = LocalWorkflowProgress(
+                sessionId = "session-graph",
+                stage = "受阻",
+                task = "依赖节点",
+                completed = 2,
+                total = 3,
+                blockedReason = "子任务未通过验收",
+                needsUserAction = true,
+            ),
+        )
+        val evidence = localWorkCompletionEvidence(work)
+        assertFalse(evidence.readyForGoalCompletion)
+        assertTrue(evidence.toDiagnosticJson()["blocked_workflow"].toString() == "true")
+        assertTrue(evidence.userReasons.any { it.contains("工作流") })
+        assertTrue(assessLocalWorkGoal(work).disposition == LocalWorkGoalDisposition.BLOCKED)
+        assertFalse(resolveWorkGoalTransition(goal, goal.copy(status = "completed"), work).accepted)
+        val afterResolution = work.copy(workflowProgress = null)
+        assertTrue(localWorkCompletionEvidence(afterResolution).readyForGoalCompletion)
+    }
+
     @Test
     fun goalTransitionAndDeliveryUseOneDiagnosticFactProjection() {
         val work = LocalWorkState(

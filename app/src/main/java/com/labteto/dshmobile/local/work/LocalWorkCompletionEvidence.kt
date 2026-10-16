@@ -26,6 +26,7 @@ internal data class LocalWorkCompletionEvidence(
     val pendingApproval: Boolean,
     val pendingQuestion: Boolean,
     val deliveryEvidence: LocalWorkDeliveryEvidence? = null,
+    val blockedWorkflow: Boolean = false,
 ) {
     val findings: List<String> get() = buildList {
         if (openTodos > 0) add("完成声明与未完成任务清单冲突")
@@ -37,6 +38,7 @@ internal data class LocalWorkCompletionEvidence(
         if (teamFailure) add("完成声明与 Agent Team 异常状态冲突")
         if (teamRebuilding) add("完成声明与正在恢复的 Agent Team 状态冲突")
         if (blockedGoal) add("完成声明与阻塞目标状态冲突")
+        if (blockedWorkflow) add("完成声明与尚未解决的工作流阻塞冲突")
         if (pendingApproval) add("完成声明与待审批操作冲突")
         if (pendingQuestion) add("完成声明与待回答问题冲突")
         deliveryEvidence?.missing?.forEach { add("完成声明缺少正向验收证据：$it") }
@@ -52,6 +54,7 @@ internal data class LocalWorkCompletionEvidence(
         if (teamFailure) add("Agent Team 当前存在异常状态")
         if (teamRebuilding) add("Agent Team 正在恢复状态")
         if (blockedGoal) add("目标仍处于阻塞状态")
+        if (blockedWorkflow) add("还有工作流节点执行受阻，必须先重新执行或处理结果")
         if (pendingApproval) add("还有工具操作等待审批")
         if (pendingQuestion) add("还有待回答的问题")
         deliveryEvidence?.missing?.let(::addAll)
@@ -87,6 +90,7 @@ internal fun localWorkCompletionEvidence(
         pendingApproval = work.pendingApproval != null,
         pendingQuestion = work.pendingQuestion != null,
         deliveryEvidence = deliveryEvidence,
+        blockedWorkflow = work.workflowProgress?.needsUserAction == true,
     )
 }
 
@@ -107,6 +111,7 @@ internal fun LocalWorkCompletionEvidence.toDiagnosticJson(): JsonObject = buildJ
     put("team_has_failure", teamFailure)
     put("team_rebuilding", teamRebuilding)
     put("blocked_goal", blockedGoal)
+    put("blocked_workflow", blockedWorkflow)
     put("pending_approval", pendingApproval)
     put("pending_question", pendingQuestion)
     put("delivery_missing", JsonArray(deliveryEvidence?.missing.orEmpty().map(::JsonPrimitive)))
@@ -163,7 +168,7 @@ internal fun assessLocalWorkGoal(
     val disposition = when {
         goal == null -> LocalWorkGoalDisposition.NO_GOAL
         goal.status == "paused" -> LocalWorkGoalDisposition.PAUSED
-        goal.status == "blocked" || !team.failure.isNullOrBlank() ->
+        goal.status == "blocked" || !team.failure.isNullOrBlank() || evidence.blockedWorkflow ->
             LocalWorkGoalDisposition.BLOCKED
         work.pendingApproval != null -> LocalWorkGoalDisposition.WAITING_APPROVAL
         work.pendingQuestion != null -> LocalWorkGoalDisposition.WAITING_USER
