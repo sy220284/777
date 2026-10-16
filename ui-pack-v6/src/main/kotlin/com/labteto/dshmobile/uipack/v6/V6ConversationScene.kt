@@ -194,6 +194,7 @@ fun V6ConversationScene(
     val ids = messages.map { it.id }.toSet()
     var anchorRestored by remember(identity) { mutableStateOf(false) }
     var pendingAnchorId by remember(identity) { mutableStateOf<String?>(null) }
+    var anchorScrollInProgress by remember(identity) { mutableStateOf(false) }
 
     fun show(receipt: UiCommandReceipt) { feedback = describeV6ConversationReceipt(receipt) }
 
@@ -284,11 +285,12 @@ fun V6ConversationScene(
         )
         anchorRestored = true
     }
-    LaunchedEffect(identity?.sessionId, anchorRestored, messages, part, pendingAnchorId) {
+    LaunchedEffect(identity?.sessionId, anchorRestored, messages, part,
+        pendingAnchorId, anchorScrollInProgress) {
         if (part != V6ConversationPart.FULL && part != V6ConversationPart.TIMELINE)
             return@LaunchedEffect
         val sid = identity?.sessionId ?: return@LaunchedEffect
-        if (!anchorRestored || pendingAnchorId != null) return@LaunchedEffect
+        if (!anchorRestored || pendingAnchorId != null || anchorScrollInProgress) return@LaunchedEffect
         snapshotFlow {
             val msg = list.layoutInfo.visibleItemsInfo.firstOrNull { item ->
                 (item.key as? String)?.removePrefix("message:") in ids &&
@@ -324,13 +326,16 @@ fun V6ConversationScene(
                     hasOlder = loaded.hasOlder
                 }
                 if (loaded.found) {
-                    // Do not clear the pending anchor until after scrolling: otherwise
-                    // the viewport observer could overwrite it with the previous position.
-                    androidx.compose.runtime.withFrameNanos { }
-                    val offset = if (loaded.hasOlder) 1 else 0
-                    list.scrollToItem(nextMessages.indexOfFirst { it.id == messageId } + offset)
-                    pendingAnchorId = null
-                    feedback = null
+                    // Suppress the visible-position observer while removing the temporary
+                    // "continue" row, then scroll using the final list's actual header count.
+                    anchorScrollInProgress = true
+                    try {
+                        pendingAnchorId = null
+                        androidx.compose.runtime.withFrameNanos { }
+                        val offset = if (loaded.hasOlder) 1 else 0
+                        list.scrollToItem(nextMessages.indexOfFirst { it.id == messageId } + offset)
+                        feedback = null
+                    } finally { anchorScrollInProgress = false }
                 } else if (!loaded.hasOlder) {
                     pendingAnchorId = null
                     feedback = "已检索可用历史，目标消息不存在或已失效"
