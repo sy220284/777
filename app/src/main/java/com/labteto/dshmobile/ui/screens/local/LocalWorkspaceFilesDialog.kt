@@ -1,8 +1,11 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.labteto.dshmobile.uihost.MAX_LOCAL_SHARE_FILES
+import com.labteto.dshmobile.uihost.isShareableWorkspacePath
+import com.labteto.dshmobile.uihost.shareUiWorkspaceFiles
+
 import com.shenyan.designsystem.foundation.SyMetric
 
-import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -65,8 +68,6 @@ import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 internal enum class LocalFilesMode { WORKSPACE, CONVERSATION }
 
@@ -141,10 +142,7 @@ internal fun LocalWorkspaceFilesDialog(
         shareError = null
         scope.launch {
             try {
-                val intent = withContext(Dispatchers.IO) {
-                    createLocalWorkspaceShareIntent(context, workspacePath, paths)
-                }
-                context.startActivity(Intent.createChooser(intent, chooserTitle))
+                shareUiWorkspaceFiles(context, workspacePath, paths, chooserTitle)
                 selected.clear()
                 selecting = false
             } catch (cancelled: CancellationException) {

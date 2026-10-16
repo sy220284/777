@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.ui.screens.local
+package com.labteto.dshmobile.uihost
 
 import android.content.ClipData
 import android.content.Context
@@ -9,10 +9,10 @@ import androidx.core.content.FileProvider
 import java.io.File
 import java.util.ArrayList
 
-internal const val MAX_LOCAL_SHARE_FILES = 100
+const val MAX_LOCAL_SHARE_FILES = 100
 
 /** Do not expose app-owned configuration or paths outside the workspace to share targets. */
-internal fun isShareableWorkspacePath(path: String): Boolean {
+fun isShareableWorkspacePath(path: String): Boolean {
     if (path.isBlank() || path.startsWith('/') || '\\' in path || '\u0000' in path) return false
     val segments = path.split('/')
     return segments.all { it.isNotBlank() && it != "." && it != ".." } &&
@@ -20,7 +20,7 @@ internal fun isShareableWorkspacePath(path: String): Boolean {
 }
 
 /** Verify every chosen file again immediately before sending an Android share intent. */
-internal fun resolveLocalWorkspaceShareFiles(root: File, paths: List<String>): List<File> {
+fun resolveLocalWorkspaceShareFiles(root: File, paths: List<String>): List<File> {
     require(paths.isNotEmpty()) { "share_selection_empty" }
     require(paths.size <= MAX_LOCAL_SHARE_FILES) { "share_selection_limit" }
     val canonicalRoot = root.canonicalFile
@@ -38,7 +38,7 @@ internal fun resolveLocalWorkspaceShareFiles(root: File, paths: List<String>): L
     return resolved
 }
 
-internal fun localWorkspaceShareMime(mimes: List<String>): String {
+fun localWorkspaceShareMime(mimes: List<String>): String {
     if (mimes.isEmpty()) return "application/octet-stream"
     if (mimes.distinct().size == 1) return mimes.first()
     val groups = mimes.map { it.substringBefore('/', "") }.distinct()
@@ -58,8 +58,24 @@ private fun shareMime(file: File): String {
     }
 }
 
+/**
+ * Host-owned platform share operation. The caller supplies a user selection; Host alone
+ * resolves the app workspace, issues URI read grants and launches the native chooser.
+ * Opening the chooser does not claim the receiving app accepted or persisted the file.
+ */
+suspend fun shareUiWorkspaceFiles(
+    context: Context, workspacePath: String, selectedPaths: List<String>, chooserTitle: String,
+) {
+    val send = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        createLocalWorkspaceShareIntent(context, workspacePath, selectedPaths)
+    }
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+        context.startActivity(Intent.createChooser(send, chooserTitle))
+    }
+}
+
 /** Uses the existing non-exported FileProvider; only explicitly selected URIs get read grants. */
-internal fun createLocalWorkspaceShareIntent(
+fun createLocalWorkspaceShareIntent(
     context: Context,
     workspacePath: String,
     selectedPaths: List<String>,

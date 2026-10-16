@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.labteto.dshmobile.uihost.isShareableWorkspacePath
+
 import com.shenyan.designsystem.foundation.SyMetric
 
 import androidx.compose.animation.animateColorAsState

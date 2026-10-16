@@ -1,5 +1,10 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.labteto.dshmobile.uihost.MAX_LOCAL_SHARE_FILES
+import com.labteto.dshmobile.uihost.isShareableWorkspacePath
+import com.labteto.dshmobile.uihost.resolveLocalWorkspaceShareFiles
+import com.labteto.dshmobile.uihost.localWorkspaceShareMime
+
 import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

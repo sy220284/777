@@ -105,7 +105,7 @@
       "task": "Host 权限/文件/分享/通知/焦点服务",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "\n2026-10-15 本次增量：新增 HostPreferencesUiPort 以原 HostsStore DataStore 为真相源控制外观、通知和系统权限设置跳转；明确用户手势且不自行授予权限。 2026-10-16 本批：Host 通知授权读数同时核对 Android13+ POST_NOTIFICATIONS 运行时 grant 和 NotificationManager 系统开关；补 Android12/13/14+ 图片、视频、音频、部分照片的独立只读权限投影，V6 系统权限页在 onResume 时刷新；中立 UiHostMediaPermissionSnapshot 不将 SAF 单文件授权伪作全库权限。独立 Host RenderHostedScene 在实际场景栈/会话 scope 改变时清除过期焦点并关闭 IME；新增纯逻辑回归。",
+      "implemented": "\n2026-10-15 本次增量：新增 HostPreferencesUiPort 以原 HostsStore DataStore 为真相源控制外观、通知和系统权限设置跳转；明确用户手势且不自行授予权限。 2026-10-16 本批：Host 通知授权读数同时核对 Android13+ POST_NOTIFICATIONS 运行时 grant 和 NotificationManager 系统开关；补 Android12/13/14+ 图片、视频、音频、部分照片的独立只读权限投影，V6 系统权限页在 onResume 时刷新；中立 UiHostMediaPermissionSnapshot 不将 SAF 单文件授权伪作全库权限。独立 Host RenderHostedScene 在实际场景栈/会话 scope 改变时清除过期焦点并关闭 IME；新增纯逻辑回归。\n2026-10-16 Host 本批增量：工作区原生分享搬出旧 UI Shell 至 ui-host/UiWorkspaceShare.kt，由 Host 统一持有 FileProvider Intent、ClipData、URI 读取权限和原相对路径/符号链接检查。旧 Shell 仅保留用户选择与回执显示，原 JVM/Android 分享行为测试改为调用真实 Host 函数。权限/通知/IME 的统一协议仍为待完成项。\nNative Share 后续补齐：新增 Host suspend shareUiWorkspaceFiles 负责 IO 文件解析与主线程 Android chooser；旧 Shell 只传用户已选文件、显示失败回执，移除 android.content.Intent 及 URI 授权实现依赖。",
       "remaining": "仍缺中立 Host 系统服务协议收敛：文件导入/导出/分享/外部打开、权限和通知回执、焦点/IME 生命周期统一接线与代码级生命周期回归。"
     },
     {
