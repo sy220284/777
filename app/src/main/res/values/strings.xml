@@ -2445,5 +2445,6 @@
     <string name="ui_document_media_exported">媒体已保存</string>
     <string name="ui_document_media_export_failed">保存未成功，请检查目标文件</string>
     <string name="ui_document_media_export_cancelled">已取消保存</string>
+    <string name="composer_invocation_close">关闭连接器与技能列表</string>
 </resources>
 

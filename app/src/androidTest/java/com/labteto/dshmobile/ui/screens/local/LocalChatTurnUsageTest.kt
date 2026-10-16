@@ -72,7 +72,9 @@ class LocalChatTurnUsageTest {
     }
 
     private fun awaitText(text: String) {
-        compose.waitUntil(5_000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        // Media-backed sheets may finish first-frame layout later on Android 16 emulators.
+        // Keep an actual semantic assertion rather than relying on a fixed delay.
+        compose.waitUntil(20_000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText(text).assertIsDisplayed()
     }
 }

@@ -76,9 +76,29 @@ internal fun LocalComposerInvocationPicker(
                 onDismiss = { expanded = false; query = "" },
                 modifier = Modifier.width(310.dp),
             ) {
-                Text(stringResource(R.string.composer_invocation_title), color = colors.text,
-                    style = DsType.std14Strong.withReadingWeight(),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .padding(start = 16.dp, end = 8.dp, top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(R.string.composer_invocation_title),
+                        color = colors.text,
+                        style = DsType.std14Strong.withReadingWeight(),
+                        modifier = Modifier.weight(1f),
+                    )
+                    IconButton(
+                        onClick = { expanded = false; query = "" },
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            FeatherIcons.X,
+                            contentDescription = stringResource(R.string.composer_invocation_close),
+                            tint = colors.textSecondary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
                 SyTextField(
                     value = query,
                     onValueChange = { query = it },

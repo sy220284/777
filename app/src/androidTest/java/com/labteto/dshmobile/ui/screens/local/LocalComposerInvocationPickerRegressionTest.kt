@@ -10,7 +10,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.espresso.Espresso
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.uicontract.UiInvocationOption
 import com.labteto.dshmobile.uicontract.UiInvocationRef
@@ -48,7 +47,10 @@ class LocalComposerInvocationPickerRegressionTest {
             .performClick()
         compose.onNodeWithText("Figma").performClick()
         compose.runOnIdle { assertEquals(listOf(github, figma), selected) }
-        Espresso.pressBack() // Dismiss the multi-select popup before tapping its chips.
+        // Dismiss through the popup's own control: transient Popup windows do not always
+        // receive Espresso's window-focus based Back on Android 16.
+        compose.onNodeWithContentDescription(context.getString(R.string.composer_invocation_close))
+            .performClick()
         compose.onNodeWithContentDescription(context.getString(R.string.composer_invocation_remove, "Figma"))
             .performClick()
         compose.runOnIdle { assertEquals(listOf(github), selected) }
