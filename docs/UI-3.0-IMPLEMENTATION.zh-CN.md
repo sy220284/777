@@ -3,6 +3,8 @@
 
 > **2026-10-16 本轮代码-only 交付口径（覆盖本文件所有历史验收要求）：** 按用户要求取消所有设备验证，不再要求实机/模拟器、Android16/17 仪器测试、人工视觉、TalkBack 或弱网设备验收。保留实际业务功能、会话/权限/副作用一致性、冷恢复代码与 JVM/Compose 单测，交付必须经过 Kotlin 编译、静态与架构检查。历史段落仅保留开发溯源，不作为新的设备门禁。13 项未完成代码任务与 5 项代码检查保留真实状态，以 [正式任务台账](design/ui3/R4-CODE-TASKS.json) 为准。
 
+> **S4-07 动态文档图表编辑代码增量（需最终编译验证）：** 在当前 V6 动态文档直接选择柱状图/折线图的数值点，明确标注用户更正且未经业务核验；新 `EditUiDocumentChartPointCommand` 不接受任意节点/工具动作，复用原 Session EventLog 的同一来源、审批、会话、文档修订 CAS 流程。重构文本/表格/图表三条修改入口共用 `replaceDisplayNode`，消除三份 Owner 权限和持久化逻辑；新增图表边界、内容不越权、版本竞争、冷恢复和墓碑回归源码。老版本完整迁移与批量整理仍缺，`S4-07` 保持部分实现。
+
 > **MCP 生命周期代码增量（需最终编译验证）：** `McpToolBridgePlugin` 在连接占位、注册成功、排空断开、卸载、重连及失败清理时由原 Owner 发出有序 `StateFlow` 版本；`LocalPluginComposition → LocalToolsManagementPort → LocalToolsUiFacade → ToolsUiPort` 同步转发真实注册变化和 Composer 选中变化。V6 的两秒轮询已删除，改为订阅 Owner 事件；失败显示错误而不是吞掉。加入连接中/注册/断开的源码回归。此增量**仅替换内部状态观察机制**，远端未经请求的断链主动推送、逐调用授权投影、外部 Agent 订阅仍缺；S-1-01 保持代码部分实现。
 
 
