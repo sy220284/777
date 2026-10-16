@@ -292,3 +292,11 @@ Host 的 `ConversationShellUiPort` 接入重命名与显式置顶；原偏好 St
 - 中立UiMessageHistoryPort新增当前会话消息检索，沿用原Session授权、日志实例/重置代次与200条分页窗口。逐页扫描直到本批有命中或到末尾，不累计全量历史；关闭窗口取消，改变关键词须重新检索。
 - 命中通过原消息ID定位到检索时的真实只读历史页，可查看完整消息/复制；不会向主时间线插入中间缺失的消息页。跨会话全文检索、全局导航与主时间线定位恢复仍缺，S1-06保持CODE_PARTIAL。
 - 本批仅实现并提交代码，未测试、未编译、未做设备验证；10个Next注册Renderer和65个缺失包内Renderer数量不变。
+
+
+## 2026-10-16 按优先级推进：V6 独立设置场景（代码阶段）
+
+- 新增 `:ui-pack-v6/V6ApplicationScenePack`，外观、通知、系统权限三项各有真实 Compose Renderer，不复用 App 原 Shell 页面。页面通过原 `HostPreferencesUiPort` 读取和提交设置，系统权限跳转仍由 Host 处理；V6 组件沿用 `Sy*`，不强制 Next 继承。
+- `LocalApplicationPackInstallations.fromOwners` 注册迁移中 V6 候选包，保持既有 `legacy-v6-shell` 为稳定模式。生产 Host 仍以 **75 个必要 Scene** 和真实 Renderer 双重门禁判断准入；当前 V6 候选只有 **3/75**，不能启用或作为完成证明。
+- 新增独立 V6 场景测试源码：三项真实注册、生产完整目录拒绝和限定三场景准入。不把测试源码视为运行通过，也未做 Android 16/17 设备验收。
+- S3-01、S3-03、S3-05 仍是 `CODE_PARTIAL`。下一代码优先工作是从 App Shell 迁出会话导航、Composer、时间线、二级页、原业务回调，并逐项保持现有完整行为；S0 动作映射仍为 75/173，恢复 E2E 仍待验收。
