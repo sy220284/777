@@ -2,6 +2,9 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.attachment.copyAttachmentCancellably
 import com.labteto.dshmobile.local.attachment.commitImportedAttachmentFile
+import com.labteto.dshmobile.local.attachment.inspectImportedAttachmentFile
+import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
+import com.labteto.dshmobile.uicontract.UiAttachmentInspectionReceipt
 import java.io.File
 import java.nio.file.Files
 import java.io.ByteArrayOutputStream
@@ -22,6 +25,63 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalAttachmentImporterTest {
+    private fun stored(root: File, text: String): LocalImportedAttachment {
+        val sha = MessageDigest.getInstance("SHA-256")
+            .digest(text.toByteArray()).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        val dir = File(root, ".dsh/attachments").apply { mkdirs() }
+        File(dir, "$sha.txt").writeText(text)
+        return LocalImportedAttachment("note.txt", ".dsh/attachments/$sha.txt",
+            "text/plain", text.toByteArray().size.toLong(), sha)
+    }
+
+    @Test fun importedTextIsPreviewedWithVerifiedDigest() {
+        val root = kotlin.io.path.createTempDirectory("attachment-preview").toFile()
+        try {
+            val item = stored(root, "local attachment")
+            val result = inspectImportedAttachmentFile(root, item) as UiAttachmentInspectionReceipt.Ready
+            assertEquals("local attachment", result.value.preview)
+            assertTrue(result.value.digestVerified)
+            assertFalse(result.value.truncated)
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun tamperedOrMissingAttachmentCannotAppearHealthy() {
+        val root = kotlin.io.path.createTempDirectory("attachment-preview-changed").toFile()
+        try {
+            val item = stored(root, "original")
+            val file = File(root, item.relativePath)
+            file.writeText("tampered")
+            assertTrue(inspectImportedAttachmentFile(root, item) is UiAttachmentInspectionReceipt.Unavailable)
+            file.delete()
+            assertTrue(inspectImportedAttachmentFile(root, item) is UiAttachmentInspectionReceipt.Unavailable)
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun attachmentInspectorRejectsTraversalAndSymlinks() {
+        val root = kotlin.io.path.createTempDirectory("attachment-preview-link").toFile()
+        try {
+            val item = stored(root, "secret")
+            assertTrue(inspectImportedAttachmentFile(root, item.copy(relativePath = "../secret"))
+                is UiAttachmentInspectionReceipt.Unavailable)
+            val storedFile = File(root, item.relativePath)
+            val other = File(root, "other.txt").apply { writeText("secret") }
+            storedFile.delete()
+            Files.createSymbolicLink(storedFile.toPath(), other.toPath())
+            assertTrue(inspectImportedAttachmentFile(root, item) is UiAttachmentInspectionReceipt.Unavailable)
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun largeTextPreviewStaysBoundedWithoutFalseDigestClaim() {
+        val root = kotlin.io.path.createTempDirectory("attachment-preview-long").toFile()
+        try {
+            val item = stored(root, "A".repeat(9 * 1024 * 1024))
+            val result = inspectImportedAttachmentFile(root, item) as UiAttachmentInspectionReceipt.Ready
+            assertFalse(result.value.digestVerified)
+            assertTrue(result.value.truncated)
+            assertEquals(16_384, result.value.preview?.length)
+        } finally { root.deleteRecursively() }
+    }
+
     @Test
     fun onlySystemContentUrisMayCrossTheAttachmentPort() {
         assertTrue(isSupportedPickerAttachmentUri("content", "com.android.providers.media.documents"))
