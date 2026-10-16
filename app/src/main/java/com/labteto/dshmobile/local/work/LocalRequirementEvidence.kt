@@ -43,6 +43,47 @@ internal fun projectRequirementEvidenceLinks(
     return linked.values.toList().sortedBy(LocalRequirementEvidenceLink::requirementIndex)
 }
 
+/** User review is independent of the file reference and never asserts an automatic pass. */
+internal data class LocalRequirementEvidenceReview(
+    val requirementIndex: Int,
+    val requirement: String,
+    val artifactPath: String,
+    val linkSequence: Long,
+    val version: String,
+    val reviewSequence: Long,
+    val approvedByUser: Boolean,
+)
+
+/** Reviews bind to one exact current link/goal/version. Replacing a link invalidates old reviews. */
+internal fun projectRequirementEvidenceReviews(
+    events: Sequence<LocalSessionEventLog.Event>,
+    links: List<LocalRequirementEvidenceLink>,
+    goalId: String?,
+): List<LocalRequirementEvidenceReview> {
+    val current = links.associateBy { it.eventSequence }
+    val reviews = linkedMapOf<Long, LocalRequirementEvidenceReview>()
+    events.forEach { event ->
+        if (event.type != "work/requirement-evidence-review") return@forEach
+        val data = event.data
+        val savedGoal = (data["goal_id"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
+        if (savedGoal != goalId) return@forEach
+        val linkSequence = (data["link_sequence"] as? JsonPrimitive)?.longOrNull ?: return@forEach
+        val link = current[linkSequence] ?: return@forEach
+        val index = (data["requirement_index"] as? JsonPrimitive)?.intOrNull ?: return@forEach
+        val text = (data["requirement"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
+        val path = (data["artifact_path"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
+        val version = (data["sha256"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
+        val decision = (data["approved_by_user"] as? JsonPrimitive)?.contentOrNull
+        if (index != link.requirementIndex || text != link.requirement ||
+            path != link.artifactPath || version != link.versionAtLink ||
+            event.sequence <= linkSequence || decision !in setOf("true", "false")) return@forEach
+        reviews[linkSequence] = LocalRequirementEvidenceReview(
+            index, text, path, linkSequence, version, event.sequence, decision == "true",
+        )
+    }
+    return reviews.values.sortedBy(LocalRequirementEvidenceReview::requirementIndex)
+}
+
 /** Exact selected source event; no fuzzy matching by filename or task wording. */
 internal fun sourceArtifactMatchesEvidence(
     event: LocalSessionEventLog.Event?,
