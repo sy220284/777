@@ -29,6 +29,7 @@ import com.labteto.dshmobile.uicontract.preparedInput
 import com.labteto.dshmobile.uicontract.invalidInputFields
 import com.labteto.dshmobile.uicontract.withUserEditedText
 import com.labteto.dshmobile.uicontract.withUserEditedTableCell
+import com.labteto.dshmobile.uicontract.withUserEditedChartPoint
 import com.labteto.dshmobile.local.uiBindingIdentity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -266,85 +267,38 @@ internal class LocalUiDocumentUiAdapter(
         }
 
     /**
-     * User-edited presentation text is a new Session EventLog revision. The edited card
-     * receives explicit USER-EDITED provenance, and CAS prevents overwriting late work
-     * updates or a concurrently deleted document. No approval/tool action can be edited.
+     * All user corrections share exactly one versioned Session Owner transaction:
+     * exact source lookup, immutable rewrite, active binding check, then EventLog CAS.
+     * UI commands never authorize tools or edit Work-generated live/approval cards.
      */
-    override suspend fun replaceText(command: com.labteto.dshmobile.uicontract.EditUiDocumentTextCommand):
-        UiDocumentReceipt = kotlinx.coroutines.withContext(Dispatchers.IO) {
-        if (command.documentId.isBlank() || command.documentId.length > 200 ||
-            command.source.sessionId != command.identity.sessionId ||
-            command.source.messageId.isBlank() || command.replacementText.length > 16_384)
-            return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
-        try {
-            val original = store.latestDocument(command.identity.sessionId, command.source.messageId,
-                command.documentId, generation.budget, knownScenes)
-                ?: return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
-            val document = original.document
-            if (original.recoveryNotice != null || document.revision != command.revision ||
-                document.source != command.source ||
-                document.actions.any { it is UiDocumentAction.AnswerApproval } ||
-                document.documentId.startsWith("work-live:"))
-                return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
-            val changed = document.withUserEditedText(command.textNodeId, command.replacementText)
-                ?: return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
-            // Version and output budgets are verified again under the existing Store CAS.
-            synchronized(state.foregroundRunHandle.lock) {
-                val current = state.state.value
-                if (state.sessionTransitioning ||
-                    state.uiBindingIdentity(current) != command.identity ||
-                    (current.usageMode == LocalUsageMode.WORK) != command.source.workMode ||
-                    current.messages.none { it.id == command.source.messageId } ||
-                    !sourceMatches(command.source, command.identity,
-                        current.usageMode == LocalUsageMode.WORK))
-                    return@synchronized UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
-                val provenance = com.labteto.dshmobile.uicontract.UiDocumentProvenance(
-                    null, "user-edited", false,
-                    com.labteto.dshmobile.uicontract.UiDocumentOrigin.LOCAL)
-                if (store.publish(changed, provenance, null, document,
-                        generation.budget, knownScenes))
-                    UiDocumentReceipt.Published(changed.documentId)
-                else UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
-            }
-        } catch (cancelled: CancellationException) { throw cancelled }
-        catch (failure: Exception) { UiDocumentReceipt.Failed(failure.message) }
-    }
-
-    /**
-     * Versioned user correction of one existing table cell. No arbitrary node replacement,
-     * schema transformation, tool permission, or media reference may be supplied by the UI.
-     */
-    override suspend fun replaceTableCell(
-        command: com.labteto.dshmobile.uicontract.EditUiDocumentTableCellCommand,
+    private suspend fun replaceDisplayNode(
+        identity: UiSessionIdentity, documentId: String, revision: Long,
+        source: UiDocumentSource,
+        rewrite: (com.labteto.dshmobile.uicontract.UiDocument) ->
+            com.labteto.dshmobile.uicontract.UiDocument?,
     ): UiDocumentReceipt = kotlinx.coroutines.withContext(Dispatchers.IO) {
-        if (command.documentId.isBlank() || command.documentId.length > 200 ||
-            command.source.sessionId != command.identity.sessionId ||
-            command.source.messageId.isBlank() || command.tableNodeId.isBlank() ||
-            command.replacementText.length > 4096 ||
-            command.rowIndex < 0 || command.columnIndex < 0)
+        if (documentId.isBlank() || documentId.length > 200 ||
+            source.sessionId != identity.sessionId || source.messageId.isBlank())
             return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
         try {
-            val original = store.latestDocument(command.identity.sessionId,
-                command.source.messageId, command.documentId, generation.budget, knownScenes)
+            val original = store.latestDocument(identity.sessionId, source.messageId,
+                documentId, generation.budget, knownScenes)
                 ?: return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
             val doc = original.document
-            if (original.recoveryNotice != null || doc.revision != command.revision ||
-                doc.source != command.source ||
+            if (original.recoveryNotice != null || doc.revision != revision ||
+                doc.source != source ||
                 doc.actions.any { it is UiDocumentAction.AnswerApproval } ||
                 doc.documentId.startsWith("work-live:"))
                 return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
-            val replacement = doc.withUserEditedTableCell(
-                command.tableNodeId, command.rowIndex, command.columnIndex,
-                command.replacementText,
-            ) ?: return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+            val replacement = rewrite(doc)
+                ?: return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
             synchronized(state.foregroundRunHandle.lock) {
                 val current = state.state.value
                 if (state.sessionTransitioning ||
-                    state.uiBindingIdentity(current) != command.identity ||
-                    (current.usageMode == LocalUsageMode.WORK) != command.source.workMode ||
-                    current.messages.none { it.id == command.source.messageId } ||
-                    !sourceMatches(command.source, command.identity,
-                        current.usageMode == LocalUsageMode.WORK))
+                    state.uiBindingIdentity(current) != identity ||
+                    (current.usageMode == LocalUsageMode.WORK) != source.workMode ||
+                    current.messages.none { it.id == source.messageId } ||
+                    !sourceMatches(source, identity, current.usageMode == LocalUsageMode.WORK))
                     return@synchronized UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
                 val provenance = com.labteto.dshmobile.uicontract.UiDocumentProvenance(
                     null, "user-edited", false,
@@ -356,6 +310,42 @@ internal class LocalUiDocumentUiAdapter(
             }
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) { UiDocumentReceipt.Failed(failure.message) }
+    }
+
+    override suspend fun replaceText(
+        command: com.labteto.dshmobile.uicontract.EditUiDocumentTextCommand,
+    ): UiDocumentReceipt {
+        if (command.textNodeId.isBlank() || command.replacementText.length > 16_384)
+            return UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+        return replaceDisplayNode(command.identity, command.documentId, command.revision,
+            command.source) { doc ->
+            doc.withUserEditedText(command.textNodeId, command.replacementText)
+        }
+    }
+
+    override suspend fun replaceTableCell(
+        command: com.labteto.dshmobile.uicontract.EditUiDocumentTableCellCommand,
+    ): UiDocumentReceipt {
+        if (command.tableNodeId.isBlank() || command.rowIndex < 0 ||
+            command.columnIndex < 0 || command.replacementText.length > 4096)
+            return UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+        return replaceDisplayNode(command.identity, command.documentId, command.revision,
+            command.source) { doc ->
+            doc.withUserEditedTableCell(command.tableNodeId, command.rowIndex,
+                command.columnIndex, command.replacementText)
+        }
+    }
+
+    override suspend fun replaceChartPoint(
+        command: com.labteto.dshmobile.uicontract.EditUiDocumentChartPointCommand,
+    ): UiDocumentReceipt {
+        if (command.chartNodeId.isBlank() || command.pointIndex < 0 ||
+            !command.value.isFinite() || command.value !in 0.0..1.0e12)
+            return UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+        return replaceDisplayNode(command.identity, command.documentId, command.revision,
+            command.source) { doc ->
+            doc.withUserEditedChartPoint(command.chartNodeId, command.pointIndex, command.value)
+        }
     }
 
     /** Explicit user deletion, not a model-generated action; the EventLog owns the tombstone. */
