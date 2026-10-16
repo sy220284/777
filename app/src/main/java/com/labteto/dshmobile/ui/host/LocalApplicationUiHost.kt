@@ -70,7 +70,7 @@ internal object LocalApplicationPackInstallations {
                     reading = owner.conversationReadingUiPort,
                     attachments = owner.attachmentUiPort, history = owner.messageHistoryUiPort,
                     documents = owner.nextUiDocumentUiPort, forms = owner.uiDocumentFormPort,
-                    media = owner.mediaUiPort,
+                    media = owner.mediaUiPort, evidence = owner.workEvidenceUiPort,
                     workMode = { owner.shellState.value.usageMode == LocalUsageMode.WORK },
                     workModeUpdates = owner.shellState.map { it.usageMode == LocalUsageMode.WORK },
                 ),
