@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.uicontract
 
 enum class UiToolRegistration { REGISTERED, PENDING, REMOVING }
+/** Explicit ping only; RESPONDED never implies tool authorization or continuous availability. */
+enum class UiMcpHealth { RESPONDED, BUSY, NOT_CONNECTED, UNCONFIRMED, UNSUPPORTED }
 enum class UiToolSelection { UNKNOWN }
 enum class UiToolConnection { HEALTH_UNCHECKED, CONNECTING, RECONNECTING, DISCONNECTING }
 enum class UiToolAuthorization { REQUIRED_PER_CALL }
@@ -21,6 +23,7 @@ data class UiSkillEditorSnapshot(val id: String, val document: String)
 /** Metadata is not an invocation grant. Actual tool execution remains outside this management port. */
 interface ToolsUiPort {
     suspend fun servers(): List<UiMcpServerSnapshot>
+    suspend fun checkServerHealth(serverId: String): UiMcpHealth = UiMcpHealth.UNSUPPORTED
     suspend fun githubConfigured(): Boolean
     fun capabilityCatalogue(): List<UiToolCapabilitySnapshot>
     fun installedPluginIds(): List<String>
