@@ -82,6 +82,9 @@ internal object LocalApplicationPackInstallations {
                     workMode = { owner.shellState.value.usageMode == LocalUsageMode.WORK },
                     workModeUpdates = owner.shellState.map { it.usageMode == LocalUsageMode.WORK },
                 ),
+                usageOwner = owner.usageUiPort,
+                updateStatus = updateStatus,
+                checkForUpdate = checkForUpdate,
             ),
             NextApplicationScenePack(NextApplicationFeaturePorts(
             chat = owner.chatUiPort, work = owner.workConversationUiPort,
