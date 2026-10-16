@@ -41,4 +41,6 @@ interface HostPreferencesUiPort {
     /** The Host opens the OS settings activity, never an arbitrary page or model URL. */
     fun openSystemPermissions(): Boolean
     fun openSystemNotifications(): Boolean
+    /** OS-level notification access, not a saved preference and never a permission grant. */
+    fun notificationPermissionGranted(): Boolean? = null
 }
