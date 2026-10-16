@@ -28,6 +28,8 @@ internal fun NextWorldBookScene(
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
     var keywords by remember { mutableStateOf("") }
+    var secondaryKeywords by remember { mutableStateOf("") }
+    var stage by remember { mutableStateOf("") }
     var alwaysOn by remember { mutableStateOf(false) }
     var priority by remember { mutableIntStateOf(50) }
     var busy by remember { mutableStateOf(false) }
@@ -103,7 +105,8 @@ internal fun NextWorldBookScene(
             Text("世界资料 ${value.draft.lore.size} 条")
             Button(enabled = !busy, onClick = {
                 editing = UiPersonaLore(UUID.randomUUID().toString(), "", "")
-                title = ""; content = ""; keywords = ""; alwaysOn = false; priority = 50
+                title = ""; content = ""; keywords = ""; secondaryKeywords = ""; stage = ""
+                alwaysOn = false; priority = 50
             }) { Text("新增世界资料") }
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(value.draft.lore, key = { it.id }) { entry ->
@@ -116,6 +119,8 @@ internal fun NextWorldBookScene(
                                 editing = entry
                                 title = entry.title; content = entry.content
                                 keywords = entry.keywords.joinToString(",")
+                                secondaryKeywords = entry.secondaryKeywords.joinToString(",")
+                                stage = entry.stage
                                 alwaysOn = entry.alwaysOn; priority = entry.priority
                             }) { Text("编辑") }
                             TextButton(enabled = !busy, onClick = { deletion = entry }) { Text("删除") }
@@ -134,6 +139,10 @@ internal fun NextWorldBookScene(
                     minLines = 3)
                 OutlinedTextField(keywords, { keywords = it.take(300) },
                     label = { Text("关键词，逗号分隔") })
+                OutlinedTextField(secondaryKeywords, { secondaryKeywords = it.take(300) },
+                    label = { Text("次级关键词，逗号分隔") })
+                OutlinedTextField(stage, { stage = it.take(150) },
+                    label = { Text("条目生效阶段") })
                 Row {
                     Switch(alwaysOn, onCheckedChange = { alwaysOn = it })
                     Text("常驻资料")
@@ -145,7 +154,9 @@ internal fun NextWorldBookScene(
                 onClick = {
                     val revised = original.copy(title = title.trim(), content = content.trim(),
                         keywords = keywords.split(',','，').map(String::trim).filter(String::isNotBlank).distinct(),
-                        alwaysOn = alwaysOn, priority = priority)
+                        secondaryKeywords = secondaryKeywords.split(',','，').map(String::trim)
+                            .filter(String::isNotBlank).distinct(),
+                        stage = stage.trim(), alwaysOn = alwaysOn, priority = priority)
                     mutate { existing ->
                         val index = existing.indexOfFirst { it.id == original.id }
                         if (index < 0) existing + revised else existing.toMutableList().apply { set(index, revised) }
