@@ -164,6 +164,9 @@ internal fun LocalGeneratedMediaResultRow(
     var confirmDeletion by remember(result.id) { mutableStateOf(false) }
     var deleting by remember(result.id) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val revisionActive = revisionJob?.phase in setOf(
+        LocalMediaCreationPhase.PREPARING, LocalMediaCreationPhase.SUBMITTING, LocalMediaCreationPhase.SAVING,
+    )
     val label = when (result.kind) {
         LocalMediaKind.IMAGE.name -> resources.getString(R.string.media_chat_image_done)
         LocalMediaKind.SPEECH.name -> resources.getString(R.string.media_chat_speech_done)
@@ -260,10 +263,10 @@ internal fun LocalGeneratedMediaResultRow(
                 LocalMediaRevisionDraft.from(result)?.let { draft ->
                     SyButton(text = resources.getString(R.string.media_recreate_edit_and_generate),
                         onClick = { showActions = false; onRevise(draft) },
-                        enabled = revisionJob == null)
+                        enabled = !revisionActive)
                 }
                 SyButton(text = resources.getString(R.string.media_studio_delete_record),
-                    enabled = revisionJob == null, variant = SyButtonVariant.Ghost,
+                    enabled = !revisionActive, variant = SyButtonVariant.Ghost,
                     onClick = { confirmDeletion = true })
             }
             SyButton(text = resources.getString(R.string.media_studio_delete_cancel),
