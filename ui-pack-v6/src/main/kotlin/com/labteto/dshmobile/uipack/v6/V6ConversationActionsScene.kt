@@ -168,6 +168,7 @@ fun V6MessageOperationScene(
 fun V6ReplySuggestionsScene(
     owner: ReplySuggestionsUiPort,
     drafts: ConversationDraftUiPort,
+    chat: ChatUiPort,
     onBack: () -> Unit,
 ) {
     val state by owner.snapshots.collectAsStateWithLifecycle(
@@ -202,6 +203,18 @@ fun V6ReplySuggestionsScene(
                         drafts.updateDraft(identity.sessionId, idea.text)
                         notice = "已填写草稿，发送前仍可修改"
                     }, style = SyButtonStyle.SECONDARY)
+                    SyButton("直接发送此建议", {
+                        val latest = chat.snapshot()
+                        if (owner.snapshot().identity != identity || latest.identity != identity ||
+                            !latest.send.enabled) {
+                            notice = "会话或发送权限已变化，请重新确认"
+                        } else {
+                            val receipt = chat.submit(ChatUiCommand.SendText(identity, idea.text))
+                            notice = describeV6ConversationReceipt(receipt)
+                            // This path does not clear the user's unrelated composer draft.
+                        }
+                    }, enabled = !busy && idea.text.isNotBlank(),
+                        style = SyButtonStyle.GHOST)
                 }
             }
         }
