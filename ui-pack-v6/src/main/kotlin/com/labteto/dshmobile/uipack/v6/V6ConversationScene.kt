@@ -593,11 +593,12 @@ fun V6ConversationScene(
             })
     }
     BoxWithConstraints(Modifier.fillMaxSize().imePadding().padding(12.dp)) {
-    val composerLines = when { maxHeight < 360.dp -> 1; maxHeight < 480.dp -> 2; else -> 5 }
+    val isCompactViewport = maxHeight < 480.dp
+    val composerLines = when { maxHeight < 360.dp -> 1; isCompactViewport -> 2; else -> 5 }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (part == V6ConversationPart.FULL || part == V6ConversationPart.HEADER) {
         if (onNavigate != null) V6ConversationEntries(ports, modelSettings, sessions, availableScenes,
-            workMode, identity, chat.group != null, maxHeight < 480.dp, onBack, onNavigate)
+            workMode, identity, chat.group != null, isCompactViewport, onBack, onNavigate)
         else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(if (workMode) "工作" else "聊天", style = MaterialTheme.typography.titleLarge)
             SyButton("返回", onBack, style = SyButtonStyle.GHOST)
