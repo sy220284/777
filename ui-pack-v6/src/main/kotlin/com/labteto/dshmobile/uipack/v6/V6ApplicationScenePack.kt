@@ -435,10 +435,12 @@ fun V6PreferencesScene(page: V6PreferencesPage, owner: HostPreferencesUiPort, on
     var saving by remember(owner, page) { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
     var systemNotificationAccess by remember(owner) { mutableStateOf(owner.notificationPermissionGranted()) }
+    var mediaAccess by remember(owner) { mutableStateOf(owner.mediaPermissionSnapshot()) }
     DisposableEffect(owner, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 systemNotificationAccess = owner.notificationPermissionGranted()
+                mediaAccess = owner.mediaPermissionSnapshot()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -488,6 +490,16 @@ fun V6PreferencesScene(page: V6PreferencesPage, owner: HostPreferencesUiPort, on
                 false -> "Android 系统通知：未允许；应用通知偏好不会授予系统权限"
                 null -> "Android 系统通知：当前无法确认授权状态"
             })
+        }
+        if (page == V6PreferencesPage.PERMISSIONS) {
+            mediaAccess?.let { media ->
+                SyNote("系统媒体授权：图片" + if (media.images) "允许" else "未允许")
+                SyNote("系统媒体授权：视频" + if (media.videos) "允许" else "未允许")
+                SyNote("系统媒体授权：音频" + if (media.audio) "允许" else "未允许")
+                if (media.selectedVisualOnly)
+                    SyNote("照片仅授予部分选择范围，应用不可直接访问其他媒体")
+                SyNote("此处只显示媒体库读取授权；系统文件选择器的单文件授权独立生效。")
+            } ?: SyNote("当前无法读取 Android 媒体权限状态")
         }
         val current = settings
         if (current == null) SyNote("尚未读取到真实设置，操作不可用")
