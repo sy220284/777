@@ -16,7 +16,11 @@ internal interface LocalToolsManagementPort {
     suspend fun recoverFailedPlugin(id: String): List<String> =
         error("当前工具 Owner 不支持插件恢复")
     fun installedPluginIds(): List<String>
-    fun capabilityCatalogue(): List<LocalToolCatalogueEntry> = emptyList()
+    fun capabilityCatalogue(): List<LocalToolCatalogueEntry>
+    fun validateCapabilityDraft(
+        name: String, expectedSchema: kotlinx.serialization.json.JsonObject,
+        argumentsJson: String,
+    ): com.labteto.dshmobile.uicontract.UiToolDraftValidation
 
     fun installedSkills(): List<LocalInstalledSkill>
     fun presetSkills(): List<LocalPresetSkill>
@@ -41,4 +45,5 @@ internal interface LocalToolsManagementPort {
 
 /** Read-only registry metadata; registration never grants invocation or Android permissions. */
 internal data class LocalToolCatalogueEntry(val name: String, val family: String,
-    val access: String, val approval: String, val requirements: List<String>)
+    val access: String, val approval: String, val requirements: List<String>,
+    val parameterSchema: kotlinx.serialization.json.JsonObject)
