@@ -80,7 +80,8 @@
       "task": "Work 证据写入与核验契约",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": ""
+      "implemented": "2026-10-16：原 Work Owner 按选中文件源/事件/要求提交时校验版本，并在文件哈希读取前后复核 inode/大小/修改时间；拒绝工作区符号链接及目录符号链接，避免别名冒充交付证据。补路径穿越与文件版本的 JVM 测试源码。",
+      "remaining": "真实证据内容核验和用户授权结论、文件修改与提交间剩余竞态的设备级复查、并发进程恢复回归仍缺。文件哈希一致仅说明字节版本，没有证明任务完成。"
     },
     {
       "id": "S1-06",
@@ -210,8 +211,8 @@
       "task": "动态证据有效性/核验卡",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": " 2026-10-16：V6 可从原 WorkReadUiPort 的真实 requirementEvidenceForUi 快照生成只读来源关联卡，区分关联时/当前文件版本相同、已变化及不可判定；显式标注未核验，不将来源关联伪报通过；同模板原位 revision 版本更新。",
-      "remaining": "实际核验执行及授权结论、证据变动主动订阅、重启后真实重核与V6 单包设备验收仍未完成。"
+      "implemented": " 2026-10-16：V6 可从原 WorkReadUiPort 的真实 requirementEvidenceForUi 快照生成只读来源关联卡，区分关联时/当前文件版本相同、已变化及不可判定；显式标注未核验，不将来源关联伪报通过；同模板原位 revision 版本更新。 本轮 V6 Work 证据面板打开期间每30秒重新读取 Work Owner 来源状态；任务/目标/会话代次改变撤销已选证据，文件或引用改变撤销旧检视；用户未授予操作权限时不执行核验。新增纯契约回归测试。",
+      "remaining": "完整实际核验执行、显式授权及来源有效性订阅仍缺；本轮为界面可见期间定时复查而非持续订阅；需 Android 16/17 设备及重启后真实重核验收。"
     },
     {
       "id": "S4-04",
