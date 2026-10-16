@@ -313,3 +313,11 @@ Host 的 `ConversationShellUiPort` 接入重命名与显式置顶；原偏好 St
 
 
 - 本批同步了三项真实设置操作的端口/回执源码证据：外观、通知、聊天规则。S0 源码映射由 **75/173 → 78/173**，尚余 **95**；173 项真实 E2E/恢复证据仍全部缺失（没有把新代码直接改成 VERIFIED）。
+
+
+## 2026-10-16 代码继续：V6 原生会话骨架接入真实 Owner
+
+- `:ui-pack-v6` 新增 `V6ConversationScene.kt`，并将 `route.home`、`conversation.chat`、`conversation.work` 加入独立的 **真实 Renderer**；组合根注入原 Chat/Work/草稿/附件/阅读锚点/消息分页 Owner，UI 包不复制 Session/Agent 执行状态。
+- 本轮有可执行的真实消息收发、修订与重生成、Chat 分支切换、Work 工具审批/提问、附件导入、长历史分页与阅读位置恢复。特别处理了文件选择结果绑定原 Session identity、空输入拒绝与明确的异步回执；单测源码覆盖 Chat/Work 命令路由与不可误清空草稿。
+- 当前 V6 仅 **8/75** 个必要 Scene，**67** 个仍未独立迁移，包括更细的 Composer/时间线槽位、会话工具菜单、UiDocument 全量交互、模型配置、任务/图库/日记/工作区/插件等。Legacy V6 仍是稳定正式入口；不能将这个独立候选包标记已完成或合并发布。
+- 上一轮 CI [38844583911](https://github.com/sy220284/777/actions/runs/38844583911) 静态与架构门禁通过，但 Kotlin 编译因 `V6ChatSettingsScene.kt` 缺 `SyListItem` import 中止，现已补齐并提交。Android 17 CI 首先在 SDK Emulator zip 下载/解压阶段失败，设备测试未实际执行。新 HEAD 的 CI 回执应独立确认，不能继承前一轮成功状态。
