@@ -1079,6 +1079,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         is LocalTranscriptItem.MediaResult -> LocalGeneratedMediaResultRow(
                             result = transcriptItem.result,
                             viewModel = mediaStudioViewModel,
+                            revisionJob = transcriptItem.revisionJob,
                             onRevise = { draft ->
                                 mediaRevision = draft
                                 mediaInitialPrompt = draft.prompt
