@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onAllNodes
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -65,6 +66,21 @@ class V6AutomationContextInteractionTest {
         compose.runOnIdle { assertTrue(owner.submissions.isEmpty()) }
     }
 
+    @Test fun dailyTaskSubmittedFromV6RetainsCalendarRecurrenceAndChatIdentity() {
+        val owner = AutomationOwner(first)
+        show(owner)
+        compose.onNodeWithText("每天").performScrollTo().performClick()
+        compose.onNodeWithText("创建任务").performScrollTo().performClick()
+        compose.waitUntil(10_000) { owner.submissions.size == 1 }
+        compose.runOnIdle {
+            val command = owner.submissions.single() as AutomationUiCommand.Create
+            assertEquals(first, command.identity)
+            assertEquals(com.labteto.dshmobile.automation.AutomationScheduleType.DAILY,
+                command.schedule.scheduleType)
+            assertEquals(1440L, command.schedule.recurringMinutes)
+        }
+    }
+
     @Test fun restartingEditorAfterSwitchBindsOnlyTheNewOwnerIdentity() {
         val owner = AutomationOwner(first)
         show(owner)
@@ -74,8 +90,8 @@ class V6AutomationContextInteractionTest {
         compose.onNodeWithText("新建任务").performClick()
         compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("属于新会话的计划")
         compose.onNodeWithText("创建任务").assertIsEnabled()
-        compose.onNodeWithText("创建任务").performClick()
-        compose.waitForIdle()
+        compose.onNodeWithText("创建任务").performScrollTo().performClick()
+        compose.waitUntil(10_000) { owner.submissions.size == 1 }
         compose.runOnIdle {
             assertEquals(1, owner.submissions.size)
             val command = owner.submissions.single() as AutomationUiCommand.Create
