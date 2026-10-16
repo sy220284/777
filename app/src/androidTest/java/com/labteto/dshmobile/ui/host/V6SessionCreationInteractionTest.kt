@@ -27,10 +27,16 @@ class V6SessionCreationInteractionTest {
         )
         var receipt: UiCommandReceipt = UiCommandReceipt.Accepted
         var summary: String? = null
+        var activateCreationImmediately = true
         val submitted = mutableListOf<SessionUiCommand>()
         override fun snapshot() = snapshots.value
         override fun submit(command: SessionUiCommand): UiCommandReceipt {
             submitted.add(command)
+            if (command is SessionUiCommand.Create && receipt == UiCommandReceipt.Accepted &&
+                activateCreationImmediately) {
+                snapshots.value = snapshots.value.copy(identity =
+                    UiSessionIdentity("new-session", "created", identity.contextGeneration + 1L, null, null))
+            }
             return receipt
         }
         override fun handoffSummary(identity: UiSessionIdentity): String? = summary
@@ -63,6 +69,25 @@ class V6SessionCreationInteractionTest {
                 LocalConversationMode.INDEPENDENT, LocalUsageMode.CHAT, null)), owner.submitted)
             assertEquals(listOf(UiSceneId("route.home")), destinations)
         }
+    }
+
+    @Test fun queuedCreationNeverNavigatesOldStoryUntilOwnerActivatesNewSession() {
+        val owner = SessionOwner(identity)
+        owner.receipt = UiCommandReceipt.Queued
+        owner.activateCreationImmediately = false
+        val destinations = mutableListOf<UiSceneId>()
+        show(owner, destinations)
+        compose.onNodeWithText("创建本地会话").performClick()
+        compose.runOnIdle {
+            assertEquals(1, owner.submitted.size)
+            assertTrue(destinations.isEmpty())
+        }
+        compose.runOnIdle {
+            owner.snapshots.value = owner.snapshots.value.copy(identity =
+                UiSessionIdentity("new-session", "created", 5L, null, null))
+        }
+        compose.waitUntil(3_000L) { destinations.size == 1 }
+        compose.runOnIdle { assertEquals(listOf(UiSceneId("route.home")), destinations) }
     }
 
     @Test fun rejectedCreateNeverChangesHostNavigation() {
