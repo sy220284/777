@@ -26,6 +26,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** Calendar cadence needs non-null recurring metadata so WorkManager never treats it as once. */
+internal fun v6AutomationRecurrence(type: AutomationScheduleType, interval: Long?): Long? =
+    when (type) {
+        AutomationScheduleType.DAILY -> 24L * 60L
+        AutomationScheduleType.WEEKLY -> 7L * 24L * 60L
+        AutomationScheduleType.MONTHLY -> 30L * 24L * 60L
+        AutomationScheduleType.INTERVAL -> interval?.takeIf { it >= 60L }
+        else -> null
+    }
+
 /** One scheduler Owner, four real task workflows; list, edit, chat-scoped and global route. */
 @Composable
 fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Unit) {
@@ -167,7 +177,7 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
                 scheduleType == AutomationScheduleType.SILENCE) {
                 if (scheduleType == AutomationScheduleType.INTERVAL) {
                     SyInput(repeatMinutes, { repeatMinutes = it.filter(Char::isDigit).take(8) },
-                        label = "重复间隔（分钟，至少 15）")
+                        label = "重复间隔（分钟，至少 60）")
                 } else {
                     SyInput(silenceMinutes, { silenceMinutes = it.filter(Char::isDigit).take(8) },
                         label = "未收到用户消息持续多久后触发（分钟）")
@@ -209,7 +219,7 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
             val gap = proactiveGap.toLongOrNull()
             val unanswered = maxUnanswered.toIntOrNull()
             val scheduleValid = when (scheduleType) {
-                AutomationScheduleType.INTERVAL -> repeat != null && repeat >= 15
+                AutomationScheduleType.INTERVAL -> repeat != null && repeat >= 60
                 AutomationScheduleType.SILENCE -> silence != null && silence >= 1
                 AutomationScheduleType.WINDOW -> start != null && end != null &&
                     start in 0..1439 && end in 0..1439 && start != end
@@ -229,7 +239,7 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
                 val actualMode = t?.mode ?: mode
                 val schedule = UiAutomationSchedule(
                     prompt.trim(), timestamp,
-                    if (scheduleType == AutomationScheduleType.INTERVAL) repeat else null,
+                    v6AutomationRecurrence(scheduleType, repeat),
                     actualMode, scheduleType,
                     if (scheduleType == AutomationScheduleType.SILENCE) silence else null,
                     if (scheduleType == AutomationScheduleType.WINDOW) start else null,
