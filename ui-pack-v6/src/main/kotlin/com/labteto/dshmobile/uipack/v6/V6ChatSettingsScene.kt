@@ -4,11 +4,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,7 +30,6 @@ import com.shenyan.designsystem.components.SyButton
 import com.shenyan.designsystem.components.SyButtonStyle
 import com.shenyan.designsystem.components.SyGlassCard
 import com.shenyan.designsystem.components.SyInput
-import com.shenyan.designsystem.components.SyListItem
 import com.shenyan.designsystem.components.SyNote
 import com.shenyan.designsystem.components.SySwitch
 
@@ -103,9 +104,13 @@ fun V6ChatStyleSettingsScene(settings: SettingsUiPort, onBack: () -> Unit) {
                     if (submit(SettingsUiCommand.AddStylePhrase(candidate))) draft = ""
                 }, enabled = canAdd)
                 custom.forEach { phrase ->
-                    SyListItem(phrase, "移除自定义过滤词", onClick = {
-                        submit(SettingsUiCommand.RemoveStylePhrase(phrase))
-                    })
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("• $phrase", modifier = Modifier.weight(1f))
+                        SyButton("移除", {
+                            submit(SettingsUiCommand.RemoveStylePhrase(phrase))
+                        }, style = SyButtonStyle.GHOST)
+                    }
                 }
                 if (custom.isEmpty()) SyNote("尚无自定义过滤词")
             }
