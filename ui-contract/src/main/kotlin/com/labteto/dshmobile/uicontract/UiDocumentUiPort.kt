@@ -38,6 +38,18 @@ data class EditUiDocumentTextCommand(
     val replacementText: String,
 )
 
+/** User-initiated edit of one table display cell; never model-authored and never a tool call. */
+data class EditUiDocumentTableCellCommand(
+    val identity: UiSessionIdentity,
+    val documentId: String,
+    val revision: Long,
+    val source: UiDocumentSource,
+    val tableNodeId: String,
+    val rowIndex: Int,
+    val columnIndex: Int,
+    val replacementText: String,
+)
+
 /** Closed user intent; documents themselves cannot embed or invoke deletion. */
 data class DeleteUiDocumentCommand(
     val identity: UiSessionIdentity,
@@ -68,6 +80,8 @@ interface UiDocumentUiPort {
     suspend fun generate(command: GenerateUiDocumentCommand): UiDocumentReceipt
     suspend fun delete(command: DeleteUiDocumentCommand): UiDocumentReceipt
     suspend fun replaceText(command: EditUiDocumentTextCommand): UiDocumentReceipt =
+        UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+    suspend fun replaceTableCell(command: EditUiDocumentTableCellCommand): UiDocumentReceipt =
         UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
     fun submit(identity: UiSessionIdentity, request: UiDocumentActionRequest): UiDocumentReceipt
 }
