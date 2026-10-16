@@ -136,6 +136,28 @@ internal fun V6DocumentCard(
     var editingText by remember(doc.documentId, doc.revision) { mutableStateOf<UiDocumentNode.Text?>(null) }
     var editDraft by remember(doc.documentId, doc.revision) { mutableStateOf("") }
     var editBusy by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
+    var editingTable by remember(doc.documentId, doc.revision) {
+        mutableStateOf<UiDocumentNode.Table?>(null)
+    }
+    var editingCell by remember(doc.documentId, doc.revision) {
+        mutableStateOf<Pair<Int, Int>?>(null)
+    }
+    var editingCellText by remember(doc.documentId, doc.revision) { mutableStateOf("") }
+    var tableBusy by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
+    val tableNodes = remember(doc) {
+        val found = mutableListOf<UiDocumentNode.Table>()
+        fun collect(node: UiDocumentNode) {
+            when (node) {
+                is UiDocumentNode.Table -> found += node
+                is UiDocumentNode.Column -> node.children.forEach(::collect)
+                is UiDocumentNode.Row -> node.children.forEach(::collect)
+                is UiDocumentNode.Disclosure -> node.children.forEach(::collect)
+                else -> Unit
+            }
+        }
+        doc.nodes.forEach(::collect)
+        found.toList()
+    }
     val textNodes = remember(doc) {
         val collected = mutableListOf<UiDocumentNode.Text>()
         fun collect(node: UiDocumentNode) {
@@ -211,6 +233,18 @@ internal fun V6DocumentCard(
                 }
             }, enabled = !editBusy && !deleting, style = SyButtonStyle.SECONDARY)
         }
+        if (validIdentity && tableNodes.isNotEmpty() &&
+            doc.actions.none { it is UiDocumentAction.AnswerApproval } &&
+            !doc.documentId.startsWith("work-live:")) {
+            SyButton("编辑表格数据", {
+                if (identityIsCurrent()) {
+                    editingTable = tableNodes.first()
+                    editingCell = null
+                    editingCellText = ""
+                }
+            }, enabled = !editBusy && !tableBusy && !deleting,
+                style = SyButtonStyle.SECONDARY)
+        }
         if (validIdentity) SyButton("删除这份文档", { confirmDelete = true },
             style = SyButtonStyle.GHOST, enabled = !deleting)
         feedback?.let { SyNote(it) }
@@ -282,6 +316,71 @@ internal fun V6DocumentCard(
             }, enabled = !editBusy) { Text("保存新版本") } },
             dismissButton = { TextButton(onClick = { editingText = null },
                 enabled = !editBusy) { Text("取消") } },
+        )
+    }
+
+    editingTable?.let { table ->
+        AlertDialog(
+            onDismissRequest = { if (!tableBusy) editingTable = null },
+            title = { Text("编辑结构化表格（用户修改，未经业务核验）") },
+            text = {
+                Column(Modifier.heightIn(max = 430.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (tableNodes.size > 1) {
+                        Text("选择表格")
+                        tableNodes.forEach { option ->
+                            TextButton(onClick = {
+                                editingTable = option; editingCell = null
+                                editingCellText = ""
+                            }, enabled = !tableBusy) {
+                                Text((if (option.id == table.id) "✓ " else "") + option.id)
+                            }
+                        }
+                    }
+                    Text("选择要修改的单元格")
+                    table.rows.forEachIndexed { rowIndex, cells ->
+                        cells.forEachIndexed { columnIndex, cell ->
+                            TextButton(onClick = {
+                                editingCell = rowIndex to columnIndex
+                                editingCellText = cell
+                            }, enabled = !tableBusy) {
+                                Text("${rowIndex + 1} · ${table.headers[columnIndex]}：${cell.take(70)}")
+                            }
+                        }
+                    }
+                    if (editingCell != null) {
+                        val (row, column) = editingCell!!
+                        Text("正在修改第${row + 1}行 · ${table.headers[column]}")
+                        SyInput(editingCellText, { editingCellText = it.take(4096) },
+                            label = "新的显示数据（不会验证业务真实性）",
+                            singleLine = false, enabled = !tableBusy)
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = {
+                val cell = editingCell ?: return@TextButton
+                if (!validIdentity || !identityIsCurrent() || tableBusy) {
+                    feedback = "会话上下文已变化，请重新加载文档"
+                    return@TextButton
+                }
+                tableBusy = true
+                val command = EditUiDocumentTableCellCommand(identity, doc.documentId,
+                    doc.revision, doc.source, table.id, cell.first, cell.second, editingCellText)
+                scope.launch {
+                    try {
+                        val receipt = owner.replaceTableCell(command)
+                        if (identityIsCurrent()) {
+                            feedback = describeV6DocumentReceipt(receipt)
+                            if (receipt is UiDocumentReceipt.Published) editingTable = null
+                        }
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (failure: Exception) {
+                        if (identityIsCurrent()) feedback = failure.message ?: "表格数据保存失败"
+                    } finally { tableBusy = false }
+                }
+            }, enabled = editingCell != null && !tableBusy) { Text("保存新版本") } },
+            dismissButton = { TextButton(onClick = { editingTable = null },
+                enabled = !tableBusy) { Text("取消") } },
         )
     }
 
