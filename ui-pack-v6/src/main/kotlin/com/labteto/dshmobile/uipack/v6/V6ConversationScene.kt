@@ -38,6 +38,8 @@ import com.labteto.dshmobile.uicontract.ChatUiPort
 import com.labteto.dshmobile.uicontract.ConversationDraftUiPort
 import com.labteto.dshmobile.uicontract.ConversationReadingUiPort
 import com.labteto.dshmobile.uicontract.ImportUiAttachmentCommand
+import com.labteto.dshmobile.uicontract.InspectUiAttachmentCommand
+import com.labteto.dshmobile.uicontract.UiAttachmentInspectionReceipt
 import com.labteto.dshmobile.uicontract.UiAttachmentReceipt
 import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.UiCommandRejection
@@ -188,6 +190,10 @@ fun V6ConversationScene(
     val attachments by ports.drafts.attachments.collectAsStateWithLifecycle()
     val draft = drafts[identity?.sessionId].orEmpty()
     val imported = attachments[identity?.sessionId].orEmpty()
+    var inspectionPath by remember(identity) { mutableStateOf<String?>(null) }
+    var inspectedAttachment by remember(identity) {
+        mutableStateOf<com.labteto.dshmobile.uicontract.UiAttachmentInspection?>(null)
+    }
     val docOwner = ports.documents
     val formOwner = ports.forms
     val docSnapshot = docOwner?.let { owner ->
@@ -365,6 +371,25 @@ fun V6ConversationScene(
             finally { loadingHistory = false }
         }
     }
+
+    if (inspectedAttachment != null) AlertDialog(
+        onDismissRequest = { inspectedAttachment = null },
+        title = { Text("附件状态与预览") },
+        text = {
+            Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+                inspectedAttachment?.let { info ->
+                    Text(info.displayName)
+                    Text(info.mediaType + " · " + info.bytes + " 字节")
+                    SyNote(if (info.digestVerified) "当前文件完整性已校验"
+                        else "大型文件仅确认存在及长度，尚未完整哈希核验")
+                    if (info.preview != null) Text(info.preview)
+                    else SyNote("此类文件提供元数据与状态；二进制内容暂无直接播放器")
+                    if (info.truncated) SyNote("文本仅显示前16 KiB")
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { inspectedAttachment = null }) { Text("关闭") } },
+    )
 
     val picker = rememberUiAttachmentPicker { uri ->
         val target = pickerIdentity
@@ -692,6 +717,28 @@ fun V6ConversationScene(
                     Text("${file.mediaType} · ${file.bytes} 字节$dimensions",
                         style = MaterialTheme.typography.labelSmall)
                 }
+                if (ports.attachments != null) SyButton(
+                    if (inspectionPath == file.relativePath) "检查中" else "检查/预览", {
+                        val target = identity ?: return@SyButton
+                        val inspector = ports.attachments ?: return@SyButton
+                        if (inspectionPath != null) return@SyButton
+                        inspectionPath = file.relativePath
+                        scope.launch {
+                            try {
+                                val result = inspector.inspect(InspectUiAttachmentCommand(target, file))
+                                val current = (if (workMode) ports.work.snapshot().identity
+                                    else ports.chat.snapshot().identity) == target
+                                if (current) when (result) {
+                                    is UiAttachmentInspectionReceipt.Ready -> inspectedAttachment = result.value
+                                    is UiAttachmentInspectionReceipt.Unavailable -> feedback = result.message
+                                    is UiAttachmentInspectionReceipt.Rejected ->
+                                        feedback = "附件检查未获准：" + result.reason.name
+                                }
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (failure: Exception) { feedback = failure.message ?: "附件检查失败" }
+                            finally { inspectionPath = null }
+                        }
+                    }, enabled = inspectionPath == null, style = SyButtonStyle.SECONDARY)
                 SyButton("移除", {
                     identity?.let { ports.drafts.removeAttachment(it.sessionId, file.relativePath) }
                 }, style = SyButtonStyle.GHOST)
