@@ -65,6 +65,7 @@ fun V6ToolsManagementScene(
 ) {
     var revision by remember(owner) { mutableIntStateOf(0) }
     var servers by remember(owner) { mutableStateOf(emptyList<UiMcpServerSnapshot>()) }
+    var healthResults by remember(owner) { mutableStateOf<Map<String, UiMcpHealth>>(emptyMap()) }
     var plugins by remember(owner) { mutableStateOf(emptyList<String>()) }
     var skills by remember(owner) { mutableStateOf(emptyList<UiSkillSnapshot>()) }
     var presets by remember(owner) { mutableStateOf(emptyList<UiPresetSkillSnapshot>()) }
@@ -145,6 +146,20 @@ fun V6ToolsManagementScene(
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) { feedback = failure.message ?: "工具目录读取失败" }
         finally { loading = false }
+    }
+    fun checkHealth(id: String) {
+        if (busy) return
+        busy = true
+        scope.launch {
+            try {
+                val health = withContext(Dispatchers.IO) { owner.checkServerHealth(id) }
+                healthResults = healthResults + (id to health)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                healthResults = healthResults + (id to UiMcpHealth.UNCONFIRMED)
+                feedback = failure.message ?: "MCP 健康检查未能确认"
+            } finally { busy = false }
+        }
     }
     fun execute(command: ToolsUiCommand) {
         if (busy) return
@@ -234,6 +249,18 @@ fun V6ToolsManagementScene(
                         " · 连接：" + server.connection.name)
                     Text("每次工具调用均须独立授权：" + server.authorization.name)
                     Text("声明工具：" + server.tools.joinToString(", ").take(1000))
+                    healthResults[server.id]?.let { health ->
+                        SyNote(when (health) {
+                            UiMcpHealth.RESPONDED -> "MCP ping 已响应；这不代表工具已授权或持续在线"
+                            UiMcpHealth.BUSY -> "MCP 服务正在停止或重连"
+                            UiMcpHealth.NOT_CONNECTED -> "MCP 服务当前未登记连接"
+                            UiMcpHealth.UNCONFIRMED -> "MCP 响应未确认；可检查网络、进程或协议"
+                            UiMcpHealth.UNSUPPORTED -> "当前工具 Owner 不支持主动健康检查"
+                        })
+                    }
+                    SyButton("主动检查服务状态", { checkHealth(server.id) },
+                        enabled = !busy && !loading && server.registration == UiToolRegistration.REGISTERED,
+                        style = SyButtonStyle.SECONDARY)
                     SyButton("断开连接", { disconnect = server.id },
                         enabled = !busy && !loading, style = SyButtonStyle.DANGER)
                 }
