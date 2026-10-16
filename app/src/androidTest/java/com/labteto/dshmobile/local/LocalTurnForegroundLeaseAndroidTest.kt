@@ -7,9 +7,10 @@ import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.local.runtime.LocalExecutionService
-import kotlinx.coroutines.CancellationException
+import com.labteto.dshmobile.local.runtime.LocalExecutionTurnLedger
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -18,7 +19,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class LocalTurnForegroundLeaseAndroidTest {
     @Test
-    fun rejectedForegroundStartDoesNotExecuteProtectedTurn() = runBlocking {
+    fun deniedForegroundStartNeverExecutesTurnAndReturnsRejectedResult() = runBlocking {
         val rejected = object : ContextWrapper(InstrumentationRegistry.getInstrumentation().targetContext) {
             override fun getApplicationContext(): Context = this
             override fun startForegroundService(service: Intent): ComponentName {
@@ -26,53 +27,43 @@ class LocalTurnForegroundLeaseAndroidTest {
             }
         }
         var executed = false
-        val failure = runCatching {
-            LocalExecutionService.withTurn(rejected, "session", { null }) {
-                executed = true
-            }
-        }.exceptionOrNull()
-        assertTrue(failure is IllegalStateException)
-        assertTrue(!executed)
+        var rejectedStatus = false
+        val admitted = LocalExecutionService.withTurn(
+            rejected, "session", { null },
+            onRejected = { rejectedStatus = true },
+        ) { executed = true }
+        assertFalse(admitted)
+        assertTrue(rejectedStatus)
+        assertFalse(executed)
     }
 
     @Test
-    fun overlappingTurnsOfTheSameSessionReleaseOnlyTheirOwnHold() = runBlocking {
-        val context = RecordingContext()
-        LocalExecutionService.withTurn(context, "session", { null }) {
-            LocalExecutionService.withTurn(context, "session", { null }) { }
-        }
-        val intents = context.intents
-        assertEquals(4, intents.size)
-        assertNotEquals(intents[0].getStringExtra("key"), intents[1].getStringExtra("key"))
-        assertEquals(intents[1].getStringExtra("key"), intents[2].getStringExtra("key"))
-        assertEquals(intents[0].getStringExtra("key"), intents[3].getStringExtra("key"))
-        assertTrue(intents.all { it.getStringExtra("session_id") == "session" })
-        assertEquals(LocalExecutionService.OUTCOME_COMPLETED, intents[3].getStringExtra("outcome"))
+    fun independentTurnsUseDistinctKeysAndReleaseWithoutStealingTheOtherTurn() {
+        val ledger = LocalExecutionTurnLedger()
+        val first = LocalExecutionTurnLedger.Hold("turn:session:first", "session", "first", 0)
+        val second = LocalExecutionTurnLedger.Hold("turn:session:second", "session", "second", 0)
+        assertNotEquals(first.key, second.key)
+        ledger.acquire(first)
+        ledger.acquire(second)
+        assertEquals(2, ledger.size())
+        assertTrue(ledger.update(second.key, 7))
+        assertEquals(7, ledger.latest()?.step)
+        assertEquals(second.key, ledger.release(second.key)?.key)
+        assertTrue(ledger.contains(first.key))
+        assertEquals(first.key, ledger.release(first.key)?.key)
+        assertTrue(ledger.isEmpty())
     }
 
     @Test
-    fun cancellationAndFailureReleaseTheHoldWithTheCorrectOutcome() = runBlocking {
-        for (cancelled in listOf(false, true)) {
-            val context = RecordingContext()
-            val error = runCatching {
-                LocalExecutionService.withTurn(context, "session", { null }) {
-                    if (cancelled) throw CancellationException("stop") else throw IllegalStateException("failed")
-                }
-            }.exceptionOrNull()
-            assertTrue(error != null)
-            assertEquals(2, context.intents.size)
-            assertEquals(context.intents[0].getStringExtra("key"), context.intents[1].getStringExtra("key"))
-            assertEquals(if (cancelled) LocalExecutionService.OUTCOME_CANCELLED else LocalExecutionService.OUTCOME_FAILED,
-                context.intents[1].getStringExtra("outcome"))
-        }
-    }
-
-    private class RecordingContext : ContextWrapper(InstrumentationRegistry.getInstrumentation().targetContext) {
-        val intents = mutableListOf<Intent>()
-        override fun getApplicationContext(): Context = this
-        override fun startForegroundService(service: Intent): ComponentName {
-            intents += Intent(service)
-            return ComponentName(this, LocalExecutionService::class.java)
-        }
+    fun updatingAStepDoesNotCreateAnAdditionalForegroundLease() {
+        val ledger = LocalExecutionTurnLedger()
+        val first = LocalExecutionTurnLedger.Hold("turn:session", "session", "Work", 0)
+        ledger.acquire(first)
+        for (step in 1..64) assertTrue(ledger.update(first.key, step))
+        assertEquals(1, ledger.size())
+        assertEquals(64, ledger.latest()?.step)
+        assertFalse(ledger.update("unknown", 65))
+        assertEquals(first.key, ledger.release(first.key)?.key)
+        assertTrue(ledger.isEmpty())
     }
 }

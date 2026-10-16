@@ -132,7 +132,7 @@ internal class LocalWorkAgentTurnExecutor(
             sourceMessageId, resolveWorkUiDocumentSource(binding.eventLog, sourceMessageId),
             binding.state.value.messages.lastOrNull { it.role == "user" }?.id,
         )
-        var heldSession: String? = null
+        var foregroundLease: LocalExecutionService.TurnLease? = null
         var serviceReleased = false
         try {
             LocalSessionRuntimeRegistry.withOwner(
@@ -170,11 +170,18 @@ internal class LocalWorkAgentTurnExecutor(
             workTurnToolRuntime.prepare(binding, input)
             val foregroundSessionId = runSessionId
             var foregroundOutcome = LocalExecutionService.OUTCOME_COMPLETED
-            heldSession = foregroundSessionId
-            if (!LocalExecutionService.holdTurn(context, foregroundSessionId)) {
-                binding.state.update { it.copy(error = "前台执行服务启动失败，当前 Work 回合已停止") }
-                error("前台执行服务启动失败")
+            val lease = LocalExecutionService.acquireTurn(context, foregroundSessionId)
+            if (lease == null) {
+                val message = "系统未准许前台执行，当前 Work 回合未启动；进度已保留"
+                runEventLog.append("turn/foreground-start-rejected", buildJsonObject {
+                    put("session_id", foregroundSessionId)
+                    put("source_message_id", uiSourceMessageId)
+                    put("reason", "foreground_service_not_ready")
+                })
+                binding.state.update { it.copy(error = message, kernel = it.kernel.copy(running = false)) }
+                return@withOwner
             }
+            foregroundLease = lease
             binding.state.update {
                 it.copy(
                     work = it.work.copy(
@@ -501,7 +508,7 @@ internal class LocalWorkAgentTurnExecutor(
                         }
                         is AgentEvent.StepStarted -> {
                             activeStep = event.step
-                            check(LocalExecutionService.holdTurn(context, foregroundSessionId, event.step)) { "前台执行保护更新失败" }
+                            check(lease.updateStep(event.step)) { "前台服务已失去执行租约，Work 回合已停止" }
                             activeToolCalls = emptyList()
                             completedToolCallIds.clear()
                             runEventLog.append("step/start", buildJsonObject {
@@ -813,7 +820,7 @@ internal class LocalWorkAgentTurnExecutor(
                     binding.state.update { current -> current.copy(error = "Work 回合已结束，快照保存失败：${error.message}") }
                 } finally {
                     try {
-                        try { LocalExecutionService.releaseTurn(context, foregroundSessionId, foregroundOutcome) }
+                        try { lease.release(foregroundOutcome) }
                         finally { serviceReleased = true }
                     } finally {
                         workRunRegistry.finishTurn(binding, completedJob) { next, ownedBinding ->
@@ -832,9 +839,7 @@ internal class LocalWorkAgentTurnExecutor(
         }
     } finally {
         try {
-            if (!serviceReleased) heldSession?.let { sessionId ->
-                LocalExecutionService.releaseTurn(context, sessionId, LocalExecutionService.OUTCOME_FAILED)
-            }
+            if (!serviceReleased) foregroundLease?.release(LocalExecutionService.OUTCOME_FAILED)
         } finally {
             if (ownerJob != null) workRunRegistry.releaseCompletedTurn(binding, ownerJob)
         }

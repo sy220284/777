@@ -15,6 +15,7 @@ internal suspend fun runOwnedGroupChatTurn(
     sessionId: String,
     currentSessionId: () -> String,
     currentError: () -> String?,
+    onForegroundRejected: () -> Unit,
     executor: LocalGroupChatTurnExecutor,
     input: String,
     sourceMessageId: String? = null,
@@ -26,6 +27,7 @@ internal suspend fun runOwnedGroupChatTurn(
         context = context,
         sessionId = sessionId,
         error = currentError,
+        onRejected = onForegroundRejected,
     ) {
         executor.run(input, sourceMessageId)
     }

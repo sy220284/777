@@ -128,6 +128,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             context = context,
             sessionId = sessionId,
             error = { runtimeStateStore.state.value.error },
+            onRejected = { runtimeStateStore.projection.publishError("系统拒绝前台执行，聊天回合未启动") },
         ) { runOwned(sessionId, input, memoryInput, sourceMessageId, replacingMessageId) }
     }
 

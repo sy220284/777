@@ -41,6 +41,7 @@ internal class LocalChatTurnDispatcher @Inject constructor(
                 sessionId = snapshot.sessionId,
                 currentSessionId = { runtimeStateStore.currentSessionId },
                 currentError = { runtimeStateStore.state.value.error },
+                onForegroundRejected = { runtimeStateStore.projection.publishError("系统拒绝前台执行，群聊回合未启动") },
                 executor = groupExecutor,
                 input = input,
                 sourceMessageId = sourceMessageId,
