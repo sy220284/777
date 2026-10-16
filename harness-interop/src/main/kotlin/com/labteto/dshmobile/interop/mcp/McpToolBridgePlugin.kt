@@ -16,6 +16,9 @@ import java.net.URI
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -186,6 +189,12 @@ class McpToolBridgePlugin(
     }
 
     private val mutex = Mutex()
+    // The MCP owner publishes lifecycle invalidations at each committed state transition.
+    // Readers subsequently obtain the actual registry snapshot under the same mutex.
+    private val lifecycleRevision = MutableStateFlow(0L)
+    val lifecycleRevisions: StateFlow<Long> = lifecycleRevision.asStateFlow()
+    private fun signalLifecycleChangedLocked() { lifecycleRevision.value += 1L }
+
     private val servers = linkedMapOf<String, ServerBinding>()
     private val connectingIds = linkedSetOf<String>()
     private val reconnectingIds = linkedSetOf<String>()
@@ -198,6 +207,7 @@ class McpToolBridgePlugin(
                 "MCP 插件存在未清理的连接状态"
             }
             acceptingConnections = true
+            signalLifecycleChangedLocked()
         }
         context.tools.register(
             HarnessTool(
@@ -368,6 +378,7 @@ class McpToolBridgePlugin(
             val callDrains = servers.values.toList().map { binding ->
                 binding to binding.beginDisconnect()
             }
+            signalLifecycleChangedLocked()
             connectionDrain to callDrains
         }
 
@@ -381,6 +392,7 @@ class McpToolBridgePlugin(
                         binding.toolNames.forEach(context.tools::unregister)
                     }
                     servers.clear()
+                    signalLifecycleChangedLocked()
                 }
             }
             owned.forEach(ServerBinding::closeClientOnce)
@@ -502,6 +514,7 @@ class McpToolBridgePlugin(
                 "MCP 服务已连接或正在连接：$serverId"
             }
             connectingIds += serverId
+            signalLifecycleChangedLocked()
         }
 
         val client = try {
@@ -639,6 +652,7 @@ class McpToolBridgePlugin(
         val serverId = validateServerId(rawId)
         val existing = mutex.withLock {
             require(reconnectingIds.add(serverId)) { "MCP 服务正在重连：$serverId" }
+            signalLifecycleChangedLocked()
             servers[serverId]
         }
         try {
@@ -650,7 +664,7 @@ class McpToolBridgePlugin(
             return connect(context, serverId, existing.transport, existing.displayTarget,
                 existing.clientFactory, fromReconnect = true)
         } finally {
-            withContext(NonCancellable) { mutex.withLock { reconnectingIds.remove(serverId) } }
+            withContext(NonCancellable) { mutex.withLock { if (reconnectingIds.remove(serverId)) signalLifecycleChangedLocked() } }
         }
     }
 
@@ -665,7 +679,9 @@ class McpToolBridgePlugin(
                 "MCP 服务正在重连：$serverId"
             }
             val binding = servers[serverId] ?: return@withLock null
-            binding to binding.beginDisconnect()
+            (binding to binding.beginDisconnect()).also { (_, ticket) ->
+                if (ticket.started) signalLifecycleChangedLocked()
+            }
         } ?: return "MCP 服务未连接：$serverId"
 
         val (binding, ticket) = prepared
@@ -680,6 +696,7 @@ class McpToolBridgePlugin(
                 if (servers[serverId] === binding) {
                     binding.toolNames.forEach(context.tools::unregister)
                     servers.remove(serverId)
+                    signalLifecycleChangedLocked()
                 }
             }
             binding.closeClientOnce()
@@ -688,7 +705,7 @@ class McpToolBridgePlugin(
     }
 
     private fun releaseConnectionReservationLocked(serverId: String) {
-        connectingIds.remove(serverId)
+        if (connectingIds.remove(serverId)) signalLifecycleChangedLocked()
         if (connectingIds.isEmpty()) {
             connectingDrained?.complete(Unit)
             connectingDrained = null
