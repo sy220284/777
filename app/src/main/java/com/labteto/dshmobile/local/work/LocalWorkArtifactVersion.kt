@@ -34,7 +34,7 @@ internal fun localWorkFileSha256(root: File, path: String): String? = runCatchin
     safeLocalWorkArtifactFile(root, path)?.let(::fileSha256)
 }.getOrNull()
 
-private fun safeLocalWorkArtifactFile(root: File, relative: String): File? {
+internal fun safeLocalWorkArtifactFile(root: File, relative: String): File? {
     if (relative.isBlank() || relative.startsWith("/") || relative.contains('\\') ||
         relative.contains(':') || relative.split('/').any {
             it.isBlank() || it == "." || it == ".."
@@ -73,4 +73,32 @@ private fun fileSha256(file: File): String {
         "证据文件在读取期间发生变化"
     }
     return digest.digest().joinToString("") { "%02x".format(it) }
+}
+
+/** Read one immutable byte observation, matching the user-selected SHA exactly. */
+internal fun inspectLocalWorkEvidenceText(
+    root: File, path: String, expectedSha256: String, requiredText: String,
+): Boolean? {
+    if (!expectedSha256.matches(Regex("[a-f0-9]{64}")) ||
+        requiredText.isBlank() || requiredText.length > 512) return null
+    val source = safeLocalWorkArtifactFile(root, path) ?: return null
+    val target = source.toPath()
+    fun stamp() = Files.readAttributes(target, BasicFileAttributes::class.java,
+        LinkOption.NOFOLLOW_LINKS)
+    val before = stamp()
+    if (!before.isRegularFile || before.size() > 1024 * 1024L) return null
+    val bytes = Files.readAllBytes(target)
+    val after = stamp()
+    if (before.fileKey() != after.fileKey() || before.size() != after.size() ||
+        before.lastModifiedTime() != after.lastModifiedTime()) return null
+    val digest = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") {
+        "%02x".format(it.toInt() and 0xff)
+    }
+    if (digest != expectedSha256) return null
+    val content = try {
+        Charsets.UTF_8.newDecoder()
+            .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+            .decode(java.nio.ByteBuffer.wrap(bytes)).toString()
+    } catch (_: java.nio.charset.CharacterCodingException) { return null }
+    return content.contains(requiredText)
 }

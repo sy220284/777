@@ -34,6 +34,8 @@ class LocalWorkEvidenceControllerTest {
                 com.labteto.dshmobile.uicontract.UiCommandReceipt.NotAdmitted
             override suspend fun review(command: com.labteto.dshmobile.uicontract.ReviewWorkEvidenceCommand) =
                 com.labteto.dshmobile.uicontract.UiCommandReceipt.NotAdmitted
+            override suspend fun checkText(command: com.labteto.dshmobile.uicontract.CheckWorkEvidenceTextCommand) =
+                com.labteto.dshmobile.uicontract.UiCommandReceipt.NotAdmitted
         },
         workState = MutableStateFlow(LocalWorkUiState(sessionId = "session")),
         workspaceFiles = { emptyList() }, conversationFiles = { error("not used") }, previewWorkspaceFile = { error("not used") },

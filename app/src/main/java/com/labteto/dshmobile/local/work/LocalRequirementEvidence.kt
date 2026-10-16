@@ -73,6 +73,35 @@ internal fun projectRequirementEvidenceReviews(
     return reviews.values.sortedBy(LocalRequirementEvidenceReview::requirementIndex)
 }
 
+/** Latest exact-link literal assertion, never an overall Work task completion claim. */
+internal fun projectRequirementEvidenceTextChecks(
+    events: Sequence<LocalSessionEventLog.Event>,
+    links: List<LocalRequirementEvidenceLink>,
+    goalId: String?,
+): List<LocalRequirementEvidenceTextCheck> {
+    val current = links.associateBy { it.eventSequence }
+    val latest = linkedMapOf<Long, LocalRequirementEvidenceTextCheck>()
+    events.forEach { event ->
+        if (event.type != "work/requirement-evidence-text-check") return@forEach
+        val data = event.data
+        if ((data["goal_id"] as? JsonPrimitive)?.contentOrNull != goalId) return@forEach
+        val linkId = (data["link_sequence"] as? JsonPrimitive)?.longOrNull ?: return@forEach
+        val link = current[linkId] ?: return@forEach
+        val index = (data["requirement_index"] as? JsonPrimitive)?.intOrNull ?: return@forEach
+        val path = (data["artifact_path"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
+        val version = (data["sha256"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
+        val needleHash = (data["condition_sha256"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
+        val matched = (data["contains_required_text"] as? JsonPrimitive)?.contentOrNull
+        if (event.sequence <= linkId || index != link.requirementIndex ||
+            path != link.artifactPath || version != link.versionAtLink ||
+            !needleHash.matches(Regex("[a-f0-9]{64}")) || matched !in setOf("true", "false"))
+            return@forEach
+        latest[linkId] = LocalRequirementEvidenceTextCheck(
+            index, path, linkId, version, event.sequence, needleHash, matched == "true")
+    }
+    return latest.values.sortedBy(LocalRequirementEvidenceTextCheck::requirementIndex)
+}
+
 /** Exact selected source event; no fuzzy matching by filename or task wording. */
 internal fun sourceArtifactMatchesEvidence(
     event: LocalSessionEventLog.Event?,

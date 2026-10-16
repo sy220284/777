@@ -164,7 +164,46 @@ class LocalRequirementEvidenceProjectionTest {
         } finally { restored.close() }
     }
 
-    @Test fun manualReviewRequiresExactGoalLinkRevisionAndDigest() {
+    @Test fun literalContentCheckUsesVerifiedBytesAndCannotClaimWorkCompletion() {
+        val root = temp.newFolder("literal-check")
+        val actual = File(root, "output.txt").apply { writeText("written report content") }
+        val sha = localWorkFileSha256(root, "output.txt")!!
+        assertEquals(true, inspectLocalWorkEvidenceText(root, "output.txt", sha, "report"))
+        assertEquals(false, inspectLocalWorkEvidenceText(root, "output.txt", sha, "signed"))
+        assertEquals(null, inspectLocalWorkEvidenceText(root, "output.txt", sha, ""))
+        actual.writeText("changed bytes")
+        assertEquals(null, inspectLocalWorkEvidenceText(root, "output.txt", sha, "report"))
+        assertEquals(null, inspectLocalWorkEvidenceText(root, "../output.txt", sha, "report"))
+    }
+
+    @Test fun contentCheckEventsAreExactLinkGoalScopedAndCanBeColdRebuilt() {
+        val sha = "a".repeat(64)
+        val evidence = LocalSessionEventLog.Event(10L, "work/requirement-evidence", 10L, buildJsonObject {
+            put("goal_id", "goal"); put("requirement_index", 0)
+            put("requirement", "交付报告"); put("artifact_path", "output.txt")
+            put("origin_sequence", 1L); put("source_call_id", "call"); put("sha256", sha)
+        })
+        val todos = listOf(LocalTodoItem("交付报告", "pending"))
+        val links = projectRequirementEvidenceLinks(sequenceOf(evidence), todos, "goal")
+        fun check(seq: Long, goal: String, matched: Boolean) =
+            LocalSessionEventLog.Event(seq, "work/requirement-evidence-text-check", seq, buildJsonObject {
+                put("goal_id", goal); put("requirement_index", 0)
+                put("artifact_path", "output.txt"); put("link_sequence", 10L)
+                put("sha256", sha); put("condition_sha256", "b".repeat(64))
+                put("contains_required_text", matched)
+            })
+        val checks = projectRequirementEvidenceTextChecks(sequenceOf(
+            check(11L, "goal", true), check(12L, "other", true), check(13L, "goal", false)
+        ), links, "goal")
+        assertEquals(1, checks.size)
+        assertFalse(checks.single().containsRequiredText)
+        assertEquals(13L, checks.single().checkSequence)
+        assertEquals("pending", todos.single().status)
+        assertTrue(projectRequirementEvidenceTextChecks(sequenceOf(check(14L, "goal", true)),
+            emptyList(), "goal").isEmpty())
+    }
+
+    @Test fun manualReviewRequiresExactGoalLinkRevisionAndDigest() { {
         val digest = "a".repeat(64)
         val tasks = listOf(LocalTodoItem("交付报告", "completed"))
         fun goalLink(sequence: Long, path: String = "reports/one.md") = link(

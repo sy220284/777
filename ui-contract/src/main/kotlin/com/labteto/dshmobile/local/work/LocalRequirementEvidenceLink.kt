@@ -23,3 +23,10 @@ data class LocalRequirementEvidenceReview(
     val reviewSequence: Long,
     val approvedByUser: Boolean,
 )
+
+/** One exact, machine-tested UTF-8 literal condition. Never implies the entire task passed. */
+data class LocalRequirementEvidenceTextCheck(
+    val requirementIndex: Int, val artifactPath: String, val linkSequence: Long,
+    val version: String, val checkSequence: Long, val conditionSha256: String,
+    val containsRequiredText: Boolean,
+)

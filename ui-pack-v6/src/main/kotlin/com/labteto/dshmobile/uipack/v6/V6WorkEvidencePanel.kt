@@ -125,6 +125,48 @@ fun V6WorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSessionIdentity,
                         reviewed.approvedByUser -> "用户已确认内容符合（不代表自动测试通过）"
                         else -> "用户已标记内容不符合要求"
                     })
+                    val textCheck = snapshot?.textChecks?.firstOrNull {
+                        it.linkSequence == reference.eventSequence
+                    }
+                    if (reference.versionNow == reference.versionAtLink && textCheck != null)
+                        Text(if (textCheck.containsRequiredText)
+                            "用户指定的文本检查通过（不代表任务完成）"
+                            else "用户指定的文本检查不通过")
+                    var needle by remember(identity, reference.eventSequence) { mutableStateOf("") }
+                    if (reference.versionNow == reference.versionAtLink && !snapshot?.goalId.isNullOrBlank()) {
+                        com.shenyan.designsystem.components.SyInput(needle, {
+                            needle = it.take(512)
+                        }, label = "需要存在的原文片段", singleLine = false)
+                        TextButton(onClick = {
+                            val seq = ++generation
+                            val fixedGoal = requireNotNull(snapshot?.goalId)
+                            val literal = needle
+                            pending = true
+                            scope.launch {
+                                try {
+                                    val result = port.checkText(CheckWorkEvidenceTextCommand(
+                                        identity, fixedGoal, requirement.index, requirement.text,
+                                        reference.artifactPath, reference.eventSequence,
+                                        reference.versionAtLink, literal,
+                                    ))
+                                    if (seq != generation) return@launch
+                                    feedback = when (result) {
+                                        UiCommandReceipt.Accepted -> "文本检查已写入真实文件版本记录"
+                                        is UiCommandReceipt.Failed -> result.message ?: unavailable
+                                        else -> "检查未被接受：目标或来源可能已变化"
+                                    }
+                                    if (result == UiCommandReceipt.Accepted) {
+                                        val reread = port.read(identity)
+                                        if (seq == generation && reread is UiWorkEvidenceReadReceipt.Available)
+                                            snapshot = reread.snapshot
+                                    }
+                                } catch (cancelled: CancellationException) { throw cancelled }
+                                catch (failure: Exception) {
+                                    if (seq == generation) feedback = failure.message ?: unavailable
+                                } finally { if (seq == generation) pending = false }
+                            }
+                        }, enabled = !pending && needle.isNotBlank()) { Text("核验文件文本条件") }
+                    }
                     val displayedGoalId = snapshot?.goalId
                     if (!displayedGoalId.isNullOrBlank() &&
                         reference.versionNow == reference.versionAtLink) {

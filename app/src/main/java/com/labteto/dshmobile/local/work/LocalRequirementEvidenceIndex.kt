@@ -15,11 +15,13 @@ private data class RequirementEvidenceCursor(
     val requirements: List<String>,
     val links: List<LocalSessionEventLog.Event>,
     val reviews: List<LocalSessionEventLog.Event>,
+    val textChecks: List<LocalSessionEventLog.Event>,
 )
 
 internal data class IndexedRequirementEvidence(
     val links: List<LocalRequirementEvidenceLink>,
     val reviews: List<LocalRequirementEvidenceReview>,
+    val textChecks: List<LocalRequirementEvidenceTextCheck>,
     /** Observability for a bounded-tail regression; never claims a pass. */
     val replayedEvents: Int,
 )
@@ -40,6 +42,7 @@ internal fun indexedRequirementEvidence(
     }
     val links = linkedMapOf<Pair<Int, String>, LocalSessionEventLog.Event>()
     val reviews = linkedMapOf<Long, LocalSessionEventLog.Event>()
+    val checks = linkedMapOf<Long, LocalSessionEventLog.Event>()
 
     fun projectLinks(): List<LocalRequirementEvidenceLink> =
         projectRequirementEvidenceLinks(links.values.asSequence(), todos, goalId)
@@ -51,7 +54,7 @@ internal fun indexedRequirementEvidence(
                     .singleOrNull() ?: return
                 val key = candidate.requirementIndex to candidate.artifactPath
                 val old = links.put(key, event)
-                if (old != null) reviews.remove(old.sequence)
+                if (old != null) { reviews.remove(old.sequence); checks.remove(old.sequence) }
                 require(links.size <= MAX_ACTIVE_EVIDENCE) {
                     "Work 证据关联数量超过 $MAX_ACTIVE_EVIDENCE 项，请归档旧目标"
                 }
@@ -62,6 +65,12 @@ internal fun indexedRequirementEvidence(
                 ).singleOrNull() ?: return
                 reviews[current.linkSequence] = event
             }
+            "work/requirement-evidence-text-check" -> {
+                val current = projectRequirementEvidenceTextChecks(
+                    sequenceOf(event), projectLinks(), goalId,
+                ).singleOrNull() ?: return
+                checks[current.linkSequence] = event
+            }
         }
     }
 
@@ -69,6 +78,7 @@ internal fun indexedRequirementEvidence(
     // An edited goal contract forces an original-log replay, never a cross-goal reuse.
     restored?.links?.forEach(::consume)
     restored?.reviews?.forEach(::consume)
+    restored?.textChecks?.forEach(::consume)
     val through = if (restored == null) -1L else requireNotNull(checkpoint).throughSequence
     var cursor = through
     val last = log.latestSequence()
@@ -86,6 +96,7 @@ internal fun indexedRequirementEvidence(
         "Work 证据投影期间会话日志已经重置或关闭"
     }
     val projectedLinks = projectLinks()
+    val projectedChecks = projectRequirementEvidenceTextChecks(checks.values.asSequence(), projectedLinks, goalId)
     val projectedReviews = projectRequirementEvidenceReviews(
         reviews.values.asSequence(), projectedLinks, goalId,
     )
@@ -94,14 +105,14 @@ internal fun indexedRequirementEvidence(
             INDEX_NAME, INDEX_VERSION, cursor,
             Json.encodeToString(RequirementEvidenceCursor.serializer(),
                 RequirementEvidenceCursor(goalId, requirements, links.values.toList(),
-                    reviews.values.toList())),
+                    reviews.values.toList(), checks.values.toList())),
             generation,
         )
     }
-    return IndexedRequirementEvidence(projectedLinks, projectedReviews, replayed)
+    return IndexedRequirementEvidence(projectedLinks, projectedReviews, projectedChecks, replayed)
 }
 
 private const val INDEX_NAME = "work.requirement-evidence"
-private const val INDEX_VERSION = 1
+private const val INDEX_VERSION = 2
 private const val PAGE_SIZE = 256
 private const val MAX_ACTIVE_EVIDENCE = 2_048

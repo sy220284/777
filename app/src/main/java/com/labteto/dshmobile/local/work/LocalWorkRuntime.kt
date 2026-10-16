@@ -261,6 +261,56 @@ class LocalWorkRuntime @Inject internal constructor(
         return true
     }
 
+    internal fun requirementEvidenceTextChecksForUi(sessionId: String): List<LocalRequirementEvidenceTextCheck> =
+        requirementEvidenceIndexForUi(sessionId).textChecks
+
+    internal data class PreparedEvidenceTextCheck(
+        val reference: LocalPreparedRequirementEvidenceReview,
+        val needleSha256: String,
+        val matched: Boolean,
+    )
+
+    internal fun prepareEvidenceTextCheckForUi(
+        sessionId: String, goalId: String, index: Int, requirement: String,
+        path: String, linkSequence: Long, version: String, requiredText: String,
+    ): PreparedEvidenceTextCheck? {
+        if (requiredText.isBlank() || requiredText.length > 512) return null
+        val proof = prepareRequirementEvidenceReviewForUi(
+            sessionId, goalId, index, requirement, path, linkSequence, version) ?: return null
+        val matched = inspectLocalWorkEvidenceText(
+            File(sessionFiles.workspace.path), path, version, requiredText) ?: return null
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(requiredText.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        return PreparedEvidenceTextCheck(proof, digest, matched)
+    }
+
+    /** The result concerns one literal condition and one observed byte version only. */
+    internal fun commitEvidenceTextCheckForUi(value: PreparedEvidenceTextCheck): Boolean {
+        val proof = value.reference
+        val snapshot = runtimeStateStore.state.value
+        if (snapshot.sessionId != proof.sessionId ||
+            runtimeStateStore.currentSessionId != proof.sessionId ||
+            snapshot.usageMode != LocalUsageMode.WORK || snapshot.work.goal?.id != proof.goalId ||
+            snapshot.work.todos.getOrNull(proof.requirementIndex)?.content != proof.requirement)
+            return false
+        val log = eventLogs.get(proof.sessionId)
+        if (log.isClosed || log.historyInstanceIdentity != proof.logIdentity ||
+            log.resetGeneration != proof.generation || log.latestSequence() != proof.observedSequence ||
+            !preparedReviewVersionStillCurrent(proof)) return false
+        log.append("work/requirement-evidence-text-check", buildJsonObject {
+            put("goal_id", proof.goalId)
+            put("requirement_index", proof.requirementIndex)
+            put("artifact_path", proof.artifactPath)
+            put("link_sequence", proof.linkSequence)
+            put("sha256", proof.version)
+            put("condition_sha256", value.needleSha256)
+            put("contains_required_text", value.matched)
+            put("assertion", "utf8_contains_only_not_work_completion")
+        })
+        return true
+    }
+
     override fun planForUi(sessionId: String): com.labteto.dshmobile.uicontract.UiWorkPlanSnapshot? {
         val current = runtimeStateStore.state.value
         if (current.sessionId != sessionId || current.usageMode != LocalUsageMode.WORK) return null
