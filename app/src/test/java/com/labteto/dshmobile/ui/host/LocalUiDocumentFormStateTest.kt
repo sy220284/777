@@ -112,6 +112,29 @@ class LocalUiDocumentFormStateTest {
             legacy.values.value[UiDocumentFormKey("s", "doc", 0)])
     }
 
+    @Test fun disposingSensitiveFormClearsTransientValuesButKeepsOrdinarySavedDraft() {
+        var saved = arrayListOf<String>()
+        val key = UiDocumentFormKey("session", "form", 5)
+        val forms = LocalUiDocumentFormState(emptyList()) { saved = it }
+        forms.bindRetention(key, mapOf(
+            "oneTime" to com.labteto.dshmobile.uicontract.UiFieldRetention.MEMORY_ONLY,
+            "note" to com.labteto.dshmobile.uicontract.UiFieldRetention.SAVED_STATE,
+        ))
+        forms.update(key, "oneTime", "temporary-private")
+        forms.update(key, "note", "keep-this")
+        forms.releaseRetention(key)
+        assertEquals(mapOf("note" to "keep-this"), forms.values.value[key])
+        assertFalse(saved.contains("temporary-private"))
+        assertEquals("keep-this", LocalUiDocumentFormState(saved) {}.values.value[key]?.get("note"))
+        forms.bindRetention(key, mapOf(
+            "oneTime" to com.labteto.dshmobile.uicontract.UiFieldRetention.MEMORY_ONLY,
+            "note" to com.labteto.dshmobile.uicontract.UiFieldRetention.SAVED_STATE,
+        ))
+        assertFalse(forms.values.value[key].orEmpty().containsKey("oneTime"))
+        forms.forgetSessions(setOf("session"))
+        assertTrue(forms.values.value.isEmpty())
+    }
+
     @Test fun explicitMemoryOnlyRetentionScrubsHistoricalValuesAndKeepsCurrentDraftTransient() {
         val key = UiDocumentFormKey("session", "typed-document", 4)
         var saved = arrayListOf<String>()
