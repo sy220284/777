@@ -39,6 +39,9 @@ data class V6SecondaryPorts(
     val authoring: PersonaAuthoringUiPort? = null,
     val currentPersona: CurrentPersonaUiPort? = null,
     val replySuggestions: ReplySuggestionsUiPort? = null,
+    val gallery: PersonaGalleryUiPort? = null,
+    val selection: PersonaSelectionUiPort? = null,
+    val portraits: PersonaPortraitUiPort? = null,
 )
 
 @Composable
