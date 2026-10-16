@@ -61,10 +61,14 @@
         "AE4V3-02",
         "AE4V3-03"
       ],
-      "status": "not_started",
-      "code_evidence": [],
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionEvidence.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionClaimGuard.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt"
+      ],
       "tests_verified": [],
-      "notes": ""
+      "notes": "已对 Work 实际 turn/end 事件增加 Kotlin 强类型 GoalDisposition（NO_GOAL/PAUSED/BLOCKED/WAITING_* /NEEDS_EXECUTION/READY_FOR_SETTLEMENT/COMPLETED），与真实 Work 验收证据共享同一快照；仅首个可交付切片，完整 Run/Turn/Tool typed contract 尚未完成。"
     },
     {
       "id": "AE4V3-05",
@@ -346,5 +350,12 @@
     "behavior": "atomic rejection before execution; all valid admitted work retained; bounded concurrency unchanged",
     "pr_head_before_commit": "cd0dbc0604996cf0b64fee8fd5a484dbbed42b85"
   },
-  "status": "first incremental implementation, not entire refactor"
+  "status": "first incremental implementation, not entire refactor",
+  "current_slice": {
+    "date": "2026-10-16",
+    "component": "Work goal typed turn disposition",
+    "head_before": "90a451dca3602393c2ba6ac43f30136dbd50b0ca",
+    "description": "Use one Work-owned acceptance-evidence snapshot for turn-end disposition and completion quality; no automatic resumption before safe GoalDriver admission.",
+    "ci": "awaiting latest branch SHA"
+  }
 }
