@@ -216,6 +216,13 @@ private fun LocalDocumentNode(node: UiDocumentNode, values: Map<String, String>,
                 )
             }
         }
+        // Legacy compatibility renderer remains read-only until the independent V6 migration is accepted.
+        is UiDocumentNode.LineChart -> Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+            Text(node.title)
+            node.points.forEach { point ->
+                Text("${point.label}: ${point.value} ${node.unit}".trim())
+            }
+        }
         is UiDocumentNode.BoundText -> {
             val value = when (val bound = snapshot.bindings[node.binding]) {
                 is UiDocumentBoundValue.Text -> bound.value
