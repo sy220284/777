@@ -5,12 +5,26 @@ import kotlinx.serialization.json.JsonObject
 /** Execution origin is part of the durable queue contract, not encoded in ID prefixes. */
 enum class QueuedAgentInputKind { USER, WORK_CONTINUATION }
 
+/** Stable resume coordinates are persisted with the queue, not inferred from display IDs. */
+data class AgentContinuationRef(
+    val sourceRunId: String,
+    val checkpointSequence: Long,
+    val failureCode: String,
+    val index: Int,
+    val sourceMessageId: String?,
+) {
+    init {
+        require(sourceRunId.isNotBlank() && checkpointSequence >= 0 && index > 0)
+    }
+}
+
 data class QueuedAgentInput(
     val content: String,
     val memoryInput: String = content,
     val modelMessage: JsonObject? = null,
     val id: String = "",
     val kind: QueuedAgentInputKind = QueuedAgentInputKind.USER,
+    val continuation: AgentContinuationRef? = null,
 )
 
 class AgentInputQueue(

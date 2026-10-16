@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.agent
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.agent.QueuedAgentInputKind
+import com.labteto.dshmobile.harness.agent.AgentContinuationRef
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import kotlinx.serialization.json.JsonArray
@@ -11,6 +12,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 internal const val LOCAL_AGENT_INBOX_EVENT_TYPE = "agent/inbox/spliced"
@@ -59,12 +61,27 @@ internal fun decodeLocalAgentInboxPending(data: JsonObject): List<QueuedAgentInp
             "WORK_CONTINUATION" -> QueuedAgentInputKind.WORK_CONTINUATION
             else -> return null
         }
+        val metadata = item["continuation"]
+        val continuation = if (metadata == null) null else {
+            val ref = metadata as? JsonObject ?: return null
+            val sourceRunId = stringValue(ref, "source_run_id")
+                ?.takeIf(String::isNotBlank) ?: return null
+            val sequence = (ref["checkpoint_sequence"] as? JsonPrimitive)?.longOrNull
+                ?.takeIf { it >= 0 } ?: return null
+            val failureCode = stringValue(ref, "failure_code") ?: return null
+            val index = (ref["index"] as? JsonPrimitive)?.intOrNull
+                ?.takeIf { it > 0 } ?: return null
+            AgentContinuationRef(sourceRunId, sequence, failureCode, index,
+                stringValue(ref, "source_message_id"))
+        }
+        if ((kind == QueuedAgentInputKind.WORK_CONTINUATION) != (continuation != null)) return null
         decoded += QueuedAgentInput(
             content = content,
             memoryInput = memoryInput,
             modelMessage = modelMessage,
             id = id,
             kind = kind,
+            continuation = continuation,
         )
     }
     return decoded
@@ -75,6 +92,15 @@ private fun encodeQueuedAgentInput(input: QueuedAgentInput): JsonObject = buildJ
     put("content", input.content)
     put("memory_input", input.memoryInput)
     put("kind", input.kind.name)
+    input.continuation?.let { ref ->
+        put("continuation", buildJsonObject {
+            put("source_run_id", ref.sourceRunId)
+            put("checkpoint_sequence", ref.checkpointSequence)
+            put("failure_code", ref.failureCode)
+            put("index", ref.index)
+            ref.sourceMessageId?.let { put("source_message_id", it) }
+        })
+    }
     input.modelMessage?.let { put("model_message", it) }
 }
 

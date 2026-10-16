@@ -828,7 +828,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 run(
                                     input = next.content,
                                     memoryInput = next.memoryInput,
-                                    sourceMessageId = next.id,
+                                    sourceMessageId = next.continuation?.sourceMessageId ?: next.id,
                                     binding = ownedBinding,
                                 )
                             }

@@ -217,7 +217,13 @@ class LocalWorkRunRegistry internal constructor(
             if (next == null) return@synchronized null
             // A separate user input is a fresh task allowance. Only internal continuation
             // inputs retain the bounded count for their original interrupted task.
-            if (next.kind != QueuedAgentInputKind.WORK_CONTINUATION) {
+            if (next.kind == QueuedAgentInputKind.WORK_CONTINUATION) {
+                val resume = requireNotNull(next.continuation) {
+                    "已持久化的 Work 续接命令缺少原任务与检查点坐标"
+                }
+                binding.automaticContinuationCount = resume.index
+                binding.continuationParentRunId = resume.sourceRunId
+            } else {
                 binding.automaticContinuationCount = 0
                 binding.continuationParentRunId = null
             }

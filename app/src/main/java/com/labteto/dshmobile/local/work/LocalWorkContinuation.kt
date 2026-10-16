@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.agent.QueuedAgentInputKind
+import com.labteto.dshmobile.harness.agent.AgentContinuationRef
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.LocalModelException
@@ -35,6 +36,9 @@ internal data class LocalWorkResumeCommand(
         },
         id = id,
         kind = QueuedAgentInputKind.WORK_CONTINUATION,
+        continuation = AgentContinuationRef(
+            sourceRunId, checkpointSequence, failureCode, index, sourceMessageId,
+        ),
     )
 }
 
