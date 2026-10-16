@@ -117,7 +117,11 @@ class DiagnosticReportTest {
             eventId = "process-123:9")
         val persisted = AppLog.encodeEntry(event)
         assertEquals("process-123:9", AppLog.decodeEntry(persisted)?.eventId)
-        val legacyElevenColumns = persisted.substringBeforeLast('\t')
+        // Version 13 appended sanitized stack frames after the event identity.
+        // Remove both new columns to exercise the historical 11-column format.
+        val legacyTwelveColumns = persisted.substringBeforeLast('\t')
+        assertEquals(event.eventId, AppLog.decodeEntry(legacyTwelveColumns)?.eventId)
+        val legacyElevenColumns = legacyTwelveColumns.substringBeforeLast('\t')
         assertEquals(null, AppLog.decodeEntry(legacyElevenColumns)?.eventId)
         assertEquals(event.message, AppLog.decodeEntry(legacyElevenColumns)?.message)
     }
