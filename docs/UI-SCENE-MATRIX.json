@@ -1217,8 +1217,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "save": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "MediaUiPort.assetForSession(resultId, sessionId) + exportToSessionAsset via user-picked Android SAF after creation result exists",
+          "receiptType": "MediaUiReceipt; V6DocumentMediaNode on creation/results page",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1616,8 +1616,8 @@
           "status": "PENDING_EVIDENCE"
         },
         "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "ModelPerformanceUiPort.submit(SetReasoning / SetTemperature)",
+          "receiptType": "ModelPerformanceUiReceipt",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1660,7 +1660,7 @@
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
       "actions": [
         "open",
-        "edit_owner_configuration"
+        "filter_usage_by_model"
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
@@ -1673,9 +1673,9 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
-        "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+        "filter_usage_by_model": {
+          "ownerPort": "UsageUiPort.snapshot().byModel / requestDetail(requestId); UI-only model filter",
+          "receiptType": "TokenUsageAnalyticsSnapshot / TokenUsageRecord? read-only",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1689,7 +1689,7 @@
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
       "actions": [
         "open",
-        "edit_owner_configuration"
+        "query_provider_quota"
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
@@ -1702,9 +1702,9 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
-        "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+        "query_provider_quota": {
+          "ownerPort": "SettingsUiPort.queryMiniMaxQuota(configuredProfile)",
+          "receiptType": "MiniMaxProviderUsage, or explicit network error",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1718,7 +1718,7 @@
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
       "actions": [
         "open",
-        "edit_owner_configuration"
+        "refresh_official_prices"
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
@@ -1731,9 +1731,9 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
-        "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+        "refresh_official_prices": {
+          "ownerPort": "PricingUiPort.refreshOfficial() + PricingUiPort.snapshots",
+          "receiptType": "PricingUiReceipt / UiProviderPricingSnapshot",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1747,7 +1747,7 @@
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
       "actions": [
         "open",
-        "edit_owner_configuration"
+        "inspect_usage_summary"
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
@@ -1760,9 +1760,9 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
-        "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+        "inspect_usage_summary": {
+          "ownerPort": "UsageUiPort.snapshot().tracked / chat / work",
+          "receiptType": "TokenUsageAnalyticsSnapshot read-only",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1776,7 +1776,7 @@
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
       "actions": [
         "open",
-        "edit_owner_configuration"
+        "inspect_request_log"
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
@@ -1789,9 +1789,9 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
-        "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+        "inspect_request_log": {
+          "ownerPort": "UsageUiPort.snapshot().recentRecords with optional model filter",
+          "receiptType": "TokenUsageRecord read-only",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
@@ -1805,7 +1805,7 @@
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
       "actions": [
         "open",
-        "edit_owner_configuration"
+        "inspect_request_detail"
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
@@ -1818,9 +1818,9 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         },
-        "edit_owner_configuration": {
-          "ownerPort": null,
-          "receiptType": null,
+        "inspect_request_detail": {
+          "ownerPort": "UsageUiPort.requestDetail(requestId)",
+          "receiptType": "TokenUsageRecord? read-only",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
