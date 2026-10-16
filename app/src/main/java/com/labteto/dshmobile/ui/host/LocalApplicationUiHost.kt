@@ -41,6 +41,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.ui.screens.local.LocalHarnessViewModel
 import com.labteto.dshmobile.uipack.next.NextApplicationFeaturePorts
 import com.labteto.dshmobile.uipack.next.NextApplicationScenePack
+import com.labteto.dshmobile.uipack.v6.V6ApplicationScenePack
 import kotlinx.coroutines.flow.map
 
 /** The original shipped screen is an explicit compatibility mode, never a fake complete UiPack. */
@@ -56,7 +57,11 @@ internal object LocalApplicationPackInstallations {
         updateStatus: kotlinx.coroutines.flow.StateFlow<String?>? = null,
         checkForUpdate: (() -> Unit)? = null,
     ): List<UiApplicationScenePack> =
-        listOf(NextApplicationScenePack(NextApplicationFeaturePorts(
+        listOf(
+            // Migrating V6 has only real settings renderers. Full-application Host denies it
+            // until every required Scene exists, so current users stay on legacy stable V6.
+            V6ApplicationScenePack(owner.hostPreferencesUiPort),
+            NextApplicationScenePack(NextApplicationFeaturePorts(
             chat = owner.chatUiPort, work = owner.workConversationUiPort,
             drafts = owner.conversationDraftUiPort, reading = owner.conversationReadingUiPort,
             gallery = owner.personaGalleryUiPort, selection = owner.personaSelectionUiPort,
