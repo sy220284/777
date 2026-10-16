@@ -76,6 +76,43 @@ class LocalWorkflowCoordinatorTest {
     }
 
     @Test
+    fun graphPartialResultIsStructuredAndCannotMasqueradeAsFullyDelivered() = runTest {
+        val workflow = LocalWorkflowCoordinator(
+            execute = { prompt -> if (prompt == "A") "" else "完成" },
+            pruneOutput = { it }, onProgress = {},
+        )
+        val prepared = workflow.prepare(
+            tasks = listOf("A", "B", "C"), mode = "graph",
+            requiredEvidence = emptyList(),
+            dependencies = listOf(emptyList(), listOf(0), emptyList()),
+        )
+        val result = workflow.runDetailed(prepared)
+        assertEquals(3, result.total)
+        assertEquals(1, result.completed)
+        assertEquals(1, result.failed)
+        assertEquals(1, result.blocked)
+        assertEquals("partial", result.executionOutcome)
+        assertTrue(result.summary.contains("工作流仍有未完成节点"))
+        assertTrue(result.summary.contains("B"))
+    }
+
+    @Test
+    fun allVerifiedGraphNodesCompleteTheirGraphButDoNotSetTheParentGoal() = runTest {
+        val workflow = LocalWorkflowCoordinator(
+            execute = { "实际核验记录" }, pruneOutput = { it }, onProgress = {},
+        )
+        val result = workflow.runDetailed(
+            workflow.prepare(listOf("检查一", "检查二"), "parallel",
+                listOf("核验", "核验")),
+        )
+        assertEquals("nodes_completed", result.executionOutcome)
+        assertEquals(2, result.completed)
+        assertEquals(0, result.failed)
+        assertEquals(0, result.blocked)
+        assertTrue(result.allNodesCompleted)
+    }
+
+    @Test
     fun graphPreflightRejectsInvalidDependencyBeforeAnyStartIsPersisted() {
         var executions = 0
         val coordinator = LocalWorkflowCoordinator(

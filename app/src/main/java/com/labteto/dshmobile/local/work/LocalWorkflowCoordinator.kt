@@ -14,6 +14,27 @@ internal data class LocalPreparedWorkflow(
     val pipeline: Boolean,
 )
 
+
+/**
+ * Work graph execution result, independently of parent Goal completion.
+ * The complete node set is retained even when one branch failed or was blocked.
+ */
+internal data class LocalWorkflowRunResult(
+    val nodes: List<com.labteto.dshmobile.harness.workflow.TaskGraphNodeResult>,
+    val summary: String,
+) {
+    val total: Int get() = nodes.size
+    val completed: Int get() = nodes.count { it.outcome == TaskGraphOutcome.COMPLETED }
+    val failed: Int get() = nodes.count { it.outcome == TaskGraphOutcome.FAILED }
+    val blocked: Int get() = nodes.count { it.outcome == TaskGraphOutcome.BLOCKED }
+    val allNodesCompleted: Boolean get() = total > 0 && completed == total
+    val executionOutcome: String get() = when {
+        allNodesCompleted -> "nodes_completed"
+        completed > 0 -> "partial"
+        else -> "blocked"
+    }
+}
+
 /**
  * Work-owned read-only delegated task workflow using the shared Kotlin DAG scheduler.
  * Work still owns acceptance policy and subagent capabilities.
@@ -75,7 +96,10 @@ internal class LocalWorkflowCoordinator(
         return LocalPreparedWorkflow(nodes, requiredEvidence.toList(), pipeline)
     }
 
-    suspend fun run(plan: LocalPreparedWorkflow): String {
+    suspend fun run(plan: LocalPreparedWorkflow): String =
+        runDetailed(plan).summary
+
+    suspend fun runDetailed(plan: LocalPreparedWorkflow): LocalWorkflowRunResult {
         val pipeline = plan.pipeline
         val requiredEvidence = plan.evidence
         val results = graph.run(
@@ -108,7 +132,7 @@ internal class LocalWorkflowCoordinator(
                 )
             },
         )
-        return results.joinToString("\n\n") { result ->
+        val summary = results.joinToString("\n\n") { result ->
             val label = if (pipeline) "阶段" else "子任务"
             when (result.outcome) {
                 TaskGraphOutcome.COMPLETED -> {
@@ -122,5 +146,12 @@ internal class LocalWorkflowCoordinator(
                     "$label ${result.index + 1} 未启动：${result.error.orEmpty()}。"
             }
         }
+        val projection = LocalWorkflowRunResult(results, summary)
+        // A node failure must be visible to the next agent turn, never rendered
+        // as an entirely successful graph solely because execution returned.
+        return if (projection.allNodesCompleted) projection else projection.copy(
+            summary = "工作流仍有未完成节点：已完成 ${projection.completed}/${projection.total}，" +
+                "失败 ${projection.failed}，因依赖受阻 ${projection.blocked}。\n\n" + summary,
+        )
     }
 }

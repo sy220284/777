@@ -241,7 +241,7 @@
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamReducer.kt"
       ],
       "tests_verified": [],
-      "notes": "本轮重构并接入 DAG 图调度器（不可变拓扑、依赖条件、环与容量原子拒绝、执行并发上限、独立分支隔离、阻塞传播、Work 只读委托验收）。删除旧 HarnessWorkflowRunner 及旧测试；Agent Team 的持久 TaskGraph/恢复仍待统一，不能标记完成。 本批为 Work 模型工具 workflow 增加 graph 模式及零基有向依赖数组，接到 LocalWorkSubagentRuntime 和 TaskGraphExecutor 正式执行路径；循环/重复/自依赖/缺失/越界在执行前拒绝，并为汇总任务提供已验收的前置结果。当前 SHA CI 未验收。；Work Graph 与 Agent Team 统一使用 TaskGraphTopology 环检测。Work Graph 委托的每个节点状态变化写入 Session EventLog，UI 从事件之后读取；完整持久恢复与单元回归仍待最终 CI。；Work 图在写入 taskgraph/start 前完成统一拓扑预检；每条合法工作图均写入 start/progress/end(settled/failed/cancelled) EventLog 完整生命周期，取消不转为成功。仍待最新 HEAD CI。；TaskGraph 将 executor/acceptor 的可重试失败与 Session EventLog 的 onProgress 持久提交故障分离；事件落盘失败即停止整张图、禁止重复触发已成功工具。新增两项 JVM 回归待 CI。"
+      "notes": "本轮重构并接入 DAG 图调度器（不可变拓扑、依赖条件、环与容量原子拒绝、执行并发上限、独立分支隔离、阻塞传播、Work 只读委托验收）。删除旧 HarnessWorkflowRunner 及旧测试；Agent Team 的持久 TaskGraph/恢复仍待统一，不能标记完成。 本批为 Work 模型工具 workflow 增加 graph 模式及零基有向依赖数组，接到 LocalWorkSubagentRuntime 和 TaskGraphExecutor 正式执行路径；循环/重复/自依赖/缺失/越界在执行前拒绝，并为汇总任务提供已验收的前置结果。当前 SHA CI 未验收。；Work Graph 与 Agent Team 统一使用 TaskGraphTopology 环检测。Work Graph 委托的每个节点状态变化写入 Session EventLog，UI 从事件之后读取；完整持久恢复与单元回归仍待最终 CI。；Work 图在写入 taskgraph/start 前完成统一拓扑预检；每条合法工作图均写入 start/progress/end(settled/failed/cancelled) EventLog 完整生命周期，取消不转为成功。仍待最新 HEAD CI。；TaskGraph 将 executor/acceptor 的可重试失败与 Session EventLog 的 onProgress 持久提交故障分离；事件落盘失败即停止整张图、禁止重复触发已成功工具。新增两项 JVM 回归待 CI。；TaskGraph 在 Work 消费端新增结构化 LocalWorkflowRunResult，failed/blocked 节点形成 node counts 与 durable taskgraph/end 的 nodes_completed/partial/blocked 终态，Goal 验收仍独立；新增部分失败及全成功 JVM 回归。"
     },
     {
       "id": "AE4V3-15",
@@ -394,13 +394,14 @@
   "status": "first incremental implementation, not entire refactor",
   "current_slice": {
     "date": "2026-10-16",
-    "component": "Incremental durable tool facts over long-lived Session history",
-    "baseline_head": "a41700f2cf1ea8506312ebb61ac4a86e33f7ded6",
+    "component": "TaskGraph typed outcome and Work session event settlement",
+    "based_on_sha": "d909ffa340a37201638ad1856beb6f3d90ece68a",
     "status": "code_committed_ci_pending",
-    "testEvidence": [
-      "ToolAttemptLedgerTest",
-      "SessionRecoveryTest",
-      "LocalWorkGoalContinuationTest"
-    ]
+    "files": [
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkflowCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSubagentRuntime.kt",
+      "app/src/test/java/com/labteto/dshmobile/local/LocalWorkflowCoordinatorTest.kt"
+    ],
+    "tests_verified": []
   }
 }

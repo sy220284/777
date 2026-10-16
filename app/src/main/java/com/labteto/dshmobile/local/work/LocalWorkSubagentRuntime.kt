@@ -54,6 +54,7 @@ internal class LocalWorkSubagentRuntime(
         dependencies: List<List<Int>> = emptyList(),
     ): String {
         val workerSelection = LocalWorkerModelRouter.resolve(modelOverride, binding.aggregateSnapshot())
+        val goalIdAtStart = binding.workState.snapshot().goal?.id.orEmpty()
         // Preflight is pure and rejects cycles, missing nodes and capacity overflow
         // before the canonical EventLog may declare a graph started.
         val graphId = java.util.UUID.randomUUID().toString()
@@ -80,7 +81,7 @@ internal class LocalWorkSubagentRuntime(
                 // An emitted EventLog progress fact precedes every Work UI projection.
                 binding.eventLog.append("taskgraph/progress", kotlinx.serialization.json.buildJsonObject {
                     put("graph_id", graphId)
-                    put("goal_id", binding.workState.snapshot().goal?.id ?: "")
+                    put("goal_id", goalIdAtStart)
                     put("task_index", progress.index)
                     put("task", progress.task.take(500))
                     put("stage", progress.stage)
@@ -109,26 +110,36 @@ internal class LocalWorkSubagentRuntime(
         binding.eventLog.append("taskgraph/start", kotlinx.serialization.json.buildJsonObject {
             put("graph_id", graphId)
             put("session_id", binding.sessionId)
-            put("goal_id", binding.workState.snapshot().goal?.id ?: "")
+            put("goal_id", goalIdAtStart)
             put("mode", mode)
             put("task_count", tasks.size)
         })
         binding.workState.update { current -> current.copy(workflowProgress = null) }
 
-        fun settleGraph(outcome: String, detail: String = "") {
+        fun settleGraph(
+            outcome: String,
+            detail: String = "",
+            result: LocalWorkflowRunResult? = null,
+        ) {
             binding.eventLog.append("taskgraph/end", kotlinx.serialization.json.buildJsonObject {
                 put("graph_id", graphId)
-                put("goal_id", binding.workState.snapshot().goal?.id ?: "")
+                put("goal_id", goalIdAtStart)
                 put("outcome", outcome)
                 put("detail", detail.take(500))
+                result?.let {
+                    put("total_nodes", it.total)
+                    put("completed_nodes", it.completed)
+                    put("failed_nodes", it.failed)
+                    put("blocked_nodes", it.blocked)
+                }
             })
         }
         try {
-            val summary = workflow.run(prepared)
-            // "settled" denotes the execution phase ending. Goal acceptance has
-            // its own Work-owned evidence gate and must not be inferred here.
-            settleGraph("settled")
-            return summary
+            val result = workflow.runDetailed(prepared)
+            // Graph execution outcome is typed and persistent. Even if every
+            // node succeeds, Work's Goal Verifier separately decides delivery.
+            settleGraph(result.executionOutcome, result = result)
+            return result.summary
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
                 try { settleGraph("cancelled") }
