@@ -19,6 +19,9 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.uicontract.UiCommandReceipt
+import com.labteto.dshmobile.uicontract.UiCommandRejection
+import com.labteto.dshmobile.uicontract.UiMessageEditOutcome
 import com.labteto.dshmobile.uicontract.UiDocumentSnapshot
 import com.labteto.dshmobile.uicontract.UiDocumentFormKey
 import com.labteto.dshmobile.uicontract.UiDocumentFormUiPort
@@ -76,18 +79,7 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
             SyButton(text = "删除文档", onClick = { confirmDeletion = true },
                 enabled = !deleting, variant = SyButtonVariant.Ghost)
         deletionNotice?.let { Text(it) }
-        receipt?.let { result ->
-            if (result is UiDocumentReceipt.InvalidFields) {
-                Text(stringResource(R.string.ui_document_invalid_fields, result.fieldIds.joinToString()))
-            } else {
-                Text(stringResource(when (result) {
-                    UiDocumentReceipt.DraftPrepared -> R.string.ui_document_draft_prepared
-                    UiDocumentReceipt.NavigationRequested -> R.string.ui_document_navigation_requested
-                    is UiDocumentReceipt.OwnerReceipt -> R.string.ui_document_owner_receipt
-                    else -> R.string.ui_document_unavailable
-                }))
-            }
-        }
+        receipt?.let { result -> LocalDocumentActionFeedback(result) }
     }
     if (confirmDeletion) AlertDialog(
         onDismissRequest = { if (!deleting) confirmDeletion = false },
@@ -117,6 +109,52 @@ internal fun LocalDynamicDocument(snapshot: UiDocumentSnapshot, identity: UiSess
         dismissButton = { TextButton(onClick = { confirmDeletion = false }) { Text("取消") } },
     )
 }
+
+/** V6 displays the actual Owner outcome, including rejection and unknown side effects. */
+@Composable
+internal fun LocalDocumentActionFeedback(result: UiDocumentReceipt) {
+    val label = when (result) {
+        UiDocumentReceipt.Deleted -> stringResource(R.string.ui_document_deleted)
+        UiDocumentReceipt.DraftPrepared -> stringResource(R.string.ui_document_draft_prepared)
+        UiDocumentReceipt.NavigationRequested -> stringResource(R.string.ui_document_navigation_requested)
+        UiDocumentReceipt.AdditionalRequestConsentRequired -> stringResource(R.string.ui_document_extra_request_consent)
+        is UiDocumentReceipt.InvalidFields -> stringResource(R.string.ui_document_invalid_fields, result.fieldIds.joinToString())
+        is UiDocumentReceipt.Failed -> result.message?.takeIf(String::isNotBlank)
+            ?: stringResource(R.string.ui_document_unavailable)
+        is UiDocumentReceipt.Rejected -> documentRejectionText(result.reason)
+        is UiDocumentReceipt.OwnerReceipt -> when (val owner = result.receipt) {
+            UiCommandReceipt.Accepted -> stringResource(R.string.ui_document_owner_receipt)
+            UiCommandReceipt.Queued -> stringResource(R.string.ui_document_enqueued)
+            is UiCommandReceipt.Rejected -> documentRejectionText(owner.reason)
+            is UiCommandReceipt.Failed -> owner.message
+            UiCommandReceipt.NotAdmitted -> stringResource(R.string.ui_document_not_admitted)
+            UiCommandReceipt.OutcomeUnknown -> stringResource(R.string.local_ui_result_unknown)
+            is UiCommandReceipt.MessageEdited -> when (owner.result) {
+                UiMessageEditOutcome.SENT -> stringResource(R.string.ui_document_owner_receipt)
+                UiMessageEditOutcome.COMMITTED_NOT_STARTED -> stringResource(R.string.ui_document_edit_committed)
+                else -> stringResource(R.string.ui_document_unavailable)
+            }
+        }
+        is UiDocumentReceipt.Published -> stringResource(R.string.ui_document_owner_receipt)
+        is UiDocumentReceipt.Fallback -> stringResource(R.string.ui_document_unavailable)
+    }
+    Text(label)
+}
+
+@Composable
+private fun documentRejectionText(reason: UiCommandRejection): String =
+    stringResource(when (reason) {
+        UiCommandRejection.EMPTY_INPUT -> R.string.ui_document_reject_empty
+        UiCommandRejection.LOADING -> R.string.ui_document_reject_loading
+        UiCommandRejection.UNCONFIGURED -> R.string.ui_document_reject_config
+        UiCommandRejection.STALE_IDENTITY -> R.string.local_ui_context_changed
+        UiCommandRejection.SESSION_TRANSITION -> R.string.ui_document_reject_transition
+        UiCommandRejection.QUEUE_FULL -> R.string.ui_document_reject_queue_full
+        UiCommandRejection.QUEUE_UNAVAILABLE -> R.string.ui_document_reject_queue_unavailable
+        UiCommandRejection.APPROVAL_EXPIRED -> R.string.local_ui_approval_expired
+        UiCommandRejection.QUESTION_EXPIRED -> R.string.ui_document_reject_question
+        UiCommandRejection.UNSUPPORTED -> R.string.ui_document_not_admitted
+    })
 
 @Composable
 private fun LocalDocumentNode(node: UiDocumentNode, values: Map<String, String>, snapshot: UiDocumentSnapshot,

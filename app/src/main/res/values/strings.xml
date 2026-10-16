@@ -2446,5 +2446,18 @@
     <string name="ui_document_media_export_failed">保存未成功，请检查目标文件</string>
     <string name="ui_document_media_export_cancelled">已取消保存</string>
     <string name="composer_invocation_close">关闭连接器与技能列表</string>
+    <string name="ui_document_enqueued">操作已加入队列，请等待处理</string>
+    <string name="ui_document_not_admitted">此操作未获准执行，请查看当前任务状态</string>
+    <string name="ui_document_edit_committed">修改已保存，但尚未开始执行</string>
+    <string name="ui_document_reject_empty">请先填写操作所需内容</string>
+    <string name="ui_document_reject_loading">会话仍在加载，请稍后重试</string>
+    <string name="ui_document_reject_config">尚未配置可用模型，请先连接模型</string>
+    <string name="ui_document_reject_transition">会话正在切换，请等待后重新操作</string>
+    <string name="ui_document_reject_queue_full">输入队列已满，请等待已有消息处理</string>
+    <string name="ui_document_reject_queue_unavailable">当前任务暂时不能接收新输入</string>
+    <string name="ui_document_reject_question">这项问题已结束，请查看当前任务</string>
+    <string name="ui_document_media_audio_preparing">正在准备音频…</string>
+    <string name="ui_document_media_retry">重新加载音频</string>
+    <string name="ui_document_deleted">文档已删除</string>
 </resources>
 

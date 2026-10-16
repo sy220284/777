@@ -325,4 +325,9 @@
     <string name="next_search_role_assistant">助手</string>
     <string name="next_search_role_tool">工具</string>
     <string name="next_search_role_system">系统</string>
+    <string name="next_document_audio_preparing">正在准备音频…</string>
+    <string name="next_document_audio_failed">音频无法播放，请重新加载或检查原文件</string>
+    <string name="next_document_audio_retry">重新加载音频</string>
+    <string name="next_document_audio_play">播放音频</string>
+    <string name="next_document_audio_pause">暂停音频</string>
 </resources>

@@ -75,6 +75,8 @@ internal class LocalUiDocumentUiAdapter(
                     document.documentId == "work-live:${document.source.messageId}" &&
                     document.actions.isEmpty() && document.source.workMode &&
                     context.workMode && id?.sessionId == document.source.sessionId
+                // Work activity cards are per-turn durable facts, never bindings to the
+                // currently foreground turn. This also fences legacy saved BoundText nodes.
                 // A detached Work card has no actions and cannot grant expired permissions.
                 val current = record.recoveryNotice == null &&
                     (sourceMatches(document.source, id, context.workMode) || readOnlyWorkProgress)
@@ -86,7 +88,7 @@ internal class LocalUiDocumentUiAdapter(
                         else -> null
                     }
                     action.id to UiActionAvailability(reason == null, reason)
-                }, if (!current) emptyMap() else mapOf(
+                }, if (!current || readOnlyWorkProgress) emptyMap() else mapOf(
                     UiDocumentBinding.EXECUTION_PHASE to UiDocumentBoundValue.Phase(context.phase),
                     UiDocumentBinding.QUEUED_INPUT_COUNT to UiDocumentBoundValue.Count(context.queued),
                     UiDocumentBinding.PENDING_APPROVAL_TOOL to (context.approvalTool?.let { UiDocumentBoundValue.Text(it) }

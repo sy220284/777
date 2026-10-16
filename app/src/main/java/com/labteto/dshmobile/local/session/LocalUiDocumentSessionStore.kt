@@ -199,47 +199,47 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
         event: LocalSessionEventLog.Event, sessionId: String,
         messageIds: Set<String>, budget: UiDocumentBudget, knownScenes: Set<UiSceneId>,
     ): LocalUiDocumentRecord? {
-            val anchorId = runCatching { event.data["source"]?.jsonObject?.get("messageId")?.jsonPrimitive?.content }
-                .getOrNull()?.takeIf { it in messageIds } ?: return null
-            return try {
-                val value = event.data
-                val anchor = value.getValue("source").jsonObject
-                val source = UiDocumentSource(anchor.getValue("sessionId").jsonPrimitive.content,
-                    anchor.getValue("messageId").jsonPrimitive.content,
-                    anchor.getValue("contextGeneration").jsonPrimitive.long,
-                    anchor["profileId"]?.jsonPrimitive?.content, anchor["projectId"]?.jsonPrimitive?.content,
-                    anchor["workMode"]?.jsonPrimitive?.boolean ?: false)
-                if (source.sessionId != sessionId) return null
-                val definition = value.getValue("definition")
-                val decoded = LocalUiDocumentCodec.decode(definition.toString(), source,
-                    budget, knownScenes, value["admittedApprovalId"]?.jsonPrimitive?.content)
-                val fallback = runCatching { definition.jsonObject["fallbackText"]?.jsonPrimitive?.content }.getOrNull().orEmpty()
-                    .takeIf { it.length <= budget.maxTextChars }.orEmpty()
-                // An incompatible historical card is readable but cannot regain executable actions.
-                val originalId = runCatching {
-                    definition.jsonObject["documentId"]?.jsonPrimitive?.content
-                }.getOrNull()?.takeIf { it.isNotBlank() && it.length <= 200 &&
-                    it.none(Char::isISOControl) }
-                val document = decoded.getOrNull() ?: UiDocument(1,
-                    originalId ?: "unavailable:${event.sequence}", source, 0,
-                    "", if (fallback.isBlank()) emptyList() else listOf(UiDocumentNode.Text("fallback", fallback)),
-                    emptyList(), "")
-                val provenance = value.getValue("provenance").jsonObject
-                LocalUiDocumentRecord(document, UiDocumentProvenance(provenance["requestId"]?.jsonPrimitive?.content,
-                    provenance.getValue("model").jsonPrimitive.content, provenance.getValue("usageReported").jsonPrimitive.boolean,
-                    provenance["origin"]?.jsonPrimitive?.content?.let(com.labteto.dshmobile.uicontract.UiDocumentOrigin::valueOf)
-                        ?: com.labteto.dshmobile.uicontract.UiDocumentOrigin.MODEL),
-                    if (decoded.isFailure) "ui_document_history_incomplete" else null)
-            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-            catch (_: Exception) {
-                // A log-indexed message anchor is sufficient for read-only fallback, never actions.
-                val fallback = runCatching { event.data["definition"]?.jsonObject?.get("fallbackText")?.jsonPrimitive?.content }
-                    .getOrNull()?.takeIf { it.length <= budget.maxTextChars }.orEmpty()
-                val source = UiDocumentSource(sessionId, anchorId, -1L, null, null)
-                LocalUiDocumentRecord(UiDocument(1, "unavailable:${event.sequence}", source, 0L, "",
-                    if (fallback.isBlank()) emptyList() else listOf(UiDocumentNode.Text("fallback", fallback)), emptyList(), ""),
-                    UiDocumentProvenance(null, "", false, com.labteto.dshmobile.uicontract.UiDocumentOrigin.UNKNOWN), "ui_document_history_incomplete")
-            }
+        val anchorId = runCatching { event.data["source"]?.jsonObject?.get("messageId")?.jsonPrimitive?.content }
+            .getOrNull()?.takeIf { it in messageIds } ?: return null
+        return try {
+            val value = event.data
+            val anchor = value.getValue("source").jsonObject
+            val source = UiDocumentSource(anchor.getValue("sessionId").jsonPrimitive.content,
+                anchor.getValue("messageId").jsonPrimitive.content,
+                anchor.getValue("contextGeneration").jsonPrimitive.long,
+                anchor["profileId"]?.jsonPrimitive?.content, anchor["projectId"]?.jsonPrimitive?.content,
+                anchor["workMode"]?.jsonPrimitive?.boolean ?: false)
+            if (source.sessionId != sessionId) return null
+            val definition = value.getValue("definition")
+            val decoded = LocalUiDocumentCodec.decode(definition.toString(), source,
+                budget, knownScenes, value["admittedApprovalId"]?.jsonPrimitive?.content)
+            val fallback = runCatching { definition.jsonObject["fallbackText"]?.jsonPrimitive?.content }.getOrNull().orEmpty()
+                .takeIf { it.length <= budget.maxTextChars }.orEmpty()
+            // An incompatible historical card is readable but cannot regain executable actions.
+            val originalId = runCatching {
+                definition.jsonObject["documentId"]?.jsonPrimitive?.content
+            }.getOrNull()?.takeIf { it.isNotBlank() && it.length <= 200 &&
+                it.none(Char::isISOControl) }
+            val document = decoded.getOrNull() ?: UiDocument(1,
+                originalId ?: "unavailable:${event.sequence}", source, 0,
+                "", if (fallback.isBlank()) emptyList() else listOf(UiDocumentNode.Text("fallback", fallback)),
+                emptyList(), "")
+            val provenance = value.getValue("provenance").jsonObject
+            LocalUiDocumentRecord(document, UiDocumentProvenance(provenance["requestId"]?.jsonPrimitive?.content,
+                provenance.getValue("model").jsonPrimitive.content, provenance.getValue("usageReported").jsonPrimitive.boolean,
+                provenance["origin"]?.jsonPrimitive?.content?.let(com.labteto.dshmobile.uicontract.UiDocumentOrigin::valueOf)
+                    ?: com.labteto.dshmobile.uicontract.UiDocumentOrigin.MODEL),
+                if (decoded.isFailure) "ui_document_history_incomplete" else null)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) {
+            // A log-indexed message anchor is sufficient for read-only fallback, never actions.
+            val fallback = runCatching { event.data["definition"]?.jsonObject?.get("fallbackText")?.jsonPrimitive?.content }
+                .getOrNull()?.takeIf { it.length <= budget.maxTextChars }.orEmpty()
+            val source = UiDocumentSource(sessionId, anchorId, -1L, null, null)
+            LocalUiDocumentRecord(UiDocument(1, "unavailable:${event.sequence}", source, 0L, "",
+                if (fallback.isBlank()) emptyList() else listOf(UiDocumentNode.Text("fallback", fallback)), emptyList(), ""),
+                UiDocumentProvenance(null, "", false, com.labteto.dshmobile.uicontract.UiDocumentOrigin.UNKNOWN), "ui_document_history_incomplete")
+        }
     }
 
 }

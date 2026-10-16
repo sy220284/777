@@ -203,7 +203,7 @@
       "task": "动态图片/音频/视频状态/预览/保存",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": " Next 新增独立媒体创作及成果管理界面，经原 MediaUiPort 显示真实创建、视频、保存状态并做受控操作；这是媒体功能页面，不是 UiDocument 中的动态媒体节点。\n2026-10-15 本次增量：新增 UiDocument.Media IMAGE/AUDIO/VIDEO 结构化节点，闭合 JSON codec 和预算校验；Next 本地图片限尺寸解码、音视频原生预览、SAF 用户选址保存；Owner 按 Session ID + 真实媒体类型解析和受控字节导出，不接受文档指定原始 URL/路径。MEDIA_RESULTS 本地模板从真实 Media Owner 构造文档节点。\n2026-10-16 本轮源代码：V6 与 Next 的媒体卡现在都监听 Media Owner 状态变化；音频异步 prepare、播放器销毁释放；导出沿用原文件实际已识别的后缀。\n2026-10-16 功能代码补充：原 V6、Next 经 SAF CreateDocument 导出媒体时失败/取消后尝试移除新建的不完整目标文件；清理失败显式提示，避免损坏文件被误报为已保存。",
+      "implemented": " Next 新增独立媒体创作及成果管理界面，经原 MediaUiPort 显示真实创建、视频、保存状态并做受控操作；这是媒体功能页面，不是 UiDocument 中的动态媒体节点。\n2026-10-15 本次增量：新增 UiDocument.Media IMAGE/AUDIO/VIDEO 结构化节点，闭合 JSON codec 和预算校验；Next 本地图片限尺寸解码、音视频原生预览、SAF 用户选址保存；Owner 按 Session ID + 真实媒体类型解析和受控字节导出，不接受文档指定原始 URL/路径。MEDIA_RESULTS 本地模板从真实 Media Owner 构造文档节点。\n2026-10-16 本轮源代码：V6 与 Next 的媒体卡现在都监听 Media Owner 状态变化；音频异步 prepare、播放器销毁释放；导出沿用原文件实际已识别的后缀。\n2026-10-16 功能代码补充：原 V6、Next 经 SAF CreateDocument 导出媒体时失败/取消后尝试移除新建的不完整目标文件；清理失败显式提示，避免损坏文件被误报为已保存。\n2026-10-16 审计修复：V6/Next 音频分开准备、真实失败和显式重新加载，释放替换播放器。 最终 SHA CI 待核对，仍不视为完整验收。",
       "remaining": "远程成果的可授权下载及中断恢复与更多编码容器支持仍缺；完整播放器回归不在本轮执行。"
     },
     {
@@ -216,14 +216,15 @@
       "id": "S4-04",
       "task": "同文档真实事件/成果渐进更新",
       "codeStatus": "CODE_PARTIAL",
-      "verification": "DEFERRED"
+      "verification": "DEFERRED",
+      "implemented": "\n2026-10-16 审计修复：Work 自动卡不再绑定当前前台回合状态，旧版活动卡也禁止注入其他回合实时字段。 最终 SHA CI 待核对，仍不视为完整验收。"
     },
     {
       "id": "S4-05",
       "task": "原 Work Owner 运行内自动发布",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "\n2026-10-15 本次增量：Work AgentToolFinished 在 tool/result 原始事件已持久化后通过 LocalWorkUiDocumentPublisher 同步发布单会话版本化 UiDocument；投影真实阶段、最近工具回执与错误，原 Session EventLog CAS，避免覆盖用户手工/AI设计，卡片失败不改变工具执行结果，无二次模型请求。\n2026-10-16 本轮源代码：Work 活动文档使用 work-live:<sourceMessageId> 稳定 ID，隔离用户本地模板和模型生成卡；跨前后台保留同一卡原来源，纯只读历史卡可在前台会话切换后继续显示，不恢复已过期的执行授权。\n2026-10-16 本轮代码增量：Work 回合的开始/工具调用/真实回执/完成/步数上限/失败/取消事件追加来源消息标识，原 Work Owner 在事件落日志后更新同源 UiDocument；按真实 call_id 配对未完成与完成回执，关联事件时 SHA256，但不宣称当前文件已验收。\n2026-10-16 功能代码补充：Work 自动生成文档与用户删除共用同一会话 EventLog：被用户删除的同 ID Work 卡不允许晚到事件重新写入；独立卡的 CAS 版本更新不覆盖同消息其他卡。",
+      "implemented": "\n2026-10-15 本次增量：Work AgentToolFinished 在 tool/result 原始事件已持久化后通过 LocalWorkUiDocumentPublisher 同步发布单会话版本化 UiDocument；投影真实阶段、最近工具回执与错误，原 Session EventLog CAS，避免覆盖用户手工/AI设计，卡片失败不改变工具执行结果，无二次模型请求。\n2026-10-16 本轮源代码：Work 活动文档使用 work-live:<sourceMessageId> 稳定 ID，隔离用户本地模板和模型生成卡；跨前后台保留同一卡原来源，纯只读历史卡可在前台会话切换后继续显示，不恢复已过期的执行授权。\n2026-10-16 本轮代码增量：Work 回合的开始/工具调用/真实回执/完成/步数上限/失败/取消事件追加来源消息标识，原 Work Owner 在事件落日志后更新同源 UiDocument；按真实 call_id 配对未完成与完成回执，关联事件时 SHA256，但不宣称当前文件已验收。\n2026-10-16 功能代码补充：Work 自动生成文档与用户删除共用同一会话 EventLog：被用户删除的同 ID Work 卡不允许晚到事件重新写入；独立卡的 CAS 版本更新不覆盖同消息其他卡。\n2026-10-16 审计修复：Work 中断结算保留原 source_message_id，区分未执行、只读中断和可能副作用的结果未知；增加真实 EventLog→Session 文档回归。 最终 SHA CI 待核对，仍不视为完整验收。",
       "remaining": "多次后台续跑身份恢复、源事件全量回放和跨进程连续发布还有实现缺口。"
     },
     {
@@ -237,7 +238,7 @@
       "task": "历史编辑/分页/删除/版本迁移与完整恢复",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": " Next归档历史新增有界冷档案分页与单条删除入口；页面仅保存人物/故事ID和不透明游标，恢复后重新读取，变化返回Stale。删除确认/副作用不自动恢复或重放；完整跨版本迁移、崩溃与双包恢复验收仍缺。\n2026-10-16 本轮源代码：Session 文档读写按 (sourceMessageId, documentId) 维护独立最新版本；本地模板按身份与模板建立稳定 ID，模型生成仅更新模型起源卡，损坏记录不得覆盖；增加同消息并存与并发版本冲突测试源码。\n2026-10-16 功能代码补充：Session EventLog 增加同文档 ID 的版本化删除墓碑；删除前强制当前会话身份、原始消息、文档修订号及存储记录 CAS 比对。被删除文档不可由迟到的 Work 事件原 ID 再生；热缓存增量回放与冷恢复均隐藏墓碑。V6/Next 删除确认调用原 UiDocumentUiPort，Owner 真实持久化后返回 Deleted；同步清除该文档所有版本的 SavedState 表单草稿，新增相关回归测试。",
+      "implemented": " Next归档历史新增有界冷档案分页与单条删除入口；页面仅保存人物/故事ID和不透明游标，恢复后重新读取，变化返回Stale。删除确认/副作用不自动恢复或重放；完整跨版本迁移、崩溃与双包恢复验收仍缺。\n2026-10-16 本轮源代码：Session 文档读写按 (sourceMessageId, documentId) 维护独立最新版本；本地模板按身份与模板建立稳定 ID，模型生成仅更新模型起源卡，损坏记录不得覆盖；增加同消息并存与并发版本冲突测试源码。\n2026-10-16 功能代码补充：Session EventLog 增加同文档 ID 的版本化删除墓碑；删除前强制当前会话身份、原始消息、文档修订号及存储记录 CAS 比对。被删除文档不可由迟到的 Work 事件原 ID 再生；热缓存增量回放与冷恢复均隐藏墓碑。V6/Next 删除确认调用原 UiDocumentUiPort，Owner 真实持久化后返回 Deleted；同步清除该文档所有版本的 SavedState 表单草稿，新增相关回归测试。\n2026-10-16 审计修复：复核并保留最新文档解析显式 return 修复和增量索引/删除能力。 最终 SHA CI 待核对，仍不视为完整验收。",
       "remaining": "历史消息级检索/分页/批量整理、文档正文版本化编辑与更复杂的冲突恢复仍未完成；本次新增删除路径不能替代全部历史治理。"
     },
     {
@@ -253,7 +254,7 @@
       "task": "同文档双包恢复/提交/拒绝验证",
       "codeStatus": "VERIFICATION_DEFERRED",
       "verification": "DEFERRED",
-      "implemented": " 修正 NextUiDocument 对 OwnerReceipt 的视觉回执分类：受理/排队/拒绝/执行失败/未准入/结果未知分别展示，审批失效不再误报已提交。需要真实动态卡测试。"
+      "implemented": " 修正 NextUiDocument 对 OwnerReceipt 的视觉回执分类：受理/排队/拒绝/执行失败/未准入/结果未知分别展示，审批失效不再误报已提交。需要真实动态卡测试。\n2026-10-16 审计修复：V6 按原 Owner 接受/拒绝/失败/排队/未知回执显示，不再全部提示已提交；增加 Compose 回归。 最终 SHA CI 待核对，仍不视为完整验收。"
     },
     {
       "id": "S5-01",

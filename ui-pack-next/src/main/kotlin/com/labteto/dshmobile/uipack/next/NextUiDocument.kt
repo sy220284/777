@@ -280,26 +280,32 @@ private fun NextDocumentMediaNode(node: UiDocumentNode.Media, sessionId: String)
                 else Text("图片正在载入或无法解码")
             }
             UiDocumentMediaKind.AUDIO -> {
-                var ready by remember(path) { mutableStateOf(false) }
-                var playing by remember(path) { mutableStateOf(false) }
-                val player = remember(path) { MediaPlayer() }
+                var attempt by remember(path) { mutableStateOf(0) }
+                var ready by remember(path, attempt) { mutableStateOf(false) }
+                var playing by remember(path, attempt) { mutableStateOf(false) }
+                var failed by remember(path, attempt) { mutableStateOf(false) }
+                val player = remember(path, attempt) { MediaPlayer() }
                 androidx.compose.runtime.DisposableEffect(path, player) {
                     player.setOnPreparedListener { ready = true }
                     player.setOnCompletionListener { playing = false }
-                    player.setOnErrorListener { _, _, _ -> ready = false; playing = false; true }
+                    player.setOnErrorListener { _, _, _ -> failed = true; ready = false; playing = false; true }
                     try { player.setDataSource(path); player.prepareAsync() }
-                    catch (_: Exception) { ready = false }
+                    catch (_: Exception) { failed = true; ready = false }
                     onDispose {
                         runCatching { player.stop() }
                         player.release()
                     }
                 }
+                if (failed) {
+                    Text(stringResource(R.string.next_document_audio_failed))
+                    TextButton(onClick = { attempt++ }) { Text(stringResource(R.string.next_document_audio_retry)) }
+                } else if (!ready) Text(stringResource(R.string.next_document_audio_preparing))
                 TextButton(enabled = ready, onClick = {
                     try {
                         if (player.isPlaying) player.pause() else player.start()
                         playing = player.isPlaying
-                    } catch (_: Exception) { playing = false }
-                }) { Text(if (playing) "暂停" else if (ready) "播放音频" else "准备音频…") }
+                    } catch (_: Exception) { failed = true; ready = false; playing = false }
+                }) { Text(stringResource(if (playing) R.string.next_document_audio_pause else R.string.next_document_audio_play)) }
             }
             UiDocumentMediaKind.VIDEO -> {
                 var video by remember(path) { mutableStateOf<VideoView?>(null) }

@@ -94,18 +94,21 @@ private fun LocalDocumentMediaImage(path: String, description: String) {
 }
 
 @Composable
-private fun LocalDocumentMediaAudio(path: String) {
-    val player = remember(path) { MediaPlayer() }
-    var ready by remember(path) { mutableStateOf(false) }
-    var playing by remember(path) { mutableStateOf(false) }
+internal fun LocalDocumentMediaAudio(path: String) {
+    var attempt by remember(path) { mutableStateOf(0) }
+    val player = remember(path, attempt) { MediaPlayer() }
+    var failed by remember(path, attempt) { mutableStateOf(false) }
+    var ready by remember(path, attempt) { mutableStateOf(false) }
+    var playing by remember(path, attempt) { mutableStateOf(false) }
     DisposableEffect(path, player) {
         player.setOnPreparedListener { ready = true }
         player.setOnCompletionListener { playing = false }
-        player.setOnErrorListener { _, _, _ -> ready = false; playing = false; true }
+        player.setOnErrorListener { _, _, _ -> failed = true; ready = false; playing = false; true }
         try {
             player.setDataSource(path)
             player.prepareAsync()
         } catch (_: Exception) {
+            failed = true
             ready = false
         }
         onDispose {
@@ -113,7 +116,11 @@ private fun LocalDocumentMediaAudio(path: String) {
             player.release()
         }
     }
-    if (!ready) Text(stringResource(R.string.ui_document_media_playback_failed))
+    if (failed) {
+        Text(stringResource(R.string.ui_document_media_playback_failed))
+        SyButton(text = stringResource(R.string.ui_document_media_retry),
+            onClick = { attempt++ }, variant = SyButtonVariant.Ghost)
+    } else if (!ready) Text(stringResource(R.string.ui_document_media_audio_preparing))
     SyButton(
         text = stringResource(if (playing) R.string.ui_document_media_pause else R.string.ui_document_media_play),
         enabled = ready,
@@ -123,6 +130,7 @@ private fun LocalDocumentMediaAudio(path: String) {
                 if (player.isPlaying) player.pause() else player.start()
                 playing = player.isPlaying
             } catch (_: Exception) {
+                failed = true
                 ready = false
                 playing = false
             }

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.harness.session.SessionRecovery
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.session.LocalUiDocumentSessionStore
@@ -8,7 +9,6 @@ import com.labteto.dshmobile.uicontract.UiDocumentBudget
 import com.labteto.dshmobile.uicontract.UiSceneId
 import com.labteto.dshmobile.uicontract.UiDocumentSource
 import com.labteto.dshmobile.uicontract.UiDocumentNode
-import com.labteto.dshmobile.uicontract.UiDocumentBinding
 import com.labteto.dshmobile.uicontract.UiDocument
 import com.labteto.dshmobile.uicontract.UiDocumentProvenance
 import com.labteto.dshmobile.uicontract.UiDocumentOrigin
@@ -86,10 +86,15 @@ internal class LocalWorkUiDocumentPublisher @Inject constructor(
                     ?.take(150).orEmpty()
                 val artifactHash = data["artifact_sha256"]?.jsonPrimitive?.contentOrNull
                     ?.take(64).orEmpty()
-                listOf(name, when (failed) {
-                    true -> "执行报错"
-                    false -> "工具已返回（未核验）"
-                    null -> "返回状态未知"
+                listOf(name, when {
+                    code == SessionRecovery.TOOL_OUTCOME_UNKNOWN ->
+                        "执行结果未知；请核实副作用，勿直接重试"
+                    code == SessionRecovery.TOOL_NOT_STARTED -> "中断前尚未执行"
+                    code == SessionRecovery.TOOL_READ_RESULT_UNKNOWN ->
+                        "只读调用已中断，未取得完整结果"
+                    failed == true -> "执行报错"
+                    failed == false -> "工具已返回（未核验）"
+                    else -> "返回状态未知"
                 }, code, if (artifact.isNotEmpty() && artifactHash.isNotEmpty())
                     "$artifact (事件时 SHA256：$artifactHash，未复核文件当前版本)" else "")
             }
@@ -109,7 +114,6 @@ internal class LocalWorkUiDocumentPublisher @Inject constructor(
             else -> "本轮结束原因：${endReason.take(80)}"
         }
         val nodes = listOf(
-            UiDocumentNode.BoundText("work_phase", "前台实时阶段", UiDocumentBinding.EXECUTION_PHASE),
             UiDocumentNode.Text("work_turn_status", endLabel),
             UiDocumentNode.Text("work_scope",
                 "最近 256 条事件窗口内，本轮最多 24 个工具调用与回执；不代表全部历史结果。"),
