@@ -97,6 +97,7 @@ internal class LocalWorkTeamLifecycle(
             "failed",
             "cancelled",
             "killed",
+            "waiting_slice",
         )
     }
 

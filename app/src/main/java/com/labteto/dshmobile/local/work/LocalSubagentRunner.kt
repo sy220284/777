@@ -12,6 +12,7 @@ import com.labteto.dshmobile.harness.agent.AgentToolExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.modelVisibleContent
 import com.labteto.dshmobile.harness.jobs.JobContinuationPersistenceException
+import com.labteto.dshmobile.harness.jobs.JobExecutionSliceBoundaryException
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.local.LocalHarnessState
@@ -860,6 +861,23 @@ internal class LocalSubagentRunner(
             primaryFailure = error
             throw error
         } catch (error: LocalModelException) {
+            if (error.code == "WORK_BUDGET_EXHAUSTED" &&
+                backgroundJobId != null && capabilities.continuable
+            ) {
+                // This request was rejected by the local admission budget before provider
+                // execution. Resume only from a committed, already-settled step.
+                val safeStep = (modelStep - 1).coerceAtLeast(recoveredBaseStep)
+                persistContinuationCheckpoint(step = safeStep)
+                eventLog().append("subagent/slice-suspended", buildJsonObject {
+                    put("agent_id", subagentId)
+                    put("background_job_id", backgroundJobId)
+                    put("step", safeStep)
+                    put("reason", error.code)
+                })
+                val pause = JobExecutionSliceBoundaryException(error)
+                primaryFailure = pause
+                throw pause
+            }
             AppLog.warn(
                 "LocalSubagentRunner",
                 "子智能体模型失败 agent=$subagentId model=$routeModel code=${error.code} detail=${error.message.orEmpty().take(800)}",

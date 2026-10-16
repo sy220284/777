@@ -21,6 +21,11 @@ class JobContinuationPersistenceException(
     cause: Throwable,
 ) : IllegalStateException(message, cause)
 
+/** Persisted child execution pauses until a newly admitted root Work slice is available. */
+class JobExecutionSliceBoundaryException(
+    cause: Throwable,
+) : IllegalStateException("模型请求执行片已用尽；子任务检查点已保存，等待根任务下一执行片", cause)
+
 data class JobInfo(
     val id: String,
     val label: String,
@@ -117,6 +122,7 @@ class HarnessJobManager(
         job?.isCompleted != false &&
             (
                 status == "interrupted" ||
+                    status == "waiting_slice" ||
                     (isIdleContinuableAgent() && inbox.isNotEmpty())
             )
 
@@ -251,7 +257,7 @@ class HarnessJobManager(
             previousUpdatedAt = found.updatedAt
             previousOwnerId = found.ownerId
             previousJob = found.job
-            if (found.isIdleContinuableAgent() && found.job?.isCompleted != false) {
+            if (found.job?.isCompleted != false) {
                 found.job = null
             }
             if (!ownerId.isNullOrBlank()) found.ownerId = ownerId
@@ -564,6 +570,13 @@ class HarnessJobManager(
                     }
                 }
                 throw cancelled
+            } catch (error: JobExecutionSliceBoundaryException) {
+                synchronized(lock) {
+                    if (record.status != "running") return@synchronized
+                    record.status = "waiting_slice"
+                    record.output = error.message.orEmpty()
+                    record.updatedAt = System.currentTimeMillis()
+                }
             } catch (error: JobContinuationPersistenceException) {
                 synchronized(lock) {
                     if (record.status != "running") return@synchronized

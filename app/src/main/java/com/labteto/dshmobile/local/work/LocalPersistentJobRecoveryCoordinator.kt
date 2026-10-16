@@ -64,6 +64,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
 ) {
     private val lock = Any()
     private val pendingRecoverySessions = linkedSetOf<String>()
+    private val rootAdmittedSessions = linkedSetOf<String>()
     private var recoveryJob: Job? = null
 
     suspend fun startReadonlySubagent(
@@ -226,19 +227,25 @@ internal class LocalPersistentJobRecoveryCoordinator(
         return result
     }
 
-    fun schedule(sessionId: String = currentSessionId()) {
+    fun schedule(
+        sessionId: String = currentSessionId(),
+        rootSliceAdmitted: Boolean = false,
+    ) {
         val targetSession = sessionId.trim()
         if (targetSession.isEmpty()) return
         synchronized(lock) {
             pendingRecoverySessions += targetSession
+            if (rootSliceAdmitted) rootAdmittedSessions += targetSession
             if (recoveryJob?.isActive == true) return
             recoveryJob = scope.launch {
                 try {
                     while (true) {
-                        val nextSession = synchronized(lock) {
-                            pendingRecoverySessions.firstOrNull()?.also { pendingRecoverySessions.remove(it) }
+                        val next = synchronized(lock) {
+                            val session = pendingRecoverySessions.firstOrNull()
+                                ?.also { pendingRecoverySessions.remove(it) }
+                            session?.let { it to rootAdmittedSessions.remove(it) }
                         } ?: break
-                        resumePass(nextSession)
+                        resumePass(next.first, resumeSlicePaused = next.second)
                     }
                 } finally {
                     val completed = currentCoroutineContext()[Job]
@@ -255,8 +262,10 @@ internal class LocalPersistentJobRecoveryCoordinator(
         }
     }
 
-    private fun resumePass(targetSession: String) {
+    private fun resumePass(targetSession: String, resumeSlicePaused: Boolean = false) {
         jobs.resumableSnapshots().forEach { snapshot ->
+            // Startup/UI rehydration cannot grant new model request slots.
+            if (snapshot.status == "waiting_slice" && !resumeSlicePaused) return@forEach
             val payload = decodePayload(snapshot, targetSession) ?: return@forEach
             val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull ?: targetSession
             if (sessionId != targetSession || jobs.availableSlots() <= 0) return@forEach

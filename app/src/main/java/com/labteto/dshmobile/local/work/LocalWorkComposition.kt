@@ -286,6 +286,9 @@ internal class LocalWorkComposition @Inject constructor(
         workTurnToolRuntime = turnToolRuntime,
         workUiDocumentPublisher = workUiDocumentPublisher,
         replyDocuments = replyDocuments,
+        onRootExecutionSliceStarted = { sessionId ->
+            persistentJobs.schedule(sessionId, rootSliceAdmitted = true)
+        },
     )
 
     internal val turnStarter = LocalWorkTurnStarter(

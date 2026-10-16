@@ -97,6 +97,7 @@ internal class LocalWorkAgentTurnExecutor(
     private val workTurnToolRuntime: LocalWorkTurnToolRuntime,
     private val workUiDocumentPublisher: LocalWorkUiDocumentPublisher,
     private val replyDocuments: com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPublisher,
+    private val onRootExecutionSliceStarted: (String) -> Unit = {},
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val resourceScheduler
@@ -499,6 +500,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 put("source_message_id", uiSourceMessageId)
                                 put("model", runState.value.modelState.model)
                             })
+                            onRootExecutionSliceStarted(runSessionId)
                             try {
                                 workUiDocumentPublisher.onToolResult(binding, uiSourceMessageId)
                             } catch (cancelled: CancellationException) { throw cancelled }

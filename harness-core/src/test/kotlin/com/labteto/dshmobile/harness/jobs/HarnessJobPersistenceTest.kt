@@ -176,6 +176,40 @@ class HarnessJobPersistenceTest {
     }
 
     @Test
+    fun subagentRequestSliceBoundaryPersistsAndCanResumeAfterExplicitRootAdmission() = runTest {
+        val durable = java.util.concurrent.atomic.AtomicReference<List<JobSnapshot>>(emptyList())
+        val manager = HarnessJobManager(
+            scope = this, onChanged = { }, onSnapshotsChanged = durable::set,
+            maxConcurrentJobs = 2,
+        )
+        val started = manager.startPersistent(
+            label = "子代理：预算边界",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerId = "session-A",
+        ) { _, _ ->
+            throw JobExecutionSliceBoundaryException(IllegalStateException("WORK_BUDGET_EXHAUSTED"))
+        }
+        val id = started.substringAfterLast('：')
+        runCurrent()
+        assertEquals("waiting_slice", manager.snapshots().single().status)
+        assertEquals("waiting_slice", durable.get().single().status)
+        assertEquals(1, manager.resumableSnapshots().size)
+        assertEquals(2, manager.availableSlots())
+
+        val restored = HarnessJobManager(
+            scope = this, onChanged = { }, initialSnapshots = durable.get(),
+        )
+        assertEquals("waiting_slice", restored.snapshots().single().status)
+        assertTrue(restored.resumableSnapshots().any { it.id == id })
+        val resumed = restored.resumePersistent(id, ownerId = "session-A") { _, _ -> "已完成" }
+        assertTrue(resumed.contains("已恢复"))
+        runCurrent()
+        assertEquals("dormant", restored.snapshots().single().status)
+        assertEquals("已完成", restored.output(id))
+    }
+
+    @Test
     fun restartedShellJobReportsInterruptionWithoutSuggestingRecovery() = runTest {
         val manager = HarnessJobManager(
             scope = this,

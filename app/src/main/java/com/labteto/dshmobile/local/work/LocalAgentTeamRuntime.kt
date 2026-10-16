@@ -91,7 +91,7 @@ internal fun recoverTeamStartPhase(
     if (job.status in setOf("failed", "cancelled", "killed")) return LocalTeamMemberPhase.FAILED
     if (
         previous == LocalTeamMemberPhase.CREATED || admitted ||
-        job.pendingMessageCount > 0 || job.status in setOf("running", "stopping")
+        job.pendingMessageCount > 0 || job.status in setOf("running", "stopping", "waiting_slice")
     ) return LocalTeamMemberPhase.ACTIVE
     return if (cancelled) previous else LocalTeamMemberPhase.FAILED
 }
