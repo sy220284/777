@@ -341,3 +341,11 @@ Host 的 `ConversationShellUiPort` 接入重命名与显式置顶；原偏好 St
 - `V6ConversationScene` 的聊天/Work 消息时间线现在按真实来源消息 ID 直接渲染所属动态文档；同时提供 Host 导航的“查看文档”和“从消息生成结构化内容”入口。新增本地有类型模板生成，以及显式确认额外模型请求后的 AI 设计入口；动作包括输入发送和批准等需确认的操作、按文档版本删除及回执展示。
 - 将已有 `V6WorkEvidencePanel` 正式以原 `WorkEvidenceUiPort` 注入并登记独立 `work.requirement_evidence` 场景；在 Work 主会话有入口，关联文件的版本信息为 Owner 数据，不声称关联等于完成或验收。
 - V6 独立候选累计 **17/75** 个真正登记的场景，还差 **58** 个。新增文档/生成与 Work Evidence 三个场景的局部准入/整包拒绝测试，以及媒体会话作用域和操作回执的 4 个单测；均未获得 CI 或 Android 设备验收回执，不计为已验证。生产继续使用 `legacy-v6-shell`。
+
+
+## 2026-10-16 续：V6 人物选择与群聊 Owner 入口及 CI 编译阻断修复
+
+- `V6PersonaGroupScenes.kt` 在独立 `:ui-pack-v6` 中实现 `chat.persona_picker`、`chat.group_members`、`chat.group_announcement` 三个可执行 Renderer。当前人物切换使用 `PersonaGalleryUiPort.read`、`PersonaSelectionUiPort.submit` 和实时 Owner identity；群聊模式、创建群会话、成员配置/移除、公告存储完全由 `ChatGroupUiPort` 的命令驱动；不存在 UI 私自写人物/群聊业务状态。
+- 聊天主页增加人物与群聊入口，跳转仅经过 Host 原场景路由；拒绝、身份变化与 Busy 状态保留可见反馈。人数上下限以及可选人物图库 ID 均来自 Owner Snapshot，创建/修改前二次确认。新增群聊有效选择 4 项及 Host 场景覆盖回归测试源码。
+- 从 [CI #38847008039](https://github.com/sy220284/777/actions/runs/38847008039) 下载真实日志，确认 `:ui-pack-v6:compileDebugKotlin` 因 `V6ConversationScene.kt` 的 nullable `docSnapshot.documents` 与 nullable `message.editableText` 两处 Kotlin 类型错误失败；本轮已修复，等待新 CI 验证。其他后续 Android/构建任务受旧批次失败影响，不能宣称通过。
+- 当前独立 V6 候选为 **20/75** 必要场景，仍差 **55**，完整生产包门禁照旧拒绝、Legacy V6 保持启用，R4 35 项状态不因增量源码上报已验收。
