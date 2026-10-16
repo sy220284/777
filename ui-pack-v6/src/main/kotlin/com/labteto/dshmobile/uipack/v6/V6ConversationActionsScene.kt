@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.uicontract.*
+import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.shenyan.designsystem.components.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -216,6 +217,7 @@ fun V6WorkSteeringScene(
     val state by policy.snapshots.collectAsStateWithLifecycle(
         initialValue = policy.snapshot())
     var feedback by remember(state.identity) { mutableStateOf<String?>(null) }
+    var pendingMode by remember(state.identity) { mutableStateOf<LocalApprovalMode?>(null) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Work 运行策略", style = MaterialTheme.typography.titleLarge)
@@ -224,6 +226,20 @@ fun V6WorkSteeringScene(
         Text("当前审批模式：" + state.approvalMode.name)
         Text("设备授权租约：" + (if (state.deviceApprovalLease) "当前生效" else "未生效"))
         val id = state.identity
+        Text("审批策略变更仅调整后续操作规则；当前等待中的工具调用仍须单独审批。")
+        LocalApprovalMode.entries.forEach { choice ->
+            SyButton(
+                when (choice) {
+                    LocalApprovalMode.DEFAULT -> "默认审批模式"
+                    LocalApprovalMode.MANUAL -> "逐次人工确认"
+                    LocalApprovalMode.AUTO -> "符合策略的请求自动批准"
+                }, onClick = {
+                    if (policy.snapshot().approvalMode != choice) pendingMode = choice
+                }, enabled = choice != state.approvalMode,
+                style = if (choice == state.approvalMode) SyButtonStyle.PRIMARY
+                    else SyButtonStyle.SECONDARY,
+            )
+        }
         if (id != null) {
             SySwitch("计划优先", state.planMode, { enabled ->
                 if (policy.snapshot().identity != id)
@@ -236,6 +252,25 @@ fun V6WorkSteeringScene(
                     policy.submit(WorkPolicyUiCommand.RevokeDeviceTurn(id)))
             }, style = SyButtonStyle.DANGER)
         }
-        SyNote("待审批工具必须由当前 Work Owner 通过单独的审批交互确认。")
+        SyNote("等待中的工具审批使用原 Work Owner 的 pendingId；切换模式不会直接调用批准命令。")
+    }
+    pendingMode?.let { next ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingMode = null },
+            title = { Text("确认变更 Work 审批模式") },
+            text = { Text("将后续请求审批模式设为 ${next.name}。AUTO 可能使符合原 Owner 策略的请求自动获批；正在等待的审批不会被此操作代为同意。") },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = {
+                pendingMode = null
+                val now = policy.snapshot()
+                if (now.identity != state.identity) {
+                    feedback = "会话已切换，审批策略未更改"
+                } else {
+                    feedback = describeV6ConversationReceipt(
+                        policy.submit(WorkPolicyUiCommand.SetApprovalMode(now.identity, next)))
+                }
+            }) { Text("确认变更") } },
+            dismissButton = { androidx.compose.material3.TextButton(
+                onClick = { pendingMode = null }) { Text("取消") } },
+        )
     }
 }
