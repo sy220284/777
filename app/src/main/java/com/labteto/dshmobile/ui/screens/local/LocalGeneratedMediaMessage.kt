@@ -173,70 +173,82 @@ internal fun LocalGeneratedMediaResultRow(
         LocalMediaKind.TRANSCRIBE.name -> resources.getString(R.string.media_chat_transcript_done)
         else -> resources.getString(R.string.media_chat_generic_result)
     }
-    MediaMessageCard(title = label,
-        subtitle = resources.getString(if (result.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
-        onLongClick = { showActions = true }) {
-        when (result.kind) {
-            LocalMediaKind.IMAGE.name -> {
-                MediaInlinePicture(
-                    file = file, remoteUrl = result.remoteUrl,
-                    onOpen = { showImageDetail = true },
-                )
-                if (showImageDetail) {
-                    MediaImageDetailDialog(file, result.remoteUrl, onDismiss = { showImageDetail = false })
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                    if (file != null) {
-                        MediaSaveButton(file, imageMime(file))
-                        SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
-                            variant = SyButtonVariant.Ghost,
-                            onClick = { shareMediaFile(context, file, imageMime(file)) { error = it } })
-                    } else result.remoteUrl?.let { url ->
-                        SyButton(text = resources.getString(R.string.media_chat_share_url), size = SyButtonSize.Small,
-                            variant = SyButtonVariant.Ghost,
-                            onClick = { shareMediaUrl(context, url) { error = it } })
-                    }
-                }
+    if (result.kind == LocalMediaKind.SPEECH.name) {
+        // Chat-native voice message: no generation header, player panel, or exposed transport bar.
+        Column(modifier = Modifier.padding(vertical = SyMetric.gapSm),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+            if (file != null) {
+                InlineSpeechPlayer(file, onLongClick = { showActions = true })
+            } else {
+                Text(resources.getString(R.string.media_chat_audio_missing),
+                    modifier = Modifier.combinedClickable(onClick = {}, onLongClick = { showActions = true })
+                        .padding(SyMetric.gapMd),
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
-            LocalMediaKind.SPEECH.name -> {
-                if (file != null) {
-                    InlineSpeechPlayer(file)
-                    Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                        MediaSaveButton(file, "audio/mpeg")
-                        SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
-                            variant = SyButtonVariant.Ghost,
-                            onClick = { shareMediaFile(context, file, "audio/mpeg") { error = it } })
-                    }
-                } else Text(resources.getString(R.string.media_chat_audio_missing), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+            revisionJob?.let { pending ->
+                Text(resources.getString(if (revisionActive) R.string.media_chat_regenerating
+                    else R.string.media_chat_regenerate_failed),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
-            LocalMediaKind.TRANSCRIBE.name -> {
-                result.textOutput?.let { text ->
-                    androidx.compose.foundation.text.selection.SelectionContainer {
-                        Text(text, style = DsType.std14.withReadingWeight(),
-                            color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
+            error?.let { Text(it, style = DsType.caption11.withReadingWeight(),
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary) }
+        }
+    } else {
+        MediaMessageCard(title = label,
+            subtitle = resources.getString(if (result.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
+            onLongClick = { showActions = true }) {
+            when (result.kind) {
+                LocalMediaKind.IMAGE.name -> {
+                    MediaInlinePicture(
+                        file = file, remoteUrl = result.remoteUrl,
+                        onOpen = { showImageDetail = true },
+                    )
+                    if (showImageDetail) {
+                        MediaImageDetailDialog(file, result.remoteUrl, onDismiss = { showImageDetail = false })
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                        SyButton(text = resources.getString(R.string.media_chat_insert_text), size = SyButtonSize.Small,
-                            onClick = { onInsertText(text) })
-                        SyButton(text = resources.getString(R.string.media_chat_copy), size = SyButtonSize.Small,
-                            variant = SyButtonVariant.Ghost,
-                            onClick = {
-                                (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
-                                    .setPrimaryClip(ClipData.newPlainText(resources.getString(R.string.media_chat_transcription), text))
-                            })
+                        if (file != null) {
+                            MediaSaveButton(file, imageMime(file))
+                            SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
+                                variant = SyButtonVariant.Ghost,
+                                onClick = { shareMediaFile(context, file, imageMime(file)) { error = it } })
+                        } else result.remoteUrl?.let { url ->
+                            SyButton(text = resources.getString(R.string.media_chat_share_url), size = SyButtonSize.Small,
+                                variant = SyButtonVariant.Ghost,
+                                onClick = { shareMediaUrl(context, url) { error = it } })
+                        }
+                    }
+                }
+                LocalMediaKind.TRANSCRIBE.name -> {
+                    result.textOutput?.let { text ->
+                        androidx.compose.foundation.text.selection.SelectionContainer {
+                            Text(text, style = DsType.std14.withReadingWeight(),
+                                color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+                            SyButton(text = resources.getString(R.string.media_chat_insert_text), size = SyButtonSize.Small,
+                                onClick = { onInsertText(text) })
+                            SyButton(text = resources.getString(R.string.media_chat_copy), size = SyButtonSize.Small,
+                                variant = SyButtonVariant.Ghost,
+                                onClick = {
+                                    (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
+                                        .setPrimaryClip(ClipData.newPlainText(resources.getString(R.string.media_chat_transcription), text))
+                                })
+                        }
                     }
                 }
             }
+            revisionJob?.let { pending ->
+                val active = pending.phase in setOf(LocalMediaCreationPhase.PREPARING,
+                    LocalMediaCreationPhase.SUBMITTING, LocalMediaCreationPhase.SAVING)
+                Text(resources.getString(if (active) R.string.media_chat_regenerating
+                    else R.string.media_chat_regenerate_failed),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+            }
+            error?.let { Text(it, style = DsType.caption11, color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary) }
         }
-        revisionJob?.let { pending ->
-            val active = pending.phase in setOf(LocalMediaCreationPhase.PREPARING,
-                LocalMediaCreationPhase.SUBMITTING, LocalMediaCreationPhase.SAVING)
-            Text(resources.getString(if (active) R.string.media_chat_regenerating
-                else R.string.media_chat_regenerate_failed),
-                style = DsType.caption11.withReadingWeight(),
-                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
-        }
-        error?.let { Text(it, style = DsType.caption11, color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary) }
     }
     if (showActions) {
         SyResponsiveSheet(
@@ -260,6 +272,14 @@ internal fun LocalGeneratedMediaResultRow(
                         }
                     })
             } else {
+                if (result.kind == LocalMediaKind.SPEECH.name && file != null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+                        MediaSaveButton(file, "audio/mpeg")
+                        SyButton(text = resources.getString(R.string.media_action_share),
+                            size = SyButtonSize.Small, variant = SyButtonVariant.Ghost,
+                            onClick = { shareMediaFile(context, file, "audio/mpeg") { error = it } })
+                    }
+                }
                 LocalMediaRevisionDraft.from(result)?.let { draft ->
                     SyButton(text = resources.getString(R.string.media_recreate_edit_and_generate),
                         onClick = { showActions = false; onRevise(draft) },
@@ -695,9 +715,11 @@ private fun MediaVideoPoster(file: File?, onPlay: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun InlineSpeechPlayer(file: File) {
+private fun InlineSpeechPlayer(file: File, onLongClick: () -> Unit) {
     val resources = LocalResources.current
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var playing by remember(file.absolutePath) { mutableStateOf(false) }
     var preparing by remember(file.absolutePath) { mutableStateOf(false) }
     var error by remember(file.absolutePath) { mutableStateOf<String?>(null) }
@@ -725,87 +747,99 @@ private fun InlineSpeechPlayer(file: File) {
             delay(300)
         }
     }
-    Row(modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
-        SyButton(
-            text = if (playing) resources.getString(R.string.media_chat_pause_compact)
-                else resources.getString(R.string.media_chat_play_compact),
-            size = SyButtonSize.Small,
-            enabled = !preparing,
-            onClick = {
-                if (preparing) return@SyButton
-                error = null
-                runCatching {
-                    val current = player
-                    if (current == null) {
-                        val created = MediaPlayer()
-                        created.setOnCompletionListener {
-                            playing = false
-                            positionMs = durationMs
-                        }
-                        created.setOnPreparedListener { ready ->
-                            preparing = false
-                            durationMs = ready.duration.coerceAtLeast(0)
-                            runCatching { ready.start() }
-                                .onSuccess { playing = true }
-                                .onFailure { failure ->
-                                    playing = false
-                                    error = failure.message ?: resources.getString(R.string.media_chat_audio_failed)
-                                    runCatching { ready.release() }
-                                    player = null
-                                }
-                        }
-                        created.setOnErrorListener { _, _, _ ->
-                            preparing = false
-                            playing = false
-                            durationMs = 0
-                            positionMs = 0
-                            error = resources.getString(R.string.media_chat_audio_failed)
-                            player = null
-                            runCatching { created.release() }
-                            true
-                        }
-                        // Own the player before I/O so failed setDataSource cannot leak it.
-                        player = created
-                        created.setDataSource(file.absolutePath)
-                        preparing = true
-                        created.prepareAsync()
-                    } else if (playing) {
-                        current.pause()
+    val togglePlayback: () -> Unit = {
+        if (!preparing) {
+            error = null
+            runCatching {
+                val current = player
+                if (current == null) {
+                    val created = MediaPlayer()
+                    created.setOnCompletionListener {
                         playing = false
-                    } else {
-                        if (positionMs >= durationMs && durationMs > 0) current.seekTo(0)
-                        current.start()
-                        playing = true
+                        positionMs = durationMs
                     }
-                }.onFailure { failure ->
-                    preparing = false
+                    created.setOnPreparedListener { ready ->
+                        preparing = false
+                        durationMs = ready.duration.coerceAtLeast(0)
+                        runCatching { ready.start() }
+                            .onSuccess { playing = true }
+                            .onFailure { failure ->
+                                playing = false
+                                error = failure.message ?: resources.getString(R.string.media_chat_audio_failed)
+                                runCatching { ready.release() }
+                                player = null
+                            }
+                    }
+                    created.setOnErrorListener { _, _, _ ->
+                        preparing = false
+                        playing = false
+                        durationMs = 0
+                        positionMs = 0
+                        error = resources.getString(R.string.media_chat_audio_failed)
+                        player = null
+                        runCatching { created.release() }
+                        true
+                    }
+                    // Own the player before I/O so failed setDataSource cannot leak it.
+                    player = created
+                    created.setDataSource(file.absolutePath)
+                    preparing = true
+                    created.prepareAsync()
+                } else if (playing) {
+                    current.pause()
                     playing = false
-                    error = failure.message ?: resources.getString(R.string.media_chat_audio_failed)
-                    runCatching { player?.release() }
-                    player = null
+                } else {
+                    if (positionMs >= durationMs && durationMs > 0) current.seekTo(0)
+                    current.start()
+                    playing = true
                 }
-            },
-        )
-        androidx.compose.material3.Slider(
-            value = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f,
-            onValueChange = { fraction ->
-                val target = (durationMs * fraction).toInt().coerceIn(0, durationMs)
-                runCatching { player?.seekTo(target) }.onSuccess { positionMs = target }
-            },
-            enabled = durationMs > 0,
-            modifier = Modifier.weight(1f).widthIn(max = 112.dp).height(32.dp),
-        )
-        Text(
-            "${formatMediaDuration(positionMs)} / ${formatMediaDuration(durationMs)}",
-            style = DsType.caption11.withReadingWeight(),
-            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
-            maxLines = 1,
-        )
+            }.onFailure { failure ->
+                preparing = false
+                playing = false
+                error = failure.message ?: resources.getString(R.string.media_chat_audio_failed)
+                runCatching { player?.release() }
+                player = null
+            }
+    
+        }
     }
-    error?.let { Text(it, style = DsType.caption11.withReadingWeight(),
-        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary) }
+    val heights = intArrayOf(7, 13, 19, 11, 23, 16, 9, 20, 14, 25, 12, 18, 9, 22, 14, 19, 8, 14, 20, 10)
+    val playedBars = if (durationMs > 0) ((positionMs.toFloat() / durationMs) * heights.size)
+        .toInt().coerceIn(0, heights.size) else 0
+    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+        Row(
+            modifier = Modifier.widthIn(min = 190.dp, max = 260.dp)
+                .heightIn(min = 48.dp)
+                .clip(RoundedCornerShape(22.dp))
+                .background(colors.materialL3)
+                .combinedClickable(
+                    onClickLabel = resources.getString(
+                        if (playing) R.string.media_chat_pause_audio else R.string.media_chat_play_audio),
+                    onLongClickLabel = resources.getString(R.string.media_chat_actions_title),
+                    onClick = togglePlayback,
+                    onLongClick = onLongClick,
+                )
+                .padding(horizontal = 15.dp, vertical = 10.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+        ) {
+            Text(if (playing) "Ⅱ" else "▶", style = DsType.std14.withReadingWeight(),
+                color = colors.text)
+            Row(modifier = Modifier.weight(1f),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                heights.forEachIndexed { index, bar ->
+                    Box(Modifier.width(2.dp).height(bar.dp).clip(RoundedCornerShape(2.dp))
+                        .background(if (index < playedBars) colors.text else colors.textSecondary))
+                }
+            }
+            Text(formatMediaDuration(if (playing) positionMs else durationMs),
+                style = DsType.caption11.withReadingWeight(), maxLines = 1,
+                color = colors.textSecondary)
+        }
+        error?.let { Text(it, style = DsType.caption11.withReadingWeight(),
+            color = colors.textSecondary) }
+    }
 }
 
 private fun formatMediaDuration(ms: Int): String {
