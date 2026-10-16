@@ -18,6 +18,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /** Admission/projection adapter only. Work owns origin lookup, hashes and reference persistence. */
 @Singleton
@@ -28,6 +30,15 @@ class LocalWorkEvidenceUiAdapter @Inject internal constructor(
     private fun current(identity: UiSessionIdentity): Boolean =
         !state.sessionTransitioning && !state.state.value.loading &&
             state.state.value.usageMode == LocalUsageMode.WORK && state.uiBindingIdentity(state.state.value) == identity
+
+    override fun changes(identity: UiSessionIdentity): kotlinx.coroutines.flow.Flow<Unit> {
+        val workBinding = state.state.map { snapshot ->
+            Triple(state.uiBindingIdentity(snapshot), snapshot.work.goal?.id,
+                snapshot.work.todos.map { it.content to it.status })
+        }.distinctUntilChanged()
+        return kotlinx.coroutines.flow.combine(workBinding,
+            work.requirementEvidenceChangesForUi(identity.sessionId)) { _, _ -> Unit }
+    }
 
     override suspend fun read(identity: UiSessionIdentity): UiWorkEvidenceReadReceipt = withContext(Dispatchers.IO) {
         try {
