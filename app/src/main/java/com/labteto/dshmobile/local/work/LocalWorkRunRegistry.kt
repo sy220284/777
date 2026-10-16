@@ -212,8 +212,8 @@ class LocalWorkRunRegistry internal constructor(
                 while (true) {
                     var staleGoal = false
                     val polled = binding.runHandle.pendingInputs.pollCommitted { input, remaining ->
-                        staleGoal = input.kind == QueuedAgentInputKind.WORK_CONTINUATION &&
-                            !isCurrentWorkGoalContinuation(input.continuation, binding.workState.snapshot())
+                        staleGoal = shouldDiscardWorkGoalContinuation(
+                            input, remaining, binding.workState.snapshot())
                         val message = input.modelMessage ?: buildJsonObject {
                             put("role", "user")
                             put("content", input.content)
