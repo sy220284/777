@@ -107,6 +107,46 @@ class UiDocumentTest {
         assertTrue(original.copy(revision = Long.MAX_VALUE).withUserEditedText("editable", "x") == null)
     }
 
+    @Test fun tableCellEditingPreservesStructureActionsAndVersionSemantics() {
+        val old = document(listOf(
+            UiDocumentNode.Column("container", listOf(
+                UiDocumentNode.Table("records", listOf("field", "value"),
+                    listOf(listOf("status", "pending"), listOf("owner", "original"))),
+                UiDocumentNode.Button("act", "Send", "send"),
+            )),
+        ), listOf(UiDocumentAction.SendUserInput("send", "Request", emptyList())))
+        val updated = old.withUserEditedTableCell("records", 1, 1, "corrected")
+        assertTrue(updated != null)
+        val table = ((updated!!.nodes.single() as UiDocumentNode.Column)
+            .children.first() as UiDocumentNode.Table)
+        assertTrue(table.rows[1][1] == "corrected")
+        assertTrue(table.rows[0][1] == "pending")
+        assertTrue(updated.revision == 1L && updated.actions == old.actions)
+        assertTrue(updated.fallbackText.contains("未经业务核验"))
+        assertTrue(old.withUserEditedTableCell("missing", 0, 0, "x") == null)
+        assertTrue(old.withUserEditedTableCell("act", 0, 0, "x") == null)
+        assertTrue(old.withUserEditedTableCell("records", 2, 0, "x") == null)
+        assertTrue(old.withUserEditedTableCell("records", 0, 3, "x") == null)
+        assertTrue(old.withUserEditedTableCell("records", -1, 0, "x") == null)
+        assertTrue(old.withUserEditedTableCell("records", 0, 0, "x".repeat(4097)) == null)
+        assertTrue(old.copy(documentId = "work-live:run")
+            .withUserEditedTableCell("records", 0, 0, "x") == null)
+        assertTrue(old.copy(revision = Long.MAX_VALUE)
+            .withUserEditedTableCell("records", 0, 0, "x") == null)
+        assertTrue(UiDocumentPatch(old.documentId, 0, updated).matches(old))
+        assertFalse(UiDocumentPatch(old.documentId, 1, updated).matches(old))
+    }
+
+    @Test fun tableCorrectionDoesNotBypassGlobalDocumentTextBudget() {
+        val original = document(listOf(UiDocumentNode.Table("table", listOf("a"),
+            listOf(listOf("value")))), emptyList())
+        val changed = original.withUserEditedTableCell("table", 0, 0,
+            "x".repeat(1000))
+        assertTrue(changed != null)
+        assertTrue(changed!!.validate(UiDocumentBudget(20, 4, 120),
+            emptySet(), null).problems.contains("text_budget"))
+    }
+
     @Test fun patchesCannotCrossMessagesOrApplyToAnOldRevision() {
         val current = document(listOf(UiDocumentNode.Text("text", "old")), emptyList())
         val updated = current.copy(revision = 1, nodes = listOf(UiDocumentNode.Text("text", "new")))
