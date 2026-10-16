@@ -299,9 +299,15 @@ private fun V6DocumentNode(
                 }
             }
         }
-        is UiDocumentNode.Field -> SyInput(values[node.id].orEmpty(),
-            { update(node.id, it) }, label = node.label,
-            enabled = active, singleLine = !node.multiline)
+        is UiDocumentNode.Field -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            val limit = if (node.multiline) MAX_UI_DOCUMENT_MULTILINE_CHARS
+                else MAX_UI_DOCUMENT_SINGLE_LINE_CHARS
+            SyInput(values[node.id].orEmpty(),
+                { update(node.id, it.take(limit)) }, label = node.label,
+                enabled = active, singleLine = !node.multiline)
+            if (values[node.id].orEmpty().length >= limit)
+                SyNote("字段已达到 $limit 字符上限")
+        }
         is UiDocumentNode.Select -> Column {
             Text(node.label)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
