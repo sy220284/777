@@ -185,7 +185,7 @@ class LocalWorkRuntime @Inject internal constructor(
         val snapshot = runtimeStateStore.state.value
         if (sessionId != runtimeStateStore.currentSessionId ||
             snapshot.sessionId != sessionId || snapshot.usageMode != LocalUsageMode.WORK)
-            return IndexedRequirementEvidence(emptyList(), emptyList(), 0)
+            return IndexedRequirementEvidence(emptyList(), emptyList(), emptyList(), 0)
         val indexed = indexedRequirementEvidence(
             eventLogs.get(sessionId), snapshot.work.todos, snapshot.work.goal?.id,
         )
