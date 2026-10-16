@@ -124,10 +124,26 @@ fun V6SettingsSuiteScene(
             "route.settings","settings.root" -> {
                 v6SettingsGroups.forEach { group ->
                     V6DestinationSection(group) { entry ->
-                        val result = onNavigate(UiSceneId(entry.id))
-                        if (result !is UiSceneNavigationResult.Changed)
-                            feedback = "当前无法进入：" + entry.title
+                        if (entry.id == "settings.update") {
+                            // The retired standalone update page is a SLOT, not a Host navigation target.
+                            // Execute the real Host update action in place instead of navigating to a dead end.
+                            if (checkForUpdate != null) {
+                                checkForUpdate()
+                                feedback = "已请求检查更新，请查看下方结果"
+                            } else {
+                                feedback = "当前无法检查更新"
+                            }
+                        } else {
+                            val result = onNavigate(UiSceneId(entry.id))
+                            if (result !is UiSceneNavigationResult.Changed)
+                                feedback = "当前无法进入：" + entry.title
+                        }
                     }
+                }
+                if (checkForUpdate != null) {
+                    val updateResult by updateStatus?.collectAsStateWithLifecycle()
+                        ?: remember { mutableStateOf<String?>(null) }
+                    updateResult?.let { SyNote(it) }
                 }
             }
             "settings.models","conversation.model_picker" -> {
