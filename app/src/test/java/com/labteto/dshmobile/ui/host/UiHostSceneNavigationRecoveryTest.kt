@@ -6,14 +6,13 @@ import com.labteto.dshmobile.uihost.UiSceneNavigationResult
 import com.labteto.dshmobile.uihost.UiSceneNavigationSnapshotCodec
 import com.labteto.dshmobile.uihost.restoreEncodedSnapshot
 import com.labteto.dshmobile.uicontract.UiSceneId
-import com.labteto.dshmobile.uipack.next.NextConversationUiPack
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class UiHostSceneNavigationRecoveryTest {
     private val nav = UiHostSceneNavigation(
         requiredScenes = LocalUiSceneCatalog.requirements,
-        pack = NextConversationUiPack.manifest,
+        pack = testConversationSliceManifest,
         root = UiSceneId("conversation.chat"),
     )
 
