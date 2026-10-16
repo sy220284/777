@@ -1420,8 +1420,8 @@
       "acceptance": "待设备验收",
       "actionProof": {
         "open_session": {
-          "ownerPort": null,
-          "receiptType": null,
+          "ownerPort": "MainActivity.notificationLocalSession(intent) -> AppRoot -> LocalApplicationUiHost notificationSessions.snapshots.first(!loading) -> SessionUiPort.submit(SessionUiCommand.Open(id)) with catalog membership; UiHostSceneNavigation.openDeepLink(route.home)",
+          "receiptType": "UiCommandReceipt.Accepted / Queued -> UiSceneNavigationResult.Changed; invalid/missing targets explicitly rejected",
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
