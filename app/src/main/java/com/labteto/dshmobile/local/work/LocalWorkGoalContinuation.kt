@@ -5,6 +5,11 @@ import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import java.io.File
 import java.security.MessageDigest
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 
@@ -46,6 +51,57 @@ internal fun canAutomaticallyFollowUpWorkGoal(
         conditions.pendingInputs == 0 &&
         conditions.steeringUnchanged &&
         conditions.completedContinuations < DEFAULT_AGENT_CONTINUATION_POLICY.maxContinuations
+}
+
+
+/**
+ * Authoritative tool facts can outlive a crashed turn. Before admitting autonomous follow-through,
+ * ensure that no execution belonging to this goal has an unknown side effect or a started tool
+ * without a durable result. A later model response cannot settle a tool merely by claiming it did.
+ *
+ * Explicit reconciliation is a separate Shared Tool responsibility; pending/unknown effects
+ * conservatively block automatic continuation until that authority can prove the outcome.
+ */
+internal fun hasUnresolvedWorkGoalToolEffects(
+    eventLog: LocalSessionEventLog,
+    goal: LocalGoal,
+): Boolean {
+    val callIds = mutableSetOf<String>()
+    val started = mutableSetOf<String>()
+    val settled = mutableSetOf<String>()
+    var unknown = false
+    val goalStartSequence = goal.startedAtSequence.takeIf { it >= 0L } ?: -1L
+    for (event in eventLog.snapshotAfter(goalStartSequence)) {
+        val data = event.data
+        val callId = (data["id"] as? kotlinx.serialization.json.JsonPrimitive)
+            ?.contentOrNull?.takeIf(String::isNotBlank) ?: continue
+        when (event.type) {
+            "tool/call" -> {
+                if ((data["goal_id"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull == goal.id) {
+                    callIds.add(callId)
+                }
+            }
+            "tool/execution-started" -> {
+                val attributes = data["attributes"] as? JsonObject
+                if ((attributes?.get("goal_id") as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull == goal.id ||
+                    callId in callIds) {
+                    callIds.add(callId)
+                    started.add(callId)
+                }
+            }
+            "tool/result" -> {
+                if (callId !in callIds) continue
+                settled.add(callId)
+                val code = (data["error_code"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
+                val sideEffect = (data["side_effect"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
+                val isError = (data["is_error"] as? kotlinx.serialization.json.JsonPrimitive)?.booleanOrNull == true
+                if (code == "TOOL_OUTCOME_UNKNOWN" || (isError && sideEffect == "possible")) {
+                    unknown = true
+                }
+            }
+        }
+    }
+    return unknown || started.any { it !in settled }
 }
 
 /** Content-addressed identity for a Work goal including its acceptance contract. */
@@ -136,6 +192,8 @@ internal fun queueWorkGoalProgressFollowUp(
         completedContinuations = binding.automaticContinuationCount,
     )
     if (!canAutomaticallyFollowUpWorkGoal(conditions)) return false
+    // Even a different, successful tool receipt cannot certify an older unknown mutation.
+    if (hasUnresolvedWorkGoalToolEffects(binding.eventLog, requireNotNull(goal))) return false
 
     val resume = LocalWorkResumeCommand(
         sourceRunId = sourceRunId,

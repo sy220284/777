@@ -77,7 +77,9 @@ internal fun queueAutomaticWorkContinuation(
         sourceMessageId = sourceMessageId,
     )
     val queued = command.toQueueInput()
-    val accepted = binding.runHandle.pendingInputs.offer(queued) {
+    // The user may queue a new instruction after the earlier pending-count check.
+    // Keep failure recovery behind the same atomic user-priority gate as Goal progress.
+    val accepted = binding.runHandle.pendingInputs.offerIfEmpty(queued) {
         // One authoritative inbox snapshot is committed while the queue is locked.
         // A process restart can reconstruct the typed continuation before running it.
         binding.eventLog.append(

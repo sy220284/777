@@ -110,3 +110,11 @@ JVM 回归新增：
 4. 新增 Work Goal 测试覆盖身份变化、验收命令变化、暂停、用户队列抢占、团队阻塞、持久编解码；另测格式只存在 goal ID 而缺 SHA 时 fail-closed。
 
 **仍未实现**：Work 的跨进程自动接管与主动重试完整事务、真正增量进度的持久证据模型、UNKNOWN_SIDE_EFFECT 外部核销。此批不提高 AE4V3-11 完成度、不变更 ChatFeature 与 App Shell 业务。构建/单测结果仅以最新 SHA 的 CI 判定。
+
+
+## 10. 第四批：工具副作用确定性和失败续轮原子准入（CI 待验证）
+
+1. Work Goal 自动续轮在取得当前模型成功工具回执后，还扫描相同 Goal 在正式 EventLog 中的 `tool/call`、`tool/execution-started` 和 `tool/result`。对已开始未结算或 `TOOL_OUTCOME_UNKNOWN` / `is_error+side_effect=possible` 的调用，**阻止新自动续轮**，直到权威工具结算可以证实结果；不凭模型的后续成功回复覆盖先前未知副作用。
+2. 修复模型错误自动续轮的原子性竞态：原先判断用户队列为空后使用普通 `offer`，并发用户输入可插入后导致内部续轮排队。现用与 Goal 自动接续相同的 `offerIfEmpty`，用户新要求始终优先。
+3. 新增 JVM 回归：执行已开始但无结果、工具恢复报告未知副作用、后继成功结果不得掩盖旧未知、其他 Goal 隔离、工具声明但未开始与正常已结算路径。
+4. 本轮没有新增后台任务队列或改变 App Shell / ChatFeature；工具副作用裁决的独立核销接口、复杂长任务的真实进度证明及跨进程完整恢复仍待后续工作包。保留 AE4V3-11 `in_progress`，以当前提交 SHA 的自动 CI 为验收依据。

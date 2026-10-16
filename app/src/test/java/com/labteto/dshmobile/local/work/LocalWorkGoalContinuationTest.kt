@@ -9,8 +9,55 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import java.io.File
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 class LocalWorkGoalContinuationTest {
+    @get:Rule val files = TemporaryFolder()
+
+    private fun toolLog(): LocalSessionEventLog = LocalSessionEventLog(
+        file = File(files.root, "work-${System.nanoTime()}.events.jsonl"),
+        json = Json { ignoreUnknownKeys = true },
+        sessionId = "goal-tool-test",
+    )
+
+    private fun LocalSessionEventLog.goalToolCall(id: String, belongsTo: String = goal.id) {
+        append("tool/call", buildJsonObject {
+            put("id", id)
+            put("name", "write_file")
+            put("goal_id", belongsTo)
+        })
+    }
+
+    private fun LocalSessionEventLog.goalToolStarted(id: String) {
+        append("tool/execution-started", buildJsonObject {
+            put("id", id)
+            put("execution_id", "exec-$id")
+            put("attributes", buildJsonObject { put("goal_id", goal.id) })
+        })
+    }
+
+    private fun LocalSessionEventLog.goalToolResult(
+        id: String,
+        isError: Boolean = false,
+        unknown: Boolean = false,
+    ) {
+        append("tool/result", buildJsonObject {
+            put("id", id)
+            put("execution_id", "exec-$id")
+            put("is_error", isError)
+            if (unknown) {
+                put("error_code", "TOOL_OUTCOME_UNKNOWN")
+                put("side_effect", "possible")
+            }
+        })
+    }
+
     private val goal = LocalGoal(
         description = "实现并验证代码",
         id = "goal-1",
@@ -31,6 +78,55 @@ class LocalWorkGoalContinuationTest {
         steeringUnchanged = true,
         completedContinuations = 0,
     )
+
+    @Test
+    fun unknownOrUnsettledSideEffectBlocksAllAutomaticGoalFollowUp() {
+        val log = toolLog()
+        try {
+            log.goalToolCall("write-1")
+            log.goalToolStarted("write-1")
+            assertTrue(hasUnresolvedWorkGoalToolEffects(log, goal))
+            log.goalToolResult("write-1", isError = true, unknown = true)
+            assertTrue(hasUnresolvedWorkGoalToolEffects(log, goal))
+            // A subsequent successful tool cannot prove an earlier unknown mutation is safe.
+            log.goalToolCall("read-2")
+            log.goalToolStarted("read-2")
+            log.goalToolResult("read-2")
+            assertTrue(hasUnresolvedWorkGoalToolEffects(log, goal))
+        } finally {
+            log.close()
+        }
+    }
+
+    @Test
+    fun settledGoalToolsDoNotBlockAndUnrelatedGoalEffectsRemainIsolated() {
+        val log = toolLog()
+        try {
+            log.goalToolCall("other-1", belongsTo = "other-goal")
+            log.append("tool/execution-started", buildJsonObject {
+                put("id", "other-1")
+                put("attributes", buildJsonObject { put("goal_id", "other-goal") })
+            })
+            assertFalse(hasUnresolvedWorkGoalToolEffects(log, goal))
+            log.goalToolCall("write-ok")
+            log.goalToolStarted("write-ok")
+            log.goalToolResult("write-ok")
+            assertFalse(hasUnresolvedWorkGoalToolEffects(log, goal))
+        } finally {
+            log.close()
+        }
+    }
+
+    @Test
+    fun toolDeclaredButNeverStartedHasNoUnknownExternalSideEffect() {
+        val log = toolLog()
+        try {
+            log.goalToolCall("unstarted")
+            assertFalse(hasUnresolvedWorkGoalToolEffects(log, goal))
+        } finally {
+            log.close()
+        }
+    }
 
     @Test
     fun realToolProgressWithOpenGoalCanScheduleOneMoreTurn() {
