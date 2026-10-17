@@ -68,6 +68,58 @@ class V6FullSceneCoverageTest {
         assertTrue(selection is UiApplicationPackAdmission.Incompatible)
     }
 
+    @Test fun independentV6HasAllRealOwnerCapabilitiesExceptUnreleasedMigrationSeal() {
+        // The old host inventory silently omitted work.team/work.plan_review,
+        // making full V6 impossible to admit even with a future valid release.
+        val actual = LocalUiConnectedCapabilities.from(
+            chat = owner(), work = owner(), drafts = owner(),
+            documents = owner(), forms = owner(), attachments = owner(),
+            transcript = owner(), groups = owner(), team = owner(),
+            workReads = owner(), workPolicy = owner(), shell = owner(),
+            evidence = owner(), gallery = owner(), personas = owner(),
+            personaTransfer = owner(), stories = owner(),
+            galleryDeletion = owner(), gallerySave = owner(),
+            portraits = owner(), authoring = owner(), currentPersona = owner(),
+            files = owner(), memory = owner(), settings = owner(),
+            automation = owner(), media = owner(), usage = owner(), diary = owner(),
+        )
+        val pack = fullCandidate()
+        val expected = pack.manifest.requiredCapabilities -
+            UiCapabilityId("v6.migration.accepted")
+        assertTrue("Host misses feature-owned V6 capabilities: ${expected - actual}",
+            actual.containsAll(expected))
+        // No Owner claims production acceptance; that seal requires separate
+        // code-only lifecycle/interaction verification.
+        assertTrue(UiCapabilityId("v6.migration.accepted") !in actual)
+        val refused = UiApplicationPackRegistry(listOf(pack))
+            .select(pack.manifest.id, UiPackAdmissionRequirements(
+                UI_CONTRACT_VERSION, LocalUiSceneCatalog.requirements, actual,
+                UiWindowClass.COMPACT, UiAccessibility.entries.toSet(), false,
+            ))
+        assertTrue(refused is UiApplicationPackAdmission.Incompatible)
+
+        // A verified full-pack test may explicitly supply the *one* separate
+        // migration seal and exercise real Host navigation without old Shell.
+        val admitted = UiApplicationPackRegistry(listOf(pack))
+            .select(pack.manifest.id, UiPackAdmissionRequirements(
+                UI_CONTRACT_VERSION, LocalUiSceneCatalog.requirements,
+                actual + UiCapabilityId("v6.migration.accepted"),
+                UiWindowClass.COMPACT, UiAccessibility.entries.toSet(), false,
+            ))
+        assertTrue(admitted is UiApplicationPackAdmission.Admitted)
+    }
+
+    @Test fun missingActualWorkOwnerPreventsFalseCapabilityAdvertisement() {
+        val connected = LocalUiConnectedCapabilities.from(
+            chat = owner(), work = owner(), drafts = owner(),
+            documents = owner(), forms = owner(), attachments = owner(),
+            transcript = owner(), team = owner(),
+            workReads = null, workPolicy = owner(),
+        )
+        assertTrue(UiCapabilityId("work.team") in connected)
+        assertTrue(UiCapabilityId("work.plan_review") !in connected)
+    }
+
     @Test fun actualSceneManifestPassesItsOwnStrictScopedContract() {
         val candidate = fullCandidate()
         val requirements = UiPackAdmissionRequirements(
