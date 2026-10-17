@@ -50,9 +50,11 @@ fun SyEntrance(
     // Position-only offset preserves the visual rise, and makes the actual motion
     // observable to Android accessibility/Compose semantics (graphicsLayer
     // translation alone can keep stale boundsInRoot on some Compose versions).
-    Box(modifier.offset {
+    // Offset wraps the caller modifier so its semantics/testTag bounds follow
+    // the actual moving child, including reduced-motion transitions.
+    Box(Modifier.offset {
         IntOffset(0, if (reduced) 0 else (distance * (1f - progress.value)).roundToInt())
-    }.graphicsLayer {
+    }.then(modifier).graphicsLayer {
         alpha = if (reduced) 1f else progress.value
     }) { content() }
 }

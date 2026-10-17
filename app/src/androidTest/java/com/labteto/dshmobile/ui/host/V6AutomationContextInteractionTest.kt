@@ -117,7 +117,8 @@ class V6AutomationContextInteractionTest {
         show(owner)
         compose.runOnIdle { owner.change(second) }
         compose.onNodeWithText("创建任务").assertIsNotEnabled()
-        compose.onNodeWithText("取消").performClick()
+        // The cancel button is below the fold on a phone; tap only after it is visible.
+        compose.onNodeWithText("取消").performScrollTo().performClick()
         compose.waitUntil(10_000) {
             compose.onAllNodes(androidx.compose.ui.test.hasText("新建任务")).fetchSemanticsNodes().isNotEmpty()
         }
