@@ -1,5 +1,6 @@
-
 <h1 align="center">神言神语</h1>
+
+> **目前仅保留后端与新 UI 接口。** 原 V6 页面、组件、图标、字体、动画与设计素材已移除；启动入口不再绘制旧界面。新 UI 未接入前，APK 无法提供正常的图形交互。详见 [后端基线与新 UI 接入规范](docs/UI-BACKEND-RESET.zh-CN.md)。
 
 <p align="center">
   一款开源的 Android 端侧 Agent 平台。<b>一部手机，就是一台 Agent 主机。</b>
@@ -182,3 +183,4 @@ Agent 理解目标、规划步骤、调用真实工具、根据结果继续判�
 [MIT](LICENSE)。第三方材料见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 DeepSeek Harness 及其品牌归各自所有者所有；本项目是独立的社区构建，并已沿自己的产品与架构路径持续演化。
+
