@@ -1,0 +1,29 @@
+name: PR705 audit source 4ade8686ec
+on:
+  push:
+    branches: [chore/pr705-local-snapshot-20261017]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 4ade8686ecd08f70fcdd0a8e117d08cf9cc7e45b
+          persist-credentials: false
+      - name: Archive exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "4ade8686ecd08f70fcdd0a8e117d08cf9cc7e45b"
+          tar -czf "$RUNNER_TEMP/PR705-AUDIT-SOURCE.tar.gz" --exclude=.git .
+          printf '%s\n' "4ade8686ecd08f70fcdd0a8e117d08cf9cc7e45b" > "$RUNNER_TEMP/SNAPSHOT_SHA"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr705-audit-4ade8686ecd0
+          path: |
+            ${{ runner.temp }}/PR705-AUDIT-SOURCE.tar.gz
+            ${{ runner.temp }}/SNAPSHOT_SHA
+          retention-days: 1
