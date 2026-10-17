@@ -15,6 +15,7 @@ import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.prepareLocalHarnessStartup
 import com.labteto.dshmobile.local.session.LocalSessionArchiveMaintenance
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.migrateLegacySessionFiles
 import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
 import com.labteto.dshmobile.local.work.LocalWorkComposition
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -114,19 +115,6 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
             preferences.edit().putLong(KEY_ATTACHMENT_GC_AT, now).apply()
         }
     }
-}
-
-private fun migrateLegacySessionFiles(
-    root: File,
-    sessionsRoot: File,
-    currentSessionId: String,
-) {
-    val legacy = File(root, "session.json")
-    val destination = File(sessionsRoot, "$currentSessionId.json")
-    if (!legacy.isFile || destination.exists()) return
-    legacy.copyTo(destination, overwrite = false)
-    File(root, "session.events.jsonl").takeIf(File::isFile)
-        ?.copyTo(File(sessionsRoot, "$currentSessionId.events.jsonl"), overwrite = false)
 }
 
 private fun cleanupUnreferencedLocalImagesNow(

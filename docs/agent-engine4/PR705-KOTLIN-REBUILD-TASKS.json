@@ -511,10 +511,18 @@
         "AE4V3-21",
         "AE4V3-22"
       ],
-      "status": "not_started",
-      "code_evidence": [],
-      "tests_verified": [],
-      "notes": ""
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalRuntimeBootstrapComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalLegacySessionMigration.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/session/LocalLegacySessionMigrationTest.kt"
+      ],
+      "tests_verified": [
+        "local :app:compileDebugKotlin and :app:testDebugUnitTest --tests LocalLegacySessionMigrationTest (3 passed)",
+        "local 7-module JVM suite 3224 tests, 0 failures, no APK build",
+        "local 7 static architecture/performance/quality/Kotlin/CI/UI/Android security gates"
+      ],
+      "notes": "2026-10-17：开始旧路径/重复机制清退。删除 LocalRuntimeBootstrapComposition 中直接 copyTo 的旧会话双文件迁移逻辑，Session 存储域统一持有 LocalLegacySessionMigration，采用进程间 FileLock、持久唯一迁移 owner 标记与同目录 staging+atomic move，固定旧历史所属 Session。中断后只补齐同一目标缺失文件，不覆盖已有 canonical Session，切换当前会话不可重复复制旧私有历史；旧文件 JSON 无效或越界 id 则失败关闭并保留原数据。新增 3 项 Owner/重启续迁/错误输入回归；本地 Kotlin 编译和七模块 3224 JVM 全量 0 失败，7 静态门禁通过。原 Legacy Shell 与 MCP 旧协议仍有活跃兼容调用者不可删除；完整 AE4V3-21/22/23 依赖验收和本 SHA CI 未完成。"
     },
     {
       "id": "AE4V3-24",
