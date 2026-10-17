@@ -79,12 +79,21 @@ internal fun localNavigationSnapshotKey(packId: String, sessionId: String?): Str
  * checks the COMPLETE scene catalog and real renderers before executing a package.
  * Only the V6 migration candidate is installed; legacy UI remains stable until verified.
  */
+/** V6 observes Session Owner directly; the legacy Shell has no execution authority. */
+internal class LocalV6SessionBinding(private val sessions: SessionUiPort) {
+    fun isWork(): Boolean = sessions.snapshot().usageMode == LocalUsageMode.WORK
+    fun sessionId(): String = sessions.snapshot().identity?.sessionId.orEmpty()
+    val workModeUpdates: kotlinx.coroutines.flow.Flow<Boolean> =
+        sessions.snapshots.map { it.usageMode == LocalUsageMode.WORK }
+}
+
 internal object LocalApplicationPackInstallations {
     fun fromOwners(owner: LocalHarnessViewModel,
         updateStatus: kotlinx.coroutines.flow.StateFlow<String?>? = null,
         checkForUpdate: (() -> Unit)? = null,
-    ): List<UiApplicationScenePack> =
-        listOf(
+    ): List<UiApplicationScenePack> {
+        val session = LocalV6SessionBinding(owner.sessionUiPort)
+        return listOf(
             // Migrating V6 has only actual settings and conversation renderers; Host denies it
             // until every required Scene exists, so current users stay on legacy stable V6.
             V6ApplicationScenePack(
@@ -108,8 +117,8 @@ internal object LocalApplicationPackInstallations {
                     workTeam = owner.workTeamUiPort,
                     replySuggestions = owner.replySuggestionsUiPort,
                     files = owner.filesUiPort,
-                    workMode = { owner.shellState.value.usageMode == LocalUsageMode.WORK },
-                    workModeUpdates = owner.shellState.map { it.usageMode == LocalUsageMode.WORK },
+                    workMode = session::isWork,
+                    workModeUpdates = session.workModeUpdates,
                 ),
                 usageOwner = owner.usageUiPort,
                 updateStatus = updateStatus,
@@ -117,7 +126,7 @@ internal object LocalApplicationPackInstallations {
                 secondary = V6SecondaryPorts(
                     tools = owner.toolsUiPort, files = owner.filesUiPort,
                     media = owner.mediaUiPort, settings = owner.settingsUiPort,
-                    sessionId = { owner.shellState.value.sessionId },
+                    sessionId = session::sessionId,
                     automation = owner.automationUiPort, sessions = owner.sessionUiPort,
                     transcript = owner.messageHistoryUiPort,
                     memory = owner.memoryUiPort, diary = owner.diaryUiPort,
@@ -132,6 +141,7 @@ internal object LocalApplicationPackInstallations {
                 ),
             ),
         )
+    }
 }
 
 internal sealed interface LocalApplicationUiDecision {
