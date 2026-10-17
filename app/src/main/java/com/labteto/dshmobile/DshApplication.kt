@@ -35,6 +35,10 @@ class DshApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // The MCP Binder worker has its own OS process. It must never bootstrap
+        // a second Agent/runtime kernel, WorkManager scheduler or app maintenance
+        // from the ordinary Application onCreate().
+        if (isMcpWorkerProcess(Application.getProcessName(), packageName)) return
         AppLog.configurePersistence(File(filesDir, "diagnostics/app-log.tsv"))
         AppLog.installUnhandledExceptionLogger()
         // Load the existing on-device Model Owner policy before either Legacy or V6 Pack
@@ -85,6 +89,10 @@ class DshApplication : Application() {
     }
 
     companion object {
+        @JvmStatic
+        internal fun isMcpWorkerProcess(processName: String, appId: String): Boolean =
+            processName == "$appId:mcp_worker"
+
         private const val UI_PREFS = "ui_prefs"
         private const val KEY_THEME = "theme_preference"
 
