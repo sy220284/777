@@ -242,6 +242,67 @@ class ToolAttemptLedgerTest {
     }
 
     @Test
+    fun reusedLegacyCallIdCannotSettleASecondUnidentifiedMutation() {
+        val ledger = ToolAttemptLedger()
+        repeat(2) {
+            ledger.observe("tool/call", buildJsonObject {
+                put("id", "same-provider-id")
+                put("goal_id", "goal")
+                // Original sessions did not persist an execution identity.
+            })
+        }
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "same-provider-id")
+            put("is_error", false)
+        })
+        assertEquals(2, ledger.pending().size)
+        assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
+    }
+
+    @Test
+    fun executionAddressedResultStillSettlesTheCorrectAttemptAfterLegacyReuse() {
+        val ledger = ToolAttemptLedger()
+        ledger.observe("tool/call", buildJsonObject {
+            put("id", "same-provider-id"); put("goal_id", "goal")
+        })
+        ledger.observe("tool/call", buildJsonObject {
+            put("id", "same-provider-id")
+            put("goal_id", "goal")
+            put("execution_started", false)
+        })
+        ledger.observe("tool/execution-started", buildJsonObject {
+            put("id", "same-provider-id"); put("execution_id", "new-run-execution")
+        })
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "same-provider-id")
+            put("execution_id", "new-run-execution")
+            put("is_error", false)
+        })
+        assertEquals(1, ledger.pending().size)
+        assertEquals(null, ledger.pending().single().executionId)
+        assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
+        // Delayed receipt without an identity must not settle the old attempt.
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "same-provider-id"); put("is_error", false)
+        })
+        assertEquals(1, ledger.pending().size)
+    }
+
+    @Test
+    fun uniqueLegacyCallIdKeepsExistingRecoveryCompatibility() {
+        val ledger = ToolAttemptLedger()
+        ledger.observe("tool/call", buildJsonObject {
+            put("id", "unique-legacy")
+            put("goal_id", "goal")
+        })
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "unique-legacy"); put("is_error", false)
+        })
+        assertTrue(ledger.pending().isEmpty())
+        assertFalse(ledger.hasUnresolvedExternalEffects("goal"))
+    }
+
+    @Test
     fun foreignExecutionIdentityCannotSettleAStartedLegacyAttempt() {
         val ledger = ToolAttemptLedger()
         ledger.observe("tool/call", buildJsonObject {

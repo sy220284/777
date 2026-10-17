@@ -279,6 +279,37 @@ class SessionRecoveryTest {
         }
     }
 
+    @Test
+    fun coldRecoveryPreservesUnresolvedLegacyWritesWhenProviderCallIdsAreReused() {
+        val directory = Files.createTempDirectory("session-recovery-reused-legacy").toFile()
+        try {
+            val file = directory.resolve("events.jsonl")
+            val log = SessionEventLog(file, json, maxBytes = 4_096)
+            log.append("turn/start", buildJsonObject {})
+            log.append("step/start", buildJsonObject { put("step", 1) })
+            repeat(2) {
+                log.append("tool/call", buildJsonObject {
+                    put("id", "reused")
+                    put("name", "write")
+                    put("goal_id", "goal")
+                })
+            }
+            // Recovery must still emit model-visible results but cannot ascribe
+            // either receipt to one of the two legacy executions by call ID alone.
+            val repaired = SessionRecovery.repairInterruptedTail(log)
+            assertEquals(2, repaired.toolResults.size)
+            assertTrue(repaired.toolResults.all {
+                it.code == SessionRecovery.TOOL_OUTCOME_UNKNOWN
+            })
+            val ledger = ToolAttemptLedger()
+            SessionEventLog(file, json, maxBytes = 4_096).use { recoveredLog ->
+                recoveredLog.forEachAfter(-1L) { ledger.observe(it) }
+            }
+            assertEquals(2, ledger.pending().size)
+            assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
+        } finally { directory.deleteRecursively() }
+    }
+
     private fun assistantWithTool(id: String, name: String) = buildJsonObject {
         put("role", "assistant")
         put("content", "")

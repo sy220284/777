@@ -69,6 +69,9 @@ class ToolAttemptLedger {
     private val attempts = mutableListOf<MutableAttempt>()
     private val latestByCallId = mutableMapOf<String, MutableAttempt>()
     private val byExecutionId = mutableMapOf<String, MutableAttempt>()
+    // A provider call ID has request scope, not session scope. Once reused,
+    // a legacy receipt without execution identity cannot identify its target.
+    private val ambiguousLegacyCallIds = mutableSetOf<String>()
 
     fun observe(event: SessionEvent, stepHint: Int? = null) {
         observe(event.type, event.data, stepHint)
@@ -91,6 +94,7 @@ class ToolAttemptLedger {
             val newAttempt = previous == null ||
                 (if (actualCall) previous.toolCallObserved
                  else previous.toolCallObserved || previous.started || previous.settled)
+            if (newAttempt && previous != null) ambiguousLegacyCallIds += id
             val attempt = if (newAttempt) {
                 MutableAttempt(id).also {
                     attempts.add(it)
@@ -178,7 +182,8 @@ class ToolAttemptLedger {
                 // A receipt without execution identity can only settle a legacy attempt
                 // that never acquired one. Provider call IDs may be reused across runs.
                 if (executionId != null && known == null) return
-                if (executionId == null && latest?.executionId != null) return
+                if (executionId == null &&
+                    (latest?.executionId != null || id in ambiguousLegacyCallIds)) return
                 val attempt = known ?: track(id)
                 attempt.apply {
                     if (executionId != null) {
