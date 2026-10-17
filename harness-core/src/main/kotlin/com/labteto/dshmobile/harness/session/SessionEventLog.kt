@@ -114,8 +114,10 @@ class SessionEventLog(
                 pathState.fileLeaseDepth = 1
                 try { block() }
                 finally {
-                    pathState.headStamp = durableHeadStamp()
+                    // Even if the storage stat fails, do not keep a stale re-entrant
+                    // lease flag that could bypass all future OS writer locks.
                     pathState.fileLeaseDepth = 0
+                    pathState.headStamp = durableHeadStamp()
                 }
             }
         }
