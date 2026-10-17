@@ -116,11 +116,12 @@ def self_test() -> None:
 self_test()
 
 violations = []
-# UI scenes moved into the standalone Pack. Audit both old App surfaces
-# (still used for system/UI bridges) and the actual V6 scene renderers.
+# Modal primitives in App-owned screens use the App's wrappers; UI Packs are
+# independently designed and may implement their own dialogs (UI 3.0 §7).
+# Do not accidentally impose App-only composition rules on independent Packs.
 V6_SCENES = ROOT / "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6"
-for path in list(UI.rglob("*.kt")) + list(V6_SCENES.rglob("*.kt")):
-    relative = path.relative_to(UI).as_posix() if path.is_relative_to(UI) else path.relative_to(ROOT).as_posix()
+for path in UI.rglob("*.kt"):
+    relative = path.relative_to(UI).as_posix()
     text = mask_non_code(path.read_text(encoding="utf-8"))
     for pattern, allowed, hint in RULES:
         if relative in allowed:
