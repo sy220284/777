@@ -89,8 +89,9 @@ internal fun decideApplicationUi(
 }
 
 /**
- * Production entry point for eventual whole-app replacement.
- * This does not advertise a pack selector until all its real renderers exist.
+ * Production entry point for the current independent V6 whole-application pack.
+ * Multiple-pack selection remains a separate product capability; each future
+ * pack must prove its own renderers and actual Feature Port behavior.
  * An unavailable saved pack is shown explicitly, and requires a user action to reset it.
  */
 @Composable

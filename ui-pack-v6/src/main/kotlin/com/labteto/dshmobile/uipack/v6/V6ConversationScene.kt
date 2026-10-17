@@ -176,7 +176,8 @@ internal fun submitV6ConversationDraft(
 /**
  * V6-native conversation scene. Sends/edits/history/attachments/approvals remain
  * Owner commands; a UI receipt never pretends to prove completion.
- * More advanced tool/media/document scenes are intentionally NOT registered yet.
+ * Advanced tool, media and document scenes are registered by their dedicated
+ * independent V6 renderers; their behavior is verified separately.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

@@ -13,7 +13,8 @@ import com.labteto.dshmobile.uicontract.checkCompatibility
  * Feature Ports are bound by the App composition root to the pack's typed
  * renderer factories; the Host only supplies navigation, never Owner authority.
  *
- * No currently installed pack implements this whole-application contract yet.
+ * The current V6 pack implements this contract; admission still requires real
+ * Feature capabilities and verification for each user-visible action.
  */
 interface UiApplicationScenePack {
     val manifest: UiPackManifest

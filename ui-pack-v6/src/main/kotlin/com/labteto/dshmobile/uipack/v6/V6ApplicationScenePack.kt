@@ -40,7 +40,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
-/** First independent V6 application scenes; never claims that all 75 have migrated. */
+/** The independent V6 pack registers 75 required renderers; registration is not 173-action behavioral sign-off. */
 class V6ApplicationScenePack(
     private val preferences: HostPreferencesUiPort,
     private val settings: SettingsUiPort? = null,
