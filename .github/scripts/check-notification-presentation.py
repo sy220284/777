@@ -30,22 +30,23 @@ def notification_configuration(text: str) -> tuple[str | None, bool]:
     if not re.search(r"\bNotificationCompat\s*\.\s*Builder\s*\(", code):
         return None, False
     has_large_icon = bool(re.search(r"\.\s*setLargeIcon\s*\(", code))
-    found = re.findall(r"\.\s*setSmallIcon\s*\(\s*R\.drawable\.([A-Za-z_]\w*)", code)
+    found = re.findall(r"\.\s*setSmallIcon\s*\(\s*((?:android\.)?R\.drawable\.[A-Za-z_]\w*)", code)
     return (found[0] if len(set(found)) == 1 else None), has_large_icon
 
 def self_test() -> None:
     assert notification_configuration(
         "NotificationCompat.Builder(ctx, channel).setSmallIcon(R.drawable.icon)"
-    ) == ("icon", False)
+    ) == ("R.drawable.icon", False)
     assert notification_configuration(
         "// .setLargeIcon(old)\nNotificationCompat.Builder(ctx, channel).setSmallIcon(R.drawable.icon)"
     ) == ("icon", False)
     assert notification_configuration(
         "NotificationCompat.Builder(ctx, channel).setSmallIcon(R.drawable.icon).setLargeIcon(bitmap)"
-    ) == ("icon", True)
+    ) == ("R.drawable.icon", True)
     assert notification_configuration(
         "NotificationCompat.Builder(ctx, channel).setSmallIcon(R.drawable.one).setSmallIcon(R.drawable.two)"
     )[0] is None
+    assert notification_configuration("NotificationCompat.Builder(ctx, channel).setSmallIcon(android.R.drawable.ic_dialog_info)") == ("android.R.drawable.ic_dialog_info", False)
 
 if "--self-test" in sys.argv:
     self_test()
@@ -63,13 +64,18 @@ for path in KOTLIN.rglob("*.kt"):
     if has_large:
         violations.append(f"{path.relative_to(ROOT)}: notification template must not setLargeIcon")
     if not icon:
-        violations.append(f"{path.relative_to(ROOT)}: notification must set one static drawable small icon")
+        violations.append(f"{path.relative_to(ROOT)}: notification must set one approved static drawable small icon")
     else:
         small_icons.add(icon)
 if len(small_icons) != 1:
     violations.append(f"all notification builders must share one monochrome small icon, got {sorted(small_icons)}")
 for icon in small_icons:
-    path = resource(icon)
+    if icon == "android.R.drawable.ic_dialog_info":
+        continue  # Android system-owned static icon; no legacy visual asset is bundled.
+    if not icon.startswith("R.drawable."):
+        violations.append("unapproved platform notification icon: " + icon)
+        continue
+    path = resource(icon.removeprefix("R.drawable."))
     if path is None:
         violations.append(f"notification small icon drawable is missing: {icon}")
     else:
@@ -82,8 +88,11 @@ application = manifest.find("application")
 if application is None:
     violations.append("AndroidManifest.xml: no application element")
 else:
+    backend_only = (ROOT / "docs/UI-BACKEND-RESET.zh-CN.md").is_file() and not (ROOT / "ui-pack-v6").exists()
     for attr in ("icon", "roundIcon"):
         value = application.get(ANDROID + attr, "")
+        if backend_only and not value:
+            continue  # No user-facing launcher artwork is installed in this baseline.
         match = re.fullmatch(r"@mipmap/([A-Za-z_]\w*)", value)
         if match is None:
             violations.append(f"AndroidManifest.xml: missing valid application {attr}")
