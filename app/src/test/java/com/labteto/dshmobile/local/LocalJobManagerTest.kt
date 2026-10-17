@@ -274,6 +274,40 @@ class LocalJobManagerTest {
     }
 
     @Test
+    fun incompleteJsonJobRecordFallsBackToLastValidGenerationInsteadOfDroppingIt() = runTest {
+        val root = kotlin.io.path.createTempDirectory("persistent-job-missing-id-").toFile()
+        try {
+            val file = File(root, "jobs.json")
+            val store = LocalPersistentJobStore(file, Json { ignoreUnknownKeys = true })
+            store.write(listOf(JobSnapshot("backup", "已保存", "completed")))
+            store.write(listOf(JobSnapshot("new", "新任务", "running")))
+            // Valid JSON, but the second record has no id and must not disappear.
+            file.writeText("""[{"id":"new","label":"新任务","status":"running"},
+                {"label":"被损坏的任务","status":"running"}]""")
+            val recovered = store.read()
+            assertEquals(listOf("backup"), recovered.map { it.id })
+            assertTrue(root.listFiles().orEmpty().any { it.name.startsWith("jobs.json.corrupt-") })
+            assertEquals(listOf("backup"), store.read().map { it.id })
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test
+    fun duplicateJobIdsWithoutBackupFailClosedWithoutRewritingPrimary() = runTest {
+        val root = kotlin.io.path.createTempDirectory("persistent-job-duplicates-").toFile()
+        try {
+            val file = File(root, "jobs.json")
+            val duplicates = """[{"id":"same","label":"A","status":"running"},
+                {"id":"same","label":"B","status":"completed"}]"""
+            file.writeText(duplicates)
+            val store = LocalPersistentJobStore(file, Json { ignoreUnknownKeys = true })
+            assertTrue(runCatching { store.read() }.isFailure)
+            assertEquals(duplicates, file.readText())
+            assertTrue(runCatching { store.write(listOf(JobSnapshot("new", "new", "running"))) }.isFailure)
+            assertEquals(duplicates, file.readText())
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test
     fun interruptedNonPersistentJobReportsEarlyTerminationAgainstRequestedDeadline() = runTest {
         val root = kotlin.io.path.createTempDirectory("interrupted-shell-deadline-").toFile()
         try {

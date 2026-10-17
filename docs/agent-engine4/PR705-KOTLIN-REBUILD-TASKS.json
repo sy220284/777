@@ -491,10 +491,17 @@
         "AE4V3-16",
         "AE4V3-21"
       ],
-      "status": "not_started",
-      "code_evidence": [],
-      "tests_verified": [],
-      "notes": ""
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/local/jobs/LocalPersistentJobStore.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalJobManagerTest.kt"
+      ],
+      "tests_verified": [
+        "local :app:compileDebugKotlin and LocalJobManagerTest with 2 new negative corruption cases (success)",
+        "local 7-module JVM suite: 3221 tests, 0 failures",
+        "local 7 architecture/performance/security/quality/Kotlin/UI/CI static gates (success)"
+      ],
+      "notes": "2026-10-17：启动历史迁移与异常恢复。LocalPersistentJobStore 解析合法 JSON 快照时不再 mapNotNull 静默忽略缺 id/label/status 的任务，改为严格校验必需身份及去重 id；损坏主文件触发已存在的上代有效快照恢复/隔离留痕，无可用备份则显式拒绝读写、保留原始损坏文件，防止任务记录不可察觉地永久消失或旧 ID 覆盖。新增不完整记录从有效备份恢复、重复 ID 无备份时失败关闭且拒绝盲写的正反回归；本地 App Kotlin 编译、七模块 3221 项 JVM 全量 0 失败和 7 类静态门禁通过，提交 SHA CI 与历史大规模迁移尚待验收。"
     },
     {
       "id": "AE4V3-23",
