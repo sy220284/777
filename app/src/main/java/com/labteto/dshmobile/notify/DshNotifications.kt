@@ -75,7 +75,7 @@ class DshNotifications @Inject constructor(
             "local:$notificationKey",
             id,
             NotificationCompat.Builder(context, CHANNEL_LOCAL_JOBS)
-                .setSmallIcon(R.drawable.ic_notification_butterfly)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setContentTitle(title)
                 .setContentText(text)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(text))

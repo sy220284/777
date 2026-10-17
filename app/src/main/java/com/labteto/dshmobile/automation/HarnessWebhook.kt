@@ -310,7 +310,7 @@ class HarnessWebhookService : Service() {
             ),
         )
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification_butterfly)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("777 Harness Webhook")
             .setContentText("本机自动化回调服务正在运行")
             .setOngoing(true)
