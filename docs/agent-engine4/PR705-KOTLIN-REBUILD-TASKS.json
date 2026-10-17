@@ -436,15 +436,20 @@
       "status": "in_progress",
       "code_evidence": [
         "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpLegacyTransports.kt",
-        "harness-interop/src/test/kotlin/com/labteto/dshmobile/interop/mcp/McpProtocolBoundaryTest.kt"
+        "harness-interop/src/test/kotlin/com/labteto/dshmobile/interop/mcp/McpProtocolBoundaryTest.kt",
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt",
+        "harness-interop/src/test/kotlin/com/labteto/dshmobile/interop/lsp/LspFramingTest.kt",
+        "harness-interop/src/test/kotlin/com/labteto/dshmobile/interop/lsp/LspPluginTest.kt"
       ],
       "tests_verified": [
         "local :harness-interop:test (69 tests, 0 failures)",
         "local :harness-core:test (268 tests, 0 failures)",
         "local :reference-validation:test (5 tests, 0 failures)",
-        "local 7 static architecture/performance/security/CI/quality/Kotlin/UI boundary checks"
+        "local 7 static architecture/performance/security/CI/quality/Kotlin/UI boundary checks",
+        "local :harness-interop:test after LSP integrity fix (70 tests, 0 failures)",
+        "local seven static architecture/security/performance/CI/UI/Kotlin/test-quality checks after LSP fix"
       ],
-      "notes": "2026-10-17：MCP HTTP 与 stdio 首次协议协商改由只读 tools/list 选定传输，工具调用 tools/call 仅在传输版本确定后发出一次，禁止 404/不兼容等错误造成跨协议双次远端写入。新增现代 HTTP 错误与旧协议回退各 1 个正反回归；基线 470f2cf harness-interop 69、harness-core 268、reference-validation 5 项 JVM 测试全部通过，0 失败；7 类静态门禁通过。App Kotlin 编译另被 V6StandaloneDebugActivity 的 ProvideUiHostSystemOperationOwner 未解析阻断，尚未验收全应用编译、跨进程 Device/LSP 生命周期或提交 SHA CI。整体仍 in_progress。"
+      "notes": "2026-10-17：MCP HTTP 与 stdio 首次协议协商改由只读 tools/list 选定传输，工具调用 tools/call 仅在传输版本确定后发出一次，禁止 404/不兼容等错误造成跨协议双次远端写入。新增现代 HTTP 错误与旧协议回退各 1 个正反回归；基线 470f2cf harness-interop 69、harness-core 268、reference-validation 5 项 JVM 测试全部通过，0 失败；7 类静态门禁通过。App Kotlin 编译另被 V6StandaloneDebugActivity 的 ProvideUiHostSystemOperationOwner 未解析阻断，尚未验收全应用编译、跨进程 Device/LSP 生命周期或提交 SHA CI。整体仍 in_progress。 2026-10-17：LSP 客户端只允许已注册 pendingReplies 的 JSON-RPC 请求 ID 结算，拒绝缓存未发送请求的无主/提前回复；防止恶意语言服务器用预测 ID 伪造下次请求结果。3 个旧夹具改为真实收到 request 后才回复，保留原行为覆盖；新增先发送伪造 id=2、再回复真实 id=1/id=2 的进程级攻防回归。harness-interop 70 项 JVM 测试 0 失败，七项静态门禁通过；App Debug 编译独立 UI Host 未解析缺口仍待合并修复与该 SHA CI 验收。"
     },
     {
       "id": "AE4V3-21",
