@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.host
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
@@ -117,7 +118,8 @@ class V6AutomationContextInteractionTest {
         show(owner)
         compose.runOnIdle { owner.change(second) }
         compose.onNodeWithText("创建任务").assertIsNotEnabled()
-        compose.onNodeWithText("取消").performClick()
+        // Cancel is now a pinned action above the scrollable, long editor.
+        compose.onNodeWithText("取消").assertIsDisplayed().performClick()
         compose.waitUntil(10_000) {
             compose.onAllNodes(androidx.compose.ui.test.hasText("新建任务")).fetchSemanticsNodes().isNotEmpty()
         }

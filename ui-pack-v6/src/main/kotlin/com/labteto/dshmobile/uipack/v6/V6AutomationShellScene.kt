@@ -143,13 +143,27 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
         notify = task.notify
         editor = true
     }
-    Column(Modifier.fillMaxSize().verticalScroll(editorScroll).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(if (onlyChat) "人物互动自动任务" else "自动任务",
-            style = MaterialTheme.typography.titleLarge)
-        SyButton("返回", onBack, style = SyButtonStyle.GHOST)
-        feedback?.let { SyNote(it) }
-        if (!editor) {
+    // Keep Back and Cancel outside the scrolling form. A long editor must
+    // never require clicking an offscreen node to get back to the task list.
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(if (onlyChat) "人物互动自动任务" else "自动任务",
+                Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+            SyButton("返回", onBack, style = SyButtonStyle.GHOST)
+        }
+        if (editor) SyButton("取消", {
+            // An old chat draft is never reattached to the newly active session.
+            editing = null
+            prompt = ""
+            editorIdentity = owner.snapshot().context.identity
+            editor = false
+        }, modifier = Modifier.padding(horizontal = 16.dp),
+            style = SyButtonStyle.GHOST)
+        Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(editorScroll).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            feedback?.let { SyNote(it) }
+            if (!editor) {
             SyButton("新建任务", {
                 prompt = ""; firstMinutes = "60"; editing = null
                 editorIdentity = owner.snapshot().context.identity
@@ -301,14 +315,7 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
                 scheduleValid && policyValid &&
                 (editing != null || mode != AutomationMode.CHAT ||
                     (chatAllowed && sameEditorChat)))
-            SyButton("取消", {
-                // An abandoned task draft from the previous conversation must not survive
-                // a user-requested cancel into another session's editor.
-                editing = null
-                prompt = ""
-                editorIdentity = owner.snapshot().context.identity
-                editor = false
-            }, style = SyButtonStyle.GHOST)
+        }
         }
     }
     remove?.let { task -> AlertDialog(onDismissRequest = { remove = null },
