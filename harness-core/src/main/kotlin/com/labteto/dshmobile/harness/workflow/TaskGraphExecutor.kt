@@ -2,6 +2,8 @@ package com.labteto.dshmobile.harness.workflow
 
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -83,59 +85,50 @@ class TaskGraphExecutor(
         }
         val semaphore = Semaphore(maxParallelism)
         val completed = AtomicInteger(0)
-        val results = LinkedHashMap<String, TaskGraphNodeResult>()
         val indices = accepted.mapIndexed { i, node -> node.id to i }.toMap()
         val total = accepted.size
 
-        // Each wave runs only nodes whose dependencies are already settled.
-        // Branch failure stops descendants while independent branches proceed.
-        while (results.size < total) {
-            // Propagate a failed dependency through the *entire* DAG before choosing
-            // ready nodes. A single pass leaves grandchildren incorrectly "waiting"
-            // and can cause false deadlock when the root branch has already failed.
-            while (true) {
-                val blocked = accepted.filter { node ->
-                    node.id !in results && node.dependsOn.any { dep ->
-                        results[dep]?.outcome == TaskGraphOutcome.FAILED ||
-                            results[dep]?.outcome == TaskGraphOutcome.BLOCKED
-                    }
+        // Build all bounded lazy continuations before launching any of them. Each node
+        // waits only on its own prerequisites: an unrelated slow branch no longer holds
+        // back dependents of a fast branch (the previous wave/barrier behavior).
+        //
+        // No parallel task mutates this lookup after scheduling starts; results remain
+        // immutable, and the public return order stays equal to the submitted graph.
+        val scheduled = LinkedHashMap<String, Deferred<TaskGraphNodeResult>>(total)
+        for (node in accepted) {
+            scheduled[node.id] = async(start = CoroutineStart.LAZY) {
+                val prerequisites = node.dependsOn.map { dependencyId ->
+                    scheduled.getValue(dependencyId).await()
                 }
-                if (blocked.isEmpty()) break
-                for (node in blocked) {
-                    val index = indices.getValue(node.id)
-                    val failedDeps = node.dependsOn.filter {
-                        results[it]?.outcome != TaskGraphOutcome.COMPLETED
-                    }
-                    val reason = "依赖未完成：${failedDeps.joinToString()}"
-                    results[node.id] = TaskGraphNodeResult(
-                        node, index, TaskGraphOutcome.BLOCKED, error = reason,
+                val blockedBy = node.dependsOn.zip(prerequisites)
+                    .filter { (_, result) -> result.outcome != TaskGraphOutcome.COMPLETED }
+                    .map { (dependencyId, _) -> dependencyId }
+                val index = indices.getValue(node.id)
+                if (blockedBy.isNotEmpty()) {
+                    val reason = "依赖未完成：${blockedBy.joinToString()}"
+                    val result = TaskGraphNodeResult(
+                        node = node, index = index,
+                        outcome = TaskGraphOutcome.BLOCKED, error = reason,
                     )
                     onProgress(TaskGraphProgress(
-                        index, node.task, "受阻", completed.incrementAndGet(), total, reason,
-                        nodeId = node.id,
+                        index, node.task, "受阻", completed.incrementAndGet(), total,
+                        reason, nodeId = node.id,
                     ))
-                }
-            }
-            val ready = accepted.filter { node ->
-                node.id !in results && node.dependsOn.all {
-                    results[it]?.outcome == TaskGraphOutcome.COMPLETED
-                }
-            }
-            check(ready.isNotEmpty() || results.size == total) {
-                "Graph cannot advance despite acyclic admission"
-            }
-            val finished = ready.map { node ->
-                async {
-                    semaphore.withPermit {
-                        val ctx = TaskGraphTaskContext(
-                            index = indices.getValue(node.id),
-                            node = node,
-                            dependencyOutputs = node.dependsOn.associateWith { dep ->
-                                checkNotNull(results[dep]?.output) { "Successful dependency lost output" }
+                    result
+                } else {
+                    val context = TaskGraphTaskContext(
+                        index = index,
+                        node = node,
+                        dependencyOutputs = node.dependsOn.zip(prerequisites)
+                            .associate { (dependencyId, result) ->
+                                dependencyId to checkNotNull(result.output) {
+                                    "Successful prerequisite lost its result"
+                                }
                             },
-                        )
+                    )
+                    semaphore.withPermit {
                         executeNode(
-                            ctx = ctx,
+                            ctx = context,
                             total = total,
                             completed = completed,
                             maxAttempts = maxAttempts,
@@ -147,10 +140,11 @@ class TaskGraphExecutor(
                         )
                     }
                 }
-            }.awaitAll()
-            for (result in finished) results[result.node.id] = result
+            }
         }
-        accepted.map { node -> results.getValue(node.id) }
+        // Graph admission is atomic; no model/tool executor starts during validation.
+        scheduled.values.forEach { it.start() }
+        accepted.map { node -> scheduled.getValue(node.id) }.awaitAll()
     }
 
     private suspend fun executeNode(

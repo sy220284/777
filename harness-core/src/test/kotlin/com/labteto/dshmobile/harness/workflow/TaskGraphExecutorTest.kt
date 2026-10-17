@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.harness.workflow
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -194,6 +197,61 @@ class TaskGraphExecutorTest {
         assertTrue(r.all { it.succeeded })
         assertEquals(setOf("stable-a", "stable-b"), progress.map { it.nodeId }.toSet())
         assertTrue(progress.all { it.nodeId.isNotBlank() })
+    }
+
+    @Test
+    fun dependentRunsImmediatelyWhenItsOwnPrerequisiteFinishes() = runTest {
+        val slowRelease = CompletableDeferred<Unit>()
+        val slowStarted = CompletableDeferred<Unit>()
+        val dependentStarted = CompletableDeferred<Unit>()
+        val graphRun = async {
+            graph.run(listOf(
+                TaskGraphNode("fast", "已就绪的前置任务"),
+                TaskGraphNode("slow", "无关慢任务"),
+                TaskGraphNode("dependent", "立即跟进", listOf("fast")),
+            )) { context, _ ->
+                when (context.node.id) {
+                    "fast" -> "已完成"
+                    "slow" -> {
+                        slowStarted.complete(Unit)
+                        slowRelease.await()
+                        "无关任务完成"
+                    }
+                    else -> {
+                        assertEquals("已完成", context.dependencyOutputs["fast"])
+                        dependentStarted.complete(Unit)
+                        "下一阶段完成"
+                    }
+                }
+            }
+        }
+        runCurrent()
+        assertTrue(slowStarted.isCompleted)
+        assertTrue(dependentStarted.isCompleted)
+        assertFalse(graphRun.isCompleted)
+        slowRelease.complete(Unit)
+        val result = graphRun.await()
+        assertEquals(listOf("fast", "slow", "dependent"), result.map { it.node.id })
+        assertTrue(result.all { it.succeeded })
+    }
+
+    @Test
+    fun dependentBlocksWithoutExecutionWhileUnrelatedBranchStillSucceeds() = runTest {
+        val launched = mutableListOf<String>()
+        val result = graph.run(listOf(
+            TaskGraphNode("failed", "前置失败"),
+            TaskGraphNode("dependent", "必须阻塞", listOf("failed")),
+            TaskGraphNode("independent", "无关分支"),
+        )) { context, _ ->
+            launched += context.node.id
+            if (context.node.id == "failed") "" else "已完成"
+        }
+        assertEquals(listOf("failed", "independent"), launched.sorted())
+        assertEquals(listOf(
+            TaskGraphOutcome.FAILED, TaskGraphOutcome.BLOCKED,
+            TaskGraphOutcome.COMPLETED,
+        ), result.map { it.outcome })
+        assertEquals(0, result[1].attempts)
     }
 
     @Test
