@@ -646,11 +646,11 @@ class SessionEventLog(
                 active.readFully(bytes)
                 try {
                     val recovered = SessionEventSchemaCodec.decode(
-                        json, String(bytes, Charsets.UTF_8).trimEnd('\\r'),
+                        json, String(bytes, Charsets.UTF_8).trimEnd('\r'),
                     )
                     check(recovered.sequence >= 0L)
                     active.seek(length)
-                    active.writeByte('\\n'.code)
+                    active.writeByte('\n'.code)
                     diagnosticSink("complete-tail-newline-restored", null)
                     return
                 } catch (future: UnsupportedSessionEventSchemaVersion) {
