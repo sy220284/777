@@ -1,7 +1,7 @@
 {
   "contractVersion": 1,
   "baseline": "8d4855ff",
-  "scope": "S0 源码场景审计；不是独立 UI Pack 覆盖或设备验收证明",
+  "scope": "R4 单独 V6 UI Pack + 中立 Host/Feature Port；当前仅以源码、Kotlin/Compose/JVM 契约与架构门禁签收，不要求设备/视觉验收。场景登记和Owner映射不等于173项动作行为签收。",
   "scenes": [
     {
       "id": "conversation.chat",
@@ -18,8 +18,8 @@
       ],
       "recovery": "Shared Session + Chat branch + draft + reading anchor",
       "v6": 1,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "send": {
           "ownerPort": "ChatUiPort.submit(ChatUiCommand.SendMessage)",
@@ -66,8 +66,8 @@
       ],
       "recovery": "Shared Session + Work run identity + draft",
       "v6": 2,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "send": {
           "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.SendMessage)",
@@ -102,8 +102,8 @@
       ],
       "recovery": "Session metadata + explicit delete confirmation",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "rename": {
           "ownerPort": "ConversationShellUiPort.submit(ConversationShellUiCommand.Rename)",
@@ -137,8 +137,8 @@
       ],
       "recovery": "Session EventLog cursor + message/branch anchor",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "load_older": {
           "ownerPort": "UiMessageHistoryPort.messagePage(sessionId, cursor, limit) [V6 Session Owner]",
@@ -167,8 +167,8 @@
       ],
       "recovery": "Session-keyed draft; rejected send retains input",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "send": {
           "ownerPort": "ChatUiPort.submit(ChatUiCommand.SendMessage) / WorkConversationUiPort.submit(WorkConversationUiCommand.SendMessage)",
@@ -201,8 +201,8 @@
       ],
       "recovery": "Model request/Work events; no invented percentages",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "stop": {
           "ownerPort": "ChatUiPort.submit(ChatUiCommand.Stop) / WorkConversationUiPort.submit(WorkConversationUiCommand.Stop)",
@@ -226,8 +226,8 @@
       ],
       "recovery": "Message ID + branch/variant; old interactions invalidated",
       "v6": 11,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "edit": {
           "ownerPort": "ChatUiPort.submit(ChatUiCommand.EditUserMessage) / WorkConversationUiPort.submit(WorkConversationUiCommand.EditUserMessage)",
@@ -266,8 +266,8 @@
       ],
       "recovery": "Message ID + edit draft; owner admission",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "edit_and_resend": {
           "ownerPort": "ChatUiPort.submit(ChatUiCommand.EditUserMessage) / WorkConversationUiPort.submit(WorkConversationUiCommand.EditUserMessage)",
@@ -289,8 +289,8 @@
       ],
       "recovery": "Reading position + drawer origin",
       "v6": 5,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "read": {
           "ownerPort": "UiMessageHistoryPort.messagePage(sessionId, cursor, limit)",
@@ -317,8 +317,8 @@
       ],
       "recovery": "Exact account/profile; running admission",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "select_profile": {
           "ownerPort": "SettingsUiPort.submit(SettingsUiCommand.SelectModel(profileId))",
@@ -339,8 +339,8 @@
       ],
       "recovery": "Android picker + attachment import owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "import_attachment": {
           "ownerPort": "AttachmentUiPort.import(ImportUiAttachmentCommand)",
@@ -361,8 +361,8 @@
       ],
       "recovery": "Gallery/persona identity",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "select_persona": {
           "ownerPort": "PersonaSelectionUiPort.submit(PersonaSelectionUiCommand.SelectForCurrentChat)",
@@ -384,8 +384,8 @@
       ],
       "recovery": "Persona draft; explicitly frozen model request",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "configure_persona": {
           "ownerPort": "PersonaAuthoringUiPort.create(draft) / save(galleryId, expectedRevision, draft)",
@@ -412,8 +412,8 @@
       ],
       "recovery": "Chat profile values; no invented relationship facts",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "configure_behavior": {
           "ownerPort": "CurrentPersonaUiPort.save(target, draft)",
@@ -437,8 +437,8 @@
       ],
       "recovery": "Member gallery IDs + current session",
       "v6": 10,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "configure_members": {
           "ownerPort": "ChatGroupUiPort.submit(ChatGroupUiCommand.ConfigureMembers)",
@@ -477,8 +477,8 @@
       ],
       "recovery": "Current group session + owner validation",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "save_announcement": {
           "ownerPort": "ChatGroupUiPort.submit(ChatGroupUiCommand.SaveAnnouncement)",
@@ -500,8 +500,8 @@
       ],
       "recovery": "Current turn + bounded generated suggestions",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "generate_suggestions": {
           "ownerPort": "ReplySuggestionsUiPort.generate(identity)",
@@ -529,8 +529,8 @@
       ],
       "recovery": "Chat branch identity + context generation",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "select_variant": {
           "ownerPort": "ChatUiPort.submit(ChatUiCommand.SelectVariant)",
@@ -558,8 +558,8 @@
       ],
       "recovery": "Existing pending callId + interaction waiter",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "approve": {
           "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.AnswerApproval)",
@@ -587,8 +587,8 @@
       ],
       "recovery": "Composer draft + explicit steering choice; queue/execution remain original Work owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "select_steering": {
           "ownerPort": "WorkPolicyUiPort.submit(WorkPolicyUiCommand.SetApprovalMode(identity, mode))",
@@ -616,8 +616,8 @@
       ],
       "recovery": "Existing question callId + owner waiter",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "answer_question": {
           "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.AnswerQuestion)",
@@ -644,8 +644,8 @@
       ],
       "recovery": "Real pending plan question ID",
       "v6": 19,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "answer_question": {
           "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.AnswerQuestion)",
@@ -670,8 +670,8 @@
       ],
       "recovery": "Team run/member identities + EventLog projection",
       "v6": 17,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "start_team": {
           "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.SendWithTeam)",
@@ -716,8 +716,8 @@
       ],
       "recovery": "Tool descriptions; execution authority remains owner",
       "v6": 14,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "use_capability": {
           "ownerPort": "WorkConversationUiPort.snapshot() + ConversationDraftUiPort.updateDraft(sessionId, userProvidedCapabilityRequest) + UiHostSceneNavigation.navigate(conversation.work) [draft only; subsequent Work send is separate]",
@@ -740,8 +740,8 @@
       ],
       "recovery": "Workspace relative path + project identity",
       "v6": 16,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "preview": {
           "ownerPort": "FilesUiPort.previewWorkspaceFile(relativePath)",
@@ -781,8 +781,8 @@
       ],
       "recovery": "Gallery/story identities + revision",
       "v6": 6,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "save": {
           "ownerPort": "PersonaGallerySaveUiPort.save(SavePersonaGalleryCommand)",
@@ -847,8 +847,8 @@
       ],
       "recovery": "Saved profile/story identity; draft",
       "v6": 7,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "edit": {
           "ownerPort": "PersonaStoryUiPort.submit(PersonaStoryUiCommand.SaveDetails) / PersonaGalleryUiPort.submit(PersonaGalleryUiCommand.RenameStory)",
@@ -881,8 +881,8 @@
       ],
       "recovery": "Owner profile data; no second memory store",
       "v6": 8,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "edit_world_book": {
           "ownerPort": "PersonaAuthoringUiPort.save(galleryId, expectedRevision, draft.copy(lore=...))",
@@ -905,8 +905,8 @@
       ],
       "recovery": "Explicit target IDs + confirmation",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "delete_persona": {
           "ownerPort": "PersonaGalleryDeletionUiPort.delete(DeletePersonaGalleryCommand)",
@@ -940,8 +940,8 @@
       ],
       "recovery": "Android file picker + gallery identity",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "import_portrait": {
           "ownerPort": "PersonaPortraitUiPort.submit(PersonaPortraitUiCommand.Import)",
@@ -969,8 +969,8 @@
       ],
       "recovery": "Subject ID + entry ID + expected revision",
       "v6": 9,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "correct_diary": {
           "ownerPort": "DiaryUiPort.correct(UiDiaryCorrection)",
@@ -1001,8 +1001,8 @@
       ],
       "recovery": "Task ID + durable schedule generation",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "create": {
           "ownerPort": "AutomationUiPort.submit(AutomationUiCommand.Create)",
@@ -1047,8 +1047,8 @@
       ],
       "recovery": "Task draft + generation; scheduler remains owner",
       "v6": 13,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "save_task": {
           "ownerPort": "AutomationUiPort.submit(AutomationUiCommand.Create|Update)",
@@ -1069,8 +1069,8 @@
       ],
       "recovery": "Chat target + Automation task generation",
       "v6": 12,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "configure_schedule": {
           "ownerPort": "AutomationUiPort.submit(AutomationUiCommand.Create/Update/UpdatePolicy)",
@@ -1093,8 +1093,8 @@
       ],
       "recovery": "Registry snapshot; connection health unknown until observed",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "connect": {
           "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.ConnectHttp / ToolsUiCommand.ConnectStdio)",
@@ -1128,8 +1128,8 @@
       ],
       "recovery": "Existing encrypted credential owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "save_credentials": {
           "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.ConfigureGitHub)",
@@ -1159,8 +1159,8 @@
       ],
       "recovery": "Plugin lifecycle/resource admission",
       "v6": 18,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "install": {
           "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.InstallPreset/CreateSkill/InstallGitHubSkill)",
@@ -1201,8 +1201,8 @@
       ],
       "recovery": "Media owner task/profile identity; unknown outcome no blind replay",
       "v6": 38,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "create": {
           "ownerPort": "MediaUiPort.submit(MediaUiCommand.Image|Speech|Transcribe|Video)",
@@ -1237,8 +1237,8 @@
       ],
       "recovery": "Media sidecar task ID + session origin",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "preview": {
           "ownerPort": "MediaUiPort.assetForSession(resultId, sessionId) -> V6DocumentMediaNode",
@@ -1273,8 +1273,8 @@
       ],
       "recovery": "Committed session selects mode; draft not silently dropped",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "create_chat": {
           "ownerPort": "SessionUiPort.submit(SessionUiCommand.Create(mode=INDEPENDENT, usageMode=CHAT))",
@@ -1438,8 +1438,8 @@
       ],
       "recovery": "Android grants; UI cannot manufacture authorization",
       "v6": 32,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "request_permission": {
           "ownerPort": "HostPreferencesUiPort.openSystemPermissions()",
@@ -1461,8 +1461,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1490,8 +1490,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1519,8 +1519,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1548,8 +1548,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1577,8 +1577,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1606,8 +1606,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1635,8 +1635,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1664,8 +1664,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1693,8 +1693,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1722,8 +1722,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1751,8 +1751,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1780,8 +1780,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1809,8 +1809,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1838,8 +1838,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1867,8 +1867,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1896,8 +1896,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1925,8 +1925,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1954,8 +1954,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -1983,8 +1983,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -2012,8 +2012,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -2041,8 +2041,8 @@
       ],
       "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "open": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -2070,8 +2070,8 @@
       ],
       "recovery": "Settings ROOT; existing update owner retains download/install status; standalone page retired in #697",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "check_update": {
           "ownerPort": "LocalApplicationUiHost.checkForUpdate callback passed into V6SettingsSuiteScene",
@@ -2099,8 +2099,8 @@
       ],
       "recovery": "LocalFeatureCatalog + contribution restore policy",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "navigate": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -2128,8 +2128,8 @@
       ],
       "recovery": "LocalFeatureCatalog + contribution restore policy",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "navigate": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -2157,8 +2157,8 @@
       ],
       "recovery": "LocalFeatureCatalog + contribution restore policy",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "navigate": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -2186,8 +2186,8 @@
       ],
       "recovery": "LocalFeatureCatalog + contribution restore policy",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "navigate": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -2215,8 +2215,8 @@
       ],
       "recovery": "LocalFeatureCatalog + contribution restore policy",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "navigate": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -2244,8 +2244,8 @@
       ],
       "recovery": "LocalFeatureCatalog + contribution restore policy",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "navigate": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -2273,8 +2273,8 @@
       ],
       "recovery": "LocalFeatureCatalog + contribution restore policy",
       "v6": null,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "navigate": {
           "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
@@ -2303,7 +2303,7 @@
       ],
       "recovery": "Shared Session ui.document.published sidecar + source message/context/profile/project identity; Host SavedStateHandle form values",
       "v6": null,
-      "implementation": "V6 和 Next 原生渲染；Next 不支持页面导航并明确禁用该动作；Work 运行内发布和绑定事实尚未实现",
+      "implementation": "独立 V6 文档 Renderer 接入原 Session/Work Owner；动态发布及动作契约仍需逐项核证",
       "acceptance": "协议/Schema 自动化校验；真实模型、恢复和双包业务旅程待验收",
       "actionProof": {
         "prepare_user_input": {
@@ -2338,7 +2338,7 @@
       ],
       "recovery": "One captured model route/request; actual provider usage; cancelled generation is not replayed",
       "v6": null,
-      "implementation": "V6 和 Next 显式确认后调用共享模型生成 Owner；不新增工具权限、不隐式付费重试",
+      "implementation": "独立 V6 通过原 Owner 显式确认后生成；不隐式追加收费调用或授予工具权限，组合行为待验证",
       "acceptance": "编译/协议自动化验证；真实模型收费与取消旅程待验收",
       "actionProof": {
         "acknowledge_additional_model_request": {
@@ -2367,8 +2367,8 @@
       ],
       "recovery": "Owner session identity + requirement text + origin event/log generation + file versions; selected reference is not verification",
       "v6": null,
-      "implementation": "V6/Next 原生独立渲染器已接同一 Work Port，未验证",
-      "acceptance": "待设备验收",
+      "implementation": "独立 V6 通过 Work Port 渲染；行为待 CODE_ONLY 契约验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
       "actionProof": {
         "read_references": {
           "ownerPort": "WorkEvidenceUiPort.read",
@@ -2389,12 +2389,12 @@
     {
       "referenceScene": 1,
       "semanticScene": "conversation.chat",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 2,
       "semanticScene": "conversation.work",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 3,
@@ -2404,57 +2404,57 @@
     {
       "referenceScene": 4,
       "semanticScene": "settings.usage",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 5,
       "semanticScene": "conversation.reader",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 6,
       "semanticScene": "chat.gallery",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 7,
       "semanticScene": "chat.gallery_profile",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 8,
       "semanticScene": "chat.world_book",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 9,
       "semanticScene": "chat.diary",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 10,
       "semanticScene": "chat.group_members",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 11,
       "semanticScene": "conversation.message_actions",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 12,
       "semanticScene": "automation.persona_interaction",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 13,
       "semanticScene": "automation.editor",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 14,
       "semanticScene": "work.capabilities",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 15,
@@ -2464,107 +2464,107 @@
     {
       "referenceScene": 16,
       "semanticScene": "workspace.preview",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 17,
       "semanticScene": "work.team",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 18,
       "semanticScene": "tools.plugins",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 19,
       "semanticScene": "work.plan_review",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 20,
       "semanticScene": "settings.root",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 21,
       "semanticScene": "settings.models",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 22,
       "semanticScene": "settings.model_performance",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 23,
       "semanticScene": "settings.account",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 24,
       "semanticScene": "settings.memory",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 25,
       "semanticScene": "settings.session_storage",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 26,
       "semanticScene": "settings.appearance",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 27,
       "semanticScene": "settings.permissions",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 28,
       "semanticScene": "settings.notifications",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 29,
       "semanticScene": "settings.diagnostics",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 30,
       "semanticScene": "settings.update",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 31,
       "semanticScene": "shell.onboarding",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 32,
       "semanticScene": "system.permissions",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 33,
       "semanticScene": "shell.search",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 34,
       "semanticScene": "shell.empty",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 35,
       "semanticScene": "shell.error",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 36,
       "semanticScene": "shell.notifications",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     },
     {
       "referenceScene": 37,
@@ -2574,7 +2574,7 @@
     {
       "referenceScene": 38,
       "semanticScene": "media.creation",
-      "acceptance": "待原生视觉验收"
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
     }
   ],
   "retiredScenes": [

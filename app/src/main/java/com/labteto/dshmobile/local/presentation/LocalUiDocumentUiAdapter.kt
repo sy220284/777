@@ -43,6 +43,25 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 
+/**
+ * Shared foreground fence for an explicit document deletion. The first check protects
+ * preflight; the SAME check must run again under the foreground lock immediately
+ * before the durable tombstone, after any slow EventLog read has completed.
+ */
+internal fun mayDeleteUiDocumentForForeground(
+    command: DeleteUiDocumentCommand,
+    currentIdentity: UiSessionIdentity?,
+    workMode: Boolean,
+    transitioning: Boolean,
+    visibleMessageIds: Set<String>,
+): Boolean = !transitioning && currentIdentity == command.identity &&
+    command.source.sessionId == command.identity.sessionId &&
+    command.source.contextGeneration == command.identity.contextGeneration &&
+    command.source.profileId == command.identity.profileId &&
+    command.source.projectId == command.identity.projectId &&
+    command.source.workMode == workMode &&
+    command.source.messageId in visibleMessageIds
+
 /** Host adapter dispatches only closed intentions; it never executes arbitrary model actions. */
 internal class LocalUiDocumentUiAdapter(
     scope: CoroutineScope,
@@ -353,11 +372,11 @@ internal class LocalUiDocumentUiAdapter(
         kotlinx.coroutines.withContext(Dispatchers.IO) {
             val eligible = synchronized(state.foregroundRunHandle.lock) {
                 val current = state.state.value
-                !state.sessionTransitioning &&
-                    state.uiBindingIdentity(current) == command.identity &&
-                    command.source.sessionId == command.identity.sessionId &&
-                    (current.usageMode == LocalUsageMode.WORK) == command.source.workMode &&
-                    current.messages.any { it.id == command.source.messageId }
+                mayDeleteUiDocumentForForeground(
+                    command, state.uiBindingIdentity(current),
+                    current.usageMode == LocalUsageMode.WORK, state.sessionTransitioning,
+                    current.messages.map { it.id }.toSet(),
+                )
             }
             if (!eligible) return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
             try {
@@ -367,9 +386,20 @@ internal class LocalUiDocumentUiAdapter(
                 if (record.recoveryNotice != null || record.document.revision != command.revision ||
                     record.document.source != command.source)
                     return@withContext UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
-                if (store.delete(record.document, generation.budget, knownScenes))
-                    UiDocumentReceipt.Deleted
-                else UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                // Reading the latest revision can race navigation, mode changes or
+                // Session rebinding. Never commit the tombstone on the old snapshot.
+                synchronized(state.foregroundRunHandle.lock) {
+                    val current = state.state.value
+                    if (!mayDeleteUiDocumentForForeground(
+                            command, state.uiBindingIdentity(current),
+                            current.usageMode == LocalUsageMode.WORK, state.sessionTransitioning,
+                            current.messages.map { it.id }.toSet(),
+                        ))
+                        UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                    else if (store.delete(record.document, generation.budget, knownScenes))
+                        UiDocumentReceipt.Deleted
+                    else UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { UiDocumentReceipt.Failed(failure.message) }
         }
