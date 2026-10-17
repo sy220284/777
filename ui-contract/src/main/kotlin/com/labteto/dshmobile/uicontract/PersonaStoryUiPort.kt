@@ -30,3 +30,17 @@ sealed interface UiPersonaGalleryDeletionReceipt {
 interface PersonaGalleryDeletionUiPort {
     suspend fun delete(command: DeletePersonaGalleryCommand): UiPersonaGalleryDeletionReceipt
 }
+
+/** Archive coordination is a Feature API, never a UI dependency on Chat internals. */
+sealed interface UiPersonaArchiveMutationReceipt {
+    data class Committed(
+        val sessionSyncDeferred: Boolean,
+        val portraitCleanupWarning: String? = null,
+    ) : UiPersonaArchiveMutationReceipt
+    data object Missing : UiPersonaArchiveMutationReceipt
+    data class Rejected(val reason: String?) : UiPersonaArchiveMutationReceipt
+}
+interface PersonaArchiveMutationUiPort {
+    suspend fun saveStory(command: PersonaStoryUiCommand): UiPersonaArchiveMutationReceipt
+    suspend fun deleteGallery(command: DeletePersonaGalleryCommand): UiPersonaArchiveMutationReceipt
+}

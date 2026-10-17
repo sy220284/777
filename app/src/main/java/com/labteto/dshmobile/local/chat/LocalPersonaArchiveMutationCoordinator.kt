@@ -20,41 +20,34 @@ internal class LocalPersonaArchiveMutationCoordinator(
     private val stories: PersonaStoryUiPort,
     private val gallery: PersonaGalleryDeletionUiPort,
     private val refresh: suspend () -> Unit,
-) {
-    sealed interface Receipt {
-        data class Committed(
-            val sessionSyncDeferred: Boolean,
-            val portraitCleanupWarning: String? = null,
-        ) : Receipt
-        data object Missing : Receipt
-        data class Rejected(val reason: String?) : Receipt
-    }
-
-    suspend fun saveStory(command: PersonaStoryUiCommand): Receipt =
+) : com.labteto.dshmobile.uicontract.PersonaArchiveMutationUiPort {
+    override suspend fun saveStory(command: PersonaStoryUiCommand):
+        com.labteto.dshmobile.uicontract.UiPersonaArchiveMutationReceipt =
         when (val saved = stories.submit(command)) {
             is UiPersonaStoryReceipt.Saved -> {
                 val refreshFailed = refreshCommittedArchive()
-                Receipt.Committed(
+                com.labteto.dshmobile.uicontract.UiPersonaArchiveMutationReceipt.Committed(
                     sessionSyncDeferred = saved.sessionSync == UiStorySessionSync.DEFERRED ||
                         refreshFailed,
                 )
             }
-            UiPersonaStoryReceipt.Missing -> Receipt.Missing
-            is UiPersonaStoryReceipt.Failed -> Receipt.Rejected(saved.message)
+            UiPersonaStoryReceipt.Missing -> com.labteto.dshmobile.uicontract.UiPersonaArchiveMutationReceipt.Missing
+            is UiPersonaStoryReceipt.Failed -> com.labteto.dshmobile.uicontract.UiPersonaArchiveMutationReceipt.Rejected(saved.message)
         }
 
-    suspend fun deleteGallery(command: DeletePersonaGalleryCommand): Receipt =
+    override suspend fun deleteGallery(command: DeletePersonaGalleryCommand):
+        com.labteto.dshmobile.uicontract.UiPersonaArchiveMutationReceipt =
         when (val deleted = gallery.delete(command)) {
             is UiPersonaGalleryDeletionReceipt.Deleted -> {
                 val refreshFailed = refreshCommittedArchive()
-                Receipt.Committed(
+                com.labteto.dshmobile.uicontract.UiPersonaArchiveMutationReceipt.Committed(
                     sessionSyncDeferred = deleted.sessionSync == UiStorySessionSync.DEFERRED ||
                         refreshFailed,
                     portraitCleanupWarning = deleted.portraitCleanupWarning,
                 )
             }
-            UiPersonaGalleryDeletionReceipt.Missing -> Receipt.Missing
-            is UiPersonaGalleryDeletionReceipt.Failed -> Receipt.Rejected(deleted.message)
+            UiPersonaGalleryDeletionReceipt.Missing -> com.labteto.dshmobile.uicontract.UiPersonaArchiveMutationReceipt.Missing
+            is UiPersonaGalleryDeletionReceipt.Failed -> com.labteto.dshmobile.uicontract.UiPersonaArchiveMutationReceipt.Rejected(deleted.message)
         }
 
     private suspend fun refreshCommittedArchive(): Boolean = try {

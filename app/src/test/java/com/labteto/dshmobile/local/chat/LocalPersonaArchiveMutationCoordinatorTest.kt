@@ -27,7 +27,7 @@ class LocalPersonaArchiveMutationCoordinatorTest {
             refresh = { refreshed++ },
         )
         val result = owner.saveStory(save)
-        assertEquals(LocalPersonaArchiveMutationCoordinator.Receipt.Committed(true), result)
+        assertEquals(UiPersonaArchiveMutationReceipt.Committed(true), result)
         assertEquals(1, submitted)
         assertEquals(1, refreshed)
     }
@@ -46,9 +46,9 @@ class LocalPersonaArchiveMutationCoordinatorTest {
             gallery = unusedGallery(),
             refresh = { refreshed++; error("UI cache temporarily unavailable") },
         )
-        assertEquals(LocalPersonaArchiveMutationCoordinator.Receipt.Missing, owner.saveStory(save))
+        assertEquals(UiPersonaArchiveMutationReceipt.Missing, owner.saveStory(save))
         assertEquals(0, refreshed)
-        assertEquals(LocalPersonaArchiveMutationCoordinator.Receipt.Committed(true), owner.saveStory(save))
+        assertEquals(UiPersonaArchiveMutationReceipt.Committed(true), owner.saveStory(save))
         assertEquals(2, submitted)
         assertEquals(1, refreshed)
     }
@@ -68,7 +68,7 @@ class LocalPersonaArchiveMutationCoordinatorTest {
             refresh = {},
         )
         val result = owner.deleteGallery(delete)
-        assertEquals(LocalPersonaArchiveMutationCoordinator.Receipt.Committed(
+        assertEquals(UiPersonaArchiveMutationReceipt.Committed(
             false, "orphan portrait pending"), result)
         assertEquals(1, deleted)
     }

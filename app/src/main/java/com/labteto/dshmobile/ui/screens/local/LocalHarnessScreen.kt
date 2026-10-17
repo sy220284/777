@@ -474,16 +474,10 @@ fun LocalHarnessScreen(
     val capturedTeam = viewModel.workTeamUiPort.snapshot()
     // Gallery mutations are now orchestrated by the Chat Feature; this legacy
     // adapter only displays presentation receipts and preserves prior UI actions.
-    val archiveMutations = remember(viewModel.personaStoryUiPort,
-        viewModel.personaGalleryDeletionUiPort) {
-        com.labteto.dshmobile.local.chat.LocalPersonaArchiveMutationCoordinator(
-            viewModel.personaStoryUiPort, viewModel.personaGalleryDeletionUiPort,
-            refresh = viewModel::refreshGalleryForUi,
-        )
-    }
+    val archiveMutations = viewModel.personaArchiveMutationUiPort
     suspend fun submitStory(command: com.labteto.dshmobile.uicontract.PersonaStoryUiCommand): Result<Unit> = runSuspendResult {
         when (val result = archiveMutations.saveStory(command)) {
-            is com.labteto.dshmobile.local.chat.LocalPersonaArchiveMutationCoordinator.Receipt.Committed -> {
+            is com.labteto.dshmobile.uicontract.UiPersonaArchiveMutationReceipt.Committed -> {
                 if (result.sessionSyncDeferred) {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
                         android.widget.Toast.makeText(context,
@@ -492,16 +486,16 @@ fun LocalHarnessScreen(
                     }
                 }
             }
-            com.labteto.dshmobile.local.chat.LocalPersonaArchiveMutationCoordinator.Receipt.Missing ->
+            com.labteto.dshmobile.uicontract.UiPersonaArchiveMutationReceipt.Missing ->
                 error(resources.getString(R.string.local_gallery_story_missing))
-            is com.labteto.dshmobile.local.chat.LocalPersonaArchiveMutationCoordinator.Receipt.Rejected ->
+            is com.labteto.dshmobile.uicontract.UiPersonaArchiveMutationReceipt.Rejected ->
                 error(result.reason ?: resources.getString(R.string.local_gallery_story_update_failed))
         }
     }
     suspend fun deleteGallery(id: String): Result<Unit> = runSuspendResult {
         when (val result = archiveMutations.deleteGallery(
             com.labteto.dshmobile.uicontract.DeletePersonaGalleryCommand(sendIdentity, id))) {
-            is com.labteto.dshmobile.local.chat.LocalPersonaArchiveMutationCoordinator.Receipt.Committed -> {
+            is com.labteto.dshmobile.uicontract.UiPersonaArchiveMutationReceipt.Committed -> {
                 val notices = buildList {
                     result.portraitCleanupWarning?.let { add(it) }
                     if (result.sessionSyncDeferred)
@@ -513,9 +507,9 @@ fun LocalHarnessScreen(
                             android.widget.Toast.LENGTH_LONG).show()
                     }
             }
-            com.labteto.dshmobile.local.chat.LocalPersonaArchiveMutationCoordinator.Receipt.Missing ->
+            com.labteto.dshmobile.uicontract.UiPersonaArchiveMutationReceipt.Missing ->
                 error(resources.getString(R.string.local_gallery_entry_missing))
-            is com.labteto.dshmobile.local.chat.LocalPersonaArchiveMutationCoordinator.Receipt.Rejected ->
+            is com.labteto.dshmobile.uicontract.UiPersonaArchiveMutationReceipt.Rejected ->
                 error(result.reason ?: resources.getString(R.string.local_gallery_story_update_failed))
         }
     }
