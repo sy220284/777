@@ -83,7 +83,8 @@ fun AppRoot(
             ) {
                 // Fail closed if the selected pack becomes unavailable mid-frame.
                 // The user must explicitly select legacy in Host settings to leave V6.
-                androidx.compose.material3.Text("V6 独立宿主未获准运行，请检查场景准入状态")
+                androidx.compose.material3.Text(
+                    androidx.compose.ui.res.stringResource(R.string.v6_independent_host_unavailable))
             }
         } else {
         // The application Host derives capabilities from actual Feature Owner composition,
