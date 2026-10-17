@@ -35,7 +35,11 @@ import okhttp3.OkHttpClient
  * This is process/failure isolation (same app UID), NOT a separate-UID permission sandbox.
  */
 class McpPluginWorkerService : Service() {
-    private class Instance(val transport: McpTransport) {
+    private class Instance(
+        val transport: McpTransport,
+        val owner: Messenger,
+        val calls: McpWorkerCallLedger = McpWorkerCallLedger(),
+    ) {
         @Volatile var terminalObserver: Job? = null
     }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -81,7 +85,7 @@ class McpPluginWorkerService : Service() {
                                 }
                                 else -> error("unknown worker transport")
                             }
-                            val instance = Instance(transport)
+                            val instance = Instance(transport, sender)
                             check(instances.putIfAbsent(token, instance) == null) {
                                 transport.close()
                                 "IPC duplicate transport"
@@ -95,6 +99,14 @@ class McpPluginWorkerService : Service() {
                             require(McpWorkerWire.isAllowedMethod(method) &&
                                 McpWorkerWire.validRequestSize(params)) { "IPC request budget exceeded" }
                             val instance = instances[token] ?: throw IOException("MCP worker connection closed")
+                            // The token is owned by the original reply Binder, not any
+                            // later Message that happens to repeat a transport identifier.
+                            val ticket = synchronized(instance) {
+                                if (instances[token] !== instance ||
+                                    instance.owner.binder != sender.binder) null
+                                else instance.calls.begin()
+                            } ?: throw IOException("MCP worker transport was revoked or saturated")
+                            try {
                             val result = instance.transport.request(
                                 method, json.parseToJsonElement(params) as? JsonObject
                                     ?: error("MCP arguments must be an object"))
@@ -108,9 +120,7 @@ class McpPluginWorkerService : Service() {
                                             ?.terminalEvents?.let { events ->
                                                 scope.launch {
                                                     events.collect { cause ->
-                                                        invalidate(token)
-                                                        send(sender, McpWorkerWire.TERMINATED, 0,
-                                                            token, error = cause.javaClass.simpleName)
+                                                        invalidate(token, "MCP_TRANSPORT_TERMINATED")
                                                     }
                                                 }
                                             }
@@ -120,9 +130,19 @@ class McpPluginWorkerService : Service() {
                             require(McpWorkerWire.validResponseSize(encoded)) {
                                 "MCP reply exceeds Binder budget; cannot declare success"
                             }
-                            send(sender, McpWorkerWire.RESPONSE, requestId, token, result = encoded)
+                            // CLOSE/terminal faults serialize against the final
+                            // result publish. A request completing afterwards cannot
+                            // resurrect a revoked tool or bless an unknown side effect.
+                            synchronized(instance) {
+                                if (instances[token] === instance && instance.calls.complete(ticket))
+                                    send(sender, McpWorkerWire.RESPONSE, requestId, token, result = encoded)
+                            }
+                            } finally { instance.calls.abandon(ticket) }
                         }
                         McpWorkerWire.CLOSE -> {
+                            val instance = instances[token]
+                            if (instance != null && instance.owner.binder != sender.binder)
+                                throw SecurityException("MCP worker owner identity mismatch")
                             invalidate(token)
                             send(sender, McpWorkerWire.RESPONSE, requestId, token, result = "{}")
                         }
@@ -130,7 +150,7 @@ class McpPluginWorkerService : Service() {
                 } catch (cancelled: CancellationException) { throw cancelled }
                 catch (failure: Exception) {
                     val transportFailure = failure is IOException
-                    if (transportFailure) invalidate(token)
+                    if (transportFailure) invalidate(token, "MCP_WORKER_IO_FAILURE")
                     send(sender, McpWorkerWire.RESPONSE, requestId, token,
                         error = failure.javaClass.simpleName,
                         transportError = transportFailure,
@@ -141,11 +161,17 @@ class McpPluginWorkerService : Service() {
         }
     })
 
-    private fun invalidate(token: String) {
-        instances.remove(token)?.let {
-            it.terminalObserver?.cancel()
-            runCatching { it.transport.close() }
+    private fun invalidate(token: String, reason: String? = null) {
+        val instance = instances.remove(token) ?: return
+        synchronized(instance) {
+            instance.calls.revoke()
+            instance.terminalObserver?.cancel()
         }
+        // Closing a network/process transport can block; never hold the same
+        // monitor needed to reject late result delivery during this I/O.
+        runCatching { instance.transport.close() }
+        if (reason != null)
+            send(instance.owner, McpWorkerWire.TERMINATED, 0, token, error = reason)
     }
 
     private fun send(to: Messenger, kind: Int, requestId: Int, token: String,
