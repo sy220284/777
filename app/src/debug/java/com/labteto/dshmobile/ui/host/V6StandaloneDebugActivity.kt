@@ -53,7 +53,7 @@ class V6StandaloneDebugActivity : AppCompatActivity() {
                         },
                     )
                 }
-            }            }
-
+            }
+        }
     }
 }
