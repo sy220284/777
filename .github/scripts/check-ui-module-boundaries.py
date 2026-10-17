@@ -92,6 +92,9 @@ def main() -> None:
     entry = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/host/LocalProductionUiEntry.kt").read_text(encoding="utf-8")
     if "visualFrame = { content -> V6VisualBridge(appViewModel, content) }" not in entry:
         errors.append("production V6 pack must own the appearance wrapper; neutral Host cannot do it")
+    debug = (ROOT / "app/src/debug/java/com/labteto/dshmobile/ui/host/V6StandaloneDebugActivity.kt").read_text(encoding="utf-8")
+    if "DshTheme" in debug or "visualFrame = { content -> V6VisualBridge(app, content) }" not in debug:
+        errors.append("debug V6 entry must use the same pack-scoped visual wrapper as production")
     if errors:
         for issue in errors:
             print("::error::" + issue)

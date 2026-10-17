@@ -56,7 +56,7 @@ internal fun LocalProductionUiEntry(
  * can replace this bridge without changing AppRoot or Host.
  */
 @Composable
-private fun V6VisualBridge(
+internal fun V6VisualBridge(
     appViewModel: AppViewModel,
     content: @Composable () -> Unit,
 ) {

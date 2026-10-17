@@ -10,7 +10,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.BuildConfig
 import com.labteto.dshmobile.ui.AppViewModel
-import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.uihost.ProvideUiHostSystemOperationOwner
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -36,15 +35,19 @@ class V6StandaloneDebugActivity : AppCompatActivity() {
             androidx.compose.runtime.CompositionLocalProvider(
                 com.labteto.dshmobile.uihost.LocalUiPrivateTextCipher provides privateText,
             ) {
-            ProvideUiHostSystemOperationOwner {
-                DshTheme {
+                ProvideUiHostSystemOperationOwner {
                     LocalApplicationUiHost(
                         installedPacks = remember(owner, app) {
-                            listOf(owner.pack(app.updateInstallStatus) {
-                                app.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
-                            })
+                            listOf(owner.pack(
+                                updateStatus = app.updateInstallStatus,
+                                checkForUpdate = {
+                                    app.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
+                                },
+                                visualFrame = { content -> V6VisualBridge(app, content) },
+                            ))
                         },
-                        // Use the same actual Feature capability inventory as the application root.
+                        // Use the same actual Feature capability inventory and V6
+                        // visual frame as production; only the pack preference differs.
                         availableCapabilities = owner.connectedCapabilities,
                         selectionPreferenceName = "ui_application_pack_v6_only_debug",
                         requestedSceneKey = requestedScene,
@@ -52,7 +55,6 @@ class V6StandaloneDebugActivity : AppCompatActivity() {
                         onSceneRequestProcessed = { key, _ -> owner.consumeSceneRequest(key) },
                     )
                 }
-            }
             }
         }
     }
