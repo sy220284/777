@@ -34,6 +34,8 @@ internal fun LocalProductionUiEntry(
     }
     LocalApplicationUiHost(
         installedPacks = installedPacks,
+        defaultPackId = V6_APPLICATION_UI,
+        legacyPackIds = V6_LEGACY_PACK_IDS,
         availableCapabilities = owner.connectedCapabilities,
         requestedSceneKey = requestedExternalSceneKey ?: requestedV6Scene,
         notificationSessionId = requestedLocalSessionId,
@@ -45,4 +47,3 @@ internal fun LocalProductionUiEntry(
         },
     )
 }
-

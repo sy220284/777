@@ -45,6 +45,8 @@ class V6StandaloneDebugActivity : AppCompatActivity() {
                                 },
                             ))
                         },
+                        defaultPackId = V6_APPLICATION_UI,
+                        legacyPackIds = V6_LEGACY_PACK_IDS,
                         // The same pack-owned visual frame as production; only selection differs.
                         availableCapabilities = owner.connectedCapabilities,
                         selectionPreferenceName = "ui_application_pack_v6_only_debug",
