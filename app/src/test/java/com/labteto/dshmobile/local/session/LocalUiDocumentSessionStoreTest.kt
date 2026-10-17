@@ -15,6 +15,27 @@ class LocalUiDocumentSessionStoreTest {
         UiDocumentSource("session", message, 2, "profile", null), 0,
         UiLocalDocumentData.ListItems(listOf("preserved")), budget, emptySet()).getOrThrow()
 
+    @Test fun failedOptionalCheckpointWriteDoesNotHideDurableHistory() {
+        val directory = Files.createTempDirectory("ui-doc-checkpoint-write-failure").toFile()
+        val registry = LocalSessionEventLogRegistry(directory, Json)
+        try {
+            val store = LocalUiDocumentSessionStore(registry)
+            val first = document("first")
+            assertTrue(store.publish(first, provenance, null, null, budget, emptySet()))
+            // A nonempty directory at the sidecar destination makes atomic replacement fail
+            // on every host, without depending on root/non-root permission behavior.
+            val blocked = java.io.File(directory, "session.events.jsonl.projection-ui-document-window.json")
+            assertTrue(blocked.mkdir())
+            java.io.File(blocked, "occupied").writeText("block checkpoint replacement")
+            assertEquals(first, store.read("session", setOf("first"), budget, emptySet()).single().document)
+            assertTrue(blocked.deleteRecursively())
+            // A fresh projection can still rebuild and persist from the original authority.
+            assertEquals(first, LocalUiDocumentSessionStore(registry)
+                .read("session", setOf("first"), budget, emptySet()).single().document)
+            assertNotNull(registry.get("session").readProjectionCheckpoint("ui-document-window", 1))
+        } finally { registry.get("session").close(); directory.deleteRecursively() }
+    }
+
     @Test fun coldWindowCheckpointReplaysEditsAndBatchTombstonesFromOriginalLog() {
         val directory = Files.createTempDirectory("ui-doc-cold-window").toFile()
         val registry = LocalSessionEventLogRegistry(directory, Json)

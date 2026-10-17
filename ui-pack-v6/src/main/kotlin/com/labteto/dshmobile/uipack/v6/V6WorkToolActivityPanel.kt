@@ -164,6 +164,17 @@ internal fun v6StructuredToolResultNodes(
     return nodes
 }
 
+/** Refresh the selected receipt; a replaced execution/result must be selected again explicitly. */
+internal fun v6RefreshSelectedToolActivity(
+    selected: LocalToolActivityUiItem?,
+    activities: List<LocalToolActivityUiItem>,
+): LocalToolActivityUiItem? = selected?.let { old ->
+    activities.lastOrNull {
+        it.callId == old.callId && it.executionId == old.executionId &&
+            it.finishedSequence == old.finishedSequence
+    }
+}
+
 /** Show exact Work Owner execution facts, never derive success from an arbitrary JSON payload. */
 @Composable
 internal fun V6WorkToolActivityPanel(
@@ -189,15 +200,13 @@ internal fun V6WorkToolActivityPanel(
                 }
                 if (revision == activityEpoch) {
                     activities = next
-                    if (selected != null && next.none {
-                        it.callId == selected?.callId && it.executionId == selected?.executionId &&
-                            it.finishedSequence == selected?.finishedSequence
-                    }) {
+                    val refreshed = v6RefreshSelectedToolActivity(selected, next)
+                    if (selected != null && refreshed == null) {
                         ++detailEpoch
                         loading = false
                         selected = null
                         detail = emptyList()
-                    }
+                    } else selected = refreshed
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) {

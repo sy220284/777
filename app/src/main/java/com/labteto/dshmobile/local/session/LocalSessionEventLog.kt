@@ -89,7 +89,14 @@ class LocalSessionEventLog(
     internal fun writeProjectionCheckpointIfFits(name: String, version: Int, throughSequence: Long,
         payload: String, generation: Long) {
         val value = LocalSessionProjectionCheckpoint(version, projectionIdentity(), throughSequence, payload)
-        if (checkpoints.fits(value)) writeProjectionCheckpoint(name, version, throughSequence, payload, generation)
+        if (!checkpoints.fits(value)) return
+        try {
+            writeProjectionCheckpoint(name, version, throughSequence, payload, generation)
+        } catch (failure: java.io.IOException) {
+            // This optional acceleration must never turn a successful authoritative read
+            // into a failed history load (for example when storage fills during fsync).
+            AppLog.warn("SessionProjection", "派生检查点写入失败，保留原事件日志读取结果 name=$name", failure)
+        }
     }
 
     /** Shares the native Session Owner's compare/append lock with every adapter for this path. */

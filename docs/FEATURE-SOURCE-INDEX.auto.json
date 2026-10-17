@@ -1894,7 +1894,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt",
-      "sha256": "f8ed569f690c1804"
+      "sha256": "9f6de715e208b19b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLogRegistry.kt",
@@ -4094,7 +4094,7 @@
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6WorkToolActivityPanel.kt",
-      "sha256": "5bed6b781c66e4d6"
+      "sha256": "a4fc766e320593c7"
     },
     {
       "path": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanBasics.kt",
@@ -4166,13 +4166,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "9f43929dbd10",
+  "source_snapshot": "36bde3a501e5",
   "observed_delta": {
-    "baseline": "57dfe61e28f8",
+    "baseline": "9f43929dbd10",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalApplicationUiHost.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt",
+      "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6WorkToolActivityPanel.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

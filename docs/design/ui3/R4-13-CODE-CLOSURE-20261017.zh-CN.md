@@ -121,3 +121,16 @@ Media Owner保留原账户/会话/任务、真实下载与未知收费结算；�
 当前机器台账：29项代码实现待验证、5项专项验证待执行、0项代码缺口。正式生产准入、合并、发布均未执行。
 
 实际执行的架构、性能、测试质量、Kotlin风险、UI场景矩阵、设计边界、功能树、Android安全、CI完整性及V3台账静态检查均通过；编译与Kotlin/JVM/Compose测试仍未运行。
+
+## 最新 #705 的实现完整性复核补充
+
+复核基准：`4ade8686ecd08f70fcdd0a8e117d08cf9cc7e45b`，主线 `e03573fed4a3a77f9f6db850fb0522e367a678d2`。本轮继续核对原13项的当前调用链，不将上述台账状态视为行为证明，也不将本轮范围扩大为 Agent Engine V3 的24项整项完成。
+
+本轮确认并修复两处缺口：
+
+| 缺口 | 根因与修正 | 回归源码 |
+| --- | --- | --- |
+| 历史卡片已从EventLog成功读取，却因检查点写入失败变成页面加载失败 | 可丢弃的窗口加速侧车错误地影响权威读取结果；可选写入边界只隔离并记录IOException，原日志读取、业务写入、取消及其他错误语义保留 | `LocalUiDocumentSessionStoreTest.failedOptionalCheckpointWriteDoesNotHideDurableHistory`：以非空目录阻挡原子替换，验证历史仍可读、移除冲突后可重新冷建检查点 |
+| 选中的Work工具详情保留旧授权状态 | 列表收到Owner新投影，但详情仍持有选择时的旧对象；现在同一执行与结果更新选中回执，执行替换、结果变化或记录移除则撤下旧详情 | `V6WorkToolActivityPanelTest.selectedReceiptRefreshesAuthorizationWithoutReusingAReplacedExecution`：拒绝/允许刷新、替换执行、终态变化和移除 |
+
+这两处属于原13项的恢复与展示边界补齐，不增加新权限、业务Owner或持久化事实源。功能树入口数量与归属不变，源码定位随代码同步。新增测试未运行；原13项继续为代码待验证，不能认定运行完整、验收完成或可发布。最新基准CI读取时为pending，尚无编译与行为结果。

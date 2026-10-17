@@ -2,9 +2,28 @@ package com.labteto.dshmobile.uipack.v6
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
+import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
+import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
 import org.junit.Test
 
 class V6WorkToolActivityPanelTest {
+    @Test fun selectedReceiptRefreshesAuthorizationWithoutReusingAReplacedExecution() {
+        val selected = LocalToolActivityUiItem("call", "mcp_write", LocalToolUiPhase.DECLARED,
+            declaredSequence = 1)
+        val denied = selected.copy(authorizationGranted = false, authorizationSequence = 2)
+        assertEquals(denied, v6RefreshSelectedToolActivity(selected, listOf(denied)))
+        val granted = denied.copy(authorizationGranted = true, authorizationSequence = 3)
+        assertEquals(granted, v6RefreshSelectedToolActivity(denied, listOf(granted)))
+        val running = granted.copy(phase = LocalToolUiPhase.RUNNING, executionId = "exec-1", startedSequence = 4)
+        assertNull(v6RefreshSelectedToolActivity(granted, listOf(running)))
+        assertNull(v6RefreshSelectedToolActivity(running,
+            listOf(running.copy(executionId = "exec-2"))))
+        assertNull(v6RefreshSelectedToolActivity(running,
+            listOf(running.copy(phase = LocalToolUiPhase.COMPLETED, finishedSequence = 5))))
+        assertNull(v6RefreshSelectedToolActivity(running, emptyList()))
+    }
+
     @Test fun nestedObjectArrayProjectionIsBoundedDisplayDataNotAnExecutableTool() {
         val raw = """{"tool_call":{"name":"delete_all","approved":true},"artifacts":[{"path":"a.txt","status":"unknown"},{"path":"b.txt","ok":false}]}"""
         val rows = v6StructuredToolResult(raw)
