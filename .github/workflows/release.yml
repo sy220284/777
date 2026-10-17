@@ -101,6 +101,28 @@ jobs:
           # 比对目标固定为本次触发快照，绝不追随发布期间变化的 main。
           cp .github/scripts/classify-ci-scope.py "$RUNNER_TEMP/classify-ci-scope.py"
 
+          # An explicitly retired GitHub Release must never be regenerated from
+          # an unchanged APK. Preserve the tag and source SHA as audit evidence.
+          RETIRED_TAGS=""
+          if [ -f .github/scripts/retired-releases.txt ]; then
+            while read -r retired_tag retired_sha retired_id; do
+              [ -n "$retired_tag" ] || continue
+              [[ "$retired_tag" == \#* ]] && continue
+              if [[ ! "$retired_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$ ]] ||
+                 [[ ! "$retired_sha" =~ ^[0-9a-f]{40}$ ]] ||
+                 [[ ! "$retired_id" =~ ^[0-9]+$ ]]; then
+                echo "::error::Invalid retired release ledger entry: $retired_tag"
+                exit 1
+              fi
+              RETIRED_TAGS="${RETIRED_TAGS}${retired_tag}"$'\n'
+              if release_equivalent_to_batch "$retired_sha" "$BATCH_SHA"; then
+                echo "::notice::Retired $retired_tag matches current APK; refusing to recreate it."
+                skip_release
+                exit 0
+              fi
+            done < .github/scripts/retired-releases.txt
+          fi
+
           if ! has_full_main_validation "$RELEASE_SHA"; then
             echo "本批次提交未完成主线完整 CI；寻找与本批次产物等价的已验证候选。"
             FOUND_CANDIDATE=false
@@ -143,6 +165,7 @@ jobs:
               grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$' || true
           )"
           MAX_RELEASE_TAG="$(printf '%s\n' "$RELEASE_TAGS" | sed '/^$/d' | sort -V | tail -n 1)"
+          MAX_RESERVED_TAG="$(printf '%s\n%s\n' "$MAX_RELEASE_TAG" "$RETIRED_TAGS" | sed '/^$/d' | sort -V | tail -n 1)"
 
           # Compare against the latest *published* binary, not the previous
           # Git commit. A docs-only main change cannot produce a new APK tag.
@@ -182,7 +205,7 @@ jobs:
           fi
 
           FALLBACK_VERSION="$(tr -d '\r\n' < .github/release-version)"
-          if [[ "$MAX_RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+-777\.)([0-9]+)$ ]]; then
+          if [[ "$MAX_RESERVED_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+-777\.)([0-9]+)$ ]]; then
             VERSION="${BASH_REMATCH[1]}$((BASH_REMATCH[2] + 1))"
           elif [[ "$FALLBACK_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$ ]]; then
             VERSION="$FALLBACK_VERSION"
@@ -192,10 +215,10 @@ jobs:
           fi
 
           CANDIDATE_TAG="v$VERSION"
-          if [ -n "$MAX_RELEASE_TAG" ]; then
-            HIGHEST_TAG="$(printf '%s\n%s\n' "$CANDIDATE_TAG" "$MAX_RELEASE_TAG" | sort -V | tail -n 1)"
-            if [ "$HIGHEST_TAG" != "$CANDIDATE_TAG" ] || [ "$CANDIDATE_TAG" = "$MAX_RELEASE_TAG" ]; then
-              echo "::error::拒绝生成非递增版本：$CANDIDATE_TAG <= $MAX_RELEASE_TAG"
+          if [ -n "$MAX_RESERVED_TAG" ]; then
+            HIGHEST_TAG="$(printf '%s\n%s\n' "$CANDIDATE_TAG" "$MAX_RESERVED_TAG" | sort -V | tail -n 1)"
+            if [ "$HIGHEST_TAG" != "$CANDIDATE_TAG" ] || [ "$CANDIDATE_TAG" = "$MAX_RESERVED_TAG" ]; then
+              echo "::error::拒绝生成非递增版本：$CANDIDATE_TAG <= $MAX_RESERVED_TAG"
               exit 1
             fi
           fi
