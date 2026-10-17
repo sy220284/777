@@ -203,12 +203,11 @@ internal class LocalMediaApiClient @Inject constructor(
                 if (partial.exists()) check(partial.delete()) { "旧视频片段无法删除，已中止保存" }
                 if (checkpoint.exists()) check(checkpoint.delete()) { "旧视频断点无法删除" }
             }
-            if (transfer.etag != null) {
-                checkpoint.writeText("$fingerprint\n${transfer.etag}\n")
-            } else if (checkpoint.exists()) {
+            if (transfer.etag == null && checkpoint.exists()) {
                 check(checkpoint.delete()) { "不可验证的视频断点元数据无法清除" }
             }
             var downloaded = if (transfer.append) resume!!.offset else 0L
+            var confirmedOffset = downloaded
             body.byteStream().use { input ->
                 java.io.FileOutputStream(partial, transfer.append).use { output ->
                     val buffer = ByteArray(16_384)
@@ -219,11 +218,24 @@ internal class LocalMediaApiClient @Inject constructor(
                         downloaded += n
                         require(downloaded <= 200_000_000L) { "视频超过本地保存上限" }
                         output.write(buffer, 0, n)
+                        if (transfer.etag != null && downloaded - confirmedOffset >= 32L * 1024L * 1024L) {
+                            // A crash may leave trailing bytes without a checkpoint; only
+                            // this fsynced, SHA-256 checked prefix may ever be resumed.
+                            output.fd.sync()
+                            saveLocalVideoResumeCheckpoint(partial, checkpoint, fingerprint, transfer.etag)
+                            confirmedOffset = downloaded
+                        }
                     }
                     output.fd.sync()
                 }
             }
             check(downloaded > 0L) { "视频下载为空" }
+            if (transfer.etag != null && downloaded != transfer.expectedLength &&
+                downloaded > confirmedOffset) {
+                // EOF before the advertised total is not a successful download, but
+                // these new bytes were fully persisted and can be verified on retry.
+                saveLocalVideoResumeCheckpoint(partial, checkpoint, fingerprint, transfer.etag)
+            }
             check(transfer.expectedLength == null || downloaded == transfer.expectedLength) {
                 "视频字节长度不完整，原断点保留，未生成可见成果"
             }
