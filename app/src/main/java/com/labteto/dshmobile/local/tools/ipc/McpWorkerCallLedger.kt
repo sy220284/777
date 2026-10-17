@@ -20,7 +20,9 @@ internal class McpWorkerCallLedger(
     @Synchronized
     fun begin(): Long? {
         if (!admitted || pending.size >= maxInFlight) return null
-        return ++nextTicket.also(pending::add)
+        val ticket = ++nextTicket
+        pending.add(ticket)
+        return ticket
     }
 
     /** True only if the same incarnation is still admitted at result commit. */
