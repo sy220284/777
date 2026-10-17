@@ -275,9 +275,22 @@ fun V6ToolsManagementScene(
                                     val display = field.label + (if (field.required) "（必填）" else "（可选）") +
                                         " · " + field.type
                                     if (field.type == "boolean") {
-                                        SySwitch(display, capabilityFieldValues[field.name] == "true", {
-                                            capabilityFieldValues = capabilityFieldValues + (field.name to it.toString())
+                                        SyNote(display + "：" + when (capabilityFieldValues[field.name]) {
+                                            "true" -> "是"
+                                            "false" -> "否"
+                                            else -> "尚未选择"
                                         })
+                                        SyButton("是", {
+                                            capabilityFieldValues = capabilityFieldValues + (field.name to "true")
+                                        }, style = SyButtonStyle.SECONDARY)
+                                        SyButton("否", {
+                                            capabilityFieldValues = capabilityFieldValues + (field.name to "false")
+                                        }, style = SyButtonStyle.SECONDARY)
+                                        if (!field.required) {
+                                            SyButton("清除选择", {
+                                                capabilityFieldValues = capabilityFieldValues - field.name
+                                            }, style = SyButtonStyle.GHOST)
+                                        }
                                     } else {
                                         SyInput(capabilityFieldValues[field.name].orEmpty(), {
                                             capabilityFieldValues = capabilityFieldValues + (field.name to it.take(4_096))

@@ -98,4 +98,70 @@ class V6ToolParameterFormTest {
             v6ToolArgumentsJson(schema, mapOf("query" to "a".repeat(4097)))
         }
     }
+    @Test fun nestedMandatoryFieldsFollowTheirAncestorRequirement() {
+        val s = buildJsonObject {
+            put("type", "object")
+            put("required", buildJsonArray { add(JsonPrimitive("person")) })
+            put("properties", buildJsonObject {
+                put("person", buildJsonObject {
+                    put("type", "object")
+                    put("required", buildJsonArray { add(JsonPrimitive("name")) })
+                    put("properties", buildJsonObject {
+                        put("name", buildJsonObject { put("type", "string") })
+                    })
+                })
+                put("optional", buildJsonObject {
+                    put("type", "object")
+                    put("required", buildJsonArray { add(JsonPrimitive("tag")) })
+                    put("properties", buildJsonObject {
+                        put("tag", buildJsonObject { put("type", "string") })
+                    })
+                })
+            })
+        }
+        val projected = v6ToolFormFields(s)
+        assertTrue(projected.single { it.name == "person.name" }.required)
+        assertFalse(projected.single { it.name == "optional.tag" }.required)
+        assertThrows(IllegalArgumentException::class.java) {
+            v6ToolArgumentsJson(s, mapOf("optional.tag" to "foo"))
+        }
+        assertEquals("""{"person":{"name":"A"}}""",
+            v6ToolArgumentsJson(s, mapOf("person.name" to "A")))
+    }
+
+    @Test fun formRejectsIncorrectJsonTypesAndUnselectedRequiredBoolean() {
+        val s = buildJsonObject {
+            put("type", "object")
+            put("required", buildJsonArray { add(JsonPrimitive("enabled")) })
+            put("properties", buildJsonObject {
+                put("enabled", buildJsonObject { put("type", "boolean") })
+                put("count", buildJsonObject { put("type", "integer") })
+                put("list", buildJsonObject { put("type", "array") })
+                put("object", buildJsonObject { put("type", "object") })
+            })
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            v6ToolArgumentsJson(s, emptyMap())
+        }
+        for (invalid in listOf("0", "null", "\"false\"", "[]")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                v6ToolArgumentsJson(s, mapOf("enabled" to invalid))
+            }
+        }
+        assertEquals("""{"enabled":false}""", v6ToolArgumentsJson(s, mapOf("enabled" to "false")))
+        for ((key, invalid) in listOf("count" to "1.2", "list" to "{}", "object" to "[]")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                v6ToolArgumentsJson(s, mapOf("enabled" to "true", key to invalid))
+            }
+        }
+    }
+
+    @Test fun trustedEnumerationsAlsoRejectFreeformInput() {
+        assertThrows(IllegalArgumentException::class.java) {
+            v6ToolArgumentsJson(schema, mapOf("query" to "delete-all"))
+        }
+        assertEquals("""{"query":"inspect"}""",
+            v6ToolArgumentsJson(schema, mapOf("query" to "inspect")))
+    }
+
 }

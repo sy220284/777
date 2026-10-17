@@ -27,7 +27,7 @@ internal data class V6ToolFormField(
 internal fun v6ToolFormFields(schema: JsonObject): List<V6ToolFormField> {
     val result = mutableListOf<V6ToolFormField>()
     val keys = mutableSetOf<String>()
-    fun visit(owner: JsonObject, path: List<String>, depth: Int) {
+    fun visit(owner: JsonObject, path: List<String>, depth: Int, ancestorsRequired: Boolean) {
         require(depth <= 5) { "工具对象嵌套超过五层" }
         val properties = owner["properties"] as? JsonObject ?: return
         val required = (owner["required"] as? JsonArray).orEmpty().map {
@@ -43,7 +43,7 @@ internal fun v6ToolFormFields(schema: JsonObject): List<V6ToolFormField> {
             }
             val currentPath = path + name
             if (type == "object" && field["properties"] is JsonObject) {
-                visit(field, currentPath, depth + 1)
+                visit(field, currentPath, depth + 1, ancestorsRequired && name in required)
             } else {
                 val key = currentPath.joinToString(".")
                 require(keys.add(key)) { "字段显示路径冲突：$key" }
@@ -52,7 +52,7 @@ internal fun v6ToolFormFields(schema: JsonObject): List<V6ToolFormField> {
                 }
                 require(values.size <= 32) { "枚举选项太多：$key" }
                 result += V6ToolFormField(
-                    key, type, name in required,
+                    key, type, ancestorsRequired && name in required,
                     (field["title"] as? JsonPrimitive)?.contentOrNull?.take(120) ?: key,
                     (field["description"] as? JsonPrimitive)?.contentOrNull?.take(240).orEmpty(),
                     values, currentPath,
@@ -61,7 +61,7 @@ internal fun v6ToolFormFields(schema: JsonObject): List<V6ToolFormField> {
             }
         }
     }
-    visit(schema, emptyList(), 0)
+    visit(schema, emptyList(), 0, true)
     return result
 }
 
@@ -82,7 +82,11 @@ internal fun v6ToolArgumentsJson(schema: JsonObject, values: Map<String, String>
         }
     }
     for (field in fields) {
-        val raw = values[field.name]?.takeIf { it.isNotBlank() } ?: continue
+        val raw = values[field.name]?.takeIf { it.isNotBlank() }
+        if (raw == null) {
+            require(!field.required) { "缺少必填字段：${field.label}" }
+            continue
+        }
         require(raw.length <= 4_096) { "输入字段太长：${field.name}" }
         val value = when (field.type) {
             "string" -> JsonPrimitive(raw)
@@ -91,6 +95,28 @@ internal fun v6ToolArgumentsJson(schema: JsonObject, values: Map<String, String>
                     throw IllegalArgumentException("字段需要有效的 ${field.type} JSON：${field.name}", error)
                 }
         }
+        val validType = when (field.type) {
+            "string" -> value is JsonPrimitive && value.isString
+            "boolean" -> value is JsonPrimitive && !value.isString &&
+                value.content in setOf("true", "false")
+            "integer" -> value is JsonPrimitive && !value.isString &&
+                value.content.matches(Regex("-?(0|[1-9][0-9]*)"))
+            "number" -> value is JsonPrimitive && !value.isString &&
+                value.content.matches(Regex("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?"))
+            "array" -> value is JsonArray
+            "object" -> value is JsonObject
+            else -> false
+        }
+        require(validType) { "字段类型不匹配：${field.label}（需要 ${field.type}）" }
+        var spec: JsonObject = schema
+        for (member in field.path) {
+            val properties = spec["properties"] as? JsonObject
+                ?: throw IllegalArgumentException("工具 Schema 字段结构已变化")
+            spec = properties[member] as? JsonObject
+                ?: throw IllegalArgumentException("工具 Schema 字段已失效")
+        }
+        val allowed = spec["enum"] as? JsonArray
+        require(allowed == null || value in allowed) { "字段不在许可选项中：${field.label}" }
         putPath(tree, field.path, value)
     }
     return JsonObject(tree).toString().also {
