@@ -36,13 +36,14 @@ fun AppRoot(
     }
     var standaloneSelected by remember(selection) {
         androidx.compose.runtime.mutableStateOf(
-            selection.getString("selected_pack", null) == "v6-application-migrating"
+            com.labteto.dshmobile.ui.host.isIndependentV6Selected(
+                selection.getString("selected_pack", null))
         )
     }
     androidx.compose.runtime.DisposableEffect(selection) {
         val observer = android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
             if (key == "selected_pack")
-                standaloneSelected = prefs.getString(key, null) == "v6-application-migrating"
+                standaloneSelected = com.labteto.dshmobile.ui.host.isIndependentV6Selected(prefs.getString(key, null))
         }
         selection.registerOnSharedPreferenceChangeListener(observer)
         onDispose { selection.unregisterOnSharedPreferenceChangeListener(observer) }
