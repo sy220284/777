@@ -144,7 +144,11 @@ class LocalWorkRuntime @Inject internal constructor(
             current.work.goal?.id != prepared.goalId) return false
         val log = eventLogs.get(prepared.sessionId)
         if (log.isClosed || log.historyInstanceIdentity != prepared.logIdentity || log.resetGeneration != prepared.generation) return false
-        log.append("work/requirement-evidence", buildJsonObject {
+        return log.withWriterLease {
+            if (log.isClosed || log.resetGeneration != prepared.generation ||
+                !preparedEvidenceStillCurrent(prepared) ||
+                runtimeStateStore.state.value.work.goal?.id != prepared.goalId) return@withWriterLease false
+            log.append("work/requirement-evidence", buildJsonObject {
             put("requirement_index", prepared.requirementIndex)
             put("requirement", prepared.requirement)
             prepared.goalId?.let { put("goal_id", it) }
@@ -153,8 +157,9 @@ class LocalWorkRuntime @Inject internal constructor(
             put("source_call_id", prepared.sourceCallId)
             put("sha256", prepared.version)
             put("assertion", "user_selected_reference_only")
-        })
-        return true
+            })
+            true
+        }
     }
 
     /** Same authoritative EventLog across app restarts; source version checked on display. */
@@ -246,9 +251,14 @@ class LocalWorkRuntime @Inject internal constructor(
             return false
         val log = eventLogs.get(prepared.sessionId)
         if (log.isClosed || log.historyInstanceIdentity != prepared.logIdentity ||
-            log.resetGeneration != prepared.generation ||
-            log.latestSequence() != prepared.observedSequence) return false
-        log.append("work/requirement-evidence-review", buildJsonObject {
+            log.resetGeneration != prepared.generation) return false
+        return log.withWriterLease {
+            if (log.isClosed || log.resetGeneration != prepared.generation ||
+                log.latestSequence() != prepared.observedSequence ||
+                !preparedReviewVersionStillCurrent(prepared) ||
+                runtimeStateStore.state.value.work.goal?.id != prepared.goalId)
+                return@withWriterLease false
+            log.append("work/requirement-evidence-review", buildJsonObject {
             put("goal_id", prepared.goalId)
             put("requirement_index", prepared.requirementIndex)
             put("requirement", prepared.requirement)
@@ -257,8 +267,9 @@ class LocalWorkRuntime @Inject internal constructor(
             put("sha256", prepared.version)
             put("approved_by_user", approved)
             put("assertion", "manual_content_review_only")
-        })
-        return true
+            })
+            true
+        }
     }
 
     internal fun requirementEvidenceTextChecksForUi(sessionId: String): List<LocalRequirementEvidenceTextCheck> =
@@ -296,9 +307,14 @@ class LocalWorkRuntime @Inject internal constructor(
             return false
         val log = eventLogs.get(proof.sessionId)
         if (log.isClosed || log.historyInstanceIdentity != proof.logIdentity ||
-            log.resetGeneration != proof.generation || log.latestSequence() != proof.observedSequence ||
-            !preparedReviewVersionStillCurrent(proof)) return false
-        log.append("work/requirement-evidence-text-check", buildJsonObject {
+            log.resetGeneration != proof.generation) return false
+        return log.withWriterLease {
+            if (log.isClosed || log.resetGeneration != proof.generation ||
+                log.latestSequence() != proof.observedSequence ||
+                !preparedReviewVersionStillCurrent(proof) ||
+                runtimeStateStore.state.value.work.goal?.id != proof.goalId)
+                return@withWriterLease false
+            log.append("work/requirement-evidence-text-check", buildJsonObject {
             put("goal_id", proof.goalId)
             put("requirement_index", proof.requirementIndex)
             put("artifact_path", proof.artifactPath)
@@ -307,8 +323,9 @@ class LocalWorkRuntime @Inject internal constructor(
             put("condition_sha256", value.needleSha256)
             put("contains_required_text", value.matched)
             put("assertion", "utf8_contains_only_not_work_completion")
-        })
-        return true
+            })
+            true
+        }
     }
 
     override fun planForUi(sessionId: String): com.labteto.dshmobile.uicontract.UiWorkPlanSnapshot? {
