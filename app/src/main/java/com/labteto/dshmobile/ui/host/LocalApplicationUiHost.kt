@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -47,6 +48,9 @@ import com.labteto.dshmobile.uihost.UiPackAdmissionRequirements
 import com.labteto.dshmobile.uihost.RenderHostedScene
 import com.labteto.dshmobile.uihost.UiSceneRenderAccess
 
+
+internal const val UI_PACK_RETRY_TAG = "ui-pack-retry"
+internal const val UI_PACK_EXIT_TAG = "ui-pack-exit"
 
 /** Never route a notification to Home until the Session Owner confirms the exact target. */
 internal fun localNotificationHomeReady(target: String?, snapshot: com.labteto.dshmobile.uicontract.UiSessionsSnapshot?): Boolean =
@@ -89,8 +93,9 @@ internal fun decideApplicationUi(
 }
 
 /**
- * Production entry point for eventual whole-app replacement.
- * This does not advertise a pack selector until all its real renderers exist.
+ * Production entry point for the current independent V6 whole-application pack.
+ * Multiple-pack selection remains a separate product capability; each future
+ * pack must prove its own renderers and actual Feature Port behavior.
  * An unavailable saved pack is shown explicitly, and requires a user action to reset it.
  */
 @Composable
@@ -229,30 +234,45 @@ internal fun LocalApplicationUiHost(
             }
             // An invalid restored history must not turn the application into an empty screen.
             if (result is UiSceneRenderAccess.Rejected) {
-                UnavailablePackNotice {
-                    // Explicit recovery must clear the rejected pack's saved history.
-                    preference.edit().remove(snapshotKey).commit()
-                    navigationReset += 1L
-                }
+                UnavailablePackNotice(
+                    onRetry = {
+                        // Explicit recovery must clear only the rejected pack's history.
+                        preference.edit().remove(snapshotKey).commit()
+                        navigationReset += 1L
+                    },
+                    onExit = { activity?.finish() },
+                )
             }
         }
         is LocalApplicationUiDecision.Unavailable -> {
-            UnavailablePackNotice {
-                preference.edit().putString("selected_pack", V6_APPLICATION_UI).commit()
-            }
+            UnavailablePackNotice(
+                onRetry = {
+                    // An invalid choice needs a new validated pack selection, not
+                    // Activity recreation: rebuilding the Activity discards the
+                    // existing Compose hierarchy and unrelated saved UI state.
+                    if (preference.edit().putString("selected_pack", V6_APPLICATION_UI).commit()) {
+                        selectedId = V6_APPLICATION_UI
+                    }
+                },
+                onExit = { activity?.finish() },
+            )
         }
     }
 }
 
 @Composable
-private fun UnavailablePackNotice(onSelectStable: () -> Unit) {
+private fun UnavailablePackNotice(onRetry: () -> Unit, onExit: () -> Unit) {
     Surface(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(24.dp),
             verticalArrangement = Arrangement.Center) {
             Text(stringResource(R.string.ui_pack_incompatible),
                 style = MaterialTheme.typography.titleMedium)
-            Button(onClick = onSelectStable) {
-                Text(stringResource(R.string.ui_pack_back_to_stable))
+            Text(stringResource(R.string.ui_pack_unavailable_hint))
+            Button(onClick = onRetry, modifier = Modifier.testTag(UI_PACK_RETRY_TAG)) {
+                Text(stringResource(R.string.ui_pack_retry))
+            }
+            Button(onClick = onExit, modifier = Modifier.testTag(UI_PACK_EXIT_TAG)) {
+                Text(stringResource(R.string.ui_pack_exit))
             }
         }
     }

@@ -40,7 +40,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
-/** First independent V6 application scenes; never claims that all 75 have migrated. */
+/** The independent V6 pack registers 75 required renderers; registration is not 173-action behavioral sign-off. */
 class V6ApplicationScenePack(
     private val preferences: HostPreferencesUiPort,
     private val settings: SettingsUiPort? = null,
@@ -49,10 +49,13 @@ class V6ApplicationScenePack(
     private val updateStatus: kotlinx.coroutines.flow.StateFlow<String?>? = null,
     private val checkForUpdate: (() -> Unit)? = null,
     private val secondary: V6SecondaryPorts? = null,
+    private val visualFrame: @Composable (@Composable () -> Unit) -> Unit = { body -> body() },
 ) : UiApplicationScenePack {
     @Composable
     override fun SceneFrame(state: com.labteto.dshmobile.uihost.UiSceneNavigationState,
-        content: @Composable () -> Unit) = V6SceneMotionFrame(state, content)
+        content: @Composable () -> Unit) {
+        visualFrame { V6SceneMotionFrame(state, content) }
+    }
 
     private val pages = mapOf(
         UiSceneId("settings.appearance") to V6PreferencesPage.APPEARANCE,

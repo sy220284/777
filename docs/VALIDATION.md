@@ -34,12 +34,14 @@ CI 采用 **四级风险分流、独立合并门禁、发布资格严格隔离**
 
 - L0 文档：scope 控制面与 merge-gate；修改功能树 / 验收索引时增跑 static-gates，检查树与验收凭据的一致性。
 - L1 普通源码：static-gates、受影响的 architecture-3-gates、unit-tests、build-arm64；`build-arm64` 同时编译 `:app:compileDebugAndroidTestKotlin`，避免业务 Port 变更后 Android 测试替身与导入失效漏到主线。普通 UI 和模型无关业务不重复执行双模拟器。
+- UI 模块风险分级：`:ui-contract`/`:ui-host` 生产契约修改采用完整矩阵；`:ui-pack-v6` 的场景与动作修改执行 Android 16/17，视觉组件修改执行静态、架构、模块单测和编译。影响 APK 的主线 push 始终执行完整矩阵。
+- UI 证据变更：`docs/UI-SCENE-MATRIX.json`、R4 任务清单与 UI 3.0 实施台账须执行静态门禁；UI 3.0 权威规范另外执行架构门禁；V6 设计包素材变更执行静态设计一致性检查。场景登记无法替代真实 E2E。
 - L2 跨功能底层、Android 平台/ABI、安全边界、CI/发布控制面：完整单测、架构、ARM64/x86 与 Android 16/17。androidTest 变更验证双设备，导航入口变更补 Android 16。
 - L3 正式 APK 发布：必须在**同一发布 SHA** 找到 `main` push 对应成功的完整 CI 矩阵（含 merge-gate、两套 APK、双模拟器），并与最近已发布的正式版本比较，确认实际存在影响 APK 的变更。文档/自动化独立改动不会制造正式 Release。
 
 正式 Release 以 **`main` 分支的完整 CI（push）成功事件立即触发检查**，同时保留每小时 13 分、43 分（UTC）的半小时定时兜底与手动入口；普通 PR、失败 CI 和其他分支不能授权发布。每次触发以当时的 `main` 提交为不可变快照：必须具备该发布 SHA 对应的完整 CI 验收；无影响 APK 的新变更或尚无合格候选则跳过本次。发布开始后新合并不得取消、替换或撤销正在构建的版本，改动由下一触发处理。发布任务继续串行以避免版本号与差分包冲突。GitHub Actions 定时触发可能延迟或丢失，因此它只作为兜底，不保证严格准点；CI 成功事件负责降低发布时间的不确定性。
 
-普通 PR 的产品源码在确保真实 Kotlin 编译、相关单测及专项检查的基础上执行精准集合；`main` 的所有影响发布产物的 push 强制执行完整矩阵，`workflow_dispatch` 同样强制完整（含 fixture-provenance）。发布判断与一般 CI 成功解绑，轻量 CI 无法授权 APK 发布。CI 和发布工作流自身变更必须经过真实完整矩阵，不能依赖静态关键字扫描冒充验证。
+普通 PR 的产品源码在确保真实 Kotlin 编译、相关单测及专项检查的基础上执行精准集合；**当分类器选择 device-artifacts-x86/Android16/Android17 时，PR 也必须执行并由 merge-gate 校验这些作业**。L0/L1 无设备需求的 PR 照常跳过模拟器，不强制全量。`main` 的所有影响发布产物的 push 强制执行完整矩阵，`workflow_dispatch` 同样强制完整（含 fixture-provenance）。发布判断与一般 CI 成功解绑，轻量 CI 无法授权 APK 发布。CI 和发布工作流自身变更必须经过真实完整矩阵，不能依赖静态关键字扫描冒充验证。
 
 **执行顺序**：scope 自举和范围防降级 → static-gates + architecture-3-gates 并行 → 成功后 unit-tests / ARM64 / x86 构建并行；选中的 Android 16/17 模拟器同步从当前 Run 的 x86 产物执行，最后由 merge-gate 汇总。本次必需检查必须 success，未选中可 skipped。只有 PR 的旧 CI 因更新自动取消，main 的发布候选验证不被后续文档提交取消。
 
@@ -67,7 +69,8 @@ CI 采用 **四级风险分流、独立合并门禁、发布资格严格隔离**
 - Python / Shell 自动化语法校验。
 - Android Manifest / exported component / FileProvider / 模型 HTTPS-or-loopback 安全边界。
 - UI 硬编码、Design System、通知、Kotlin 风险与构建基线。
-- 测试质量门禁：禁止禁用测试、伪断言、未审计的环境跳过与真实阻塞等待。
+- 测试质量门禁：扫描所有 Gradle 模块中的实际 JVM/Android 测试目录，包括 `ui-contract`、`ui-pack-v6`；禁止禁用测试、伪断言、未审计的环境跳过与真实阻塞等待。
+- UI 3.0 模块边界：静态核对 `ui-contract`、`ui-host`、`ui-pack-v6` 的 Gradle 依赖方向及非法 App 实现层导入；共享 UI DTO 允许复用已迁入 Contract 的历史 local.* 类型；提供反向样例并由 Kotlin 编译复核。
 - Runtime 压缩器自测。
 - 发布版本格式。
 

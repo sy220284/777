@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.uipack.v6
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -23,6 +24,7 @@ import com.labteto.dshmobile.uicontract.UiReadingAnchor
 import com.labteto.dshmobile.uicontract.*
 import com.labteto.dshmobile.uihost.UiSceneNavigationResult
 import com.shenyan.designsystem.components.*
+import com.shenyan.designsystem.foundation.SyOption
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -60,6 +62,7 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
     var editing by remember(page) { mutableStateOf<AutomationTask?>(null) }
     var remove by remember(page) { mutableStateOf<AutomationTask?>(null) }
     var taskActions by remember(page) { mutableStateOf<String?>(null) }
+    var confirmExit by remember(page) { mutableStateOf(false) }
     var prompt by remember(page) { mutableStateOf("") }
     var firstMinutes by remember(page) { mutableStateOf("60") }
     var scheduleType by remember(page) { mutableStateOf(AutomationScheduleType.ONCE) }
@@ -81,10 +84,17 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
     var busy by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    // Editor and list have very different heights. Restore the viewport when switching so
-    // "新建任务" and the editor header cannot remain outside the accessible viewport.
-    val editorScroll = rememberScrollState()
-    LaunchedEffect(editor) { editorScroll.scrollTo(0) }
+    // List and editor are distinct scroll surfaces. Reusing the same ScrollState
+    // across an editor close can leave the much shorter list offset below its
+    // actionable first row, particularly during Android window/layout transitions.
+    // Reset synchronously with the mode change instead of racing a LaunchedEffect.
+    val editorScroll = remember(editor) { androidx.compose.foundation.ScrollState(0) }
+    // Leaving a draft is distinct from Cancel: user input must not disappear
+    // because the top-level Back action or system gesture was pressed by mistake.
+    BackHandler(enabled = editor && prompt.isNotBlank()) { confirmExit = true }
+    fun requestExit() {
+        if (editor && prompt.isNotBlank()) confirmExit = true else onBack()
+    }
     fun send(command: AutomationUiCommand) {
         if (busy) return
         val admittedIdentity = owner.snapshot().context.identity
@@ -142,13 +152,27 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
         notify = task.notify
         editor = true
     }
-    Column(Modifier.fillMaxSize().verticalScroll(editorScroll).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(if (onlyChat) "人物互动自动任务" else "自动任务",
-            style = MaterialTheme.typography.titleLarge)
-        SyButton("返回", onBack, style = SyButtonStyle.GHOST)
-        feedback?.let { SyNote(it) }
-        if (!editor) {
+    // Keep Back and Cancel outside the scrolling form. A long editor must
+    // never require clicking an offscreen node to get back to the task list.
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(if (onlyChat) "人物互动自动任务" else "自动任务",
+                Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+            SyButton("返回", { requestExit() }, style = SyButtonStyle.GHOST)
+        }
+        if (editor) SyButton("取消", {
+            // An old chat draft is never reattached to the newly active session.
+            editing = null
+            prompt = ""
+            editorIdentity = owner.snapshot().context.identity
+            editor = false
+        }, modifier = Modifier.padding(horizontal = 16.dp),
+            style = SyButtonStyle.GHOST)
+        Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(editorScroll).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            feedback?.let { SyNote(it) }
+            if (!editor) {
             SyButton("新建任务", {
                 prompt = ""; firstMinutes = "60"; editing = null
                 editorIdentity = owner.snapshot().context.identity
@@ -196,19 +220,26 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
             SyInput(firstMinutes, { firstMinutes = it.filter(Char::isDigit).take(8) },
                 label = "距离下一次执行的分钟数")
             Text("排程类型", style = MaterialTheme.typography.titleMedium)
-            listOf(
-                AutomationScheduleType.ONCE to "单次",
-                AutomationScheduleType.INTERVAL to "固定间隔",
-                AutomationScheduleType.DAILY to "每天",
-                AutomationScheduleType.WEEKLY to "每周",
-                AutomationScheduleType.MONTHLY to "每月",
-                AutomationScheduleType.SILENCE to "用户静默触发",
-                AutomationScheduleType.WINDOW to "限定时间窗",
-            ).forEach { (type, label) ->
-                SyButton(label, { scheduleType = type },
-                    style = if (scheduleType == type) SyButtonStyle.PRIMARY
-                        else SyButtonStyle.GHOST)
-            }
+            // Compact dropdown keeps the primary action within reach on small phones.
+            SyGlassSelect(
+                options = listOf(
+                    AutomationScheduleType.ONCE to "单次",
+                    AutomationScheduleType.INTERVAL to "固定间隔",
+                    AutomationScheduleType.DAILY to "每天",
+                    AutomationScheduleType.WEEKLY to "每周",
+                    AutomationScheduleType.MONTHLY to "每月",
+                    AutomationScheduleType.SILENCE to "用户静默触发",
+                    AutomationScheduleType.WINDOW to "限定时间窗",
+                ).map { (type, label) -> SyOption(type.name, label) },
+                selectedId = scheduleType.name,
+                onSelect = { id ->
+                    AutomationScheduleType.entries.firstOrNull { it.name == id }?.let {
+                        scheduleType = it
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
+            )
             if (scheduleType == AutomationScheduleType.INTERVAL ||
                 scheduleType == AutomationScheduleType.SILENCE) {
                 if (scheduleType == AutomationScheduleType.INTERVAL) {
@@ -300,16 +331,24 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
                 scheduleValid && policyValid &&
                 (editing != null || mode != AutomationMode.CHAT ||
                     (chatAllowed && sameEditorChat)))
-            SyButton("取消", {
-                // An abandoned task draft from the previous conversation must not survive
-                // a user-requested cancel into another session's editor.
-                editing = null
-                prompt = ""
-                editorIdentity = owner.snapshot().context.identity
-                editor = false
-            }, style = SyButtonStyle.GHOST)
+        }
         }
     }
+    if (confirmExit) AlertDialog(
+        onDismissRequest = { confirmExit = false },
+        title = { Text("放弃未保存的自动任务？") },
+        text = { Text("当前任务指令和排程尚未提交，离开后需要重新编辑。") },
+        confirmButton = { TextButton(onClick = {
+            confirmExit = false
+            editor = false
+            editing = null
+            prompt = ""
+            onBack()
+        }) { Text("放弃并返回") } },
+        dismissButton = { TextButton(onClick = { confirmExit = false }) {
+            Text("继续编辑")
+        } },
+    )
     remove?.let { task -> AlertDialog(onDismissRequest = { remove = null },
         title = { Text("确认删除自动任务") }, text = { Text(task.prompt) },
         confirmButton = { TextButton(onClick = {

@@ -25,7 +25,12 @@
           "ownerPort": "ChatUiPort.submit(ChatUiCommand.SendMessage)",
           "receiptType": "UiCommandReceipt",
           "restoreTest": null,
-          "status": "PENDING_EVIDENCE"
+          "status": "PENDING_EVIDENCE",
+          "partialContractTests": [
+            "ui-pack-v6/src/test/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationSubmissionTest.kt#anAttachmentWithoutTextStillGoesToTheExistingChatOwner",
+            "ui-pack-v6/src/test/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationSubmissionTest.kt#trulyEmptyInputIsRefusedBeforeAnyOwnerMutation",
+            "ui-pack-v6/src/test/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationSubmissionTest.kt#rejectionAndUnknownOutcomesNeverClearTheUsersDraft"
+          ]
         },
         "edit": {
           "ownerPort": "ChatUiPort.submit(ChatUiCommand.EditUserMessage)",
@@ -51,6 +56,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -73,7 +82,10 @@
           "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.SendMessage)",
           "receiptType": "UiCommandReceipt",
           "restoreTest": null,
-          "status": "PENDING_EVIDENCE"
+          "status": "PENDING_EVIDENCE",
+          "partialContractTests": [
+            "ui-pack-v6/src/test/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationSubmissionTest.kt#workMessagesCannotAccidentallyBeSentToChatOwner"
+          ]
         },
         "stop": {
           "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.Stop)",
@@ -87,6 +99,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -123,6 +139,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -152,6 +172,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -174,7 +198,10 @@
           "ownerPort": "ChatUiPort.submit(ChatUiCommand.SendMessage) / WorkConversationUiPort.submit(WorkConversationUiCommand.SendMessage)",
           "receiptType": "UiCommandReceipt",
           "restoreTest": null,
-          "status": "PENDING_EVIDENCE"
+          "status": "PENDING_EVIDENCE",
+          "partialContractTests": [
+            "ui-pack-v6/src/test/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationSubmissionTest.kt#rejectionAndUnknownOutcomesNeverClearTheUsersDraft"
+          ]
         },
         "queue": {
           "ownerPort": "ChatUiPort.submit(ChatUiCommand.SendMessage) / WorkConversationUiPort.submit(WorkConversationUiCommand.SendMessage)",
@@ -188,6 +215,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -210,6 +241,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -253,6 +288,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -275,6 +314,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -304,6 +347,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -326,6 +373,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -370,6 +421,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -399,6 +454,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -421,6 +480,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -464,6 +527,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -486,6 +553,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -515,6 +586,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -544,6 +619,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -573,6 +652,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -602,6 +685,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -631,6 +718,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -653,6 +744,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -703,6 +798,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -725,6 +824,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -761,6 +864,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -832,6 +939,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -868,6 +979,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -890,6 +1005,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -926,6 +1045,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -955,6 +1078,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -984,6 +1111,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1034,6 +1165,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1056,6 +1191,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1078,6 +1217,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1114,6 +1257,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1143,6 +1290,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1186,6 +1337,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1222,6 +1377,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1258,6 +1417,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1294,6 +1457,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1323,6 +1490,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1352,6 +1523,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1381,6 +1556,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1403,6 +1582,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1476,6 +1659,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1505,6 +1692,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1534,6 +1725,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1563,6 +1758,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1592,6 +1791,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1621,6 +1824,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1650,6 +1857,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1679,6 +1890,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1708,6 +1923,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1737,6 +1956,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1766,6 +1989,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1795,6 +2022,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1824,6 +2055,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1853,6 +2088,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1882,6 +2121,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1911,6 +2154,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1940,6 +2187,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1969,6 +2220,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -1998,6 +2253,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -2027,6 +2286,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -2056,6 +2319,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -2085,6 +2352,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -2114,6 +2385,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -2143,6 +2418,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -2172,6 +2451,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -2201,6 +2484,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -2230,6 +2517,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -2259,6 +2550,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -2288,6 +2583,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -2324,6 +2623,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -2353,6 +2656,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     },
     {
@@ -2382,6 +2689,10 @@
           "restoreTest": null,
           "status": "PENDING_EVIDENCE"
         }
+      },
+      "rendererRegistration": {
+        "registrySource": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt",
+        "coverageTest": "app/src/test/java/com/labteto/dshmobile/ui/host/V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
       }
     }
   ],
@@ -2639,5 +2950,11 @@
       "acceptance": "不计入当前场景覆盖"
     }
   ],
-  "actionProofStatus": "PENDING_END_TO_END_VERIFICATION"
+  "actionProofStatus": "PENDING_END_TO_END_VERIFICATION",
+  "evidenceInterpretation": {
+    "legacySource": "场景 source 仅记录历史用户入口/业务落点，可能仍保留迁移前的 App 文件；不是当前 V6 渲染器实现证据。",
+    "rendererRegistration": "非 Host 场景的 rendererRegistration 记录 V6 独立包中的真实注册与全场景覆盖测试，仅证明可注册/可准入。",
+    "partialContractTests": "具名局部测试只覆盖其实际断言，不提升 actionProof.status，也不替代完整动作+失败恢复签收。",
+    "verification": "只有具备真实 Owner 交互、恢复具名测试、固定 SHA 与成功运行记录时才能人工核实再设置 VERIFIED。"
+  }
 }

@@ -60,12 +60,15 @@ class ManagedProcessAndroidTest {
         val marker = File(root, "unexpected-output")
         val workspace = LocalWorkspace(root)
 
-        val result = workspace.shell(
+        val result = workspace.shellResult(
             command = "(sleep 2; printf leftover > '${marker.absolutePath}') & wait",
             timeoutSeconds = 1,
         )
 
-        assertTrue("workspace did not return timeout: $result", result.contains("[TOOL_TIMEOUT]"))
+        // The typed ToolResult is the authoritative outcome. Human-readable shell
+        // output intentionally no longer embeds legacy "[TOOL_TIMEOUT]" markers.
+        assertTrue("workspace timeout must be an error: $result", result.isError)
+        assertEquals("TOOL_TIMEOUT", result.errorCode)
         delay(2_200)
         assertFalse("workspace descendant survived timeout", marker.exists())
     }

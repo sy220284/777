@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.host
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
@@ -74,7 +75,9 @@ class V6AutomationContextInteractionTest {
     @Test fun dailyTaskSubmittedFromV6RetainsCalendarRecurrenceAndChatIdentity() {
         val owner = AutomationOwner(first)
         show(owner)
-        compose.onNodeWithText("每天").performScrollTo().performClick()
+        // Choose the real cadence from the compact schedule selector.
+        compose.onNodeWithText("单次").performScrollTo().performClick()
+        compose.onNodeWithText("每天").performClick()
         compose.onNodeWithText("创建任务").performScrollTo().performClick()
         compose.waitUntil(10_000) { owner.submissions.size == 1 }
         compose.runOnIdle {
@@ -112,12 +115,23 @@ class V6AutomationContextInteractionTest {
         }
     }
 
+    @Test fun returningFromUnsavedAutomationRequiresExplicitDiscard() {
+        val owner = AutomationOwner(first)
+        show(owner)
+        compose.onNodeWithText("返回").performClick()
+        compose.onNodeWithText("放弃未保存的自动任务？").assertIsDisplayed()
+        compose.onNodeWithText("继续编辑").performClick()
+        compose.onNodeWithText("创建任务").assertIsEnabled()
+        compose.runOnIdle { assertTrue(owner.submissions.isEmpty()) }
+    }
+
     @Test fun restartingEditorAfterSwitchBindsOnlyTheNewOwnerIdentity() {
         val owner = AutomationOwner(first)
         show(owner)
         compose.runOnIdle { owner.change(second) }
         compose.onNodeWithText("创建任务").assertIsNotEnabled()
-        compose.onNodeWithText("取消").performClick()
+        // Cancel is now a pinned action above the scrollable, long editor.
+        compose.onNodeWithText("取消").assertIsDisplayed().performClick()
         compose.waitUntil(10_000) {
             compose.onAllNodes(androidx.compose.ui.test.hasText("新建任务")).fetchSemanticsNodes().isNotEmpty()
         }
