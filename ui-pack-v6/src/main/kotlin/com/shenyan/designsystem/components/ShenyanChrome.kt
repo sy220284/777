@@ -68,7 +68,7 @@ fun SyTopBar(
                     fontWeight = FontWeight.SemiBold,
                     color = tokens.text,
                     textAlign = TextAlign.Center,
-                    maxLines = 2,
+                    maxLines = if (androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.8f) 3 else 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -90,7 +90,9 @@ fun SyTopBar(
         if (!subtitle.isNullOrBlank()) {
             Text(subtitle, modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp),
                 color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                textAlign = TextAlign.Center,
+                maxLines = if (androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.8f) 5 else 3,
+                overflow = TextOverflow.Ellipsis)
         }
     }
 }
