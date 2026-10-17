@@ -331,6 +331,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.appcompat)
+    // AppCompat otherwise pulls an older, unverified activity module without the old UI tree.
+    // Keep the host-level Activity at the already checksum-verified version.
+    implementation("androidx.activity:activity:1.9.3")
 
     // The UI-neutral Host exposes Compose renderer contracts; no legacy screen libraries.
     implementation(platform(libs.androidx.compose.bom))
