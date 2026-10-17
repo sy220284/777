@@ -23,6 +23,10 @@ import kotlinx.coroutines.CancellationException
 internal fun isSupportedPickerAttachmentUri(scheme: String?, authority: String?): Boolean =
     scheme == "content" && !authority.isNullOrBlank()
 
+internal fun attachmentImportFailureReceipt(error: Exception): UiAttachmentReceipt =
+    if (error is SecurityException) UiAttachmentReceipt.GrantRevoked
+    else UiAttachmentReceipt.Failed(error.message)
+
 /** Platform data adaptation; the existing Session/File owner performs the only durable import. */
 @Singleton
 class LocalAttachmentUiPortComposition @Inject internal constructor(
@@ -73,8 +77,7 @@ class LocalAttachmentUiPortComposition @Inject internal constructor(
             if (!current(command)) UiAttachmentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
             else UiAttachmentReceipt.Imported(imported)
         } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: SecurityException) { UiAttachmentReceipt.GrantRevoked }
-        catch (failure: Exception) { UiAttachmentReceipt.Failed(failure.message) }
+        catch (failure: Exception) { attachmentImportFailureReceipt(failure) }
     }
 }
 
