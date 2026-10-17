@@ -46,6 +46,8 @@ class LocalWorkEvidenceSheetTest {
                 com.labteto.dshmobile.uicontract.UiCommandReceipt.NotAdmitted
             override suspend fun review(command: com.labteto.dshmobile.uicontract.ReviewWorkEvidenceCommand) =
                 com.labteto.dshmobile.uicontract.UiCommandReceipt.NotAdmitted
+            override suspend fun checkText(command: com.labteto.dshmobile.uicontract.CheckWorkEvidenceTextCommand) =
+                com.labteto.dshmobile.uicontract.UiCommandReceipt.NotAdmitted
         },
         workState = work, workspaceFiles = { emptyList() }, conversationFiles = { error("unused") },
         previewWorkspaceFile = { error("no preview") }, artifactsForUi = { emptyList() }, eventSequenceForUi = { 1L },

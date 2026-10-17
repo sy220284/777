@@ -26,14 +26,14 @@ Local Harness semantic reference: 0.2.1-alpha.1 / 5badb150...
 
 ## 仓库验收边界（与产品功能清单分离）
 
-仓库可执行验收索引只收录 **128 个已有 Kotlin @Test 直接证据的功能叶节点**，其他 318 个叶节点继续保留在 446 项权威功能树中，不进入本仓库 CI 验收目标、不可计作验收失败或通过。真实第三方账户/套餐、付费联机、物理设备辅助技术、长期电量/跨天行为由环境专项验证，不能作为仓库 CI 必过项。见 `docs/ACCEPTANCE-PLAYBOOK.zh-CN.md`。
+按本轮 `FEATURE-TREE.zh-CN.md` 与 `ACCEPTANCE-MATRIX.json` 的实际登记，**440 个功能叶节点中 125 项存在具名 Kotlin 测试映射，315 项尚无该索引映射**；125 项均为 `automated_partial`，只能证明对应断言存在且需在当前 SHA 上执行，不表示整个功能通过。无映射不等于失败，也不等于通过。真实第三方账户/套餐、付费联机、物理设备辅助技术、长期电量/跨天行为由环境专项验证，不能作为仓库 CI 必过项。见 `docs/ACCEPTANCE-PLAYBOOK.zh-CN.md`。
 
 ## CI
 
 CI 采用 **四级风险分流、独立合并门禁、发布资格严格隔离**。分类由 `.github/scripts/classify-ci-scope.py` 决定，混合变更取检查并集；未知或关键底层改动回退完整矩阵。
 
 - L0 文档：scope 控制面与 merge-gate；修改功能树 / 验收索引时增跑 static-gates，检查树与验收凭据的一致性。
-- L1 普通源码：static-gates、受影响的 architecture-3-gates、unit-tests、build-arm64。普通 UI 和模型无关业务不重复执行双模拟器。
+- L1 普通源码：static-gates、受影响的 architecture-3-gates、unit-tests、build-arm64；`build-arm64` 同时编译 `:app:compileDebugAndroidTestKotlin`，避免业务 Port 变更后 Android 测试替身与导入失效漏到主线。普通 UI 和模型无关业务不重复执行双模拟器。
 - L2 跨功能底层、Android 平台/ABI、安全边界、CI/发布控制面：完整单测、架构、ARM64/x86 与 Android 16/17。androidTest 变更验证双设备，导航入口变更补 Android 16。
 - L3 正式 APK 发布：必须在**同一发布 SHA** 找到 `main` push 对应成功的完整 CI 矩阵（含 merge-gate、两套 APK、双模拟器），并与最近已发布的正式版本比较，确认实际存在影响 APK 的变更。文档/自动化独立改动不会制造正式 Release。
 

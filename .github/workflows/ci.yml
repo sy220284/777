@@ -284,6 +284,9 @@ jobs:
       - uses: ./.github/actions/setup-runtime-cached
         with:
           abi: arm64-v8a
+      - name: Compile Android instrumentation test contracts
+        # Compile test fakes on PRs even when emulator lanes are skipped.
+        run: ./gradlew :app:compileDebugAndroidTestKotlin --stacktrace --console=plain
       - name: Lint and assemble optimized APK
         run: |
           set -euo pipefail

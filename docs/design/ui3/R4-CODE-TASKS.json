@@ -546,5 +546,18 @@
     "formalActionSignoffs": 0,
     "formalActionTotal": 173,
     "note": "不以29项源码实现或5项测试任务的数量推导全部行为完成率；本轮准入改动仍需新Head复核。"
+  },
+  "postMergeReview": {
+    "asOf": "2026-10-17",
+    "mainCommit": "e17804391ecfd185baf71a282e66d179c266d0df",
+    "mergedPr": 705,
+    "productionUi": "LocalApplicationUiHost + single admitted V6 pack",
+    "mainCiRun": "https://github.com/sy220284/777/actions/runs/39016721514",
+    "mainCiConclusion": "failure",
+    "mainCiFailure": "AndroidTest fixture/invalid import compile failure; Android 16 and 17 instrumentation did not execute",
+    "correctivePr": 733,
+    "formalActionSignoffs": 0,
+    "formalActionTotal": 173,
+    "verification": "代码实现登记和局部 CI 不能替代逐动作业务与恢复签收。原 verificationEvidence/mainlineReview 保留为合并前历史快照。"
   }
 }

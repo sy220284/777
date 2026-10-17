@@ -63,6 +63,7 @@ class LocalDynamicDocumentFeedbackTest {
             override suspend fun generateLocal(command: GenerateLocalUiDocumentCommand) = UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
             override suspend fun generate(command: GenerateUiDocumentCommand) = UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
             override suspend fun delete(command: DeleteUiDocumentCommand) = UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+            override suspend fun deleteBatch(commands: List<DeleteUiDocumentCommand>) = UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
             override fun submit(identity: UiSessionIdentity, request: UiDocumentActionRequest): UiDocumentReceipt {
                 sent += request
                 return UiDocumentReceipt.OwnerReceipt(UiCommandReceipt.Queued)

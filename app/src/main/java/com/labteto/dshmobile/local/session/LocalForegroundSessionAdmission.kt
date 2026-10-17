@@ -72,6 +72,13 @@ internal fun coordinateOwnedLocalSend(
     onStart: (LocalSessionRuntimeLease?) -> Unit,
     preownedLease: LocalSessionRuntimeLease? = null,
 ): LocalSendResult {
+    // Validate before onAccepted/enqueue/onStart. A stale edit continuation or a
+    // different session's/operation's lease must not mutate the current turn.
+    if (preownedLease != null) {
+        LocalSessionRuntimeRegistry.requireOwner(
+            preownedLease, sessionId, LocalSessionRuntimeKind.FOREGROUND,
+        )
+    }
     val ownership = if (preownedLease != null) {
         LocalForegroundSendOwnership(activeRun = visibleJobActive || workBindingActive, reservedLease = preownedLease)
     } else reserveForegroundSendOwnership(
