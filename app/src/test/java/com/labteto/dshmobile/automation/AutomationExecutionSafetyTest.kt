@@ -5,6 +5,8 @@ import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AutomationExecutionSafetyTest {
@@ -61,6 +63,67 @@ class AutomationExecutionSafetyTest {
         } finally {
             directory.deleteRecursively()
         }
+    }
+
+    @Test
+    fun scheduledAutomationCannotRestartAfterTerminalSettlement() {
+        val generation = 42L
+        val active = AutomationTask(
+            id = "scheduled", prompt = "work", createdAt = 1L, nextRunAt = 2L,
+            scheduleGeneration = generation, status = AutomationStatus.RUNNING, lastRunAt = 1_000L,
+        )
+        assertTrue(mayStartScheduledAutomation(active, generation))
+        assertTrue(ownsAutomationSettlement(active, generation, 1_000L, manualRun = false))
+        for (terminal in listOf(
+            AutomationStatus.COMPLETED, AutomationStatus.FAILED,
+            AutomationStatus.PAUSED, AutomationStatus.BLOCKED, AutomationStatus.WAITING_USER,
+        )) {
+            val finished = active.copy(status = terminal)
+            assertFalse(mayStartScheduledAutomation(finished, generation))
+            assertFalse(ownsAutomationSettlement(finished, generation, 1_000L, manualRun = false))
+        }
+    }
+
+    @Test
+    fun staleScheduledWorkerCannotSettleAnotherRunOfTheSameGeneration() {
+        val directory = Files.createTempDirectory("automation-attempt-fencing").toFile()
+        try {
+            val store = AutomationStore(directory.resolve("automations.json"), json)
+            val admitted = store.upsert(AutomationTask(
+                id = "scheduled", prompt = "work", createdAt = 1L, nextRunAt = 2L,
+                status = AutomationStatus.RUNNING, lastRunAt = 200L,
+            )).admitted
+            val generation = admitted.scheduleGeneration
+            // The next run uses the same schedule generation: that is not a run identity.
+            store.updateIf("scheduled", predicate = { it.scheduleGeneration == generation }) {
+                it.copy(status = AutomationStatus.RUNNING, lastRunAt = 300L)
+            }
+            assertNull(store.updateIf("scheduled", predicate = {
+                ownsAutomationSettlement(it, generation, 200L, manualRun = false)
+            }) { it.copy(status = AutomationStatus.COMPLETED, lastResult = "stale") })
+            assertEquals(AutomationStatus.RUNNING, store.get("scheduled")!!.status)
+            assertNull(store.get("scheduled")!!.lastResult)
+            assertNotNull(store.updateIf("scheduled", predicate = {
+                ownsAutomationSettlement(it, generation, 300L, manualRun = false)
+            }) { it.copy(status = AutomationStatus.COMPLETED, lastResult = "current") })
+            assertNull(store.updateIf("scheduled", predicate = {
+                ownsAutomationSettlement(it, generation, 300L, manualRun = false)
+            }) { it.copy(lastResult = "duplicate") })
+            assertEquals("current", store.get("scheduled")!!.lastResult)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun automationSettlementRejectsEditedGenerationAndPreservesManualContract() {
+        val task = AutomationTask(
+            id = "manual", prompt = "work", createdAt = 1L, nextRunAt = 2L,
+            scheduleGeneration = 10L, status = AutomationStatus.PAUSED,
+        )
+        assertFalse(ownsAutomationSettlement(task, 9L, 10L, manualRun = true))
+        assertTrue(ownsAutomationSettlement(task, 10L, 10L, manualRun = true))
+        assertFalse(ownsAutomationSettlement(task, 10L, 10L, manualRun = false))
     }
 
     @Test

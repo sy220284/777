@@ -341,10 +341,20 @@
         "AE4V3-12",
         "AE4V3-15"
       ],
-      "status": "not_started",
-      "code_evidence": [],
-      "tests_verified": [],
-      "notes": ""
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/automation/AutomationRun.kt",
+        "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationWorker.kt",
+        "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkerSettlementCoordinator.kt",
+        "app/src/test/java/com/labteto/dshmobile/automation/AutomationExecutionSafetyTest.kt"
+      ],
+      "tests_verified": [
+        "local App compileDebugKotlin",
+        "local AutomationExecutionSafetyTest (new replay/ownership regressions)",
+        "local 7-module JVM suite: 3165 tests, 0 failures",
+        "local architecture, performance, test-quality, Kotlin risk, CI integrity checks"
+      ],
+      "notes": "2026-10-17：启动 Automation 任务与结算重构；排程 Worker 的入场仅允许 SCHEDULED 或 RUNNING 冷恢复，历史终态不得由迟到 WorkManager 请求重启。同一 scheduleGeneration 内以原始 lastRunAt + RUNNING 构成本次执行的持久结算栅栏，所有 delivered/blocked/failed/cancelled 更新、Work session 回写通过 AutomationStore.updateIf 原子核验，防止旧 Worker 跨轮覆盖新的成功/失败及重复结算。手动运行维持 generation 合同，新增 3 项正反回归。本地 App Kotlin 编译及七模块 3165 JVM 测试 0 失败，五项静态检查通过；完整 Automation 调度/跨进程结算及本提交 SHA CI 待验收，整项 in_progress。"
     },
     {
       "id": "AE4V3-17",

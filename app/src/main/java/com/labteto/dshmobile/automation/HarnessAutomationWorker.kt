@@ -85,7 +85,7 @@ class HarnessAutomationWorker(
         )
         if (
             preflightTask.scheduleGeneration != requestedGeneration ||
-            (preflightTask.status in setOf(AutomationStatus.PAUSED, AutomationStatus.WAITING_USER) && !manualRun)
+            (!manualRun && !mayStartScheduledAutomation(preflightTask, requestedGeneration))
         ) return Result.success()
 
         // A manual request is a real user action, not a disposable probe. If another trigger owns
@@ -118,7 +118,7 @@ class HarnessAutomationWorker(
         var task = store.get(id) ?: return Result.success()
         if (
             task.scheduleGeneration != requestedGeneration ||
-            (task.status in setOf(AutomationStatus.PAUSED, AutomationStatus.WAITING_USER) && !manualRun)
+            (!manualRun && !mayStartScheduledAutomation(task, requestedGeneration))
         ) return Result.success()
 
         val recovering = !manualRun && task.status == AutomationStatus.RUNNING && task.lastRunAt != null
@@ -127,8 +127,7 @@ class HarnessAutomationWorker(
             task = store.updateIf(
                 id,
                 predicate = {
-                    it.scheduleGeneration == requestedGeneration &&
-                        it.status !in setOf(AutomationStatus.PAUSED, AutomationStatus.WAITING_USER)
+                    mayStartScheduledAutomation(it, requestedGeneration)
                 },
             ) {
                 it.copy(
@@ -148,7 +147,9 @@ class HarnessAutomationWorker(
                 ).also { sessionId ->
                     task = store.updateIf(
                         id,
-                        predicate = { it.scheduleGeneration == requestedGeneration },
+                        predicate = {
+                            ownsAutomationSettlement(it, requestedGeneration, started, manualRun)
+                        },
                     ) { current ->
                         current.copy(workSessionId = sessionId)
                     } ?: return Result.success()

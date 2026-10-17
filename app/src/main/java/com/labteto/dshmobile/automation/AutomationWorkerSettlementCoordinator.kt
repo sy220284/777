@@ -50,7 +50,9 @@ internal class AutomationWorkerSettlementCoordinator(
         var committedWaiting = false
         val updated = store.updateIf(
             id,
-            predicate = { it.scheduleGeneration == requestedGeneration },
+            predicate = {
+                ownsAutomationSettlement(it, requestedGeneration, started, manualRun)
+            },
         ) { current ->
             val userActivityDuringRun = current.lastUserActivityAt
                 ?.takeIf { it >= started }
@@ -135,7 +137,9 @@ internal class AutomationWorkerSettlementCoordinator(
         val finished = System.currentTimeMillis()
         val updated = store.updateIf(
             id,
-            predicate = { it.scheduleGeneration == requestedGeneration },
+            predicate = {
+                ownsAutomationSettlement(it, requestedGeneration, started, manualRun)
+            },
         ) { current ->
             current.copy(
                 workSessionId = sessionId ?: current.workSessionId,
@@ -177,7 +181,9 @@ internal class AutomationWorkerSettlementCoordinator(
         if (manualRun) {
             val updated = store.updateIf(
                 id,
-                predicate = { it.scheduleGeneration == requestedGeneration },
+                predicate = {
+                ownsAutomationSettlement(it, requestedGeneration, started, manualRun)
+            },
             ) { current ->
                 current.copy(
                     workSessionId = if (persistWorkSessionId) sessionId else current.workSessionId,
@@ -208,7 +214,9 @@ internal class AutomationWorkerSettlementCoordinator(
         var committedNext: Long? = null
         val updated = store.updateIf(
             id,
-            predicate = { it.scheduleGeneration == requestedGeneration },
+            predicate = {
+                ownsAutomationSettlement(it, requestedGeneration, started, manualRun)
+            },
         ) { current ->
             val nextFailureStreak = current.failureStreak.saturatingIncrement()
             autoPaused = shouldAutoPauseChatAutomation(current, nextFailureStreak)
