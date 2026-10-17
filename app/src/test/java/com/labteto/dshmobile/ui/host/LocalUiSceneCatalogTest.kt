@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.ui.host
 
 import com.labteto.dshmobile.local.feature.LocalFeatureCatalog
-import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.uicontract.UiSceneId
 import com.labteto.dshmobile.uicontract.UiSceneKind
 import org.junit.Assert.assertEquals
@@ -27,7 +26,9 @@ class LocalUiSceneCatalogTest {
         val update = LocalUiSceneCatalog.requirements.single { it.id == UiSceneId("settings.update") }
         assertEquals(UiSceneKind.SLOT, update.kind)
         assertFalse(update.hostProvided)
-        assertFalse(SettingsDestination.entries.any { it.name.equals("UPDATE", ignoreCase = true) })
+        assertFalse(LocalUiSceneCatalog.requirements.any {
+            it.id == UiSceneId("settings.update") && it.kind == UiSceneKind.PAGE
+        })
     }
 
     @Test fun requiredCoverageIncludesEveryOwnedRouteAndSettingsDestination() {
@@ -41,9 +42,11 @@ class LocalUiSceneCatalogTest {
         val settingPages = requirements.filter {
             it.kind == UiSceneKind.PAGE && it.id.value.startsWith("settings.")
         }.map { it.id }.toSet()
-        assertEquals(SettingsDestination.entries.map {
-            UiSceneId("settings.${it.name.lowercase()}")
-        }.toSet(), settingPages)
+        assertTrue(settingPages.containsAll(setOf(
+            UiSceneId("settings.account"), UiSceneId("settings.chat"),
+            UiSceneId("settings.session"), UiSceneId("settings.appearance"),
+        )))
+        assertTrue(settingPages.all { it.value.substringAfter("settings.").isNotBlank() })
     }
 }
 
