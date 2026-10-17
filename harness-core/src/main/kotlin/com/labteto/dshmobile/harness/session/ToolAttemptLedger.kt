@@ -54,6 +54,7 @@ class ToolAttemptLedger {
         var settled: Boolean = false,
         var uncertain: Boolean = false,
         var toolCallObserved: Boolean = false,
+        var admissionObserved: Boolean = false,
         var executionId: String? = null,
         var verifiedReadOnly: Boolean = false,
         var runId: String? = null,
@@ -142,7 +143,13 @@ class ToolAttemptLedger {
             "tool/execution-started" -> {
                 val id = readString(data, "id") ?: return
                 val executionId = readString(data, "execution_id")
-                val attempt = executionId?.let(byExecutionId::get) ?: track(id)
+                val known = executionId?.let(byExecutionId::get)
+                // An execution identity is immutable after its first actual admission.
+                // Replayed or delayed admissions may neither rebind a provider call ID
+                // nor rewrite the Run/read-only contract of an earlier invocation.
+                if (known != null && known.id != id) return
+                val attempt = known ?: track(id)
+                if (attempt.admissionObserved || attempt.settled || attempt.executionId != null) return
                 attempt.apply {
                     name = readString(data, "name") ?: name
                     step = stepHint ?: step
@@ -150,6 +157,7 @@ class ToolAttemptLedger {
                         this.executionId = executionId
                         byExecutionId[executionId] = this
                     }
+                    admissionObserved = true
                     val attributes = data["attributes"] as? JsonObject
                     goalId = attributes?.let { readString(it, "goal_id") } ?: goalId
                     runId = attributes?.let { readString(it, "run_id") } ?: runId

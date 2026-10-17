@@ -263,4 +263,81 @@ class ToolAttemptLedgerTest {
         assertFalse(ledger.hasUnresolvedExternalEffects("goal"))
     }
 
+
+    @Test
+    fun duplicateAdmissionCannotChangeRunOwnershipOrReadOnlyContract() {
+        val ledger = ToolAttemptLedger()
+        ledger.observe("tool/call", buildJsonObject {
+            put("id", "call"); put("goal_id", "goal"); put("execution_started", false)
+        })
+        ledger.observe("tool/execution-started", buildJsonObject {
+            put("id", "call"); put("execution_id", "exec")
+            put("attributes", buildJsonObject { put("run_id", "original-run") })
+            put("read_only", false)
+        })
+        ledger.observe("tool/execution-started", buildJsonObject {
+            put("id", "call"); put("execution_id", "exec")
+            put("attributes", buildJsonObject { put("run_id", "different-run") })
+            put("read_only", true)
+        })
+        ledger.observe("tool/execution-started", buildJsonObject {
+            put("id", "call"); put("read_only", true)
+        })
+        val attempt = ledger.pending().single()
+        assertEquals("original-run", attempt.runId)
+        assertEquals("exec", attempt.executionId)
+        assertEquals(ToolAttemptState.EXTERNAL_PENDING, attempt.state)
+        assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
+    }
+
+    @Test
+    fun secondExecutionIdentityCannotReplaceAnUnsettledAdmission() {
+        val ledger = ToolAttemptLedger()
+        ledger.observe("tool/call", buildJsonObject {
+            put("id", "call"); put("goal_id", "goal"); put("execution_started", false)
+        })
+        ledger.observe("tool/execution-started", buildJsonObject {
+            put("id", "call"); put("execution_id", "first")
+        })
+        ledger.observe("tool/execution-started", buildJsonObject {
+            put("id", "call"); put("execution_id", "second")
+        })
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "call"); put("execution_id", "second"); put("is_error", false)
+        })
+        assertEquals("first", ledger.pending().single().executionId)
+        assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "call"); put("execution_id", "first"); put("is_error", false)
+        })
+        assertTrue(ledger.pending().isEmpty())
+    }
+
+    @Test
+    fun foreignCallCannotReuseAnAlreadyBoundExecutionIdentity() {
+        val ledger = ToolAttemptLedger()
+        for (id in listOf("first-call", "second-call")) {
+            ledger.observe("tool/call", buildJsonObject {
+                put("id", id); put("goal_id", "goal"); put("execution_started", false)
+            })
+        }
+        ledger.observe("tool/execution-started", buildJsonObject {
+            put("id", "first-call"); put("execution_id", "shared")
+        })
+        ledger.observe("tool/execution-started", buildJsonObject {
+            put("id", "second-call"); put("execution_id", "shared")
+            put("read_only", true)
+        })
+        val attempts = ledger.snapshot()
+        assertEquals(2, attempts.size)
+        assertEquals("shared", attempts[0].executionId)
+        assertEquals(null, attempts[1].executionId)
+        assertEquals(ToolAttemptState.DECLARED, attempts[1].state)
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "second-call"); put("execution_id", "shared"); put("is_error", false)
+        })
+        assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
+        assertEquals("shared", ledger.pending().first().executionId)
+    }
+
 }

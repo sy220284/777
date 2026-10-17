@@ -180,7 +180,7 @@
         "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt"
       ],
       "tests_verified": [],
-      "notes": "共享 Kotlin ToolAttemptLedger 强类型状态机在 Work 和 SessionRecovery 真实生产路径接管工具执行事实；尚未重构平台 Tool Executor 权限/租约/未知副作用权威核销。；共享工具历史按单次声明保存独立 Attempt，并用 execution_id 精确对应异步回执；重复 provider callId 不能抹去先前未知副作用。SessionRecovery 保留执行实例字段，新增重复编号和乱序回执 JVM 测试。需当前 CI 验证。；工具审批和资源等待后的准入校验精确 Session 租约，执行上下文与 tool/execution-started 共享身份属性；抛出异常的已启动执行保留 executionId，避免重复 callId 乱序结算失配。待当前 SHA 单测和构建。；实际执行准入记录 read_only 与 Run/parentRun 身份，Shared ledger 区分声明/读取/外部待结算/已结算/外部未知；未知结果不被只读提示改写。后台重放检查复用 ledger 单次流式折叠，移除旧 callId 集合和全档 materialize。 此批按用户要求只做代码实现与静态复查，Kotlin 编译/测试未执行，不提高整项完成状态。 本批：明确 execution_id 不匹配或 callId 归属不符的回执不能结算当前写入。中断回执保留精确 execution_id。 仅执行静态检查，未运行 Kotlin 编译/单测。"
+      "notes": "共享 Kotlin ToolAttemptLedger 强类型状态机在 Work 和 SessionRecovery 真实生产路径接管工具执行事实；尚未重构平台 Tool Executor 权限/租约/未知副作用权威核销。；共享工具历史按单次声明保存独立 Attempt，并用 execution_id 精确对应异步回执；重复 provider callId 不能抹去先前未知副作用。SessionRecovery 保留执行实例字段，新增重复编号和乱序回执 JVM 测试。需当前 CI 验证。；工具审批和资源等待后的准入校验精确 Session 租约，执行上下文与 tool/execution-started 共享身份属性；抛出异常的已启动执行保留 executionId，避免重复 callId 乱序结算失配。待当前 SHA 单测和构建。；实际执行准入记录 read_only 与 Run/parentRun 身份，Shared ledger 区分声明/读取/外部待结算/已结算/外部未知；未知结果不被只读提示改写。后台重放检查复用 ledger 单次流式折叠，移除旧 callId 集合和全档 materialize。 此批按用户要求只做代码实现与静态复查，Kotlin 编译/测试未执行，不提高整项完成状态。 本批：明确 execution_id 不匹配或 callId 归属不符的回执不能结算当前写入。中断回执保留精确 execution_id。 仅执行静态检查，未运行 Kotlin 编译/单测。 2026-10-17：Shared ToolAttemptLedger 的准入身份在第一次真实 tool/execution-started 后不可重绑；重复、跨调用执行 ID 及迟到准入不能改写 Run/read_only 或清除未知副作用。新增 3 个 JVM 正反例；本地 :harness-core:test 和架构/性能/测试质量静态检查通过，待最新 PR SHA CI 验证；整项仍为 in_progress。"
     },
     {
       "id": "AE4V3-10",
