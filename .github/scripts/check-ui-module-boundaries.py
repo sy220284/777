@@ -18,8 +18,6 @@ IMPORT = re.compile(r'^\s*import\s+([A-Za-z0-9_.]+)', re.M)
 # Reject actual App screen imports and internal runtime/owner implementation symbols.
 APP_INTERNAL = (
     "com.labteto.dshmobile.ui.screens.",
-    "com.labteto.dshmobile.ui.shenyan.",
-    "com.labteto.dshmobile.ui.theme.",
 )
 APP_IMPL_SYMBOLS = {
     "LocalHarnessViewModel", "LocalFeatureUiActions", "LocalRuntimeKernel",
@@ -40,7 +38,8 @@ def import_errors(module: str, content: str) -> list[str]:
             name.startswith(("android.", "androidx.", "com.shenyan.designsystem.", "com.labteto.dshmobile.uipack."))
             if module == "ui-contract" else
             (name.startswith(APP_INTERNAL) or name.rsplit(".", 1)[-1] in APP_IMPL_SYMBOLS) or
-            (module == "ui-host" and name.startswith(("com.shenyan.designsystem.", "com.labteto.dshmobile.uipack."))) or
+            (module == "ui-host" and name.startswith(("com.shenyan.designsystem.", "com.labteto.dshmobile.uipack.",
+                 "com.labteto.dshmobile.ui.shenyan.", "com.labteto.dshmobile.ui.theme."))) or
             (module == "ui-pack-v6" and name.startswith("com.labteto.dshmobile.uipack.") and
              not name.startswith("com.labteto.dshmobile.uipack.v6."))
         )
@@ -89,12 +88,20 @@ def main() -> None:
     for symbol in forbidden_root:
         if re.search(r"\b" + symbol + r"\b", root):
             errors.append(f"AppRoot: pack-specific visual or owner reference {symbol}")
+    # The pack owns the real theme, typography, wallpaper and animation sources.
+    visual_root = ROOT / "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/ui/theme"
+    old_root = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/theme"
+    for name in ("Theme.kt", "AppBackground.kt", "Type.kt", "Animation.kt"):
+        if not (visual_root / name).is_file() or (old_root / name).exists():
+            errors.append(f"V6 visual ownership invalid: {name}")
     entry = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/host/LocalProductionUiEntry.kt").read_text(encoding="utf-8")
-    if "visualFrame = { content -> V6VisualBridge(appViewModel, content) }" not in entry:
-        errors.append("production V6 pack must own the appearance wrapper; neutral Host cannot do it")
     debug = (ROOT / "app/src/debug/java/com/labteto/dshmobile/ui/host/V6StandaloneDebugActivity.kt").read_text(encoding="utf-8")
-    if "DshTheme" in debug or "visualFrame = { content -> V6VisualBridge(app, content) }" not in debug:
-        errors.append("debug V6 entry must use the same pack-scoped visual wrapper as production")
+    for path, content in (("production", entry), ("debug", debug)):
+        if any(symbol in content for symbol in ("DshTheme", "V6VisualBridge", "visualFrame =")):
+            errors.append(f"{path}: V6 rendering leaked back into the application installer")
+    frame = (ROOT / "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt").read_text(encoding="utf-8")
+    if "V6VisualFrame(appearance)" not in frame:
+        errors.append("V6 pack must render its own visual frame")
     if errors:
         for issue in errors:
             print("::error::" + issue)

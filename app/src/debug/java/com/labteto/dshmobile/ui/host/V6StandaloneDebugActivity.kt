@@ -43,11 +43,9 @@ class V6StandaloneDebugActivity : AppCompatActivity() {
                                 checkForUpdate = {
                                     app.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
                                 },
-                                visualFrame = { content -> V6VisualBridge(app, content) },
                             ))
                         },
-                        // Use the same actual Feature capability inventory and V6
-                        // visual frame as production; only the pack preference differs.
+                        // The same pack-owned visual frame as production; only selection differs.
                         availableCapabilities = owner.connectedCapabilities,
                         selectionPreferenceName = "ui_application_pack_v6_only_debug",
                         requestedSceneKey = requestedScene,
