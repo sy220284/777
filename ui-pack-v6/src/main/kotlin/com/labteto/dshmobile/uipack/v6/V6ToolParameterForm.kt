@@ -42,7 +42,7 @@ private fun v6TrustedRequiredKeys(
             ?: throw IllegalArgumentException("工具 Schema 必填字段必须是字符串")
     }
     require(names.size == names.toSet().size) { "工具 Schema 必填字段重复" }
-    if (properties != null) require(names.all { it in properties }) {
+    require(names.isEmpty() || (properties != null && names.all { it in properties })) {
         "工具 Schema 必填字段未在 properties 中声明"
     }
     return names.toSet()
