@@ -3,7 +3,7 @@ package com.labteto.dshmobile.ui.host
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import android.util.Base64
+import java.util.Base64
 import java.nio.ByteBuffer
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -95,17 +95,19 @@ internal object LocalUiDraftCipher {
         val encrypted = cipher.doFinal(plain)
         val iv = cipher.iv
         require(iv.size == 12)
-        return Base64.encodeToString(ByteBuffer.allocate(1 + iv.size + encrypted.size)
-            .put(1.toByte()).put(iv).put(encrypted).array(), Base64.NO_WRAP)
+        return Base64.getEncoder().encodeToString(ByteBuffer.allocate(1 + iv.size + encrypted.size)
+            .put(1.toByte()).put(iv).put(encrypted).array())
     }
 
     fun decrypt(key: SecretKey, blob: String, domain: String): ByteArray {
-        val bytes = Base64.decode(blob, Base64.NO_WRAP)
-        require(bytes.size in 30..(256 * 1024)) { "加密草稿长度错误" }
+        val bytes = Base64.getDecoder().decode(blob)
+        require(bytes.size in 29..(256 * 1024)) { "加密草稿长度错误" }
         val buffer = ByteBuffer.wrap(bytes)
         require(buffer.get().toInt() == 1) { "加密草稿版本不受支持" }
-        val iv = ByteArray(12).also(buffer::get)
-        val ciphertext = ByteArray(buffer.remaining()).also(buffer::get)
+        val iv = ByteArray(12)
+        buffer.get(iv)
+        val ciphertext = ByteArray(buffer.remaining())
+        buffer.get(ciphertext)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv))
         cipher.updateAAD(domain.toByteArray(Charsets.UTF_8))
