@@ -2,9 +2,9 @@ package com.labteto.dshmobile.uipack.zhaoxi
 
 import com.labteto.dshmobile.uicontract.UI_CONTRACT_VERSION
 import com.labteto.dshmobile.uicontract.UiSceneId
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import org.junit.Test
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 
 /**
  * 朝夕包结构一致性回归（E8.14 实装）。
@@ -23,16 +23,13 @@ class ZhaoxiPackCoverageTest {
 
     @Test
     fun fullInventoryMatchesMergedCatalog() {
-        assertEquals(75, ZhaoxiUiPackManifest.fullSceneIds.size,
-            "朝夕 75 场景目标清单与 LocalUiSceneCatalog 非 hostProvided 全集不一致")
-        assertEquals(37, ZhaoxiUiPackManifest.fullCapabilityIds.size,
-            "朝夕 37 能力目标清单与 LocalUiConnectedCapabilities 投影不一致")
+        assertEquals("朝夕 75 场景目标清单与 LocalUiSceneCatalog 非 hostProvided 全集不一致", 75, ZhaoxiUiPackManifest.fullSceneIds.size)
+        assertEquals("朝夕 37 能力目标清单与 LocalUiConnectedCapabilities 投影不一致", 37, ZhaoxiUiPackManifest.fullCapabilityIds.size)
     }
 
     @Test
     fun inventoryNeverDeclaresHostServices() {
-        assertTrue((ZhaoxiUiPackManifest.fullSceneIds intersect hostProvided).isEmpty(),
-            "朝夕不得声明 hostProvided 场景（conversation.attachments / shell.notifications / system.permissions）")
+        assertTrue("朝夕不得声明 hostProvided 场景（conversation.attachments / shell.notifications / system.permissions）", (ZhaoxiUiPackManifest.fullSceneIds intersect hostProvided).isEmpty())
     }
 
     @Test
