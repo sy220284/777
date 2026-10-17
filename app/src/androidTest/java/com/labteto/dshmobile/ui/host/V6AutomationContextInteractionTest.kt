@@ -75,7 +75,9 @@ class V6AutomationContextInteractionTest {
     @Test fun dailyTaskSubmittedFromV6RetainsCalendarRecurrenceAndChatIdentity() {
         val owner = AutomationOwner(first)
         show(owner)
-        compose.onNodeWithText("每天").performScrollTo().performClick()
+        // Choose the real cadence from the compact schedule selector.
+        compose.onNodeWithText("单次").performScrollTo().performClick()
+        compose.onNodeWithText("每天").performClick()
         compose.onNodeWithText("创建任务").performScrollTo().performClick()
         compose.waitUntil(10_000) { owner.submissions.size == 1 }
         compose.runOnIdle {

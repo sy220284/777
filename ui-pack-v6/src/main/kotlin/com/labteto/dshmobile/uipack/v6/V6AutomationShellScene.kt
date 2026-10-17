@@ -23,6 +23,7 @@ import com.labteto.dshmobile.uicontract.UiReadingAnchor
 import com.labteto.dshmobile.uicontract.*
 import com.labteto.dshmobile.uihost.UiSceneNavigationResult
 import com.shenyan.designsystem.components.*
+import com.shenyan.designsystem.foundation.SyOption
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -211,19 +212,26 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
             SyInput(firstMinutes, { firstMinutes = it.filter(Char::isDigit).take(8) },
                 label = "距离下一次执行的分钟数")
             Text("排程类型", style = MaterialTheme.typography.titleMedium)
-            listOf(
-                AutomationScheduleType.ONCE to "单次",
-                AutomationScheduleType.INTERVAL to "固定间隔",
-                AutomationScheduleType.DAILY to "每天",
-                AutomationScheduleType.WEEKLY to "每周",
-                AutomationScheduleType.MONTHLY to "每月",
-                AutomationScheduleType.SILENCE to "用户静默触发",
-                AutomationScheduleType.WINDOW to "限定时间窗",
-            ).forEach { (type, label) ->
-                SyButton(label, { scheduleType = type },
-                    style = if (scheduleType == type) SyButtonStyle.PRIMARY
-                        else SyButtonStyle.GHOST)
-            }
+            // Compact dropdown keeps the primary action within reach on small phones.
+            SyGlassSelect(
+                options = listOf(
+                    AutomationScheduleType.ONCE to "单次",
+                    AutomationScheduleType.INTERVAL to "固定间隔",
+                    AutomationScheduleType.DAILY to "每天",
+                    AutomationScheduleType.WEEKLY to "每周",
+                    AutomationScheduleType.MONTHLY to "每月",
+                    AutomationScheduleType.SILENCE to "用户静默触发",
+                    AutomationScheduleType.WINDOW to "限定时间窗",
+                ).map { (type, label) -> SyOption(type.name, label) },
+                selectedId = scheduleType.name,
+                onSelect = { id ->
+                    AutomationScheduleType.entries.firstOrNull { it.name == id }?.let {
+                        scheduleType = it
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
+            )
             if (scheduleType == AutomationScheduleType.INTERVAL ||
                 scheduleType == AutomationScheduleType.SILENCE) {
                 if (scheduleType == AutomationScheduleType.INTERVAL) {
