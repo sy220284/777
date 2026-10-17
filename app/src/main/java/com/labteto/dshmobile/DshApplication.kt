@@ -14,6 +14,7 @@ import com.labteto.dshmobile.update.UpdateCache
 import dagger.hilt.android.HiltAndroidApp
 import java.io.File
 import javax.inject.Inject
+import javax.inject.Provider
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,8 +25,11 @@ import kotlinx.coroutines.launch
 @HiltAndroidApp
 class DshApplication : Application() {
 
-    @Inject lateinit var hostsStore: HostsStore
-    @Inject lateinit var localRuntimeKernel: LocalRuntimeKernel
+    // Hilt injects the providers without eagerly constructing the main-process
+    // runtime. The dedicated :mcp_worker process must never create the Agent
+    // singleton graph just by instantiating this Application class.
+    @Inject lateinit var hostsStoreProvider: Provider<HostsStore>
+    @Inject lateinit var localRuntimeKernelProvider: Provider<LocalRuntimeKernel>
 
     private val maintenanceScope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, error ->
@@ -41,6 +45,7 @@ class DshApplication : Application() {
         if (isMcpWorkerProcess(Application.getProcessName(), packageName)) return
         AppLog.configurePersistence(File(filesDir, "diagnostics/app-log.tsv"))
         AppLog.installUnhandledExceptionLogger()
+        val hostsStore = hostsStoreProvider.get()
         // Load the existing on-device Model Owner policy before either Legacy or V6 Pack
         // renders settings. This is idempotent and does not create a second store.
         LocalModelPerformanceControls.attach(this)
@@ -51,7 +56,7 @@ class DshApplication : Application() {
         )
         // Cancel relay reconnect work left by older installations.
         WorkManager.getInstance(this).cancelUniqueWork("dsh-keep-alive")
-        localRuntimeKernel.start()
+        localRuntimeKernelProvider.get().start()
 
         // Legacy update files are removed immediately. A verified APK that has already been handed
         // to Android's installer is kept only until either this installed build reaches the target
