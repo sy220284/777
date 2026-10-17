@@ -41,3 +41,10 @@
 - 本轮查阅 UI Host、设置导航及返回、自动任务编辑与未保存保护、会话冷启动、弹窗与工作入口、文档重试、插件入口等已有设备交互测试的断言与标签。此前 312 项中 310 项通过，仅可证明已覆盖的行为；未执行到的人工视觉操作与全部 173 个 UI 动作不可据此标记验证完成。未在已核查的其他测试中确认相同的旧 UI Host 资源键误用。
 - **统一修复路径：** UI Host 的恢复提示、重试、退出提示均使用同一处 `R.string` 资源；两按钮建立稳定 Compose 语义标签，测试分别检查当前可见文案和真实点击目标，继续验证损坏快照恢复到 Home、无效 Pack 不进入旧 Shell 且持久化选择回到 V6。错误提示改为同时适用“包缺失”和“导航快照损坏”的中性描述，避免误导。
 - 必须按**修复后新提交 SHA** 重跑 Android 16、Android 17 和 merge-gate，必要时修复重试 Activity 重建与 Compose 测试生命周期不一致问题。不得将源代码修补、编译成功或旧 310/312 当作设备签收；不关闭失败测试、不下调门禁。
+
+## 2026-10-17 后续代码修复与真实设备阻断（PR #736）
+
+- #735 的 Android16/17 作业运行 312 项测试，均有 1 项失败：`LocalApplicationUiHostInstrumentedTest.invalidChoiceIsRejectedWithoutChangingTheV6RecoveryRule`。Android17 失败堆栈在测试第 157 行找不到 Compose hierarchy；根因是失效 UI 包「重试」分支调用 `activity.recreate()`，测试活动重建后并不会自动重新安装 `createComposeRule.setContent`。
+- #736 的源代码修复将失效包重试改为 **仅在 selected_pack 写入成功后更新宿主选包 Compose 状态**，不重建 Activity；同一界面树中的原 Owner、Host 及其他状态不被无故销毁。仍需 Android16/17 当前 SHA 的真实设备运行成功才能关闭缺口。
+- 中立 `AppRoot` → `LocalProductionUiEntry` → `LocalApplicationUiHost` → `V6ApplicationScenePack.SceneFrame` 是新的装配顺序。V6 现行主题参数保持一致，但主题实现尚未物理移动到 V6 模块，后续需要全量字体/壁纸/动效的等价回归。
+- 173 项用户动作的正式端到端/冷恢复签收维持 **0/173**，不得由 312 项 Android 仪表通过（若以后通过）推导全部动作已验收。

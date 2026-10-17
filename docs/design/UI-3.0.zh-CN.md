@@ -210,3 +210,11 @@ V6 独立包必须完成 75 个必需场景与 173 项动作的真实等价验�
 ## 12. 当前执行状态
 
 **规范已定义；R4 独立 V6 的代码装配已投入生产，行为验收仍未闭环。** 当前 `AppRoot` 仅装配 `LocalApplicationUiHost` 和单一 `V6ApplicationScenePack`；旧 Legacy Shell 入口已退役，不能再作为回退路径或独立包尚未安装的依据。`75/75` 必需场景已注册，但 `173/173` 动作仍缺正式行为签收；主线 Android 16/17 模拟器用例曾失败，#734 的 PR 作业未执行设备测试，不能以该 PR 的绿色 merge-gate 宣称设备验证完成。视觉主题仍从 `AppRoot/DshTheme` 注入，尚待按 UI Pack 所有权目标迁移与回归。Next/双 UI 切换不在 R4 范围，阶段、源码和当前证据见 [实施台账](../UI-3.0-IMPLEMENTATION.zh-CN.md) 和 [#734 审计记录](ui3/R4-POSTMERGE-RECHECK-20261017.zh-CN.md)。
+
+## 13. 2026-10-17 可插拔装配入口整改（PR #736，待验收）
+
+- 生产 `AppRoot` 不再直接实例化 V6 的 ViewModel 或在所有 UI 包外包裹 `DshTheme`；`LocalProductionUiEntry` 是唯一生产 UI 包安装点，`LocalApplicationUiHost` 仍保持中立的场景准入、导航与恢复职责。
+- 现有 `DshTheme` 参数及读写由 V6 专属 `V6VisualBridge` 原样提供，通过 `V6ApplicationScenePack.SceneFrame` 组合后作用于 V6 场景。未来不同 UI 包不会被 Host 强制使用 V6 的色板、背景、字体及动画。
+- **仍未完成**：`DshTheme / AppBackground / Type` 实现源文件仍位于 `:app`，视觉桥接尚未下沉为完全独立的 `:ui-pack-v6` 自有实现；不得把本次作用域隔离称为视觉物理模块搬迁或任意 UI 包即插即用。当前生产仅安装一个 V6 包。
+- 不变：75 个必需场景注册及 173 项动作源码映射不能替代真实用户流程签收；172+ 项未签收等不得擅自变更为通过，当前 0/173。
+- 验证以 #736 最新 SHA 的静态、架构、JVM、ARM64、x86 和 Android16/17 作业为准；修复失效包重试时不应重新创建 Activity，防止 Compose 层级销毁。
