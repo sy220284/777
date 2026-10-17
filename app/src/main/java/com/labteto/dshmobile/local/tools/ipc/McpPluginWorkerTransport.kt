@@ -107,8 +107,10 @@ internal class McpPluginWorkerTransport(
             runCatching { app.unbindService(connection) }
     }
 
-    private suspend fun ensureOpened() = mutex.withLock {
-        check(!closed.get()) { "MCP isolated worker is closed; explicit reconnect required" }
+    private suspend fun ensureOpened() {
+        try {
+            mutex.withLock {
+                check(!closed.get()) { "MCP isolated worker is closed; explicit reconnect required" }
         if (opened) return@withLock
         withContext(Dispatchers.Main.immediate) {
             if (bound.compareAndSet(false, true)) {
@@ -148,6 +150,14 @@ internal class McpPluginWorkerTransport(
         }
         workerPid = pid
         opened = true
+            }
+        } catch (cancelled: CancellationException) {
+            terminate(IOException("MCP worker open cancelled; explicit reconnect required"))
+            throw cancelled
+        } catch (failure: Exception) {
+            terminate(IOException("MCP worker open failed; no in-process fallback", failure))
+            throw failure
+        }
     }
 
     private suspend fun rpc(kind: Int, payload: Bundle): Bundle {
