@@ -33,7 +33,7 @@ Local Harness semantic reference: 0.2.1-alpha.1 / 5badb150...
 CI 采用 **四级风险分流、独立合并门禁、发布资格严格隔离**。分类由 `.github/scripts/classify-ci-scope.py` 决定，混合变更取检查并集；未知或关键底层改动回退完整矩阵。
 
 - L0 文档：scope 控制面与 merge-gate；修改功能树 / 验收索引时增跑 static-gates，检查树与验收凭据的一致性。
-- L1 普通源码：static-gates、受影响的 architecture-3-gates、unit-tests、build-arm64。普通 UI 和模型无关业务不重复执行双模拟器。
+- L1 普通源码：static-gates、受影响的 architecture-3-gates、unit-tests、build-arm64；`build-arm64` 同时编译 `:app:compileDebugAndroidTestKotlin`，避免业务 Port 变更后 Android 测试替身与导入失效漏到主线。普通 UI 和模型无关业务不重复执行双模拟器。
 - L2 跨功能底层、Android 平台/ABI、安全边界、CI/发布控制面：完整单测、架构、ARM64/x86 与 Android 16/17。androidTest 变更验证双设备，导航入口变更补 Android 16。
 - L3 正式 APK 发布：必须在**同一发布 SHA** 找到 `main` push 对应成功的完整 CI 矩阵（含 merge-gate、两套 APK、双模拟器），并与最近已发布的正式版本比较，确认实际存在影响 APK 的变更。文档/自动化独立改动不会制造正式 Release。
 
