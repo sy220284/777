@@ -32,26 +32,28 @@ class V6StandaloneDebugActivity : AppCompatActivity() {
             val app: AppViewModel = hiltViewModel()
             val owner: LocalV6StandaloneViewModel = hiltViewModel()
             val requestedScene by owner.sceneRequest.collectAsStateWithLifecycle()
-            DshTheme {
-                LocalApplicationUiHost(
-                    installedPacks = remember(owner, app) {
-                        listOf(owner.pack(app.updateInstallStatus) {
-                            app.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
-                        })
-                    },
-                    // This seal exists only in the debug-exclusive launch path.
-                    // Neither AppRoot nor a production Owner can advertise it.
-                    availableCapabilities = owner.connectedCapabilities +
-                        UiCapabilityId("v6.migration.accepted"),
-                    selectionPreferenceName = "ui_application_pack_v6_only_debug",
-                    requestedSceneKey = requestedScene,
-                    notificationSessions = owner.sessions,
-                    onSceneRequestProcessed = { key, _ -> owner.consumeSceneRequest(key) },
-                    legacyContent = {
-                        error("V6-only verification must not fall back to Legacy Shell")
-                    },
-                )
-            }
-        }
+            ProvideUiHostSystemOperationOwner {
+                DshTheme {
+                    LocalApplicationUiHost(
+                        installedPacks = remember(owner, app) {
+                            listOf(owner.pack(app.updateInstallStatus) {
+                                app.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
+                            })
+                        },
+                        // This seal exists only in the debug-exclusive launch path.
+                        // Neither AppRoot nor a production Owner can advertise it.
+                        availableCapabilities = owner.connectedCapabilities +
+                            UiCapabilityId("v6.migration.accepted"),
+                        selectionPreferenceName = "ui_application_pack_v6_only_debug",
+                        requestedSceneKey = requestedScene,
+                        notificationSessions = owner.sessions,
+                        onSceneRequestProcessed = { key, _ -> owner.consumeSceneRequest(key) },
+                        legacyContent = {
+                            error("V6-only verification must not fall back to Legacy Shell")
+                        },
+                    )
+                }
+            }            }
+
     }
 }

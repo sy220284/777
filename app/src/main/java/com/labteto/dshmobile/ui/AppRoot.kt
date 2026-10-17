@@ -51,107 +51,109 @@ fun AppRoot(
         onDispose { selection.unregisterOnSharedPreferenceChangeListener(observer) }
     }
 
-    DshTheme(
-        preference = themePreference,
-        accentKey = settings.accentTheme,
-        backgroundPath = settings.backgroundImagePath,
-        backgroundAdaptiveContrast = settings.backgroundAdaptiveContrast,
-        textScale = settings.textScale,
-        textWeightAdjustment = settings.textWeightAdjustment,
-        wallpaperSurfaceTransparency = settings.wallpaperSurfaceTransparency,
-        ambientGlow = settings.ambientGlow,
-        componentEmphasis = settings.componentEmphasis,
-        motionDurationScale = settings.motionDurationScale,
-    ) {
-        if (standaloneSelected) {
-            // Owner-only boot path: no LocalHarnessViewModel, no LocalHarnessScreen,
-            // and no dispatch into legacy business callbacks on this branch.
-            val owner: com.labteto.dshmobile.ui.host.LocalV6StandaloneViewModel = hiltViewModel()
-            val requestedV6Scene by owner.sceneRequest.collectAsStateWithLifecycle()
+    com.labteto.dshmobile.uihost.ProvideUiHostSystemOperationOwner {
+        DshTheme(
+            preference = themePreference,
+            accentKey = settings.accentTheme,
+            backgroundPath = settings.backgroundImagePath,
+            backgroundAdaptiveContrast = settings.backgroundAdaptiveContrast,
+            textScale = settings.textScale,
+            textWeightAdjustment = settings.textWeightAdjustment,
+            wallpaperSurfaceTransparency = settings.wallpaperSurfaceTransparency,
+            ambientGlow = settings.ambientGlow,
+            componentEmphasis = settings.componentEmphasis,
+            motionDurationScale = settings.motionDurationScale,
+        ) {
+            if (standaloneSelected) {
+                // Owner-only boot path: no LocalHarnessViewModel, no LocalHarnessScreen,
+                // and no dispatch into legacy business callbacks on this branch.
+                val owner: com.labteto.dshmobile.ui.host.LocalV6StandaloneViewModel = hiltViewModel()
+                val requestedV6Scene by owner.sceneRequest.collectAsStateWithLifecycle()
+                com.labteto.dshmobile.ui.host.LocalApplicationUiHost(
+                    installedPacks = remember(owner, viewModel) {
+                        listOf(owner.pack(viewModel.updateInstallStatus) {
+                            viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
+                        })
+                    },
+                    availableCapabilities = owner.connectedCapabilities,
+                    requestedSceneKey = requestedExternalSceneKey ?: requestedV6Scene,
+                    notificationSessionId = requestedLocalSessionId,
+                    notificationSessions = owner.sessions,
+                    onNotificationSessionProcessed = onLocalSessionRequestConsumed,
+                    onSceneRequestProcessed = { key, _ ->
+                        if (requestedExternalSceneKey == key) onExternalSceneRequestConsumed()
+                        else owner.consumeSceneRequest(key)
+                    },
+                ) {
+                    // Fail closed if the selected pack becomes unavailable mid-frame.
+                    // The user must explicitly select legacy in Host settings to leave V6.
+                    androidx.compose.material3.Text(
+                        androidx.compose.ui.res.stringResource(R.string.v6_independent_host_unavailable))
+                }
+            } else {
+                // The application Host derives capabilities from actual Feature Owner composition,
+                // never from claims advertised by an installed UI pack.
+                val features: LocalHarnessViewModel = hiltViewModel()
+                val requestedHostScene by features.uiSceneRequest.collectAsStateWithLifecycle()
+                val hostCapabilities = com.labteto.dshmobile.ui.host.LocalUiConnectedCapabilities.from(
+                    chat = features.chatUiPort,
+                    work = features.workConversationUiPort,
+                    drafts = features.conversationDraftUiPort,
+                    documents = features.uiDocumentUiPort,
+                    forms = features.uiDocumentFormPort,
+                    attachments = features.attachmentUiPort,
+                    transcript = features.messageHistoryUiPort,
+                    groups = features.chatGroupUiPort,
+                    team = features.workTeamUiPort,
+                    workReads = features.workReadUiPort,
+                    workPolicy = features.workPolicyUiPort,
+                    shell = features.conversationShellUiPort,
+                    evidence = features.workEvidenceUiPort,
+                    gallery = features.personaGalleryUiPort,
+                    personas = features.personaSelectionUiPort,
+                    personaTransfer = features.personaTransferUiPort,
+                    stories = features.personaStoryUiPort,
+                    galleryDeletion = features.personaGalleryDeletionUiPort,
+                    gallerySave = features.personaGallerySaveUiPort,
+                    portraits = features.personaPortraitUiPort,
+                    authoring = features.personaAuthoringUiPort, currentPersona = features.currentPersonaUiPort,
+                    files = features.filesUiPort,
+                    memory = features.memoryUiPort,
+                    settings = features.settingsUiPort,
+                    automation = features.automationUiPort,
+                    media = features.mediaUiPort,
+                    usage = features.usageUiPort,
+                    diary = features.diaryUiPort,
+                )
+
             com.labteto.dshmobile.ui.host.LocalApplicationUiHost(
-                installedPacks = remember(owner, viewModel) {
-                    listOf(owner.pack(viewModel.updateInstallStatus) {
-                        viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
-                    })
+                installedPacks = remember(features, viewModel) {
+                    com.labteto.dshmobile.ui.host.LocalApplicationPackInstallations.fromOwners(
+                        features,
+                        updateStatus = viewModel.updateInstallStatus,
+                        checkForUpdate = {
+                            viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
+                        },
+                    )
                 },
-                availableCapabilities = owner.connectedCapabilities,
-                requestedSceneKey = requestedExternalSceneKey ?: requestedV6Scene,
+                availableCapabilities = hostCapabilities,
+                requestedSceneKey = requestedExternalSceneKey ?: requestedHostScene,
                 notificationSessionId = requestedLocalSessionId,
-                notificationSessions = owner.sessions,
+                notificationSessions = features.sessionUiPort,
                 onNotificationSessionProcessed = onLocalSessionRequestConsumed,
                 onSceneRequestProcessed = { key, _ ->
                     if (requestedExternalSceneKey == key) onExternalSceneRequestConsumed()
-                    else owner.consumeSceneRequest(key)
+                    else features.consumeUiSceneRequest(key)
                 },
             ) {
-                // Fail closed if the selected pack becomes unavailable mid-frame.
-                // The user must explicitly select legacy in Host settings to leave V6.
-                androidx.compose.material3.Text(
-                    androidx.compose.ui.res.stringResource(R.string.v6_independent_host_unavailable))
-            }
-        } else {
-            // The application Host derives capabilities from actual Feature Owner composition,
-            // never from claims advertised by an installed UI pack.
-            val features: LocalHarnessViewModel = hiltViewModel()
-            val requestedHostScene by features.uiSceneRequest.collectAsStateWithLifecycle()
-            val hostCapabilities = com.labteto.dshmobile.ui.host.LocalUiConnectedCapabilities.from(
-                chat = features.chatUiPort,
-                work = features.workConversationUiPort,
-                drafts = features.conversationDraftUiPort,
-                documents = features.uiDocumentUiPort,
-                forms = features.uiDocumentFormPort,
-                attachments = features.attachmentUiPort,
-                transcript = features.messageHistoryUiPort,
-                groups = features.chatGroupUiPort,
-                team = features.workTeamUiPort,
-                workReads = features.workReadUiPort,
-                workPolicy = features.workPolicyUiPort,
-                shell = features.conversationShellUiPort,
-                evidence = features.workEvidenceUiPort,
-                gallery = features.personaGalleryUiPort,
-                personas = features.personaSelectionUiPort,
-                personaTransfer = features.personaTransferUiPort,
-                stories = features.personaStoryUiPort,
-                galleryDeletion = features.personaGalleryDeletionUiPort,
-                gallerySave = features.personaGallerySaveUiPort,
-                portraits = features.personaPortraitUiPort,
-                authoring = features.personaAuthoringUiPort, currentPersona = features.currentPersonaUiPort,
-                files = features.filesUiPort,
-                memory = features.memoryUiPort,
-                settings = features.settingsUiPort,
-                automation = features.automationUiPort,
-                media = features.mediaUiPort,
-                usage = features.usageUiPort,
-                diary = features.diaryUiPort,
-            )
-
-        com.labteto.dshmobile.ui.host.LocalApplicationUiHost(
-            installedPacks = remember(features, viewModel) {
-                com.labteto.dshmobile.ui.host.LocalApplicationPackInstallations.fromOwners(
-                    features,
-                    updateStatus = viewModel.updateInstallStatus,
-                    checkForUpdate = {
-                        viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
-                    },
+                LocalHarnessScreen(
+                    requestedSessionId = requestedLocalSessionId,
+                    onSessionRequestConsumed = onLocalSessionRequestConsumed,
+                    onCheckUpdate = { viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME) },
+                    updateStatus = updateInstallStatus,
                 )
-            },
-            availableCapabilities = hostCapabilities,
-            requestedSceneKey = requestedExternalSceneKey ?: requestedHostScene,
-            notificationSessionId = requestedLocalSessionId,
-            notificationSessions = features.sessionUiPort,
-            onNotificationSessionProcessed = onLocalSessionRequestConsumed,
-            onSceneRequestProcessed = { key, _ ->
-                if (requestedExternalSceneKey == key) onExternalSceneRequestConsumed()
-                else features.consumeUiSceneRequest(key)
-            },
-        ) {
-            LocalHarnessScreen(
-                requestedSessionId = requestedLocalSessionId,
-                onSessionRequestConsumed = onLocalSessionRequestConsumed,
-                onCheckUpdate = { viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME) },
-                updateStatus = updateInstallStatus,
-            )
-        }
+            }
+            }
         }
     }
 }
