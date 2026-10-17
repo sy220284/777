@@ -65,9 +65,15 @@ class ZhaoxiApplicationScenePack(
     private fun currentDocumentContext(): ZhaoxiDocumentContext? {
         val ports = conversations ?: return null
         val workMode = ports.workMode()
-        val snapshot = if (workMode) ports.work.snapshot() else ports.chat.snapshot()
-        val identity = snapshot.identity ?: return null
-        val messageId = snapshot.messages.lastOrNull()?.id ?: return null
+        val active = if (workMode) {
+            val snapshot = ports.work.snapshot()
+            snapshot.identity to snapshot.messages.lastOrNull()?.id
+        } else {
+            val snapshot = ports.chat.snapshot()
+            snapshot.identity to snapshot.messages.lastOrNull()?.id
+        }
+        val identity = active.first ?: return null
+        val messageId = active.second ?: return null
         return ZhaoxiDocumentContext(identity, workMode, messageId)
     }
 
