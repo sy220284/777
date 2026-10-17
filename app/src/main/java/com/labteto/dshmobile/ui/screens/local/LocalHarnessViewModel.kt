@@ -224,7 +224,7 @@ class LocalHarnessViewModel @Inject constructor(
         personaGalleryController.removeGalleryPortrait(id)
     /** Legacy and future packs consume the same Chat Feature-owned mutation contract. */
     val personaArchiveMutationUiPort: com.labteto.dshmobile.uicontract.PersonaArchiveMutationUiPort by lazy {
-        com.labteto.dshmobile.local.chat.LocalPersonaArchiveMutationCoordinator(
+        com.labteto.dshmobile.local.presentation.LocalPersonaArchiveMutationUiFacade.bind(
             personaStoryUiPort, personaGalleryDeletionUiPort,
             refresh = this::refreshGalleryForUi,
         )
