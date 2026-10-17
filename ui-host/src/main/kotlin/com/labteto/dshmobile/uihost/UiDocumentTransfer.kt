@@ -36,9 +36,22 @@ fun rememberUiDocumentImporter(maxBytes: Int, onResult: (UiDocumentPickReceipt) 
     val scope = rememberCoroutineScope()
     val callback by rememberUpdatedState(onResult)
     val gate = remember { UiHostDocumentOperationGate<Int>() }
+    val hostOwner = LocalUiHostSystemOperationOwner.current ?: remember { UiHostSystemOperationOwner() }
+    val lease = remember(hostOwner) {
+        UiHostSystemOperationLease(hostOwner, UiHostPlatformAction.IMPORT_DOCUMENT)
+    }
+    DisposableEffect(gate, lease) {
+        onDispose {
+            if (gate.phase == UiHostDocumentOperationGate.Phase.WAITING_FOR_PICKER)
+                lease.finish()
+        }
+    }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) {
-            if (gate.cancelSelection() != null) callback(UiDocumentPickReceipt.Cancelled)
+            if (gate.cancelSelection() != null) {
+                lease.finish()
+                callback(UiDocumentPickReceipt.Cancelled)
+            }
             else callback(UiDocumentPickReceipt.Failed("文档选择请求已失效，请重新选择"))
         } else {
             val ticket = gate.selectionReturned()
@@ -67,7 +80,10 @@ fun rememberUiDocumentImporter(maxBytes: Int, onResult: (UiDocumentPickReceipt) 
                         UiDocumentPickReceipt.Picked(UiPickedDocument(name, resolver.getType(uri), bytes))
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (failure: Exception) { UiDocumentPickReceipt.Failed(failure.message) }
-                } } finally { gate.finish(ticket) }
+                } } finally {
+                    gate.finish(ticket)
+                    lease.finish()
+                }
                 callback(result)
             }
             }
@@ -77,11 +93,19 @@ fun rememberUiDocumentImporter(maxBytes: Int, onResult: (UiDocumentPickReceipt) 
         val ticket = gate.begin(maxBytes)
         if (ticket == null) {
             callback(UiDocumentPickReceipt.Failed("上一个文档正在读取，请先完成或取消该请求"))
+        } else if (!lease.begin()) {
+            gate.failToLaunch(ticket)
+            callback(UiDocumentPickReceipt.Failed("HOST_PLATFORM_OPERATION_BUSY"))
         } else {
             try { launcher.launch(arrayOf("*/*")) }
-            catch (cancelled: CancellationException) { gate.failToLaunch(ticket); throw cancelled }
+            catch (cancelled: CancellationException) {
+                gate.failToLaunch(ticket)
+                lease.finish()
+                throw cancelled
+            }
             catch (failure: Exception) {
                 gate.failToLaunch(ticket)
+                lease.finish()
                 callback(UiDocumentPickReceipt.Failed(failure.message))
             }
         }
@@ -95,9 +119,22 @@ fun rememberUiDocumentSaver(mimeType: String, onResult: (UiDocumentWriteReceipt)
     val scope = rememberCoroutineScope()
     val callback by rememberUpdatedState(onResult)
     val gate = remember { UiHostDocumentOperationGate<UiExportFile>() }
+    val hostOwner = LocalUiHostSystemOperationOwner.current ?: remember { UiHostSystemOperationOwner() }
+    val lease = remember(hostOwner) {
+        UiHostSystemOperationLease(hostOwner, UiHostPlatformAction.SAVE_DOCUMENT)
+    }
+    DisposableEffect(gate, lease) {
+        onDispose {
+            if (gate.phase == UiHostDocumentOperationGate.Phase.WAITING_FOR_PICKER)
+                lease.finish()
+        }
+    }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mimeType)) { uri ->
         if (uri == null) {
-            if (gate.cancelSelection() != null) callback(UiDocumentWriteReceipt.Cancelled)
+            if (gate.cancelSelection() != null) {
+                lease.finish()
+                callback(UiDocumentWriteReceipt.Cancelled)
+            }
             else callback(UiDocumentWriteReceipt.Failed("导出请求已失效，请重新发起"))
         } else {
             val ticket = gate.selectionReturned()
@@ -118,7 +155,10 @@ fun rememberUiDocumentSaver(mimeType: String, onResult: (UiDocumentWriteReceipt)
                         UiDocumentWriteReceipt.Saved
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (failure: Exception) { UiDocumentWriteReceipt.Failed(failure.message) }
-                } } finally { gate.finish(ticket) }
+                } } finally {
+                    gate.finish(ticket)
+                    lease.finish()
+                }
                 callback(result)
             }
         }
@@ -127,11 +167,19 @@ fun rememberUiDocumentSaver(mimeType: String, onResult: (UiDocumentWriteReceipt)
         val ticket = gate.begin(file)
         if (ticket == null) {
             callback(UiDocumentWriteReceipt.Failed("上一个文件保存尚未结束，请完成或取消后重试"))
+        } else if (!lease.begin()) {
+            gate.failToLaunch(ticket)
+            callback(UiDocumentWriteReceipt.Failed("HOST_PLATFORM_OPERATION_BUSY"))
         } else {
             try { launcher.launch(file.name) }
-            catch (cancelled: CancellationException) { gate.failToLaunch(ticket); throw cancelled }
+            catch (cancelled: CancellationException) {
+                gate.failToLaunch(ticket)
+                lease.finish()
+                throw cancelled
+            }
             catch (failure: Exception) {
                 gate.failToLaunch(ticket)
+                lease.finish()
                 callback(UiDocumentWriteReceipt.Failed(failure.message))
             }
         }
