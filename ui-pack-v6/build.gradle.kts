@@ -30,10 +30,15 @@ android {
     buildToolsVersion = "37.0.0"
     defaultConfig { minSdk = 36 }
     buildFeatures { compose = true }
-    sourceSets.getByName("main").res.srcDir(generatedV6Fonts.get().asFile)
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
+    }
+}
+// AGP 9 Library source-set wrappers are not compatible with the old sourceSets API.
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.sources.res?.addStaticSourceDirectory(generatedV6Fonts.get().asFile.absolutePath)
     }
 }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21) } }
