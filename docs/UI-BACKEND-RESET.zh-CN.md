@@ -33,3 +33,8 @@
 ## 禁止空白 APK 发版
 
 本阶段属于无界面后端基线，即使 CI 构建、Android 设备测试全部通过，也不能对终端用户发布空白客户端。`.github/workflows/release.yml` 在发布检测阶段识别本权威文档作为无界面标志并直接跳过发版；`.github/scripts/check-ci-repository-integrity.py` 强制验证拦截存在。**未来完整接入并验收新 UI 后**，在移除无界面标志和发布拦截时必须重新完成全量主线 CI 与发布证据检查。
+
+
+## 朝夕 E8.17 接入 PR #740
+
+新视觉层在独立 `ui-pack-zhaoxi`；应用 `MainActivity` 现在通过 Hilt 提供的 `LocalApplicationFeaturePortsOwner` 装配真实业务端口，并由 UI Host 做全目录准入、导航历史校验和系统返回。当前仍在 PR 阶段做设备/行为回归，禁止空白 APK/未验收 UI 自动发版的保护仍保持生效。旧 UI 路径与旧资源不可恢复。
