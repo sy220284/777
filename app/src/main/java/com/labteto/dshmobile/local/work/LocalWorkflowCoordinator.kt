@@ -157,9 +157,9 @@ internal class LocalWorkflowCoordinator(
                     "$label ${result.index + 1}：${result.node.task}\n${result.output.orEmpty()}\n$check（尝试 ${result.attempts} 次）"
                 }
                 TaskGraphOutcome.FAILED ->
-                    "$label ${result.index + 1} 受阻：${result.error.orEmpty()}；尝试 ${result.attempts} 次。"
+                    "$label ${result.index + 1}：${result.node.task}\n受阻：${result.error.orEmpty()}；尝试 ${result.attempts} 次。"
                 TaskGraphOutcome.BLOCKED ->
-                    "$label ${result.index + 1} 未启动：${result.error.orEmpty()}。"
+                    "$label ${result.index + 1}：${result.node.task}\n未启动：${result.error.orEmpty()}。"
             }
         }
         val projection = LocalWorkflowRunResult(results, summary)

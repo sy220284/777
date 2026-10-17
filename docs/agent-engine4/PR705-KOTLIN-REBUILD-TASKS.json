@@ -405,13 +405,11 @@
   "status": "first incremental implementation, not entire refactor",
   "current_slice": {
     "date": "2026-10-17",
-    "component": "ToolAttemptLedger execution-instance history and recovery identity",
-    "head_before": "0022626f531231939bb9f6a3ea5d5c30597e89a1",
+    "component": "CI-targeted workflow partial delivery regression",
+    "pr_head_before": "952bdf235003d178f8539fa879a6565d2c50f90a",
     "status": "code_submitted_ci_pending",
-    "evidence": [
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt",
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt",
-      "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedgerTest.kt"
-    ]
+    "ci_failure": "LocalWorkflowCoordinatorTest.graphPartialResultIsStructuredAndCannotMasqueradeAsFullyDelivered",
+    "correction": "Keep failed/blocked node task names in returned report; avoid claimed complete/omitted unresolved work",
+    "test": "app/src/test/java/com/labteto/dshmobile/local/LocalWorkflowCoordinatorTest.kt"
   }
 }

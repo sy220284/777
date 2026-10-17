@@ -101,7 +101,9 @@ class LocalWorkflowCoordinatorTest {
         assertEquals(1, result.blocked)
         assertEquals("partial", result.executionOutcome)
         assertTrue(result.summary.contains("工作流仍有未完成节点"))
-        assertTrue(result.summary.contains("B"))
+        assertTrue("Blocked node identity must survive user-facing delivery", result.summary.contains("子任务 2：B"))
+        assertTrue("Failed node identity must survive user-facing delivery", result.summary.contains("子任务 1：A"))
+        assertTrue(result.summary.contains("依赖未完成：task-1"))
     }
 
     @Test
