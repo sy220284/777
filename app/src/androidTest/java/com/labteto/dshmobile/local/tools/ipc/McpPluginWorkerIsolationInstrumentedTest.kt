@@ -41,6 +41,19 @@ class McpPluginWorkerIsolationInstrumentedTest {
             assertTrue(runCatching {
                 client.request("tools/call", kotlinx.serialization.json.JsonObject(emptyMap()))
             }.isFailure)
+            // Recovery is a NEW explicitly constructed transport: old in-flight
+            // calls and the old Binder instance are never reattached or replayed.
+            val recovery = McpPluginWorkerTransport(app, kind = "http",
+                endpoint = "http://127.0.0.1:1")
+            try {
+                assertTrue(runCatching {
+                    withTimeout(15_000) {
+                        recovery.request("ping", kotlinx.serialization.json.JsonObject(emptyMap()))
+                    }
+                }.isFailure)
+                assertNotNull(recovery.workerPid)
+                assertNotEquals(Process.myPid(), recovery.workerPid)
+            } finally { recovery.close() }
         } finally {
             client.close()
         }
