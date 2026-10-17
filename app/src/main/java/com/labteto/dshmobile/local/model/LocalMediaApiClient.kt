@@ -122,6 +122,8 @@ internal class LocalMediaApiClient @Inject constructor(
 ) {
     // Media providers may spend minutes generating an image or transcoding audio.
     // An idle-read timeout remains, but never use the app-wide 30s short-request policy.
+    private val videoLeases = LocalVideoTaskLeaseManager(File(context.filesDir, "media-studio"))
+
     private val mediaHttp = http.newBuilder()
         .readTimeout(10, TimeUnit.MINUTES)
         .writeTimeout(2, TimeUnit.MINUTES)
@@ -177,6 +179,7 @@ internal class LocalMediaApiClient @Inject constructor(
             !uri.host.isNullOrBlank() && uri.port == -1) { "仅支持安全 HTTPS 视频地址" }
         require(taskId.matches(Regex("[A-Za-z0-9_-]{1,128}"))) { "视频任务身份无效" }
         val directory = File(context.filesDir, "media-studio").apply { mkdirs() }
+        videoLeases.withLease(taskId) {
         val partial = File(directory, ".video-$taskId.part")
         val checkpoint = File(directory, ".video-$taskId.checkpoint")
         val fingerprint = java.security.MessageDigest.getInstance("SHA-256")
@@ -246,15 +249,18 @@ internal class LocalMediaApiClient @Inject constructor(
             if (checkpoint.exists()) check(checkpoint.delete()) { "已完成视频的断点元数据清理失败" }
             target
         }
+        }
     }
 
     /** User deletion invalidates a persisted transfer; it never starts another provider call. */
     fun forgetGeneratedVideoProgress(taskId: String) {
         require(taskId.matches(Regex("[A-Za-z0-9_-]{1,128}")))
         val directory = File(context.filesDir, "media-studio")
-        listOf(".video-$taskId.part", ".video-$taskId.checkpoint").forEach { name ->
-            val file = File(directory, name)
-            if (file.exists()) check(file.delete()) { "视频临时成果无法清理：$name" }
+        videoLeases.withExclusiveDeletion(taskId) {
+            listOf(".video-$taskId.part", ".video-$taskId.checkpoint").forEach { name ->
+                val file = File(directory, name)
+                if (file.exists()) check(file.delete()) { "视频临时成果无法清理：$name" }
+            }
         }
     }
 

@@ -19,7 +19,7 @@ internal class LocalVideoTaskLeaseManager(private val directory: File) {
     private fun register(taskId: String): Lease {
         require(taskId.matches(Regex("[A-Za-z0-9_-]{1,128}"))) { "视频任务身份无效" }
         return synchronized(leases) {
-            leases.getOrPut(taskId, ::Lease).also { it.clients++ }
+            leases.getOrPut(taskId) { Lease() }.also { it.clients++ }
         }
     }
 
