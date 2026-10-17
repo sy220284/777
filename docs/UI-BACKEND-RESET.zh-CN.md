@@ -25,3 +25,7 @@
 ## 验证原则
 
 后端基线仍必须通过架构 3.0、业务单元测试、Android 构建和运行时服务检查；旧 V6 专用的视觉/页面截图断言不再适用于无界面产物。新增的 `check-ui-module-boundaries.py` 明确禁止旧 UI 源码或依赖回来。
+
+## 历史审计快照口径
+
+`docs/FEATURE-SOURCE-INDEX.auto.json`、`FEATURE-REVIEW.auto.json`、`FEATURE-REALITY-AUDIT.auto.json` 等报告产生于旧 UI 代码仍存在时，文件中的 `ui-pack-v6` / `ui/screens` 路径仅是**历史证据**，不是现行源码或当前功能验收结果。当前 UI 实现以本分支实际 Git 树和新的负面边界门禁为准；重建新 UI 后需要重新生成全量功能审计基线，不能复用这些旧截图、页面或证据声明。现行功能来源登记已改指向真实业务端口或 Provider 解析代码。

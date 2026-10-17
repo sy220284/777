@@ -4,10 +4,10 @@
     {
       "id": "automation.management-receipts",
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务操作异常与受理回执",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementOperation.kt",
-      "entry": "runTaskManagementOperation",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/LocalAutomationUiPortComposition.kt",
+      "entry": "submit",
       "owner": "AUTOMATION",
-      "test": "app/src/test/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementOperationTest.kt#failedAcknowledgementReadsCurrentFactsWithoutReplayingMutation"
+      "test": "app/src/test/java/com/labteto/dshmobile/automation/AutomationReceiptTest.kt#keepsNewestTwoHundredReceipts"
     },
     {
       "id": "settings.memory.management-query",
@@ -20,10 +20,10 @@
     {
       "id": "settings.minimax.quota",
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / MiniMax 侧边栏套餐额度",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalSettingsUiContribution.kt",
-      "entry": "localSettingsFeatureUiContribution",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/model/MiniMaxProviderQuota.kt",
+      "entry": "MiniMaxProviderQuotaParser",
       "owner": "SETTINGS",
-      "test": "app/src/test/java/com/labteto/dshmobile/ui/screens/local/MiniMaxQuotaNavigationTest.kt#quotaDrawerOpensQuotaDirectlyAndClosesDrawer"
+      "test": "app/src/test/java/com/labteto/dshmobile/local/model/MiniMaxProviderQuotaTest.kt#legacyRemainingCountAndNewUsedCountAreResolvedByProviderPercent"
     },
     {
       "id": "skills.minimax-official-bundles",
