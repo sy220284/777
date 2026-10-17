@@ -34,6 +34,16 @@ class UiHostDocumentOperationGateTest {
         assertNull(gate.selectionReturned())
     }
 
+    @Test fun processRecreationRejectsOldPickerTicketsEvenForTheSameRequest() {
+        val original = UiHostDocumentOperationGate<String>()
+        val stale = requireNotNull(original.begin("same.txt"))
+        val restored = UiHostDocumentOperationGate<String>()
+        val current = requireNotNull(restored.begin("same.txt"))
+        assertFalse(restored.finish(stale))
+        assertEquals(current, restored.selectionReturned())
+        assertTrue(restored.finish(current))
+    }
+
     @Test fun launchFailureReleasesTheOnlyPickerReservation() {
         val gate = UiHostDocumentOperationGate<String>()
         val first = requireNotNull(gate.begin("first"))

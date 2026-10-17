@@ -10,7 +10,8 @@ package com.labteto.dshmobile.uihost
  */
 class UiHostDocumentOperationGate<T> {
     enum class Phase { IDLE, WAITING_FOR_PICKER, TRANSFERRING }
-    data class Ticket<T>(val generation: Long, val request: T)
+    /** Reference identity prevents tickets from a recreated Host instance being reused. */
+    class Ticket<T>(val generation: Long, val request: T)
 
     private var generation = 0L
     private var current: Ticket<T>? = null
