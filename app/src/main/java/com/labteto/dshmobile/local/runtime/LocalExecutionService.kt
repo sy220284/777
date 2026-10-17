@@ -203,7 +203,7 @@ class LocalExecutionService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         return NotificationCompat.Builder(this, DshNotifications.CHANNEL_LOCAL_JOBS)
-            .setSmallIcon(R.drawable.ic_notification_butterfly)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(pending)

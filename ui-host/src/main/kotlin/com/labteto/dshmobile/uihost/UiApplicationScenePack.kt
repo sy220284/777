@@ -13,8 +13,7 @@ import com.labteto.dshmobile.uicontract.checkCompatibility
  * Feature Ports are bound by the App composition root to the pack's typed
  * renderer factories; the Host only supplies navigation, never Owner authority.
  *
- * The current V6 pack implements this contract; admission still requires real
- * Feature capabilities and verification for each user-visible action.
+ * Any future pack must pass real Feature capability and action verification.
  */
 interface UiApplicationScenePack {
     val manifest: UiPackManifest
@@ -178,7 +177,7 @@ fun UiApplicationPackAdmission.Admitted.resolve(
     ))
 }
 
-/** No fallback to a legacy/V6 page when the active pack has no renderer. */
+/** No fallback renderer is installed when the active pack lacks a scene. */
 @Composable
 fun UiApplicationPackAdmission.Admitted.RenderScene(
     state: UiSceneNavigationState,

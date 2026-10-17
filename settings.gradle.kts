@@ -32,5 +32,3 @@ include(":harness-device-android")
 
 include(":ui-contract")
 include(":ui-host")
-
-include(":ui-pack-v6")

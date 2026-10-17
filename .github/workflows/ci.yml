@@ -164,23 +164,19 @@ jobs:
           "$RUNNER_TEMP/actionlint/actionlint"
       - name: Validate Python and shell automation syntax
         run: |
-          python3 -m compileall -q .github/scripts tools/runtime tools/dev tools/fonts
-          python3 -m unittest discover -s tools/fonts -p 'test_*.py'
+          python3 -m compileall -q .github/scripts tools/runtime tools/dev
           python3 tools/dev/test-install.py
           python3 tools/runtime/test-verification.py
           while IFS= read -r -d '' file; do
             bash -n "$file"
-          done < <(find .github/scripts tools/runtime tools/dev tools/reference-validation tools/fonts -type f -name '*.sh' -print0)
+          done < <(find .github/scripts tools/runtime tools/dev tools/reference-validation -type f -name '*.sh' -print0)
       - name: Validate Android security boundaries
         run: python3 .github/scripts/check-android-security-boundaries.py
       - name: Validate static product guards
         run: |
-          python3 .github/scripts/check-ui-hardcoded-cjk.py
-          python3 .github/scripts/check-ui-design-system-boundaries.py
           python3 .github/scripts/check-ui-module-boundaries.py --self-test
+          python3 tools/ui/new-pack.py --self-test
           python3 .github/scripts/check-ui-module-boundaries.py
-          python3 .github/scripts/check-ui-color-boundaries.py --self-test
-          python3 .github/scripts/check-ui-color-boundaries.py
           python3 .github/scripts/check-notification-presentation.py
           python3 .github/scripts/check-kotlin-risk-patterns.py
           python3 .github/scripts/check-build-baseline.py
@@ -188,8 +184,6 @@ jobs:
           python3 .github/scripts/check-acceptance-matrix.py
           python3 .github/scripts/check-v3-refactor-ledger.py --self-test
           python3 .github/scripts/check-v3-refactor-ledger.py
-          python3 .github/scripts/check-ui-r4-scene-matrix.py --self-test
-          python3 .github/scripts/check-ui-r4-scene-matrix.py
           bash .github/scripts/run-android-instrumentation.sh --self-test
           bash .github/scripts/wait-android-device-artifacts.sh --self-test
           python3 tools/runtime/compact-runtime-assets.py --self-test
@@ -197,22 +191,6 @@ jobs:
         run: |
           value="$(tr -d '\r\n' < .github/release-version)"
           [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$ ]]
-      - name: Build V6.3 versioned design source package
-        if: ${{ hashFiles('docs/design/v6/V6.3-DELIVERY.zh-CN.md') != '' }}
-        run: |
-          python3 docs/design/v6/build-standalone.py --check
-          python3 docs/design/v6/audit-all-icons.py
-          python3 docs/design/v6/sync-design-package.py \
-            --source docs/design/v6 \
-            --output "$RUNNER_TEMP/shenyan-v6.3-design-source.zip"
-      - name: Upload V6.3 complete editable design sources
-        if: ${{ hashFiles('docs/design/v6/V6.3-DELIVERY.zh-CN.md') != '' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: shenyan-v6.3-design-${{ github.sha }}
-          path: ${{ runner.temp }}/shenyan-v6.3-design-source.zip
-          if-no-files-found: error
-          retention-days: 30
 
   # Architecture validation is independent of the static lane; both start after scope.
   architecture-3-gates:
@@ -269,7 +247,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
       - name: Unit tests and Harness conformance
         run: |
-          ./gradlew             :core:test             :ui-contract:test             :ui-pack-v6:testDebugUnitTest             :harness-core:test             :harness-runtime-android:test             :harness-interop:test             :harness-device-android:testDebugUnitTest             :app:testDebugUnitTest             :reference-validation:test             --stacktrace
+          ./gradlew             :core:test             :ui-contract:test                         :harness-core:test             :harness-runtime-android:test             :harness-interop:test             :harness-device-android:testDebugUnitTest             :app:testDebugUnitTest             :reference-validation:test             --stacktrace
       - name: Verify JVM 21 bytecode output
         run: python3 .github/scripts/check-jvm21-bytecode.py
 
@@ -395,21 +373,12 @@ jobs:
             adb install -r .ci/device-apks/app-debug.apk
             adb install -r .ci/device-apks/app-debug-androidTest.apk
             bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
-            bash .github/scripts/capture-fluid-ui.sh
             adb shell am force-stop com.sy220284.dshmobile.debug || true
             bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
             adb shell am force-stop com.sy220284.dshmobile.debug || true
             adb install -r .ci/device-apks/app-optimized.apk
             bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
 
-      - name: Upload Android 16 UI captures
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: fluid-ui-android-16
-          path: .ci/fluid-ui/*.png
-          if-no-files-found: warn
-          retention-days: 14
 
   android-17-instrumented:
     # Prewarm emulator and SDK in parallel with shared APK compilation.
@@ -466,21 +435,12 @@ jobs:
           adb install -r .ci/device-apks/app-debug.apk
           adb install -r .ci/device-apks/app-debug-androidTest.apk
           bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
-          bash .github/scripts/capture-fluid-ui.sh
           adb shell am force-stop com.sy220284.dshmobile.debug || true
           bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
           adb shell am force-stop com.sy220284.dshmobile.debug || true
           adb install -r .ci/device-apks/app-optimized.apk
           bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
 
-      - name: Upload Android 17 UI captures
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: fluid-ui-android-17
-          path: .ci/fluid-ui/*.png
-          if-no-files-found: warn
-          retention-days: 14
 
   merge-gate:
     if: always()

@@ -2,7 +2,7 @@ package com.labteto.dshmobile.uicontract
 
 import kotlinx.coroutines.flow.Flow
 
-/** App-owned preferences, independent of V6-specific appearance components. */
+/** App-owned preferences, independent of any UI Pack's appearance components. */
 data class UiHostPreferences(
     val theme: String = "system",
     val accent: String = "celadon",

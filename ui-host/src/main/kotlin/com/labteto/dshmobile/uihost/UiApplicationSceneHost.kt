@@ -95,7 +95,7 @@ fun UiApplicationPackAdmission.Admitted.RenderHostedScene(
         // Persist only a validated, renderable Host stack, never corrupt or foreign state.
         LaunchedEffect(encoded, navigation) { onNavigationSnapshotUpdated(encoded) }
         // External route requests enter through the same Host-owned whitelist and
-        // navigation CAS as renderer proposals; V6 does not silently handle rejects.
+        // Navigation CAS validates proposals; no missing renderer can handle rejections.
         LaunchedEffect(requestedDeepLinkKey, navigation) {
             val key = requestedDeepLinkKey ?: return@LaunchedEffect
             val currentEncoded = encoded

@@ -1,109 +1,86 @@
 #!/usr/bin/env python3
-"""Verify the current UI 3.0 module dependency boundary and its source imports."""
-from __future__ import annotations
+"""Backend-only UI boundary: reject every retired visual surface and preserve the new-pack interface."""
+from pathlib import Path
 import re
 import sys
-from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-ALLOWED = {
-    "ui-contract": set(),
-    "ui-host": {"ui-contract"},
-    "ui-pack-v6": {"ui-host", "ui-contract"},
-}
-PROJECT = re.compile(r'project\s*\(\s*"(?::)([A-Za-z0-9_-]+)"\s*\)')
-IMPORT = re.compile(r'^\s*import\s+([A-Za-z0-9_.]+)', re.M)
-# UI Contract deliberately exports immutable DTOs from historical local.* namespaces.
-# Gradle edges forbid Pack -> App; importing exported DTOs is fully legitimate.
-# Reject actual App screen imports and internal runtime/owner implementation symbols.
-APP_INTERNAL = (
-    "com.labteto.dshmobile.ui.screens.",
-    "com.labteto.dshmobile.ui.shenyan.",
-    "com.labteto.dshmobile.ui.theme.",
+RETIRED = (
+    "ui-pack-v6",
+    "app/src/main/java/com/labteto/dshmobile/ui/screens",
+    "app/src/main/java/com/labteto/dshmobile/ui/components",
+    "app/src/main/java/com/labteto/dshmobile/ui/theme",
+    "app/src/main/java/com/labteto/dshmobile/ui/shenyan",
+    "app/src/main/res/font",
+    "app/src/main/res/drawable",
+    "app/src/main/res/drawable-nodpi",
+    "app/src/main/res/mipmap",
+    "app/src/main/res/raw",
+    "app/src/main/res/anim",
+    "app/src/main/res/animator",
+    "app/src/main/res/color",
+    "app/src/main/res/layout",
+    "app/src/main/res/values/strings_capability_center.xml",
+    "app/src/main/res/values/strings_persona_gallery_v3.xml",
+    "app/src/main/res/values/persona_ai_strings.xml",
+    "app/src/main/res/values/audit_repair_strings.xml",
+    "docs/design/v6",
+    "app/src/debug/AndroidManifest.xml",
 )
-APP_IMPL_SYMBOLS = {
-    "LocalHarnessViewModel", "LocalFeatureUiActions", "LocalRuntimeKernel",
-    "LocalSessionRepository", "LocalAgentRunCoordinator",
-    "LocalToolExecutionCoordinator",
-}
-
-def project_errors(module: str, content: str) -> list[str]:
-    actual = set(PROJECT.findall(content))
-    allowed = ALLOWED[module]
-    return ([f"{module}: invalid project dependency {name}" for name in sorted(actual - allowed)]
-            + [f"{module}: missing required dependency {name}" for name in sorted(allowed - actual)])
-
-def import_errors(module: str, content: str) -> list[str]:
+REQUIRED = (
+    "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiPackManifest.kt",
+    "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiApplicationScenePack.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeKernel.kt",
+    "app/src/main/java/com/labteto/dshmobile/ui/host/LocalApplicationFeaturePortsOwner.kt",
+)
+def violations() -> list[str]:
     errors = []
-    for name in IMPORT.findall(content):
-        forbidden = (
-            name.startswith(("android.", "androidx.", "com.shenyan.designsystem.", "com.labteto.dshmobile.uipack."))
-            if module == "ui-contract" else
-            (name.startswith(APP_INTERNAL) or name.rsplit(".", 1)[-1] in APP_IMPL_SYMBOLS) or
-            (module == "ui-host" and name.startswith(("com.shenyan.designsystem.", "com.labteto.dshmobile.uipack."))) or
-            (module == "ui-pack-v6" and name.startswith("com.labteto.dshmobile.uipack.") and
-             not name.startswith("com.labteto.dshmobile.uipack.v6."))
-        )
-        if forbidden:
-            errors.append(f"{module}: forbidden import {name}")
-    return errors
-
-def self_test() -> None:
-    assert not project_errors("ui-host", 'api(project(":ui-contract"))')
-    assert project_errors("ui-host", 'api(project(":ui-contract")); implementation(project(":app"))')
-    assert project_errors("ui-host", 'api(project(":ui-pack-v6"))')
-    assert project_errors("ui-pack-v6", 'implementation(project(":ui-host"))')
-    assert import_errors("ui-pack-v6", "import com.labteto.dshmobile.local.session.LocalSessionRepository")
-    assert import_errors("ui-host", "import com.labteto.dshmobile.uipack.v6.V6Scene")
-    assert import_errors("ui-contract", "import androidx.compose.runtime.Composable")
-    assert not import_errors("ui-contract", "import kotlinx.coroutines.flow.Flow")
-    assert not import_errors("ui-pack-v6", "import com.shenyan.designsystem.components.SyEntrance")
-    assert not import_errors("ui-pack-v6", "import com.labteto.dshmobile.local.session.LocalConversationMode")
-    assert not import_errors("ui-pack-v6", "import com.labteto.dshmobile.local.model.LocalMediaPage")
-
-def main() -> None:
-    errors = []
+    for path in RETIRED:
+        if (ROOT / path).exists(): errors.append("retired UI restored: " + path)
+    for path in REQUIRED:
+        if not (ROOT / path).is_file(): errors.append("backend/interface missing: " + path)
     settings = (ROOT / "settings.gradle.kts").read_text(encoding="utf-8")
     app = (ROOT / "app/build.gradle.kts").read_text(encoding="utf-8")
-    for module in ALLOWED:
-        if f'include(":{module}")' not in settings:
-            errors.append(f"{module}: not declared in settings.gradle.kts")
-        if module not in PROJECT.findall(app):
-            errors.append(f"{module}: app does not assemble this UI module")
-        build = ROOT / module / "build.gradle.kts"
-        if not build.is_file():
-            errors.append(f"{module}: missing build.gradle.kts")
-            continue
-        errors += project_errors(module, build.read_text(encoding="utf-8"))
-        source_root = ROOT / module / "src/main"
-        if not source_root.is_dir():
-            errors.append(f"{module}: missing production sources")
-            continue
-        for source in source_root.rglob("*.kt"):
-            errors += [f"{source.relative_to(ROOT)}: {error}"
-                       for error in import_errors(module, source.read_text(encoding="utf-8"))]
-    # AppRoot is a neutral application assembly, not the V6 visual owner.
-    # A future pack cannot be forced through AppRoot's DshTheme wrapper.
-    root = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt").read_text(encoding="utf-8")
-    forbidden_root = ("DshTheme", "ThemePreference", "V6ApplicationScenePack", "LocalV6StandaloneViewModel")
-    for symbol in forbidden_root:
-        if re.search(r"\b" + symbol + r"\b", root):
-            errors.append(f"AppRoot: pack-specific visual or owner reference {symbol}")
-    entry = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/host/LocalProductionUiEntry.kt").read_text(encoding="utf-8")
-    if "visualFrame = { content -> V6VisualBridge(appViewModel, content) }" not in entry:
-        errors.append("production V6 pack must own the appearance wrapper; neutral Host cannot do it")
-    debug = (ROOT / "app/src/debug/java/com/labteto/dshmobile/ui/host/V6StandaloneDebugActivity.kt").read_text(encoding="utf-8")
-    if "DshTheme" in debug or "visualFrame = { content -> V6VisualBridge(app, content) }" not in debug:
-        errors.append("debug V6 entry must use the same pack-scoped visual wrapper as production")
-    if errors:
-        for issue in errors:
-            print("::error::" + issue)
-        raise SystemExit(1)
-    print("UI 3.0 independent module/Owner dependency gate passed")
+    if "ui-pack-v6" in settings + app: errors.append("V6 module still participates in production build")
+    if 'include(":ui-contract")' not in settings or 'include(":ui-host")' not in settings:
+        errors.append("neutral UI Contract/Host missing")
+    for name in ("ui-contract", "ui-host"):
+        build = (ROOT / name / "build.gradle.kts").read_text(encoding="utf-8")
+        if re.search(r'project\s*\(\s*"(?::)(?:app|ui-pack-v6)"',build):
+            errors.append(name + " depends on app or V6")
+    owner = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/host/LocalApplicationFeaturePortsOwner.kt").read_text(encoding="utf-8")
+    if any(x in owner for x in ("V6ApplicationScenePack", "V6SecondaryPorts", "V6VisualFrame")):
+        errors.append("neutral Feature Port owner references deleted V6 UI")
+    for symbol in ("ChatUiPort", "WorkConversationUiPort", "ToolsUiPort", "SessionUiPort"):
+        if symbol not in owner: errors.append("neutral owner lost port: " + symbol)
+    activity = (ROOT / "app/src/main/java/com/labteto/dshmobile/MainActivity.kt").read_text(encoding="utf-8")
+    if any(s in activity for s in ("setContent(", "AppRoot(", "DshTheme(", "V6ApplicationScenePack(")):
+        errors.append("MainActivity renders retired interface")
+    resources = (ROOT / "app/src/main/res/values/strings.xml").read_text(encoding="utf-8")
+    if resources.count('<string name=') > 40:
+        errors.append("old UI copy has returned to base Android resources")
+    generator = (ROOT / "tools/ui/new-pack.py").read_text(encoding="utf-8")
+    if 'ui-pack-next/build.gradle.kts' in generator or 'ConversationUiPack' in generator:
+        errors.append("UI Pack scaffold still uses a deleted or old contract")
+    for dir in ("app/src/main/java", "ui-contract/src/main", "ui-host/src/main"):
+        for file in (ROOT / dir).rglob("*.kt"):
+            source = file.read_text(encoding="utf-8")
+            if re.search(r'^\s*import\s+com\.labteto\.dshmobile\.uipack\.v6\.', source, re.MULTILINE):
+                errors.append("live V6 import: " + str(file.relative_to(ROOT)))
+    return errors
+
+def self_test():
+    assert "ui-pack-v6" in RETIRED
+    assert "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiPackManifest.kt" in REQUIRED
+    assert re.search(r'project\s*\(\s*"(?::)ui-pack-v6"', 'implementation(project(":ui-pack-v6"))')
 
 if __name__ == "__main__":
     if "--self-test" in sys.argv:
         self_test()
-        print("UI 3.0 dependency negative cases passed")
+        print("Backend-only boundary negative checks passed")
     else:
-        main()
+        errors = violations()
+        for error in errors: print("::error::" + error)
+        if errors: raise SystemExit(1)
+        print("Backend-only boundary passed; no retired UI, Feature Ports and neutral Host preserved")

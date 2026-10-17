@@ -120,22 +120,6 @@ val prepareBundledGitRuntime = tasks.register<Exec>("prepareBundledGitRuntime") 
     )
 }
 
-// Generated fixed UI fonts are never copied from the complete source into the APK.
-val generatedUiFontRes = layout.buildDirectory.dir("generated/uiFontRes")
-val generateUiFontSubset = tasks.register<Exec>("generateUiFontSubset") {
-    group = "build setup"
-    description = "Produce Noto Sans SC UI glyph subsets in real font weight files."
-    inputs.file(rootProject.file("tools/fonts/source/NotoSansSC-wght.ttf"))
-    inputs.file(rootProject.file("tools/fonts/build_ui_font.py"))
-    inputs.file(rootProject.file("tools/fonts/generate.sh"))
-    inputs.dir(rootProject.file("app/src/main/res"))
-    inputs.dir(rootProject.file("app/src/main/java/com/labteto/dshmobile/ui"))
-    outputs.dir(generatedUiFontRes)
-    outputs.file(layout.buildDirectory.file("generated/ui-font-subset-manifest.json"))
-    environment("DSH_FONT_OFFLINE", gradle.startParameter.isOffline.toString())
-    commandLine("bash", rootProject.file("tools/fonts/generate.sh").absolutePath, generatedUiFontRes.get().asFile.absolutePath)
-}
-
 val generatedBundledRuntimeAssets = layout.buildDirectory.dir("generated/bundledRuntimeAssets")
 val compactBundledRuntimeAssets = tasks.register<Exec>("compactBundledRuntimeAssets") {
     group = "build setup"
@@ -196,7 +180,6 @@ android {
         versionName = dshVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters.addAll(bundledRuntimeAbis) }
-        vectorDrawables { useSupportLibrary = true }
     }
 
     buildTypes {
@@ -261,8 +244,6 @@ android {
         rootProject.file("reference-validation/src/test/resources"),
     )
 
-    sourceSets.getByName("main").res.srcDir(generatedUiFontRes.get().asFile)
-
     sourceSets.getByName("main").apply {
         // AGP 9 rejects Provider-backed entries in the legacy SourceSet API. These providers only
         // describe deterministic build-directory paths; generating task edges remain explicit
@@ -288,8 +269,7 @@ android {
     lint {
         // Chinese is the single user-facing base resource set; there is no locale translation surface.
         error += listOf("ImpliedQuantity")
-        // `HardcodedText` is deliberately absent: it only inspects XML layouts, and this app has
-        // none. Compose string literals have to be caught in review.
+        // `HardcodedText` only inspects XML layouts; this backend-only APK has none.
     }
 }
 
@@ -311,13 +291,6 @@ tasks.matching {
         prepareUpdatePatcher,
     )
 }
-
-// Resource and lint model consumers need declared generation dependencies.
-tasks.matching {
-    (it.name.contains("Resources") || it.name.endsWith("SourceSetPaths") ||
-        it.name.startsWith("extractDeepLinks") ||
-        it.name.startsWith("lint", ignoreCase = true)) && it.name != "generateUiFontSubset"
-}.configureEach { dependsOn(generateUiFontSubset) }
 
 // Lint model writers inspect the merged asset source set directly. Without this explicit edge
 // Gradle 8 correctly rejects the graph as an undeclared generated-source dependency.
@@ -345,11 +318,14 @@ if (System.getenv("CI") == "true") {
     }
 }
 
+// This remains a backend-only application. SDK libraries keep the already-
+// verified Compose/AndroidX/KSP build graph needed by the neutral UI Host.
+// No former page, theme, icon pack, material, animation, or renderer is installed.
+
 dependencies {
     implementation(project(":core"))
     implementation(project(":ui-contract"))
     implementation(project(":ui-host"))
-    implementation(project(":ui-pack-v6"))
     implementation(project(":harness-core"))
     implementation(project(":harness-runtime-android"))
     implementation(project(":harness-interop"))

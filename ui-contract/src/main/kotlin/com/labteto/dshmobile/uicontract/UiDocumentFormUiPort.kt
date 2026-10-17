@@ -2,7 +2,7 @@ package com.labteto.dshmobile.uicontract
 
 import kotlinx.coroutines.flow.StateFlow
 
-/** Fixed contract budgets, enforced both in V6 and again by the original Owner. */
+/** Fixed contract budgets, enforced at the Feature Port and again by the original Owner. */
 const val MAX_UI_DOCUMENT_SINGLE_LINE_CHARS = 4_096
 const val MAX_UI_DOCUMENT_MULTILINE_CHARS = 16_384
 const val MAX_UI_DOCUMENT_PREPARED_CHARS = 32_768
