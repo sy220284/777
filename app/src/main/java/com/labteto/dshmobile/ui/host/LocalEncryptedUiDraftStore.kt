@@ -29,16 +29,16 @@ internal class LocalEncryptedUiDraftStore(context: Context) {
         checkDomain(domain)
         val encoded = preferences.getString("cipher.$domain", null) ?: return emptyList()
         val bytes = LocalUiDraftCipher.decrypt(secretKey, encoded, domain)
-        require(bytes.size <= MAX_PLAINTEXT_BYTES) { "UI_DRAFT_RESTORE_BYTES_EXCEEDED" }
+        require(bytes.size <= byteBudget(domain)) { "UI_DRAFT_RESTORE_BYTES_EXCEEDED" }
         return Json.decodeFromString<List<String>>(bytes.toString(Charsets.UTF_8))
-            .also { require(it.size <= MAX_ELEMENTS) { "UI_DRAFT_RESTORE_ENTRIES_EXCEEDED" } }
+            .also { require(it.size <= entryBudget(domain)) { "UI_DRAFT_RESTORE_ENTRIES_EXCEEDED" } }
     }
 
     fun write(domain: String, content: List<String>) {
         checkDomain(domain)
-        require(content.size <= MAX_ELEMENTS) { "UI_DRAFT_SAVE_ENTRIES_EXCEEDED" }
+        require(content.size <= entryBudget(domain)) { "UI_DRAFT_SAVE_ENTRIES_EXCEEDED" }
         val data = Json.encodeToString(content).toByteArray(Charsets.UTF_8)
-        require(data.size <= MAX_PLAINTEXT_BYTES) { "UI_DRAFT_SAVE_BYTES_EXCEEDED" }
+        require(data.size <= byteBudget(domain)) { "UI_DRAFT_SAVE_BYTES_EXCEEDED" }
         // Even an empty value must be durably represented so old process Bundles
         // cannot later resurrect drafts the user intentionally cleared.
         preferences.edit()
@@ -60,10 +60,16 @@ internal class LocalEncryptedUiDraftStore(context: Context) {
     }
 
     private fun checkDomain(domain: String) {
-        require(domain in setOf("conversation_drafts", "attachment_drafts")) {
+        require(domain in setOf("conversation_drafts", "attachment_drafts", "ui_document_forms")) {
             "UI_DRAFT_UNKNOWN_DOMAIN"
         }
     }
+
+    private fun entryBudget(domain: String): Int =
+        if (domain == "ui_document_forms") 4_000 else MAX_DRAFT_ELEMENTS
+
+    private fun byteBudget(domain: String): Int =
+        if (domain == "ui_document_forms") MAX_FORM_BYTES else MAX_DRAFT_BYTES
 
     private fun getOrCreateKey(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
@@ -82,8 +88,9 @@ internal class LocalEncryptedUiDraftStore(context: Context) {
 
     private companion object {
         const val KEY_ALIAS = "777.ui.draft.encryption.v1"
-        const val MAX_PLAINTEXT_BYTES = 128 * 1024
-        const val MAX_ELEMENTS = 96
+        const val MAX_DRAFT_BYTES = 128 * 1024
+        const val MAX_DRAFT_ELEMENTS = 96
+        const val MAX_FORM_BYTES = 512 * 1024
     }
 }
 
@@ -102,7 +109,7 @@ internal object LocalUiDraftCipher {
 
     fun decrypt(key: SecretKey, blob: String, domain: String): ByteArray {
         val bytes = Base64.getDecoder().decode(blob)
-        require(bytes.size in 29..(256 * 1024)) { "UI_DRAFT_INVALID_CIPHERTEXT_LENGTH" }
+        require(bytes.size in 29..(1024 * 1024)) { "UI_DRAFT_INVALID_CIPHERTEXT_LENGTH" }
         val buffer = ByteBuffer.wrap(bytes)
         require(buffer.get().toInt() == 1) { "UI_DRAFT_UNSUPPORTED_CIPHERTEXT_VERSION" }
         val iv = ByteArray(12)
