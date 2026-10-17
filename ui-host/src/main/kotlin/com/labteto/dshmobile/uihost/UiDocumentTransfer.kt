@@ -59,7 +59,7 @@ fun rememberUiDocumentImporter(maxBytes: Int, onResult: (UiDocumentPickReceipt) 
                                 coroutineContext.ensureActive()
                                 val count = input.read(buffer)
                                 if (count < 0) break
-                                require(out.size().toLong() + count <= maxBytes) { "文档超过该功能允许的大小" }
+                                require(out.size().toLong() + count <= ticket.request) { "文档超过该功能允许的大小" }
                                 out.write(buffer, 0, count)
                             }
                             out.toByteArray()
@@ -94,7 +94,7 @@ fun rememberUiDocumentSaver(mimeType: String, onResult: (UiDocumentWriteReceipt)
     val resolver = LocalContext.current.contentResolver
     val scope = rememberCoroutineScope()
     val callback by rememberUpdatedState(onResult)
-    val gate = remember(mimeType) { UiHostDocumentOperationGate<UiExportFile>() }
+    val gate = remember { UiHostDocumentOperationGate<UiExportFile>() }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mimeType)) { uri ->
         if (uri == null) {
             if (gate.cancelSelection() != null) callback(UiDocumentWriteReceipt.Cancelled)
