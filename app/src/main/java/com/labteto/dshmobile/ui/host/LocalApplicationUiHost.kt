@@ -177,6 +177,9 @@ internal fun decideApplicationUi(
 internal fun LocalApplicationUiHost(
     installedPacks: Collection<UiApplicationScenePack>,
     availableCapabilities: Set<UiCapabilityId>,
+    // Explicitly scoped for a debug-only independent V6 runtime. Production
+    // always uses the default; the V6-only entry never mutates user selection.
+    selectionPreferenceName: String = "ui_application_pack",
     requestedSceneKey: String? = null,
     notificationSessionId: String? = null,
     notificationSessions: SessionUiPort? = null,
@@ -186,8 +189,8 @@ internal fun LocalApplicationUiHost(
 ) {
     val context = LocalContext.current
     val activity = remember(context) { context.findHostActivity() }
-    val preference = remember(context) {
-        context.getSharedPreferences("ui_application_pack", Context.MODE_PRIVATE)
+    val preference = remember(context, selectionPreferenceName) {
+        context.getSharedPreferences(selectionPreferenceName, Context.MODE_PRIVATE)
     }
     var selectedId by remember(preference) {
         mutableStateOf(preference.getString("selected_pack", LEGACY_V6_APP_UI))
