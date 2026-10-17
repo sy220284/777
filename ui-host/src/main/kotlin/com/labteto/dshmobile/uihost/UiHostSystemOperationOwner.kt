@@ -16,7 +16,7 @@ import androidx.compose.runtime.remember
  * the sole owners of the bytes, URI grants and business commands they submit.
  */
 enum class UiHostPlatformAction {
-    PICK_ATTACHMENT, IMPORT_DOCUMENT, SAVE_DOCUMENT, EXPORT_WORKSPACE, SHARE_WORKSPACE
+    PICK_ATTACHMENT, IMPORT_DOCUMENT, SAVE_DOCUMENT, EXPORT_WORKSPACE, SHARE_WORKSPACE, REQUEST_PERMISSION
 }
 
 class UiHostSystemOperationOwner {

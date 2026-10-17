@@ -247,6 +247,11 @@ internal fun V6WorkToolActivityPanel(
         }
         selected?.let { item ->
             Text("执行：${item.executionId ?: "未开始"} · 调用：${item.callId}")
+            Text(when (item.authorizationGranted) {
+                true -> "本次调用已获准入；此记录不授权后续调用"
+                false -> "本次调用未获授权"
+                null -> "本次调用没有可核实的授权记录"
+            })
             item.errorCode?.let { Text("错误码：$it") }
             detail.take(64).forEach { node ->
                 Text(node.label + " · " + node.kind.name + "：" + node.preview,

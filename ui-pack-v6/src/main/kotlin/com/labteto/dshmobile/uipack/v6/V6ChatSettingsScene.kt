@@ -11,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
+import com.labteto.dshmobile.uihost.rememberUiPrivateText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,7 +45,7 @@ private const val MAX_CUSTOM_CHAT_FILTER_CHARS = 32
 @Composable
 fun V6ChatStyleSettingsScene(settings: SettingsUiPort, onBack: () -> Unit) {
     val state by settings.state.collectAsStateWithLifecycle(initialValue = settings.initialState)
-    var draft by rememberSaveable(settings) { mutableStateOf("") }
+    var draft by rememberUiPrivateText("settings.chat.filter", settings) { "" }
     var feedback by remember(settings) { mutableStateOf<String?>(null) }
     var showHits by rememberSaveable(settings) { mutableStateOf(false) }
 

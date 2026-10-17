@@ -26,7 +26,12 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 class LocalWorkEvidenceUiAdapter @Inject internal constructor(
     private val state: LocalRuntimeStateStore,
     private val work: LocalWorkRuntime,
+    private val workspaceGate: com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate,
 ) : WorkEvidenceUiPort {
+    /** Hash preparation, exact-version recheck and durable conclusion share the tool workspace lease. */
+    private suspend fun <T> withEvidenceRead(block: suspend () -> T): T =
+        withContext(Dispatchers.IO) { workspaceGate.withRead(block) }
+
     private fun current(identity: UiSessionIdentity): Boolean =
         !state.sessionTransitioning && !state.state.value.loading &&
             state.state.value.usageMode == LocalUsageMode.WORK && state.uiBindingIdentity(state.state.value) == identity
@@ -43,10 +48,10 @@ class LocalWorkEvidenceUiAdapter @Inject internal constructor(
         )
     }
 
-    override suspend fun read(identity: UiSessionIdentity): UiWorkEvidenceReadReceipt = withContext(Dispatchers.IO) {
+    override suspend fun read(identity: UiSessionIdentity): UiWorkEvidenceReadReceipt = withEvidenceRead {
         try {
             val (requirements, goalId) = synchronized(state.foregroundRunHandle.lock) {
-                if (!current(identity)) return@withContext UiWorkEvidenceReadReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                if (!current(identity)) return@withEvidenceRead UiWorkEvidenceReadReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
                 state.state.value.work.todos.mapIndexed { index, todo ->
                     UiWorkRequirement(index, todo.content, todo.status)
                 } to state.state.value.work.goal?.id
@@ -77,10 +82,10 @@ class LocalWorkEvidenceUiAdapter @Inject internal constructor(
     override suspend fun inspect(
         identity: UiSessionIdentity,
         artifact: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem,
-    ): UiWorkArtifactInspectionReceipt = withContext(Dispatchers.IO) {
+    ): UiWorkArtifactInspectionReceipt = withEvidenceRead {
         try {
             synchronized(state.foregroundRunHandle.lock) {
-                if (!current(identity)) return@withContext UiWorkArtifactInspectionReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                if (!current(identity)) return@withEvidenceRead UiWorkArtifactInspectionReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
             }
             val checked = work.inspectArtifactForUi(identity.sessionId, artifact)
             currentCoroutineContext().ensureActive()
@@ -95,19 +100,19 @@ class LocalWorkEvidenceUiAdapter @Inject internal constructor(
         catch (failure: Exception) { UiWorkArtifactInspectionReceipt.Failed(failure.message) }
     }
     override suspend fun review(command: com.labteto.dshmobile.uicontract.ReviewWorkEvidenceCommand):
-        UiCommandReceipt = withContext(Dispatchers.IO) {
+        UiCommandReceipt = withEvidenceRead {
         try {
             synchronized(state.foregroundRunHandle.lock) {
                 if (!current(command.identity) || state.state.value.work.goal?.id != command.goalId ||
                     state.state.value.work.todos.getOrNull(command.requirementIndex)?.content != command.expectedRequirement)
-                    return@withContext UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                    return@withEvidenceRead UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
             }
             val prepared = work.prepareRequirementEvidenceReviewForUi(
                 command.identity.sessionId, command.goalId, command.requirementIndex,
                 command.expectedRequirement, command.artifactPath, command.linkSequence, command.sha256,
-            ) ?: return@withContext UiCommandReceipt.NotAdmitted
+            ) ?: return@withEvidenceRead UiCommandReceipt.NotAdmitted
             if (!work.preparedReviewVersionStillCurrent(prepared))
-                return@withContext UiCommandReceipt.NotAdmitted
+                return@withEvidenceRead UiCommandReceipt.NotAdmitted
             currentCoroutineContext().ensureActive()
             synchronized(state.foregroundRunHandle.lock) {
                 if (!current(command.identity) || state.state.value.work.goal?.id != command.goalId ||
@@ -121,17 +126,17 @@ class LocalWorkEvidenceUiAdapter @Inject internal constructor(
     }
 
     override suspend fun checkText(command: com.labteto.dshmobile.uicontract.CheckWorkEvidenceTextCommand):
-        UiCommandReceipt = withContext(Dispatchers.IO) {
+        UiCommandReceipt = withEvidenceRead {
         try {
             synchronized(state.foregroundRunHandle.lock) {
                 if (!current(command.identity) || state.state.value.work.goal?.id != command.goalId)
-                    return@withContext UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                    return@withEvidenceRead UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
             }
             val prepared = work.prepareEvidenceTextCheckForUi(
                 command.identity.sessionId, command.goalId, command.requirementIndex,
                 command.expectedRequirement, command.artifactPath, command.linkSequence,
                 command.sha256, command.requiredText,
-            ) ?: return@withContext UiCommandReceipt.NotAdmitted
+            ) ?: return@withEvidenceRead UiCommandReceipt.NotAdmitted
             currentCoroutineContext().ensureActive()
             synchronized(state.foregroundRunHandle.lock) {
                 if (!current(command.identity) || state.state.value.work.goal?.id != command.goalId)
@@ -143,18 +148,18 @@ class LocalWorkEvidenceUiAdapter @Inject internal constructor(
         catch (failure: Exception) { UiCommandReceipt.Failed(failure.message ?: "文件内容检查失败") }
     }
 
-    override suspend fun submit(command: LinkWorkEvidenceReferenceCommand): UiCommandReceipt = withContext(Dispatchers.IO) {
+    override suspend fun submit(command: LinkWorkEvidenceReferenceCommand): UiCommandReceipt = withEvidenceRead {
         try {
             synchronized(state.foregroundRunHandle.lock) {
                 if (!current(command.identity) ||
                     command.verifyGoalId && state.state.value.work.goal?.id != command.expectedGoalId)
-                    return@withContext UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                    return@withEvidenceRead UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
             }
             val prepared = work.prepareRequirementEvidenceForUi(command.identity.sessionId, command.requirementIndex,
-                command.expectedRequirement, command.artifact) ?: return@withContext UiCommandReceipt.NotAdmitted
+                command.expectedRequirement, command.artifact) ?: return@withEvidenceRead UiCommandReceipt.NotAdmitted
             // Do the second potentially large file hash outside the foreground mutation lock.
             // A file changed after the user's selection must not receive a stale evidence link.
-            if (!work.preparedEvidenceStillCurrent(prepared)) return@withContext UiCommandReceipt.NotAdmitted
+            if (!work.preparedEvidenceStillCurrent(prepared)) return@withEvidenceRead UiCommandReceipt.NotAdmitted
             currentCoroutineContext().ensureActive()
             synchronized(state.foregroundRunHandle.lock) {
                 if (!current(command.identity) ||

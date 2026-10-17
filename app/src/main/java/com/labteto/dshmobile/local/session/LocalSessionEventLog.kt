@@ -85,6 +85,13 @@ class LocalSessionEventLog(
         }
     }
 
+    @Synchronized
+    internal fun writeProjectionCheckpointIfFits(name: String, version: Int, throughSequence: Long,
+        payload: String, generation: Long) {
+        val value = LocalSessionProjectionCheckpoint(version, projectionIdentity(), throughSequence, payload)
+        if (checkpoints.fits(value)) writeProjectionCheckpoint(name, version, throughSequence, payload, generation)
+    }
+
     /** Shares the native Session Owner's compare/append lock with every adapter for this path. */
     internal fun <T> withWriterLease(block: () -> T): T =
         delegate.withWriterLease(block)

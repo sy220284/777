@@ -7,6 +7,18 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class LocalToolActivityProjectionTest {
+    @Test fun authorizationIsPerExecutionAndDoesNotBecomePermissionForAReplacementCall() {
+        var state = reduceLocalToolActivity(LocalToolActivityState(), event(1, "tool/authorization-decision") {
+            put("id", "call"); put("name", "mcp_write"); put("execution_id", "exec-original"); put("approved", true)
+        })
+        assertEquals(true, state.activities.single().authorizationGranted)
+        state = reduceLocalToolActivity(state, event(2, "tool/execution-started") {
+            put("id", "call"); put("name", "mcp_write"); put("execution_id", "exec-replacement")
+        })
+        assertEquals(null, state.activities.single().authorizationGranted)
+        assertEquals("exec-replacement", state.activities.single().executionId)
+    }
+
     @Test
     fun declarationAdmissionAndResultFoldIntoOneActivity() {
         var state = LocalToolActivityState()

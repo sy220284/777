@@ -19,11 +19,17 @@ import kotlinx.serialization.json.Json
  * and attachment metadata are never written to Bundles; a single application-
  * private, Keystore-encrypted owner survives process death and pack switching.
  */
-internal class LocalEncryptedUiDraftStore(context: Context) {
+internal class LocalEncryptedUiDraftStore(context: Context) : com.labteto.dshmobile.uihost.UiPrivateTextCipher {
     private val preferences = context.applicationContext.getSharedPreferences(
         "ui_private_drafts_v1", Context.MODE_PRIVATE,
     )
     private val secretKey: SecretKey by lazy { getOrCreateKey() }
+
+    override fun seal(scope: String, value: String): String =
+        LocalUiDraftCipher.encrypt(secretKey, value.toByteArray(Charsets.UTF_8), "scene:$scope")
+
+    override fun open(scope: String, sealed: String): String =
+        LocalUiDraftCipher.decrypt(secretKey, sealed, "scene:$scope").toString(Charsets.UTF_8)
 
     fun read(domain: String): List<String> {
         checkDomain(domain)

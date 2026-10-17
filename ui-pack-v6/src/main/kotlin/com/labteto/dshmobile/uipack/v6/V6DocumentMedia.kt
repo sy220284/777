@@ -1,9 +1,6 @@
 package com.labteto.dshmobile.uipack.v6
 
 import android.graphics.BitmapFactory
-import android.media.MediaPlayer
-import android.widget.MediaController
-import android.widget.VideoView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.local.model.LocalMediaPage
 import com.labteto.dshmobile.uihost.rememberUiStreamDocumentSaver
@@ -123,8 +119,10 @@ internal fun V6DocumentMediaNode(node: UiDocumentNode.Media, sessionId: String, 
                         }
                     }
                 }
-                UiDocumentMediaKind.AUDIO -> V6AudioPlayback(path)
-                UiDocumentMediaKind.VIDEO -> V6VideoPlayback(path)
+                UiDocumentMediaKind.AUDIO -> com.labteto.dshmobile.uihost.UiOwnedMediaPlayback(
+                    path, com.labteto.dshmobile.uicontract.UiAttachmentMediaKind.AUDIO)
+                UiDocumentMediaKind.VIDEO -> com.labteto.dshmobile.uihost.UiOwnedMediaPlayback(
+                    path, com.labteto.dshmobile.uicontract.UiAttachmentMediaKind.VIDEO)
             }
         }
     }
@@ -186,53 +184,4 @@ private fun V6MediaExport(node: UiDocumentNode.Media, sessionId: String, media: 
         save(node.assetId to sessionId)
     }, enabled = !exporting, style = SyButtonStyle.SECONDARY)
     result?.let { Text(it) }
-}
-
-@Composable
-private fun V6AudioPlayback(path: String) {
-    var retry by remember(path) { mutableIntStateOf(0) }
-    var ready by remember(path, retry) { mutableStateOf(false) }
-    var playing by remember(path, retry) { mutableStateOf(false) }
-    var failed by remember(path, retry) { mutableStateOf(false) }
-    val player = remember(path, retry) { MediaPlayer() }
-    DisposableEffect(player) {
-        player.setOnPreparedListener { ready = true }
-        player.setOnCompletionListener { playing = false }
-        player.setOnErrorListener { _, _, _ -> failed = true; ready = false; playing = false; true }
-        try { player.setDataSource(path); player.prepareAsync() }
-        catch (_: Exception) { failed = true }
-        onDispose {
-            runCatching { player.stop() }
-            player.release()
-        }
-    }
-    if (failed) {
-        Text("音频无法播放")
-        SyButton("重试", { retry++ }, style = SyButtonStyle.SECONDARY)
-    } else {
-        if (!ready) Text("准备音频中")
-        SyButton(if (playing) "暂停" else "播放", onClick = {
-            try {
-                if (player.isPlaying) player.pause() else player.start()
-                playing = player.isPlaying
-            } catch (_: Exception) { failed = true; ready = false; playing = false }
-        }, enabled = ready)
-    }
-}
-
-@Composable
-private fun V6VideoPlayback(path: String) {
-    var video by remember(path) { mutableStateOf<VideoView?>(null) }
-    AndroidView(
-        factory = { context ->
-            VideoView(context).apply {
-                setVideoPath(path)
-                setMediaController(MediaController(context).also { it.setAnchorView(this) })
-                video = this
-            }
-        },
-        modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 340.dp),
-    )
-    DisposableEffect(video) { onDispose { video?.stopPlayback() } }
-    Text("点击视频播放器可开始或暂停")
 }

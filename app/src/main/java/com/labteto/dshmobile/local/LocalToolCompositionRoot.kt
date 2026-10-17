@@ -52,6 +52,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
     private val networkSearchSettings: LocalNetworkSearchSettings,
     private val skillManager: com.labteto.dshmobile.local.tools.LocalSkillManager,
     private val pinnedInvocations: com.labteto.dshmobile.local.tools.LocalPinnedInvocationStore,
+    private val workspaceGate: com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate,
 ) : LocalToolsManagementPort {
     internal val workspace = sessionStorage.files.workspace
     internal val toolOutputStore = LocalToolOutputStore(
@@ -150,6 +151,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
     internal val execution: LocalToolExecutionCoordinator by lazy {
         LocalToolExecutionCoordinator(
             registry = registry,
+            workspaceReadWriteGate = workspaceGate,
             currentSessionId = runtimeStateStore::currentSessionId,
             planMode = { runtimeStateStore.state.value.work.planMode },
             networkSearchEnabled = networkSearchSettings::isEnabled,
@@ -170,6 +172,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
                 sessionStorage.eventLogs.get(sessionId).append(
                     "tool/authorization-decision",
                     buildJsonObject {
+                        put("session_id", sessionId)
                         put("id", call.id)
                         put("name", call.name)
                         put("execution_id", identity.executionId)

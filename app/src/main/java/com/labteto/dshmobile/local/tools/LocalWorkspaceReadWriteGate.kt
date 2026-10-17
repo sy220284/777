@@ -16,13 +16,14 @@ internal fun isParallelSafeReadTool(tool: HarnessTool?): Boolean =
         tool.metadata.parallelReadSafe
 
 /**
- * One existing tool coordinator owns this writer-preferred gate for its workspace.
+ * The application composition shares this writer-preferred workspace gate with tool execution and evidence reads.
  * Read operations can overlap each other, while mutations and process commands exclude them.
  * Turnstile ordering keeps a waiting writer from being starved by newly arriving readers.
  *
  * This gate is intentionally short-lived and in-memory. It is not a second session/agent owner.
  */
-internal class LocalWorkspaceReadWriteGate {
+@javax.inject.Singleton
+internal class LocalWorkspaceReadWriteGate @javax.inject.Inject constructor() {
     private val turnstile = Mutex()
     private val readerCountLock = Mutex()
     private val exclusive = Mutex()

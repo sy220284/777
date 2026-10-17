@@ -46,6 +46,11 @@ internal class LocalSessionProjectionCheckpoints(private val logFile: File, priv
         }
     }
 
+    /** A window larger than the checkpoint budget remains readable from the original log. */
+    fun fits(checkpoint: LocalSessionProjectionCheckpoint): Boolean =
+        json.encodeToString(LocalSessionProjectionCheckpoint.serializer(), checkpoint)
+            .toByteArray().size <= MAX_CHECKPOINT_BYTES
+
     fun clear() {
         logFile.parentFile?.listFiles().orEmpty()
             .filter { it.name.startsWith(logFile.name + ".projection-") }

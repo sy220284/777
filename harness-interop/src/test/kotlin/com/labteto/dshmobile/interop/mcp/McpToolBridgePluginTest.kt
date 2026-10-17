@@ -3,6 +3,9 @@ package com.labteto.dshmobile.interop.mcp
 import java.io.File
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.tools.ToolContext
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.jsonObject
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -28,6 +31,37 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class McpToolBridgePluginTest {
+    @Test fun agentSubscriptionAndLifecycleToolUseTheSameOrderedOwnerCursor() = runBlocking {
+        val plugin = McpToolBridgePlugin(http = OkHttpClient(), json = Json,
+            transportFactory = {
+                object : McpTransport {
+                    override suspend fun request(method: String, params: JsonObject) = buildJsonObject {
+                        put("result", buildJsonObject { put("tools", buildJsonArray { }) })
+                    }
+                    override fun close() = Unit
+                }
+            })
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        try {
+            val observer = async(start = CoroutineStart.UNDISPATCHED) {
+                plugin.observeLifecycle().first { page ->
+                    page.events.any { it.snapshot?.lifecycle == McpServerLifecycle.REGISTERED }
+                }
+            }
+            plugin.connectHttpFromUi(registry.context, "observed", "https://example.com/mcp")
+            val event = withTimeout(5_000) { observer.await() }
+            assertTrue(event.events.any { it.serverId == "observed" })
+            val result = registry.context.tools.execute("mcp_lifecycle_events", buildJsonObject {
+                put("incarnation", "retired-owner"); put("after_sequence", event.latestSequence)
+            })
+            val payload = Json.parseToJsonElement(result.content).jsonObject
+            assertEquals("true", payload["requires_snapshot"]?.jsonPrimitive?.content)
+            assertEquals(event.incarnation, payload["incarnation"]?.jsonPrimitive?.content)
+            assertTrue(payload.containsKey("servers"))
+        } finally { registry.uninstall("mcp-bridge") }
+    }
+
     @Test
     fun unsolicitedTransportExitRevokesOnlyThatServerWithoutReplayingItsTool() = runBlocking {
         val termination = MutableSharedFlow<Throwable>(replay = 1)

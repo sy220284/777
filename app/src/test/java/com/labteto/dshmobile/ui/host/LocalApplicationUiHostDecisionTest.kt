@@ -38,11 +38,14 @@ class LocalApplicationUiHostDecisionTest {
             override val renderers = rendered.associateWith { UiSceneRenderer { _ -> } }
         }
 
-    @Test fun productionRootDefaultsOnlyToExplicitShippedV6Mode() {
-        assertEquals(LocalApplicationUiDecision.Legacy,
-            decideApplicationUi(null, emptyList(), requirements))
-        assertEquals(LocalApplicationUiDecision.Legacy,
-            decideApplicationUi(LEGACY_V6_APP_UI, emptyList(), requirements))
+    @Test fun retiredSelectorsUseCurrentAdmissionAndNeverInstantiateLegacy() {
+        for (selector in listOf(null, "legacy-v6", "legacy-v6-shell")) {
+            val missing = decideApplicationUi(selector, emptyList(), requirements)
+            assertTrue(missing is LocalApplicationUiDecision.Unavailable)
+            assertEquals(V6_APPLICATION_UI, (missing as LocalApplicationUiDecision.Unavailable).selectedId)
+            val full = pack(V6_APPLICATION_UI, renderableScenes, renderableScenes)
+            assertTrue(decideApplicationUi(selector, listOf(full), requirements) is LocalApplicationUiDecision.Hosted)
+        }
     }
 
     @Test fun conversationSliceCannotEnterWholeApplicationHost() {

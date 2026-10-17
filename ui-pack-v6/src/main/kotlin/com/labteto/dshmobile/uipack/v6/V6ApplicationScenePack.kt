@@ -19,6 +19,8 @@ import com.labteto.dshmobile.uicontract.UiAccessibility
 import com.labteto.dshmobile.uicontract.UiHostPreferences
 import com.labteto.dshmobile.uicontract.UiHostPreferencesCommand
 import com.labteto.dshmobile.uicontract.UiPackManifest
+import com.labteto.dshmobile.uicontract.UiSystemPermission
+import com.labteto.dshmobile.uicontract.UiSystemPermissionReceipt
 import com.labteto.dshmobile.uicontract.UiSceneId
 import com.labteto.dshmobile.uicontract.UiCapabilityId
 import com.labteto.dshmobile.uicontract.SettingsUiPort
@@ -446,6 +448,16 @@ fun V6PreferencesScene(page: V6PreferencesPage, owner: HostPreferencesUiPort, on
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
+    val requestPermission = com.labteto.dshmobile.uihost.rememberUiSystemPermissionRequester { receipt ->
+        systemNotificationAccess = owner.notificationPermissionGranted()
+        mediaAccess = owner.mediaPermissionSnapshot()
+        feedback = when (receipt) {
+            is UiSystemPermissionReceipt.Completed -> "系统权限请求已结束，实际授权以当前系统状态为准"
+            UiSystemPermissionReceipt.Busy -> "请先完成当前系统窗口的操作"
+            UiSystemPermissionReceipt.Interrupted -> "权限请求已中断，请按需重新发起"
+            is UiSystemPermissionReceipt.Failed -> receipt.message ?: "无法打开系统权限请求"
+        }
+    }
     val scope = rememberCoroutineScope()
     LaunchedEffect(owner) {
         try {
@@ -509,6 +521,10 @@ fun V6PreferencesScene(page: V6PreferencesPage, owner: HostPreferencesUiPort, on
                 onOpenSettings = { launchSystem(true) })
             V6PreferencesPage.PERMISSIONS -> SyGlassCard(Modifier.fillMaxWidth()) {
                 Text("权限由 Android 系统决定，本界面不会自动授予。")
+                SyButton("请求通知权限", { requestPermission(setOf(UiSystemPermission.NOTIFICATIONS)) })
+                SyButton("选择图片与视频授权", { requestPermission(setOf(
+                    UiSystemPermission.IMAGES, UiSystemPermission.VIDEOS, UiSystemPermission.SELECTED_VISUAL)) })
+                SyButton("请求音频读取授权", { requestPermission(setOf(UiSystemPermission.AUDIO)) })
                 SyButton("应用权限设置", { launchSystem(false) })
                 SyButton("通知权限设置", { launchSystem(true) }, style = SyButtonStyle.SECONDARY)
             }

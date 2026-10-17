@@ -12,6 +12,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.labteto.dshmobile.uihost.rememberUiPrivateText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -90,9 +91,9 @@ fun V6PersonaArchiveScene(
     var notice by remember(gallery) { mutableStateOf<String?>(null) }
     val chosen = entries.firstOrNull { it.id == activeGallery }
     val story = chosen?.stories?.firstOrNull { it.id == activeStory }
-    var rename by rememberSaveable(activeGallery, activeStory) { mutableStateOf(story?.title.orEmpty()) }
-    var notes by rememberSaveable(activeGallery, activeStory) { mutableStateOf(story?.notes.orEmpty()) }
-    var stage by rememberSaveable(activeGallery, activeStory) { mutableStateOf(story?.storyStage.orEmpty()) }
+    var rename by rememberUiPrivateText("story.title:$activeGallery:$activeStory") { story?.title.orEmpty() }
+    var notes by rememberUiPrivateText("story.notes:$activeGallery:$activeStory") { story?.notes.orEmpty() }
+    var stage by rememberUiPrivateText("story.stage:$activeGallery:$activeStory") { story?.storyStage.orEmpty() }
     val dirty = story != null && (rename != story.title || notes != story.notes || stage != story.storyStage)
     var pendingDeparture by remember(gallery) { mutableStateOf<(() -> Unit)?>(null) }
     var departureError by remember(gallery) { mutableStateOf<String?>(null) }

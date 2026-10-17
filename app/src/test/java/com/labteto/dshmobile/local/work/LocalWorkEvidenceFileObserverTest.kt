@@ -14,6 +14,16 @@ class LocalWorkEvidenceFileObserverTest {
         0, "报告", path, 1L, "call", "a".repeat(64), 2L,
     )
 
+    @Test fun originalGoalArtifactsAreWatchedEvenWithoutManualEvidenceLinks() {
+        val root = files.newFolder("machine-goal")
+        val reports = File(root, "reports").apply { mkdirs() }
+        File(reports, "result.txt").writeText("original goal output")
+        val targets = workEvidenceWatchTargets(root, emptyList(), listOf("reports/result.txt"))
+        assertEquals(setOf("reports"), targets[root.canonicalFile])
+        assertEquals(setOf("result.txt"), targets[reports.canonicalFile])
+        assertTrue(workEvidenceWatchTargets(root, emptyList(), listOf("../outside.txt")).isEmpty())
+    }
+
     @Test fun onlyActualWorkspaceFileParentsCanBeObserved() {
         val root = files.newFolder("project")
         val reports = File(root, "reports").apply { mkdirs() }

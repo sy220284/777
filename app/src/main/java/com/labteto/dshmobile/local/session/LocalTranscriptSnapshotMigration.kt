@@ -32,15 +32,15 @@ internal fun migrateLegacyTranscriptSnapshot(
     eventLog: LocalSessionEventLog,
     windowSize: Int,
     chunkSize: Int = 200,
-): LocalTranscriptSnapshotMigration? {
-    if (session.messages.isEmpty() || session.transcriptWindow.isNotEmpty()) return null
+): LocalTranscriptSnapshotMigration? = eventLog.withWriterLease {
+    if (session.messages.isEmpty() || session.transcriptWindow.isNotEmpty()) return@withWriterLease null
     val boundedWindow = windowSize.coerceAtLeast(1)
     val boundedChunk = chunkSize.coerceIn(1, 1_000)
 
     val existingCompletion = eventLog.latest(LOCAL_TRANSCRIPT_MIGRATION_COMPLETE_EVENT)
     if (existingCompletion != null) {
         val rebuilt = LocalSessionTranscriptPager(eventLog).all()
-        return LocalTranscriptSnapshotMigration(
+        return@withWriterLease LocalTranscriptSnapshotMigration(
             window = rebuilt.takeLast(boundedWindow),
             index = buildLocalTranscriptRuntimeIndex(rebuilt),
             projectedThroughSequence = eventLog.latestSequence(),
@@ -91,7 +91,7 @@ internal fun migrateLegacyTranscriptSnapshot(
         },
     )
 
-    return LocalTranscriptSnapshotMigration(
+    return@withWriterLease LocalTranscriptSnapshotMigration(
         window = source.takeLast(boundedWindow),
         index = buildLocalTranscriptRuntimeIndex(source),
         projectedThroughSequence = complete.sequence,

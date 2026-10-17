@@ -57,9 +57,9 @@ internal class LocalToolExecutionCoordinator(
     private val networkSearchEnabled: () -> Boolean = { true },
     private val pinnedConnectorIds: () -> List<String> = { emptyList() },
     private val pinnedSkillIds: () -> List<String> = { emptyList() },
+    private val workspaceReadWriteGate: LocalWorkspaceReadWriteGate = LocalWorkspaceReadWriteGate(),
 ) {
     // 前台 Lead 与所有后台成员共用此闸门，文件写入工具不得并行交错执行。
-    private val workspaceReadWriteGate = LocalWorkspaceReadWriteGate()
 
     internal fun isNetworkSearchPermitted(name: String): Boolean =
         networkSearchEnabled() || LocalToolPolicy.canonical(name) !in NETWORK_SEARCH_TOOLS
@@ -366,6 +366,7 @@ internal class LocalToolExecutionCoordinator(
 
         val executionOwner = currentCoroutineContext()[SessionExecutionContext]?.lease
         val runOwner = currentCoroutineContext()[AgentRunExecutionContext]
+        var authorizationRecorded = false
         var approvalDenied = false
         var executionStarted = false
         val executionIdentity = LocalToolExecutionIdentity(
@@ -411,6 +412,7 @@ internal class LocalToolExecutionCoordinator(
                             // No tool may start if the exact user's decision failed to
                             // persist. Do not reuse a previous call's selection/grant.
                             recordAuthorizationDecision(sessionId, call, executionIdentity, granted)
+                            authorizationRecorded = true
                             if (!granted) approvalDenied = true
                             granted
                         },
@@ -432,6 +434,12 @@ internal class LocalToolExecutionCoordinator(
                             // for the shared read/write gate and before writing the started fact.
                             if (registry.get(call.name) !== admittedTool) {
                                 throw LocalToolRegistrationChanged()
+                            }
+                            // NEVER/automatic policies still produce a decision for this exact
+                            // execution. Registry admission is the authority, not UI selection.
+                            if (!authorizationRecorded) {
+                                recordAuthorizationDecision(sessionId, call, executionIdentity, true)
+                                authorizationRecorded = true
                             }
                             recordExecutionStarted(sessionId, call, executionIdentity)
                             executionStarted = true

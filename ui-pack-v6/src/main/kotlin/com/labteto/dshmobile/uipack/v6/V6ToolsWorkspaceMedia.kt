@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
+import com.labteto.dshmobile.uihost.rememberUiPrivateText
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
@@ -748,10 +749,10 @@ fun V6MediaScene(media: MediaUiPort, settings: SettingsUiPort,
     var chosenKind by rememberSaveable { mutableStateOf(LocalMediaKind.IMAGE.name) }
     val kind = LocalMediaKind.valueOf(chosenKind)
     val candidates = offers.filter { it.kind == kind }
-    var picked by rememberSaveable(chosenKind) { mutableStateOf("") }
-    var imageText by rememberSaveable { mutableStateOf("") }
-    var videoText by rememberSaveable { mutableStateOf("") }
-    var speechText by rememberSaveable { mutableStateOf("") }
+    var picked by rememberUiPrivateText("media.selection:$sessionId:$chosenKind") { "" }
+    var imageText by rememberUiPrivateText("media.imageText:$sessionId") { "" }
+    var videoText by rememberUiPrivateText("media.videoText:$sessionId") { "" }
+    var speechText by rememberUiPrivateText("media.speechText:$sessionId") { "" }
     var showModels by rememberSaveable { mutableStateOf(false) }
     var creating by rememberSaveable(sessionId) { mutableStateOf(creation) }
     var audioRouteId by remember { mutableStateOf<String?>(null) }

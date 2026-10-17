@@ -47,8 +47,6 @@ import com.labteto.dshmobile.uihost.UiPackAdmissionRequirements
 import com.labteto.dshmobile.uihost.RenderHostedScene
 import com.labteto.dshmobile.uihost.UiSceneRenderAccess
 
-/** The original shipped screen is an explicit compatibility mode, never a fake complete UiPack. */
-internal const val LEGACY_V6_APP_UI = "legacy-v6-shell"
 
 /** Never route a notification to Home until the Session Owner confirms the exact target. */
 internal fun localNotificationHomeReady(target: String?, snapshot: com.labteto.dshmobile.uicontract.UiSessionsSnapshot?): Boolean =
@@ -69,7 +67,6 @@ internal fun localNavigationSnapshotKey(packId: String, sessionId: String?): Str
 
 
 internal sealed interface LocalApplicationUiDecision {
-    data object Legacy : LocalApplicationUiDecision
     data class Hosted(val admission: UiApplicationPackAdmission.Admitted) : LocalApplicationUiDecision
     data class Unavailable(val selectedId: String, val rejection: UiApplicationPackAdmission) : LocalApplicationUiDecision
 }
@@ -83,12 +80,11 @@ internal fun decideApplicationUi(
     installed: Collection<UiApplicationScenePack>,
     requirements: UiPackAdmissionRequirements,
 ): LocalApplicationUiDecision {
-    if (selectedId == null || selectedId == LEGACY_V6_APP_UI)
-        return LocalApplicationUiDecision.Legacy
-    val admission = UiApplicationPackRegistry(installed).select(selectedId, requirements)
+    val currentId = currentApplicationPack(selectedId)
+    val admission = UiApplicationPackRegistry(installed).select(currentId, requirements)
     return when (admission) {
         is UiApplicationPackAdmission.Admitted -> LocalApplicationUiDecision.Hosted(admission)
-        else -> LocalApplicationUiDecision.Unavailable(selectedId, admission)
+        else -> LocalApplicationUiDecision.Unavailable(currentId, admission)
     }
 }
 
@@ -109,7 +105,6 @@ internal fun LocalApplicationUiHost(
     notificationSessions: SessionUiPort? = null,
     onNotificationSessionProcessed: () -> Unit = {},
     onSceneRequestProcessed: (String, com.labteto.dshmobile.uihost.UiSceneNavigationResult) -> Unit = { _, _ -> },
-    legacyContent: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
     val activity = remember(context) { context.findHostActivity() }
@@ -117,14 +112,14 @@ internal fun LocalApplicationUiHost(
         context.getSharedPreferences(selectionPreferenceName, Context.MODE_PRIVATE)
     }
     var selectedId by remember(preference) {
-        mutableStateOf(preference.getString("selected_pack", LEGACY_V6_APP_UI))
+        mutableStateOf(currentApplicationPack(preference.getString("selected_pack", null)))
     }
     // An admitted pack selection persisted by Settings must swap the live Host too.
     // This listener watches a local preference only: no cloud/network UI-state coupling.
     DisposableEffect(preference) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
             if (key == "selected_pack")
-                selectedId = prefs.getString(key, LEGACY_V6_APP_UI)
+                selectedId = currentApplicationPack(prefs.getString(key, null))
         }
         preference.registerOnSharedPreferenceChangeListener(listener)
         onDispose { preference.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -149,7 +144,6 @@ internal fun LocalApplicationUiHost(
         decideApplicationUi(selectedId, installedPacks, requirements)
     }
     when (decision) {
-        LocalApplicationUiDecision.Legacy -> legacyContent()
         is LocalApplicationUiDecision.Hosted -> {
             val packId = decision.admission.pack.manifest.id
             // An old overlay or pending screen is not part of a different session.
@@ -236,14 +230,14 @@ internal fun LocalApplicationUiHost(
             if (result is UiSceneRenderAccess.Rejected) {
                 UnavailablePackNotice {
                     // Explicit recovery must clear the rejected pack's saved history.
-                    preference.edit().remove(snapshotKey)
-                        .putString("selected_pack", LEGACY_V6_APP_UI).commit()
+                    preference.edit().remove(snapshotKey).commit()
+                    activity?.recreate()
                 }
             }
         }
         is LocalApplicationUiDecision.Unavailable -> {
             UnavailablePackNotice {
-                preference.edit().putString("selected_pack", LEGACY_V6_APP_UI).commit()
+                preference.edit().putString("selected_pack", V6_APPLICATION_UI).commit()
             }
         }
     }

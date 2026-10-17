@@ -14,6 +14,18 @@ import org.junit.Test
 
 /** One Host controls every native picker / provider stream across all Scenes. */
 class UiHostSystemOperationOwnerTest {
+    @Test fun permissionWindowUsesTheSameOwnerAsFilesAndLateResultCannotFinishAnotherWindow() {
+        val owner = UiHostSystemOperationOwner()
+        val permission = requireNotNull(owner.begin(UiHostPlatformAction.REQUEST_PERMISSION))
+        assertNull(owner.begin(UiHostPlatformAction.PICK_ATTACHMENT))
+        assertNull(owner.begin(UiHostPlatformAction.SAVE_DOCUMENT))
+        assertTrue(owner.finish(permission))
+        val document = requireNotNull(owner.begin(UiHostPlatformAction.PICK_ATTACHMENT))
+        assertFalse(owner.finish(permission))
+        assertEquals(UiHostPlatformAction.PICK_ATTACHMENT, owner.activeAction())
+        assertTrue(owner.finish(document))
+    }
+
     @Test fun attachmentPickerBlocksWorkspaceExportAndDocumentSaveUntilOperationCompletes() {
         val owner = UiHostSystemOperationOwner()
         val attachment = UiHostSystemOperationLease(owner, UiHostPlatformAction.PICK_ATTACHMENT)

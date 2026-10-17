@@ -12,6 +12,8 @@ data class LocalToolActivityUiItem(
     val finishedSequence: Long? = null,
     val argumentsPreview: String? = null,
     val resultPreview: String? = null,
+    val authorizationGranted: Boolean? = null,
+    val authorizationSequence: Long? = null,
 )
 
 enum class LocalToolUiPhase {

@@ -76,7 +76,7 @@ class LocalApplicationUiHostInstrumentedTest {
                         if (result is com.labteto.dshmobile.uihost.UiSceneNavigationResult.Changed)
                             acknowledgements += key
                     },
-                ) { Text("Explicit legacy screen") }
+                )
             }
         }
         compose.onNodeWithText("settings.models").assertExists()
@@ -100,7 +100,7 @@ class LocalApplicationUiHostInstrumentedTest {
             MaterialTheme {
                 LocalApplicationUiHost(
                     installedPacks = listOf(next), availableCapabilities = emptySet(),
-                ) { Text("Explicit legacy screen") }
+                )
             }
         }
         compose.onNodeWithText("settings.models").assertExists()
@@ -118,13 +118,13 @@ class LocalApplicationUiHostInstrumentedTest {
             MaterialTheme {
                 LocalApplicationUiHost(
                     installedPacks = listOf(next), availableCapabilities = emptySet(),
-                ) { Text("Explicit legacy screen") }
+                )
             }
         }
         compose.onNodeWithText(context.getString(R.string.ui_pack_incompatible)).assertExists()
         compose.onNodeWithText("Independent V6 home").assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.ui_pack_back_to_stable)).performClick()
-        compose.onNodeWithText("Explicit legacy screen").assertExists()
+        compose.onNodeWithText(context.getString(R.string.ui_pack_incompatible)).assertExists()
         compose.runOnIdle {
             assertEquals(null, preference.getString(localNavigationSnapshotKey("fixture-v6", null), null))
         }
@@ -137,16 +137,16 @@ class LocalApplicationUiHostInstrumentedTest {
                 LocalApplicationUiHost(
                     installedPacks = listOf(v6),
                     availableCapabilities = emptySet(),
-                ) { Text("Explicit legacy screen") }
+                )
             }
         }
-        compose.onNodeWithText("Explicit legacy screen").assertExists()
+        compose.onNodeWithText(context.getString(R.string.ui_pack_incompatible)).assertExists()
         compose.runOnIdle { preference.edit().putString("selected_pack", "fixture-v6").commit() }
         compose.onNodeWithText("Independent V6 home").assertExists()
         compose.runOnIdle { preference.edit().putString("selected_pack", "missing-pack").commit() }
         compose.onNodeWithText(context.getString(R.string.ui_pack_incompatible)).assertExists()
         compose.onNodeWithText("Independent V6 home").assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.ui_pack_back_to_stable)).performClick()
-        compose.onNodeWithText("Explicit legacy screen").assertExists()
+        compose.onNodeWithText(context.getString(R.string.ui_pack_incompatible)).assertExists()
     }
 }

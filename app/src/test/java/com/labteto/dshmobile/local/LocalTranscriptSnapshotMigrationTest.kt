@@ -9,6 +9,7 @@ import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
 import com.labteto.dshmobile.local.session.buildLocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
+import com.labteto.dshmobile.local.session.LocalTranscriptSnapshotMigration
 import com.labteto.dshmobile.local.session.migrateLegacyTranscriptSnapshot
 import java.io.File
 import kotlinx.serialization.json.Json
@@ -20,6 +21,33 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalTranscriptSnapshotMigrationTest {
+    @Test fun twoOwnersCannotInterleaveDuplicateLegacyMigrationBaselines() {
+        val directory = java.nio.file.Files.createTempDirectory("legacy-migration-owners").toFile()
+        val path = File(directory, "session.events.jsonl")
+        val first = LocalSessionEventLog(path, Json)
+        val second = LocalSessionEventLog(path, Json)
+        val workers = java.util.concurrent.Executors.newFixedThreadPool(2)
+        try {
+            val source = (0 until 7).map { message("m$it", "user", "legacy-$it") }
+            val session = LocalHarnessSession(id = "legacy", messages = source,
+                transcriptIndex = buildLocalTranscriptRuntimeIndex(source))
+            val start = java.util.concurrent.CountDownLatch(1)
+            val futures = listOf(first, second).map { log -> workers.submit<LocalTranscriptSnapshotMigration?> {
+                check(start.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                migrateLegacyTranscriptSnapshot(session, log, windowSize = 3, chunkSize = 2)
+            } }
+            start.countDown()
+            futures.forEach { future ->
+                assertEquals(7L, future.get(5, java.util.concurrent.TimeUnit.SECONDS)!!.index.totalMessageCount)
+            }
+            assertEquals(1, first.snapshot().count { it.type == LOCAL_TRANSCRIPT_MIGRATION_BASELINE_EVENT })
+            assertEquals(source.map { it.id }, LocalSessionTranscriptPager(second).all(pageSize = 2).map { it.id })
+        } finally {
+            workers.shutdownNow()
+            first.close(); second.close(); directory.deleteRecursively()
+        }
+    }
+
     @Test
     fun migrationMovesLegacySnapshotBehindHardEventBoundary() {
         withLog { log ->

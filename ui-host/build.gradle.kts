@@ -20,6 +20,7 @@ dependencies {
     implementation("androidx.compose.runtime:runtime")
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     constraints {
         listOf("lifecycle-common-java8", "lifecycle-process", "lifecycle-runtime",
             "lifecycle-runtime-ktx", "lifecycle-viewmodel", "lifecycle-viewmodel-ktx",

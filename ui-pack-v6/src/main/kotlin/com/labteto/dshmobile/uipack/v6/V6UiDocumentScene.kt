@@ -17,6 +17,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.labteto.dshmobile.uihost.rememberUiPrivateText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
@@ -609,8 +610,7 @@ private fun V6DocumentNode(
         is UiDocumentNode.Text -> Text(node.text)
         is UiDocumentNode.Media -> V6DocumentMediaNode(node, snapshot.document.source.sessionId, media)
         is UiDocumentNode.Table -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            var filter by rememberSaveable(snapshot.document.documentId,
-                snapshot.document.revision, node.id) { mutableStateOf("") }
+            var filter by rememberUiPrivateText("document.filter:${snapshot.document.source.sessionId}:${snapshot.document.documentId}:${snapshot.document.revision}:${node.id}") { "" }
             SyInput(filter, { filter = it }, label = "筛选表格")
             val visible = node.rows.filter { row ->
                 filter.isBlank() || row.any { it.contains(filter, ignoreCase = true) }
@@ -712,9 +712,7 @@ private fun V6DocumentGeneration(
     var busy by remember(identity, message?.id) { mutableStateOf(false) }
     var feedback by remember(identity, message?.id) { mutableStateOf<String?>(null) }
     var confirmAi by remember(identity, message?.id) { mutableStateOf(false) }
-    var design by rememberSaveable(identity?.sessionId, message?.id) {
-        mutableStateOf(message?.text.orEmpty())
-    }
+    var design by rememberUiPrivateText("document.design:${identity?.sessionId}:${message?.id}") { message?.text.orEmpty() }
     val scope = rememberCoroutineScope()
     val target = identity
     val msg = message

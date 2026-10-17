@@ -978,34 +978,10 @@ for module_id, relative in feature_contribution_paths.items():
             if required not in contribution:
                 die(f"Feature UI contribution {module_id} lost {required.strip(' =')} ownership")
 
-feature_shell = strip_comments(read(
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
-))
-contribution_factories: dict[str, str] = {}
-for module_id, relative in feature_contribution_paths.items():
-    declared = re.findall(
-        r"\bfun\s+(local[A-Za-z_0-9]+FeatureUiContribution)\s*\(",
-        strip_comments(read(relative)),
-    )
-    if len(declared) != 1:
-        die(f"{relative} must define exactly one Feature contribution factory: {declared}")
-    contribution_factories[module_id] = declared[0]
-if len(set(contribution_factories.values())) != len(module_ids):
-    die("Feature UI contribution factories must have unique names")
-try:
-    assembled_feature_factories(feature_shell, set(contribution_factories.values()))
-except ValueError as error:
-    die(str(error))
-
-for required in (
-    "localFeatureOwnedBackAction(",
-    "localFeatureRestoreStack(",
-    "localFeatureDrawerAction(entry, featureContributions)",
-):
-    if required not in feature_shell:
-        die("Shell lost Feature-owned navigation contract: " + required)
-if re.search(r"openFeatureFromDrawer\(\s*LocalFeaturePage\.", feature_shell):
-    die("Shell must not hard-code product Drawer route ownership")
+# The old callback-composing Shell is retired. Route ownership is still checked
+# above against FeatureCatalog; the sole application renderer is now the Scene Host.
+if (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt").exists():
+    die("Retired Shell source must not be restored; shared feedback belongs to LocalSendFeedback")
 
 plugin_composition = strip_comments(read(
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt"
@@ -1038,25 +1014,13 @@ if "transportFactory = { endpoint ->" not in plugin_composition or (
 ) or plugin_composition.count("McpPluginWorkerTransport(") < 2:
     die("R4 production MCP HTTP and stdio must both use Binder worker without local fallback")
 v6_boot = strip_comments(read("app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt"))
-for required in ("if (standaloneSelected)", "LocalV6StandaloneViewModel = hiltViewModel()",
-                 "else {", "LocalLegacyApplicationEntry("):
-    if required not in v6_boot:
-        die("R4 independent V6 root lost its explicit Feature/Legacy branch: " + required)
-if "LocalHarnessViewModel" in v6_boot or "LocalHarnessScreen" in v6_boot:
-    die("R4 application root must never directly depend on aggregate Legacy ViewModel or screen")
-legacy_entry = strip_comments(
-    read("app/src/main/java/com/labteto/dshmobile/ui/legacy/LocalLegacyApplicationEntry.kt")
-)
-for required in ("LocalHarnessViewModel = hiltViewModel()", "LocalHarnessScreen("):
-    if required not in legacy_entry:
-        die("R4 former Shell construction must stay quarantined in compatibility entry: " + required)
-if v6_boot.index("LocalV6StandaloneViewModel = hiltViewModel()") >= v6_boot.index("LocalLegacyApplicationEntry("):
-    die("R4 standalone V6 must branch before quarantined Legacy composition")
-legacy_entry_pack = strip_comments(
-    read("app/src/main/java/com/labteto/dshmobile/ui/legacy/LocalLegacyApplicationEntry.kt")
-)
-if "installedPacks = emptyList()" not in legacy_entry_pack or "LocalApplicationPackInstallations" in legacy_entry_pack:
-    die("R4 Legacy compatibility must not install a second V6 pack from aggregate old ViewModel")
+if "LocalV6StandaloneViewModel = hiltViewModel()" not in v6_boot:
+    die("R4 AppRoot must compose the real Feature Port application owner")
+for retired in ("LocalHarnessViewModel", "LocalHarnessScreen", "LocalLegacyApplicationEntry"):
+    for path, source in kotlin_sources_under(ROOT / "app/src/main/java"):
+        if references_type(source, retired) or re.search(r"\b(?:class|fun)\s+" + retired + r"\b", source):
+            die(f"R4 retired Shell entry is still executable: {path}: {retired}")
+
 worker_process_guard = strip_comments(read(APPLICATION_PATH))
 if "if (isMcpWorkerProcess(Application.getProcessName(), packageName)) return" not in worker_process_guard:
     die("R4 isolated worker must not bootstrap the full Agent runtime")

@@ -773,8 +773,8 @@
     {
       "id": "existing.0097",
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 运行中、排队中、拒绝发送的反馈",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "entry": "localSendRejectMessage",
+      "source": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationScene.kt",
+      "entry": "describeV6ConversationReceipt",
       "owner": "SHELL",
       "evidence": "static_declaration_only"
     },
@@ -813,8 +813,8 @@
     {
       "id": "existing.0102",
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 导航转场和加载状态",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "entry": "pushFeature",
+      "source": "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiHostSceneNavigation.kt",
+      "entry": "navigate",
       "owner": "SHELL",
       "evidence": "static_declaration_only"
     },

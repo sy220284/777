@@ -51,6 +51,9 @@ internal data class LocalToolActivity(
     val finishedSequence: Long? = null,
     val argumentsPreview: String? = null,
     val resultPreview: String? = null,
+    val authorizationGranted: Boolean? = null,
+    val authorizationExecutionId: String? = null,
+    val authorizationSequence: Long? = null,
 )
 
 internal data class LocalToolActivityState(
@@ -70,7 +73,7 @@ internal class LocalToolActivityProjectionRuntime @Inject constructor(
     private val projection: RegisteredSessionProjection<LocalToolActivityState> =
         sessionStorage.projectionRegistry.register(
             name = "tool.activity",
-            stateVersion = 2,
+            stateVersion = 3,
             initial = { LocalToolActivityState() },
             reducer = SessionReducer(::reduceLocalToolActivity),
         )
@@ -123,7 +126,21 @@ internal fun reduceLocalToolActivity(
             argumentsPreview = event.data["arguments"]?.toString()?.let { truncateWithoutSplittingSurrogatePair(it, 2_000) },
             declaredSequence = event.sequence,
             startedSequence = previous?.startedSequence,
+            authorizationGranted = previous?.authorizationGranted,
+            authorizationExecutionId = previous?.authorizationExecutionId,
+            authorizationSequence = previous?.authorizationSequence,
         )
+        "tool/authorization-decision" -> {
+            val execution = event.data["execution_id"]?.jsonPrimitive?.contentOrNull
+                ?.takeIf(String::isNotBlank) ?: return state
+            val granted = event.data["approved"]?.jsonPrimitive?.booleanOrNull ?: return state
+            (previous ?: LocalToolActivity(callId, name, localToolActivityKind(name),
+                LocalToolActivityPhase.DECLARED)).copy(
+                authorizationGranted = granted,
+                authorizationExecutionId = execution,
+                authorizationSequence = event.sequence,
+            )
+        }
         "tool/execution-started" -> (previous ?: LocalToolActivity(
             callId = callId,
             name = name,
@@ -135,6 +152,9 @@ internal fun reduceLocalToolActivity(
             phase = LocalToolActivityPhase.RUNNING,
             executionId = event.data["execution_id"]?.jsonPrimitive?.contentOrNull,
             startedSequence = event.sequence,
+            authorizationGranted = previous?.authorizationGranted.takeIf {
+                previous?.authorizationExecutionId == event.data["execution_id"]?.jsonPrimitive?.contentOrNull
+            },
         )
         "tool/result" -> {
             val errorCode = event.data["error_code"]?.jsonPrimitive?.contentOrNull
@@ -201,5 +221,6 @@ private const val LOCAL_TOOL_ACTIVITY_EVENT_SCAN_LIMIT = 256
 private val LOCAL_TOOL_ACTIVITY_EVENT_TYPES = setOf(
     "tool/call",
     "tool/execution-started",
+    "tool/authorization-decision",
     "tool/result",
 )

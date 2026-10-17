@@ -32,6 +32,70 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalToolExecutionCoordinatorTest {
+    @Test fun workEvidenceReadAndCommitExcludeActualCoordinatorWorkspaceMutation() = runBlocking {
+        val gate = com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate()
+        val source = java.nio.file.Files.createTempFile("work-proof", ".txt").toFile()
+        val commit = CompletableDeferred<Unit>()
+        val order = mutableListOf<String>()
+        source.writeText("original")
+        try {
+            val registry = ToolRegistry().apply {
+                register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.NEVER) {
+                    order += "write"
+                    source.writeText("replacement")
+                    ToolResult("written")
+                })
+            }
+            val evidence = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                gate.withRead {
+                    val read = source.readText()
+                    order += "read"
+                    commit.await()
+                    assertEquals(read, source.readText())
+                    order += "commit"
+                }
+            }
+            val write = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                coordinator(registry, workspaceGate = gate).executeScoped(
+                    LocalToolCall("write-proof", "write", JsonObject(emptyMap()), "{}"),
+                    "session-proof", true, false, approval = { _, _, _ -> true })
+            }
+            assertFalse(write.isCompleted)
+            commit.complete(Unit)
+            evidence.await()
+            assertFalse(write.await().isError)
+            assertEquals(listOf("read", "commit", "write"), order)
+            assertEquals("replacement", source.readText())
+        } finally { source.delete() }
+    }
+
+    @Test fun automaticReadAdmissionStillRecordsExactCallBeforeExecutorAndAuditFailureStopsIt() = runBlocking {
+        var executions = 0
+        val registry = ToolRegistry().apply {
+            register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                executions++
+                ToolResult("read result")
+            })
+        }
+        val decisions = mutableListOf<String>()
+        val owner = coordinator(registry, recordAuthorizationDecision = { session, call, execution, approved ->
+            assertTrue(approved)
+            assertEquals(0, executions)
+            decisions += "$session:${call.id}:${execution.executionId}"
+        })
+        val result = owner.executeScoped(LocalToolCall("call-read", "read", JsonObject(emptyMap()), "{}"),
+            "session-read", false, false, approval = { _, _, _ -> error("read does not ask approval") })
+        assertFalse(result.isError)
+        assertEquals(listOf("session-read:call-read:exec-test"), decisions)
+        assertEquals(1, executions)
+        val blocked = coordinator(registry, recordAuthorizationDecision = { _, _, _, _ ->
+            throw IllegalStateException("storage failed")
+        }).executeScoped(LocalToolCall("call-blocked", "read", JsonObject(emptyMap()), "{}"),
+            "session-read", false, false, approval = { _, _, _ -> true })
+        assertTrue(blocked.isError)
+        assertEquals(1, executions)
+    }
+
     @Test
     fun pinnedGitHubIsLoadedAcrossTurnsAndNeverBypassesCredentialGate() = runBlocking {
         val registry = ToolRegistry().apply {
@@ -1446,6 +1510,8 @@ class LocalToolExecutionCoordinatorTest {
         networkSearchEnabled: () -> Boolean = { true },
         pinnedConnectorIds: () -> List<String> = { emptyList() },
         pinnedSkillIds: () -> List<String> = { emptyList() },
+        workspaceGate: com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate =
+            com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate(),
     ) = LocalToolExecutionCoordinator(
         registry = registry,
         currentSessionId = { "s1" },
@@ -1458,6 +1524,7 @@ class LocalToolExecutionCoordinatorTest {
         networkSearchEnabled = networkSearchEnabled,
         pinnedConnectorIds = pinnedConnectorIds,
         pinnedSkillIds = pinnedSkillIds,
+        workspaceReadWriteGate = workspaceGate,
     )
 
     private fun webFetchTool(execute: suspend () -> ToolResult) = HarnessTool(

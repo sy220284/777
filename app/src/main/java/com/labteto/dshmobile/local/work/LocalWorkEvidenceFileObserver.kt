@@ -14,13 +14,13 @@ import kotlinx.coroutines.flow.callbackFlow
 internal fun workEvidenceWatchTargets(
     workspace: File,
     links: List<LocalRequirementEvidenceLink>,
+    artifactPaths: List<String> = emptyList(),
 ): Map<File, Set<String>> {
     val root = workspace.canonicalFile
     if (!root.isDirectory) return emptyMap()
     val rootPath = root.toPath()
     val watches = linkedMapOf<File, MutableSet<String>>()
-    for (link in links) {
-        val relative = link.artifactPath
+    for (relative in (links.map { it.artifactPath } + artifactPaths).distinct()) {
         if (relative.isBlank() || relative.startsWith('/') ||
             relative.contains('\\') || relative.contains(':')) continue
         val parts = relative.split('/')
@@ -61,8 +61,9 @@ internal fun workEvidenceWatchTargets(
 internal fun watchLocalWorkEvidenceFiles(
     workspace: File,
     links: List<LocalRequirementEvidenceLink>,
+    artifactPaths: List<String> = emptyList(),
 ): Flow<Unit> = callbackFlow {
-    val targets = workEvidenceWatchTargets(workspace, links)
+    val targets = workEvidenceWatchTargets(workspace, links, artifactPaths)
     val flags = FileObserver.MODIFY or FileObserver.CLOSE_WRITE or
         FileObserver.MOVED_TO or FileObserver.MOVED_FROM or FileObserver.DELETE or
         FileObserver.CREATE or FileObserver.ATTRIB or FileObserver.DELETE_SELF

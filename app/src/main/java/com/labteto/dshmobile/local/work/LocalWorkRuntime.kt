@@ -178,6 +178,9 @@ class LocalWorkRuntime @Inject internal constructor(
                     watchLocalWorkEvidenceFiles(
                         File(sessionFiles.workspace.path),
                         requirementEvidenceIndexForUi(sessionId).links,
+                        runtimeStateStore.state.value.takeIf {
+                            it.sessionId == sessionId && it.usageMode == LocalUsageMode.WORK
+                        }?.work?.goal?.artifactPaths.orEmpty(),
                     ).collect {
                         send(Unit)
                         rearm.tryEmit(Unit)
@@ -380,6 +383,8 @@ class LocalWorkRuntime @Inject internal constructor(
                 finishedSequence = activity.finishedSequence,
                 argumentsPreview = activity.argumentsPreview,
                 resultPreview = activity.resultPreview,
+                authorizationGranted = activity.authorizationGranted,
+                authorizationSequence = activity.authorizationSequence,
             )
         }
     }
@@ -393,7 +398,7 @@ class LocalWorkRuntime @Inject internal constructor(
         return when (event.type) {
             "tool/call" -> event.data["arguments"]?.toString()
             "tool/result", "subagent/tool-result" -> event.data["content"]?.jsonPrimitive?.contentOrNull
-            "tool/execution-started" -> event.data.toString()
+            "tool/execution-started", "tool/authorization-decision" -> event.data.toString()
             else -> null
         }
     }

@@ -21,6 +21,8 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -113,6 +115,8 @@ data class McpLifecycleHistory(
     val latestSequence: Long,
     val events: List<McpLifecycleEvent>,
     val requiresSnapshot: Boolean,
+    /** Captured under the same Owner mutex and sequence as the gap marker. */
+    val snapshot: List<McpServerSnapshot>? = null,
 )
 
 /** Exact on-demand ping result; never a tool permission or continuous-health claim. */
@@ -275,13 +279,29 @@ class McpToolBridgePlugin(
         require(afterSequence >= -1L && limit in 1..200)
         val oldest = lifecycleHistory.firstOrNull()?.sequence ?: nextLifecycleSequence + 1L
         val needsSnapshot = (expectedIncarnation != null && expectedIncarnation != incarnation) ||
-            (expectedIncarnation != null && afterSequence < oldest - 1L) ||
+            (oldest > 1L && afterSequence < oldest - 1L) ||
             afterSequence > nextLifecycleSequence
         McpLifecycleHistory(incarnation, nextLifecycleSequence,
             if (needsSnapshot) emptyList() else lifecycleHistory.asSequence()
                 .filter { it.sequence > afterSequence }.take(limit).toList(),
             requiresSnapshot = needsSnapshot,
+            snapshot = if (needsSnapshot) currentLifecycleLocked() else null,
         )
+    }
+
+    /** Agent/plugin subscribers consume the same ordered Owner history as V6, without polling. */
+    fun observeLifecycle(): kotlinx.coroutines.flow.Flow<McpLifecycleHistory> = flow {
+        var cursor = -1L
+        var expected: String? = null
+        lifecycleRevisions.collect {
+            do {
+                val page = lifecycleEventsSince(expected, cursor)
+                emit(page)
+                expected = page.incarnation
+                cursor = if (page.requiresSnapshot) page.latestSequence
+                    else page.events.lastOrNull()?.sequence ?: page.latestSequence
+            } while (!page.requiresSnapshot && cursor < page.latestSequence)
+        }
     }
 
     private val servers = linkedMapOf<String, ServerBinding>()
@@ -389,6 +409,59 @@ class McpToolBridgePlugin(
                 ),
                 executor = HarnessToolExecutor { _, _, _ ->
                     ToolResult(listServers())
+                },
+            ),
+        )
+        context.tools.register(
+            HarnessTool(
+                name = "mcp_lifecycle_events",
+                schema = functionToolSchema(
+                    name = "mcp_lifecycle_events",
+                    description = "读取有序 MCP 连接生命周期；支持等待真实变更。游标失效时返回当前快照，不授予调用权限。",
+                    properties = buildJsonObject {
+                        put("incarnation", buildJsonObject { put("type", "string") })
+                        put("after_sequence", buildJsonObject { put("type", "integer"); put("minimum", -1) })
+                        put("wait_for_change", buildJsonObject { put("type", "boolean") })
+                    },
+                ),
+                access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
+                timeoutMillis = CONNECT_TIMEOUT_MILLIS,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(family = "MCP", discoveryKeywords = MCP_DISCOVERY_KEYWORDS),
+                executor = HarnessToolExecutor { _, input, _ ->
+                    val expected = input.optional("incarnation")
+                    val after = input["after_sequence"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: -1L
+                    var page = lifecycleEventsSince(expected, after)
+                    if (input["wait_for_change"]?.jsonPrimitive?.booleanOrNull == true &&
+                        !page.requiresSnapshot && page.events.isEmpty()) {
+                        // Subscribe to the existing Owner revision; no heartbeat network request.
+                        withTimeoutOrNull(CONNECT_TIMEOUT_MILLIS - 5_000L) {
+                            lifecycleRevisions.first {
+                                val current = lifecycleEventsSince(expected, after)
+                                current.requiresSnapshot || current.latestSequence > after
+                            }
+                        }
+                        page = lifecycleEventsSince(expected, after)
+                    }
+                    ToolResult(buildJsonObject {
+                        put("incarnation", page.incarnation)
+                        put("latest_sequence", page.latestSequence)
+                        put("requires_snapshot", page.requiresSnapshot)
+                        put("events", buildJsonArray {
+                            page.events.forEach { event -> add(buildJsonObject {
+                                put("sequence", event.sequence); put("server_id", event.serverId)
+                                put("state", event.snapshot?.lifecycle?.name ?: "REMOVED")
+                            }) }
+                        })
+                        if (page.requiresSnapshot) put("servers", buildJsonArray {
+                            page.snapshot.orEmpty().forEach { server -> add(buildJsonObject {
+                                put("server_id", server.id); put("transport", server.transport)
+                                put("state", server.lifecycle.name)
+                                put("tools", buildJsonArray { server.tools.forEach { add(JsonPrimitive(it)) } })
+                            }) }
+                        })
+                    }.toString())
                 },
             ),
         )
@@ -974,6 +1047,7 @@ class McpToolBridgePlugin(
             "mcp_http_connect",
             "mcp_stdio_connect",
             "mcp_server_list",
+            "mcp_lifecycle_events",
             "mcp_reconnect",
             "mcp_disconnect",
         )

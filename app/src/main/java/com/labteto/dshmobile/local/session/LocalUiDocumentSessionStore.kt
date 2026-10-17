@@ -13,6 +13,10 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -45,6 +49,20 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
         val latestByDocument: Map<Pair<String, String>, LocalSessionEventLog.Event>,
         val records: List<LocalUiDocumentRecord>,
     )
+    @Serializable
+    private data class ColdWindow(val messages: Set<String>, val events: List<LocalSessionEventLog.Event>)
+
+    /** One replaceable current-window checkpoint per Session, never a second document authority. */
+    private fun coldWindow(log: LocalSessionEventLog, key: ReadKey): ReadCache? {
+        val saved = log.readProjectionCheckpoint("ui-document-window", 1) ?: return null
+        val seed = try { Json.decodeFromString<ColdWindow>(saved.payload) }
+            catch (_: kotlinx.serialization.SerializationException) { return null }
+        if (seed.messages != key.messageIds || seed.events.any { it.sequence > saved.throughSequence }) return null
+        val indexed = linkedMapOf<Pair<String, String>, LocalSessionEventLog.Event>()
+        seed.events.forEach { event -> documentEventKeys(event, key.sessionId, key.messageIds).forEach { indexed[it] = event } }
+        return ReadCache(key, saved.throughSequence, indexed, emptyList())
+    }
+
     @Volatile private var lastRead: ReadCache? = null
     private val mutableRevision = MutableStateFlow(0L)
     val revision = mutableRevision.asStateFlow()
@@ -104,8 +122,53 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
         val checkpoint = log.latestSequence()
         val candidate = lastRead?.takeIf { old ->
             old.key.copy(revision = revision) == key && old.throughSequence <= checkpoint
+        } ?: coldWindow(log, key)?.takeIf { it.throughSequence <= checkpoint }
+        val indexed: Map<Pair<String, String>, LocalSessionEventLog.Event> =
+            if (candidate != null) {
+                // A single visible window normally survives hundreds of Work tool events.
+                // Catch up from the last observed EventLog cursor, not from the first event.
+                val next = LinkedHashMap(candidate.latestByDocument)
+                var cursor = candidate.throughSequence
+                var continuity = true
+                while (cursor < checkpoint) {
+                    val page = log.pageAfter(cursor, limit = 128)
+                    if (page.isEmpty() || page.last().sequence <= cursor) {
+                        continuity = false
+                        break
+                    }
+                    val admitted = page.takeWhile { it.sequence <= checkpoint }
+                    admitted.forEach { event -> documentEventKeys(event, sessionId, messageIds).forEach { next[it] = event } }
+                    cursor = admitted.lastOrNull()?.sequence ?: checkpoint
+                    if (admitted.size < page.size) break
+                }
+                if (continuity) next else log.withEvents { stream ->
+                    val rebuild = LinkedHashMap<Pair<String, String>, LocalSessionEventLog.Event>()
+                    stream.takeWhile { it.sequence <= checkpoint }.forEach { event -> documentEventKeys(event, sessionId, messageIds).forEach { rebuild[it] = event } }
+                    rebuild
+                }
+            } else log.withEvents { stream ->
+                // An uncached/after-restart read is exact, including historical revisions.
+                // Only the latest event for each visible (message, document) is retained.
+                val rebuild = LinkedHashMap<Pair<String, String>, LocalSessionEventLog.Event>()
+                stream.takeWhile { it.sequence <= checkpoint }.forEach { event -> documentEventKeys(event, sessionId, messageIds).forEach { rebuild[it] = event } }
+                rebuild
+            }
+
+        val records = indexed.values.asSequence()
+            .filter { it.type == UI_DOCUMENT_EVENT }
+            .sortedBy { it.sequence }
+            .mapNotNull { event -> decodeEvent(event, sessionId, messageIds, budget, knownScenes) }
+            .toList()
+        if (!log.isClosed && log.resetGeneration == key.reset && mutableRevision.value == revision) {
+            lastRead = ReadCache(key, checkpoint, indexed, records)
+            // Tombstones are included. A cold read replays only events after this exact cursor.
+            val payload = Json.encodeToString(ColdWindow(key.messageIds, indexed.values.distinctBy { it.sequence }))
+            log.writeProjectionCheckpointIfFits("ui-document-window", 1, checkpoint, payload, key.reset)
         }
-        fun indexKeys(event: LocalSessionEventLog.Event): List<Pair<String, String>> {
+        return records
+    }
+    private fun documentEventKeys(event: LocalSessionEventLog.Event, sessionId: String,
+        messageIds: Set<String>): List<Pair<String, String>> {
             if (event.type == UI_DOCUMENT_BATCH_DELETED_EVENT) {
                 if (event.data["sessionId"]?.jsonPrimitive?.content != sessionId) return emptyList()
                 return event.data["targets"]?.jsonArray.orEmpty().mapNotNull { target ->
@@ -128,47 +191,7 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
             }.getOrNull() ?: "malformed:${event.sequence}"
             return listOf(anchor to documentId)
         }
-        val indexed: Map<Pair<String, String>, LocalSessionEventLog.Event> =
-            if (candidate != null) {
-                // A single visible window normally survives hundreds of Work tool events.
-                // Catch up from the last observed EventLog cursor, not from the first event.
-                val next = LinkedHashMap(candidate.latestByDocument)
-                var cursor = candidate.throughSequence
-                var continuity = true
-                while (cursor < checkpoint) {
-                    val page = log.pageAfter(cursor, limit = 128)
-                    if (page.isEmpty() || page.last().sequence <= cursor) {
-                        continuity = false
-                        break
-                    }
-                    val admitted = page.takeWhile { it.sequence <= checkpoint }
-                    admitted.forEach { event -> indexKeys(event).forEach { next[it] = event } }
-                    cursor = admitted.lastOrNull()?.sequence ?: checkpoint
-                    if (admitted.size < page.size) break
-                }
-                if (continuity) next else log.withEvents { stream ->
-                    val rebuild = LinkedHashMap<Pair<String, String>, LocalSessionEventLog.Event>()
-                    stream.forEach { event -> indexKeys(event).forEach { rebuild[it] = event } }
-                    rebuild
-                }
-            } else log.withEvents { stream ->
-                // An uncached/after-restart read is exact, including historical revisions.
-                // Only the latest event for each visible (message, document) is retained.
-                val rebuild = LinkedHashMap<Pair<String, String>, LocalSessionEventLog.Event>()
-                stream.forEach { event -> indexKeys(event).forEach { rebuild[it] = event } }
-                rebuild
-            }
 
-        val records = indexed.values.asSequence()
-            .filter { it.type == UI_DOCUMENT_EVENT }
-            .sortedBy { it.sequence }
-            .mapNotNull { event -> decodeEvent(event, sessionId, messageIds, budget, knownScenes) }
-            .toList()
-        if (!log.isClosed && log.resetGeneration == key.reset && mutableRevision.value == revision) {
-            lastRead = ReadCache(key, checkpoint, indexed, records)
-        }
-        return records
-    }
     /** Explicit user deletion is a versioned event in the same Session authority. */
     @Synchronized
     fun delete(document: UiDocument, budget: UiDocumentBudget,

@@ -1301,15 +1301,15 @@
       "owner": "SHELL",
       "route": "HOME",
       "kind": "OVERLAY",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "source": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6AutomationShellScene.kt",
       "actions": [
         "search",
         "open_result"
       ],
       "recovery": "Source session/task/file anchor + return chain",
       "v6": 33,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立V6 Renderer通过原Owner Port已接线；待验证",
+      "acceptance": "待代码验证（本轮不要求设备验收）",
       "actionProof": {
         "search": {
           "ownerPort": "UiMessageHistoryPort.searchMessages(sessionId, query, cursor)",
@@ -1330,15 +1330,15 @@
       "owner": "SHELL",
       "route": "HOME",
       "kind": "OVERLAY",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "source": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6AutomationShellScene.kt",
       "actions": [
         "configure",
         "finish"
       ],
       "recovery": "Explicit onboarding preference",
       "v6": 31,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立V6 Renderer通过原Owner Port已接线；待验证",
+      "acceptance": "待代码验证（本轮不要求设备验收）",
       "actionProof": {
         "configure": {
           "ownerPort": "SessionUiPort.submit(SessionUiCommand.SelectMode)",
@@ -1359,15 +1359,15 @@
       "owner": "SHELL",
       "route": "HOME",
       "kind": "SLOT",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "source": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6AutomationShellScene.kt",
       "actions": [
         "configure",
         "create_session"
       ],
       "recovery": "No inferred successful state",
       "v6": 34,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立V6 Renderer通过原Owner Port已接线；待验证",
+      "acceptance": "待代码验证（本轮不要求设备验收）",
       "actionProof": {
         "configure": {
           "ownerPort": "SessionUiPort.submit(SessionUiCommand.SelectMode)",
@@ -1388,14 +1388,14 @@
       "owner": "SHELL",
       "route": "HOME",
       "kind": "SLOT",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "source": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6AutomationShellScene.kt",
       "actions": [
         "retry_if_owner_allows"
       ],
       "recovery": "Owner error/retry capability; sensitive values excluded",
       "v6": 35,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "独立V6 Renderer通过原Owner Port已接线；待验证",
+      "acceptance": "待代码验证（本轮不要求设备验收）",
       "actionProof": {
         "retry_if_owner_allows": {
           "ownerPort": "SessionUiPort.submit(SessionUiCommand.Open(currentSessionId)) guarded by current UiSessionIdentity [reopen only; no tool/model retry]",
@@ -1410,14 +1410,14 @@
       "owner": "SHELL",
       "route": "HOME",
       "kind": "SYSTEM",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalApplicationUiHost.kt",
       "actions": [
         "open_session"
       ],
       "recovery": "Notification source session + consumed deep link",
       "v6": 36,
-      "implementation": "V6 现行入口；独立 Pack 待迁移",
-      "acceptance": "待设备验收",
+      "implementation": "中立Host系统服务已接线；待验证",
+      "acceptance": "待代码验证（本轮不要求设备验收）",
       "actionProof": {
         "open_session": {
           "ownerPort": "MainActivity.notificationLocalSession(intent) -> AppRoot -> LocalApplicationUiHost notificationSessions.snapshots.first(!loading) -> SessionUiPort.submit(SessionUiCommand.Open(id)) with catalog membership; UiHostSceneNavigation.openDeepLink(route.home)",

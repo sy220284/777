@@ -15,6 +15,50 @@ class LocalUiDocumentSessionStoreTest {
         UiDocumentSource("session", message, 2, "profile", null), 0,
         UiLocalDocumentData.ListItems(listOf("preserved")), budget, emptySet()).getOrThrow()
 
+    @Test fun coldWindowCheckpointReplaysEditsAndBatchTombstonesFromOriginalLog() {
+        val directory = Files.createTempDirectory("ui-doc-cold-window").toFile()
+        val registry = LocalSessionEventLogRegistry(directory, Json)
+        try {
+            val store = LocalUiDocumentSessionStore(registry)
+            val first = document("first")
+            val second = document("second")
+            assertTrue(store.publish(first, provenance, null, null, budget, emptySet()))
+            assertTrue(store.publish(second, provenance, null, null, budget, emptySet()))
+            val messages = setOf("first", "second")
+            assertEquals(2, store.read("session", messages, budget, emptySet()).size)
+            val log = registry.get("session")
+            val checkpoint = log.readProjectionCheckpoint("ui-document-window", 1)!!
+            assertEquals(log.latestSequence(), checkpoint.throughSequence)
+            val edited = first.withUserEditedText("item_0", "updated after checkpoint")!!
+            assertTrue(store.publish(edited, provenance, null, first, budget, emptySet()))
+            val otherRegistry = LocalSessionEventLogRegistry(directory, Json)
+            val reopened = LocalUiDocumentSessionStore(otherRegistry)
+            val restored = reopened.read("session", messages, budget, emptySet())
+            assertEquals(edited, restored.single { it.document.documentId == first.documentId }.document)
+            assertTrue(store.deleteBatch(listOf(edited, second), budget, emptySet()))
+            assertTrue(LocalUiDocumentSessionStore(registry).read("session", messages, budget, emptySet()).isEmpty())
+            assertFalse(store.publish(first, provenance, null, null, budget, emptySet()))
+            otherRegistry.get("session").close()
+        } finally { registry.get("session").close(); directory.deleteRecursively() }
+    }
+
+    @Test fun corruptColdWindowIsRebuiltWithoutLosingCurrentEditsOrRestoringDeletedCards() {
+        val directory = Files.createTempDirectory("ui-doc-corrupt-cold-window").toFile()
+        val registry = LocalSessionEventLogRegistry(directory, Json)
+        try {
+            val store = LocalUiDocumentSessionStore(registry)
+            val first = document("first")
+            assertTrue(store.publish(first, provenance, null, null, budget, emptySet()))
+            store.read("session", setOf("first"), budget, emptySet())
+            registry.get("session").writeProjectionCheckpoint("ui-document-window", 1,
+                registry.get("session").latestSequence(), "not-json", registry.get("session").resetGeneration)
+            assertEquals(first, LocalUiDocumentSessionStore(registry)
+                .read("session", setOf("first"), budget, emptySet()).single().document)
+            assertTrue(store.delete(first, budget, emptySet()))
+            assertTrue(LocalUiDocumentSessionStore(registry).read("session", setOf("first"), budget, emptySet()).isEmpty())
+        } finally { registry.get("session").close(); directory.deleteRecursively() }
+    }
+
     @Test fun userEditedDocumentIsCASVersionedAndCannotResurrectDeletedText() {
         val directory = Files.createTempDirectory("ui-doc-user-edit").toFile()
         try {
