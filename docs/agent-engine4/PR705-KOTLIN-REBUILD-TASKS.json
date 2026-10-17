@@ -157,10 +157,11 @@
       "code_evidence": [
         "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt",
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
-        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt"
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt",
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedgerTest.kt"
       ],
       "tests_verified": [],
-      "notes": "共享 Kotlin ToolAttemptLedger 强类型状态机在 Work 和 SessionRecovery 真实生产路径接管工具执行事实；尚未重构平台 Tool Executor 权限/租约/未知副作用权威核销。"
+      "notes": "共享 Kotlin ToolAttemptLedger 强类型状态机在 Work 和 SessionRecovery 真实生产路径接管工具执行事实；尚未重构平台 Tool Executor 权限/租约/未知副作用权威核销。；共享工具历史按单次声明保存独立 Attempt，并用 execution_id 精确对应异步回执；重复 provider callId 不能抹去先前未知副作用。SessionRecovery 保留执行实例字段，新增重复编号和乱序回执 JVM 测试。需当前 CI 验证。"
     },
     {
       "id": "AE4V3-10",
@@ -404,16 +405,13 @@
   "status": "first incremental implementation, not entire refactor",
   "current_slice": {
     "date": "2026-10-17",
-    "component": "TaskGraph coroutine dependency-ready scheduler replacing wave barrier",
-    "head_before": "da9e4dfc5a46d6468b11e6eeba4bf5d0db981a96",
+    "component": "ToolAttemptLedger execution-instance history and recovery identity",
+    "head_before": "0022626f531231939bb9f6a3ea5d5c30597e89a1",
     "status": "code_submitted_ci_pending",
     "evidence": [
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/workflow/TaskGraphExecutor.kt",
-      "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/workflow/TaskGraphExecutorTest.kt"
-    ],
-    "tests_pending": [
-      "dependentRunsImmediatelyWhenItsOwnPrerequisiteFinishes",
-      "dependentBlocksWithoutExecutionWhileUnrelatedBranchStillSucceeds"
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt",
+      "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedgerTest.kt"
     ]
   }
 }

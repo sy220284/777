@@ -24,6 +24,7 @@ class ToolAttemptLedger {
         val started: Boolean,
         val settled: Boolean,
         val outcomeUncertain: Boolean,
+        val executionId: String? = null,
     ) {
         val unresolvedExternalEffect: Boolean
             get() = outcomeUncertain || (started && !settled)
@@ -37,11 +38,17 @@ class ToolAttemptLedger {
         var started: Boolean = false,
         var settled: Boolean = false,
         var uncertain: Boolean = false,
+        var toolCallObserved: Boolean = false,
+        var executionId: String? = null,
     ) {
-        fun snapshot() = Attempt(id, name, step, goalId, started, settled, uncertain)
+        fun snapshot() = Attempt(id, name, step, goalId, started, settled, uncertain, executionId)
     }
 
-    private val attempts = linkedMapOf<String, MutableAttempt>()
+    // Tool call IDs are only guaranteed by providers within an individual request.
+    // Reuse across turns must never settle an earlier, still-unknown mutation.
+    private val attempts = mutableListOf<MutableAttempt>()
+    private val latestByCallId = mutableMapOf<String, MutableAttempt>()
+    private val byExecutionId = mutableMapOf<String, MutableAttempt>()
 
     fun observe(event: SessionEvent, stepHint: Int? = null) {
         observe(event.type, event.data, stepHint)
@@ -52,7 +59,27 @@ class ToolAttemptLedger {
             (obj[key] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)
 
         fun track(id: String): MutableAttempt =
-            attempts.getOrPut(id) { MutableAttempt(id) }
+            latestByCallId.getOrPut(id) {
+                MutableAttempt(id).also(attempts::add)
+            }
+
+        fun declare(id: String, actualCall: Boolean): MutableAttempt {
+            val previous = latestByCallId[id]
+            // The assistant can declare a tool just before tool/call; that pair
+            // belongs to one attempt. A later call with the same ID creates
+            // a fresh record even if the earlier external effect is unresolved.
+            val newAttempt = previous == null ||
+                (if (actualCall) previous.toolCallObserved
+                 else previous.toolCallObserved || previous.started || previous.settled)
+            val attempt = if (newAttempt) {
+                MutableAttempt(id).also {
+                    attempts.add(it)
+                    latestByCallId[id] = it
+                }
+            } else requireNotNull(previous)
+            if (actualCall) attempt.toolCallObserved = true
+            return attempt
+        }
 
         when (type) {
             "assistant/message" -> {
@@ -61,7 +88,7 @@ class ToolAttemptLedger {
                     for (element in neutral) {
                         val call = element as? JsonObject ?: continue
                         val id = readString(call, "id") ?: continue
-                        track(id).apply {
+                        declare(id, actualCall = false).apply {
                             name = readString(call, "name") ?: name
                             step = stepHint ?: step
                         }
@@ -73,7 +100,7 @@ class ToolAttemptLedger {
                         val call = element as? JsonObject ?: continue
                         val id = readString(call, "id") ?: continue
                         val function = call["function"] as? JsonObject
-                        track(id).apply {
+                        declare(id, actualCall = false).apply {
                             name = function?.let { readString(it, "name") } ?: name
                             step = stepHint ?: step
                         }
@@ -82,7 +109,7 @@ class ToolAttemptLedger {
             }
             "tool/call" -> {
                 val id = readString(data, "id") ?: return
-                track(id).apply {
+                declare(id, actualCall = true).apply {
                     name = readString(data, "name") ?: name
                     step = (data["step"] as? JsonPrimitive)?.intOrNull ?: stepHint ?: step
                     goalId = readString(data, "goal_id") ?: goalId
@@ -95,9 +122,15 @@ class ToolAttemptLedger {
             }
             "tool/execution-started" -> {
                 val id = readString(data, "id") ?: return
-                track(id).apply {
+                val executionId = readString(data, "execution_id")
+                val attempt = executionId?.let(byExecutionId::get) ?: track(id)
+                attempt.apply {
                     name = readString(data, "name") ?: name
                     step = stepHint ?: step
+                    if (executionId != null) {
+                        this.executionId = executionId
+                        byExecutionId[executionId] = this
+                    }
                     val attributes = data["attributes"] as? JsonObject
                     goalId = attributes?.let { readString(it, "goal_id") } ?: goalId
                     started = true
@@ -105,7 +138,13 @@ class ToolAttemptLedger {
             }
             "tool/result" -> {
                 val id = readString(data, "id") ?: return
-                track(id).apply {
+                val executionId = readString(data, "execution_id")
+                val attempt = executionId?.let(byExecutionId::get) ?: track(id)
+                attempt.apply {
+                    if (executionId != null) {
+                        this.executionId = executionId
+                        byExecutionId[executionId] = this
+                    }
                     settled = true
                     val code = readString(data, "error_code")
                     val sideEffect = readString(data, "side_effect")
@@ -120,14 +159,14 @@ class ToolAttemptLedger {
 
     /** In declaration order, for rebuilding the currently open Step after a crash. */
     fun pending(): List<Attempt> =
-        attempts.values.filter { !it.settled }.map { it.snapshot() }
+        attempts.filter { !it.settled }.map { it.snapshot() }
 
     /** Never allow an unknown mutation to be masked by a later successful tool. */
     fun hasUnresolvedExternalEffects(goalId: String): Boolean =
-        goalId.isNotBlank() && attempts.values.any { attempt ->
+        goalId.isNotBlank() && attempts.any { attempt ->
             attempt.goalId == goalId &&
                 (attempt.uncertain || (attempt.started && !attempt.settled))
         }
 
-    fun snapshot(): List<Attempt> = attempts.values.map { it.snapshot() }
+    fun snapshot(): List<Attempt> = attempts.map { it.snapshot() }
 }

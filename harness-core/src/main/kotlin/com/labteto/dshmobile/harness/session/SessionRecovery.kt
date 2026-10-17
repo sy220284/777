@@ -121,6 +121,7 @@ object SessionRecovery {
             appended += log.append("tool/result", buildJsonObject {
                 result.step?.let { put("step", it) }
                 put("id", result.callId)
+                call.executionId?.let { put("execution_id", it) }
                 result.name?.let { put("name", it) }
                 put("content", result.content)
                 put("model_content", result.modelContent)

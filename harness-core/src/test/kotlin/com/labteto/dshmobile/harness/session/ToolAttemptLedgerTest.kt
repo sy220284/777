@@ -92,4 +92,66 @@ class ToolAttemptLedgerTest {
         assertFalse(ledger.hasUnresolvedExternalEffects("goal"))
         assertTrue(ledger.pending().isEmpty())
     }
+    @Test
+    fun reusedCallIdDoesNotSettleAnEarlierUnknownExecution() {
+        val ledger = ToolAttemptLedger()
+        ledger.observe("tool/call", buildJsonObject {
+            put("id", "reused")
+            put("goal_id", "work")
+            put("execution_started", false)
+        })
+        ledger.observe("tool/execution-started", buildJsonObject {
+            put("id", "reused")
+            put("execution_id", "execution-old")
+        })
+        ledger.observe("tool/call", buildJsonObject {
+            put("id", "reused")
+            put("goal_id", "work")
+            put("execution_started", false)
+        })
+        ledger.observe("tool/execution-started", buildJsonObject {
+            put("id", "reused")
+            put("execution_id", "execution-new")
+        })
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "reused")
+            put("execution_id", "execution-new")
+            put("is_error", false)
+        })
+        assertEquals(2, ledger.snapshot().size)
+        assertEquals("execution-old", ledger.pending().single().executionId)
+        assertTrue(ledger.hasUnresolvedExternalEffects("work"))
+    }
+
+    @Test
+    fun delayedResultSettlesOnlyMatchingExecutionId() {
+        val ledger = ToolAttemptLedger()
+        for (id in listOf("execution-a", "execution-b")) {
+            ledger.observe("tool/call", buildJsonObject {
+                put("id", "same-provider-id")
+                put("goal_id", "goal")
+                put("execution_started", false)
+            })
+            ledger.observe("tool/execution-started", buildJsonObject {
+                put("id", "same-provider-id")
+                put("execution_id", id)
+            })
+        }
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "same-provider-id")
+            put("execution_id", "execution-a")
+            put("is_error", false)
+        })
+        assertEquals(listOf("execution-b"), ledger.pending().map { it.executionId })
+        assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "same-provider-id")
+            put("execution_id", "execution-b")
+            put("is_error", false)
+        })
+        assertTrue(ledger.pending().isEmpty())
+        assertFalse(ledger.hasUnresolvedExternalEffects("goal"))
+    }
+
+
 }
