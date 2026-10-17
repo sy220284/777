@@ -213,12 +213,15 @@ class SessionEventLogMultiInstanceTest {
         val file = File(root, "session.events.jsonl")
         val log = SessionEventLog(file, json)
         try {
-            log.append("test/original", buildJsonObject { put("slot", "a") })
+            val first = log.append("test/original", buildJsonObject { put("slot", "a") })
+            val fileBytes = file.length()
             val before = java.nio.file.Files.getLastModifiedTime(file.toPath())
-            val replacement = SessionEvent(1L, "test/foreign!", 42L,
+            val replacement = SessionEvent(1L, "test/foreign!", first.createdAt,
                 buildJsonObject { put("slot", "b") })
-            // Keep a byte-valid row; external atomic restore can preserve mtime.
+            // Both byte count and timestamp are deliberately unchanged: metadata
+            // equality cannot certify that a foreign writer kept the same sequence.
             file.writeText(json.encodeToString(SessionEvent.serializer(), replacement) + "\n")
+            assertEquals(fileBytes, file.length())
             java.nio.file.Files.setLastModifiedTime(file.toPath(), before)
             assertEquals(1L, log.latestSequence())
             assertEquals(2L, log.append("test/next", buildJsonObject { put("slot", "c") }).sequence)
