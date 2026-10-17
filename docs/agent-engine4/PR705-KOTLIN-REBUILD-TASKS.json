@@ -35,10 +35,12 @@
       "depends_on": [
         "AE4V3-01"
       ],
-      "status": "not_started",
-      "code_evidence": [],
+      "status": "in_progress",
+      "code_evidence": [
+        "docs/agent-engine4/AE4V3-02-PRODUCTION-OWNERSHIP-INVENTORY.md"
+      ],
       "tests_verified": [],
-      "notes": ""
+      "notes": "基于当前生产调用与唯一 Owner 的入口逐项核实，尚需完备其他消费者清理证据。"
     },
     {
       "id": "AE4V3-03",
@@ -48,10 +50,13 @@
         "AE4V3-01",
         "AE4V3-02"
       ],
-      "status": "not_started",
-      "code_evidence": [],
+      "status": "in_progress",
+      "code_evidence": [
+        "docs/agent-engine4/AE4V3-02-PRODUCTION-OWNERSHIP-INVENTORY.md",
+        "reference-validation/src/test/kotlin/com/labteto/dshmobile/reference/AgentEngine4ExecutionBaselineTest.kt"
+      ],
       "tests_verified": [],
-      "notes": ""
+      "notes": "新增真实 Kotlin/JVM 跨 Agent/Tool/Session/TaskGraph 行为基准，待当前提交 CI 验收。"
     },
     {
       "id": "AE4V3-04",
@@ -405,11 +410,13 @@
   "status": "first incremental implementation, not entire refactor",
   "current_slice": {
     "date": "2026-10-17",
-    "component": "CI-targeted workflow partial delivery regression",
-    "pr_head_before": "952bdf235003d178f8539fa879a6565d2c50f90a",
+    "component": "AE4V3-02 source-grounded ownership inventory + AE4V3-03 cross-runtime JVM baseline",
+    "previous_head": "85c164f1aaa5db1e3f1892bdb17eab3d0d124c6e",
     "status": "code_submitted_ci_pending",
-    "ci_failure": "LocalWorkflowCoordinatorTest.graphPartialResultIsStructuredAndCannotMasqueradeAsFullyDelivered",
-    "correction": "Keep failed/blocked node task names in returned report; avoid claimed complete/omitted unresolved work",
-    "test": "app/src/test/java/com/labteto/dshmobile/local/LocalWorkflowCoordinatorTest.kt"
+    "code_evidence": [
+      "reference-validation/src/test/kotlin/com/labteto/dshmobile/reference/AgentEngine4ExecutionBaselineTest.kt",
+      "docs/agent-engine4/AE4V3-02-PRODUCTION-OWNERSHIP-INVENTORY.md"
+    ],
+    "tests_verified": []
   }
 }
