@@ -166,15 +166,16 @@ fun V6ToolsManagementScene(
         var throughSequence = -1L
         owner.serverChanges().collect {
             try {
-                val oldCursor = throughSequence
                 var lifecycleChanged = false
                 withContext(Dispatchers.IO) {
+                    var latest: Long
                     do {
                         val page = owner.lifecycleHistory(incarnation, throughSequence) ?: break
+                        latest = page.latestSequence
                         if (page.requiresSnapshot) {
                             lifecycleChanged = true
                             incarnation = page.incarnation
-                            throughSequence = page.latestSequence
+                            throughSequence = latest
                             break
                         }
                         incarnation = page.incarnation
@@ -182,18 +183,21 @@ fun V6ToolsManagementScene(
                             lifecycleChanged = true
                             throughSequence = page.events.last().sequence
                         } else {
-                            throughSequence = page.latestSequence
+                            throughSequence = latest
                         }
-                    } while (throughSequence < (owner.lifecycleHistory(incarnation, throughSequence)
-                        ?.latestSequence ?: throughSequence))
+                    } while (throughSequence < latest)
                 }
                 val refreshed = withContext(Dispatchers.IO) { owner.servers() }
+                // A server may disconnect and reconnect between UI renders. Its final
+                // snapshot can equal the prior one, but an earlier successful ping
+                // must still be invalidated by the ordered Owner transitions.
+                if (lifecycleChanged) healthResults = emptyMap()
                 if (refreshed != servers) {
                     val original = servers.associateBy(UiMcpServerSnapshot::id)
                     val connectionChanged = refreshed.any { now ->
                         original[now.id]?.let { it.connection != now.connection || it.registration != now.registration } ?: true
                     } || original.keys.any { id -> refreshed.none { it.id == id } }
-                    if (connectionChanged || lifecycleChanged) healthResults = emptyMap()
+                    if (connectionChanged) healthResults = emptyMap()
                     servers = refreshed
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
