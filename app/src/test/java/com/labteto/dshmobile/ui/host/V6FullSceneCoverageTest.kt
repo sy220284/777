@@ -55,12 +55,12 @@ class V6FullSceneCoverageTest {
         assertTrue(candidate.renderers.values.distinct().size == 75)
     }
 
-    @Test fun fullCoveragePackIsStillBlockedUntilTheProductionAcceptanceCapabilityExists() {
+    @Test fun fullCoveragePackStillRejectsAMissingActualFeatureCapability() {
         val candidate = fullCandidate()
         val requirements = UiPackAdmissionRequirements(
             UI_CONTRACT_VERSION, LocalUiSceneCatalog.requirements,
             candidate.manifest.requiredCapabilities -
-                UiCapabilityId("v6.migration.accepted"),
+                UiCapabilityId("work.send_text"),
             UiWindowClass.COMPACT, UiAccessibility.entries.toSet(), false,
         )
         val selection = UiApplicationPackRegistry(listOf(candidate))
@@ -68,7 +68,7 @@ class V6FullSceneCoverageTest {
         assertTrue(selection is UiApplicationPackAdmission.Incompatible)
     }
 
-    @Test fun independentV6HasAllRealOwnerCapabilitiesExceptUnreleasedMigrationSeal() {
+    @Test fun independentV6IsAdmittedWithOnlyActualFeatureOwnerCapabilities() {
         // The old host inventory silently omitted work.team/work.plan_review,
         // making full V6 impossible to admit even with a future valid release.
         val actual = LocalUiConnectedCapabilities.from(
@@ -84,26 +84,14 @@ class V6FullSceneCoverageTest {
             automation = owner(), media = owner(), usage = owner(), diary = owner(),
         )
         val pack = fullCandidate()
-        val expected = pack.manifest.requiredCapabilities -
-            UiCapabilityId("v6.migration.accepted")
+        val expected = pack.manifest.requiredCapabilities
         assertTrue("Host misses feature-owned V6 capabilities: ${expected - actual}",
             actual.containsAll(expected))
-        // No Owner claims production acceptance; that seal requires separate
-        // code-only lifecycle/interaction verification.
-        assertTrue(UiCapabilityId("v6.migration.accepted") !in actual)
-        val refused = UiApplicationPackRegistry(listOf(pack))
-            .select(pack.manifest.id, UiPackAdmissionRequirements(
-                UI_CONTRACT_VERSION, LocalUiSceneCatalog.requirements, actual,
-                UiWindowClass.COMPACT, UiAccessibility.entries.toSet(), false,
-            ))
-        assertTrue(refused is UiApplicationPackAdmission.Incompatible)
-
-        // A verified full-pack test may explicitly supply the *one* separate
-        // migration seal and exercise real Host navigation without old Shell.
+        assertTrue(UiCapabilityId("v6.migration.accepted") !in expected)
         val admitted = UiApplicationPackRegistry(listOf(pack))
             .select(pack.manifest.id, UiPackAdmissionRequirements(
                 UI_CONTRACT_VERSION, LocalUiSceneCatalog.requirements,
-                actual + UiCapabilityId("v6.migration.accepted"),
+                actual,
                 UiWindowClass.COMPACT, UiAccessibility.entries.toSet(), false,
             ))
         assertTrue(admitted is UiApplicationPackAdmission.Admitted)

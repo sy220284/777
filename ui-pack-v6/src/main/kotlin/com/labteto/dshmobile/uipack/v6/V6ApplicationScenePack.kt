@@ -143,9 +143,7 @@ class V6ApplicationScenePack(
             extraPersonaScenes + extraTuningScene + extraPortraitScene +
             extraDiaryScenes + extraMemoryScene,
         requiredCapabilities = buildSet {
-            // Full scene registration alone cannot release an unverified UI to production.
-            // The Host intentionally does not advertise this capability until V6 signs off.
-            add("v6.migration.accepted")
+            // Admission checks real Feature capabilities; release qualification belongs to CI.
             if (conversations != null) {
                 addAll(setOf("chat.send_text", "work.send_text", "chat.edit", "chat.regenerate",
                     "chat.select_variant", "chat.stop", "work.edit", "work.regenerate",

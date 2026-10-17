@@ -11,7 +11,6 @@ import com.labteto.dshmobile.BuildConfig
 import com.labteto.dshmobile.ui.host.LocalApplicationUiHost
 import com.labteto.dshmobile.ui.host.LocalEncryptedUiDraftStore
 import com.labteto.dshmobile.ui.host.LocalV6StandaloneViewModel
-import com.labteto.dshmobile.ui.host.v6RuntimeCapabilities
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.ui.theme.ThemePreference
 import com.labteto.dshmobile.uihost.LocalUiPrivateTextCipher
@@ -55,8 +54,8 @@ fun AppRoot(
                             viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
                         })
                     },
-                    // Debug runs the complete candidate; release admission remains unsigned.
-                    availableCapabilities = v6RuntimeCapabilities(owner.connectedCapabilities, BuildConfig.DEBUG),
+                    // Both builds admit only capabilities backed by the actual Feature Ports.
+                    availableCapabilities = owner.connectedCapabilities,
                     requestedSceneKey = requestedExternalSceneKey ?: requestedV6Scene,
                     notificationSessionId = requestedLocalSessionId,
                     notificationSessions = owner.sessions,

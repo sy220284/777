@@ -10,11 +10,3 @@ internal fun currentApplicationPack(selected: String?): String = when (selected)
 
 internal fun isIndependentV6Selected(selectedPack: String?): Boolean =
     currentApplicationPack(selectedPack) == V6_APPLICATION_UI
-
-/** Candidate execution is a build property, never a model/UI capability claim or release signoff. */
-internal fun v6RuntimeCapabilities(
-    connected: Set<com.labteto.dshmobile.uicontract.UiCapabilityId>,
-    verificationBuild: Boolean,
-): Set<com.labteto.dshmobile.uicontract.UiCapabilityId> =
-    if (verificationBuild) connected + com.labteto.dshmobile.uicontract.UiCapabilityId("v6.migration.accepted")
-    else connected

@@ -9,14 +9,6 @@ import org.junit.Test
 
 /** Contract that independent V6 boot cannot accidentally instantiate old business Shell. */
 class LocalV6StandaloneBootTest {
-    @Test fun verificationBuildCanRunCandidateButReleaseAdmissionRemainsUnsigned() {
-        val actual = setOf(com.labteto.dshmobile.uicontract.UiCapabilityId("chat.send_text"))
-        val seal = com.labteto.dshmobile.uicontract.UiCapabilityId("v6.migration.accepted")
-        assertTrue(seal in v6RuntimeCapabilities(actual, true))
-        assertFalse(seal in v6RuntimeCapabilities(actual, false))
-        assertTrue(actual.all { it in v6RuntimeCapabilities(actual, true) })
-    }
-
     @Test fun independentAppPreferenceCannotImplicitlyRedirectToLegacy() {
         assertTrue(isIndependentV6Selected("v6-application-migrating"))
         assertTrue(isIndependentV6Selected("legacy-v6"))

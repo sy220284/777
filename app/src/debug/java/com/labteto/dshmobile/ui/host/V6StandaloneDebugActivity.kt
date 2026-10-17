@@ -44,9 +44,8 @@ class V6StandaloneDebugActivity : AppCompatActivity() {
                                 app.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
                             })
                         },
-                        // This seal exists only in the debug-exclusive launch path.
-                        // Release builds never advertise this candidate-run capability.
-                        availableCapabilities = v6RuntimeCapabilities(owner.connectedCapabilities, BuildConfig.DEBUG),
+                        // Use the same actual Feature capability inventory as the application root.
+                        availableCapabilities = owner.connectedCapabilities,
                         selectionPreferenceName = "ui_application_pack_v6_only_debug",
                         requestedSceneKey = requestedScene,
                         notificationSessions = owner.sessions,
