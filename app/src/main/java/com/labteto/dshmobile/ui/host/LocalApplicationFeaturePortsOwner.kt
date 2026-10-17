@@ -74,8 +74,9 @@ internal class LocalApplicationFeaturePortsOwner @Inject constructor(
             }
         }
     private val readingState = LocalConversationReadingState(
-        savedStateHandle.get<List<String>>("v6_reading").orEmpty()
-    ) { savedStateHandle["v6_reading"] = ArrayList(it) }
+        (savedStateHandle.get<List<String>>("reading_state")
+            ?: savedStateHandle.remove<List<String>>("v6_reading")).orEmpty()
+    ) { savedStateHandle["reading_state"] = ArrayList(it) }
     private val formState = LocalUiDocumentFormState(
         secureDrafts.read("ui_document_forms"),
     ) { secureDrafts.write("ui_document_forms", it) }

@@ -90,7 +90,7 @@ class UiHostSceneNavigation(
 
     /**
      * Fail closed: a stale/foreign pack snapshot or a scene removed by an update must not
-     * silently reopen an unrelated V6 page. The caller may then explicitly choose initial.
+     * silently reopen an unrelated UI Pack page. The caller may then explicitly choose initial.
      */
     fun restore(snapshot: UiSceneNavigationState): UiSceneNavigationResult {
         if (snapshot.packId != pack.id)

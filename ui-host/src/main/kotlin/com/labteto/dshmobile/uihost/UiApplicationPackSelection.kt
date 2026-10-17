@@ -45,7 +45,7 @@ class UiApplicationPackSelection(
         if (selected is UiApplicationPackAdmission.Admitted)
             return UiApplicationPackSelectionResult.Selected(selected)
         // Callers can display and explicitly accept the fallback: never quietly
-        // paint a legacy V6 page when a requested independent renderer is missing.
+        // render an undeclared page when a requested independent renderer is missing.
         val stable = packs.select(stableId, requirements) as? UiApplicationPackAdmission.Admitted
         return UiApplicationPackSelectionResult.Rejected(requestedId, selected, stable)
     }

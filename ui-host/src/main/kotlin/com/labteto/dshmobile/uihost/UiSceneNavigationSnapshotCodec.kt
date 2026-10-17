@@ -11,7 +11,7 @@ import java.util.Base64
  * capability claims. Decode is intentionally permissive about known IDs; the *current*
  * UiHostSceneNavigation.restore() must validate the pack, scene catalog and legal history.
  *
- * A stale or corrupt snapshot fails closed and must never silently route to V6.
+ * A stale or corrupt snapshot fails closed and must never silently route to an unrelated renderer.
  */
 object UiSceneNavigationSnapshotCodec {
     const val MAX_STACK_DEPTH: Int = 32

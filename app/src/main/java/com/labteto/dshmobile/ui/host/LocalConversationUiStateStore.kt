@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Owns local-only conversation presentation preferences so the screen ViewModel stays focused on
+ * Owns local-only conversation presentation preferences so the Feature Port owner stays focused on
  * orchestration instead of persistence details.
  */
 internal class LocalConversationUiStateStore(context: Context,

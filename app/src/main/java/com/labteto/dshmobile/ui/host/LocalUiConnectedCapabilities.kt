@@ -63,7 +63,7 @@ internal object LocalUiConnectedCapabilities {
         if (groups != null) add(UiCapabilityId("chat.group_members"))
         if (team != null) {
             add(UiCapabilityId("work.team_control"))
-            // V6 manifests require the actual Work Team action, not only a
+            // Scene manifests require the actual Work Team action, not only a
             // legacy control hint. WorkTeamUiPort remains the admission owner.
             add(UiCapabilityId("work.team"))
         }
