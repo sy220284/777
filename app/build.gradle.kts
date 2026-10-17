@@ -318,6 +318,10 @@ if (System.getenv("CI") == "true") {
     }
 }
 
+// This remains a backend-only application. SDK libraries keep the already-
+// verified Compose/AndroidX/KSP build graph needed by the neutral UI Host.
+// No former page, theme, icon pack, material, animation, or renderer is installed.
+
 dependencies {
     implementation(project(":core"))
     implementation(project(":ui-contract"))
@@ -329,22 +333,25 @@ dependencies {
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.service)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.appcompat)
-    // AppCompat otherwise pulls an older, unverified activity module without the old UI tree.
-    // Keep the host-level Activity at the already checksum-verified version.
-    implementation("androidx.activity:activity:1.9.3")
 
-    // The UI-neutral Host exposes Compose renderer contracts; no legacy screen libraries.
     implementation(platform(libs.androidx.compose.bom))
-    implementation("androidx.compose.runtime:runtime")
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.hilt.navigation.compose)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-    // Hilt/KSP processor graph otherwise selects old artifacts without verified binaries.
-    // Constrain that isolated processor classpath to checksum-pinned AndroidX versions.
-    ksp("androidx.collection:collection:1.5.0")
-    ksp("androidx.savedstate:savedstate:1.3.2")
 
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
@@ -359,5 +366,10 @@ dependencies {
     // is a second thing to keep in step and the failure it guards against is a silent one.
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4.accessibility)
     androidTestImplementation(libs.androidx.test.runner)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
