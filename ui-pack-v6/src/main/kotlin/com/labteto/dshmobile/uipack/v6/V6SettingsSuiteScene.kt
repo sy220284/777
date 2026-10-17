@@ -71,12 +71,17 @@ fun V6SettingsSuiteScene(
         else -> false
     }
     // Hardware Back and visible Back use the same confirmation rule.
-    BackHandler(enabled = editable && draftDirty && hasUnsavedChanges && !state.loading) {
+    BackHandler(enabled = editable && draftDirty && hasUnsavedChanges) {
         confirmDiscard = true
     }
     fun requestBack() {
-        if (editable && draftDirty && hasUnsavedChanges && !state.loading) confirmDiscard = true
+        if (editable && draftDirty && hasUnsavedChanges) confirmDiscard = true
         else onBack()
+    }
+    // Once the owner actually reflects the edited values (or the user restores
+    // them), re-enable ordinary live refresh for this screen.
+    LaunchedEffect(scene, state.loading, draftDirty, hasUnsavedChanges) {
+        if (!state.loading && draftDirty && !hasUnsavedChanges) draftDirty = false
     }
     LaunchedEffect(scene, state.loading, state.userRules, state.autoRecall,
         state.autoMemory, state.mainMaxSteps, state.subagentMaxSteps, state.modelAttempts) {
