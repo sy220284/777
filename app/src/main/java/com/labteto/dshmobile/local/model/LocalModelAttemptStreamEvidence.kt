@@ -13,10 +13,19 @@ internal class LocalModelAttemptStreamEvidence(
         private set
 
     val truncated: Boolean get() = emittedChars > tail.length
+    // Provider reasoning is output evidence but must never enter diagnostic tails.
+    var reasoningObserved: Boolean = false
+        private set
 
     fun beginAttempt() {
         emittedChars = 0
         tail = ""
+        reasoningObserved = false
+    }
+
+    fun observe(delta: LocalModelDelta) {
+        append(delta.content)
+        if (delta.reasoning.isNotEmpty()) reasoningObserved = true
     }
 
     fun append(delta: String) {
@@ -25,5 +34,6 @@ internal class LocalModelAttemptStreamEvidence(
         tail = takeLastWithoutSplittingSurrogatePair(tail + delta, maxTailChars)
     }
 
-    fun retryable(error: Exception): Boolean = canRetryModelAttemptAfterOutput(error, emittedChars)
+    fun retryable(error: Exception): Boolean =
+        canRetryModelAttemptAfterOutput(error, emittedChars, reasoningObserved)
 }

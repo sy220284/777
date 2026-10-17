@@ -136,10 +136,16 @@
         "AE4V3-04",
         "AE4V3-06"
       ],
-      "status": "not_started",
-      "code_evidence": [],
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRequestAttemptPolicy.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelAttemptStreamEvidence.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/model/LocalModelAttemptStreamEvidenceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/model/LocalModelRequestAttemptPolicyTest.kt"
+      ],
       "tests_verified": [],
-      "notes": ""
+      "notes": "按 V3 模型能力任务启动：模型流式重试依据同时观察正文与 reasoning delta，防止只输出推理内容却被当作零输出重放，降低双次推理/付费风险；只持有 reasoningObserved 布尔事实，绝不将推理正文写入诊断 tail。生产消费者 LocalModelRequestCoordinator 已接入，新增 reasoning-only / mixed / retry reset 回归，定向 App JVM 测试、compileDebugKotlin 及架构/性能/测试质量/Kotlin 风险门禁已在本地通过。全域 Gateway/adapters/account/route freeze 与完整 CI 仍待施工验收。"
     },
     {
       "id": "AE4V3-08",
@@ -192,10 +198,13 @@
       "depends_on": [
         "AE4V3-09"
       ],
-      "status": "not_started",
-      "code_evidence": [],
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalGitHubSkillImporter.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/tools/PublicGitHubSkillChildPathTest.kt"
+      ],
       "tests_verified": [],
-      "notes": ""
+      "notes": "按 V3 Tools/MCP/Skill management 任务启动：生产 GitHub 技能安装严格核对每级子条目的 path 必须等于当前选定目录/name，拒绝跨目录返回和重复文件静默覆盖；保留既有 ZIP 入口、资源预算及 UI。新增路径伪装、非法名称和合法嵌套路径回归；本地定向 JVM 测试和 App Kotlin 编译通过。MCP 生命周期、完整技能治理、CI 最终 SHA 验证未完成。"
     },
     {
       "id": "AE4V3-11",

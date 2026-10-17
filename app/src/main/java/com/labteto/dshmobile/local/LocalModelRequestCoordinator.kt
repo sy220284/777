@@ -823,7 +823,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             },
                             onDelta = { delta ->
                                     val visible = delta.content
-                                    attemptEvidence.append(visible)
+                                    attemptEvidence.observe(delta)
                                     streamPreview.append(previewDeltaTransform?.invoke(visible) ?: visible)
                                 },
                             )

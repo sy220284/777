@@ -67,6 +67,16 @@ class LocalModelRequestAttemptPolicyTest {
     }
 
     @Test
+    fun reasoningOnlyOutputBlocksRetryDespiteProviderRejectionFlag() {
+        val retryableRejection = LocalModelException(
+            code = "MODEL_HTTP_503", message = "rejected", retryable = true,
+            status = 503, admissionState = LocalModelAdmissionState.REJECTED,
+        )
+        assertTrue(canRetryModelAttemptAfterOutput(retryableRejection, 0))
+        assertFalse(canRetryModelAttemptAfterOutput(retryableRejection, 0, reasoningObserved = true))
+    }
+
+    @Test
     fun knownAdmittedAndNonTransportFailuresNeverReplay() {
         val admitted = modelPostAdmissionFailure(
             code = "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION",

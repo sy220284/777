@@ -50,6 +50,17 @@ internal data class PublicGitHubSkillLocation(
     }
 }
 
+/** GitHub's directory listing is metadata, never permission to walk outside the chosen folder. */
+internal fun requireGitHubSkillChildPath(parent: String, name: String, advertisedPath: String): String {
+    require(name.matches(Regex("[A-Za-z0-9._-]{1,100}")) && name != "." && name != "..") {
+        "技能文件名无效"
+    }
+    require(advertisedPath == "$parent/$name") {
+        "GitHub 技能目录条目越过所选目录或返回了不一致的路径"
+    }
+    return advertisedPath
+}
+
 /** Fetches a single public GitHub skill folder, then delegates admission to the existing
  * ZIP importer. No desktop Python, Git binary, remote execution or hidden cloud service. */
 @Singleton
@@ -73,14 +84,12 @@ internal class LocalGitHubSkillImporter @Inject constructor(
             for (entry in entries) {
                 val item = entry.jsonObject
                 val name = item.string("name")
-                require(name.matches(Regex("[A-Za-z0-9._-]{1,100}")) && name != "." && name != "..") {
-                    "技能文件名无效"
-                }
-                val childPath = item.string("path")
+                val childPath = requireGitHubSkillChildPath(path, name, item.string("path"))
                 val childRelative = if (relative.isEmpty()) name else "$relative/$name"
                 when (item.string("type")) {
                     "dir" -> collect(childPath, childRelative, depth + 1)
                     "file" -> {
+                        require(childRelative !in files) { "技能目录包含重复文件，拒绝覆盖" }
                         val blob = get(source, childPath).jsonObject
                         require(blob.string("encoding") == "base64") { "技能文件不可按 Base64 读取" }
                         val value = blob.string("content").replace("\n", "")
