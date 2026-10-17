@@ -32,23 +32,27 @@ internal class LocalPersonaArchiveMutationCoordinator(
 
     suspend fun saveStory(command: PersonaStoryUiCommand): Receipt =
         when (val saved = stories.submit(command)) {
-            is UiPersonaStoryReceipt.Saved ->
+            is UiPersonaStoryReceipt.Saved -> {
+                val refreshFailed = refreshCommittedArchive()
                 Receipt.Committed(
                     sessionSyncDeferred = saved.sessionSync == UiStorySessionSync.DEFERRED ||
-                        refreshCommittedArchive(),
+                        refreshFailed,
                 )
+            }
             UiPersonaStoryReceipt.Missing -> Receipt.Missing
             is UiPersonaStoryReceipt.Failed -> Receipt.Rejected(saved.message)
         }
 
     suspend fun deleteGallery(command: DeletePersonaGalleryCommand): Receipt =
         when (val deleted = gallery.delete(command)) {
-            is UiPersonaGalleryDeletionReceipt.Deleted ->
+            is UiPersonaGalleryDeletionReceipt.Deleted -> {
+                val refreshFailed = refreshCommittedArchive()
                 Receipt.Committed(
                     sessionSyncDeferred = deleted.sessionSync == UiStorySessionSync.DEFERRED ||
-                        refreshCommittedArchive(),
+                        refreshFailed,
                     portraitCleanupWarning = deleted.portraitCleanupWarning,
                 )
+            }
             UiPersonaGalleryDeletionReceipt.Missing -> Receipt.Missing
             is UiPersonaGalleryDeletionReceipt.Failed -> Receipt.Rejected(deleted.message)
         }
