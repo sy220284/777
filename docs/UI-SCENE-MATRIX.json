@@ -1432,7 +1432,7 @@
       "owner": "SETTINGS",
       "route": "SETTINGS",
       "kind": "SYSTEM",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeviceCapabilitiesController.kt",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalHostDeviceCapabilitiesOwner.kt",
       "actions": [
         "request_permission"
       ],
