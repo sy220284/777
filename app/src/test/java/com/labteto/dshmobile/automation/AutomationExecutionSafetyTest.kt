@@ -173,6 +173,10 @@ class AutomationExecutionSafetyTest {
                     manualRun = true, manualExecutionId = "request-b")
             }) { it.copy(lastResult = "duplicate") })
             assertEquals("genuine", AutomationStore(file, json).get("manual")!!.lastResult)
+            val edited = restarted.upsert(requireNotNull(restarted.get("manual"))
+                .copy(prompt = "edited", activeManualRunId = "old-request")).admitted
+            assertTrue(edited.scheduleGeneration > task.scheduleGeneration)
+            assertNull(edited.activeManualRunId)
         } finally {
             dir.deleteRecursively()
         }

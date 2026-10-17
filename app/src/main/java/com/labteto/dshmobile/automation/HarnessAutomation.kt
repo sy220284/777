@@ -254,6 +254,9 @@ class AutomationStore internal constructor(
         require(watermark < Long.MAX_VALUE) { "自动任务排程 generation 已耗尽" }
         val admitted = normalizeAutomationTask(task).copy(
             scheduleGeneration = maxOf(task.scheduleGeneration, watermark + 1L),
+            // A schedule edit creates a new run generation; never inherit a
+            // WorkManager request identity claimed by the previous generation.
+            activeManualRunId = null,
         )
         val current = document.tasks.filterNot { it.id == task.id } + admitted
         write(document.copy(tasks = current, generationWatermark = admitted.scheduleGeneration))

@@ -348,7 +348,8 @@
         "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkerSettlementCoordinator.kt",
         "app/src/test/java/com/labteto/dshmobile/automation/AutomationExecutionSafetyTest.kt",
         "ui-contract/src/main/kotlin/com/labteto/dshmobile/automation/AutomationValues.kt",
-        "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt"
+        "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt",
+        "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomation.kt"
       ],
       "tests_verified": [
         "local App compileDebugKotlin",
@@ -357,9 +358,10 @@
         "local architecture, performance, test-quality, Kotlin risk, CI integrity checks",
         "2026-10-17: local 9-module JVM suite: 3323 tests, zero failures (PR snapshot with exact Automation patch)",
         "2026-10-17: App Kotlin compile and AutomationExecutionSafetyTest manual-run claim/restart/replaced/duplicate receipt cases",
-        "2026-10-17: local architecture, performance, test quality, Kotlin risk, CI integrity and ledger gates"
+        "2026-10-17: local architecture, performance, test quality, Kotlin risk, CI integrity and ledger gates",
+        "2026-10-17: local app Kotlin compile + AutomationExecutionSafetyTest: schedule generation edit revokes old manual work request (exit 0)"
       ],
-      "notes": "2026-10-17：启动 Automation 任务与结算重构；排程 Worker 的入场仅允许 SCHEDULED 或 RUNNING 冷恢复，历史终态不得由迟到 WorkManager 请求重启。同一 scheduleGeneration 内以原始 lastRunAt + RUNNING 构成本次执行的持久结算栅栏，所有 delivered/blocked/failed/cancelled 更新、Work session 回写通过 AutomationStore.updateIf 原子核验，防止旧 Worker 跨轮覆盖新的成功/失败及重复结算。手动运行维持 generation 合同，新增 3 项正反回归。本地 App Kotlin 编译及七模块 3165 JVM 测试 0 失败，五项静态检查通过；完整 Automation 调度/跨进程结算及本提交 SHA CI 待验收，整项 in_progress。 2026-10-17 三源深度优化：参考 Codex 的运行身份/持久提交栅栏与 DeepSeek Goal Round 的逐次 attempt 边界，手动 Automation 现在在 enqueue 前持久认领 WorkManager request UUID；Worker 入场与 Work session 回写、所有成功/失败/阻塞结算必须同时匹配排程代际和当前 manualExecutionId。替换手动请求撤销旧授权，结算一次即消费授权，重启从 AutomationStore 读取身份；定时 Worker 首次准入清除旧手动声明，旧数据缺省 null 保持读取兼容。新增跨新 Store 实例恢复、旧回执、替换与重复结算回归。按当前 Kotlin 原生功能保留 Shared Run/Store 单一事实源，未声明跨设备沙箱与最终 CI 完整验收，AE4V3-16 仍 in_progress。"
+      "notes": "2026-10-17：启动 Automation 任务与结算重构；排程 Worker 的入场仅允许 SCHEDULED 或 RUNNING 冷恢复，历史终态不得由迟到 WorkManager 请求重启。同一 scheduleGeneration 内以原始 lastRunAt + RUNNING 构成本次执行的持久结算栅栏，所有 delivered/blocked/failed/cancelled 更新、Work session 回写通过 AutomationStore.updateIf 原子核验，防止旧 Worker 跨轮覆盖新的成功/失败及重复结算。手动运行维持 generation 合同，新增 3 项正反回归。本地 App Kotlin 编译及七模块 3165 JVM 测试 0 失败，五项静态检查通过；完整 Automation 调度/跨进程结算及本提交 SHA CI 待验收，整项 in_progress。 2026-10-17 三源深度优化：参考 Codex 的运行身份/持久提交栅栏与 DeepSeek Goal Round 的逐次 attempt 边界，手动 Automation 现在在 enqueue 前持久认领 WorkManager request UUID；Worker 入场与 Work session 回写、所有成功/失败/阻塞结算必须同时匹配排程代际和当前 manualExecutionId。替换手动请求撤销旧授权，结算一次即消费授权，重启从 AutomationStore 读取身份；定时 Worker 首次准入清除旧手动声明，旧数据缺省 null 保持读取兼容。新增跨新 Store 实例恢复、旧回执、替换与重复结算回归。按当前 Kotlin 原生功能保留 Shared Run/Store 单一事实源，未声明跨设备沙箱与最终 CI 完整验收，AE4V3-16 仍 in_progress。 2026-10-17：进一步修复新排程生成代际时意外继承旧 activeManualRunId；AutomationStore.upsert 强制重置旧请求身份，新增保存后验证代际增加且授权已撤销的回归；App Kotlin 编译与 Automation 定向测试成功。"
     },
     {
       "id": "AE4V3-17",
