@@ -81,7 +81,7 @@ class LocalWorkflowCoordinatorTest {
             execute = { prompt ->
                 // Retries add feedback to the original task; A must continue failing.
                 // Only the independent C is allowed to complete.
-                when (prompt.substringBefore("\\n")) {
+                when (prompt.lineSequence().first()) {
                     "A" -> ""
                     "B" -> error("Dependent node B must stay blocked")
                     else -> "完成"
