@@ -6,6 +6,7 @@ data class ImportUiAttachmentCommand(val identity: UiSessionIdentity, val conten
 sealed interface UiAttachmentReceipt {
     data class Imported(val attachment: LocalImportedAttachment) : UiAttachmentReceipt
     data class Rejected(val reason: UiCommandRejection) : UiAttachmentReceipt
+    data object GrantRevoked : UiAttachmentReceipt
     data class Failed(val message: String?) : UiAttachmentReceipt
 }
 
