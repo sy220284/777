@@ -73,6 +73,7 @@ class LocalAttachmentUiPortComposition @Inject internal constructor(
             if (!current(command)) UiAttachmentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
             else UiAttachmentReceipt.Imported(imported)
         } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: SecurityException) { UiAttachmentReceipt.GrantRevoked }
         catch (failure: Exception) { UiAttachmentReceipt.Failed(failure.message) }
     }
 }
