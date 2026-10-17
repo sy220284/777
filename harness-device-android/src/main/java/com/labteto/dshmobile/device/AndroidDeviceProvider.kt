@@ -44,6 +44,7 @@ class AndroidDeviceProvider(
     private val resourceScheduler: HarnessResourceScheduler? = null,
 ) : HarnessDeviceProvider, HarnessVirtualDisplayProvider {
     private val virtualDisplayLeases = ConcurrentHashMap<String, HarnessResourceLease>()
+    private val displayOwnership = VirtualDisplayOwnership()
 
     override val capabilities: Set<String> = setOf(
         "device_info",
@@ -143,21 +144,38 @@ class AndroidDeviceProvider(
                         height = arguments.deviceOptionalInt("height", 1920),
                         densityDpi = arguments.deviceOptionalInt("density_dpi", 420),
                     )
-                    if (lease != null) virtualDisplayLeases[status.id] = lease
-                    virtualStatus(status)
+                    try {
+                        displayOwnership.registerTool(status.id)
+                        if (lease != null) virtualDisplayLeases[status.id] = lease
+                        virtualStatus(status)
+                    } catch (error: Throwable) {
+                        // Do not leak a live display when publication/ownership fails.
+                        displayOwnership.releaseTool(status.id)
+                        virtualDisplayLeases.remove(status.id)?.close()
+                        runCatching { virtualDisplays.close(status.id) }
+                        throw error
+                    }
                 } catch (error: Throwable) {
                     lease?.close()
                     throw error
                 }
             }
-            "vscreen_list" -> virtualDisplays.list().joinToString("\n", transform = ::virtualStatus)
-            "vscreen_status" -> virtualStatus(virtualDisplays.status(arguments.required("id")))
-            "vscreen_launch" -> virtualDisplays.launch(
-                arguments.required("id"),
-                arguments.required("package"),
-            )
+            "vscreen_list" -> virtualDisplays.list()
+                .filter { displayOwnership.isTool(it.id) }
+                .joinToString("\n", transform = ::virtualStatus)
+            "vscreen_status" -> {
+                val id = arguments.required("id")
+                displayOwnership.requireTool(id)
+                virtualStatus(virtualDisplays.status(id))
+            }
+            "vscreen_launch" -> {
+                val id = arguments.required("id")
+                displayOwnership.requireTool(id)
+                virtualDisplays.launch(id, arguments.required("package"))
+            }
             "vscreen_tap" -> {
                 val id = arguments.required("id")
+                displayOwnership.requireTool(id)
                 accessibility().tap(
                     x = arguments.deviceRequiredFiniteFloat("x"),
                     y = arguments.deviceRequiredFiniteFloat("y"),
@@ -167,6 +185,7 @@ class AndroidDeviceProvider(
             }
             "vscreen_swipe" -> {
                 val id = arguments.required("id")
+                displayOwnership.requireTool(id)
                 accessibility().swipe(
                     startX = arguments.deviceRequiredFiniteFloat("start_x"),
                     startY = arguments.deviceRequiredFiniteFloat("start_y"),
@@ -177,14 +196,18 @@ class AndroidDeviceProvider(
                 ).toString()
             }
             "vscreen_screenshot" -> {
-                val png = virtualDisplays.screenshotPng(arguments.required("id"))
+                val id = arguments.required("id")
+                displayOwnership.requireTool(id)
+                val png = virtualDisplays.screenshotPng(id)
                 "data:image/png;base64," + Base64.encodeToString(png, Base64.NO_WRAP)
             }
             "vscreen_close" -> {
                 val id = arguments.required("id")
+                displayOwnership.requireTool(id)
                 try {
                     virtualDisplays.close(id).toString()
                 } finally {
+                    displayOwnership.releaseTool(id)
                     virtualDisplayLeases.remove(id)?.close()
                 }
             }
@@ -198,8 +221,16 @@ class AndroidDeviceProvider(
         )
         return try {
             val status = virtualDisplays.create()
-            if (lease != null) virtualDisplayLeases[status.id] = lease
-            status.id
+            try {
+                displayOwnership.registerAgent(status.id)
+                if (lease != null) virtualDisplayLeases[status.id] = lease
+                status.id
+            } catch (error: Throwable) {
+                displayOwnership.releaseAgent(status.id)
+                virtualDisplayLeases.remove(status.id)?.close()
+                runCatching { virtualDisplays.close(status.id) }
+                throw error
+            }
         } catch (error: Throwable) {
             lease?.close()
             throw error
@@ -207,8 +238,13 @@ class AndroidDeviceProvider(
     }
 
     override fun releaseAgentVirtualDisplay(id: String) {
-        runCatching { virtualDisplays.close(id) }
-        virtualDisplayLeases.remove(id)?.close()
+        // An Agent release must never destroy a tool-owned display by mistake.
+        if (!displayOwnership.releaseAgent(id)) return
+        try {
+            runCatching { virtualDisplays.close(id) }
+        } finally {
+            virtualDisplayLeases.remove(id)?.close()
+        }
     }
 
     override fun close() {
@@ -217,6 +253,7 @@ class AndroidDeviceProvider(
         } finally {
             virtualDisplayLeases.values.forEach { lease -> runCatching { lease.close() } }
             virtualDisplayLeases.clear()
+            displayOwnership.clear()
         }
     }
 
