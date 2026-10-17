@@ -24,15 +24,46 @@ internal data class V6ToolFormField(
     val path: List<String> = listOf(name),
 )
 
+/**
+ * A malformed remote "required" declaration must produce a typed schema
+ * rejection, not a ClassCastException on a rendered V6 Scene. Unrecognized
+ * names and duplicates are errors rather than implicitly granting new fields.
+ */
+private fun v6TrustedRequiredKeys(
+    schema: JsonObject,
+    properties: JsonObject? = null,
+): Set<String> {
+    val member = schema["required"] ?: return emptySet()
+    require(member is JsonArray && member.size <= 64) {
+        "工具 Schema 必填字段声明必须是有界字符串数组"
+    }
+    val names = member.map { value ->
+        (value as? JsonPrimitive)?.takeIf { it.isString }?.content
+            ?: throw IllegalArgumentException("工具 Schema 必填字段必须是字符串")
+    }
+    require(names.size == names.toSet().size) { "工具 Schema 必填字段重复" }
+    if (properties != null) require(names.all { it in properties }) {
+        "工具 Schema 必填字段未在 properties 中声明"
+    }
+    return names.toSet()
+}
+
 internal fun v6ToolFormFields(schema: JsonObject): List<V6ToolFormField> {
+    require((schema["type"] as? JsonPrimitive)?.content == "object") {
+        "工具 Schema 顶层必须是对象"
+    }
     val result = mutableListOf<V6ToolFormField>()
     val keys = mutableSetOf<String>()
     fun visit(owner: JsonObject, path: List<String>, depth: Int, ancestorsRequired: Boolean) {
         require(depth <= 5) { "工具对象嵌套超过五层" }
-        val properties = owner["properties"] as? JsonObject ?: return
-        val required = (owner["required"] as? JsonArray).orEmpty().map {
-            (it as JsonPrimitive).content
-        }.toSet()
+        val properties = owner["properties"] as? JsonObject
+        if (properties == null) {
+            require(owner["properties"] == null && v6TrustedRequiredKeys(owner).isEmpty()) {
+                "工具 Schema 缺少必填对象属性定义"
+            }
+            return
+        }
+        val required = v6TrustedRequiredKeys(owner, properties)
         for ((name, element) in properties) {
             val field = element as? JsonObject
                 ?: throw IllegalArgumentException("字段定义必须是对象：$name")
@@ -226,8 +257,7 @@ internal fun v6ToolArgumentsJson(schema: JsonObject, values: Map<String, String>
         val choices = spec["enum"] as? JsonArray
         require(choices == null || value in choices) { "字段不在许可选项中：$path" }
         if (value is JsonObject) {
-            val required = (spec["required"] as? JsonArray).orEmpty()
-                .map { (it as JsonPrimitive).content }
+            val required = v6TrustedRequiredKeys(spec, spec["properties"] as? JsonObject)
             for (key in required) {
                 require(key in value) { "缺少必填字段：$path.$key" }
             }
