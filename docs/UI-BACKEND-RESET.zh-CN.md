@@ -16,7 +16,7 @@
 - App `ui/screens`、`ui/components`、`ui/theme`、`ui/shenyan`、侧边栏 UI 实现、字体、图标、旧动画与视觉回归测试。
 - V6 设计源码/图标体系/视觉素材文档与旧截图采集工作流。
 - 任意编译期对 V6 包的依赖，以及旧 UI 的生产装配。
-- 旧页面文案资源（数千条页面标题、按钮与提示）和 App 侧旧 Material/Navigation/图标库；保留仅供系统通知、业务存储错误与 Android 契约测试使用的字符串。
+- 旧页面文案资源（数千条页面标题、按钮与提示）；保留仅供系统通知、业务存储错误与 Android 契约测试使用的字符串。**Gradle 中 AndroidX Compose/Material/Icon/Navigation 的 SDK 依赖仍保留为经过校验的中立编译基座**，并非旧 UI 的页面、组件、素材或活动渲染器，MainActivity 不执行 UI 装配。原安全校验的 Hilt/KSP 依赖图必须保持稳定，新 UI 可在其上接入。
 
 ## 新 UI 接入要求
 
