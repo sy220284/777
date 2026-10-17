@@ -100,6 +100,14 @@ class LocalAttachmentImporterTest {
     }
 
     @Test
+    fun revokedSystemDocumentPermissionRequiresUserReselection() {
+        assertEquals(com.labteto.dshmobile.uicontract.UiAttachmentReceipt.GrantRevoked,
+            attachmentImportFailureReceipt(SecurityException("access revoked")))
+        val missing = attachmentImportFailureReceipt(java.io.FileNotFoundException("file deleted"))
+        assertTrue(missing is com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Failed)
+    }
+
+    @Test
     fun onlySystemContentUrisMayCrossTheAttachmentPort() {
         assertTrue(isSupportedPickerAttachmentUri("content", "com.android.providers.media.documents"))
         assertFalse(isSupportedPickerAttachmentUri("file", ""))
