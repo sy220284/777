@@ -29,7 +29,7 @@ def named_test_exists(reference: str) -> bool:
         path.suffix != ".kt" or "/src/test/" not in str(path) and
         "/src/androidTest/" not in str(path)):
         return False
-    return re.search(r"\\bfun\\s+" + re.escape(method) + r"\\s*\\(",
+    return re.search(r"\bfun\s+" + re.escape(method) + r"\s*\(",
                      path.read_text(encoding="utf-8")) is not None
 
 MATRIX = ROOT / "docs/UI-SCENE-MATRIX.json"
