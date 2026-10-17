@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.uipack.v6
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -58,6 +59,25 @@ fun V6SettingsSuiteScene(
     // values locally until an explicit discard or navigation; never overwrite
     // an unsaved form from a background projection refresh.
     var draftDirty by remember(scene) { mutableStateOf(false) }
+    var confirmDiscard by remember(scene) { mutableStateOf(false) }
+    val editable = scene.value in setOf("settings.memory", "settings.memory_settings", "settings.advanced")
+    val hasUnsavedChanges = when (scene.value) {
+        "settings.memory", "settings.memory_settings" ->
+            rules != state.userRules || recall != state.autoRecall || autoMemory != state.autoMemory
+        "settings.advanced" ->
+            mainSteps != state.mainMaxSteps.toString() ||
+                subSteps != state.subagentMaxSteps.toString() ||
+                attempts != state.modelAttempts.toString()
+        else -> false
+    }
+    // Hardware Back and visible Back use the same confirmation rule.
+    BackHandler(enabled = editable && draftDirty && hasUnsavedChanges && !state.loading) {
+        confirmDiscard = true
+    }
+    fun requestBack() {
+        if (editable && draftDirty && hasUnsavedChanges && !state.loading) confirmDiscard = true
+        else onBack()
+    }
     LaunchedEffect(scene, state.loading, state.userRules, state.autoRecall,
         state.autoMemory, state.mainMaxSteps, state.subagentMaxSteps, state.modelAttempts) {
         if (!state.loading && !draftDirty) {
@@ -120,7 +140,7 @@ fun V6SettingsSuiteScene(
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-            SyButton("返回", onBack, style = SyButtonStyle.GHOST)
+            SyButton("返回", { requestBack() }, style = SyButtonStyle.GHOST)
         }
         if (state.loading) SyNote("正在加载设置")
         state.error?.let { SyNote(it) }
@@ -368,6 +388,19 @@ fun V6SettingsSuiteScene(
         }
         output?.let { SelectionContainer { Text(it) } }
     }
+    if (confirmDiscard) AlertDialog(
+        onDismissRequest = { confirmDiscard = false },
+        title = { Text("放弃未保存的设置？") },
+        text = { Text("当前修改尚未在设置 Owner 中确认；离开后需要重新输入。") },
+        confirmButton = { TextButton(onClick = {
+            confirmDiscard = false
+            draftDirty = false
+            onBack()
+        }) { Text("放弃并返回") } },
+        dismissButton = { TextButton(onClick = { confirmDiscard = false }) {
+            Text("继续编辑")
+        } },
+    )
     selectedModel?.let { id ->
         AlertDialog(onDismissRequest = { selectedModel = null },
             title = { Text("确认删除模型配置") }, text = { Text("仅删除已选择的配置：" + id) },
