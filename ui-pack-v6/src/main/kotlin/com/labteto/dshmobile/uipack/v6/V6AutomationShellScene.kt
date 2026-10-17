@@ -81,10 +81,11 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
     var busy by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    // Editor and list have very different heights. Restore the viewport when switching so
-    // "新建任务" and the editor header cannot remain outside the accessible viewport.
-    val editorScroll = rememberScrollState()
-    LaunchedEffect(editor) { editorScroll.scrollTo(0) }
+    // List and editor are distinct scroll surfaces. Reusing the same ScrollState
+    // across an editor close can leave the much shorter list offset below its
+    // actionable first row, particularly during Android window/layout transitions.
+    // Reset synchronously with the mode change instead of racing a LaunchedEffect.
+    val editorScroll = remember(editor) { androidx.compose.foundation.ScrollState(0) }
     fun send(command: AutomationUiCommand) {
         if (busy) return
         val admittedIdentity = owner.snapshot().context.identity
