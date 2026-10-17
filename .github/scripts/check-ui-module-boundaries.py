@@ -21,6 +21,7 @@ REQUIRED = (
     "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiApplicationScenePack.kt",
     "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt",
     "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeKernel.kt",
+    "app/src/main/java/com/labteto/dshmobile/ui/host/LocalApplicationFeaturePortsOwner.kt",
 )
 def violations() -> list[str]:
     errors = []
@@ -37,6 +38,11 @@ def violations() -> list[str]:
         build = (ROOT / name / "build.gradle.kts").read_text(encoding="utf-8")
         if re.search(r'project\s*\(\s*"(?::)(?:app|ui-pack-v6)"',build):
             errors.append(name + " depends on app or V6")
+    owner = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/host/LocalApplicationFeaturePortsOwner.kt").read_text(encoding="utf-8")
+    if any(x in owner for x in ("V6ApplicationScenePack", "V6SecondaryPorts", "V6VisualFrame")):
+        errors.append("neutral Feature Port owner references deleted V6 UI")
+    for symbol in ("ChatUiPort", "WorkConversationUiPort", "ToolsUiPort", "SessionUiPort"):
+        if symbol not in owner: errors.append("neutral owner lost port: " + symbol)
     activity = (ROOT / "app/src/main/java/com/labteto/dshmobile/MainActivity.kt").read_text(encoding="utf-8")
     if any(s in activity for s in ("setContent(", "AppRoot(", "DshTheme(", "V6ApplicationScenePack(")):
         errors.append("MainActivity renders retired interface")

@@ -7,7 +7,7 @@
 - `:core`、Harness 系列、`app/local`、`app/automation`、`app/connection`、持久化与通知服务。模型请求、会话、记忆、工具、Work、执行和用户数据均由原业务 Owner 保管。
 - `:ui-contract` 的各 Feature Port、命令、快照、回执与能力契约。
 - `:ui-host` 的场景准入、导航状态、安全系统操作和系统权限入口。Host 不规定界面布局、风格、动画、字体或图标。
-- App 内 Host/Feature 适配器、已有用户数据与业务配置，不抹除持久数据，不卸载或重置用户状态。
+- App 内 Host/Feature 适配器及中立的 `LocalApplicationFeaturePortsOwner`：集中注入原 Chat/Work/Tools/Persona/Memory/Session 等真实 Owner 与业务端口，保留加密草稿、Scene Request 和原有用户数据，UI 不复制业务状态。
 - 人物预设的角色内容素材属于产品数据，非旧 UI 皮肤，保留供新界面使用。
 
 ## 明确移除
