@@ -85,7 +85,8 @@ class McpPluginWorkerService : Service() {
                                 transport.close()
                                 "IPC duplicate transport"
                             }
-                            send(sender, McpWorkerWire.RESPONSE, requestId, token, result = "{}")
+                            send(sender, McpWorkerWire.RESPONSE, requestId, token,
+                                result = "{\"worker_pid\":${android.os.Process.myPid()}}")
                         }
                         McpWorkerWire.REQUEST -> {
                             val method = fields.getString("method") ?: error("missing RPC method")

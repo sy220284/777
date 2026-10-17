@@ -17,6 +17,9 @@ internal object McpWorkerWire {
     const val CONNECT_TIMEOUT_MS = 15_000L
     const val REQUEST_TIMEOUT_MS = 120_000L
 
+    fun isDedicatedProcess(hostPid: Int, workerPid: Int): Boolean =
+        hostPid > 0 && workerPid > 0 && hostPid != workerPid
+
     fun isAllowedMethod(method: String): Boolean = method.isNotBlank() &&
         method.length <= 96 && method.none(Char::isISOControl)
     fun validRequestSize(value: String): Boolean =

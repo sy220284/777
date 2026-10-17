@@ -7,6 +7,9 @@ import org.junit.Test
 /** Fast contract checks for the independently hosted MCP Binder envelope. */
 class McpWorkerWireTest {
     @Test fun everyWireMethodAndPayloadHasAHardBudget() {
+        assertTrue(McpWorkerWire.isDedicatedProcess(100, 101))
+        assertFalse(McpWorkerWire.isDedicatedProcess(100, 100))
+        assertFalse(McpWorkerWire.isDedicatedProcess(100, 0))
         assertTrue(McpWorkerWire.isAllowedMethod("tools/call"))
         assertTrue(McpWorkerWire.isAllowedMethod("tools/list"))
         assertFalse(McpWorkerWire.isAllowedMethod(""))

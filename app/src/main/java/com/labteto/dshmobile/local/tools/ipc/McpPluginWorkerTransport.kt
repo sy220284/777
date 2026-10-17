@@ -52,6 +52,8 @@ internal class McpPluginWorkerTransport(
     private val closed = AtomicBoolean(false)
     private val bound = AtomicBoolean(false)
     private var opened = false
+    internal var workerPid: Int? = null
+        private set
     private val events = MutableSharedFlow<Throwable>(replay = 1, extraBufferCapacity = 1)
     override val terminalEvents = events.asSharedFlow()
     private val reply = Messenger(object : Handler(Looper.getMainLooper()) {
@@ -83,8 +85,19 @@ internal class McpPluginWorkerTransport(
             terminate(IOException("MCP worker returned null binder"))
     }
 
+    private fun sendCloseWithoutWaiting() {
+        runCatching {
+            remoteMessenger?.send(Message.obtain(null, McpWorkerWire.CLOSE,
+                ids.getAndIncrement(), McpWorkerWire.VERSION).apply {
+                replyTo = reply
+                data = Bundle().apply { putString("token", token) }
+            })
+        }
+    }
+
     private fun terminate(cause: IOException) {
         if (!closed.compareAndSet(false, true)) return
+        sendCloseWithoutWaiting()
         events.tryEmit(cause)
         if (!connected.isCompleted) connected.completeExceptionally(cause)
         pending.values.forEach { it.completeExceptionally(cause) }
@@ -123,7 +136,16 @@ internal class McpPluginWorkerTransport(
                 else -> error("unsupported MCP worker kind")
             }
         }
-        rpc(McpWorkerWire.OPEN, request)
+        val openedResult = rpc(McpWorkerWire.OPEN, request)
+        val pid = Json.parseToJsonElement(openedResult.getString("result") ?: "{}")
+            .let { it as? JsonObject }?.get("worker_pid")
+            ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() }
+            ?: throw IOException("MCP worker identity is missing")
+        if (!McpWorkerWire.isDedicatedProcess(android.os.Process.myPid(), pid)) {
+            terminate(IOException("MCP worker is not running in a separate OS process"))
+            throw IOException("MCP worker isolation unavailable")
+        }
+        workerPid = pid
         opened = true
     }
 
@@ -183,18 +205,7 @@ internal class McpPluginWorkerTransport(
         pending.values.forEach { it.completeExceptionally(
             IOException("MCP transport closed; pending call outcome unknown")) }
         pending.clear()
-        if (opened && connected.isCompleted) {
-            runCatching {
-                // Service connection owns its own isolated transport instance.
-                // CLOSE is best effort only; no attempt to replay pending tool calls.
-                val message = Message.obtain(null, McpWorkerWire.CLOSE, ids.getAndIncrement(),
-                    McpWorkerWire.VERSION).apply {
-                    replyTo = reply
-                    data = Bundle().apply { putString("token", token) }
-                }
-                remoteMessenger?.send(message)
-            }
-        }
+        if (connected.isCompleted) sendCloseWithoutWaiting()
         if (bound.compareAndSet(true, false))
             runCatching { app.unbindService(connection) }
     }
