@@ -593,12 +593,16 @@ for required in (
         die("app Runtime bootstrap composition is incomplete: " + required)
 
 application = strip_comments(read(APPLICATION_PATH))
-for required in (
-    "LocalRuntimeKernel",
-    "localRuntimeKernel.start()",
-):
-    if required not in application:
-        die("DshApplication must eagerly start the process Runtime Kernel: " + required)
+if "LocalRuntimeKernel" not in application:
+    die("DshApplication must inject the process Runtime Kernel")
+kernel_direct = "localRuntimeKernel.start()"
+kernel_provider = "localRuntimeKernelProvider.get().start()"
+if kernel_direct not in application and kernel_provider not in application:
+    die("DshApplication must eagerly start the main-process Runtime Kernel")
+if kernel_provider in application:
+    worker_guard = "if (isMcpWorkerProcess(Application.getProcessName(), packageName)) return"
+    if worker_guard not in application or application.index(worker_guard) >= application.index(kernel_provider):
+        die("MCP worker process must return before eager main-process Runtime Kernel start")
 
 
 # Session owns transaction ordering; provider Features own domain interpretation.
