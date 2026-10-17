@@ -29,16 +29,16 @@ internal class LocalEncryptedUiDraftStore(context: Context) {
         checkDomain(domain)
         val encoded = preferences.getString("cipher.$domain", null) ?: return emptyList()
         val bytes = LocalUiDraftCipher.decrypt(secretKey, encoded, domain)
-        require(bytes.size <= MAX_PLAINTEXT_BYTES) { "保存的草稿超过安全恢复大小预算" }
+        require(bytes.size <= MAX_PLAINTEXT_BYTES) { "UI_DRAFT_RESTORE_BYTES_EXCEEDED" }
         return Json.decodeFromString<List<String>>(bytes.toString(Charsets.UTF_8))
-            .also { require(it.size <= MAX_ELEMENTS) { "保存的草稿条目过多" } }
+            .also { require(it.size <= MAX_ELEMENTS) { "UI_DRAFT_RESTORE_ENTRIES_EXCEEDED" } }
     }
 
     fun write(domain: String, content: List<String>) {
         checkDomain(domain)
-        require(content.size <= MAX_ELEMENTS) { "草稿条目超过恢复预算" }
+        require(content.size <= MAX_ELEMENTS) { "UI_DRAFT_SAVE_ENTRIES_EXCEEDED" }
         val data = Json.encodeToString(content).toByteArray(Charsets.UTF_8)
-        require(data.size <= MAX_PLAINTEXT_BYTES) { "草稿内容超出安全保存预算" }
+        require(data.size <= MAX_PLAINTEXT_BYTES) { "UI_DRAFT_SAVE_BYTES_EXCEEDED" }
         // Even an empty value must be durably represented so old process Bundles
         // cannot later resurrect drafts the user intentionally cleared.
         preferences.edit()
@@ -61,7 +61,7 @@ internal class LocalEncryptedUiDraftStore(context: Context) {
 
     private fun checkDomain(domain: String) {
         require(domain in setOf("conversation_drafts", "attachment_drafts")) {
-            "未知的草稿私有存储域"
+            "UI_DRAFT_UNKNOWN_DOMAIN"
         }
     }
 
@@ -102,9 +102,9 @@ internal object LocalUiDraftCipher {
 
     fun decrypt(key: SecretKey, blob: String, domain: String): ByteArray {
         val bytes = Base64.getDecoder().decode(blob)
-        require(bytes.size in 29..(256 * 1024)) { "加密草稿长度错误" }
+        require(bytes.size in 29..(256 * 1024)) { "UI_DRAFT_INVALID_CIPHERTEXT_LENGTH" }
         val buffer = ByteBuffer.wrap(bytes)
-        require(buffer.get().toInt() == 1) { "加密草稿版本不受支持" }
+        require(buffer.get().toInt() == 1) { "UI_DRAFT_UNSUPPORTED_CIPHERTEXT_VERSION" }
         val iv = ByteArray(12)
         buffer.get(iv)
         val ciphertext = ByteArray(buffer.remaining())
