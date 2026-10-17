@@ -71,6 +71,12 @@
         </activity>
 
         <service
+            android:name=".local.tools.ipc.McpPluginWorkerService"
+            android:process=":mcp_worker"
+            android:exported="false"
+            android:stopWithTask="true" />
+
+        <service
             android:name=".local.runtime.LocalExecutionService"
             android:exported="false"
             android:foregroundServiceType="specialUse">
