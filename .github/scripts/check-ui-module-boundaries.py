@@ -14,6 +14,16 @@ RETIRED = (
     "app/src/main/res/font",
     "app/src/main/res/drawable",
     "app/src/main/res/drawable-nodpi",
+    "app/src/main/res/mipmap",
+    "app/src/main/res/raw",
+    "app/src/main/res/anim",
+    "app/src/main/res/animator",
+    "app/src/main/res/color",
+    "app/src/main/res/layout",
+    "app/src/main/res/values/strings_capability_center.xml",
+    "app/src/main/res/values/strings_persona_gallery_v3.xml",
+    "app/src/main/res/values/persona_ai_strings.xml",
+    "app/src/main/res/values/audit_repair_strings.xml",
     "docs/design/v6",
     "app/src/debug/AndroidManifest.xml",
 )
@@ -47,6 +57,12 @@ def violations() -> list[str]:
     activity = (ROOT / "app/src/main/java/com/labteto/dshmobile/MainActivity.kt").read_text(encoding="utf-8")
     if any(s in activity for s in ("setContent(", "AppRoot(", "DshTheme(", "V6ApplicationScenePack(")):
         errors.append("MainActivity renders retired interface")
+    resources = (ROOT / "app/src/main/res/values/strings.xml").read_text(encoding="utf-8")
+    if resources.count('<string name=') > 40:
+        errors.append("old UI copy has returned to base Android resources")
+    generator = (ROOT / "tools/ui/new-pack.py").read_text(encoding="utf-8")
+    if 'ui-pack-next/build.gradle.kts' in generator or 'ConversationUiPack' in generator:
+        errors.append("UI Pack scaffold still uses a deleted or old contract")
     for dir in ("app/src/main/java", "ui-contract/src/main", "ui-host/src/main"):
         for file in (ROOT / dir).rglob("*.kt"):
             source = file.read_text(encoding="utf-8")

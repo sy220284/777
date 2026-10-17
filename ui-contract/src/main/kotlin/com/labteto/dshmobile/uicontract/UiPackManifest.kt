@@ -42,7 +42,7 @@ data class UiPackManifest(
     }
 }
 
-/** A compatibility result is explicit; a host never silently renders missing scenes in V6. */
+/** A compatibility result is explicit; a host never silently renders missing scenes. */
 data class UiPackCompatibility(
     val contractCompatible: Boolean,
     val missingScenes: Set<UiSceneId>,

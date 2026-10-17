@@ -175,6 +175,7 @@ jobs:
       - name: Validate static product guards
         run: |
           python3 .github/scripts/check-ui-module-boundaries.py --self-test
+          python3 tools/ui/new-pack.py --self-test
           python3 .github/scripts/check-ui-module-boundaries.py
           python3 .github/scripts/check-notification-presentation.py
           python3 .github/scripts/check-kotlin-risk-patterns.py

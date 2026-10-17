@@ -180,7 +180,6 @@ android {
         versionName = dshVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters.addAll(bundledRuntimeAbis) }
-        vectorDrawables { useSupportLibrary = true }
     }
 
     buildTypes {
@@ -270,8 +269,7 @@ android {
     lint {
         // Chinese is the single user-facing base resource set; there is no locale translation surface.
         error += listOf("ImpliedQuantity")
-        // `HardcodedText` is deliberately absent: it only inspects XML layouts, and this app has
-        // none. Compose string literals have to be caught in review.
+        // `HardcodedText` only inspects XML layouts; this backend-only APK has none.
     }
 }
 
@@ -331,22 +329,12 @@ dependencies {
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.service)
-    implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.appcompat)
 
+    // The UI-neutral Host exposes Compose renderer contracts; no legacy screen libraries.
     implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material.icons.extended)
-    implementation(libs.androidx.compose.foundation)
-    implementation(libs.androidx.navigation.compose)
-    implementation(libs.androidx.hilt.navigation.compose)
+    implementation("androidx.compose.runtime:runtime")
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
@@ -364,10 +352,5 @@ dependencies {
     // is a second thing to keep in step and the failure it guards against is a silent one.
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4.accessibility)
     androidTestImplementation(libs.androidx.test.runner)
-    debugImplementation(libs.androidx.compose.ui.tooling)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
