@@ -247,10 +247,12 @@ internal fun LocalApplicationUiHost(
         is LocalApplicationUiDecision.Unavailable -> {
             UnavailablePackNotice(
                 onRetry = {
-                    // The retired Shell is not an alternative pack. Recreate the
-                    // composition to retry Owner availability and pack admission.
-                    preference.edit().putString("selected_pack", V6_APPLICATION_UI).commit()
-                    activity?.recreate()
+                    // An invalid choice needs a new validated pack selection, not
+                    // Activity recreation: rebuilding the Activity discards the
+                    // existing Compose hierarchy and unrelated saved UI state.
+                    if (preference.edit().putString("selected_pack", V6_APPLICATION_UI).commit()) {
+                        selectedId = V6_APPLICATION_UI
+                    }
                 },
                 onExit = { activity?.finish() },
             )
