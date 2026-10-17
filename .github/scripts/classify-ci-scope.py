@@ -82,6 +82,12 @@ ARCHITECTURE_3_CONTROL_FILES = ARCHITECTURE_AUTHORITY_FILES | {
     ".github/scripts/check-local-architecture-boundaries.py",
     ".github/scripts/check-local-performance-invariants.py",
 }
+UI_ARCHITECTURE_AUTHORITY_FILES = {"docs/design/UI-3.0.zh-CN.md"}
+UI_EVIDENCE_INDEX_FILES = {
+    "docs/UI-SCENE-MATRIX.json",
+    "docs/design/ui3/R4-CODE-TASKS.json",
+    "docs/UI-3.0-IMPLEMENTATION.zh-CN.md",
+}
 ARCHITECTURE_3_PREFIXES = (
     "app/src/main/java/com/labteto/dshmobile/local/",
     "app/src/test/java/com/labteto/dshmobile/local/",
@@ -173,6 +179,10 @@ HIGH_RISK_PREFIXES = (
     "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalAgent",
     "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeState",
 )
+UI_PACK_SCENE_PREFIX = "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/"
+UI_PACK_VISUAL_PREFIX = "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/"
+UI_PLATFORM_MODULE_PREFIXES = ("ui-host/src/main/", "ui-contract/src/main/")
+
 ANDROID_UI_ENTRYPOINTS = {
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureNavigation.kt",
@@ -214,7 +224,7 @@ def classify(
         if not path:
             continue
 
-        architecture = architecture or is_architecture_3_path(path)
+        architecture = architecture or is_architecture_3_path(path) or path in UI_ARCHITECTURE_AUTHORITY_FILES
 
         if path == "docs/agent-engine4/PR705-KOTLIN-REBUILD-TASKS.json":
             audit_index = True
@@ -225,6 +235,13 @@ def classify(
             audit_index = True
             continue
 
+        if path in UI_EVIDENCE_INDEX_FILES or path in UI_ARCHITECTURE_AUTHORITY_FILES:
+            audit_index = True
+            continue
+        if path.startswith("docs/design/v6/"):
+            # Design deliverables are audited by the static V6 package/parity guard.
+            audit_index = True
+            continue
         if path in ARCHITECTURE_3_CONTROL_FILES and is_documentation(path):
             continue
         if is_documentation(path) or is_repository_metadata(path):
@@ -269,6 +286,28 @@ def classify(
             unit = True
             continue
 
+        if path.startswith(UI_PLATFORM_MODULE_PREFIXES):
+            # UI Host/Contract changes affect every UI Pack's behavior and API.
+            full = True
+            affects_release = True
+            continue
+        if path.startswith(UI_PACK_SCENE_PREFIX):
+            # Scene/action changes require both supported Android system versions.
+            architecture = True
+            unit = True
+            build = True
+            device = True
+            android16 = True
+            android17 = True
+            affects_release = True
+            continue
+        if path.startswith(UI_PACK_VISUAL_PREFIX):
+            # Visual primitive changes still run static, architecture, unit and compile.
+            architecture = True
+            unit = True
+            build = True
+            affects_release = True
+            continue
         if path in PLATFORM_FILES or path in ANDROID_PLATFORM_FILES or path.startswith(PLATFORM_PREFIXES):
             full = True
             affects_release = True
@@ -385,6 +424,29 @@ def self_test() -> None:
            release=True)
     verify(["docs/FEATURE-TREE.zh-CN.md"], required=("static",),
            excluded=("unit", "build", "device"), release=False)
+    verify(["docs/UI-SCENE-MATRIX.json"], required=("static",),
+           excluded=("unit", "build", "device"), release=False)
+    verify(["docs/design/ui3/R4-CODE-TASKS.json"], required=("static",),
+           excluded=("unit", "build", "device"), release=False)
+    verify(["docs/UI-3.0-IMPLEMENTATION.zh-CN.md"], required=("static",),
+           excluded=("unit", "build", "device"), release=False)
+    verify(["docs/design/UI-3.0.zh-CN.md"], required=("static", "architecture"),
+           excluded=("unit", "build", "device"), release=False)
+    verify(["docs/design/v6/current-ui.json"], required=("static",),
+           excluded=("unit", "build", "device"), release=False)
+    verify(["ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanMotion.kt"],
+           required=("static", "architecture", "unit", "build"),
+           excluded=("android16", "android17", "device"), release=True)
+    verify(["ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationScene.kt"],
+           required=("static", "architecture", "unit", "build", "android16", "android17", "device"), release=True)
+    verify(["ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiApplicationScenePack.kt"],
+           full=True, release=True)
+    verify(["ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiContracts.kt"],
+           full=True, release=True)
+    verify(["ui-pack-v6/src/test/kotlin/com/labteto/dshmobile/uipack/v6/V6PresentationTest.kt"],
+           required=("unit",), excluded=("build", "device"), release=False)
+    verify(["ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanMotion.kt"],
+           main=True, full=True, release=True)
     verify(["docs/ACCEPTANCE-MATRIX.json"], required=("static",),
            excluded=("unit", "build"), release=False)
     verify(["docs/agent-engine4/PR705-KOTLIN-REBUILD-TASKS.json"],

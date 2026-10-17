@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -47,6 +48,9 @@ import com.labteto.dshmobile.uihost.UiPackAdmissionRequirements
 import com.labteto.dshmobile.uihost.RenderHostedScene
 import com.labteto.dshmobile.uihost.UiSceneRenderAccess
 
+
+internal const val UI_PACK_RETRY_TAG = "ui-pack-retry"
+internal const val UI_PACK_EXIT_TAG = "ui-pack-exit"
 
 /** Never route a notification to Home until the Session Owner confirms the exact target. */
 internal fun localNotificationHomeReady(target: String?, snapshot: com.labteto.dshmobile.uicontract.UiSessionsSnapshot?): Boolean =
@@ -243,10 +247,12 @@ internal fun LocalApplicationUiHost(
         is LocalApplicationUiDecision.Unavailable -> {
             UnavailablePackNotice(
                 onRetry = {
-                    // The retired Shell is not an alternative pack. Recreate the
-                    // composition to retry Owner availability and pack admission.
-                    preference.edit().putString("selected_pack", V6_APPLICATION_UI).commit()
-                    activity?.recreate()
+                    // An invalid choice needs a new validated pack selection, not
+                    // Activity recreation: rebuilding the Activity discards the
+                    // existing Compose hierarchy and unrelated saved UI state.
+                    if (preference.edit().putString("selected_pack", V6_APPLICATION_UI).commit()) {
+                        selectedId = V6_APPLICATION_UI
+                    }
                 },
                 onExit = { activity?.finish() },
             )
@@ -261,12 +267,12 @@ private fun UnavailablePackNotice(onRetry: () -> Unit, onExit: () -> Unit) {
             verticalArrangement = Arrangement.Center) {
             Text(stringResource(R.string.ui_pack_incompatible),
                 style = MaterialTheme.typography.titleMedium)
-            Text("独立界面初始化或导航恢复失败。原会话数据仍保留；可重试重新加载，若问题持续可退出应用后检查运行诊断。")
-            Button(onClick = onRetry) {
-                Text("重试加载界面")
+            Text(stringResource(R.string.ui_pack_unavailable_hint))
+            Button(onClick = onRetry, modifier = Modifier.testTag(UI_PACK_RETRY_TAG)) {
+                Text(stringResource(R.string.ui_pack_retry))
             }
-            Button(onClick = onExit) {
-                Text("退出应用")
+            Button(onClick = onExit, modifier = Modifier.testTag(UI_PACK_EXIT_TAG)) {
+                Text(stringResource(R.string.ui_pack_exit))
             }
         }
     }

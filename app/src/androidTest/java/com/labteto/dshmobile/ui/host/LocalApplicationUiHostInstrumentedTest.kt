@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
@@ -123,7 +124,9 @@ class LocalApplicationUiHostInstrumentedTest {
         }
         compose.onNodeWithText(context.getString(R.string.ui_pack_incompatible)).assertExists()
         compose.onNodeWithText("Independent V6 home").assertDoesNotExist()
-        compose.onNodeWithText(context.getString(R.string.ui_pack_back_to_stable)).performClick()
+        compose.onNodeWithText(context.getString(R.string.ui_pack_retry)).assertExists()
+        compose.onNodeWithTag(UI_PACK_EXIT_TAG).assertExists()
+        compose.onNodeWithTag(UI_PACK_RETRY_TAG).performClick()
         compose.onNodeWithText("Independent V6 home").assertExists()
         compose.runOnIdle {
             val restored = com.labteto.dshmobile.uihost.UiSceneNavigationSnapshotCodec.decodeOrNull(
@@ -148,7 +151,12 @@ class LocalApplicationUiHostInstrumentedTest {
         compose.runOnIdle { preference.edit().putString("selected_pack", "missing-pack").commit() }
         compose.onNodeWithText(context.getString(R.string.ui_pack_incompatible)).assertExists()
         compose.onNodeWithText("Independent V6 home").assertDoesNotExist()
-        compose.onNodeWithText(context.getString(R.string.ui_pack_back_to_stable)).performClick()
+        compose.onNodeWithText(context.getString(R.string.ui_pack_retry)).assertExists()
+        compose.onNodeWithTag(UI_PACK_EXIT_TAG).assertExists()
+        compose.onNodeWithTag(UI_PACK_RETRY_TAG).performClick()
         compose.onNodeWithText(context.getString(R.string.ui_pack_incompatible)).assertExists()
+        compose.runOnIdle {
+            assertEquals(V6_APPLICATION_UI, preference.getString("selected_pack", null))
+        }
     }
 }

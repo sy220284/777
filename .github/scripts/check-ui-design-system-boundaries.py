@@ -116,6 +116,10 @@ def self_test() -> None:
 self_test()
 
 violations = []
+# Modal primitives in App-owned screens use the App's wrappers; UI Packs are
+# independently designed and may implement their own dialogs (UI 3.0 §7).
+# Do not accidentally impose App-only composition rules on independent Packs.
+V6_SCENES = ROOT / "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6"
 for path in UI.rglob("*.kt"):
     relative = path.relative_to(UI).as_posix()
     text = mask_non_code(path.read_text(encoding="utf-8"))
@@ -157,7 +161,7 @@ RETIRED_DRAWING_CALL = re.compile(
 baseline_path = ROOT / "docs/design/v6/legacy-theme-consumers.json"
 baseline = set(json.loads(baseline_path.read_text(encoding="utf-8"))["remainingProductionFiles"])
 actual = set()
-for path in UI.rglob("*.kt"):
+for path in list(UI.rglob("*.kt")) + list(V6_SCENES.rglob("*.kt")):
     relative = path.relative_to(ROOT).as_posix()
     source = mask_non_code(path.read_text(encoding="utf-8"))
     for match in RETIRED_DRAWING_CALL.finditer(source):

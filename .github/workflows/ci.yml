@@ -112,6 +112,13 @@ jobs:
                 require_true "$RUN_ANDROID16" "android-16-instrumented" "$path"
                 require_true "$RUN_ANDROID17" "android-17-instrumented" "$path"
                 ;;
+              docs/design/UI-3.0.zh-CN.md)
+                require_true "$RUN_STATIC" "static-gates" "$path"
+                require_true "$RUN_ARCHITECTURE" "architecture-3-gates" "$path"
+                ;;
+              docs/UI-SCENE-MATRIX.json|docs/design/ui3/R4-CODE-TASKS.json|docs/UI-3.0-IMPLEMENTATION.zh-CN.md|docs/design/v6/*)
+                require_true "$RUN_STATIC" "static-gates" "$path"
+                ;;
               AGENTS.md|docs/ARCHITECTURE.md|docs/SYSTEM-AUDIT-GUIDE.zh-CN.md|docs/VALIDATION.md|.github/scripts/check-ci-repository-integrity.py|.github/scripts/check-local-architecture-boundaries.py|.github/scripts/check-local-performance-invariants.py)
                 require_true "$RUN_STATIC" "static-gates" "$path"
                 require_true "$RUN_ARCHITECTURE" "architecture-3-gates" "$path"
@@ -170,6 +177,8 @@ jobs:
         run: |
           python3 .github/scripts/check-ui-hardcoded-cjk.py
           python3 .github/scripts/check-ui-design-system-boundaries.py
+          python3 .github/scripts/check-ui-module-boundaries.py --self-test
+          python3 .github/scripts/check-ui-module-boundaries.py
           python3 .github/scripts/check-ui-color-boundaries.py --self-test
           python3 .github/scripts/check-ui-color-boundaries.py
           python3 .github/scripts/check-notification-presentation.py

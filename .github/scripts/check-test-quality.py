@@ -12,15 +12,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 
-TEST_ROOTS = (
-    ROOT / "app" / "src" / "test",
-    ROOT / "app" / "src" / "androidTest",
-    ROOT / "core" / "src" / "test",
-    ROOT / "harness-core" / "src" / "test",
-    ROOT / "harness-device-android" / "src" / "test",
-    ROOT / "harness-interop" / "src" / "test",
-    ROOT / "harness-runtime-android" / "src" / "test",
-    ROOT / "reference-validation" / "src" / "test",
+# Scan every registered module's test source sets, including independent UI Packs.
+# Source-directory discovery makes the guard cover newly added Gradle modules.
+TEST_ROOTS = tuple(sorted(path for path in ROOT.glob("*/src/test") if path.is_dir())) + tuple(
+    sorted(path for path in ROOT.glob("*/src/androidTest") if path.is_dir())
 )
 
 ASSUMPTION_ALLOW = {
