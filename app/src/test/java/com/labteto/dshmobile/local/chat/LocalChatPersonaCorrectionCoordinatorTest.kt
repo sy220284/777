@@ -66,7 +66,10 @@ class LocalChatPersonaCorrectionCoordinatorTest {
             enqueueSnapshot = { true },
         )
 
-        coordinator.undo(notice.id, notice.personaId, notice.correction)
+        assertTrue(coordinator.undo(
+            notice.id, notice.personaId, notice.correction,
+            expectedSessionId = "session-a",
+        ))
 
         assertTrue(personaStore.get(persona.id).corrections.isEmpty())
         assertTrue(runtime.state.value.chat.chatPersona.corrections.isEmpty())
@@ -119,7 +122,9 @@ class LocalChatPersonaCorrectionCoordinatorTest {
             enqueueSnapshot = { true },
         )
 
-        coordinator.undo(10L, persona.id, correction)
+        assertTrue(!coordinator.undo(10L, persona.id, correction))
+        assertTrue(!coordinator.undo(9L, persona.id, correction,
+            expectedSessionId = "unrelated-session"))
 
         assertEquals(listOf(correction), personaStore.get(persona.id).corrections)
         assertNull(logs.get("session-b").latest("chat/persona-correction"))

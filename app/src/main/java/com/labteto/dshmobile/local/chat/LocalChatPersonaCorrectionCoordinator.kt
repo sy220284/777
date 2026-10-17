@@ -137,20 +137,22 @@ internal class LocalChatPersonaCorrectionCoordinator internal constructor(
         noticeId: Long,
         personaId: String,
         correction: String,
-    ) {
+        expectedSessionId: String? = null,
+    ): Boolean {
         val snapshot = chatState.value
         val notice = snapshot.chat.personaCorrectionNotice
         if (
+            (expectedSessionId != null && expectedSessionId != snapshot.sessionId) ||
             notice == null ||
             notice.id != noticeId ||
             notice.personaId != personaId ||
             notice.correction != correction
-        ) return
+        ) return false
 
         val boundEventLog = eventLogs.get(snapshot.sessionId)
         val updated = withContext(Dispatchers.IO) {
             personaStore.removeCorrection(personaId, correction)
-        } ?: return
+        } ?: return false
 
         chatState.update { current ->
             if (
@@ -173,5 +175,6 @@ internal class LocalChatPersonaCorrectionCoordinator internal constructor(
             put("action", "undo")
             put("correction", correction)
         })
+        return true
     }
 }

@@ -60,6 +60,7 @@ class LocalHarnessViewModel @Inject constructor(
     val personaGalleryUiPort: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort,
     val personaSelectionUiPort: com.labteto.dshmobile.uicontract.PersonaSelectionUiPort,
     val personaTransferUiPort: com.labteto.dshmobile.uicontract.PersonaTransferUiPort,
+    val personaCorrectionUiPort: com.labteto.dshmobile.uicontract.PersonaCorrectionUiPort,
     val personaStoryUiPort: com.labteto.dshmobile.uicontract.PersonaStoryUiPort,
     val personaGalleryDeletionUiPort: com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort,
     val personaGallerySaveUiPort: com.labteto.dshmobile.uicontract.PersonaGallerySaveUiPort,
@@ -480,8 +481,15 @@ class LocalHarnessViewModel @Inject constructor(
     fun switchUsageMode(mode: LocalUsageMode) { sessionUiPort.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.SelectMode(mode)) }
     suspend fun configureChatPersona(profile: PersonaProfile, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Result<Unit> = personaGalleryController.configureChatPersona(profile, expected)
     fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) {
+        val identity = uiPorts.identitySnapshot() ?: return
         viewModelScope.launch {
-            runtime.chat.undoChatPersonaCorrection(noticeId, personaId, correction)
+            // The Feature Owner rechecks the exact activation and notice; a
+            // stale frame can never undo a correction in a new conversation.
+            personaCorrectionUiPort.undo(
+                com.labteto.dshmobile.uicontract.UiPersonaCorrectionUndo(
+                    identity, noticeId, personaId, correction,
+                ),
+            )
         }
     }
 
