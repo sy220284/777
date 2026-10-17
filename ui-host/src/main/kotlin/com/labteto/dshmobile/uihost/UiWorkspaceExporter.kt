@@ -51,11 +51,24 @@ fun rememberUiWorkspaceExporter(
     val callback by rememberUpdatedState(onResult)
     val writer by rememberUpdatedState(writeFile)
     val gate = remember { UiHostDocumentOperationGate<UiWorkspaceExportRequest>() }
+    val hostOwner = LocalUiHostSystemOperationOwner.current ?: remember { UiHostSystemOperationOwner() }
+    val lease = remember(hostOwner) {
+        UiHostSystemOperationLease(hostOwner, UiHostPlatformAction.EXPORT_WORKSPACE)
+    }
+    androidx.compose.runtime.DisposableEffect(gate, lease) {
+        onDispose {
+            if (gate.phase == UiHostDocumentOperationGate.Phase.WAITING_FOR_PICKER)
+                lease.finish()
+        }
+    }
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
         if (uri == null) {
-            if (gate.cancelSelection() != null) callback(UiWorkspaceExportReceipt.Cancelled)
+            if (gate.cancelSelection() != null) {
+                lease.finish()
+                callback(UiWorkspaceExportReceipt.Cancelled)
+            }
             else callback(UiWorkspaceExportReceipt.Failed("导出请求已失效，请重新发起"))
         } else {
             val ticket = gate.selectionReturned()
@@ -101,6 +114,7 @@ fun rememberUiWorkspaceExporter(
                     UiWorkspaceExportReceipt.Failed(failure.message)
                 } finally {
                     gate.finish(ticket)
+                    lease.finish()
                 }
                 callback(outcome)
             }
@@ -110,14 +124,19 @@ fun rememberUiWorkspaceExporter(
         val ticket = gate.begin(request)
         if (ticket == null) {
             callback(UiWorkspaceExportReceipt.Failed("上一个导出尚未完成，请完成或取消后重试"))
+        } else if (!lease.begin()) {
+            gate.failToLaunch(ticket)
+            callback(UiWorkspaceExportReceipt.Failed("HOST_PLATFORM_OPERATION_BUSY"))
         } else {
             try { launcher.launch(request.displayName) }
             catch (cancelled: CancellationException) {
                 gate.failToLaunch(ticket)
+                lease.finish()
                 throw cancelled
             }
             catch (failure: Exception) {
                 gate.failToLaunch(ticket)
+                lease.finish()
                 callback(UiWorkspaceExportReceipt.Failed(failure.message))
             }
         }
