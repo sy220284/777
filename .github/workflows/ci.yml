@@ -372,21 +372,12 @@ jobs:
             adb install -r .ci/device-apks/app-debug.apk
             adb install -r .ci/device-apks/app-debug-androidTest.apk
             bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
-            bash .github/scripts/capture-fluid-ui.sh
             adb shell am force-stop com.sy220284.dshmobile.debug || true
             bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
             adb shell am force-stop com.sy220284.dshmobile.debug || true
             adb install -r .ci/device-apks/app-optimized.apk
             bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
 
-      - name: Upload Android 16 UI captures
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: fluid-ui-android-16
-          path: .ci/fluid-ui/*.png
-          if-no-files-found: warn
-          retention-days: 14
 
   android-17-instrumented:
     # Prewarm emulator and SDK in parallel with shared APK compilation.
@@ -443,21 +434,12 @@ jobs:
           adb install -r .ci/device-apks/app-debug.apk
           adb install -r .ci/device-apks/app-debug-androidTest.apk
           bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
-          bash .github/scripts/capture-fluid-ui.sh
           adb shell am force-stop com.sy220284.dshmobile.debug || true
           bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
           adb shell am force-stop com.sy220284.dshmobile.debug || true
           adb install -r .ci/device-apks/app-optimized.apk
           bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
 
-      - name: Upload Android 17 UI captures
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: fluid-ui-android-17
-          path: .ci/fluid-ui/*.png
-          if-no-files-found: warn
-          retention-days: 14
 
   merge-gate:
     if: always()
