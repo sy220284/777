@@ -1039,13 +1039,19 @@ if "transportFactory = { endpoint ->" not in plugin_composition or (
     die("R4 production MCP HTTP and stdio must both use Binder worker without local fallback")
 v6_boot = strip_comments(read("app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt"))
 for required in ("if (standaloneSelected)", "LocalV6StandaloneViewModel = hiltViewModel()",
-                 "else {", "LocalHarnessViewModel = hiltViewModel()"):
+                 "else {", "LocalLegacyApplicationEntry("):
     if required not in v6_boot:
-        die("R4 independent V6 boot cannot depend on legacy ViewModel construction: " + required)
-v6_boot_order = v6_boot.index("LocalV6StandaloneViewModel = hiltViewModel()")
-legacy_boot_order = v6_boot.index("LocalHarnessViewModel = hiltViewModel()")
-if v6_boot_order >= legacy_boot_order:
-    die("R4 V6 must select its independent Feature-owner boot before legacy Shell construction")
+        die("R4 independent V6 root lost its explicit Feature/Legacy branch: " + required)
+if "LocalHarnessViewModel" in v6_boot or "LocalHarnessScreen" in v6_boot:
+    die("R4 application root must never directly depend on aggregate Legacy ViewModel or screen")
+legacy_entry = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/ui/legacy/LocalLegacyApplicationEntry.kt")
+)
+for required in ("LocalHarnessViewModel = hiltViewModel()", "LocalHarnessScreen("):
+    if required not in legacy_entry:
+        die("R4 former Shell construction must stay quarantined in compatibility entry: " + required)
+if v6_boot.index("LocalV6StandaloneViewModel = hiltViewModel()") >= v6_boot.index("LocalLegacyApplicationEntry("):
+    die("R4 standalone V6 must branch before quarantined Legacy composition")
 worker_process_guard = strip_comments(read(APPLICATION_PATH))
 if "if (isMcpWorkerProcess(Application.getProcessName(), packageName)) return" not in worker_process_guard:
     die("R4 isolated worker must not bootstrap the full Agent runtime")
