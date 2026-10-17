@@ -26,6 +26,8 @@ data class SessionEvent(
     val type: String,
     val createdAt: Long,
     val data: JsonObject,
+    @kotlinx.serialization.SerialName("schema_version")
+    val schemaVersion: Int = 1,
 )
 
 data class SessionEventFileSnapshot(
@@ -162,6 +164,7 @@ class SessionEventLog(
             type = type,
             createdAt = clock(),
             data = data,
+            schemaVersion = SessionEventSchemaCodec.CURRENT_VERSION,
         )
         val encoded = json.encodeToString(SessionEvent.serializer(), event) + "\n"
         val incomingBytes = encoded.toByteArray().size.toLong()
@@ -266,7 +269,9 @@ class SessionEventLog(
                         if (event.sequence > sequenceExclusive) result += event
                     }
                 }
-            } catch (error: Exception) {
+            } catch (future: UnsupportedSessionEventSchemaVersion) {
+            throw future
+        } catch (error: Exception) {
                 reportSegmentReadFailure(source, error)
             }
             if (result.size >= wanted) break
@@ -647,6 +652,8 @@ class SessionEventLog(
                     decodeEventOrNull(line)?.let { return it }
                 }
             }
+        } catch (future: UnsupportedSessionEventSchemaVersion) {
+            throw future
         } catch (error: Exception) {
             reportSegmentReadFailure(source, error)
         }
@@ -833,7 +840,9 @@ class SessionEventLog(
                         afterRemaining -= 1
                     }
                 }
-            } catch (error: Exception) {
+            } catch (future: UnsupportedSessionEventSchemaVersion) {
+            throw future
+        } catch (error: Exception) {
                 reportSegmentReadFailure(source, error)
             }
             right += 1
@@ -866,12 +875,17 @@ class SessionEventLog(
     }
 
     private fun decodeEventOrNull(line: String): SessionEvent? =
-        runCatching { json.decodeFromString(SessionEvent.serializer(), line) }
-            .getOrElse { error ->
-                malformedRows.incrementAndGet()
-                reportDiagnostic("malformed-row", error)
-                null
-            }
+        try {
+            SessionEventSchemaCodec.decode(json, line)
+        } catch (future: UnsupportedSessionEventSchemaVersion) {
+            // A newer writer could have committed commands this reader cannot
+            // understand. Do NOT silently skip/replay them.
+            throw future
+        } catch (error: Exception) {
+            malformedRows.incrementAndGet()
+            reportDiagnostic("malformed-row", error)
+            null
+        }
 
     private fun reportSegmentReadFailure(source: File, error: Throwable) {
         segmentReadFailures.incrementAndGet()
@@ -971,6 +985,8 @@ class SessionEventLog(
     private inline fun File.forEachEventLine(block: (String) -> Unit) {
         try {
             eventReader().useLines { lines -> lines.forEach(block) }
+        } catch (future: UnsupportedSessionEventSchemaVersion) {
+            throw future
         } catch (error: Exception) {
             reportSegmentReadFailure(this, error)
         }

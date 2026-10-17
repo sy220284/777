@@ -162,8 +162,11 @@ class LocalSessionEventLog(
                     while (true) {
                         val line = readBoundedLine(reader, MAX_DURABLE_EVENT_LINE_CHARS) ?: break
                         val event = runCatching {
-                            json.decodeFromString(Event.serializer(), line)
+                            com.labteto.dshmobile.harness.session.SessionEventSchemaCodec
+                                .decode(json, line).toLocalEvent()
                         }.onFailure { error ->
+                            if (error is com.labteto.dshmobile.harness.session.UnsupportedSessionEventSchemaVersion)
+                                throw error
                             malformedRows += 1
                             if (malformedRows <= MAX_DECODE_FAILURE_SAMPLES) {
                                 // Event bodies may contain private prompts and credentials: never export parser snippets.
