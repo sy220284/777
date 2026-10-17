@@ -73,6 +73,17 @@ class McpToolBridgePluginTest {
         assertTrue(plugin.lifecycleRevisions.value > revision)
         assertNull(registry.context.tools.get(registered.single()))
         assertEquals(McpServerLifecycle.FAILED, plugin.lifecycleSnapshots().single().lifecycle)
+        val changes = plugin.lifecycleEventsSince(null, -1L)
+        assertEquals(listOf(
+            McpServerLifecycle.CONNECTING,
+            McpServerLifecycle.REGISTERED,
+            McpServerLifecycle.FAILED,
+        ), changes.events.map { it.snapshot?.lifecycle })
+        assertTrue(changes.events.zipWithNext().all { (before, after) ->
+            before.sequence < after.sequence && before.serverId == "server" && after.serverId == "server"
+        })
+        assertTrue(plugin.lifecycleEventsSince("previous-process", changes.latestSequence)
+            .requiresSnapshot)
         assertEquals(0, remoteCalls)
         assertEquals(1, closed)
         plugin.uninstall(registry.context)

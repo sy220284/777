@@ -100,6 +100,21 @@ data class McpServerSnapshot(
     val lifecycle: McpServerLifecycle = McpServerLifecycle.REGISTERED,
 )
 
+/** A single ordered Owner transition; null means a server was removed, not success. */
+data class McpLifecycleEvent(
+    val sequence: Long,
+    val serverId: String,
+    val snapshot: McpServerSnapshot?,
+)
+
+/** Replay is bounded. A consumer detecting a gap/epoch change must request a fresh Owner snapshot. */
+data class McpLifecycleHistory(
+    val incarnation: String,
+    val latestSequence: Long,
+    val events: List<McpLifecycleEvent>,
+    val requiresSnapshot: Boolean,
+)
+
 /** Exact on-demand ping result; never a tool permission or continuous-health claim. */
 enum class McpServerHealth { RESPONDED, BUSY, NOT_CONNECTED, UNCONFIRMED }
 
@@ -211,7 +226,63 @@ class McpToolBridgePlugin(
     // Readers subsequently obtain the actual registry snapshot under the same mutex.
     private val lifecycleRevision = MutableStateFlow(0L)
     val lifecycleRevisions: StateFlow<Long> = lifecycleRevision.asStateFlow()
-    private fun signalLifecycleChangedLocked() { lifecycleRevision.value += 1L }
+    private val incarnation = java.util.UUID.randomUUID().toString()
+    private var nextLifecycleSequence = 0L
+    private var previousLifecycle = emptyMap<String, McpServerSnapshot>()
+    private val lifecycleHistory = ArrayDeque<McpLifecycleEvent>()
+
+    /**
+     * Called under the MCP Owner mutex after every state mutation. Diff the actual
+     * authoritative registry/reservations, not a shadow UI state machine.
+     * All subscribers get the same monotonic sequence, including disconnect/crash.
+     */
+    private fun signalLifecycleChangedLocked() {
+        val current = currentLifecycleLocked().associateBy(McpServerSnapshot::id)
+        (previousLifecycle.keys + current.keys).toSortedSet().forEach { id ->
+            if (previousLifecycle[id] != current[id]) {
+                lifecycleHistory.addLast(McpLifecycleEvent(++nextLifecycleSequence, id, current[id]))
+                if (lifecycleHistory.size > 512) lifecycleHistory.removeFirst()
+            }
+        }
+        previousLifecycle = current
+        lifecycleRevision.value += 1L
+    }
+
+    /** Server snapshots are only authenticated MCP Owner facts, never permissions. */
+    private fun currentLifecycleLocked(): List<McpServerSnapshot> {
+        val registered = servers.values.map { binding ->
+            val phase = when {
+                binding.id in reconnectingIds -> McpServerLifecycle.RECONNECTING
+                binding.isTransportFailed() -> McpServerLifecycle.FAILED
+                !binding.isAcceptingCalls() -> McpServerLifecycle.DISCONNECTING
+                else -> McpServerLifecycle.REGISTERED
+            }
+            McpServerSnapshot(binding.id, binding.transport, binding.displayTarget,
+                if (binding.isTransportFailed()) emptyList() else binding.toolNames.toList(), phase)
+        }
+        val pending = (connectingIds + reconnectingIds)
+            .filterNot(servers::containsKey)
+            .map { id -> McpServerSnapshot(id, "", "", emptyList(),
+                if (id in reconnectingIds) McpServerLifecycle.RECONNECTING
+                else McpServerLifecycle.CONNECTING) }
+        return registered + pending
+    }
+
+    /** Return ordered transitions or explicitly require a full re-snapshot on loss. */
+    suspend fun lifecycleEventsSince(
+        expectedIncarnation: String?, afterSequence: Long, limit: Int = 80,
+    ): McpLifecycleHistory = mutex.withLock {
+        require(afterSequence >= -1L && limit in 1..200)
+        val oldest = lifecycleHistory.firstOrNull()?.sequence ?: nextLifecycleSequence + 1L
+        val needsSnapshot = (expectedIncarnation != null && expectedIncarnation != incarnation) ||
+            (expectedIncarnation != null && afterSequence < oldest - 1L) ||
+            afterSequence > nextLifecycleSequence
+        McpLifecycleHistory(incarnation, nextLifecycleSequence,
+            if (needsSnapshot) emptyList() else lifecycleHistory.asSequence()
+                .filter { it.sequence > afterSequence }.take(limit).toList(),
+            requiresSnapshot = needsSnapshot,
+        )
+    }
 
     private val servers = linkedMapOf<String, ServerBinding>()
     private val connectingIds = linkedSetOf<String>()
@@ -467,24 +538,7 @@ class McpToolBridgePlugin(
      * The existing serverSnapshots() contract intentionally remains registry-only.
      */
     suspend fun lifecycleSnapshots(): List<McpServerSnapshot> = mutex.withLock {
-        val registered = servers.values.map { binding ->
-            val lifecycle = when {
-                binding.id in reconnectingIds -> McpServerLifecycle.RECONNECTING
-                binding.isTransportFailed() -> McpServerLifecycle.FAILED
-                !binding.isAcceptingCalls() -> McpServerLifecycle.DISCONNECTING
-                else -> McpServerLifecycle.REGISTERED
-            }
-            McpServerSnapshot(binding.id, binding.transport, binding.displayTarget,
-                if (binding.isTransportFailed()) emptyList() else binding.toolNames.toList(), lifecycle)
-        }
-        val pending = (connectingIds + reconnectingIds)
-            .filterNot(servers::containsKey)
-            .map { id ->
-                McpServerSnapshot(id, "", "", emptyList(),
-                    if (id in reconnectingIds) McpServerLifecycle.RECONNECTING
-                    else McpServerLifecycle.CONNECTING)
-            }
-        registered + pending
+        currentLifecycleLocked()
     }
 
     private suspend fun connectHttp(context: HarnessContext, rawId: String, rawEndpoint: String): String {
