@@ -368,6 +368,8 @@ class LocalHarnessViewModel @Inject constructor(
         val expected = identity ?: error("会话已改变，请重新选择附件")
         return when (val receipt = attachmentUiPort.import(com.labteto.dshmobile.uicontract.ImportUiAttachmentCommand(expected, uri.toString()))) {
             is com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Imported -> receipt.attachment
+            com.labteto.dshmobile.uicontract.UiAttachmentReceipt.GrantRevoked ->
+                error("文件访问授权已失效，请重新选择文件")
             is com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Rejected -> error("会话已改变，请重新选择附件")
             is com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Failed -> error(receipt.message ?: "附件导入失败")
         }
