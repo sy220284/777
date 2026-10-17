@@ -16,6 +16,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.uicontract.FilesUiPort
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.SessionUiPort
 import com.labteto.dshmobile.uicontract.SessionUiCommand
 import com.labteto.dshmobile.uicontract.UiSessionsSnapshot
@@ -47,19 +50,30 @@ fun ZhaoxiHomeScene(
     scope: UiSceneRenderScope,
 ) {
     val snap by (sessions?.snapshots
-        ?: kotlinx.coroutines.flow.flowOf(UiSessionsSnapshot(null, null, false, emptyList(), null)))
-        .collectAsState(initial = UiSessionsSnapshot(null, null, false, emptyList(), null))
+        ?: kotlinx.coroutines.flow.flowOf(UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null)))
+        .collectAsState(initial = UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null))
     ZxPage("神言神语", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ZxChip("＋ 新会话", false) { sessions?.submit(SessionUiCommand.Create) }
+            ZxChip("＋ 新会话", false) {
+                val receipt = sessions?.submit(SessionUiCommand.Create(null, LocalConversationMode.INDEPENDENT, LocalUsageMode.CHAT))
+                if (receipt == UiCommandReceipt.Accepted) scope.onNavigate(UiSceneId("conversation.chat"))
+            }
             ZxChip("搜索", false) { scope.onNavigate(UiSceneId("shell.search")) }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ZxChip("聊天", false) { scope.onNavigate(UiSceneId("conversation.chat")) }
+            ZxChip("人物", false) { scope.onNavigate(UiSceneId("route.persona_gallery")) }
+            ZxChip("任务", false) { scope.onNavigate(UiSceneId("route.tasks")) }
+            ZxChip("工具", false) { scope.onNavigate(UiSceneId("route.tools")) }
+            ZxChip("设置", false) { scope.onNavigate(UiSceneId("route.settings")) }
         }
         Spacer(Modifier.height(8.dp))
         if (snap.sessions.isEmpty() && !snap.loading) ZxEmpty("还没有会话", "从一次新会话开始")
         snap.sessions.forEach { s ->
-            ZxRow(s.toString().substringBefore(',').substringAfter('=').take(40), "",
-                onClick = { sessions?.submit(SessionUiCommand.Open(s)) })
+            ZxRow(s.title.take(40), s.summaryPreview.orEmpty().take(56),
+                onClick = { if (sessions?.submit(SessionUiCommand.Open(s.id)) == UiCommandReceipt.Accepted) scope.onNavigate(UiSceneId(if (s.usageMode == LocalUsageMode.WORK) "conversation.work" else "conversation.chat")) })
         }
     }
 }
