@@ -85,7 +85,21 @@ class SessionEventLog(
     private val nextSequence = pathState.nextSequence
 
     init {
-        synchronized(lock) { withProcessWriterLease { Unit } }
+        try {
+            synchronized(lock) { withProcessWriterLease { Unit } }
+        } catch (failure: Throwable) {
+            // A newer schema blocks opening this reader. Undo the path-reference
+            // allocated during field initialization so a later upgraded process
+            // is never attached to a leaked half-constructed log instance.
+            PATH_STATES.computeIfPresent(pathKey) { _, current ->
+                synchronized(current.lock) {
+                    current.references -= 1
+                    check(current.references >= 0) { "Session path lock reference underflow" }
+                    current.takeIf { it.references > 0 }
+                }
+            }
+            throw failure
+        }
     }
 
     /**

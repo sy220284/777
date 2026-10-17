@@ -58,16 +58,12 @@ class SessionEventSchemaCodecTest {
         val file = dir.resolve("events.jsonl")
         try {
             file.writeText(v1 + "\n" + v3 + "\n")
-            SessionEventLog(file, json, maxBytes = 800).use { log ->
-                assertThrows(UnsupportedSessionEventSchemaVersion::class.java) {
-                    log.pageBeforeChronological(limit = 2)
-                }
-                assertThrows(UnsupportedSessionEventSchemaVersion::class.java) {
-                    log.snapshot()
-                }
-                // Never alter an incompatible durable history just to recover.
-                assertTrue(file.readText().contains(v3))
+            // The cold reader must fail BEFORE it exposes partial history or
+            // allocates a new sequence that could overwrite future commands.
+            assertThrows(UnsupportedSessionEventSchemaVersion::class.java) {
+                SessionEventLog(file, json, maxBytes = 800)
             }
+            assertTrue(file.readText().contains(v3))
         } finally { dir.deleteRecursively() }
     }
 
