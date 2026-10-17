@@ -5,6 +5,7 @@ import com.labteto.dshmobile.uihost.UiSceneNavigationRejection
 import com.labteto.dshmobile.uihost.UiSceneNavigationResult
 import com.labteto.dshmobile.uihost.UiSceneNavigationSnapshotCodec
 import com.labteto.dshmobile.uihost.restoreEncodedSnapshot
+import com.labteto.dshmobile.uihost.recoverPersistedEncodedSnapshot
 import com.labteto.dshmobile.uicontract.UiSceneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -36,6 +37,32 @@ class UiHostSceneNavigationRecoveryTest {
         )
         assertEquals(nav.initial, UiSceneNavigationSnapshotCodec.decodeOrNull(
             UiSceneNavigationSnapshotCodec.encode(nav.initial)))
+    }
+
+    @Test fun oneTimeRecoveryPreservesValidHistoryPrefixWhenANewVersionRemovesLastScene() {
+        val work = (nav.navigate(nav.initial, UiSceneId("conversation.work"))
+            as UiSceneNavigationResult.Changed).state
+        val retired = work.copy(stack = work.stack + UiSceneId("conversation.retired_v1"))
+        val encoded = UiSceneNavigationSnapshotCodec.encode(retired)
+        assertEquals(
+            UiSceneNavigationResult.Rejected(UiSceneNavigationRejection.INVALID_HISTORY),
+            nav.restoreEncodedSnapshot(encoded),
+        )
+        assertEquals(UiSceneNavigationResult.Changed(work),
+            nav.recoverPersistedEncodedSnapshot(encoded))
+        // This is a migration of a saved memento, not a way for a live UI callback
+        // to smuggle an unknown destination into the current navigation state.
+        val foreign = retired.copy(packId = "foreign-app")
+        assertEquals(
+            UiSceneNavigationResult.Rejected(UiSceneNavigationRejection.WRONG_PACK),
+            nav.recoverPersistedEncodedSnapshot(UiSceneNavigationSnapshotCodec.encode(foreign)))
+        assertEquals(
+            UiSceneNavigationResult.Rejected(UiSceneNavigationRejection.INVALID_HISTORY),
+            nav.recoverPersistedEncodedSnapshot("malformed"))
+        val wrongRoot = retired.copy(stack = listOf(UiSceneId("route.home"), UiSceneId("conversation.work")))
+        assertEquals(
+            UiSceneNavigationResult.Rejected(UiSceneNavigationRejection.INVALID_HISTORY),
+            nav.recoverPersistedEncodedSnapshot(UiSceneNavigationSnapshotCodec.encode(wrongRoot)))
     }
 
     @Test fun actualHostRestoreChecksCapturedPackAndSceneCoverage() {

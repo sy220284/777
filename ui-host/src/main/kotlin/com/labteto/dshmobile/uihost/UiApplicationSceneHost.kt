@@ -64,8 +64,13 @@ fun UiApplicationPackAdmission.Admitted.RenderHostedScene(
     navigationStateScope: String = pack.manifest.id,
 ): UiSceneRenderAccess {
     var encoded by rememberSaveable(pack.manifest.id, navigationStateScope) {
-        mutableStateOf(persistedNavigationSnapshot ?:
-            UiSceneNavigationSnapshotCodec.encode(navigation.initial))
+        // Only the initial saved Host memento may migrate a retired scene. A
+        // foreign pack or corrupt history still fails closed, and live callbacks
+        // continue to require exact epoch + history equality.
+        val recovered = persistedNavigationSnapshot?.let(navigation::recoverPersistedEncodedSnapshot)
+        mutableStateOf(if (recovered is UiSceneNavigationResult.Changed)
+            UiSceneNavigationSnapshotCodec.encode(recovered.state)
+        else persistedNavigationSnapshot ?: UiSceneNavigationSnapshotCodec.encode(navigation.initial))
     }
     // A->B->A restores the same encoded stack: track a monotonic transition epoch
     // as well so an asynchronous callback from the first A cannot act in the new A.
