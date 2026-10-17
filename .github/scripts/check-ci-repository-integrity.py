@@ -12,7 +12,9 @@ WORKFLOWS = ROOT / ".github" / "workflows"
 CI = (WORKFLOWS / "ci.yml").read_text(encoding="utf-8")
 RELEASE = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
 CLEANUP = (WORKFLOWS / "cleanup-old-releases.yml").read_text(encoding="utf-8")
-CAPTURE = (WORKFLOWS / "capture-readme-ui.yml").read_text(encoding="utf-8")
+CAPTURE_PATH = WORKFLOWS / "capture-readme-ui.yml"
+if CAPTURE_PATH.exists():
+    raise SystemExit("Backend-only repository cannot reintroduce the retired UI screenshot workflow")
 SETTINGS = (ROOT / "settings.gradle.kts").read_text(encoding="utf-8")
 VERSIONS = (ROOT / "gradle" / "libs.versions.toml").read_text(encoding="utf-8")
 WRAPPER = (ROOT / "gradle" / "wrapper" / "gradle-wrapper.properties").read_text(encoding="utf-8")
@@ -620,10 +622,6 @@ if "timedelta(" in CLEANUP or "cutoff =" in CLEANUP:
     violations.append("Release retention must not add an age-based retention window")
 
 # Screenshot bot commits are docs-only; they must not dispatch a forced full CI.
-if "gh workflow run ci.yml" in CAPTURE:
-    violations.append("README screenshot workflow must not force workflow_dispatch full CI")
-if "actions: write" in CAPTURE:
-    violations.append("README screenshot workflow no longer needs actions: write")
 
 if violations:
     print("Repository CI/build integrity violations:")
