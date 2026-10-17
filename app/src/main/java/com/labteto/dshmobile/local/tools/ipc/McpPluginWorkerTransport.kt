@@ -10,6 +10,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.Message
 import android.os.Messenger
+import com.labteto.dshmobile.interop.mcp.McpHttpException
 import com.labteto.dshmobile.interop.mcp.McpTerminationSource
 import com.labteto.dshmobile.interop.mcp.McpTransport
 import java.io.File
@@ -142,13 +143,18 @@ internal class McpPluginWorkerTransport(
             val response = withTimeout(McpWorkerWire.REQUEST_TIMEOUT_MS) { result.await() }
             val error = response.getString("error")
             if (error != null) {
+                val status = response.getInt("http_status", 0)
+                if (status != 0) throw McpHttpException(status, "Remote MCP HTTP failure")
                 if (response.getBoolean("transport_error"))
                     throw IOException("MCP worker transport failed ($error); outcome unknown")
                 throw IllegalStateException("MCP worker refused request ($error)")
             }
             return response
         } catch (cancelled: CancellationException) {
-            // Cancellation might race an already committed remote side effect.
+            // Timeouts and explicit cancellation can race a committed remote write.
+            // Evict this worker instance and revoke its tools. The caller MUST NOT
+            // transparently retry the same paid or irreversible operation.
+            terminate(IOException("MCP request cancelled or timed out; outcome unknown"))
             throw cancelled
         } catch (error: android.os.RemoteException) {
             terminate(IOException("MCP IPC disconnected; outcome unknown", error))

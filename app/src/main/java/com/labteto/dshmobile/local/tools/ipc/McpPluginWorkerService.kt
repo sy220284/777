@@ -47,12 +47,13 @@ class McpPluginWorkerService : Service() {
                     McpWorkerWire.CLOSE)) return
             val sender = message.replyTo ?: return
             val requestId = message.arg1
+            val operation = message.what
             val fields = Bundle(message.data).apply { classLoader = javaClass.classLoader }
             val token = fields.getString("token") ?: return
             if (token.length !in 20..100) return
             scope.launch {
                 try {
-                    when (message.what) {
+                    when (operation) {
                         McpWorkerWire.OPEN -> {
                             check(token !in instances) { "IPC transport identity already exists" }
                             check(instances.size < 24) { "IPC transport budget exhausted" }
@@ -130,7 +131,9 @@ class McpPluginWorkerService : Service() {
                     if (transportFailure) invalidate(token)
                     send(sender, McpWorkerWire.RESPONSE, requestId, token,
                         error = failure.javaClass.simpleName,
-                        transportError = transportFailure)
+                        transportError = transportFailure,
+                        httpStatus = (failure as? com.labteto.dshmobile.interop.mcp.McpHttpException)
+                            ?.statusCode ?: 0)
                 }
             }
         }
@@ -144,13 +147,15 @@ class McpPluginWorkerService : Service() {
     }
 
     private fun send(to: Messenger, kind: Int, requestId: Int, token: String,
-        result: String? = null, error: String? = null, transportError: Boolean = false) {
+        result: String? = null, error: String? = null, transportError: Boolean = false,
+        httpStatus: Int = 0) {
         val msg = Message.obtain(null, kind, requestId, McpWorkerWire.VERSION).apply {
             data = Bundle().apply {
                 putString("token", token)
                 result?.let { putString("result", it) }
                 error?.let { putString("error", it.take(120)) }
                 putBoolean("transport_error", transportError)
+                if (httpStatus > 0) putInt("http_status", httpStatus)
             }
         }
         try { to.send(msg) }
