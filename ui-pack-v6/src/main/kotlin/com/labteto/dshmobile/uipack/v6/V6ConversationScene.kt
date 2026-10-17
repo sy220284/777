@@ -212,6 +212,7 @@ fun V6ConversationScene(
             initialValue = remember(owner) { owner.snapshot() }).value
     }
     var feedback by remember(identity) { mutableStateOf<String?>(null) }
+    var reselectAttachment by remember(identity) { mutableStateOf(false) }
     var readingFile by remember(identity) { mutableStateOf<String?>(null) }
     var filePreview by remember(identity, readingFile) {
         mutableStateOf<com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview?>(null)
@@ -470,6 +471,7 @@ fun V6ConversationScene(
                     val active = (if (workMode) ports.work.snapshot().identity else ports.chat.snapshot().identity) == target
                     if (active) when (result) {
                         is UiAttachmentReceipt.Imported -> {
+                            reselectAttachment = false
                             when (v6AttachmentDecision(ports.drafts.attachments.value[target.sessionId].orEmpty(),
                                 result.attachment)) {
                                 V6AttachmentDecision.ACCEPT ->
@@ -482,6 +484,10 @@ fun V6ConversationScene(
                         }
                         is UiAttachmentReceipt.Rejected ->
                             feedback = "附件未导入：${v6RejectionLabel(result.reason)}"
+                        UiAttachmentReceipt.GrantRevoked -> {
+                            reselectAttachment = true
+                            feedback = "原文件的访问授权已失效，请重新选择文件以继续导入"
+                        }
                         is UiAttachmentReceipt.Failed ->
                             feedback = result.message ?: "附件读取失败"
                     }
@@ -791,7 +797,14 @@ fun V6ConversationScene(
                         attachmentsOpen = true
                     }, style = SyButtonStyle.GHOST, compact = true)
                 }
-                SyAnimatedReveal(imported.isEmpty() && ports.attachments != null) {
+                SyAnimatedReveal(reselectAttachment && ports.attachments != null) {
+                    SyButton("重新选择文件", {
+                        pickerIdentity = identity
+                        picker()
+                    }, enabled = identity != null && !importing,
+                        style = SyButtonStyle.SECONDARY, compact = true)
+                }
+                SyAnimatedReveal(!reselectAttachment && imported.isEmpty() && ports.attachments != null) {
                     SyButton("添加附件", {
                         pickerIdentity = identity
                         picker()
