@@ -107,36 +107,36 @@ class McpPluginWorkerService : Service() {
                                 else instance.calls.begin()
                             } ?: throw IOException("MCP worker transport was revoked or saturated")
                             try {
-                            val result = instance.transport.request(
-                                method, json.parseToJsonElement(params) as? JsonObject
-                                    ?: error("MCP arguments must be an object"))
-                            // The negotiating transport's terminal flow only exists *after*
-                            // its first negotiated call. Starting earlier silently loses SSE
-                            // deaths and can leave tools registered after a crash.
-                            synchronized(instance) {
-                                if (instance.terminalObserver == null) {
-                                    instance.terminalObserver =
-                                        (instance.transport as? McpTerminationSource)
-                                            ?.terminalEvents?.let { events ->
-                                                scope.launch {
-                                                    events.collect { cause ->
-                                                        invalidate(token, "MCP_TRANSPORT_TERMINATED")
+                                val result = instance.transport.request(
+                                    method, json.parseToJsonElement(params) as? JsonObject
+                                        ?: error("MCP arguments must be an object"))
+                                // The negotiating transport's terminal flow only exists *after*
+                                // its first negotiated call. Starting earlier silently loses SSE
+                                // deaths and can leave tools registered after a crash.
+                                synchronized(instance) {
+                                    if (instance.terminalObserver == null) {
+                                        instance.terminalObserver =
+                                            (instance.transport as? McpTerminationSource)
+                                                ?.terminalEvents?.let { events ->
+                                                    scope.launch {
+                                                        events.collect { cause ->
+                                                            invalidate(token, "MCP_TRANSPORT_TERMINATED")
+                                                        }
                                                     }
                                                 }
-                                            }
+                                    }
                                 }
-                            }
-                            val encoded = json.encodeToString(JsonObject.serializer(), result)
-                            require(McpWorkerWire.validResponseSize(encoded)) {
-                                "MCP reply exceeds Binder budget; cannot declare success"
-                            }
-                            // CLOSE/terminal faults serialize against the final
-                            // result publish. A request completing afterwards cannot
-                            // resurrect a revoked tool or bless an unknown side effect.
-                            synchronized(instance) {
-                                if (instances[token] === instance && instance.calls.complete(ticket))
-                                    send(sender, McpWorkerWire.RESPONSE, requestId, token, result = encoded)
-                            }
+                                val encoded = json.encodeToString(JsonObject.serializer(), result)
+                                require(McpWorkerWire.validResponseSize(encoded)) {
+                                    "MCP reply exceeds Binder budget; cannot declare success"
+                                }
+                                // CLOSE/terminal faults serialize against the final
+                                // result publish. A request completing afterwards cannot
+                                // resurrect a revoked tool or bless an unknown side effect.
+                                synchronized(instance) {
+                                    if (instances[token] === instance && instance.calls.complete(ticket))
+                                        send(sender, McpWorkerWire.RESPONSE, requestId, token, result = encoded)
+                                }
                             } finally { instance.calls.abandon(ticket) }
                         }
                         McpWorkerWire.CLOSE -> {
