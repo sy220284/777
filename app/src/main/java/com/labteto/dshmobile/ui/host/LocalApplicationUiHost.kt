@@ -46,12 +46,6 @@ import com.labteto.dshmobile.uihost.UiHostSceneNavigation
 import com.labteto.dshmobile.uihost.UiPackAdmissionRequirements
 import com.labteto.dshmobile.uihost.RenderHostedScene
 import com.labteto.dshmobile.uihost.UiSceneRenderAccess
-import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.ui.screens.local.LocalHarnessViewModel
-import com.labteto.dshmobile.uipack.v6.V6ApplicationScenePack
-import com.labteto.dshmobile.uipack.v6.V6ConversationPorts
-import com.labteto.dshmobile.uipack.v6.V6SecondaryPorts
-import kotlinx.coroutines.flow.map
 
 /** The original shipped screen is an explicit compatibility mode, never a fake complete UiPack. */
 internal const val LEGACY_V6_APP_UI = "legacy-v6-shell"
@@ -73,76 +67,6 @@ internal fun localNavigationSnapshotKey(packId: String, sessionId: String?): Str
     return "navigation_snapshot.$packId.$digest"
 }
 
-
-/**
- * Installed packages are candidates, not admitted packages. The production Host
- * checks the COMPLETE scene catalog and real renderers before executing a package.
- * Only the V6 migration candidate is installed; legacy UI remains stable until verified.
- */
-/** V6 observes Session Owner directly; the legacy Shell has no execution authority. */
-internal class LocalV6SessionBinding(private val sessions: SessionUiPort) {
-    fun isWork(): Boolean = sessions.snapshot().usageMode == LocalUsageMode.WORK
-    fun sessionId(): String = sessions.snapshot().identity?.sessionId.orEmpty()
-    val workModeUpdates: kotlinx.coroutines.flow.Flow<Boolean> =
-        sessions.snapshots.map { it.usageMode == LocalUsageMode.WORK }
-}
-
-internal object LocalApplicationPackInstallations {
-    fun fromOwners(owner: LocalHarnessViewModel,
-        updateStatus: kotlinx.coroutines.flow.StateFlow<String?>? = null,
-        checkForUpdate: (() -> Unit)? = null,
-    ): List<UiApplicationScenePack> {
-        val session = LocalV6SessionBinding(owner.sessionUiPort)
-        return listOf(
-            // Migrating V6 has only actual settings and conversation renderers; Host denies it
-            // until every required Scene exists, so current users stay on legacy stable V6.
-            V6ApplicationScenePack(
-                owner.hostPreferencesUiPort,
-                owner.settingsUiPort,
-                V6ConversationPorts(
-                    chat = owner.chatUiPort, work = owner.workConversationUiPort,
-                    drafts = owner.conversationDraftUiPort,
-                    reading = owner.conversationReadingUiPort,
-                    attachments = owner.attachmentUiPort, history = owner.messageHistoryUiPort,
-                    documents = owner.uiDocumentUiPort, forms = owner.uiDocumentFormPort,
-                    media = owner.mediaUiPort, evidence = owner.workEvidenceUiPort,
-                    gallery = owner.personaGalleryUiPort,
-                    selection = owner.personaSelectionUiPort,
-                    groups = owner.chatGroupUiPort,
-                    stories = owner.personaStoryUiPort,
-                    galleryDeletion = owner.personaGalleryDeletionUiPort,
-                    personaAuthoring = owner.personaAuthoringUiPort,
-                    workReads = owner.workReadUiPort,
-                    workPolicy = owner.workPolicyUiPort,
-                    workTeam = owner.workTeamUiPort,
-                    replySuggestions = owner.replySuggestionsUiPort,
-                    files = owner.filesUiPort,
-                    workMode = session::isWork,
-                    workModeUpdates = session.workModeUpdates,
-                ),
-                usageOwner = owner.usageUiPort,
-                updateStatus = updateStatus,
-                checkForUpdate = checkForUpdate,
-                secondary = V6SecondaryPorts(
-                    tools = owner.toolsUiPort, files = owner.filesUiPort,
-                    media = owner.mediaUiPort, settings = owner.settingsUiPort,
-                    sessionId = session::sessionId,
-                    automation = owner.automationUiPort, sessions = owner.sessionUiPort,
-                    transcript = owner.messageHistoryUiPort,
-                    memory = owner.memoryUiPort, diary = owner.diaryUiPort,
-                    authoring = owner.personaAuthoringUiPort,
-                    currentPersona = owner.currentPersonaUiPort,
-                    replySuggestions = owner.replySuggestionsUiPort,
-                    gallery = owner.personaGalleryUiPort,
-                    selection = owner.personaSelectionUiPort,
-                    portraits = owner.personaPortraitUiPort,
-                    modelPerformance = LocalModelPerformanceUiOwner,
-                    pricing = owner.memoryUiPort as? com.labteto.dshmobile.uicontract.PricingUiPort,
-                ),
-            ),
-        )
-    }
-}
 
 internal sealed interface LocalApplicationUiDecision {
     data object Legacy : LocalApplicationUiDecision
