@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.uipack.v6
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -61,6 +62,7 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
     var editing by remember(page) { mutableStateOf<AutomationTask?>(null) }
     var remove by remember(page) { mutableStateOf<AutomationTask?>(null) }
     var taskActions by remember(page) { mutableStateOf<String?>(null) }
+    var confirmExit by remember(page) { mutableStateOf(false) }
     var prompt by remember(page) { mutableStateOf("") }
     var firstMinutes by remember(page) { mutableStateOf("60") }
     var scheduleType by remember(page) { mutableStateOf(AutomationScheduleType.ONCE) }
@@ -87,6 +89,12 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
     // actionable first row, particularly during Android window/layout transitions.
     // Reset synchronously with the mode change instead of racing a LaunchedEffect.
     val editorScroll = remember(editor) { androidx.compose.foundation.ScrollState(0) }
+    // Leaving a draft is distinct from Cancel: user input must not disappear
+    // because the top-level Back action or system gesture was pressed by mistake.
+    BackHandler(enabled = editor && prompt.isNotBlank()) { confirmExit = true }
+    fun requestExit() {
+        if (editor && prompt.isNotBlank()) confirmExit = true else onBack()
+    }
     fun send(command: AutomationUiCommand) {
         if (busy) return
         val admittedIdentity = owner.snapshot().context.identity
@@ -151,7 +159,7 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(if (onlyChat) "人物互动自动任务" else "自动任务",
                 Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-            SyButton("返回", onBack, style = SyButtonStyle.GHOST)
+            SyButton("返回", { requestExit() }, style = SyButtonStyle.GHOST)
         }
         if (editor) SyButton("取消", {
             // An old chat draft is never reattached to the newly active session.
@@ -326,6 +334,21 @@ fun V6AutomationScene(owner: AutomationUiPort, page: UiSceneId, onBack: () -> Un
         }
         }
     }
+    if (confirmExit) AlertDialog(
+        onDismissRequest = { confirmExit = false },
+        title = { Text("放弃未保存的自动任务？") },
+        text = { Text("当前任务指令和排程尚未提交，离开后需要重新编辑。") },
+        confirmButton = { TextButton(onClick = {
+            confirmExit = false
+            editor = false
+            editing = null
+            prompt = ""
+            onBack()
+        }) { Text("放弃并返回") } },
+        dismissButton = { TextButton(onClick = { confirmExit = false }) {
+            Text("继续编辑")
+        } },
+    )
     remove?.let { task -> AlertDialog(onDismissRequest = { remove = null },
         title = { Text("确认删除自动任务") }, text = { Text(task.prompt) },
         confirmButton = { TextButton(onClick = {

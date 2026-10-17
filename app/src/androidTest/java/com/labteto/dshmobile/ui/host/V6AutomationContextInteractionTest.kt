@@ -115,6 +115,16 @@ class V6AutomationContextInteractionTest {
         }
     }
 
+    @Test fun returningFromUnsavedAutomationRequiresExplicitDiscard() {
+        val owner = AutomationOwner(first)
+        show(owner)
+        compose.onNodeWithText("返回").performClick()
+        compose.onNodeWithText("放弃未保存的自动任务？").assertIsDisplayed()
+        compose.onNodeWithText("继续编辑").performClick()
+        compose.onNodeWithText("创建任务").assertIsEnabled()
+        compose.runOnIdle { assertTrue(owner.submissions.isEmpty()) }
+    }
+
     @Test fun restartingEditorAfterSwitchBindsOnlyTheNewOwnerIdentity() {
         val owner = AutomationOwner(first)
         show(owner)
