@@ -35,12 +35,18 @@ fun rememberUiDocumentImporter(maxBytes: Int, onResult: (UiDocumentPickReceipt) 
     val resolver = LocalContext.current.contentResolver
     val scope = rememberCoroutineScope()
     val callback by rememberUpdatedState(onResult)
+    val gate = remember { UiHostDocumentOperationGate<Int>() }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri == null) callback(UiDocumentPickReceipt.Cancelled)
-        else {
+        if (uri == null) {
+            if (gate.cancelSelection() != null) callback(UiDocumentPickReceipt.Cancelled)
+            else callback(UiDocumentPickReceipt.Failed("文档选择请求已失效，请重新选择"))
+        } else {
+            val ticket = gate.selectionReturned()
+            if (ticket == null) callback(UiDocumentPickReceipt.Failed("文档请求已失效，请重新选择"))
+            else {
             callback(UiDocumentPickReceipt.Reading)
             scope.launch {
-                val result = withContext(Dispatchers.IO) {
+                val result = try { withContext(Dispatchers.IO) {
                     try {
                         val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
                             val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
@@ -61,15 +67,24 @@ fun rememberUiDocumentImporter(maxBytes: Int, onResult: (UiDocumentPickReceipt) 
                         UiDocumentPickReceipt.Picked(UiPickedDocument(name, resolver.getType(uri), bytes))
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (failure: Exception) { UiDocumentPickReceipt.Failed(failure.message) }
-                }
+                } } finally { gate.finish(ticket) }
                 callback(result)
+            }
             }
         }
     }
     return {
-        try { launcher.launch(arrayOf("*/*")) }
-        catch (cancelled: CancellationException) { throw cancelled }
-        catch (failure: Exception) { callback(UiDocumentPickReceipt.Failed(failure.message)) }
+        val ticket = gate.begin(maxBytes)
+        if (ticket == null) {
+            callback(UiDocumentPickReceipt.Failed("上一个文档正在读取，请先完成或取消该请求"))
+        } else {
+            try { launcher.launch(arrayOf("*/*")) }
+            catch (cancelled: CancellationException) { gate.failToLaunch(ticket); throw cancelled }
+            catch (failure: Exception) {
+                gate.failToLaunch(ticket)
+                callback(UiDocumentPickReceipt.Failed(failure.message))
+            }
+        }
     }
 }
 
