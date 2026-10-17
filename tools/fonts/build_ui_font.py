@@ -58,18 +58,18 @@ def kotlin_literals(text):
             continue
         i += 1
 
-def used_characters(res, ui):
+def used_characters(res, ui_roots):
     out = {ord(c) for c in BASE}
     for file in sorted(res.glob("values*/**/*.xml")):
         for el in ET.parse(file).iter():
             if el.text: out.update(map(ord, el.text))
             if el.tail: out.update(map(ord, el.tail))
-    for file in sorted(ui.rglob("*.kt")):
+    for file in sorted(path for ui in ui_roots for path in ui.rglob("*.kt")):
         for literal in kotlin_literals(file.read_text(encoding="utf-8")):
             out.update(ord(c) for c in literal if ord(c) > 126 and c not in "\r\n\t")
     return {c for c in out if c >= 32 and not 0xD800 <= c <= 0xDFFF}
 
-def build(font_file, res, ui, directory):
+def build(font_file, res, ui_roots, directory):
     from fontTools.ttLib import TTFont
     from fontTools.subset import Options, Subsetter
     from fontTools.varLib.instancer import instantiateVariableFont
@@ -80,7 +80,7 @@ def build(font_file, res, ui, directory):
     axes = {a.axisTag: a for a in font["fvar"].axes} if "fvar" in font else {}
     if "wght" not in axes or axes["wght"].minValue > 400 or axes["wght"].maxValue < 800:
         raise ValueError("Noto Sans SC mother must support real 400-800 weights")
-    requested = used_characters(res, ui)
+    requested = used_characters(res, ui_roots)
     available = set(font.getBestCmap())
     missing_han = sorted(c for c in requested - available if 0x3400 <= c <= 0x9fff or 0x20000 <= c <= 0x3134f)
     if missing_han: raise ValueError("Fixed UI missing Chinese glyphs: " + "".join(chr(c) for c in missing_han))
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--font", type=Path, required=True)
     parser.add_argument("--resources", type=Path, required=True)
-    parser.add_argument("--ui", type=Path, required=True)
+    parser.add_argument("--ui", type=Path, required=True, action="append")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     build(args.font, args.resources, args.ui, args.out)

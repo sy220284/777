@@ -2,12 +2,35 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.compose)
 }
+
+// V6 alone owns its generated CJK fonts. The app and neutral Host need no visual resources.
+val generatedV6Fonts = layout.buildDirectory.dir("generated/uiFontRes")
+val generateUiFontSubset = tasks.register<Exec>("generateUiFontSubset") {
+    group = "build setup"
+    inputs.file(rootProject.file("tools/fonts/source/NotoSansSC-wght.ttf"))
+    inputs.file(rootProject.file("tools/fonts/build_ui_font.py"))
+    inputs.file(rootProject.file("tools/fonts/generate.sh"))
+    inputs.dir(rootProject.file("app/src/main/res"))
+    inputs.dir(rootProject.file("app/src/main/java/com/labteto/dshmobile/ui"))
+    inputs.dir(rootProject.file("ui-pack-v6/src/main/kotlin"))
+    outputs.dir(generatedV6Fonts)
+    outputs.file(layout.buildDirectory.file("generated/ui-font-subset-manifest.json"))
+    environment("DSH_FONT_OFFLINE", gradle.startParameter.isOffline.toString())
+    commandLine("bash", rootProject.file("tools/fonts/generate.sh").absolutePath, generatedV6Fonts.get().asFile.absolutePath)
+}
+tasks.matching {
+    (it.name.contains("Resources") || it.name.endsWith("SourceSetPaths") ||
+        it.name.startsWith("extractDeepLinks") || it.name.startsWith("lint", ignoreCase = true)) &&
+        it.name != "generateUiFontSubset"
+}.configureEach { dependsOn(generateUiFontSubset) }
+
 android {
     namespace = "com.labteto.dshmobile.uipack.v6"
     compileSdk = 37
     buildToolsVersion = "37.0.0"
     defaultConfig { minSdk = 36 }
     buildFeatures { compose = true }
+    sourceSets.getByName("main").res.srcDir(generatedV6Fonts.get().asFile)
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21

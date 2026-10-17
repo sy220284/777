@@ -1,11 +1,13 @@
 package com.labteto.dshmobile.connection
 
+import com.labteto.dshmobile.uicontract.UiReadingLimits
+
 /** UI support contract, shared by settings, rendering and regression tests. */
 object AppDisplayLimits {
     const val MIN_SUPPORTED_WIDTH_DP = 320
-    const val MIN_READING_SCALE = 0.9f
-    const val MAX_READING_SCALE = 1.5f
-    const val MAX_EFFECTIVE_FONT_SCALE = 2.0f
+    const val MIN_READING_SCALE = UiReadingLimits.MIN_READING_SCALE
+    const val MAX_READING_SCALE = UiReadingLimits.MAX_READING_SCALE
+    const val MAX_EFFECTIVE_FONT_SCALE = UiReadingLimits.MAX_EFFECTIVE_FONT_SCALE
 }
 
 /** Local application preferences persisted through DataStore. */

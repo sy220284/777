@@ -30,4 +30,5 @@ PYTHONPATH="$PY_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 \
   --font "$REPO_ROOT/tools/fonts/source/NotoSansSC-wght.ttf" \
   --resources "$REPO_ROOT/app/src/main/res" \
   --ui "$REPO_ROOT/app/src/main/java/com/labteto/dshmobile/ui" \
+  --ui "$REPO_ROOT/ui-pack-v6/src/main/kotlin" \
   --out "$TARGET/font"
