@@ -34,6 +34,8 @@ CI 采用 **四级风险分流、独立合并门禁、发布资格严格隔离**
 
 - L0 文档：scope 控制面与 merge-gate；修改功能树 / 验收索引时增跑 static-gates，检查树与验收凭据的一致性。
 - L1 普通源码：static-gates、受影响的 architecture-3-gates、unit-tests、build-arm64；`build-arm64` 同时编译 `:app:compileDebugAndroidTestKotlin`，避免业务 Port 变更后 Android 测试替身与导入失效漏到主线。普通 UI 和模型无关业务不重复执行双模拟器。
+- UI 模块风险分级：`:ui-contract`/`:ui-host` 生产契约修改采用完整矩阵；`:ui-pack-v6` 的场景与动作修改执行 Android 16/17，视觉组件修改执行静态、架构、模块单测和编译。影响 APK 的主线 push 始终执行完整矩阵。
+- UI 证据变更：`docs/UI-SCENE-MATRIX.json`、R4 任务清单与 UI 3.0 实施台账须执行静态门禁；UI 3.0 权威规范另外执行架构门禁；V6 设计包素材变更执行静态设计一致性检查。场景登记无法替代真实 E2E。
 - L2 跨功能底层、Android 平台/ABI、安全边界、CI/发布控制面：完整单测、架构、ARM64/x86 与 Android 16/17。androidTest 变更验证双设备，导航入口变更补 Android 16。
 - L3 正式 APK 发布：必须在**同一发布 SHA** 找到 `main` push 对应成功的完整 CI 矩阵（含 merge-gate、两套 APK、双模拟器），并与最近已发布的正式版本比较，确认实际存在影响 APK 的变更。文档/自动化独立改动不会制造正式 Release。
 
@@ -67,7 +69,8 @@ CI 采用 **四级风险分流、独立合并门禁、发布资格严格隔离**
 - Python / Shell 自动化语法校验。
 - Android Manifest / exported component / FileProvider / 模型 HTTPS-or-loopback 安全边界。
 - UI 硬编码、Design System、通知、Kotlin 风险与构建基线。
-- 测试质量门禁：禁止禁用测试、伪断言、未审计的环境跳过与真实阻塞等待。
+- 测试质量门禁：扫描所有 Gradle 模块中的实际 JVM/Android 测试目录，包括 `ui-contract`、`ui-pack-v6`；禁止禁用测试、伪断言、未审计的环境跳过与真实阻塞等待。
+- UI 3.0 模块边界：静态核对 `ui-contract`、`ui-host`、`ui-pack-v6` 的 Gradle 依赖方向及非法 App 实现层导入；共享 UI DTO 允许复用已迁入 Contract 的历史 local.* 类型；提供反向样例并由 Kotlin 编译复核。
 - Runtime 压缩器自测。
 - 发布版本格式。
 

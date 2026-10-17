@@ -13,19 +13,19 @@ ALLOWED = {
 }
 PROJECT = re.compile(r'project\s*\(\s*"(?::)([A-Za-z0-9_-]+)"\s*\)')
 IMPORT = re.compile(r'^\s*import\s+([A-Za-z0-9_.]+)', re.M)
+# UI Contract deliberately exports immutable DTOs from historical local.* namespaces.
+# Gradle edges forbid Pack -> App; importing exported DTOs is fully legitimate.
+# Reject actual App screen imports and internal runtime/owner implementation symbols.
 APP_INTERNAL = (
     "com.labteto.dshmobile.ui.screens.",
     "com.labteto.dshmobile.ui.shenyan.",
     "com.labteto.dshmobile.ui.theme.",
-    "com.labteto.dshmobile.local.chat.",
-    "com.labteto.dshmobile.local.work.",
-    "com.labteto.dshmobile.local.session.",
-    "com.labteto.dshmobile.local.runtime.",
-    "com.labteto.dshmobile.local.automation.",
-    "com.labteto.dshmobile.local.model.",
-    "com.labteto.dshmobile.local.tools.",
-    "com.labteto.dshmobile.local.persistence.",
 )
+APP_IMPL_SYMBOLS = {
+    "LocalHarnessViewModel", "LocalFeatureUiActions", "LocalRuntimeKernel",
+    "LocalSessionRepository", "LocalAgentRunCoordinator",
+    "LocalToolExecutionCoordinator",
+}
 
 def project_errors(module: str, content: str) -> list[str]:
     actual = set(PROJECT.findall(content))
@@ -39,7 +39,7 @@ def import_errors(module: str, content: str) -> list[str]:
         forbidden = (
             name.startswith(("android.", "androidx.", "com.shenyan.designsystem.", "com.labteto.dshmobile.uipack."))
             if module == "ui-contract" else
-            name.startswith(APP_INTERNAL) or
+            (name.startswith(APP_INTERNAL) or name.rsplit(".", 1)[-1] in APP_IMPL_SYMBOLS) or
             (module == "ui-host" and name.startswith(("com.shenyan.designsystem.", "com.labteto.dshmobile.uipack."))) or
             (module == "ui-pack-v6" and name.startswith("com.labteto.dshmobile.uipack.") and
              not name.startswith("com.labteto.dshmobile.uipack.v6."))
@@ -58,6 +58,8 @@ def self_test() -> None:
     assert import_errors("ui-contract", "import androidx.compose.runtime.Composable")
     assert not import_errors("ui-contract", "import kotlinx.coroutines.flow.Flow")
     assert not import_errors("ui-pack-v6", "import com.shenyan.designsystem.components.SyEntrance")
+    assert not import_errors("ui-pack-v6", "import com.labteto.dshmobile.local.session.LocalConversationMode")
+    assert not import_errors("ui-pack-v6", "import com.labteto.dshmobile.local.model.LocalMediaPage")
 
 def main() -> None:
     errors = []
