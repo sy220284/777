@@ -57,8 +57,9 @@ fun rememberUiWorkspaceExporter(
     }
     androidx.compose.runtime.DisposableEffect(gate, lease) {
         onDispose {
-            if (gate.phase == UiHostDocumentOperationGate.Phase.WAITING_FOR_PICKER)
-                lease.finish()
+            // UI teardown must revoke the pending ticket, not only free the Owner.
+            // A late Android picker callback may still reach this disposed instance.
+            if (gate.cancelSelection() != null) lease.finish()
         }
     }
     val launcher = rememberLauncherForActivityResult(

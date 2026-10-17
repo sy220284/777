@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.ui.host
 
 import com.labteto.dshmobile.uihost.UiHostDocumentOperationGate
+import com.labteto.dshmobile.uihost.UiHostPlatformAction
+import com.labteto.dshmobile.uihost.UiHostSystemOperationLease
+import com.labteto.dshmobile.uihost.UiHostSystemOperationOwner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -42,6 +45,26 @@ class UiHostDocumentOperationGateTest {
         assertFalse(restored.finish(stale))
         assertEquals(current, restored.selectionReturned())
         assertTrue(restored.finish(current))
+    }
+
+    @Test fun disposedHostRevokesUnreturnedPickerBeforeAnotherFeatureUsesOwner() {
+        val owner = UiHostSystemOperationOwner()
+        val importer = UiHostSystemOperationLease(owner, UiHostPlatformAction.IMPORT_DOCUMENT)
+        val exporter = UiHostSystemOperationLease(owner, UiHostPlatformAction.EXPORT_WORKSPACE)
+        val first = UiHostDocumentOperationGate<String>()
+        assertTrue(importer.begin())
+        val abandoned = requireNotNull(first.begin("private-document.txt"))
+        assertFalse(exporter.begin())
+        // Matches DisposableEffect teardown: cancel the selection before releasing
+        // the shared Host Owner. A delayed result must not read the old document.
+        assertEquals(abandoned, first.cancelSelection())
+        assertTrue(importer.finish())
+        assertNull(first.selectionReturned())
+        assertFalse(first.finish(abandoned))
+        assertTrue(exporter.begin())
+        assertFalse(importer.begin())
+        assertTrue(exporter.finish())
+        assertNull(owner.activeAction())
     }
 
     @Test fun launchFailureReleasesTheOnlyPickerReservation() {

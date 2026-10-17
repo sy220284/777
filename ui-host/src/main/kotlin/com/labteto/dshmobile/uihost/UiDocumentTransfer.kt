@@ -42,8 +42,9 @@ fun rememberUiDocumentImporter(maxBytes: Int, onResult: (UiDocumentPickReceipt) 
     }
     DisposableEffect(gate, lease) {
         onDispose {
-            if (gate.phase == UiHostDocumentOperationGate.Phase.WAITING_FOR_PICKER)
-                lease.finish()
+            // UI teardown must revoke the pending ticket, not only free the Owner.
+            // A late Android picker callback may still reach this disposed instance.
+            if (gate.cancelSelection() != null) lease.finish()
         }
     }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -125,8 +126,9 @@ fun rememberUiDocumentSaver(mimeType: String, onResult: (UiDocumentWriteReceipt)
     }
     DisposableEffect(gate, lease) {
         onDispose {
-            if (gate.phase == UiHostDocumentOperationGate.Phase.WAITING_FOR_PICKER)
-                lease.finish()
+            // UI teardown must revoke the pending ticket, not only free the Owner.
+            // A late Android picker callback may still reach this disposed instance.
+            if (gate.cancelSelection() != null) lease.finish()
         }
     }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mimeType)) { uri ->

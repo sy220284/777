@@ -469,10 +469,17 @@
         "AE4V3-18",
         "AE4V3-20"
       ],
-      "status": "not_started",
-      "code_evidence": [],
-      "tests_verified": [],
-      "notes": ""
+      "status": "in_progress",
+      "code_evidence": [
+        "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiDocumentTransfer.kt",
+        "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiWorkspaceExporter.kt",
+        "app/src/test/java/com/labteto/dshmobile/ui/host/UiHostDocumentOperationGateTest.kt"
+      ],
+      "tests_verified": [
+        "local :ui-host:compileDebugKotlin :app:compileDebugKotlin :app:testDebugUnitTest --tests UiHostDocumentOperationGateTest (exit=0)",
+        "local seven architecture/performance/CI/security/test-quality/UI/Kotlin static gates (success)"
+      ],
+      "notes": "2026-10-17：启动 V6 Port/Chat 保护适配：Host Document Import/Save/Workspace Export 的 Compose 页面销毁时同时 cancelSelection 并释放 Host 系统操作租约，旧 ActivityResult 回调不能继续拿到被销毁场景的文件请求；READING/TRANSFERRING 仍由原协程 finally 关闭，避免提前释放活跃 IO 的全局租约。新增跨 Feature 租约移交与旧请求失效正反回归，V6 Host 和 App Kotlin 编译、定向 JVM 与 7 类静态检查通过。Chat 保护全域及 PR 提交 SHA CI 尚未验收，整项 in_progress。"
     },
     {
       "id": "AE4V3-22",
