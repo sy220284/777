@@ -51,6 +51,24 @@ class SessionExecutionRegistryTest {
     }
 
     @Test
+    fun bulkAdmissionRejectsBlankSessionBeforeAcquiringAnyOwner() = runTest {
+        val registry = SessionExecutionRegistry()
+        val failed = runCatching {
+            registry.acquireAll(listOf("valid", "  ", "another"), deletion)
+        }
+        assertTrue(failed.exceptionOrNull() is IllegalArgumentException)
+        assertEquals(0, registry.retainedSessionCount())
+        assertFalse(registry.hasAnyLiveOwner())
+        val leases = registry.acquireAll(listOf("b", "a", "b"), deletion)
+        try {
+            assertEquals(listOf("a", "b"), leases.map { it.identity.sessionId })
+        } finally {
+            leases.asReversed().forEach(SessionExecutionLease::close)
+        }
+        assertEquals(0, registry.retainedSessionCount())
+    }
+
+    @Test
     fun queuedDeletionCannotBeBypassedAndCancelledWaiterDoesNotLeak() = runTest {
         val registry = SessionExecutionRegistry()
         val first = registry.acquire("session", execution)

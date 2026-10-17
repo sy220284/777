@@ -102,9 +102,13 @@ class SessionExecutionRegistry {
         sessionIds: Collection<String>,
         owner: SessionExecutionOwner,
     ): List<SessionExecutionLease> {
+        // A bulk caller must never silently drop a malformed identity: partial
+        // admission could delete/migrate only a subset of its requested sessions.
+        require(sessionIds.none(String::isBlank)) { "批量会话编号不能为空" }
+        val orderedSessions = sessionIds.distinct().sorted()
         val leases = mutableListOf<SessionExecutionLease>()
         try {
-            sessionIds.filter(String::isNotBlank).distinct().sorted().forEach {
+            orderedSessions.forEach {
                 leases += acquire(it, owner)
             }
             return leases

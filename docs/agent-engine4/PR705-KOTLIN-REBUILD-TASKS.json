@@ -123,10 +123,13 @@
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAutomationExecutionCoordinator.kt",
         "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentRunOwnership.kt",
         "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalAgentRunCoordinator.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/SessionExecutionRegistryTest.kt"
       ],
-      "tests_verified": [],
-      "notes": "Session 唯一互斥、等待队列与所有权迁入 Shared Session；Android 原 API 保持兼容。租约绑定 session/incarnation/epoch/owner，跨会话、跨类型或外来注册表租约不能进入执行；withOwner 传播协程执行身份，前台 Work 与后台 Work 自动任务接入。只完成进程内所有权合同，不冒称跨进程恢复或完整 Run Owner 完成。当前 SHA Kotlin 编译及单测仍待 CI。；Shared AgentRunOwnership 接管前台/自动任务/子代理运行提交权；同槽检查与持久提交/交接原子化，不跨会话持有 IO 锁；落盘失败不转移旧 Owner，终态只结算一次。持久恢复完整事务与外部核销仍未完成。 此批按用户要求只做代码实现与静态复查，Kotlin 编译/测试未执行，不提高整项完成状态。 本批：修复 withContext 后协程 Job 改变导致 finishTurn 拒绝原 Owner、续轮无法交接的问题；使用进入执行域前捕获的注册 Job。 仅执行静态检查，未运行 Kotlin 编译/单测。"
+      "tests_verified": [
+        "2026-10-17: :harness-core:test --tests SessionExecutionRegistryTest (0 failures), includes atomic bulk admission rejection"
+      ],
+      "notes": "Session 唯一互斥、等待队列与所有权迁入 Shared Session；Android 原 API 保持兼容。租约绑定 session/incarnation/epoch/owner，跨会话、跨类型或外来注册表租约不能进入执行；withOwner 传播协程执行身份，前台 Work 与后台 Work 自动任务接入。只完成进程内所有权合同，不冒称跨进程恢复或完整 Run Owner 完成。当前 SHA Kotlin 编译及单测仍待 CI。；Shared AgentRunOwnership 接管前台/自动任务/子代理运行提交权；同槽检查与持久提交/交接原子化，不跨会话持有 IO 锁；落盘失败不转移旧 Owner，终态只结算一次。持久恢复完整事务与外部核销仍未完成。 此批按用户要求只做代码实现与静态复查，Kotlin 编译/测试未执行，不提高整项完成状态。 本批：修复 withContext 后协程 Job 改变导致 finishTurn 拒绝原 Owner、续轮无法交接的问题；使用进入执行域前捕获的注册 Job。 仅执行静态检查，未运行 Kotlin 编译/单测。 2026-10-17：复核批量 Session acquireAll 原先对空白会话 ID 做 filter 丢弃，可能让删除/维护只锁住请求的一部分会话却返回成功。现一次性验证整批 ID，非法则在获取任何租约前拒绝；合法输入仍去重排序，异常/取消释放维持原机制。新增拒绝混合合法+空白 ID、合法重复 ID 正反 JVM 测试，Shared 核心定向测试通过；跨进程真实删除迁移与本 SHA CI 仍待整项验收。"
     },
     {
       "id": "AE4V3-07",
