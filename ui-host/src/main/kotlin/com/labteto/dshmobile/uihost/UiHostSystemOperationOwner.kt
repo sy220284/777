@@ -45,6 +45,33 @@ class UiHostSystemOperationOwner {
     fun activeAction(): UiHostPlatformAction? = active?.action
 }
 
+/**
+ * Per-feature lease backed by the one Host Owner. Each caller keeps its own
+ * concrete request and Android launcher; this only serializes the platform
+ * operation until the picker and subsequent IO/chooser have both completed.
+ */
+class UiHostSystemOperationLease(
+    private val owner: UiHostSystemOperationOwner,
+    private val action: UiHostPlatformAction,
+) {
+    private var ticket: UiHostSystemOperationOwner.Ticket? = null
+
+    @Synchronized
+    fun begin(): Boolean {
+        if (ticket != null) return false
+        val acquired = owner.begin(action) ?: return false
+        ticket = acquired
+        return true
+    }
+
+    @Synchronized
+    fun finish(): Boolean {
+        val pending = ticket ?: return false
+        ticket = null
+        return owner.finish(pending)
+    }
+}
+
 /** A null provider means standalone component tests; no implicit global singleton. */
 val LocalUiHostSystemOperationOwner =
     compositionLocalOf<UiHostSystemOperationOwner?> { null }
