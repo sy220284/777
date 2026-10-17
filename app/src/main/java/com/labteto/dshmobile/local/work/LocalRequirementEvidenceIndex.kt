@@ -34,10 +34,16 @@ internal fun indexedRequirementEvidence(
     val requirements = todos.map(LocalTodoItem::content)
     val generation = log.resetGeneration
     val checkpoint = log.readProjectionCheckpoint(INDEX_NAME, INDEX_VERSION)
+    // A checkpoint is disposable. A damaged payload must be rebuilt from the
+    // authoritative EventLog, not treated as a valid empty projection or a Work failure.
     val restored = checkpoint?.let {
-        val decoded = Json.decodeFromString(RequirementEvidenceCursor.serializer(), it.payload)
-        decoded.takeIf { value ->
-            value.goalId == goalId && value.requirements == requirements
+        try {
+            Json.decodeFromString(RequirementEvidenceCursor.serializer(), it.payload)
+                .takeIf { value ->
+                    value.goalId == goalId && value.requirements == requirements
+                }
+        } catch (_: kotlinx.serialization.SerializationException) {
+            null
         }
     }
     val links = linkedMapOf<Pair<Int, String>, LocalSessionEventLog.Event>()

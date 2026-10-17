@@ -114,6 +114,29 @@ class LocalRequirementEvidenceIndexTest {
         } finally { restored.close() }
     }
 
+    @Test fun damagedDerivedCheckpointRebuildsOnlyFromAuthoritativeEvents() {
+        val file = File(temporary.root, "corrupt-index.jsonl")
+        val log = LocalSessionEventLog(file, Json)
+        try {
+            val selected = link(log, "report.md")
+            review(log, selected.sequence, true)
+            val before = indexedRequirementEvidence(log, work, "goal-a")
+            assertTrue(before.reviews.single().approvedByUser)
+            val cache = requireNotNull(log.readProjectionCheckpoint(
+                "work.requirement-evidence", 2))
+            // Corrupt the disposable payload while leaving its outer record structurally valid.
+            log.writeProjectionCheckpoint("work.requirement-evidence", 2,
+                cache.throughSequence, "{not a cursor", log.resetGeneration)
+            val rebuilt = indexedRequirementEvidence(log, work, "goal-a")
+            assertEquals(2, rebuilt.replayedEvents)
+            assertEquals(selected.sequence, rebuilt.links.single().eventSequence)
+            assertTrue(rebuilt.reviews.single().approvedByUser)
+            assertEquals("pending", work.single().status)
+            // Once rebuilt, the repaired projection need not scan the old history again.
+            assertEquals(0, indexedRequirementEvidence(log, work, "goal-a").replayedEvents)
+        } finally { log.close() }
+    }
+
     @Test fun replacingAnExactReferenceRetiresTheEarlierManualDecision() {
         val log = LocalSessionEventLog(File(temporary.root, "replacement.jsonl"), Json)
         try {
