@@ -124,6 +124,7 @@ internal class LocalV6StandaloneViewModel @Inject constructor(
         documents = documents, forms = formState,
         attachments = attachmentUiPort, transcript = messageHistoryUiPort,
         groups = chatGroupUiPort, team = workTeamUiPort,
+        workReads = workReadUiPort, workPolicy = workPolicyUiPort,
         shell = shellPreferences, evidence = workEvidenceUiPort,
         gallery = personaGalleryUiPort, personas = personaSelectionUiPort,
         personaTransfer = personaTransferUiPort, stories = personaStoryUiPort,

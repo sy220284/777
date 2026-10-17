@@ -25,6 +25,8 @@ internal object LocalUiConnectedCapabilities {
         transcript: UiMessageHistoryPort?,
         groups: com.labteto.dshmobile.uicontract.ChatGroupUiPort? = null,
         team: com.labteto.dshmobile.uicontract.WorkTeamUiPort? = null,
+        workReads: com.labteto.dshmobile.uicontract.WorkReadUiPort? = null,
+        workPolicy: com.labteto.dshmobile.uicontract.WorkPolicyUiPort? = null,
         shell: com.labteto.dshmobile.uicontract.ConversationShellUiPort? = null,
         evidence: com.labteto.dshmobile.uicontract.WorkEvidenceUiPort? = null,
         gallery: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort? = null,
@@ -59,7 +61,14 @@ internal object LocalUiConnectedCapabilities {
         if (attachments != null) add(UiCapabilityId("attachment.import"))
         if (transcript != null) add(UiCapabilityId("session.transcript_read"))
         if (groups != null) add(UiCapabilityId("chat.group_members"))
-        if (team != null) add(UiCapabilityId("work.team_control"))
+        if (team != null) {
+            add(UiCapabilityId("work.team_control"))
+            // V6 manifests require the actual Work Team action, not only a
+            // legacy control hint. WorkTeamUiPort remains the admission owner.
+            add(UiCapabilityId("work.team"))
+        }
+        if (workReads != null && workPolicy != null)
+            add(UiCapabilityId("work.plan_review"))
         if (shell != null) add(UiCapabilityId("shell.session_preferences"))
         if (evidence != null) add(UiCapabilityId("work.evidence_reference"))
         if (gallery != null) add(UiCapabilityId("chat.gallery_archive"))

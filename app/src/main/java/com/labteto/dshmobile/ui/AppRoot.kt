@@ -104,6 +104,8 @@ fun AppRoot(
                 transcript = features.messageHistoryUiPort,
                 groups = features.chatGroupUiPort,
                 team = features.workTeamUiPort,
+                workReads = features.workReadUiPort,
+                workPolicy = features.workPolicyUiPort,
                 shell = features.conversationShellUiPort,
                 evidence = features.workEvidenceUiPort,
                 gallery = features.personaGalleryUiPort,
