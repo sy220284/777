@@ -19,6 +19,7 @@ data class RecoveredToolResult(
     val code: String,
     val content: String,
     val modelContent: String,
+    val executionId: String? = null,
 )
 
 data class SessionRepairResult(
@@ -50,6 +51,7 @@ object SessionRecovery {
         step: Int?,
         started: Boolean,
         verifiedReadOnly: Boolean = false,
+        executionId: String? = null,
     ): RecoveredToolResult {
         val code = when {
             !started -> TOOL_NOT_STARTED
@@ -79,7 +81,7 @@ object SessionRecovery {
                 "本次操作尚无成功结果，可安全重新执行只读操作或未开始的调用。"
             },
         ).modelVisibleContent()
-        return RecoveredToolResult(callId, name, step, code, content, modelContent)
+        return RecoveredToolResult(callId, name, step, code, content, modelContent, executionId)
     }
 
     fun repairInterruptedTail(log: SessionEventLog): SessionRepairResult {
@@ -117,12 +119,13 @@ object SessionRecovery {
                 step = call.step,
                 started = call.started,
                 verifiedReadOnly = call.verifiedReadOnly,
+                executionId = call.executionId,
             )
             recovered += result
             appended += log.append("tool/result", buildJsonObject {
                 result.step?.let { put("step", it) }
                 put("id", result.callId)
-                call.executionId?.let { put("execution_id", it) }
+                result.executionId?.let { put("execution_id", it) }
                 result.name?.let { put("name", it) }
                 put("content", result.content)
                 put("model_content", result.modelContent)

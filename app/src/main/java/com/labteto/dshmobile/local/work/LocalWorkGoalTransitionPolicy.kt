@@ -38,10 +38,12 @@ internal fun resolveWorkGoalUpdate(
     note: String?,
     eventLog: LocalSessionEventLog,
     workspaceRoot: java.io.File? = null,
+    executingToolId: String? = null,
 ): LocalGoal {
     val current = snapshot.goal ?: error("当前会话没有目标")
-    val candidate = current.copy(status = status, note = note?.take(2_000))
-    val delivery = if (status == "completed") localWorkDeliveryEvidence(eventLog, current, workspaceRoot) else null
+    val proposed = current.copy(status = status, note = note?.take(2_000))
+    val candidate = if (proposed == current) current else proposed.copy(revision = Math.incrementExact(current.revision))
+    val delivery = if (status == "completed") localWorkDeliveryEvidence(eventLog, current, workspaceRoot, executingToolId) else null
     val transition = resolveWorkGoalTransition(current, candidate, snapshot, delivery)
     if (!transition.accepted) {
         eventLog.append("goal/transition-rejected", buildJsonObject {

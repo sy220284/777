@@ -190,4 +190,27 @@ class ToolAttemptLedgerTest {
         assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
     }
 
+    @Test
+    fun unmatchedOrMisattributedExecutionResultCannotSettleCurrentMutation() {
+        val ledger = ToolAttemptLedger()
+        ledger.observe("tool/call", buildJsonObject {
+            put("id", "call"); put("goal_id", "goal"); put("execution_started", false)
+        })
+        ledger.observe("tool/execution-started", buildJsonObject {
+            put("id", "call"); put("execution_id", "actual")
+        })
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "call"); put("execution_id", "foreign"); put("is_error", false)
+        })
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "different-call"); put("execution_id", "actual"); put("is_error", false)
+        })
+        assertEquals("actual", ledger.pending().single().executionId)
+        assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "call"); put("execution_id", "actual"); put("is_error", false)
+        })
+        assertTrue(ledger.pending().isEmpty())
+    }
+
 }

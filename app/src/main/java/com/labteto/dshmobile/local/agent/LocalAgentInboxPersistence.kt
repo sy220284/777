@@ -73,11 +73,14 @@ internal fun decodeLocalAgentInboxPending(data: JsonObject): List<QueuedAgentInp
                 ?.takeIf { it > 0 } ?: return null
             val goalId = stringValue(ref, "goal_id")
             val goalFingerprint = stringValue(ref, "goal_fingerprint")
-            // Both identity fields must be present together. Old failure continuations use neither.
-            if ((goalId == null) != (goalFingerprint == null)) return null
-            if (goalId != null && (goalId.isBlank() || goalFingerprint.isNullOrBlank())) return null
+            val revisionField = ref["goal_revision"]
+            val goalRevision = (revisionField as? JsonPrimitive)?.longOrNull
+            if (revisionField != null && (goalRevision == null || goalRevision < 0L)) return null
+            val hasGoalVersion = goalRevision != null || goalFingerprint != null
+            if ((goalId != null) != hasGoalVersion) return null
+            if (goalId?.isBlank() == true || goalFingerprint?.isBlank() == true) return null
             AgentContinuationRef(sourceRunId, sequence, failureCode, index,
-                stringValue(ref, "source_message_id"), goalId, goalFingerprint)
+                stringValue(ref, "source_message_id"), goalId, goalFingerprint, goalRevision)
         }
         if ((kind == QueuedAgentInputKind.WORK_CONTINUATION) != (continuation != null)) return null
         decoded += QueuedAgentInput(
@@ -106,6 +109,7 @@ private fun encodeQueuedAgentInput(input: QueuedAgentInput): JsonObject = buildJ
             ref.sourceMessageId?.let { put("source_message_id", it) }
             ref.goalId?.let { put("goal_id", it) }
             ref.goalFingerprint?.let { put("goal_fingerprint", it) }
+            ref.goalRevision?.let { put("goal_revision", it) }
         })
     }
     input.modelMessage?.let { put("model_message", it) }

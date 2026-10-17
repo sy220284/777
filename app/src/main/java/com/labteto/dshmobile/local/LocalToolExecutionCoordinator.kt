@@ -6,6 +6,7 @@ import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
+import com.labteto.dshmobile.harness.tools.ToolInvocationContext
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.local.agent.LocalAgentRunPolicy
@@ -21,6 +22,7 @@ import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -382,52 +384,54 @@ internal class LocalToolExecutionCoordinator(
         val invocation = try {
             executionOwner?.requireCurrent(sessionId)
             runOwner?.requireCurrent(sessionId)
-            registry.executeTracked(
-                name = call.name,
-                input = call.arguments,
-                rawArguments = call.rawArguments,
-                context = ToolContext(
-                    sessionId = sessionId,
-                    allowMutation = allowMutation,
-                    attributes = buildMap {
-                        putAll(executionIdentity.attributes)
-                        put("call_id", call.id)
-                        put("execution_id", executionIdentity.executionId)
-                        put("root_call_id", executionIdentity.rootCallId)
-                        put("plan_mode", planModeEnabled)
-                        executionIdentity.parentExecutionId?.let { put("parent_execution_id", it) }
-                        currentCoroutineContext()[LocalModelRunContext]?.profile?.let { put("model_profile", it) }
-                    },
-                    expectedRegistration = registered,
-                    approval = { tool ->
-                        val granted = approval(call, tool, approvalSummary(call, tool))
-                        if (!granted) approvalDenied = true
-                        granted
-                    },
-                    onExecutionStarted = { admittedTool ->
-                        // A new correction can arrive while awaiting approval or resource admission.
-                        // Reject the stale call before entering its executor, with no side effect.
-                        executionOwner?.requireCurrent(sessionId)
-                        runOwner?.requireCurrent(sessionId)
-                        if (!beforeExecution()) throw LocalToolSampleSuperseded()
-                        // The registry calls this only after schema checks and user approval.
-                        // Waiting for approval must never hold a filesystem read/write lease.
-                        executionLease = workspaceReadWriteGate.acquire(admittedTool)
-                        // Admission can suspend behind another read/write operation. A correction
-                        // committed during that wait must invalidate this still-unstarted call.
-                        executionOwner?.requireCurrent(sessionId)
-                        runOwner?.requireCurrent(sessionId)
-                        if (!beforeExecution()) throw LocalToolSampleSuperseded()
-                        // Approval may outlive the exact plugin registration. Re-check after waiting
-                        // for the shared read/write gate and before writing the started fact.
-                        if (registry.get(call.name) !== admittedTool) {
-                            throw LocalToolRegistrationChanged()
-                        }
-                        recordExecutionStarted(sessionId, call, executionIdentity)
-                        executionStarted = true
-                    },
-                ),
-            ).let { invocation ->
+            withContext(ToolInvocationContext(sessionId, call.id, executionIdentity.executionId)) {
+                registry.executeTracked(
+                    name = call.name,
+                    input = call.arguments,
+                    rawArguments = call.rawArguments,
+                    context = ToolContext(
+                        sessionId = sessionId,
+                        allowMutation = allowMutation,
+                        attributes = buildMap {
+                            putAll(executionIdentity.attributes)
+                            put("call_id", call.id)
+                            put("execution_id", executionIdentity.executionId)
+                            put("root_call_id", executionIdentity.rootCallId)
+                            put("plan_mode", planModeEnabled)
+                            executionIdentity.parentExecutionId?.let { put("parent_execution_id", it) }
+                            currentCoroutineContext()[LocalModelRunContext]?.profile?.let { put("model_profile", it) }
+                        },
+                        expectedRegistration = registered,
+                        approval = { tool ->
+                            val granted = approval(call, tool, approvalSummary(call, tool))
+                            if (!granted) approvalDenied = true
+                            granted
+                        },
+                        onExecutionStarted = { admittedTool ->
+                            // A new correction can arrive while awaiting approval or resource admission.
+                            // Reject the stale call before entering its executor, with no side effect.
+                            executionOwner?.requireCurrent(sessionId)
+                            runOwner?.requireCurrent(sessionId)
+                            if (!beforeExecution()) throw LocalToolSampleSuperseded()
+                            // The registry calls this only after schema checks and user approval.
+                            // Waiting for approval must never hold a filesystem read/write lease.
+                            executionLease = workspaceReadWriteGate.acquire(admittedTool)
+                            // Admission can suspend behind another read/write operation. A correction
+                            // committed during that wait must invalidate this still-unstarted call.
+                            executionOwner?.requireCurrent(sessionId)
+                            runOwner?.requireCurrent(sessionId)
+                            if (!beforeExecution()) throw LocalToolSampleSuperseded()
+                            // Approval may outlive the exact plugin registration. Re-check after waiting
+                            // for the shared read/write gate and before writing the started fact.
+                            if (registry.get(call.name) !== admittedTool) {
+                                throw LocalToolRegistrationChanged()
+                            }
+                            recordExecutionStarted(sessionId, call, executionIdentity)
+                            executionStarted = true
+                        },
+                    ),
+                )
+            }.let { invocation ->
                 // Observe while the real workspace lease is still held. The caller owns
                 // what to observe; this neutral coordinator never interprets goal semantics.
                 if (invocation.executionStarted && executionLease != null && !invocation.result.isError) {

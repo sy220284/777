@@ -57,7 +57,6 @@ import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import com.labteto.dshmobile.local.tools.LocalModelToolStepSurface
 import com.labteto.dshmobile.local.tools.LocalRunToolSurface
 import com.labteto.dshmobile.local.tools.pendingToolSettlements
-import com.labteto.dshmobile.local.tools.startedToolCallIdsForActiveStep
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -263,14 +262,12 @@ internal class LocalWorkAgentTurnExecutor(
             val completedToolCallIds = linkedSetOf<String>()
             var hadSuccessfulToolReceipt = false
             var hadToolFailure = false
-            var completedGoalTurn = false
-            var dispositionAtTurnCompletion: LocalWorkGoalDisposition? = null
+            var completedGoalDisposition: LocalWorkGoalDisposition? = null
 
             fun settlePendingTools(reason: String) {
-                val actuallyStarted = startedToolCallIdsForActiveStep(runEventLog, activeToolCalls)
                 val settlements = pendingToolSettlements(
                     calls = activeToolCalls,
-                    startedCallIds = actuallyStarted,
+                    eventLog = runEventLog,
                     completedCallIds = completedToolCallIds,
                 )
                 if (settlements.isEmpty()) return
@@ -280,7 +277,8 @@ internal class LocalWorkAgentTurnExecutor(
                         name = settlement.call.name,
                         step = activeStep,
                         started = settlement.started,
-                        verifiedReadOnly = workTurnToolRuntime.isVerifiedReadOnly(settlement.call.name),
+                        verifiedReadOnly = settlement.verifiedReadOnly,
+                        executionId = settlement.executionId,
                     )
                     runEventLog.append("tool/result", interruptedWorkToolEvent(result, uiSourceMessageId, reason))
                     runHistory.append(
@@ -658,7 +656,6 @@ internal class LocalWorkAgentTurnExecutor(
                             val goalAssessment = recordWorkCompletionQuality(
                                 event.answer, runState.value, runEventLog, File(workspacePath))
                             // Preserve approval/question/team blockers observed BEFORE teardown.
-                            dispositionAtTurnCompletion = goalAssessment?.disposition
                             runEventLog.append("turn/end", buildJsonObject {
                                 put("source_message_id", uiSourceMessageId)
                                 // The model finished this turn; Work goal completion is independent.
@@ -671,7 +668,7 @@ internal class LocalWorkAgentTurnExecutor(
                             })
                             workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/completed")
                             workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_completed_turn")
-                            completedGoalTurn = true
+                            completedGoalDisposition = goalAssessment?.disposition
                         }
                         is AgentEvent.TurnStepLimit -> {
                             val transcriptMessage = runTranscript.newMessage(
@@ -800,7 +797,6 @@ internal class LocalWorkAgentTurnExecutor(
                         kernel = it.kernel.copy(running = false),
                     )
                 }
-                val completedJob = currentCoroutineContext()[Job]
                 try {
                     workModelHistoryRuntime.persist(binding)
                 } catch (error: Exception) {
@@ -813,11 +809,10 @@ internal class LocalWorkAgentTurnExecutor(
                         try { lease.release(foregroundOutcome) }
                         finally { serviceReleased = true }
                     } finally {
-                        workRunRegistry.finishTurn(binding, completedJob, onIdle = {
-                            if (completedGoalTurn &&
-                                dispositionAtTurnCompletion == LocalWorkGoalDisposition.NEEDS_EXECUTION
-                            ) {
-                                queueWorkGoalProgressFollowUp(
+                        workRunRegistry.finishTurn(binding, ownerJob, onIdle = {
+                            if (completedGoalDisposition == LocalWorkGoalDisposition.NEEDS_EXECUTION ||
+                                completedGoalDisposition == LocalWorkGoalDisposition.READY_FOR_SETTLEMENT) {
+                                driveLocalWorkGoalAfterTurn(
                                     binding = binding,
                                     originalGoal = goalAtTurnStart,
                                     sourceRunId = runContext.runId,
@@ -826,6 +821,14 @@ internal class LocalWorkAgentTurnExecutor(
                                     hadSuccessfulTool = hadSuccessfulToolReceipt,
                                     hadToolFailure = hadToolFailure,
                                     workspaceRoot = File(workspacePath),
+                                    completeGoal = { expected ->
+                                        LocalWorkProgressCoordinator(
+                                            state = binding.workState,
+                                            eventLog = runEventLog,
+                                            workspaceRoot = File(workspacePath),
+                                            persist = { sessionStorage.enqueueSnapshot(binding.persistenceSnapshot()) },
+                                        ).completeVerifiedGoal(expected)
+                                    },
                                 )
                             }
                         }) { next, ownedBinding ->

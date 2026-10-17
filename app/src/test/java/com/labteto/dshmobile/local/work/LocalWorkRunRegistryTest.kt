@@ -543,6 +543,37 @@ class LocalWorkRunRegistryTest {
         } finally { completed.cancel(); active.eventLog.close() }
     }
 
+    @Test
+    fun turnHandoffUsesRegisteredOwnerAcrossExecutionContextJobs() = runTest {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(sessionId = "context-owner", usageMode = LocalUsageMode.WORK))
+        val registry = LocalWorkRunRegistry(runtime)
+        val active = binding("context-owner")
+        val owner = Job()
+        val successor = Job()
+        val leases = com.labteto.dshmobile.harness.session.SessionExecutionRegistry()
+        val lease = leases.acquire("context-owner",
+            com.labteto.dshmobile.harness.session.SessionExecutionOwner("work", true))
+        active.runHandle.job = owner
+        registry.attach(active)
+        try {
+            kotlinx.coroutines.withContext(com.labteto.dshmobile.harness.session.SessionExecutionContext(lease)) {
+                org.junit.Assert.assertNotSame(owner, kotlinx.coroutines.currentCoroutineContext()[Job])
+                val next = registry.finishTurn(active, owner, onIdle = {
+                    active.runHandle.pendingInputs.offer(QueuedAgentInput("next", id = "next"))
+                }) { input, _ ->
+                    assertEquals("next", input.id)
+                    successor
+                }
+                assertSame(successor, next)
+                assertSame(successor, active.runHandle.job)
+            }
+        } finally {
+            lease.close(); owner.cancel(); successor.cancel()
+            registry.detach(active); active.eventLog.close()
+        }
+    }
+
     private fun binding(sessionId: String): LocalWorkRunBinding =
         LocalWorkRunBinding(
             sessionId = sessionId,

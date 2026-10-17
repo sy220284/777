@@ -152,3 +152,18 @@ Session 的互斥、等待者、释放、输入准入和身份事实改由 `harn
 - 恢复排队/阻塞沿用原检查点内容，仅变更恢复状态，保留精确模型档案、凭据引用、原始任务和配置。再次启动按 Run 起点之后的持久工具事实单次流式折叠，移除原先按 provider callId 的另一套集合与全会话 materialize。上次 repair 已经结束时，未知副作用也不能因临时 repair 为空而失去阻塞。后台旧恢复路径会重新执行任务而非恢复完整执行历史，因此已知写入仍需核销，不能直接重放。
 
 新增回归源码覆盖：持久认领失败、同槽交接与跨会话并发、终态一次提交、模型迟到、工具审批中 Run 交接、只读冷恢复、来源身份、未知结果不能清除、恢复模型身份保留、连续两次恢复未知写入、排队后的后台副作用重判。按用户要求不安装工具、不运行本地编译/单测；当前检查仅为源码、架构、性能不变量、测试质量、安全及功能树静态复查。整项完成计数不提升，完整 GoalDriver、执行历史恢复与外部副作用核销仍需后续实现。
+
+
+## 2026-10-17：Goal 验收、版本续轮与中断结算接通
+
+基线 `799bfb007`。参考 DeepSeek Goal Round Driver 的终态区分与 Codex execution identity；以 777 已有 Work Command / Shared Session EventLog / Agent inbox 为唯一写入口，不复制外部源码或建立平行任务账本。
+
+- 新增 Work GoalDriver，实际接入 Work Run Owner 的 `finishTurn/onIdle`。保留结束时尚未清理的 GoalDisposition 门槛，避免 finally 清理审批/提问后误作可继续。重新读取现有验收器：有显式成果或命令合同且证据满足，通过原 `updateGoal` 完成；存在待办则走现有进展证明与有界持久续轮；开放式任务只记录 declared_only/verification_required，不能自动假通过。
+- Goal 的 revision 持久到原 goal/state，创建为 1，状态或说明变化递增；暂停再激活不能复活旧续轮。新续轮存 goalId+revision，旧队列的合同指纹仍可读取。当前回合新建的目标只有起点位于该 Run 之后且 revision=1 才能借用本轮工作；旧目标和重激活目标不能冒用。
+- 显式与自动完成共享未结算工具/任务图检查。Shared ToolInvocationContext 只携带 Session/call/execution 身份；Work 的 update_goal 验收仅跳过正在执行的自身精确 invocation，另一未结算写入仍阻断。未知副作用不会被后续成功回执掩盖。
+- 进程内取消改为使用与冷恢复相同的 ToolAttemptLedger，采用准入时的只读合同而非当前注册工具名称。SessionRecovery 与 Work 中断结果都保留 execution_id；错误身份/错误 callId 的延迟回执不得结算当前调用。删除旧 startedCallIds 与按名称判断恢复只读的路径。
+- 修复上一轮引入协程 SessionExecutionContext 后的交接问题：withContext 内 Job 不再等于 Run Registry 注册的 Job。finishTurn 现使用执行前捕获的 ownerJob，才能交接真正的后继任务；原 releaseCompletedTurn 使用相同身份。
+
+新增回归源码覆盖实际文件版本验收→Goal 完成→EventLog 重放、未知写入阻塞、排除自身 update_goal 而保留其他未结算写入、开放式验收等级、版本队列往返与暂停再激活、跨执行上下文 Job 交接、取消读/写/未开始三种结算及持久回执去重。不安装工具、不运行构建或 Kotlin 测试；静态门禁通过不等于运行验收完成。
+
+本批完成上述生产链路的代码接入，**不等于 V3 全部 24 项完成**。完整执行历史冷恢复、UNKNOWN 外部核销、TaskGraph 节点结果持久恢复、Automation 交付结算及其他未启动包继续保持未完成。功能树无需新节点：均属既有 Work/Shared Session/Tool 的内部实现；同步源码索引。

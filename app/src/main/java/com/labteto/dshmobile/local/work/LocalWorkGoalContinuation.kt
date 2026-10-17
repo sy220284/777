@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 
@@ -123,6 +124,7 @@ internal fun nextGoalStalledRounds(
 internal fun hasUnresolvedWorkGoalToolEffects(
     eventLog: LocalSessionEventLog,
     goal: LocalGoal,
+    executingToolId: String? = null,
 ): Boolean {
     // Share SessionRecovery's typed tool-attempt reducer. Each event is
     // consumed once, from this Goal's first persisted sequence onwards.
@@ -131,7 +133,10 @@ internal fun hasUnresolvedWorkGoalToolEffects(
     eventLog.forEachAfter(goalStartSequence) { event ->
         ledger.observe(event.type, event.data)
     }
-    return ledger.hasUnresolvedExternalEffects(goal.id)
+    return goal.id.isNotBlank() && ledger.snapshot().any {
+        it.goalId == goal.id && it.unresolvedExternalEffect &&
+            (executingToolId == null || it.executionId != executingToolId)
+    }
 }
 
 /** Content-addressed identity for a Work goal including its acceptance contract. */
@@ -152,8 +157,9 @@ internal fun isCurrentWorkGoalContinuation(
     return !work.planMode && goal.status == "active" &&
         continuation.goalId?.isNotBlank() == true &&
         continuation.goalId == goal.id &&
-        continuation.goalFingerprint?.isNotBlank() == true &&
-        continuation.goalFingerprint == localWorkGoalFingerprint(goal) &&
+        (continuation.goalRevision?.let { it == goal.revision } ?: (
+            continuation.goalFingerprint?.isNotBlank() == true &&
+                continuation.goalFingerprint == localWorkGoalFingerprint(goal))) &&
         work.pendingApproval == null && work.pendingQuestion == null &&
         !work.team.rebuilding && work.team.failure.isNullOrBlank() &&
         work.team.activeMemberCountForContinuation() == 0
@@ -215,7 +221,8 @@ internal fun queueWorkGoalProgressFollowUp(
     ) { data ->
         (data["action"] as? JsonPrimitive)?.contentOrNull == "work-goal-progress-queued" &&
             (data["goal_id"] as? JsonPrimitive)?.contentOrNull == goal.id &&
-            (data["goal_fingerprint"] as? JsonPrimitive)?.contentOrNull == goalIdentity
+            ((data["goal_revision"] as? JsonPrimitive)?.longOrNull == goal.revision ||
+                (data["goal_fingerprint"] as? JsonPrimitive)?.contentOrNull == goalIdentity)
     }
     val prevProof = (previous?.data?.get("goal_progress_proof") as? JsonPrimitive)?.contentOrNull
     val prevStall = (previous?.data?.get("goal_stalled_rounds") as? JsonPrimitive)?.intOrNull ?: 0
@@ -249,7 +256,7 @@ internal fun queueWorkGoalProgressFollowUp(
         sourceMessageId = sourceMessageId,
         prompt = INTERNAL_WORK_GOAL_PROGRESS_PROMPT,
         goalId = requireNotNull(goal).id,
-        goalFingerprint = localWorkGoalFingerprint(goal),
+        goalRevision = goal.revision,
     )
     val input = resume.toQueueInput()
     val accepted = binding.runHandle.pendingInputs.offerIfEmpty(input) {
@@ -262,7 +269,7 @@ internal fun queueWorkGoalProgressFollowUp(
                     affected = listOf(input),
                 ).forEach { (key, value) -> put(key, value) }
                 put("goal_id", requireNotNull(goal).id)
-                put("goal_fingerprint", requireNotNull(goalIdentity))
+                put("goal_revision", goal.revision)
                 put("goal_progress_proof", requireNotNull(proof))
                 put("goal_stalled_rounds", stalled)
             },

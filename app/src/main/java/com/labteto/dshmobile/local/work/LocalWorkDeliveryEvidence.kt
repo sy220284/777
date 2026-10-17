@@ -69,10 +69,15 @@ internal fun localWorkDeliveryEvidence(
     log: LocalSessionEventLog,
     goal: LocalGoal,
     workspaceRoot: File? = null,
+    executingToolId: String? = null,
 ): LocalWorkDeliveryEvidence {
     val needsArtifact = goal.artifactPaths.isNotEmpty()
     val needsTest = goal.verificationCommands.isNotEmpty()
-    val graphMissing = localWorkGraphDeliveryMissing(log, goal)
+    val graphMissing = buildList {
+        addAll(localWorkGraphDeliveryMissing(log, goal))
+        if (hasUnsettledWorkGoalTaskGraphs(log, goal)) add("目标仍有关联工作流未结算")
+        if (hasUnresolvedWorkGoalToolEffects(log, goal, executingToolId)) add("目标仍有关联工具副作用未核实")
+    }
     if (goal.id.isBlank() && goal.status != "completed") return LocalWorkDeliveryEvidence(needsArtifact, needsTest,
         unmetRequirements = listOf("旧目标尚未明确验收要求；请依据原任务重新声明成果与验收，不适用时显式为空，已完成进度保留"))
     if (!needsArtifact && !needsTest) return LocalWorkDeliveryEvidence(false, false,

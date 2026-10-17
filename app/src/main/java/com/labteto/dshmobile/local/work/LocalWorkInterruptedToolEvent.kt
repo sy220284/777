@@ -11,6 +11,7 @@ internal fun interruptedWorkToolEvent(result: RecoveredToolResult, sourceMessage
         put("source_message_id", sourceMessageId)
         result.step?.let { put("step", it) }
         put("id", result.callId)
+        result.executionId?.let { put("execution_id", it) }
         result.name?.let { put("name", it) }
         put("content", result.content)
         put("model_content", result.modelContent)

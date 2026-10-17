@@ -15,6 +15,8 @@ data class AgentContinuationRef(
     /** Present only for Goal progress continuation: binds a resume to one immutable goal contract. */
     val goalId: String? = null,
     val goalFingerprint: String? = null,
+    /** Current Goal rounds use a durable revision; fingerprint is retained for old queue records. */
+    val goalRevision: Long? = null,
 ) {
     init {
         require(sourceRunId.isNotBlank() && checkpointSequence >= 0 && index > 0)

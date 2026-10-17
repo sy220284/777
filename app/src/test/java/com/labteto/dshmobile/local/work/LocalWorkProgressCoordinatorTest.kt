@@ -26,6 +26,28 @@ class LocalWorkProgressCoordinatorTest {
     private fun eventLog(file: File) = LocalSessionEventLog(file, Json).also(logs::add)
 
     @Test
+    fun pausedAndReactivatedGoalCannotReviveItsOldDurableContinuation() {
+        val state = MutableStateFlow(LocalWorkRunState(sessionId = "revision"))
+        val log = eventLog(File(temporary.root, "revision.jsonl"))
+        val commands = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) { }
+        commands.createGoal("完成任务")
+        val original = requireNotNull(state.value.work.goal)
+        val queued = LocalWorkResumeCommand("run", log.latestSequence(), WORK_GOAL_PROGRESS_CONTINUATION,
+            1, "source", goalId = original.id, goalRevision = original.revision).toQueueInput()
+        val replayed = requireNotNull(com.labteto.dshmobile.local.agent.decodeLocalAgentInboxPending(
+            com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent("queued", listOf(queued)))).single()
+        assertEquals(original.revision, replayed.continuation?.goalRevision)
+        assertTrue(isCurrentWorkGoalContinuation(replayed.continuation, state.value.work))
+        commands.updateGoal("paused", null)
+        commands.updateGoal("active", null)
+        assertEquals(original.revision + 2L, state.value.work.goal?.revision)
+        org.junit.Assert.assertFalse(isCurrentWorkGoalContinuation(replayed.continuation, state.value.work))
+        val before = state.value.work.goal
+        commands.updateGoal("active", null)
+        assertEquals(before, state.value.work.goal)
+    }
+
+    @Test
     fun backgroundProgressStaysInCapturedSessionAndPersistsAfterItsEvent() {
         val visible = MutableStateFlow(LocalWorkRunState(sessionId = "visible"))
         val run = MutableStateFlow(LocalWorkRunState(sessionId = "background"))

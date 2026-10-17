@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.harness.tools.ToolInvocationContext
+import kotlinx.coroutines.currentCoroutineContext
 import com.labteto.dshmobile.local.interaction.LocalQuestion
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.tools.string
@@ -29,11 +31,15 @@ internal class LocalWorkBuiltinToolRuntime(
         val run = binding
             ?: return "Work 工具缺少活动运行上下文，已拒绝旧的无绑定执行路径"
         val args = call.arguments
+        val invocation = currentCoroutineContext()[ToolInvocationContext]?.takeIf {
+            it.sessionId == run.sessionId && it.callId == call.id
+        }
         val progress = LocalWorkProgressCoordinator(
             state = run.workState,
             eventLog = run.eventLog,
             persist = { persist(run) },
             workspaceRoot = workspaceRoot,
+            executingToolId = invocation?.executionId,
         )
         return when (call.name) {
             "update_plan" -> progress.updatePlan(args)

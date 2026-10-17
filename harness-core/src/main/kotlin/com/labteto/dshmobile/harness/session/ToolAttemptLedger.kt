@@ -161,7 +161,14 @@ class ToolAttemptLedger {
             "tool/result" -> {
                 val id = readString(data, "id") ?: return
                 val executionId = readString(data, "execution_id")
-                val attempt = executionId?.let(byExecutionId::get) ?: track(id)
+                val known = executionId?.let(byExecutionId::get)
+                // Explicit execution identity must never fall back to a different admitted
+                // invocation merely because the provider reused its call ID.
+                if (known != null && known.id != id) return
+                val latest = latestByCallId[id]
+                if (executionId != null && known == null && latest?.executionId != null &&
+                    latest.executionId != executionId) return
+                val attempt = known ?: track(id)
                 attempt.apply {
                     if (executionId != null) {
                         this.executionId = executionId

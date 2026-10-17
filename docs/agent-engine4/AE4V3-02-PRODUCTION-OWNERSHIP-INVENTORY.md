@@ -1,6 +1,6 @@
 # AE4V3-02：生产调用与事实所有权核查
 
-检查基线：PR #705 `feat/ui-r4-pluggable`，HEAD `85c164f1aaa5db1e3f1892bdb17eab3d0d124c6e`（2026-10-17）。这是实际路径核验清单，并非全仓逐行审计或 CI 验收证明。
+检查基线：PR #705 `feat/ui-r4-pluggable`，HEAD `799bfb00704ac130c887dbc4f7970989193d279f`（2026-10-17）。这是实际路径核验清单，并非全仓逐行审计或 CI 验收证明。
 
 | Owner | 已核对的 Kotlin 入口 | 迁移决定与消费者 |
 | --- | --- | --- |
@@ -10,7 +10,7 @@
 | Session 事实流 | `harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionEventLog.kt`、`app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt` | Checkpoint/UI 只作为投影，后续统一冷恢复及写入租约 |
 | Tool Attempt | `harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt`、`app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt` | 统一声明、真实准入、结果不确定及身份核销 |
 | Model Request | `app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt` | 需要逐项审计 Provider、Request Admission、冻结路由、Chat/Work 共用边界 |
-| Work Goal/Verifier | `app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt`、`LocalWorkCompletionEvidence.kt` | Work 唯一目标与验收 Owner，TurnCompleted 不能代替 GoalCompleted |
+| Work Goal/Verifier | `app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt`、`LocalWorkCompletionEvidence.kt`、`LocalWorkGoalDriver.kt`、`LocalWorkProgressCoordinator.kt` | Work 唯一目标与验收 Owner，显式合同验收通过后由原命令完成；TurnCompleted 不能代替 GoalCompleted |
 | Work Run Owner | `app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistry.kt` | Work 只持有绑定及领域投影；Shared `AgentRunOwnership` 接管运行提交权，SessionExecutionRegistry 接管会话租约。恢复从 EventLog 的检查点和工具事实读取；仍待完整冷恢复与外部核销 |
 | TaskGraph | `harness-core/src/main/kotlin/com/labteto/dshmobile/harness/workflow/TaskGraphExecutor.kt` | Work `LocalWorkflowCoordinator.kt`、`LocalWorkSubagentRuntime.kt` 已调用；旧 WorkflowRunner 退出 |
 | Agent Team | `app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt`、`LocalAgentTeamReducer.kt` | 与 Shared DAG 共用拓扑，持久团队任务及结果 Owner 后续整合 |

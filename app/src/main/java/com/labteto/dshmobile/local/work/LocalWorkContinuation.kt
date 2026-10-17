@@ -23,6 +23,7 @@ internal data class LocalWorkResumeCommand(
     val prompt: String = INTERNAL_WORK_CONTINUATION_PROMPT,
     val goalId: String? = null,
     val goalFingerprint: String? = null,
+    val goalRevision: Long? = null,
 ) {
     init {
         require(sourceRunId.isNotBlank() && checkpointSequence >= 0L && index > 0)
@@ -41,7 +42,7 @@ internal data class LocalWorkResumeCommand(
         kind = QueuedAgentInputKind.WORK_CONTINUATION,
         continuation = AgentContinuationRef(
             sourceRunId, checkpointSequence, failureCode, index, sourceMessageId,
-            goalId, goalFingerprint,
+            goalId, goalFingerprint, goalRevision,
         ),
     )
 }

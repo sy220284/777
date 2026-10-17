@@ -125,9 +125,6 @@ internal class LocalWorkTurnToolRuntime(
     ): List<String> = schemas.names(schemas(policy, binding))
 
     /** Pure read proven by the registered tool contract, not by its display name alone. */
-    internal fun isVerifiedReadOnly(name: String): Boolean =
-        isSafeParallelReadTool(registry.get(LocalToolPolicy.canonical(name)))
-
     internal fun isParallel(name: String): Boolean =
         name in PARALLEL_SUBAGENT_TOOLS ||
             isSafeParallelReadTool(registry.get(LocalToolPolicy.canonical(name)))
