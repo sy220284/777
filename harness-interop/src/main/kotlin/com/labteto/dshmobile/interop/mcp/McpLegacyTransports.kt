@@ -384,17 +384,25 @@ class McpNegotiatingHttpTransport(
         selected?.let { return it.request(method, params) }
         return selectionMutex.withLock {
             selected?.let { return@withLock it.request(method, params) }
-            try {
-                modern.request(method, params).also { selected = modern }
+            // Negotiation must never issue the first side-effecting RPC. A server can
+            // commit tools/call and still return an incompatible/expired HTTP status.
+            // Select the protocol using only explicitly replay-safe discovery; the
+            // mutation is sent exactly once, AFTER the transport is pinned.
+            val probing = !canReplayMcpAfterSessionExpiry(method)
+            val probeMethod = if (probing) "tools/list" else method
+            val probeParams = if (probing) JsonObject(emptyMap()) else params
+            val probe = try {
+                modern.request(probeMethod, probeParams).also { selected = modern }
             } catch (modernError: McpHttpException) {
                 if (!modernError.isProtocolNegotiationFailure()) throw modernError
                 try {
-                    legacy.request(method, params).also { selected = legacy }
+                    legacy.request(probeMethod, probeParams).also { selected = legacy }
                 } catch (legacyError: McpHttpException) {
                     if (!legacyError.isProtocolNegotiationFailure()) throw legacyError
-                    legacySse.request(method, params).also { selected = legacySse }
+                    legacySse.request(probeMethod, probeParams).also { selected = legacySse }
                 }
             }
+            if (probing) checkNotNull(selected).request(method, params) else probe
         }
     }
 
@@ -533,18 +541,24 @@ class McpNegotiatingStdioTransport(
         selected?.let { return it.request(method, params) }
         return selectionMutex.withLock {
             selected?.let { return@withLock it.request(method, params) }
-            try {
-                current.request(method, params).also { selected = current }
+            // A stdio command can finish its irreversible effect before protocol
+            // probing fails. Never fall back to a second process for that command.
+            val probing = !canReplayMcpAfterSessionExpiry(method)
+            val probeMethod = if (probing) "tools/list" else method
+            val probeParams = if (probing) JsonObject(emptyMap()) else params
+            val probe = try {
+                current.request(probeMethod, probeParams).also { selected = current }
             } catch (currentError: Exception) {
                 current.close()
                 try {
-                    legacy.request(method, params).also { selected = legacy }
+                    legacy.request(probeMethod, probeParams).also { selected = legacy }
                 } catch (legacyError: Exception) {
                     legacy.close()
                     legacyError.addSuppressed(currentError)
                     throw legacyError
                 }
             }
+            if (probing) checkNotNull(selected).request(method, params) else probe
         }
     }
 
