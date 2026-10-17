@@ -43,6 +43,7 @@ def render(name, themes):
             raise ValueError("roles cannot be blank")
         entries = ",\n".join(f"                {literal(role)} to {token(value)}" for role, value in roles.items())
         declarations.append(f"        {literal(theme)} to mapOf(\n{entries}\n        )")
+    token_lines = ",\n".join(declarations)
     kotlin = f'''package {package}
 
 import com.labteto.dshmobile.uihost.UiApplicationScenePack
@@ -53,7 +54,7 @@ import com.labteto.dshmobile.uicontract.*
 class {class_name} : UiApplicationScenePack {{
     override val manifest = UiPackManifest(
         id = {literal(name)}, version = 1,
-        minContractVersion = 1, maxContractVersion = 1,
+        minContractVersion = UI_CONTRACT_VERSION, maxContractVersion = UI_CONTRACT_VERSION,
         scenes = emptySet(), requiredCapabilities = emptySet(),
         windowClasses = setOf(UiWindowClass.COMPACT),
         accessibility = emptySet(), supportsDark = false,
