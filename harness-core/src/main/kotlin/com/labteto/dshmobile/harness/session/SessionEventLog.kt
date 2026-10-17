@@ -103,14 +103,17 @@ class SessionEventLog(
             StandardOpenOption.CREATE, StandardOpenOption.WRITE,
         ).use { channel ->
             channel.lock().use {
-                // A foreign writer may have appended, reset or rotated this durable log.
-                // Avoid enumerating archived segments for every local append: an active
-                // inode/length/mtime change is the only foreign-write invalidation.
+                // A foreign process can clear and rewrite an equal-length event inside
+                // the same filesystem timestamp tick. Metadata alone is not a CAS proof.
+                // The OS lease pins the mutable tail while we read its last *actual*
+                // sequence, then append under that same lease. This is O(last event),
+                // not an unbounded scan of the archived session.
                 if (nextSequence.get() == UNINITIALIZED_SEQUENCE ||
                     pathState.headStamp != durableHeadStamp()) {
                     repairTornActiveTailUnsafe()
-                    nextSequence.set(readNextSequence())
                 }
+                val committedNext = readActiveTailNextSequence()
+                if (nextSequence.get() != committedNext) nextSequence.set(committedNext)
                 pathState.fileLeaseDepth = 1
                 try { block() }
                 finally {
@@ -617,6 +620,15 @@ class SessionEventLog(
         }
         malformedRows.incrementAndGet()
         diagnosticSink("torn-tail-truncated", null)
+    }
+
+    private fun readActiveTailNextSequence(): Long {
+        // The uncompressed active tail is the common case; immutable archives are
+        // consulted only for an empty/rotated/crash-damaged tail.
+        if (file.isFile && file.length() > 0L) {
+            readLastValidEventUnsafe(file)?.let { return it.sequence + 1L }
+        }
+        return readNextSequence()
     }
 
     private fun readNextSequence(): Long {

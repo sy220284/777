@@ -208,6 +208,24 @@ class SessionEventLogMultiInstanceTest {
     }
 
     @Test
+    fun crossProcessRebaseDoesNotTrustUnchangedFileSizeAndMtime() {
+        val root = kotlin.io.path.createTempDirectory("session-log-foreign-same-stamp-").toFile()
+        val file = File(root, "session.events.jsonl")
+        val log = SessionEventLog(file, json)
+        try {
+            log.append("test/original", buildJsonObject { put("slot", "a") })
+            val before = java.nio.file.Files.getLastModifiedTime(file.toPath())
+            val replacement = SessionEvent(1L, "test/foreign!", 42L,
+                buildJsonObject { put("slot", "b") })
+            // Keep a byte-valid row; external atomic restore can preserve mtime.
+            file.writeText(json.encodeToString(SessionEvent.serializer(), replacement) + "\n")
+            java.nio.file.Files.setLastModifiedTime(file.toPath(), before)
+            assertEquals(1L, log.latestSequence())
+            assertEquals(2L, log.append("test/next", buildJsonObject { put("slot", "c") }).sequence)
+        } finally { log.close(); root.deleteRecursively() }
+    }
+
+    @Test
     fun nestedCompareAndAppendHoldsOneDurableLeaseAcrossSeveralEvents() {
         val root = kotlin.io.path.createTempDirectory("session-log-nested-lease-").toFile()
         val file = File(root, "session.events.jsonl")
