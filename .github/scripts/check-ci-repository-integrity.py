@@ -233,7 +233,7 @@ merge_gate = CI.split("\n  merge-gate:\n", 1)[1] if "\n  merge-gate:\n" in CI el
 # decides whether a device lane is required; unused lanes remain skippable.
 for lane in ("device-artifacts-x86", "android-16-instrumented", "android-17-instrumented"):
     source = ci_job_source(lane)
-    if re.search(r"(?m)^    if:.*github\\.event_name\\s*!=\\s*'pull_request'", source):
+    if re.search(r"(?m)^    if:.*github\.event_name\s*!=\s*'pull_request'", source):
         violations.append(f"{lane}: PR cannot bypass a required Android lane")
 if "CHECK_DEVICE_LANES: 'true'" not in merge_gate:
     violations.append("merge-gate must check all scope-selected Android lanes on PR and main")
