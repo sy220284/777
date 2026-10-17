@@ -150,6 +150,66 @@ class LocalWorkGoalContinuationTest {
     }
 
     @Test
+    fun taskGraphWithoutTerminalEventBlocksAutomaticGoalReplayAfterRecovery() {
+        val log = toolLog()
+        try {
+            log.append("taskgraph/start", buildJsonObject {
+                put("graph_id", "graph-1")
+                put("goal_id", goal.id)
+                put("goal_fingerprint", localWorkGoalFingerprint(goal))
+            })
+            assertTrue(hasUnsettledWorkGoalTaskGraphs(log, goalFromStartOfTestLog))
+            // Progress is informative but never a settlement receipt.
+            log.append("taskgraph/progress", buildJsonObject {
+                put("graph_id", "graph-1")
+                put("goal_id", goal.id)
+                put("stage", "已完成")
+            })
+            assertTrue(hasUnsettledWorkGoalTaskGraphs(log, goalFromStartOfTestLog))
+            log.append("taskgraph/end", buildJsonObject {
+                put("graph_id", "graph-1")
+                put("goal_id", goal.id)
+                put("outcome", "partial")
+            })
+            assertFalse(hasUnsettledWorkGoalTaskGraphs(log, goalFromStartOfTestLog))
+        } finally { log.close() }
+    }
+
+    @Test
+    fun graphRecoveryCannotTreatAnotherGoalOrWrongTerminalAsSettlement() {
+        val ledger = LocalWorkTaskGraphRecoveryLedger()
+        fun event(id: String, g: String) = buildJsonObject {
+            put("graph_id", id)
+            put("goal_id", g)
+        }
+        ledger.observe("taskgraph/start", event("one", "goal-1"))
+        ledger.observe("taskgraph/start", event("two", "goal-2"))
+        ledger.observe("taskgraph/end", event("one", "goal-2"))
+        assertEquals(1, ledger.unresolvedForGoal("goal-1").size)
+        assertEquals(1, ledger.unresolvedForGoal("goal-2").size)
+        ledger.observe("taskgraph/end", event("one", "goal-1"))
+        assertTrue(ledger.unresolvedForGoal("goal-1").isEmpty())
+        assertEquals(1, ledger.unresolvedForGoal("goal-2").size)
+    }
+
+    @Test
+    fun recoveredGraphTerminalStatusesAllSettleExecutionWithoutClaimingGoalSuccess() {
+        for (terminal in listOf("nodes_completed", "partial", "failed", "cancelled")) {
+            val ledger = LocalWorkTaskGraphRecoveryLedger()
+            ledger.observe("taskgraph/start", buildJsonObject {
+                put("graph_id", terminal)
+                put("goal_id", goal.id)
+            })
+            ledger.observe("taskgraph/end", buildJsonObject {
+                put("graph_id", terminal)
+                put("goal_id", goal.id)
+                put("outcome", terminal)
+            })
+            assertTrue(ledger.unresolvedForGoal(goal.id).isEmpty())
+        }
+    }
+
+    @Test
     fun realToolProgressWithOpenGoalCanScheduleOneMoreTurn() {
         assertTrue(canAutomaticallyFollowUpWorkGoal(conditions()))
     }

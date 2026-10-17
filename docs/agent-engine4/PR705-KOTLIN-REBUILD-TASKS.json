@@ -88,10 +88,11 @@
         "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt",
         "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt",
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphRecovery.kt"
       ],
       "tests_verified": [],
-      "notes": "将 Work Goal 的工具副作用核验与 SessionRecovery 的异常工具补写统一到 harness-core/session/ToolAttemptLedger；读取原有 EventLog 不另立账本，原有历史兼容测试和新投影单测待最新 SHA CI。；ToolAttemptLedger 的 Work 投影改为 Session EventLog 流式 forEachAfter，不再将长会话事件档案整体 materialize 到 Android 堆内存。"
+      "notes": "将 Work Goal 的工具副作用核验与 SessionRecovery 的异常工具补写统一到 harness-core/session/ToolAttemptLedger；读取原有 EventLog 不另立账本，原有历史兼容测试和新投影单测待最新 SHA CI。；ToolAttemptLedger 的 Work 投影改为 Session EventLog 流式 forEachAfter，不再将长会话事件档案整体 materialize 到 Android 堆内存。；新增任务图冷重建 projector：未结算的 taskgraph/start 在 GoalDriver 自动续轮前明确阻断；跨目标终态不可错误核销。当前提交 CI 待验证；不等于完整自主恢复。"
     },
     {
       "id": "AE4V3-06",
@@ -190,10 +191,11 @@
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistryTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuationTest.kt",
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionEvidence.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidence.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidence.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphRecovery.kt"
       ],
       "tests_verified": [],
-      "notes": "已接入生产 Turn 终态→Work Run Owner onIdle→持久 agent/inbox→自动下一轮的安全 Goal 进度续轮；仅在已存在身份明确的 active Goal、真实成功工具回执、无工具错误、无用户新输入/steer/取消、无持久化错误、现有证据仍为 NEEDS_EXECUTION 时准入；复用已有最多 2 次续轮预算和 checkpoint；新增 8 个 JVM 场景但最终 SHA 编译/CI 未验证。仍缺多轮动态进度证明、跨进程目标 revision/fencing、工具未知结算与完整 GoalDriver。 新增 Goal 合同 SHA-256 存储于可选 AgentContinuationRef 字段，持久恢复前重验；用户指令若比续轮后到，出队时仍可优先，过期续轮通过 inbox 事件原子丢弃、不进入模型历史；已补相关测试，CI 仍待最新提交验收。 本批新增持久 Goal ID/验收合同 SHA-256 栅栏、Work Run Owner pollCommitted 出队时校验并将过期续轮持久登记丢弃，保留用户队列；LocalWorkAgentTurnExecutor.run 在懒协程模型启动前再次校验，避免出队与启动之间目标变更。新增 Work Run Registry JVM 用例；须等最新 CI。；本轮补 fail-closed 未结算/未知副作用扫描（关联当前 Goal 的 tool/call、tool/execution-started、tool/result），并让模型失败续轮走 offerIfEmpty 原子用户优先准入；测试和 ARM64 CI 尚待当前 SHA 验收。 GoalDriver 自动续轮由固定2轮上限改为工作证据进展驱动：文件 SHA-256/待办/团队/验收证据组成稳定 proof，写入权威 agent/inbox 同一提交；连续两轮无证明变化停止，最多96轮；已给出对应 JVM 行为测试。尚未实现 Goal 自动标记完成、完整恢复、UNKNOWN 结算。；Work 结构化工作流阻塞已正式参与 Goal 完成门禁，历史 Session EventLog 最新图终态可在 UI 临时状态清理后继续阻断假完成，含兼容旧 settled 事件。"
+      "notes": "已接入生产 Turn 终态→Work Run Owner onIdle→持久 agent/inbox→自动下一轮的安全 Goal 进度续轮；仅在已存在身份明确的 active Goal、真实成功工具回执、无工具错误、无用户新输入/steer/取消、无持久化错误、现有证据仍为 NEEDS_EXECUTION 时准入；复用已有最多 2 次续轮预算和 checkpoint；新增 8 个 JVM 场景但最终 SHA 编译/CI 未验证。仍缺多轮动态进度证明、跨进程目标 revision/fencing、工具未知结算与完整 GoalDriver。 新增 Goal 合同 SHA-256 存储于可选 AgentContinuationRef 字段，持久恢复前重验；用户指令若比续轮后到，出队时仍可优先，过期续轮通过 inbox 事件原子丢弃、不进入模型历史；已补相关测试，CI 仍待最新提交验收。 本批新增持久 Goal ID/验收合同 SHA-256 栅栏、Work Run Owner pollCommitted 出队时校验并将过期续轮持久登记丢弃，保留用户队列；LocalWorkAgentTurnExecutor.run 在懒协程模型启动前再次校验，避免出队与启动之间目标变更。新增 Work Run Registry JVM 用例；须等最新 CI。；本轮补 fail-closed 未结算/未知副作用扫描（关联当前 Goal 的 tool/call、tool/execution-started、tool/result），并让模型失败续轮走 offerIfEmpty 原子用户优先准入；测试和 ARM64 CI 尚待当前 SHA 验收。 GoalDriver 自动续轮由固定2轮上限改为工作证据进展驱动：文件 SHA-256/待办/团队/验收证据组成稳定 proof，写入权威 agent/inbox 同一提交；连续两轮无证明变化停止，最多96轮；已给出对应 JVM 行为测试。尚未实现 Goal 自动标记完成、完整恢复、UNKNOWN 结算。；Work 结构化工作流阻塞已正式参与 Goal 完成门禁，历史 Session EventLog 最新图终态可在 UI 临时状态清理后继续阻断假完成，含兼容旧 settled 事件。；新增任务图冷重建 projector：未结算的 taskgraph/start 在 GoalDriver 自动续轮前明确阻断；跨目标终态不可错误核销。当前提交 CI 待验证；不等于完整自主恢复。"
     },
     {
       "id": "AE4V3-12",
@@ -398,15 +400,13 @@
   "status": "first incremental implementation, not entire refactor",
   "current_slice": {
     "date": "2026-10-17",
-    "component": "Work DAG owner fencing + immutable topology facts + verified test repair",
+    "component": "Work TaskGraph EventLog recovery fence in GoalDriver",
     "status": "code_submitted_ci_pending",
-    "head_before": "666262342eeb51cf09115ff411a39a86ba564560",
-    "files": [
-      "app/src/test/java/com/labteto/dshmobile/local/LocalWorkflowCoordinatorTest.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSubagentRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkflowCoordinator.kt",
-      "docs/agent-engine4/PR705-KOTLIN-REBUILD-TASKS.json"
-    ],
-    "tests_verified": []
+    "head_before": "6660ec8b6de22cc6acbbec718a6a9fbdeb70f5d0",
+    "code_evidence": [
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphRecovery.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
+      "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuationTest.kt"
+    ]
   }
 }

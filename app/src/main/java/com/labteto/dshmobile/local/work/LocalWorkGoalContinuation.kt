@@ -237,6 +237,9 @@ internal fun queueWorkGoalProgressFollowUp(
     if (!canAutomaticallyFollowUpWorkGoal(conditions)) return false
     // Even a different, successful tool receipt cannot certify an older unknown mutation.
     if (hasUnresolvedWorkGoalToolEffects(binding.eventLog, requireNotNull(goal))) return false
+    // A process crash may leave a graph without its terminal event. Its nodes
+    // must be reconciled by recovery, never blindly spawned again by GoalDriver.
+    if (hasUnsettledWorkGoalTaskGraphs(binding.eventLog, goal)) return false
 
     val resume = LocalWorkResumeCommand(
         sourceRunId = sourceRunId,
