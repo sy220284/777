@@ -1,4 +1,6 @@
 package com.labteto.dshmobile.ui.screens.settings
+import com.labteto.dshmobile.ui.host.DeviceCapabilitiesController
+import com.labteto.dshmobile.ui.host.DeviceCapabilitiesState
 
 import android.content.Context
 import android.graphics.BitmapFactory

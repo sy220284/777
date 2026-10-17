@@ -30,7 +30,7 @@ import com.labteto.dshmobile.local.presentation.projectWorkState
 import com.labteto.dshmobile.local.presentation.projectWorkSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalConversationMode
-import com.labteto.dshmobile.ui.screens.settings.readDeviceCapabilityState
+import com.labteto.dshmobile.ui.host.readDeviceCapabilityState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject

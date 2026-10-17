@@ -1,4 +1,5 @@
 package com.labteto.dshmobile.ui.screens.settings
+import com.labteto.dshmobile.ui.host.DeviceCapabilitiesState
 
 import com.shenyan.designsystem.foundation.SyMetric
 

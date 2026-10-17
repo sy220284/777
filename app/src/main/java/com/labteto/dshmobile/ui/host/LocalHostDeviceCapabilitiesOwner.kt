@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.ui.screens.settings
+package com.labteto.dshmobile.ui.host
 
 import android.content.Context
 import android.content.Intent
@@ -20,7 +20,7 @@ data class DeviceCapabilitiesState(
     val error: String? = null,
 )
 
-/** Owns device-capability probes and Android system-settings navigation. */
+/** Host owns platform permission probes and all external Settings intents; UI can only request them. */
 internal class DeviceCapabilitiesController(
     private val appContext: Context,
 ) {
@@ -33,24 +33,24 @@ internal class DeviceCapabilitiesController(
         )
     }
 
-    fun openAccessibilitySettings() {
-        appContext.startActivity(
-            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
-    }
+    fun openAccessibilitySettings() = openSystemSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS)
 
-    fun openAppNotificationSettings() {
-        appContext.startActivity(
-            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                .putExtra(Settings.EXTRA_APP_PACKAGE, appContext.packageName)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
-    }
+    fun openAppNotificationSettings() =
+        openSystemSettings(Settings.ACTION_APP_NOTIFICATION_SETTINGS, includePackage = true)
 
-    fun openNotificationAccessSettings() {
-        appContext.startActivity(
-            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
+    fun openNotificationAccessSettings() =
+        openSystemSettings(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+
+    private fun openSystemSettings(action: String, includePackage: Boolean = false) {
+        val request = Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (includePackage) request.putExtra(Settings.EXTRA_APP_PACKAGE, appContext.packageName)
+        try {
+            appContext.startActivity(request)
+        } catch (_: android.content.ActivityNotFoundException) {
+            _state.value = _state.value.copy(error = "HOST_SETTINGS_HANDLER_UNAVAILABLE")
+        } catch (_: SecurityException) {
+            _state.value = _state.value.copy(error = "HOST_SETTINGS_PERMISSION_DENIED")
+        }
     }
 }
 
