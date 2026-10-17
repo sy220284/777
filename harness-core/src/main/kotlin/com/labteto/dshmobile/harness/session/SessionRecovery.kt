@@ -84,7 +84,14 @@ object SessionRecovery {
         return RecoveredToolResult(callId, name, step, code, content, modelContent, executionId)
     }
 
-    fun repairInterruptedTail(log: SessionEventLog): SessionRepairResult {
+    fun repairInterruptedTail(log: SessionEventLog): SessionRepairResult = log.withWriterLease {
+        // The unfinished-turn check and every recovery receipt must share the durable
+        // per-session writer lease. Otherwise two processes can both see an open turn,
+        // append conflicting synthetic tool results, and close it twice.
+        repairInterruptedTailUnderLease(log)
+    }
+
+    private fun repairInterruptedTailUnderLease(log: SessionEventLog): SessionRepairResult {
         // A restart only needs to inspect the newest unfinished turn. Replaying the complete
         // append-only archive here used to duplicate years of session history in the Android heap
         // and could OOM before the Harness reached its incremental projection checkpoints.

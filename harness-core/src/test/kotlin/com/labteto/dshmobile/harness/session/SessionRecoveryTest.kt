@@ -39,6 +39,48 @@ class SessionRecoveryTest {
     }
 
     @Test
+    fun concurrentRecoveryReadersCommitOnlyOneRepairForSharedSession() {
+        val directory = Files.createTempDirectory("session-recovery-exclusive").toFile()
+        try {
+            val path = directory.resolve("events.jsonl")
+            val first = SessionEventLog(path, json, maxBytes = 4_096)
+            val second = SessionEventLog(path, json, maxBytes = 4_096)
+            try {
+                first.append("turn/start", buildJsonObject {})
+                first.append("step/start", buildJsonObject { put("step", 1) })
+                first.append("tool/call", buildJsonObject {
+                    put("id", "mutation")
+                    put("execution_started", true)
+                })
+                val gate = java.util.concurrent.CountDownLatch(1)
+                val threads = java.util.concurrent.Executors.newFixedThreadPool(2)
+                try {
+                    val futures = listOf(first, second).map { log ->
+                        threads.submit<SessionRepairResult> {
+                            gate.await()
+                            SessionRecovery.repairInterruptedTail(log)
+                        }
+                    }
+                    gate.countDown()
+                    val results = futures.map { it.get(10, java.util.concurrent.TimeUnit.SECONDS) }
+                    assertEquals(1, results.count { it.repaired })
+                    assertEquals(1, first.snapshot().count { it.type == "tool/result" })
+                    assertEquals(1, first.snapshot().count { it.type == "turn/end" })
+                    assertEquals(SessionRecovery.TOOL_OUTCOME_UNKNOWN,
+                        results.flatMap { it.toolResults }.single().code)
+                } finally {
+                    threads.shutdownNow()
+                }
+            } finally {
+                second.close()
+                first.close()
+            }
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun startedToolWithoutResultBecomesOutcomeUnknownAndTailCloses() {
         val directory = Files.createTempDirectory("session-recovery-started").toFile()
         try {

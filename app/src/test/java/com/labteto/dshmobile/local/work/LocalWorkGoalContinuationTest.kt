@@ -198,6 +198,52 @@ class LocalWorkGoalContinuationTest {
     }
 
     @Test
+    fun reusedGraphIdCannotHidePreviousUnsettledGoalOrRevision() {
+        val ledger = LocalWorkTaskGraphRecoveryLedger()
+        fun event(goal: String, fingerprint: String) = buildJsonObject {
+            put("graph_id", "reused")
+            put("goal_id", goal)
+            put("goal_fingerprint", fingerprint)
+        }
+        ledger.observe("taskgraph/start", event("first", "rev-1"))
+        ledger.observe("taskgraph/start", event("second", "rev-2"))
+        assertEquals(1, ledger.unresolvedForGoal("first").size)
+        assertEquals(1, ledger.unresolvedForGoal("second").size)
+        ledger.observe("taskgraph/end", event("second", "rev-1"))
+        assertEquals(1, ledger.unresolvedForGoal("second").size)
+        ledger.observe("taskgraph/end", event("second", "rev-2"))
+        assertTrue(ledger.unresolvedForGoal("second").isEmpty())
+        assertEquals(1, ledger.unresolvedForGoal("first").size)
+    }
+
+    @Test
+    fun oldGraphTerminalCannotSettleNewActivationWithSameIdAndGoal() {
+        val ledger = LocalWorkTaskGraphRecoveryLedger()
+        fun event(fingerprint: String? = null) = buildJsonObject {
+            put("graph_id", "graph")
+            put("goal_id", goal.id)
+            fingerprint?.let { put("goal_fingerprint", it) }
+        }
+        ledger.observe("taskgraph/start", event("revision-1"))
+        ledger.observe("taskgraph/start", event("revision-2"))
+        ledger.observe("taskgraph/end", event()) // legacy ambiguous receipt
+        assertEquals(2, ledger.unresolvedForGoal(goal.id).size)
+        ledger.observe("taskgraph/end", event("revision-1"))
+        assertEquals(listOf("revision-2"), ledger.unresolvedForGoal(goal.id).map { it.goalFingerprint })
+        ledger.observe("taskgraph/progress", buildJsonObject {
+            put("graph_id", "graph")
+            put("goal_id", goal.id)
+            put("node_id", "node")
+            put("stage", "执行中")
+        })
+        assertEquals("执行中", ledger.unresolvedForGoal(goal.id).single().lastNodeStages["node"])
+        ledger.observe("taskgraph/end", event("revision-1")) // late duplicate
+        assertEquals(1, ledger.unresolvedForGoal(goal.id).size)
+        ledger.observe("taskgraph/end", event("revision-2"))
+        assertTrue(ledger.unresolvedForGoal(goal.id).isEmpty())
+    }
+
+    @Test
     fun coldGraphProjectionReconstructsPerNodeProgressWithoutInventingCompletion() {
         val ledger = LocalWorkTaskGraphRecoveryLedger()
         fun event(node: String, stage: String) = buildJsonObject {

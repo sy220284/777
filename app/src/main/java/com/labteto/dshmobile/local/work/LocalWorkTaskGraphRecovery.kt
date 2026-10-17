@@ -18,44 +18,60 @@ internal class LocalWorkTaskGraphRecoveryLedger {
         val lastNodeStages: Map<String, String> = emptyMap(),
     )
 
-    private val open = linkedMapOf<String, OpenGraph>()
+    // Graph IDs should be unique, but old logs or multiple activations can reuse them.
+    // Never overwrite an earlier unclosed graph with a later start of the same ID.
+    private val open = linkedMapOf<Pair<String, String>, MutableList<OpenGraph>>()
 
     fun observe(type: String, data: JsonObject) {
         val graphId = (data["graph_id"] as? JsonPrimitive)
             ?.contentOrNull?.takeIf(String::isNotBlank) ?: return
         val goalId = (data["goal_id"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+        val key = graphId to goalId
         when (type) {
             "taskgraph/start" -> {
                 // Graph-less legacy events and user-independent workflow sessions
                 // cannot be confused with an existing Work Goal.
                 if (goalId.isNotBlank()) {
-                    open[graphId] = OpenGraph(
+                    open.getOrPut(key) { mutableListOf() } += OpenGraph(
                         graphId, goalId,
                         (data["goal_fingerprint"] as? JsonPrimitive)?.contentOrNull,
                     )
                 }
             }
             "taskgraph/progress" -> {
-                val running = open[graphId] ?: return
-                if (running.goalId != goalId) return
+                val running = open[key]?.singleOrNull() ?: return
+                // Progress has no fingerprint. Under duplicate identity it cannot
+                // safely be associated with an individual activation.
                 val nodeId = (data["node_id"] as? JsonPrimitive)?.contentOrNull.orEmpty()
                 val stage = (data["stage"] as? JsonPrimitive)?.contentOrNull.orEmpty()
                 if (nodeId.isNotBlank() && stage.isNotBlank()) {
-                    open[graphId] = running.copy(
+                    open.getValue(key)[0] = running.copy(
                         lastNodeStages = running.lastNodeStages + (nodeId to stage),
                     )
                 }
             }
             "taskgraph/end" -> {
-                // Only an end for the same identity may settle a started graph.
-                // This protects against corrupt or misattributed historical events.
-                if (open[graphId]?.goalId == goalId) open.remove(graphId)
+                // End events in current logs carry the original acceptance fingerprint.
+                // A delayed terminal from an earlier Goal revision must not close a
+                // newer graph with a reused provider-supplied ID.
+                val fingerprint = (data["goal_fingerprint"] as? JsonPrimitive)?.contentOrNull
+                val candidates = open[key] ?: return
+                val matching = candidates.indices.filter { index ->
+                    fingerprint == null || candidates[index].goalFingerprint == fingerprint
+                }
+                if (matching.isEmpty()) return
+                // Legacy terminals lack a fingerprint. If several distinct contracts
+                // share the ID, there is no trustworthy way to identify the owner.
+                if (fingerprint == null && candidates.map { it.goalFingerprint }.distinct().size > 1) return
+                // Settle exactly one activation, preserving an earlier unclosed run.
+                candidates.removeAt(matching.last())
+                if (candidates.isEmpty()) open.remove(key)
             }
         }
     }
 
     fun unresolvedForGoal(goalId: String): List<OpenGraph> =
-        open.values.filter { it.goalId == goalId }
+        open.filterKeys { it.second == goalId }.values.flatMap { it }
 }
 
 /** Fail closed until the run/recovery owner can reconcile a graph left without its end fact. */
