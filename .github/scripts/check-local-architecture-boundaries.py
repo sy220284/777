@@ -1024,4 +1024,30 @@ for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT):
             "platform provider construction belongs to the plugin composition root"
         )
 
+# ---- R4 genuine isolated MCP process + standalone V6 boot --------------------
+# These are production wiring invariants, not claims that device tests passed.
+worker_manifest = read("app/src/main/AndroidManifest.xml")
+if not re.search(
+    r'<service\\s+android:name="\\.local\\.tools\\.ipc\\.McpPluginWorkerService"'
+    r'\\s+android:process=":mcp_worker"\\s+android:exported="false"',
+    worker_manifest,
+):
+    die("R4 MCP worker must be non-exported in an independent Android process")
+if "transportFactory = { endpoint ->" not in plugin_composition or (
+    "stdioTransportFactory = { command, workingDirectory ->" not in plugin_composition
+) or plugin_composition.count("McpPluginWorkerTransport(") < 2:
+    die("R4 production MCP HTTP and stdio must both use Binder worker without local fallback")
+v6_boot = strip_comments(read("app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt"))
+for required in ("if (standaloneSelected)", "LocalV6StandaloneViewModel = hiltViewModel()",
+                 "else {", "LocalHarnessViewModel = hiltViewModel()"):
+    if required not in v6_boot:
+        die("R4 independent V6 boot cannot depend on legacy ViewModel construction: " + required)
+v6_boot_order = v6_boot.index("LocalV6StandaloneViewModel = hiltViewModel()")
+legacy_boot_order = v6_boot.index("LocalHarnessViewModel = hiltViewModel()")
+if v6_boot_order >= legacy_boot_order:
+    die("R4 V6 must select its independent Feature-owner boot before legacy Shell construction")
+worker_process_guard = strip_comments(read(APPLICATION_PATH))
+if "if (isMcpWorkerProcess(Application.getProcessName(), packageName)) return" not in worker_process_guard:
+    die("R4 isolated worker must not bootstrap the full Agent runtime")
+
 print("[architecture-3] OK: current ownership, dependency direction, state boundaries, and runtime contracts hold")
