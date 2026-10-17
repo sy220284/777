@@ -61,6 +61,11 @@ internal object LocalSessionRuntimeRegistry {
         }
     }
 
+    /** Validate a pre-admitted lease against this registry, session and owner kind.
+     * A foreign/released lease cannot authorize user-input mutation. */
+    fun requireOwner(lease: LocalSessionRuntimeLease, sessionId: String, kind: LocalSessionRuntimeKind) =
+        executions.requireOwner(lease, sessionId, kind.owner())
+
     fun tryAcquire(sessionId: String, kind: LocalSessionRuntimeKind): LocalSessionRuntimeLease? =
         executions.tryAcquire(sessionId, kind.owner())
 

@@ -59,7 +59,8 @@ class SessionExecutionRegistry {
     private val entries = mutableMapOf<String, Entry>()
 
     @Synchronized
-    fun hasLiveOwner(sessionId: String): Boolean = entries[sessionId]?.mutex?.isLocked == true
+    fun hasLiveOwner(sessionId: String): Boolean =
+        entries[sessionId]?.reservations?.let { it > 0 } == true
 
     @Synchronized
     fun hasAnyLiveOwner(): Boolean = entries.values.any { it.reservations > 0 }
@@ -70,7 +71,9 @@ class SessionExecutionRegistry {
     @Synchronized
     fun inputAdmission(sessionId: String): SessionExecutionAdmission {
         val entry = entries[sessionId]
-        val active = entry?.mutex?.isLocked == true
+        // A reserved successor may not have resumed after the predecessor releases
+        // its mutex. That interval is NOT idle: repair/send must not race its claim.
+        val active = (entry?.reservations ?: 0) > 0
         return SessionExecutionAdmission(active, active && entry?.lease?.owner?.acceptsInput != true)
     }
 

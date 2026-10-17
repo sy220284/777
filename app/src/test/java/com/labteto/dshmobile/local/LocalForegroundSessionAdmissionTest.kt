@@ -169,6 +169,80 @@ class LocalForegroundSessionAdmissionTest {
     }
 
     @Test
+    fun preownedLeaseFromAnotherSessionIsRejectedBeforeAnySendMutation() {
+        val otherId = "preowner-other-" + UUID.randomUUID()
+        val targetId = "preowner-target-" + UUID.randomUUID()
+        val unrelated = LocalSessionRuntimeRegistry.tryAcquire(otherId, LocalSessionRuntimeKind.FOREGROUND)!!
+        var mutated = false
+        try {
+            val error = runCatching {
+                coordinateOwnedLocalSend(
+                    usageMode = LocalUsageMode.WORK, sessionId = targetId,
+                    workBindingActive = false, visibleJobActive = false,
+                    configured = true, loading = false, sessionTransitioning = false,
+                    pendingCount = 0, pendingLimit = 8,
+                    onRejected = { mutated = true },
+                    onAccepted = { mutated = true },
+                    enqueue = { mutated = true; true }, onQueued = { mutated = true },
+                    onStart = { mutated = true }, preownedLease = unrelated,
+                )
+            }.exceptionOrNull()
+            assertTrue(error is IllegalStateException)
+            assertFalse(mutated)
+            // The rejected borrower must neither close the actual owner nor retain
+            // any admission reservation for the unrelated destination session.
+            unrelated.requireCurrent(otherId)
+            assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner(targetId))
+        } finally { unrelated.close() }
+    }
+
+    @Test
+    fun maintenanceLeaseCannotImpersonateForegroundEditAndIsNotReleased() {
+        val id = "preowner-maintenance-" + UUID.randomUUID()
+        val maintenance = LocalSessionRuntimeRegistry.tryAcquire(id, LocalSessionRuntimeKind.MAINTENANCE)!!
+        var called = false
+        try {
+            val error = runCatching {
+                coordinateOwnedLocalSend(
+                    usageMode = LocalUsageMode.WORK, sessionId = id,
+                    workBindingActive = false, visibleJobActive = false,
+                    configured = true, loading = false, sessionTransitioning = false,
+                    pendingCount = 0, pendingLimit = 8,
+                    onRejected = { called = true }, onAccepted = { called = true },
+                    enqueue = { called = true; true }, onQueued = { called = true },
+                    onStart = { called = true }, preownedLease = maintenance,
+                )
+            }.exceptionOrNull()
+            assertTrue(error is IllegalStateException)
+            assertFalse(called)
+            maintenance.requireCurrent(id)
+            assertNull(LocalSessionRuntimeRegistry.tryAcquire(id, LocalSessionRuntimeKind.FOREGROUND))
+        } finally { maintenance.close() }
+    }
+
+    @Test
+    fun closedPreownedLeaseCannotReviveAFormerSend() {
+        val id = "preowner-closed-" + UUID.randomUUID()
+        val stale = LocalSessionRuntimeRegistry.tryAcquire(id, LocalSessionRuntimeKind.FOREGROUND)!!
+        stale.close()
+        var invoked = false
+        val error = runCatching {
+            coordinateOwnedLocalSend(
+                usageMode = LocalUsageMode.WORK, sessionId = id,
+                workBindingActive = false, visibleJobActive = false,
+                configured = true, loading = false, sessionTransitioning = false,
+                pendingCount = 0, pendingLimit = 8,
+                onRejected = { invoked = true }, onAccepted = { invoked = true },
+                enqueue = { invoked = true; true }, onQueued = { invoked = true },
+                onStart = { invoked = true }, preownedLease = stale,
+            )
+        }.exceptionOrNull()
+        assertTrue(error is IllegalStateException)
+        assertFalse(invoked)
+        assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner(id))
+    }
+
+    @Test
     fun maintenanceOwnerRejectsInputInsteadOfLeavingAnUnconsumedQueue() {
         for (mode in LocalUsageMode.entries) {
             val sessionId = "maintenance-$mode-" + UUID.randomUUID()

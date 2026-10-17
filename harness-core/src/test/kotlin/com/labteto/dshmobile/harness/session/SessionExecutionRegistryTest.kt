@@ -69,6 +69,33 @@ class SessionExecutionRegistryTest {
     }
 
     @Test
+    fun waitingSessionReservationCannotBePresentedAsIdleDuringOwnerHandoff() = runTest {
+        val registry = SessionExecutionRegistry()
+        val current = registry.acquire("handoff", execution)
+        var next: SessionExecutionLease? = null
+        val waiting = launch { next = registry.acquire("handoff", deletion) }
+        runCurrent() // queue deletion while the foreground lease is still owned
+        assertTrue(registry.hasLiveOwner("handoff"))
+        current.close() // suspended waiter has not yet executed its claim callback
+        val admission = registry.inputAdmission("handoff")
+        assertTrue("a pending owner reservation still owns admission", admission.ownerActive)
+        assertTrue("no active input receiver exists between claims", admission.inputBlocked)
+        assertTrue(registry.hasLiveOwner("handoff"))
+        assertNull(registry.tryAcquire("handoff", execution))
+        runCurrent()
+        try {
+            assertTrue(registry.inputAdmission("handoff").inputBlocked)
+            assertTrue(next != null)
+            next!!.requireCurrent()
+        } finally {
+            next?.close()
+            waiting.join()
+        }
+        assertFalse(registry.hasLiveOwner("handoff"))
+        assertEquals(0, registry.retainedSessionCount())
+    }
+
+    @Test
     fun queuedDeletionCannotBeBypassedAndCancelledWaiterDoesNotLeak() = runTest {
         val registry = SessionExecutionRegistry()
         val first = registry.acquire("session", execution)
