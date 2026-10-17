@@ -26,9 +26,9 @@ internal fun saturatingUsageCostProduct(tokens: Long, rate: Double): Double {
 internal fun DeepSeekTokenUsage.normalizedForAccounting(): DeepSeekTokenUsage {
     val prompt = promptTokens.coerceAtLeast(0L)
     val hit = cacheHitTokens.coerceAtLeast(0L).coerceAtMost(prompt)
-    val miss = cacheMissTokens.coerceAtLeast(0L)
-        .takeIf { it > 0L }
-        ?: nonNegativeUsageDifference(prompt, hit)
+    val availableMiss = nonNegativeUsageDifference(prompt, hit)
+    val miss = (cacheMissTokens.coerceAtLeast(0L)
+        .takeIf { it > 0L } ?: availableMiss).coerceAtMost(availableMiss)
     val write = cacheWriteTokens.coerceAtLeast(0L).coerceAtMost(miss)
     return copy(
         promptTokens = prompt,
@@ -40,16 +40,23 @@ internal fun DeepSeekTokenUsage.normalizedForAccounting(): DeepSeekTokenUsage {
     )
 }
 
-internal fun TokenUsageRecord.normalizedForAccounting(): TokenUsageRecord = copy(
-    inputTokens = inputTokens.coerceAtLeast(0L),
-    cacheHitTokens = cacheHitTokens.coerceAtLeast(0L),
-    cacheMissTokens = cacheMissTokens.coerceAtLeast(0L),
-    cacheWriteTokens = cacheWriteTokens.coerceAtLeast(0L)
-        .coerceAtMost(cacheMissTokens.coerceAtLeast(0L)),
-    outputTokens = outputTokens.coerceAtLeast(0L),
-    reasoningTokens = reasoningTokens.coerceAtLeast(0L),
-    estimatedCostCny = estimatedCostCny.takeIf { it.isFinite() && it >= 0.0 } ?: 0.0,
-)
+internal fun TokenUsageRecord.normalizedForAccounting(): TokenUsageRecord {
+    val prompt = inputTokens.coerceAtLeast(0L)
+    val hit = cacheHitTokens.coerceAtLeast(0L).coerceAtMost(prompt)
+    // Cache hits and misses partition the reported prompt, rather than creating
+    // additional billable input tokens when providers return contradictory fields.
+    val miss = cacheMissTokens.coerceAtLeast(0L)
+        .coerceAtMost(nonNegativeUsageDifference(prompt, hit))
+    return copy(
+        inputTokens = prompt,
+        cacheHitTokens = hit,
+        cacheMissTokens = miss,
+        cacheWriteTokens = cacheWriteTokens.coerceAtLeast(0L).coerceAtMost(miss),
+        outputTokens = outputTokens.coerceAtLeast(0L),
+        reasoningTokens = reasoningTokens.coerceAtLeast(0L),
+        estimatedCostCny = estimatedCostCny.takeIf { it.isFinite() && it >= 0.0 } ?: 0.0,
+    )
+}
 
 internal fun Sequence<TokenUsageRecord>.distinctForAccounting(): Sequence<TokenUsageRecord> = sequence {
     val seenRequestIds = HashSet<String>()

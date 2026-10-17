@@ -390,10 +390,18 @@
         "AE4V3-09",
         "AE4V3-16"
       ],
-      "status": "not_started",
-      "code_evidence": [],
-      "tests_verified": [],
-      "notes": ""
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/local/usage/UsageArithmetic.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/TokenUsageAnalyticsTest.kt"
+      ],
+      "tests_verified": [
+        "local App compileDebugKotlin",
+        "local TokenUsageAnalyticsTest cache accounting regression",
+        "local 7-module JVM: 3167 passed, 0 failures",
+        "local architecture/performance/test-quality/Kotlin-risk/CI-integrity static checks"
+      ],
+      "notes": "2026-10-17：启动 Usage/Event/Diagnostics 领域重构。TokenUsageRecord 归一化将缓存命中、未命中、缓存写入严格限制于实际输入 Token 子集；DeepSeekTokenUsage 对异常显式 miss 同样按剩余 prompt 上限裁剪，避免错误 Provider 数值夸大模型/会话累计用量与计费分项，缺省 miss 仍按原有逻辑推算。新增异常缓存数值与正常分区正反回归。App Kotlin 编译、七模块 3167 项 JVM 测试 0 失败及 5 项静态门禁通过；全链路 Usage 持久迁移、事件诊断与最新 SHA CI 尚未验收，整项 in_progress。"
     },
     {
       "id": "AE4V3-19",
