@@ -15,7 +15,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
-import android.provider.OpenableColumns
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.Modifier
@@ -96,46 +95,41 @@ fun V6ToolsManagementScene(
     var disconnect by remember(key) { mutableStateOf<String?>(null) }
     var removeSkill by remember(key) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    val resolver = LocalContext.current.contentResolver
-    val importSkillPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null && !busy) {
-            busy = true
-            scope.launch {
-                try {
-                    val data = withContext(Dispatchers.IO) {
-                        val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME),
-                            null, null, null)?.use { cursor ->
-                            if (cursor.moveToFirst()) cursor.getString(0) else null
-                        } ?: "imported-skill.md"
-                        val filename = name.substringAfterLast('/').substringAfterLast('\\')
+    // Only Host opens and reads Android documents. V6 submits an already bounded result
+    // to the existing Tools Owner; neither URI grants nor byte streams belong to UiPack.
+    val importSkillPicker = com.labteto.dshmobile.uihost.rememberUiDocumentImporter(
+        maxBytes = 2 * 1024 * 1024,
+    ) { result ->
+        when (result) {
+            com.labteto.dshmobile.uihost.UiDocumentPickReceipt.Reading -> busy = true
+            com.labteto.dshmobile.uihost.UiDocumentPickReceipt.Cancelled -> {
+                busy = false
+                feedback = "已取消技能导入"
+            }
+            is com.labteto.dshmobile.uihost.UiDocumentPickReceipt.Failed -> {
+                busy = false
+                feedback = result.message ?: "所选技能文件读取失败"
+            }
+            is com.labteto.dshmobile.uihost.UiDocumentPickReceipt.Picked -> {
+                busy = true
+                scope.launch {
+                    try {
+                        val filename = (result.document.name ?: "imported-skill.md")
+                            .substringAfterLast('/').substringAfterLast('\\')
                         require(filename.isNotBlank()) { "技能文件名无效" }
-                        val bytes = resolver.openInputStream(uri)?.use { input ->
-                            val buffer = ByteArray(8192)
-                            val output = java.io.ByteArrayOutputStream()
-                            while (true) {
-                                val count = input.read(buffer)
-                                if (count < 0) break
-                                require(output.size() + count <= 2 * 1024 * 1024) {
-                                    "技能文件超过 2 MiB 导入限制"
-                                }
-                                output.write(buffer, 0, count)
-                            }
-                            output.toByteArray()
-                        } ?: error("无法打开所选技能文件")
-                        filename to bytes
-                    }
-                    val result = withContext(Dispatchers.IO) {
-                        owner.submit(ToolsUiCommand.ImportSkill(data.first, data.second))
-                    }
-                    feedback = when (result) {
-                        is ToolsUiReceipt.Applied -> "所选技能已交原 Owner 导入"
-                        is ToolsUiReceipt.Failed -> "技能导入失败：" + result.reason.name
-                    }
-                    revision++
-                } catch (cancelled: CancellationException) { throw cancelled }
-                catch (failure: Exception) {
-                    feedback = failure.message ?: "所选技能文件读取失败"
-                } finally { busy = false }
+                        val response = withContext(Dispatchers.IO) {
+                            owner.submit(ToolsUiCommand.ImportSkill(filename, result.document.bytes))
+                        }
+                        feedback = when (response) {
+                            is ToolsUiReceipt.Applied -> "所选技能已交原 Owner 导入"
+                            is ToolsUiReceipt.Failed -> "技能导入失败：" + response.reason.name
+                        }
+                        revision++
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (failure: Exception) {
+                        feedback = failure.message ?: "技能导入失败"
+                    } finally { busy = false }
+                }
             }
         }
     }
@@ -472,7 +466,7 @@ fun V6ToolsManagementScene(
                 }
             }
             SyButton("从本地文件导入技能", {
-                importSkillPicker.launch(arrayOf("text/*", "application/json", "application/octet-stream"))
+                importSkillPicker()
             }, enabled = !busy, style = SyButtonStyle.SECONDARY)
             Text("新建本地技能", style = MaterialTheme.typography.titleMedium)
             SyInput(newSkillId, { newSkillId = it }, label = "技能 ID")
