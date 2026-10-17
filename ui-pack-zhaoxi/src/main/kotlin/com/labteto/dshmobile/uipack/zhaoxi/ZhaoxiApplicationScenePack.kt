@@ -400,13 +400,16 @@ class ZhaoxiApplicationScenePack(
         ZhaoxiTheme {
             Box(Modifier.fillMaxSize()) {
                 ZhaoxiBackground(Modifier.fillMaxSize())
-                val normal = ZhaoxiMotion.spec<androidx.compose.ui.unit.IntOffset>(ZhaoxiDuration.NORMAL)
+                // Motion settings are resolved in a composable scope; transitionSpec itself
+                // is a non-composable animation lambda and must only capture stable specs.
+                val offsetMotion = ZhaoxiMotion.spec<androidx.compose.ui.unit.IntOffset>(ZhaoxiDuration.NORMAL)
+                val fadeMotion = ZhaoxiMotion.spec<Float>(ZhaoxiDuration.NORMAL)
                 val fast = ZhaoxiMotion.spec<Float>(ZhaoxiDuration.FAST)
                 androidx.compose.animation.AnimatedContent(
                     targetState = state.stack.lastOrNull(),
                     transitionSpec = {
-                        (androidx.compose.animation.fadeIn(ZhaoxiMotion.spec<Float>(ZhaoxiDuration.NORMAL)) +
-                            androidx.compose.animation.slideInVertically(normal) { it / 24 })
+                        (androidx.compose.animation.fadeIn(fadeMotion) +
+                            androidx.compose.animation.slideInVertically(offsetMotion) { it / 24 })
                             .togetherWith(androidx.compose.animation.fadeOut(fast))
                     },
                     label = "zhaoxiScene",
