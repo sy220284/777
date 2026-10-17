@@ -1,6 +1,6 @@
 {
   "schema": "777.ui-r4.code-tasks/1",
-  "asOf": "2026-10-16",
+  "asOf": "2026-10-17",
   "baseline": "2026-10-16 R4 仅交付 V6 独立包 + 中立 Host/Feature Port + 真实业务闭环，共 34 项；保留 75/75 Scene、173/173 Action 源码映射与 Legacy 退场任务。按最新用户裁定，设备/模拟器/仪器/人工验收移除；代码完整性及编译/单测/静态架构检查为本轮标准。PR 保持 Draft 至代码闭环与质量检查完成。",
   "scope": "R4 单 V6 + 中立 Host/Feature Port；不含 Next 和完整双 UI 切换",
   "verificationPolicy": "只执行代码级验证：Owner/Port 真实行为和恢复实现、类型/权限/并发/收费语义回归、Kotlin 编译、JVM/Compose 单测、静态与架构门禁。无需 Android16/17 实机/模拟器、设备仪器化、人工视觉、弱网设备和 TalkBack 验收。未跑代码测试不得报通过。",
@@ -21,8 +21,8 @@
       "task": "插件故障隔离与恢复",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "原 PluginManager 单锁管理生命周期变更、并发替换及失败恢复；MCP 失败关闭逐个解绑工具，连接占位始终清理；已有插件并发/恢复源码测试。 2026-10-16 本轮补受控失败态恢复：PluginManager.recoverFailed 仅允许显式失败的插件，在依赖审查与旧外部资源清理成功后重新安装；V6 tools.plugins 展示真实生命周期并经确认触发 ToolsUiCommand.RecoverFailedPlugin。运行资源插件禁止热恢复。PluginRegistry 对单插件安装和批量回滚清理失败维护 PendingPluginCleanup、保留 FAILED 状态并封闭工具准入；重试清理及再安装成功后才重开。新增失败重试、批量清理、状态隔离与不自动重放测试源码。\n2026-10-16 增量：MCP 工具传输失败原子撤销注册并保留 FAILED 状态，精确故障生命周期订阅/显式恢复；该代码层限制了新调用，尚未隔离服务运行进程。",
-      "remaining": "仍缺针对可崩溃插件的独立进程/IPC 执行域、失联后原子撤销工具准入、未知副作用拒绝重放等代码与自动化故障测试。"
+      "implemented": "原 PluginManager 单锁管理生命周期变更、并发替换及失败恢复；MCP 失败关闭逐个解绑工具，连接占位始终清理；已有插件并发/恢复源码测试。 2026-10-16 本轮补受控失败态恢复：PluginManager.recoverFailed 仅允许显式失败的插件，在依赖审查与旧外部资源清理成功后重新安装；V6 tools.plugins 展示真实生命周期并经确认触发 ToolsUiCommand.RecoverFailedPlugin。运行资源插件禁止热恢复。PluginRegistry 对单插件安装和批量回滚清理失败维护 PendingPluginCleanup、保留 FAILED 状态并封闭工具准入；重试清理及再安装成功后才重开。新增失败重试、批量清理、状态隔离与不自动重放测试源码。\n2026-10-16 增量：MCP 工具传输失败原子撤销注册并保留 FAILED 状态，精确故障生命周期订阅/显式恢复；该代码层限制了新调用，尚未隔离服务运行进程。\n2026-10-17 源码进展：生产 MCP HTTP/stdio 强制独立 :mcp_worker + Messenger/PFD IPC；请求方验 PID、Worker 原 reply Binder 所有权、调用票据门闩及撤权原子禁止迟到成功；Worker IOException 先发 TERMINATED 再清理慢传输，主进程首个 IOException 连带终止并发 RPC；旧版 MCP HTTP 会话 404 仅 tools/list/ping/server/discover 只读允许自动恢复，tools/call 禁止自动重放；stdio 子进程崩溃/取消后旧实例禁止自动重启，必须新实例显式恢复。新增真实 HTTP 404 重放测试、stdio 显式恢复 JVM 回归及 Worker 票据并发测试。",
+      "remaining": "MCP 隔离实现与无重放合同已有源码，但尚需最终 HEAD Kotlin/Gradle 单测与静态门禁全绿、完整跨进程插件故障验收，并检查其他可崩溃插件是否仍由主进程执行；不得将 MCP 一条隔离链冒充所有插件独立进程。"
     },
     {
       "id": "S0-01",
@@ -113,8 +113,8 @@
       "task": "全量旧 UI 回调退场",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "implemented": "持续移除群聊、团队、图库故事/删除/保存/立绘的 UI 业务编排；现行大型 UI 回调与其他设置/人物业务尚待迁出。 本批预置人物安装和图库检查/建议应用迁入Chat Owner：预置图片先暂存并校验，档案/图片引用一次提交，失败后只清理实际未引用图片；模型检查冻结会话/模型和图库版本，建议由用户选择后条件版本追加。V6旧安装器和检查/建议业务编排退出，独立图库接入预置列表安装、显式模型检查、冲突阅读及建议选择。建议只更新图库，当前故事由用户重新选择应用。 当前人物配置/采样/模型补全已迁出旧UI业务编排，原LocalChatRuntime.configureChatPersona和Facade模型补全转发退出。\n2026-10-16 本轮源代码：V6 原有媒体时间线与动态 UiDocument 都消费同一个 MediaUiPort，消除漏实现媒体节点的 when； 仅架构探针。\n2026-10-16 本轮代码增量：V6 LocalDynamicDocument 的 MediaUiPort 由原 LocalMediaStudioViewModel 会话组合层显式传入；LocalDocumentMediaNode 移除内部 Hilt EntryPoint 全局查找，媒体读取/播放/导出仍经原 Owner。",
-      "remaining": "仍有 V6 巨型旧 Shell 中的业务编排和回调，需完整迁入真实 Feature Owner + Port；删除旧回调后用纯代码装配测试证明独立 V6 不依赖它。"
+      "implemented": "持续移除群聊、团队、图库故事/删除/保存/立绘的 UI 业务编排；现行大型 UI 回调与其他设置/人物业务尚待迁出。 本批预置人物安装和图库检查/建议应用迁入Chat Owner：预置图片先暂存并校验，档案/图片引用一次提交，失败后只清理实际未引用图片；模型检查冻结会话/模型和图库版本，建议由用户选择后条件版本追加。V6旧安装器和检查/建议业务编排退出，独立图库接入预置列表安装、显式模型检查、冲突阅读及建议选择。建议只更新图库，当前故事由用户重新选择应用。 当前人物配置/采样/模型补全已迁出旧UI业务编排，原LocalChatRuntime.configureChatPersona和Facade模型补全转发退出。\n2026-10-16 本轮源代码：V6 原有媒体时间线与动态 UiDocument 都消费同一个 MediaUiPort，消除漏实现媒体节点的 when； 仅架构探针。\n2026-10-16 本轮代码增量：V6 LocalDynamicDocument 的 MediaUiPort 由原 LocalMediaStudioViewModel 会话组合层显式传入；LocalDocumentMediaNode 移除内部 Hilt EntryPoint 全局查找，媒体读取/播放/导出仍经原 Owner。\n2026-10-17：将图库故事编辑/删除的成功-刷新-当前会话 DEFERRED/清理提示编排退出 LocalHarnessScreen，移到 Chat Feature LocalPersonaArchiveMutationCoordinator，经 PersonaArchiveMutationUiPort/UiPersonaArchiveMutationReceipt + presentation facade 接入 Legacy UI，保留失败不重放、仅成功后刷新、取消透传测试；旧 Shell 的回复建议也改为调用 ReplySuggestionsUiPort.generate(identity) 而非 runtime.chat 私有方法。",
+      "remaining": "LocalHarnessScreen 与 LocalHarnessViewModel 仍有大量模式切换、消息编辑、团队、人物等旧业务回调，需要继续迁入 Feature Port；本轮仅处理了图库归档事务/回复建议的一部分，未完成旧 Shell 全量退场。"
     },
     {
       "id": "S1-10",
@@ -169,7 +169,8 @@
       "task": "Host/Shell 旧绑定退场",
       "codeStatus": "CODE_PARTIAL",
       "verification": "DEFERRED",
-      "remaining": "旧 Host/Shell 回调仍参与业务装配；应抽离业务 Owner 并提供不加载 Legacy Shell 的 V6 组合与编译/导航/发送/审批回归，不以设备验收作为交付条件。"
+      "remaining": "需要最终 HEAD 完整 JVM/Compose 单测、Kotlin 编译/Android Lint，独立 V6 完整业务/导航/发送/审批契约端到端验收；旧 Shell 仍有业务回调，不能放开 v6.migration.accepted。",
+      "implemented": "2026-10-17：AppRoot 以 pack 用户选择分流，独立 V6 通过 LocalV6StandaloneViewModel 注入 Feature Port，不创建 LocalHarnessViewModel；修复 Legacy 分支 Android Lint 缩进与 Host 门禁，局部源码门禁已通过（CI #39003736942 仍在编译与单测）。"
     },
     {
       "id": "S3-07",
