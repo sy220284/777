@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -137,7 +138,9 @@ fun ZhaoxiErrorDemoScene(scope: UiSceneRenderScope) {
 fun ZhaoxiWorkspaceScene(files: FilesUiPort?, scope: UiSceneRenderScope) {
     ZxPage("工作区", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        val list = remember { runCatching { files?.workspaceFiles() }.getOrNull().orEmpty() }
+        val list by produceState(initialValue = emptyList<com.labteto.dshmobile.local.tools.LocalWorkspaceFile>(), files) {
+            value = runCatching { files?.workspaceFiles() }.getOrNull().orEmpty()
+        }
         if (list.isEmpty()) ZxEmpty("工作区是空的", "产物与附件会出现在这里")
         list.forEach { f ->
             ZxRow(f.toString().substringBefore(',').substringAfter('=').take(48), "",
@@ -151,8 +154,9 @@ fun ZhaoxiWorkspaceScene(files: FilesUiPort?, scope: UiSceneRenderScope) {
 fun ZhaoxiWorkspacePreviewScene(files: FilesUiPort?, path: String, scope: UiSceneRenderScope) {
     ZxPage("预览", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        val text = remember(path) {
-            runCatching { files?.previewWorkspaceFile(path)?.toString() }.getOrNull() ?: "预览不可用"
+        val text by produceState(initialValue = "加载中…", files, path) {
+            value = if (path.isBlank()) "请先从工作区选择文件" else
+                runCatching { files?.previewWorkspaceFile(path)?.toString() }.getOrNull() ?: "预览不可用"
         }
         Text(text.take(2000), fontSize = 12.sp, color = ZhaoxiTheme.colors.ink)
         ZxFooterNote(path)

@@ -25,15 +25,11 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadge
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadgeTone
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip
-import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDangerRow
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDetentSlider
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDivider
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxField
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxFooterNote
-import com.labteto.dshmobile.uipack.zhaoxi.components.ZxNavRow
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxSection
-import com.labteto.dshmobile.uipack.zhaoxi.components.ZxSwitchRow
-import com.labteto.dshmobile.uipack.zhaoxi.components.ZxValueRow
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 import com.labteto.dshmobile.uicontract.UiSceneId
 import kotlinx.coroutines.launch
@@ -96,11 +92,10 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
         }
         ZxSection("字号")
         ZxDetentSlider(
-            value = ((snap.textScale - 0.9f) / 0.6f).coerceIn(0f, 1f),
-            onValueChange = { v ->
-                writeAppearance(textScale = 0.9f + v * 0.6f)
-            },
+            value = ((snap.textScale - 0.9f) / 0.3f).toInt().coerceIn(0, 2),
+            steps = 3,
             labels = listOf("小", "标准", "大"),
+            onChange = { v -> writeAppearance(textScale = 0.9f + v * 0.3f) },
         )
         ZxFooterNote("外观偏好即时生效 · 写入宿主偏好存储")
     }
@@ -124,7 +119,7 @@ fun ZhaoxiModelSettingsScene(settings: SettingsUiPort, scope: UiSceneRenderScope
     ZxPage("模型", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("当前")
-        ZxValueRow("模型", value = snap?.toString()?.substringAfter("model=").take(32) ?: "—")
+        ZxValueRow("模型", value = snap?.toString()?.substringAfter("model=")?.take(32) ?: "—")
         ZxNavRow("供应商与密钥", sub = "配置经 SettingsUiPort.configure*") {}
         ZxSection("采样默认")
         ZxValueRow("温度", value = "全局默认", sub = "人物级覆盖在人物编辑器 · 行为调节")
@@ -172,7 +167,7 @@ fun ZhaoxiDiagnosticsScene(
     val status by (updateStatus ?: kotlinx.coroutines.flow.MutableStateFlow<String?>(null)).collectAsState()
     ZxPage("诊断与更新", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        ZxValueRow("版本", value = "朝夕 E8.14", sub = "契约窗 = 主线 @ 283230d5")
+        ZxValueRow("版本", value = "朝夕 E8.17", sub = "独立 UI Pack / Host 契约版本 1")
         ZxValueRow("更新状态", value = status ?: "未检查")
         Spacer(Modifier.height(8.dp))
         ZxButton("检查更新", { checkForUpdate?.invoke() }, Modifier.fillMaxWidth())

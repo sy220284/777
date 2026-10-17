@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -55,7 +56,7 @@ fun ZhaoxiAutomationTasksScene(
         snap.tasks.forEach { t ->
             val name = runCatching { t.toString().substringBefore(',').substringAfter('=').trim() }
                 .getOrDefault("任务")
-            ZxRow(name, "", onClick = { onOpenEditor(name) }) {
+            ZxRow(name, "", onClick = { onOpenEditor(name) }, trailing = {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     ZxChip("运行", false) { co.launch { automation.submit(AutomationUiCommand.RunNow(t.id)) } }
                     ZxSwitch(
@@ -67,7 +68,7 @@ fun ZhaoxiAutomationTasksScene(
                         },
                     )
                 }
-            }
+            })
         }
         Spacer(Modifier.height(8.dp))
         ZxButton("＋ 新建自动化", { scope.onNavigate(UiSceneId("automation.editor")) }, Modifier.fillMaxWidth())
@@ -96,8 +97,9 @@ fun ZhaoxiAutomationEditorScene(
         ZxButton("保存", {
             co.launch {
                 val context = automation.context()
-                feedback = if (context.canPlanChat && context.identity != null && draft.isNotBlank())
-                    automation.planAndSave(PlanChatAutomationCommand(context.identity, draft)).toString()
+                val identity = context.identity
+                feedback = if (context.canPlanChat && identity != null && draft.isNotBlank())
+                    automation.planAndSave(PlanChatAutomationCommand(identity, draft)).toString()
                 else "当前会话暂不支持自动化编排，请切换至有效聊天会话并输入任务说明。"
             }
         }, Modifier.fillMaxWidth())
@@ -133,11 +135,16 @@ fun ZhaoxiToolsScene(
     tools: com.labteto.dshmobile.uicontract.ToolsUiPort,
     scope: UiSceneRenderScope,
 ) {
-    val co = rememberCoroutineScope()
+    val skills by produceState(initialValue = emptyList<com.labteto.dshmobile.uicontract.UiSkillSnapshot>(), tools) {
+        value = runCatching { tools.installedSkills() }.getOrDefault(emptyList())
+    }
+    val servers by produceState(initialValue = emptyList<com.labteto.dshmobile.uicontract.UiMcpServerSnapshot>(), tools) {
+        value = runCatching { tools.servers() }.getOrDefault(emptyList())
+    }
     ZxPage("工具", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("技能")
-        runCatching { tools.installedSkills() }.getOrDefault(emptyList()).forEach { s ->
+        skills.forEach { s ->
             ZxRow(s.toString().substringBefore(',').substringAfter('=').take(40), "已安装")
         }
         ZxSection("插件")
@@ -145,7 +152,7 @@ fun ZhaoxiToolsScene(
             ZxRow(p.toString().substringBefore(',').substringAfter('=').take(40), "生命周期快照")
         }
         ZxSection("MCP 服务器")
-        runCatching { tools.servers() }.getOrDefault(emptyList()).forEach { s ->
+        servers.forEach { s ->
             ZxRow(s.toString().take(48), "")
         }
         ZxFooterNote("变更经 ToolsUiPort.submit · Applied/Failed 回执呈现")
