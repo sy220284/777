@@ -73,4 +73,30 @@ class SessionEventSchemaCodecTest {
                 """{"schema_version":0,"seq":1,"event_type":"user/message","timestamp":1,"payload":"missing"}""")
         }
     }
+    @Test fun completeCrashTailWithoutNewlineKeepsCommittedMessageAndMonotonicSequence() {
+        val dir = Files.createTempDirectory("event-complete-tail-").toFile()
+        val file = dir.resolve("events.jsonl")
+        try {
+            file.writeText(v1)
+            SessionEventLog(file, json, maxBytes = 800).use { log ->
+                val next = log.append("user/message", buildJsonObject { put("text", "after-restart") })
+                assertEquals(2L, next.sequence)
+                assertEquals(listOf(1L, 2L), log.snapshot().map { it.sequence })
+            }
+            assertTrue(file.readText().startsWith(v1 + "\n"))
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test fun completeFutureVersionWithoutNewlineIsNeverTruncatedOrMadeWritable() {
+        val dir = Files.createTempDirectory("event-future-tail-").toFile()
+        val file = dir.resolve("events.jsonl")
+        try {
+            file.writeText(v3)
+            assertThrows(UnsupportedSessionEventSchemaVersion::class.java) {
+                SessionEventLog(file, json, maxBytes = 800)
+            }
+            assertEquals(v3, file.readText())
+        } finally { dir.deleteRecursively() }
+    }
+
 }
