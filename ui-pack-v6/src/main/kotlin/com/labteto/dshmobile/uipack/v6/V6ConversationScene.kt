@@ -712,6 +712,11 @@ fun V6ConversationScene(
                 item(key = "work-interaction") { WorkInteractionContent() }
                 ports.evidence?.let { evidence ->
                     item(key = "work-evidence") { V6WorkEvidencePanel(evidence, identity) }
+                    ports.workReads?.let { reads ->
+                        item(key = "work-tool-activities") {
+                            V6WorkToolActivityPanel(reads, evidence, identity)
+                        }
+                    }
                 }
             }
         }
