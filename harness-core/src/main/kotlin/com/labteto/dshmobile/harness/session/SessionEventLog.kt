@@ -635,6 +635,33 @@ class SessionEventLog(
                 }
                 cursor--
             }
+            // A valid event with a missing terminal newline is NOT a torn
+            // command. Earlier writers may have fsynced its entire JSON body
+            // before dying, so discarding it can lose a committed mutation and
+            // permit the same action to be replayed. Verify under the OS lease.
+            val remaining = length - truncateTo
+            if (remaining in 1L..maxEventBytes && remaining <= Int.MAX_VALUE) {
+                active.seek(truncateTo)
+                val bytes = ByteArray(remaining.toInt())
+                active.readFully(bytes)
+                try {
+                    val recovered = SessionEventSchemaCodec.decode(
+                        json, String(bytes, Charsets.UTF_8).trimEnd('\\r'),
+                    )
+                    check(recovered.sequence >= 0L)
+                    active.seek(length)
+                    active.writeByte('\\n'.code)
+                    diagnosticSink("complete-tail-newline-restored", null)
+                    return
+                } catch (future: UnsupportedSessionEventSchemaVersion) {
+                    // Do not erase a complete future-format row or claim an
+                    // obsolete reader successfully recovered newer commands.
+                    throw future
+                } catch (_: Exception) {
+                    // An incomplete/invalid JSON body is crash-torn and may
+                    // safely be discarded; never append after an unclosed row.
+                }
+            }
             active.setLength(truncateTo)
         }
         malformedRows.incrementAndGet()
