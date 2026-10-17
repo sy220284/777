@@ -90,6 +90,73 @@ class LocalWorkGoalDriverTest {
         assertNull(localWorkGoalBaselineForTurn(null, goal.copy(revision = 3L), 3L))
     }
 
+
+    @Test
+    fun ownToolNoteRevisionRemainsEligibleForGoalCompletion() {
+        withVerifiedGoal { binding, goal, root ->
+            val start = binding.eventLog.append(
+                com.labteto.dshmobile.local.runtime.LOCAL_AGENT_RUN_CHECKPOINT_EVENT,
+                buildJsonObject { put("run_id", "run"); put("phase", "turn_started") })
+            binding.eventLog.append("tool/call", buildJsonObject {
+                put("id", "note"); put("goal_id", goal.id); put("execution_started", false) })
+            binding.eventLog.append("tool/execution-started", buildJsonObject {
+                put("id", "note"); put("execution_id", "exec-note")
+                put("attributes", buildJsonObject { put("goal_id", goal.id); put("run_id", "run") }) })
+            val cmd = LocalWorkProgressCoordinator(binding.workState, binding.eventLog, root,
+                executingToolId = "exec-note") { }
+            cmd.updateGoal("active", "实际进展已记录")
+            binding.eventLog.append("tool/result", buildJsonObject {
+                put("id", "note"); put("execution_id", "exec-note"); put("is_error", false) })
+            val current = requireNotNull(binding.workState.snapshot().goal)
+            assertEquals(current, localWorkGoalBaselineAfterVerifiedToolUpdates(
+                goal, current, "run", start.sequence, binding.eventLog))
+            val finish = LocalWorkProgressCoordinator(binding.workState, binding.eventLog, root) { }
+            assertEquals(LocalWorkGoalDriveResult.COMPLETED,
+                drive(binding, goal, root, finish::completeVerifiedGoal))
+            assertEquals("completed", binding.workState.snapshot().goal?.status)
+        }
+    }
+
+    @Test
+    fun changesWithoutCurrentRunToolProofNeverRebaseTheGoal() {
+        withVerifiedGoal { binding, goal, root ->
+            val start = binding.eventLog.append(
+                com.labteto.dshmobile.local.runtime.LOCAL_AGENT_RUN_CHECKPOINT_EVENT,
+                buildJsonObject { put("run_id", "run"); put("phase", "turn_started") })
+            val external = LocalWorkProgressCoordinator(binding.workState, binding.eventLog, root) { }
+            external.updateGoal("active", "外部改动")
+            val changed = requireNotNull(binding.workState.snapshot().goal)
+            assertEquals(goal, localWorkGoalBaselineAfterVerifiedToolUpdates(
+                goal, changed, "run", start.sequence, binding.eventLog))
+            assertEquals(LocalWorkGoalDriveResult.STALE,
+                drive(binding, goal, root) { error("external change must not settle") })
+        }
+    }
+
+    @Test
+    fun anotherRunsToolCannotAuthorizeTheCurrentGoalRevision() {
+        withVerifiedGoal { binding, goal, root ->
+            val start = binding.eventLog.append(
+                com.labteto.dshmobile.local.runtime.LOCAL_AGENT_RUN_CHECKPOINT_EVENT,
+                buildJsonObject { put("run_id", "run"); put("phase", "turn_started") })
+            binding.eventLog.append("tool/call", buildJsonObject {
+                put("id", "note"); put("goal_id", goal.id); put("execution_started", false) })
+            binding.eventLog.append("tool/execution-started", buildJsonObject {
+                put("id", "note"); put("execution_id", "exec-note")
+                put("attributes", buildJsonObject { put("goal_id", goal.id); put("run_id", "other-run") }) })
+            val cmd = LocalWorkProgressCoordinator(binding.workState, binding.eventLog, root,
+                executingToolId = "exec-note") { }
+            cmd.updateGoal("active", "别的运行提交")
+            binding.eventLog.append("tool/result", buildJsonObject {
+                put("id", "note"); put("execution_id", "exec-note"); put("is_error", false) })
+            val changed = requireNotNull(binding.workState.snapshot().goal)
+            assertEquals(goal, localWorkGoalBaselineAfterVerifiedToolUpdates(
+                goal, changed, "run", start.sequence, binding.eventLog))
+            assertEquals(LocalWorkGoalDriveResult.STALE,
+                drive(binding, goal, root) { error("other run cannot settle") })
+        }
+    }
+
     private fun conditions(goal: LocalGoal) = LocalWorkGoalFollowUpConditions(
         originalGoal = goal, currentGoal = goal, disposition = LocalWorkGoalDisposition.READY_FOR_SETTLEMENT,
         planMode = false, hadSuccessfulTool = true, hadToolFailure = false,

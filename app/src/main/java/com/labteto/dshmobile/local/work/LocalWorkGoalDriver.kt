@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.harness.session.ToolAttemptLedger
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -42,6 +44,49 @@ internal fun localWorkGoalBaselineForTurn(
     it.revision == 1L && runStartSequence != null && it.startedAtSequence > runStartSequence
 }
 
+
+/**
+ * A tool-authored Goal note update in the same Run is not an external goal replacement.
+ * Every changed revision must be tied to a settled, correctly owned execution instance.
+ */
+internal fun localWorkGoalBaselineAfterVerifiedToolUpdates(
+    original: LocalGoal,
+    current: LocalGoal,
+    sourceRunId: String,
+    runStartSequence: Long?,
+    eventLog: LocalSessionEventLog,
+): LocalGoal {
+    if (current == original) return original
+    if (runStartSequence == null || original.id.isBlank() ||
+        original.id != current.id || original.status != "active" || current.status != "active" ||
+        original.description != current.description ||
+        original.startedAtSequence != current.startedAtSequence ||
+        original.artifactPaths != current.artifactPaths ||
+        original.verificationCommands != current.verificationCommands ||
+        current.revision <= original.revision
+    ) return original
+
+    val ledger = ToolAttemptLedger()
+    val revisions = mutableListOf<kotlinx.serialization.json.JsonObject>()
+    eventLog.forEachAfter(runStartSequence) { event ->
+        ledger.observe(event.type, event.data)
+        if (event.type == "goal/state") revisions += event.data
+    }
+    if (revisions.size.toLong() != current.revision - original.revision) return original
+    val settledExecutions = ledger.snapshot().filter {
+        it.started && it.settled && !it.outcomeUncertain &&
+            it.runId == sourceRunId && it.executionId != null
+    }.associateBy { it.executionId }
+    return if (revisions.withIndex().all { (index, mutation) ->
+        (mutation["id"] as? JsonPrimitive)?.contentOrNull == current.id &&
+            (mutation["status"] as? JsonPrimitive)?.contentOrNull == "active" &&
+            (mutation["revision"] as? JsonPrimitive)?.contentOrNull?.toLongOrNull() ==
+                original.revision + index + 1L &&
+            (mutation["origin_execution_id"] as? JsonPrimitive)?.contentOrNull
+                ?.let(settledExecutions::containsKey) == true
+    }) current else original
+}
+
 /** Invoked by the Work run owner after checkpoint flush and before durable queue handoff. */
 internal fun driveLocalWorkGoalAfterTurn(
     binding: LocalWorkRunBinding,
@@ -56,13 +101,16 @@ internal fun driveLocalWorkGoalAfterTurn(
 ): LocalWorkGoalDriveResult {
     val work = binding.workState.snapshot()
     val goal = work.goal ?: return LocalWorkGoalDriveResult.IDLE
-    val start = if (originalGoal == null) binding.eventLog.latestMatching(
+    val start = binding.eventLog.latestMatching(
         setOf(com.labteto.dshmobile.local.runtime.LOCAL_AGENT_RUN_CHECKPOINT_EVENT),
     ) { data ->
         (data["run_id"] as? JsonPrimitive)?.contentOrNull == sourceRunId &&
             (data["phase"] as? JsonPrimitive)?.contentOrNull == "turn_started"
-    }?.sequence else null
-    val baseline = localWorkGoalBaselineForTurn(originalGoal, goal, start)
+    }?.sequence
+    val baseline = localWorkGoalBaselineForTurn(originalGoal, goal, start)?.let { previous ->
+        if (originalGoal == null) previous else localWorkGoalBaselineAfterVerifiedToolUpdates(
+            previous, goal, sourceRunId, start, binding.eventLog)
+    }
     val evidence = localWorkCompletionEvidence(work,
         localWorkDeliveryEvidence(binding.eventLog, goal, workspaceRoot))
     val conditions = LocalWorkGoalFollowUpConditions(

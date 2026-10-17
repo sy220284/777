@@ -135,6 +135,7 @@ internal class LocalWorkProgressCoordinator(
             put("description", updated.description)
             put("status", updated.status)
             updated.note?.let { put("note", it) }
+            executingToolId?.let { put("origin_execution_id", it) }
             delivery?.successfulToolCallId?.let { put("executed_tool_call_id", it) }
             delivery?.artifactCallId?.let { put("artifact_tool_call_id", it) }
             delivery?.testCallId?.let { put("verification_tool_call_id", it) }
