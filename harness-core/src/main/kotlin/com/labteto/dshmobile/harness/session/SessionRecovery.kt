@@ -101,19 +101,25 @@ object SessionRecovery {
             return SessionRepairResult()
         }
 
-        val latestStepStart = log.latest("step/start")
-        val latestStepEnd = log.latest("step/end")
-        val openStepEvent = latestStepStart?.takeIf { stepStart ->
-            stepStart.sequence > turnStart.sequence &&
-                (latestStepEnd == null || latestStepEnd.sequence < stepStart.sequence)
+        val latestStepStart = log.latest("step/start")?.takeIf {
+            it.sequence > turnStart.sequence
         }
-        val openStep = openStepEvent?.data?.get("step")?.jsonPrimitive?.intOrNull
+        val latestStepNumber = latestStepStart?.data?.get("step")?.jsonPrimitive?.intOrNull
+        val latestStepEnd = log.latest("step/end")
+        val endedCurrentStep = latestStepStart != null && latestStepEnd != null &&
+            latestStepEnd.sequence > latestStepStart.sequence &&
+            // Legacy step/end omitted the step number. A numbered end, however,
+            // must match the newest start; stale end events cannot close it.
+            (latestStepEnd.data["step"]?.jsonPrimitive?.intOrNull?.let { it == latestStepNumber }
+                ?: true)
+        val openStep = latestStepNumber.takeUnless { endedCurrentStep }
         val pending = ToolAttemptLedger()
-        if (openStepEvent != null) {
-            // Incrementally fold only the newest open step, not the full archive.
-            // Same tool settlement state machine is used by Work GoalDriver.
-            log.forEachAfter(openStepEvent.sequence) { event ->
-                pending.observe(event, openStep)
+        if (latestStepStart != null) {
+            // A durable step/end cannot prove an earlier tool result was flushed.
+            // Always fold the newest step's tool facts, even when it has an end,
+            // so a crash between the two writes cannot silently lose a mutation.
+            log.forEachAfter(latestStepStart.sequence) { event ->
+                pending.observe(event, latestStepNumber)
             }
         }
 

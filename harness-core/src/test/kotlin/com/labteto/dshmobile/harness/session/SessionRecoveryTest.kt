@@ -4,6 +4,8 @@ import java.nio.file.Files
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -222,6 +224,48 @@ class SessionRecoveryTest {
         }
     }
 
+
+    @Test
+    fun staleEndForEarlierStepCannotHideUnsettledCurrentWrite() {
+        val directory = Files.createTempDirectory("session-recovery-late-step-end").toFile()
+        try {
+            val log = SessionEventLog(directory.resolve("events.jsonl"), json, maxBytes = 4_096)
+            log.append("turn/start", buildJsonObject {})
+            log.append("step/start", buildJsonObject { put("step", 1) })
+            log.append("step/end", buildJsonObject { put("step", 1) })
+            log.append("step/start", buildJsonObject { put("step", 2) })
+            log.append("tool/call", buildJsonObject {
+                put("id", "write-current")
+                put("goal_id", "goal")
+            })
+            log.append("step/end", buildJsonObject { put("step", 1) }) // delayed prior step
+            val repaired = SessionRecovery.repairInterruptedTail(log)
+            assertEquals(SessionRecovery.TOOL_OUTCOME_UNKNOWN,
+                repaired.toolResults.single().code)
+            assertEquals(listOf("tool/result", "step/end", "turn/end"),
+                repaired.appended.map { it.type })
+            assertEquals(2, repaired.appended[1].data["step"]?.jsonPrimitive?.intOrNull)
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test
+    fun existingStepEndDoesNotHideToolResultLostBeforeCrash() {
+        val directory = Files.createTempDirectory("session-recovery-lost-tool-result").toFile()
+        try {
+            val log = SessionEventLog(directory.resolve("events.jsonl"), json, maxBytes = 4_096)
+            log.append("turn/start", buildJsonObject {})
+            log.append("step/start", buildJsonObject { put("step", 7) })
+            log.append("tool/call", buildJsonObject {
+                put("id", "mutation")
+                put("goal_id", "goal")
+            })
+            log.append("step/end", buildJsonObject { put("step", 7) })
+            val repaired = SessionRecovery.repairInterruptedTail(log)
+            assertEquals(SessionRecovery.TOOL_OUTCOME_UNKNOWN,
+                repaired.toolResults.single().code)
+            assertEquals(listOf("tool/result", "turn/end"), repaired.appended.map { it.type })
+        } finally { directory.deleteRecursively() }
+    }
 
     @Test
     fun completedStepInsideOpenTurnDoesNotResurrectOldPendingCalls() {
