@@ -50,8 +50,9 @@ fun SyEntrance(
     // Position-only offset preserves the visual rise, and makes the actual motion
     // observable to Android accessibility/Compose semantics (graphicsLayer
     // translation alone can keep stale boundsInRoot on some Compose versions).
-    // Offset wraps the caller modifier so its semantics/testTag bounds follow
-    // the actual moving child, including reduced-motion transitions.
+    // Place the caller's semantics/testTag *inside* the moving layout modifier.
+    // If the caller modifier comes first, boundsInRoot observes the stationary
+    // outer node even while the actual message is animating below it.
     Box(Modifier.offset {
         IntOffset(0, if (reduced) 0 else (distance * (1f - progress.value)).roundToInt())
     }.then(modifier).graphicsLayer {

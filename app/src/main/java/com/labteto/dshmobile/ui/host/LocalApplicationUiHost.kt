@@ -230,30 +230,43 @@ internal fun LocalApplicationUiHost(
             }
             // An invalid restored history must not turn the application into an empty screen.
             if (result is UiSceneRenderAccess.Rejected) {
-                UnavailablePackNotice {
-                    // Explicit recovery must clear the rejected pack's saved history.
-                    preference.edit().remove(snapshotKey).commit()
-                    navigationReset += 1L
-                }
+                UnavailablePackNotice(
+                    onRetry = {
+                        // Explicit recovery must clear only the rejected pack's history.
+                        preference.edit().remove(snapshotKey).commit()
+                        navigationReset += 1L
+                    },
+                    onExit = { activity?.finish() },
+                )
             }
         }
         is LocalApplicationUiDecision.Unavailable -> {
-            UnavailablePackNotice {
-                preference.edit().putString("selected_pack", V6_APPLICATION_UI).commit()
-            }
+            UnavailablePackNotice(
+                onRetry = {
+                    // The retired Shell is not an alternative pack. Recreate the
+                    // composition to retry Owner availability and pack admission.
+                    preference.edit().putString("selected_pack", V6_APPLICATION_UI).commit()
+                    activity?.recreate()
+                },
+                onExit = { activity?.finish() },
+            )
         }
     }
 }
 
 @Composable
-private fun UnavailablePackNotice(onSelectStable: () -> Unit) {
+private fun UnavailablePackNotice(onRetry: () -> Unit, onExit: () -> Unit) {
     Surface(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(24.dp),
             verticalArrangement = Arrangement.Center) {
             Text(stringResource(R.string.ui_pack_incompatible),
                 style = MaterialTheme.typography.titleMedium)
-            Button(onClick = onSelectStable) {
-                Text(stringResource(R.string.ui_pack_back_to_stable))
+            Text("独立界面初始化或导航恢复失败。原会话数据仍保留；可重试重新加载，若问题持续可退出应用后检查运行诊断。")
+            Button(onClick = onRetry) {
+                Text("重试加载界面")
+            }
+            Button(onClick = onExit) {
+                Text("退出应用")
             }
         }
     }

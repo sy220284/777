@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.uipack.v6
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -54,8 +55,37 @@ fun V6SettingsSuiteScene(
     var subSteps by remember(scene) { mutableStateOf("") }
     var attempts by remember(scene) { mutableStateOf("") }
     var diagnosticHost by remember(scene) { mutableStateOf("") }
-    LaunchedEffect(scene, state.loading) {
-        if (!state.loading) {
+    // Owner refreshes may flip loading while the user is typing. Keep edited
+    // values locally until an explicit discard or navigation; never overwrite
+    // an unsaved form from a background projection refresh.
+    var draftDirty by remember(scene) { mutableStateOf(false) }
+    var confirmDiscard by remember(scene) { mutableStateOf(false) }
+    val editable = scene.value in setOf("settings.memory", "settings.memory_settings", "settings.advanced")
+    val hasUnsavedChanges = when (scene.value) {
+        "settings.memory", "settings.memory_settings" ->
+            rules != state.userRules || recall != state.autoRecall || autoMemory != state.autoMemory
+        "settings.advanced" ->
+            mainSteps != state.mainMaxSteps.toString() ||
+                subSteps != state.subagentMaxSteps.toString() ||
+                attempts != state.modelAttempts.toString()
+        else -> false
+    }
+    // Hardware Back and visible Back use the same confirmation rule.
+    BackHandler(enabled = editable && draftDirty && hasUnsavedChanges) {
+        confirmDiscard = true
+    }
+    fun requestBack() {
+        if (editable && draftDirty && hasUnsavedChanges) confirmDiscard = true
+        else onBack()
+    }
+    // Once the owner actually reflects the edited values (or the user restores
+    // them), re-enable ordinary live refresh for this screen.
+    LaunchedEffect(scene, state.loading, draftDirty, hasUnsavedChanges) {
+        if (!state.loading && draftDirty && !hasUnsavedChanges) draftDirty = false
+    }
+    LaunchedEffect(scene, state.loading, state.userRules, state.autoRecall,
+        state.autoMemory, state.mainMaxSteps, state.subagentMaxSteps, state.modelAttempts) {
+        if (!state.loading && !draftDirty) {
             rules = state.userRules
             recall = state.autoRecall
             autoMemory = state.autoMemory
@@ -115,11 +145,23 @@ fun V6SettingsSuiteScene(
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-            SyButton("返回", onBack, style = SyButtonStyle.GHOST)
+            SyButton("返回", { requestBack() }, style = SyButtonStyle.GHOST)
         }
         if (state.loading) SyNote("正在加载设置")
         state.error?.let { SyNote(it) }
         feedback?.let { SyNote(it) }
+        if (draftDirty && scene.value in setOf("settings.memory","settings.memory_settings","settings.advanced")) {
+            SyNote("本页有未保存的修改；后台刷新不会覆盖草稿")
+            SyButton("放弃本页修改", {
+                rules = state.userRules
+                recall = state.autoRecall
+                autoMemory = state.autoMemory
+                mainSteps = state.mainMaxSteps.toString()
+                subSteps = state.subagentMaxSteps.toString()
+                attempts = state.modelAttempts.toString()
+                draftDirty = false
+            }, style = SyButtonStyle.GHOST)
+        }
         when(scene.value) {
             "route.settings","settings.root" -> {
                 v6SettingsGroups.forEach { group ->
@@ -208,9 +250,9 @@ fun V6SettingsSuiteScene(
                 }
             }
             "settings.memory","settings.memory_settings" -> {
-                SyInput(rules, { rules = it }, label = "个人规则", singleLine = false)
-                SySwitch("自动调用记忆", recall, { recall = it })
-                SySwitch("自动保存记忆", autoMemory, { autoMemory = it })
+                SyInput(rules, { rules = it; draftDirty = true }, label = "个人规则", singleLine = false)
+                SySwitch("自动调用记忆", recall, { recall = it; draftDirty = true })
+                SySwitch("自动保存记忆", autoMemory, { autoMemory = it; draftDirty = true })
                 SyButton("保存记忆与个性化", {
                     submit(SettingsUiCommand.Personalization(rules, recall, autoMemory))
                 }, enabled = !state.loading && !busy)
@@ -220,11 +262,11 @@ fun V6SettingsSuiteScene(
                 }, style = SyButtonStyle.SECONDARY)
             }
             "settings.advanced" -> {
-                SyInput(mainSteps, { mainSteps = it.filter(Char::isDigit).take(5) },
+                SyInput(mainSteps, { mainSteps = it.filter(Char::isDigit).take(5); draftDirty = true },
                     label = "主智能体步骤上限")
-                SyInput(subSteps, { subSteps = it.filter(Char::isDigit).take(5) },
+                SyInput(subSteps, { subSteps = it.filter(Char::isDigit).take(5); draftDirty = true },
                     label = "子智能体步骤上限")
-                SyInput(attempts, { attempts = it.filter(Char::isDigit).take(3) },
+                SyInput(attempts, { attempts = it.filter(Char::isDigit).take(3); draftDirty = true },
                     label = "请求重试上限")
                 val a = mainSteps.toIntOrNull()
                 val b = subSteps.toIntOrNull()
@@ -351,6 +393,19 @@ fun V6SettingsSuiteScene(
         }
         output?.let { SelectionContainer { Text(it) } }
     }
+    if (confirmDiscard) AlertDialog(
+        onDismissRequest = { confirmDiscard = false },
+        title = { Text("放弃未保存的设置？") },
+        text = { Text("当前修改尚未在设置 Owner 中确认；离开后需要重新输入。") },
+        confirmButton = { TextButton(onClick = {
+            confirmDiscard = false
+            draftDirty = false
+            onBack()
+        }) { Text("放弃并返回") } },
+        dismissButton = { TextButton(onClick = { confirmDiscard = false }) {
+            Text("继续编辑")
+        } },
+    )
     selectedModel?.let { id ->
         AlertDialog(onDismissRequest = { selectedModel = null },
             title = { Text("确认删除模型配置") }, text = { Text("仅删除已选择的配置：" + id) },

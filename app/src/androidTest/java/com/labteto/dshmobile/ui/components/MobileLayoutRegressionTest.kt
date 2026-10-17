@@ -30,10 +30,9 @@ import org.junit.Test
 class MobileLayoutRegressionTest {
     @get:Rule val compose = createComposeRule()
 
-    // Representative phone window widths in dp. Emulator viewports must be >= 412dp:
-    // otherwise a 412dp test would silently be constrained to the physical screen width.
-    // Support starts at 393dp; 360dp is intentionally outside the compatibility matrix.
-    private val phoneWidthsDp = listOf(AppDisplayLimits.MIN_SUPPORTED_WIDTH_DP, 412)
+    // Test 320/360dp compact phones as well as the original 393/412dp layouts.
+    // CI emulator viewport must allow 412dp; narrower cases are explicitly constrained.
+    private val phoneWidthsDp = listOf(AppDisplayLimits.MIN_SUPPORTED_WIDTH_DP, 360, 393, 412)
 
     @Test
     fun mainstreamPhoneLargeTypeHeaderKeepsActionsOutsideText() {
@@ -197,11 +196,11 @@ class MobileLayoutRegressionTest {
     }
 
     @Test
-    fun themeCapsCombinedSystemAndReadingFontScaleAtOnePointFive() {
+    fun themePreservesTwoHundredPercentSystemFontAndCapsCombinedScale() {
         var observedScale = -1f
         compose.setContent {
             val density = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.8f)) {
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 2.0f)) {
                 DshTheme(textScale = AppDisplayLimits.MAX_READING_SCALE) {
                     val renderedFontScale = LocalDensity.current.fontScale
                     SideEffect { observedScale = renderedFontScale }
