@@ -206,6 +206,10 @@ internal class McpLineProcess(
     private val mutableTerminalEvents = MutableSharedFlow<Throwable>(replay = 1)
     val terminalEvents: Flow<Throwable> = mutableTerminalEvents.asSharedFlow()
     private var process: Process? = null
+    // A terminated stdio process may have completed an irreversible command
+    // before its reply disappeared. A new explicit transport incarnation must
+    // be created after failure; never transparently respawn the same process.
+    private var startedOnce = false
     private data class QueuedLine(val value: String, val utf8Bytes: Int)
     private data class LineQueue(
         val channel: Channel<QueuedLine>,
@@ -220,11 +224,14 @@ internal class McpLineProcess(
     /**
      * Ensures a child process exists.
      *
-     * @return true when a new process was started, including restart after a crash.
+     * @return true only on the first successful start of this transport incarnation.
      */
     fun ensureStarted(): Boolean {
         check(!closed) { "MCP stdio 传输已关闭" }
         if (process?.isAlive == true) return false
+        check(!startedOnce) {
+            "MCP stdio 进程已结束：必须显式重新连接并重新发现工具，禁止自动重启或重放"
+        }
         resetProcess()
         require(command.isNotEmpty()) { "MCP stdio 命令不能为空" }
 
@@ -237,6 +244,7 @@ internal class McpLineProcess(
             .start()
         val queue = LineQueue(Channel(STDIO_QUEUE_CAPACITY))
         process = next
+        startedOnce = true
         writer = next.outputStream.bufferedWriter()
         lines = queue
         readerJob = scope.launch {
