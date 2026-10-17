@@ -15,6 +15,7 @@ RETIRED = (
     "app/src/main/res/drawable",
     "app/src/main/res/drawable-nodpi",
     "docs/design/v6",
+    "app/src/debug/AndroidManifest.xml",
 )
 REQUIRED = (
     "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiPackManifest.kt",
