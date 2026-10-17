@@ -166,6 +166,19 @@ internal class LocalToolCompositionRoot @Inject constructor(
             requestApproval = { call, tool, summary ->
                 approvalRuntime.approve(call, tool, summary)
             },
+            recordAuthorizationDecision = { sessionId, call, identity, approved ->
+                sessionStorage.eventLogs.get(sessionId).append(
+                    "tool/authorization-decision",
+                    buildJsonObject {
+                        put("id", call.id)
+                        put("name", call.name)
+                        put("execution_id", identity.executionId)
+                        put("root_call_id", identity.rootCallId)
+                        put("approved", approved)
+                        identity.attributes["run_id"]?.let { put("run_id", it) }
+                    },
+                )
+            },
             recordExecutionStarted = { sessionId, call, identity ->
                 sessionStorage.eventLogs.get(sessionId).append(
                     "tool/execution-started",

@@ -688,6 +688,39 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun permissionDecisionIsExactToSessionCallAndExecutionAndCannotExecuteWithoutAudit() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("mcp_demo_write", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS,
+                exposure = ToolExposure.OPTIONAL, family = "MCP",
+                keywords = setOf("demo")) { ToolResult("remote ok") })
+        }
+        data class Decision(val session: String, val call: String, val execution: String, val approved: Boolean)
+        val decisions = mutableListOf<Decision>()
+        val coordinator = coordinator(registry, recordAuthorizationDecision = { session, call, execution, granted ->
+            decisions += Decision(session, call.id, execution.executionId, granted)
+        })
+        suspend fun run(session: String, callId: String, approved: Boolean) =
+            coordinator.executeScoped(LocalToolCall(callId, "mcp_demo_write", JsonObject(emptyMap()), "{}"),
+                sessionId = session, allowMutation = true, planModeEnabled = false,
+                approval = { _, _, _ -> approved })
+        assertFalse(run("session-a", "call-a", true).isError)
+        assertEquals("APPROVAL_DENIED", run("session-b", "call-b", false).errorCode)
+        assertEquals(listOf(
+            Decision("session-a", "call-a", "exec-test", true),
+            Decision("session-b", "call-b", "exec-test", false),
+        ), decisions)
+        val missingRecord = coordinator(registry, recordAuthorizationDecision = { _, _, _, _ ->
+            throw IllegalStateException("EventLog unavailable")
+        })
+        val blocked = missingRecord.executeScoped(
+            LocalToolCall("call-c", "mcp_demo_write", JsonObject(emptyMap()), "{}"),
+            sessionId = "session-c", allowMutation = true, planModeEnabled = false,
+            approval = { _, _, _ -> true })
+        assertTrue(blocked.isError)
+        assertTrue(decisions.none { it.session == "session-c" })
+    }
+
+    @Test
     fun deniedApprovalNeverRecordsExecutorStart() = runBlocking {
         var executionStarts = 0
         var executed = false
@@ -1406,6 +1439,9 @@ class LocalToolExecutionCoordinatorTest {
             LocalToolCall,
             LocalToolExecutionIdentity,
         ) -> Unit = { _, _, _ -> },
+        recordAuthorizationDecision: suspend (
+            String, LocalToolCall, LocalToolExecutionIdentity, Boolean,
+        ) -> Unit = { _, _, _, _ -> },
         executionIdFactory: () -> String = { "exec-test" },
         networkSearchEnabled: () -> Boolean = { true },
         pinnedConnectorIds: () -> List<String> = { emptyList() },
@@ -1417,6 +1453,7 @@ class LocalToolExecutionCoordinatorTest {
         enabledOptionalTools = linkedSetOf(),
         requestApproval = { _, _, _ -> true },
         recordExecutionStarted = recordExecutionStarted,
+        recordAuthorizationDecision = recordAuthorizationDecision,
         executionIdFactory = executionIdFactory,
         networkSearchEnabled = networkSearchEnabled,
         pinnedConnectorIds = pinnedConnectorIds,

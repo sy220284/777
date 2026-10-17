@@ -49,6 +49,10 @@ internal class LocalToolExecutionCoordinator(
         LocalToolCall,
         LocalToolExecutionIdentity,
     ) -> Unit = { _, _, _ -> },
+    /** Durable per-call decision, scoped to the owning session; never a reusable grant. */
+    private val recordAuthorizationDecision: suspend (
+        String, LocalToolCall, LocalToolExecutionIdentity, Boolean,
+    ) -> Unit = { _, _, _, _ -> },
     private val executionIdFactory: () -> String = { UUID.randomUUID().toString() },
     private val networkSearchEnabled: () -> Boolean = { true },
     private val pinnedConnectorIds: () -> List<String> = { emptyList() },
@@ -404,6 +408,9 @@ internal class LocalToolExecutionCoordinator(
                         expectedRegistration = registered,
                         approval = { tool ->
                             val granted = approval(call, tool, approvalSummary(call, tool))
+                            // No tool may start if the exact user's decision failed to
+                            // persist. Do not reuse a previous call's selection/grant.
+                            recordAuthorizationDecision(sessionId, call, executionIdentity, granted)
                             if (!granted) approvalDenied = true
                             granted
                         },
