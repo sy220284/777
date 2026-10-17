@@ -213,4 +213,54 @@ class ToolAttemptLedgerTest {
         assertTrue(ledger.pending().isEmpty())
     }
 
+
+    @Test
+    fun receiptWithoutExecutionIdentityDoesNotSettleAnAdmittedMutation() {
+        val ledger = ToolAttemptLedger()
+        ledger.observe("tool/call", buildJsonObject {
+            put("id", "reused")
+            put("goal_id", "goal")
+            put("execution_started", false)
+        })
+        ledger.observe("tool/execution-started", buildJsonObject {
+            put("id", "reused")
+            put("execution_id", "current-execution")
+        })
+        // A delayed legacy receipt may have the same provider-scoped call ID.
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "reused")
+            put("is_error", false)
+        })
+        assertEquals("current-execution", ledger.pending().single().executionId)
+        assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "reused")
+            put("execution_id", "current-execution")
+            put("is_error", false)
+        })
+        assertFalse(ledger.hasUnresolvedExternalEffects("goal"))
+    }
+
+    @Test
+    fun foreignExecutionIdentityCannotSettleAStartedLegacyAttempt() {
+        val ledger = ToolAttemptLedger()
+        ledger.observe("tool/call", buildJsonObject {
+            put("id", "legacy")
+            put("goal_id", "goal")
+        })
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "legacy")
+            put("execution_id", "unobserved-execution")
+            put("is_error", false)
+        })
+        assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
+        assertEquals(1, ledger.pending().size)
+        // A genuine legacy receipt with no execution identity remains compatible.
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "legacy")
+            put("is_error", false)
+        })
+        assertFalse(ledger.hasUnresolvedExternalEffects("goal"))
+    }
+
 }

@@ -166,8 +166,11 @@ class ToolAttemptLedger {
                 // invocation merely because the provider reused its call ID.
                 if (known != null && known.id != id) return
                 val latest = latestByCallId[id]
-                if (executionId != null && known == null && latest?.executionId != null &&
-                    latest.executionId != executionId) return
+                // An execution-addressed receipt must match a persisted admission.
+                // A receipt without execution identity can only settle a legacy attempt
+                // that never acquired one. Provider call IDs may be reused across runs.
+                if (executionId != null && known == null) return
+                if (executionId == null && latest?.executionId != null) return
                 val attempt = known ?: track(id)
                 attempt.apply {
                     if (executionId != null) {
