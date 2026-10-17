@@ -1,6 +1,6 @@
 # V6 · 现行代码基线与真实验收台账
 
-> **2026-10-14 主线快照** `3cdd12f3395876b2d495721336d5d378b562a03c`。这是视觉/业务行为复核台账，而不是历史 38 张示例卡片的浏览器通过计数。参照 [现行规范](V6-CURRENT-IMPLEMENTATION.zh-CN.md)、[页面清单](current-ui.json) 和 [手机设计投影](mobile/app.html)。
+> **2026-10-17 合并后主线** `e17804391ecfd185baf71a282e66d179c266d0df`：#705 已合并，`AppRoot` 生产入口使用独立 V6 Pack 与 `LocalApplicationUiHost`，不再以旧 Shell 作为并行兜底。main push CI `39016721514` 因 AndroidTest Kotlin 编译失败，Android 16/17 未执行实际仪器用例；需在修复分支及后续最新 main 重新验证。以下 2026-10-14 记录为历史视觉快照，不能覆盖这一现行事实。参照 [现行规范](V6-CURRENT-IMPLEMENTATION.zh-CN.md)、[页面清单](current-ui.json) 和 [手机设计投影](mobile/app.html)。
 
 ## 代码已确认的约束
 

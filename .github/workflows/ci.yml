@@ -284,11 +284,12 @@ jobs:
       - uses: ./.github/actions/setup-runtime-cached
         with:
           abi: arm64-v8a
-      - name: Lint and assemble optimized APK
+      - name: Compile Android instrumentation tests, lint and assemble optimized APK
         run: |
           set -euo pipefail
           start=$SECONDS
-          ./gradlew :app:lintDebug :app:assembleOptimized --stacktrace --console=plain
+          # Compile androidTest contracts on PRs, even when device instrumentation is skipped.
+          ./gradlew :app:compileDebugAndroidTestKotlin :app:lintDebug :app:assembleOptimized --stacktrace --console=plain
           printf "| ARM64 Lint + 优化包构建 | %s 秒 |\n" "$((SECONDS - start))" >> "$GITHUB_STEP_SUMMARY"
       - name: Verify arm64 APK
         run: .github/scripts/verify-android16-apk.sh app/build/outputs/apk/optimized/app-optimized.apk arm64-v8a

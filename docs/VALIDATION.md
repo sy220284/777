@@ -26,7 +26,7 @@ Local Harness semantic reference: 0.2.1-alpha.1 / 5badb150...
 
 ## 仓库验收边界（与产品功能清单分离）
 
-仓库可执行验收索引只收录 **128 个已有 Kotlin @Test 直接证据的功能叶节点**，其他 318 个叶节点继续保留在 446 项权威功能树中，不进入本仓库 CI 验收目标、不可计作验收失败或通过。真实第三方账户/套餐、付费联机、物理设备辅助技术、长期电量/跨天行为由环境专项验证，不能作为仓库 CI 必过项。见 `docs/ACCEPTANCE-PLAYBOOK.zh-CN.md`。
+按本轮 `FEATURE-TREE.zh-CN.md` 与 `ACCEPTANCE-MATRIX.json` 的实际登记，**440 个功能叶节点中 125 项存在具名 Kotlin 测试映射，315 项尚无该索引映射**；125 项均为 `automated_partial`，只能证明对应断言存在且需在当前 SHA 上执行，不表示整个功能通过。无映射不等于失败，也不等于通过。真实第三方账户/套餐、付费联机、物理设备辅助技术、长期电量/跨天行为由环境专项验证，不能作为仓库 CI 必过项。见 `docs/ACCEPTANCE-PLAYBOOK.zh-CN.md`。
 
 ## CI
 
