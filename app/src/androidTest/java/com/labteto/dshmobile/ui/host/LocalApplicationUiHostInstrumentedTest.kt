@@ -124,9 +124,11 @@ class LocalApplicationUiHostInstrumentedTest {
         compose.onNodeWithText(context.getString(R.string.ui_pack_incompatible)).assertExists()
         compose.onNodeWithText("Independent V6 home").assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.ui_pack_back_to_stable)).performClick()
-        compose.onNodeWithText(context.getString(R.string.ui_pack_incompatible)).assertExists()
+        compose.onNodeWithText("Independent V6 home").assertExists()
         compose.runOnIdle {
-            assertEquals(null, preference.getString(localNavigationSnapshotKey("fixture-v6", null), null))
+            val restored = com.labteto.dshmobile.uihost.UiSceneNavigationSnapshotCodec.decodeOrNull(
+                preference.getString(localNavigationSnapshotKey("fixture-v6", null), null))
+            assertEquals(listOf(UiSceneId("route.home")), restored?.stack)
         }
     }
 

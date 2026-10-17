@@ -156,10 +156,11 @@ internal fun LocalApplicationUiHost(
             val snapshotKey = remember(packId, sessionState?.identity?.sessionId) {
                 localNavigationSnapshotKey(packId, sessionState?.identity?.sessionId)
             }
-            val persistedSnapshot = remember(preference, snapshotKey) {
+            var navigationReset by remember(packId, snapshotKey) { mutableStateOf(0L) }
+            val persistedSnapshot = remember(preference, snapshotKey, navigationReset) {
                 preference.getString(snapshotKey, null)
             }
-            val nav = remember(packId, snapshotKey) {
+            val nav = remember(packId, snapshotKey, navigationReset) {
                 UiHostSceneNavigation(LocalUiSceneCatalog.requirements,
                     decision.admission.pack.manifest, UiSceneId("route.home"),
                     deepLinks = LocalApplicationSceneDeepLinks.targets)
@@ -220,7 +221,7 @@ internal fun LocalApplicationUiHost(
                 onNavigationSnapshotUpdated = { encoded ->
                     preference.edit().putString(snapshotKey, encoded).commit()
                 },
-                navigationStateScope = snapshotKey,
+                navigationStateScope = "$snapshotKey:$navigationReset",
             )
             notificationError?.let { error ->
                 // Explicit failure is visible without treating the notification as an action grant.
@@ -231,7 +232,7 @@ internal fun LocalApplicationUiHost(
                 UnavailablePackNotice {
                     // Explicit recovery must clear the rejected pack's saved history.
                     preference.edit().remove(snapshotKey).commit()
-                    activity?.recreate()
+                    navigationReset += 1L
                 }
             }
         }
