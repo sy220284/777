@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.harness.resource
 
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.sync.Semaphore
@@ -110,7 +109,11 @@ class HarnessResourceScheduler(
     private val activeTerminals = AtomicInteger()
     private val activeVirtualDisplays = AtomicInteger()
     private val activeLanguageServers = AtomicInteger()
-    private val leases = ConcurrentHashMap<String, HarnessResourceLeaseInfo>()
+    // Counters and the lease registry are one state projection: reports must never see
+    // a changed count with a stale lease list (or vice versa).
+    private val leaseStateLock = Any()
+    private val publicationLock = Any()
+    private val leases = linkedMapOf<String, HarnessResourceLeaseInfo>()
 
     suspend fun acquire(
         kind: HarnessResourceKind,
@@ -124,12 +127,16 @@ class HarnessResourceScheduler(
             owner = owner.take(160),
             acquiredAt = System.currentTimeMillis(),
         )
-        increment(kind)
-        leases[info.id] = info
+        synchronized(leaseStateLock) {
+            increment(kind)
+            leases[info.id] = info
+        }
         publish()
         return HarnessResourceLease(info) {
-            leases.remove(info.id)
-            decrement(kind)
+            synchronized(leaseStateLock) {
+                leases.remove(info.id)
+                decrement(kind)
+            }
             semaphore.release()
             publish()
         }
@@ -148,7 +155,7 @@ class HarnessResourceScheduler(
         }
     }
 
-    fun snapshot(): HarnessResourceSnapshot = HarnessResourceSnapshot(
+    fun snapshot(): HarnessResourceSnapshot = synchronized(leaseStateLock) { HarnessResourceSnapshot(
         activeModelRequests = activeModels.get(),
         activeAgents = activeAgents.get(),
         activeTerminals = activeTerminals.get(),
@@ -156,7 +163,7 @@ class HarnessResourceScheduler(
         activeLanguageServers = activeLanguageServers.get(),
         budget = budget,
         leases = leases.values.sortedBy(HarnessResourceLeaseInfo::acquiredAt),
-    )
+    ) }
 
     private fun increment(kind: HarnessResourceKind) {
         counter(kind).incrementAndGet()
@@ -174,7 +181,10 @@ class HarnessResourceScheduler(
         HarnessResourceKind.LANGUAGE_SERVER -> activeLanguageServers
     }
 
-    private fun publish() {
+    private fun publish() = synchronized(publicationLock) {
+        // Take the snapshot only after acquiring the publication lock. Another thread
+        // may already have released/acquired leases while a slow observer was running.
+        // Publishing a previously captured snapshot here would roll the UI backwards.
         runCatching { onChanged(snapshot()) }
     }
 }

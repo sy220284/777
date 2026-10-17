@@ -243,6 +243,11 @@ class HarnessJobManager(
         var previousJob: Job? = null
         val record = synchronized(lock) {
             val found = records[id] ?: return "后台任务不存在：$id"
+            // A supplied owner may bind an unowned legacy job, but must never steal a
+            // durable job belonging to another session during recovery.
+            if (ownerId != null && found.ownerId != null && ownerId != found.ownerId) {
+                return "后台任务不属于当前会话：$id"
+            }
             if ((ownerId ?: found.ownerId) in removingOwners) return "会话正在移除，无法恢复后台任务"
             if (found.resumeKind.isNullOrBlank()) return "后台任务不可恢复：$id"
             if (!found.isResumable()) {

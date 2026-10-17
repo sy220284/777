@@ -1,6 +1,12 @@
 package com.labteto.dshmobile.harness.resource
 
 import kotlinx.coroutines.CompletableDeferred
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
@@ -110,6 +116,58 @@ class HarnessResourceSchedulerTest {
         lease.close()
         assertEquals(0, scheduler.snapshot().activeLanguageServers)
         assertTrue(scheduler.snapshot().leases.isEmpty())
+    }
+
+    @Test
+    fun overlappingCallbacksNeverPublishAnOlderLeaseSnapshotAfterRelease() {
+        val observerEntered = CountDownLatch(1)
+        val releaseObserver = CountDownLatch(1)
+        val blockOnce = AtomicBoolean(false)
+        val published = CopyOnWriteArrayList<HarnessResourceSnapshot>()
+        val scheduler = HarnessResourceScheduler(
+            HarnessResourceBudget(maxModelRequests = 1, maxAgents = 1),
+        ) { snapshot ->
+            if (snapshot.activeAgents == 1 && snapshot.activeModelRequests == 1 &&
+                blockOnce.compareAndSet(false, true)) {
+                observerEntered.countDown()
+                check(releaseObserver.await(5, TimeUnit.SECONDS))
+            }
+            published += snapshot
+        }
+        val model = runBlocking { scheduler.acquire(HarnessResourceKind.MODEL_REQUEST) }
+        val workers = Executors.newFixedThreadPool(2)
+        try {
+            val agentFuture = workers.submit<HarnessResourceLease> {
+                runBlocking { scheduler.acquire(HarnessResourceKind.AGENT) }
+            }
+            assertTrue(observerEntered.await(5, TimeUnit.SECONDS))
+            val modelRelease = workers.submit { model.close() }
+            // The release updates live state before trying to publish. Its callback
+            // must not overtake the still-blocked older callback.
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            while (scheduler.snapshot().activeModelRequests != 0 && System.nanoTime() < deadline) {
+                Thread.yield()
+            }
+            assertEquals(0, scheduler.snapshot().activeModelRequests)
+            assertEquals(1, scheduler.snapshot().activeAgents)
+            releaseObserver.countDown()
+            val agent = agentFuture.get(5, TimeUnit.SECONDS)
+            modelRelease.get(5, TimeUnit.SECONDS)
+            val finalSnapshot = scheduler.snapshot()
+            assertEquals(finalSnapshot, published.last())
+            published.forEach { report ->
+                assertEquals(report.activeModelRequests,
+                    report.leases.count { it.kind == HarnessResourceKind.MODEL_REQUEST })
+                assertEquals(report.activeAgents,
+                    report.leases.count { it.kind == HarnessResourceKind.AGENT })
+            }
+            agent.close()
+            assertEquals(0, scheduler.snapshot().activeAgents)
+        } finally {
+            releaseObserver.countDown()
+            model.close()
+            workers.shutdownNow()
+        }
     }
 
     @Test

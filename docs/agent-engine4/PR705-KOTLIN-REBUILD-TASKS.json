@@ -313,10 +313,21 @@
         "AE4V3-09",
         "AE4V3-14"
       ],
-      "status": "not_started",
-      "code_evidence": [],
-      "tests_verified": [],
-      "notes": ""
+      "status": "in_progress",
+      "code_evidence": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/resource/HarnessResourceScheduler.kt",
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/resource/HarnessResourceSchedulerTest.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/jobs/HarnessJobManager.kt",
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/jobs/HarnessJobPersistenceTest.kt"
+      ],
+      "tests_verified": [
+        "local :harness-core:test complete",
+        "local :reference-validation:test complete",
+        "local :app:compileDebugKotlin complete",
+        "local resource/jobs targeted JUnit regression",
+        "local architecture/performance/test-quality/Kotlin-risk/CI-integrity gates"
+      ],
+      "notes": "2026-10-17：启动 Resource/Jobs/Interaction 领域重构。Shared HarnessResourceScheduler 的租约清单与活跃计数改为同一临界区原子投影，并串行资源观察者通知，避免慢观察者让旧快照反向覆盖新状态；新增并发回调及快照不变量测试。Shared HarnessJobManager 持久任务恢复加入 ownerId 会话隔离：有归属的任务不可被另一会话接管，仍保留无归属旧任务首次绑定兼容，新增拒绝/合法恢复正反例。本地 harness-core 全量测试、reference-validation 测试、App Kotlin 编译和 5 个静态门禁通过；七模块全量 JVM 测试运行至 App 层时执行窗口超时，未冒称全套完成。本切片只覆盖 Resource 与 Jobs，Interaction 全链路、跨进程持久所有权、当前提交 SHA CI 尚未整项验收。"
     },
     {
       "id": "AE4V3-16",

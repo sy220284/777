@@ -176,6 +176,53 @@ class HarnessJobPersistenceTest {
     }
 
     @Test
+    fun persistentResumeCannotTransferAnOwnedJobAcrossSessions() = runTest {
+        var launched = false
+        val manager = HarnessJobManager(
+            scope = backgroundScope,
+            onChanged = {},
+            initialSnapshots = listOf(JobSnapshot(
+                id = "job-owned", label = "子代理：持久工作", status = "interrupted",
+                resumeKind = "subagent_readonly", resumePayload = "{}", ownerId = "session-a",
+            )),
+        )
+        val original = manager.snapshots().single()
+        val denied = manager.resumePersistent("job-owned", ownerId = "session-b") { _, _ ->
+            launched = true
+            "unexpected"
+        }
+        assertTrue(denied.contains("不属于当前会话"))
+        assertEquals(original, manager.snapshots().single())
+        assertFalse(launched)
+        assertTrue(manager.availableSlots() > 0)
+
+        val allowed = manager.resumePersistent("job-owned", ownerId = "session-a") { _, _ ->
+            launched = true
+            "legitimate"
+        }
+        assertTrue(allowed.contains("已恢复"))
+        runCurrent()
+        assertTrue(launched)
+        assertEquals("session-a", manager.snapshots().single().ownerId)
+    }
+
+    @Test
+    fun previouslyUnownedLegacyJobMayAcquireItsFirstSessionOwnerOnResume() = runTest {
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = {},
+            initialSnapshots = listOf(JobSnapshot(
+                id = "legacy", label = "后台抓取", status = "interrupted",
+                resumeKind = "web_fetch", resumePayload = "{}", ownerId = null,
+            )),
+        )
+        assertTrue(manager.resumePersistent("legacy", "session-a") { _, _ -> "completed" }
+            .contains("已恢复"))
+        runCurrent()
+        assertEquals("session-a", manager.snapshots().single().ownerId)
+    }
+
+    @Test
     fun subagentRequestSliceBoundaryPersistsAndCanResumeAfterExplicitRootAdmission() = runTest {
         val durable = java.util.concurrent.atomic.AtomicReference<List<JobSnapshot>>(emptyList())
         val manager = HarnessJobManager(
