@@ -338,4 +338,53 @@ class V6ToolParameterFormTest {
     }
 
 
+
+    @Test fun malformedUntrustedRequiredSchemaFailsClosedWithoutCrashingUI() {
+        val badType = buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject {
+                put("prompt", buildJsonObject { put("type", "string") })
+            })
+            put("required", buildJsonArray {
+                add(buildJsonObject { put("role", "admin") })
+            })
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            v6ToolFormFields(badType)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            v6ToolArgumentsJson(badType, mapOf("prompt" to "text"))
+        }
+        val unknownRequired = buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject {
+                put("prompt", buildJsonObject { put("type", "string") })
+            })
+            put("required", buildJsonArray { add(JsonPrimitive("secret_authorization")) })
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            v6ToolFormFields(unknownRequired)
+        }
+        val duplicate = buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject {
+                put("prompt", buildJsonObject { put("type", "string") })
+            })
+            put("required", buildJsonArray {
+                add(JsonPrimitive("prompt")); add(JsonPrimitive("prompt"))
+            })
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            v6ToolFormFields(duplicate)
+        }
+        val withoutObjectRoot = buildJsonObject {
+            put("type", "array")
+            put("properties", buildJsonObject { })
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            v6ToolFormFields(withoutObjectRoot)
+        }
+    }
+
+
 }
