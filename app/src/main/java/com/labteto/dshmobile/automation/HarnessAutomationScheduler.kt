@@ -402,12 +402,25 @@ class HarnessAutomationScheduler @Inject constructor(
             )
             .addTag(WORK_TAG)
             .build()
-        return store.withCurrentGeneration(id, task.scheduleGeneration) {
+        // Claim the exact durable WorkManager request before it can execute. REPLACE
+        // cancels older work asynchronously, so generation alone is not an authority.
+        val claimId = request.id.toString()
+        store.updateIf(id, predicate = { it.scheduleGeneration == task.scheduleGeneration }) {
+            it.copy(activeManualRunId = claimId)
+        } ?: return false
+        return try {
             workManager.enqueueUniqueWork(
                 manualWorkName(id, task.scheduleGeneration),
                 ExistingWorkPolicy.REPLACE,
                 request,
             )
+            true
+        } catch (error: Throwable) {
+            // A failed admission must not leave a ghost manual execution claim.
+            store.updateIf(id, predicate = {
+                it.scheduleGeneration == task.scheduleGeneration && it.activeManualRunId == claimId
+            }) { it.copy(activeManualRunId = null) }
+            throw error
         }
     }
 

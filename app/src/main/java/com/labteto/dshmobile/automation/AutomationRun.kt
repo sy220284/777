@@ -23,12 +23,20 @@ internal fun mayStartScheduledAutomation(task: AutomationTask, generation: Long)
  * Generation fences edits, but not two executions of the SAME schedule generation.
  * Check the original durable startedAt as well, within AutomationStore.updateIf's lock,
  * so an old Worker cannot settle a newer run or settle twice after restart.
- * Manual runs do not advance lastRunAt and retain their generation-only contract.
+ * Manual runs retain the scheduled task's lastRunAt/status, but use their
+ * durable WorkManager request UUID as an independent settlement capability.
+ * Editing/replacing a manual request revokes the old UUID before enqueuing
+ * its replacement. A stale Worker cannot publish even within one generation.
  */
 internal fun ownsAutomationSettlement(
     task: AutomationTask,
     generation: Long,
     startedAt: Long,
     manualRun: Boolean,
+    manualExecutionId: String? = null,
 ): Boolean = task.scheduleGeneration == generation &&
-    (manualRun || (task.status == AutomationStatus.RUNNING && task.lastRunAt == startedAt))
+    (if (manualRun) {
+        !manualExecutionId.isNullOrBlank() && task.activeManualRunId == manualExecutionId
+    } else {
+        task.status == AutomationStatus.RUNNING && task.lastRunAt == startedAt
+    })

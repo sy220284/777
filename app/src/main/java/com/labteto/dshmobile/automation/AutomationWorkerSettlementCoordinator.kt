@@ -32,6 +32,7 @@ internal class AutomationWorkerSettlementCoordinator(
         task: AutomationTask,
         manualRun: Boolean,
         started: Long,
+        manualExecutionId: String?,
         run: LocalAutomationRunResult,
     ) {
         val finished = System.currentTimeMillis()
@@ -51,7 +52,7 @@ internal class AutomationWorkerSettlementCoordinator(
         val updated = store.updateIf(
             id,
             predicate = {
-                ownsAutomationSettlement(it, requestedGeneration, started, manualRun)
+                ownsAutomationSettlement(it, requestedGeneration, started, manualRun, manualExecutionId)
             },
         ) { current ->
             val userActivityDuringRun = current.lastUserActivityAt
@@ -79,6 +80,7 @@ internal class AutomationWorkerSettlementCoordinator(
                 else -> AutomationStatus.COMPLETED
             }
             current.copy(
+                activeManualRunId = if (manualRun) null else current.activeManualRunId,
                 workSessionId = if (current.mode == AutomationMode.WORK) {
                     run.sessionId
                 } else {
@@ -131,6 +133,7 @@ internal class AutomationWorkerSettlementCoordinator(
         task: AutomationTask,
         manualRun: Boolean,
         started: Long,
+        manualExecutionId: String?,
         sessionId: String?,
         detail: String,
     ) {
@@ -138,10 +141,11 @@ internal class AutomationWorkerSettlementCoordinator(
         val updated = store.updateIf(
             id,
             predicate = {
-                ownsAutomationSettlement(it, requestedGeneration, started, manualRun)
+                ownsAutomationSettlement(it, requestedGeneration, started, manualRun, manualExecutionId)
             },
         ) { current ->
             current.copy(
+                activeManualRunId = if (manualRun) null else current.activeManualRunId,
                 workSessionId = sessionId ?: current.workSessionId,
                 status = if (manualRun) current.status else AutomationStatus.BLOCKED,
                 lastError = truncateWithoutSplittingSurrogatePair(detail, 4_000),
@@ -172,6 +176,7 @@ internal class AutomationWorkerSettlementCoordinator(
         task: AutomationTask,
         manualRun: Boolean,
         started: Long,
+        manualExecutionId: String?,
         sessionId: String?,
         detail: String,
         persistWorkSessionId: Boolean,
@@ -182,10 +187,11 @@ internal class AutomationWorkerSettlementCoordinator(
             val updated = store.updateIf(
                 id,
                 predicate = {
-                ownsAutomationSettlement(it, requestedGeneration, started, manualRun)
+                ownsAutomationSettlement(it, requestedGeneration, started, manualRun, manualExecutionId)
             },
             ) { current ->
                 current.copy(
+                    activeManualRunId = null,
                     workSessionId = if (persistWorkSessionId) sessionId else current.workSessionId,
                     lastError = truncateWithoutSplittingSurrogatePair(detail, 4_000),
                     runReceipts = appendAutomationReceipt(
@@ -215,7 +221,7 @@ internal class AutomationWorkerSettlementCoordinator(
         val updated = store.updateIf(
             id,
             predicate = {
-                ownsAutomationSettlement(it, requestedGeneration, started, manualRun)
+                ownsAutomationSettlement(it, requestedGeneration, started, manualRun, manualExecutionId)
             },
         ) { current ->
             val nextFailureStreak = current.failureStreak.saturatingIncrement()

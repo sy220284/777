@@ -122,4 +122,6 @@ data class AutomationTask(
     val lastError: String? = null,
     val runReceipts: List<AutomationRunReceipt> = emptyList(),
     val dispatchPolicy: AutomationDispatchPolicy? = null,
+    /** WorkManager request ID that currently owns manual-run settlement. Old records default to no owner. */
+    val activeManualRunId: String? = null,
 )

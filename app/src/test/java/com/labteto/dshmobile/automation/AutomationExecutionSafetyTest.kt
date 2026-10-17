@@ -116,14 +116,66 @@ class AutomationExecutionSafetyTest {
     }
 
     @Test
-    fun automationSettlementRejectsEditedGenerationAndPreservesManualContract() {
+    fun automationSettlementRequiresExactDurableManualExecutionIdentity() {
         val task = AutomationTask(
             id = "manual", prompt = "work", createdAt = 1L, nextRunAt = 2L,
             scheduleGeneration = 10L, status = AutomationStatus.PAUSED,
         )
-        assertFalse(ownsAutomationSettlement(task, 9L, 10L, manualRun = true))
-        assertTrue(ownsAutomationSettlement(task, 10L, 10L, manualRun = true))
-        assertFalse(ownsAutomationSettlement(task, 10L, 10L, manualRun = false))
+        val claimed = task.copy(activeManualRunId = "work-request-a")
+        assertFalse(ownsAutomationSettlement(claimed, 9L, 10L, manualRun = true, manualExecutionId = "work-request-a"))
+        assertFalse(ownsAutomationSettlement(claimed, 10L, 10L, manualRun = true))
+        assertFalse(ownsAutomationSettlement(claimed, 10L, 10L, manualRun = true, manualExecutionId = "work-request-b"))
+        assertTrue(ownsAutomationSettlement(claimed, 10L, 10L, manualRun = true, manualExecutionId = "work-request-a"))
+        assertFalse(ownsAutomationSettlement(claimed, 10L, 10L, manualRun = false))
+        // Replacing a manual WorkManager request revokes every late settlement of
+        // its predecessor even when the scheduler generation is unchanged.
+        val replacement = claimed.copy(activeManualRunId = "work-request-b")
+        assertFalse(ownsAutomationSettlement(replacement, 10L, 10L, manualRun = true, manualExecutionId = "work-request-a"))
+        assertTrue(ownsAutomationSettlement(replacement, 10L, 10L, manualRun = true, manualExecutionId = "work-request-b"))
+        assertFalse(ownsAutomationSettlement(replacement.copy(activeManualRunId = null), 10L, 10L,
+            manualRun = true, manualExecutionId = "work-request-b"))
+    }
+
+    @Test
+    fun manualRunDurableClaimSurvivesReopenAndFencesReplacedReceipt() {
+        val dir = Files.createTempDirectory("automation-manual-identity").toFile()
+        try {
+            val file = dir.resolve("automations.json")
+            val firstProcess = AutomationStore(file, json)
+            val task = firstProcess.upsert(AutomationTask(
+                id = "manual", prompt = "one shot", createdAt = 1L,
+                nextRunAt = 2L, status = AutomationStatus.PAUSED,
+            )).admitted
+            assertNull(task.activeManualRunId)
+            assertNotNull(firstProcess.updateIf("manual", predicate = {
+                it.scheduleGeneration == task.scheduleGeneration
+            }) { it.copy(activeManualRunId = "request-a") })
+
+            val restarted = AutomationStore(file, json)
+            assertEquals("request-a", restarted.get("manual")!!.activeManualRunId)
+            assertNotNull(restarted.updateIf("manual", predicate = {
+                it.scheduleGeneration == task.scheduleGeneration
+            }) { it.copy(activeManualRunId = "request-b") })
+            val staleCommit = restarted.updateIf("manual", predicate = {
+                ownsAutomationSettlement(it, task.scheduleGeneration, 100L,
+                    manualRun = true, manualExecutionId = "request-a")
+            }) { it.copy(lastResult = "stale", activeManualRunId = null) }
+            assertNull(staleCommit)
+            assertEquals("request-b", restarted.get("manual")!!.activeManualRunId)
+            assertNull(restarted.get("manual")!!.lastResult)
+            val currentCommit = restarted.updateIf("manual", predicate = {
+                ownsAutomationSettlement(it, task.scheduleGeneration, 200L,
+                    manualRun = true, manualExecutionId = "request-b")
+            }) { it.copy(lastResult = "genuine", activeManualRunId = null) }
+            assertNotNull(currentCommit)
+            assertNull(restarted.updateIf("manual", predicate = {
+                ownsAutomationSettlement(it, task.scheduleGeneration, 200L,
+                    manualRun = true, manualExecutionId = "request-b")
+            }) { it.copy(lastResult = "duplicate") })
+            assertEquals("genuine", AutomationStore(file, json).get("manual")!!.lastResult)
+        } finally {
+            dir.deleteRecursively()
+        }
     }
 
     @Test
