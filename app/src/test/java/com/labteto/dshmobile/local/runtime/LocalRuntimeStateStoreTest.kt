@@ -100,8 +100,10 @@ class LocalRuntimeStateStoreTest {
         store.foregroundRunHandle.pendingInputs.offer(
             com.labteto.dshmobile.harness.agent.QueuedAgentInput("queued", id = "queued"),
         )
-        val blocked = File(temporary.root, "blocked").apply { writeText("not a directory") }
-        val log = LocalSessionEventLog(File(blocked, "events.jsonl"), Json)
+        val blocked = temporary.newFolder("blocked")
+        val eventFile = File(blocked, "events.jsonl")
+        val log = LocalSessionEventLog(eventFile, Json)
+        com.labteto.dshmobile.local.blockEventLogWritesAfterOpen(eventFile)
         try {
             assertTrue(runCatching { store.cancelForegroundRun(log) }.isFailure)
             assertTrue(job.isCancelled)
@@ -124,8 +126,10 @@ class LocalRuntimeStateStoreTest {
             store.foregroundRunHandle.pendingInputs.offer(
                 com.labteto.dshmobile.harness.agent.QueuedAgentInput("queued", id = "queued"),
             )
-            val blocked = File(temporary.root, "blocked-join").apply { writeText("not a directory") }
-            val log = LocalSessionEventLog(File(blocked, "events.jsonl"), Json)
+            val blocked = temporary.newFolder("blocked-join")
+            val eventFile = File(blocked, "events.jsonl")
+            val log = LocalSessionEventLog(eventFile, Json)
+            com.labteto.dshmobile.local.blockEventLogWritesAfterOpen(eventFile)
             try {
                 assertTrue(runCatching { store.cancelForegroundRunAndJoin(log) }.isFailure)
                 assertTrue(job.isCompleted)

@@ -185,10 +185,10 @@ class LocalWorkApprovalCoordinatorTest {
     @Test fun failedSessionAuditLogCannotStrandOtherRunsAfterGlobalPolicyCommits() = runTest {
         val f = Fixture()
         val a = f.binding("a")
-        val blocked = java.io.File(temporary.newFolder(), "blocked").apply { writeText("file") }
-        val brokenLog = com.labteto.dshmobile.local.session.LocalSessionEventLog(
-            java.io.File(blocked, "events.jsonl"), Json,
-        )
+        val blocked = temporary.newFolder("blocked")
+        val eventFile = java.io.File(blocked, "events.jsonl")
+        val brokenLog = com.labteto.dshmobile.local.session.LocalSessionEventLog(eventFile, Json)
+        com.labteto.dshmobile.local.blockEventLogWritesAfterOpen(eventFile)
         val b = LocalWorkRunBinding(
             sessionId = "b",
             initialState = LocalHarnessState(

@@ -144,7 +144,12 @@ class LocalWorkGoalContinuationTest {
                 // Historical records lacked execution_started. Outcome stays unknown.
             })
             assertTrue(hasUnresolvedWorkGoalToolEffects(log, goalFromStartOfTestLog))
-            log.goalToolResult("legacy-side-effect")
+            // A legacy completion has no execution identity; a modern identifier
+            // would be rejected because no matching admission was ever recorded.
+            log.append("tool/result", buildJsonObject {
+                put("id", "legacy-side-effect")
+                put("is_error", false)
+            })
             assertFalse(hasUnresolvedWorkGoalToolEffects(log, goalFromStartOfTestLog))
         } finally { log.close() }
     }

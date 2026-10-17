@@ -270,8 +270,7 @@ class LocalWorkProgressCoordinatorTest {
         val state = MutableStateFlow(initial)
         val parent = temporary.newFolder("not-a-directory")
         val log = eventLog(File(parent, "goal.jsonl"))
-        assertTrue(parent.delete())
-        assertTrue(parent.createNewFile())
+        com.labteto.dshmobile.local.blockEventLogWritesAfterOpen(File(parent, "goal.jsonl"))
         var persisted = false
         val coordinator = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) { persisted = true }
         val mutations = listOf<() -> Unit>(
