@@ -24,8 +24,11 @@ class UiFontTests(unittest.TestCase):
             ui = base / "ui"
             ui.mkdir()
             (ui / "Demo.kt").write_text('val x="人物日记"', encoding="utf-8")
-            needed = font.used_characters(base / "res", ui)
-            self.assertTrue(set(map(ord, "设置按钮工作人物日记")).issubset(needed))
+            next_ui = base / "next-ui"
+            next_ui.mkdir()
+            (next_ui / "New.kt").write_text('val label="全新界面"', encoding="utf-8")
+            needed = font.used_characters(base / "res", [ui, next_ui])
+            self.assertTrue(set(map(ord, "设置按钮工作人物日记全新界面")).issubset(needed))
             self.assertNotIn(ord("忽"), needed)
 
     def test_offline_fonttools_bootstrap_rejects_network(self):
