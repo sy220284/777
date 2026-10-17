@@ -1,0 +1,26 @@
+# 后端保留版：UI 清空及新界面接入
+
+当前源代码**不提供旧聊天、Work、人物、工具或设置页面**。MainActivity 仅作为 Android 宿主入口，不安装 Compose 内容、视觉桥或任何旧 UI。此状态用于重新接入全新 UI；用户无法通过旧页面操作业务，这是有意设计的过渡态。
+
+## 保留
+
+- `:core`、Harness 系列、`app/local`、`app/automation`、`app/connection`、持久化与通知服务。模型请求、会话、记忆、工具、Work、执行和用户数据均由原业务 Owner 保管。
+- `:ui-contract` 的各 Feature Port、命令、快照、回执与能力契约。
+- `:ui-host` 的场景准入、导航状态、安全系统操作和系统权限入口。Host 不规定界面布局、风格、动画、字体或图标。
+- App 内 Host/Feature 适配器、已有用户数据与业务配置，不抹除持久数据，不卸载或重置用户状态。
+- 人物预设的角色内容素材属于产品数据，非旧 UI 皮肤，保留供新界面使用。
+
+## 明确移除
+
+- `:ui-pack-v6` 及其所有页面 Renderer / Shenyan 设计组件与视觉系统。
+- App `ui/screens`、`ui/components`、`ui/theme`、`ui/shenyan`、侧边栏 UI 实现、字体、图标、旧动画与视觉回归测试。
+- V6 设计源码/图标体系/视觉素材文档与旧截图采集工作流。
+- 任意编译期对 V6 包的依赖，以及旧 UI 的生产装配。
+
+## 新 UI 接入要求
+
+新的界面从独立 `:ui-pack-new` 模块实现 `UiApplicationScenePack`，由 App 明确安装并通过 Host 的场景准入；它只观察原 Feature Port 状态并发送命令，不得创建平行业务状态或绕开 Host 授权。包内自由实现自己的视觉、字体、材质和动画，严禁复制旧 V6 工厂或使用旧兼容回退。真正接入新界面时新增 Compose 入口并独立进行完整行为与设备回归；目前没有第二套 UI，也不宣称通过了逐功能 UI 验收。
+
+## 验证原则
+
+后端基线仍必须通过架构 3.0、业务单元测试、Android 构建和运行时服务检查；旧 V6 专用的视觉/页面截图断言不再适用于无界面产物。新增的 `check-ui-module-boundaries.py` 明确禁止旧 UI 源码或依赖回来。

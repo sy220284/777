@@ -906,77 +906,10 @@ for route_id in route_ids:
     if count != 1:
         die(f"Feature route {route_id} must have exactly one startup owner, found {count}")
 
-feature_navigation = strip_comments(read(
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureNavigation.kt"
-))
-if "LocalFeatureCatalog.resolve(" not in feature_navigation:
-    die("Feature navigation must resolve product routes through LocalFeatureCatalog")
-
-feature_page_host_path = "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt"
-feature_page_host = strip_comments(read(feature_page_host_path))
-if "LocalFeatureCatalog.ownerOf(page)" not in feature_page_host:
-    die("Feature page host must resolve its contribution owner through LocalFeatureCatalog")
-if re.search(r"\bwhen\s*\(\s*page\s*\)", feature_page_host):
-    die("central Feature page host must not dispatch product pages with when(page)")
-if "LocalFeatureUiContribution" not in feature_page_host:
-    die("Feature page host lost the Feature UI contribution contract")
-if "LocalConversationSurfaceState" in feature_page_host:
-    die("central Feature page host must not broadcast Chat surface state to every Feature contribution")
-
-for required in ("drawerActions", "backAction", "restorePage"):
-    if required not in feature_page_host:
-        die("Feature UI contribution lost navigation ownership contract: " + required)
-
-# Discover real UI contribution registrations irrespective of file naming/location.
-# New Features cannot pass by reusing or omitting an old owner.
-feature_contribution_paths: dict[str, str] = {}
-for contribution_path in sorted(UI_SOURCE_ROOT.rglob("*.kt")):
-    relative = contribution_path.relative_to(ROOT).as_posix()
-    contribution = strip_comments(contribution_path.read_text(encoding="utf-8"))
-    declared_owners = re.findall(
-        r"\bmoduleId\s*=\s*LocalFeatureModuleId\.([A-Z][A-Z0-9_]*)\b",
-        contribution,
-    )
-    if not declared_owners:
-        continue
-    if "LocalFeatureUiContribution(" not in contribution:
-        die(f"{relative} declares Feature UI owner without contribution construction")
-    if len(declared_owners) != 1:
-        die(f"{relative} must declare exactly one Feature UI contribution owner; found {declared_owners}")
-    module_id = declared_owners[0]
-    if module_id in feature_contribution_paths:
-        die(f"multiple UI contributions claim {module_id}: {feature_contribution_paths[module_id]}, {relative}")
-    feature_contribution_paths[module_id] = relative
-
-if set(feature_contribution_paths) != module_ids:
-    die(
-        "Feature UI contribution owners must match LocalFeatureModuleId exactly: "
-        + ", ".join(sorted(set(feature_contribution_paths) ^ module_ids))
-    )
-for module_id, relative in feature_contribution_paths.items():
-    contribution = strip_comments(read(relative))
-    own_marker = f"LocalFeatureModuleId.{module_id}"
-    # Unique ownership is already validated from actual moduleId assignments above.
-    # Legitimate extra references to the same module within one UI contribution
-    # must not fail merely because the symbol appears twice.
-    foreign_markers = {
-        other for other in module_ids
-        if other != module_id and f"LocalFeatureModuleId.{other}" in contribution
-    }
-    if foreign_markers:
-        die(
-            f"Feature UI contribution {module_id} must not compose sibling owners: "
-            + ", ".join(sorted(foreign_markers))
-        )
-    if "LocalHarnessViewModel" in contribution:
-        die(
-            f"Feature UI contribution {module_id} must consume narrow state/actions instead of LocalHarnessViewModel"
-        )
-
-    if module_id != "SHELL":
-        for required in ("drawerActions =", "backAction =", "restorePage ="):
-            if required not in contribution:
-                die(f"Feature UI contribution {module_id} lost {required.strip(' =')} ownership")
+# No visual Feature contribution is installed in the backend-only baseline.
+# Feature owner, route, state and capability assertions above still run unchanged.
+if (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens").exists():
+    die("Backend-only baseline must not restore retired Feature screens")
 
 # The old callback-composing Shell is retired. Route ownership is still checked
 # above against FeatureCatalog; the sole application renderer is now the Scene Host.
@@ -1013,12 +946,11 @@ if "transportFactory = { endpoint ->" not in plugin_composition or (
     "stdioTransportFactory = { command, workingDirectory ->" not in plugin_composition
 ) or plugin_composition.count("McpPluginWorkerTransport(") < 2:
     die("R4 production MCP HTTP and stdio must both use Binder worker without local fallback")
-app_root = strip_comments(read("app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt"))
-v6_boot = strip_comments(read("app/src/main/java/com/labteto/dshmobile/ui/host/LocalProductionUiEntry.kt"))
-if "LocalProductionUiEntry(" not in app_root:
-    die("R4 AppRoot must install the neutral application UI entry")
-if "LocalV6StandaloneViewModel = hiltViewModel()" not in v6_boot:
-    die("R4 production entry must compose the real Feature Port application owner")
+main_activity = strip_comments(read("app/src/main/java/com/labteto/dshmobile/MainActivity.kt"))
+if any(token in main_activity for token in ("setContent(", "AppRoot(", "V6VisualBridge(", "DshTheme(")):
+    die("Backend-only MainActivity must not install a visual tree or V6 appearance")
+if not (ROOT / "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiApplicationScenePack.kt").is_file():
+    die("Generic UI Host contracts must survive UI removal")
 for retired in ("LocalHarnessViewModel", "LocalHarnessScreen", "LocalLegacyApplicationEntry"):
     for path, source in kotlin_sources_under(ROOT / "app/src/main/java"):
         if references_type(source, retired) or re.search(r"\b(?:class|fun)\s+" + retired + r"\b", source):
