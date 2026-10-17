@@ -54,8 +54,8 @@ internal fun v6StructuredToolResult(raw: String, maxLines: Int = 64): List<Strin
                 }
                 if (value.size > 32) emit("…省略其他数组条目")
             }
-            is JsonPrimitive -> emit("$name：${value.content.take(320)}")
             JsonNull -> emit("$name：null")
+            is JsonPrimitive -> emit("$name：${value.content.take(320)}")
         }
     }
     if (raw.length > 16_384) return listOf("工具结果超过安全展示预算，请从原始事件按来源检查")
@@ -77,29 +77,32 @@ internal fun V6WorkToolActivityPanel(
     var detail by remember(identity) { mutableStateOf<List<String>>(emptyList()) }
     var failure by remember(identity) { mutableStateOf<String?>(null) }
     var loading by remember(identity) { mutableStateOf(false) }
-    var requestEpoch by remember(identity) { mutableLongStateOf(0L) }
+    var activityEpoch by remember(identity) { mutableLongStateOf(0L) }
+    var detailEpoch by remember(identity) { mutableLongStateOf(0L) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(reads, evidence, identity) {
         evidence.changes(identity).onStart { emit(Unit) }.collectLatest {
-            val revision = ++requestEpoch
+            val revision = ++activityEpoch
             try {
                 val next = withContext(Dispatchers.IO) {
                     reads.toolActivitiesForUi(identity.sessionId).takeLast(32)
                 }
-                if (revision == requestEpoch) {
+                if (revision == activityEpoch) {
                     activities = next
                     if (selected != null && next.none {
                         it.callId == selected?.callId && it.executionId == selected?.executionId &&
                             it.finishedSequence == selected?.finishedSequence
                     }) {
+                        ++detailEpoch
+                        loading = false
                         selected = null
                         detail = emptyList()
                     }
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) {
-                if (revision == requestEpoch) failure = error.message ?: "工具活动无法读取"
+                if (revision == activityEpoch) failure = error.message ?: "工具活动无法读取"
             }
         }
     }
@@ -117,7 +120,7 @@ internal fun V6WorkToolActivityPanel(
             val source = item.finishedSequence ?: item.startedSequence ?: item.declaredSequence
             TextButton(onClick = {
                 if (loading || source == null) return@TextButton
-                val request = ++requestEpoch
+                val request = ++detailEpoch
                 loading = true
                 selected = item
                 detail = emptyList()
@@ -126,16 +129,16 @@ internal fun V6WorkToolActivityPanel(
                         val raw = withContext(Dispatchers.IO) {
                             reads.toolEvidenceForUi(identity.sessionId, item.callId, source)
                         }
-                        if (request == requestEpoch) {
+                        if (request == detailEpoch) {
                             detail = if (raw == null) listOf("来源事件已失效或不可用")
                                 else v6StructuredToolResult(raw)
                             failure = null
                         }
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (error: Exception) {
-                        if (request == requestEpoch) failure = error.message ?: "来源读取失败"
+                        if (request == detailEpoch) failure = error.message ?: "来源读取失败"
                     } finally {
-                        if (request == requestEpoch) loading = false
+                        if (request == detailEpoch) loading = false
                     }
                 }
             }, enabled = source != null && !loading) {
