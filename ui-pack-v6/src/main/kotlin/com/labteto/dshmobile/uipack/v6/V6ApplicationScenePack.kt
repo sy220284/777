@@ -49,12 +49,12 @@ class V6ApplicationScenePack(
     private val updateStatus: kotlinx.coroutines.flow.StateFlow<String?>? = null,
     private val checkForUpdate: (() -> Unit)? = null,
     private val secondary: V6SecondaryPorts? = null,
-    private val visualFrame: @Composable (@Composable () -> Unit) -> Unit = { body -> body() },
 ) : UiApplicationScenePack {
     @Composable
     override fun SceneFrame(state: com.labteto.dshmobile.uihost.UiSceneNavigationState,
         content: @Composable () -> Unit) {
-        visualFrame { V6SceneMotionFrame(state, content) }
+        val appearance by preferences.snapshots.collectAsStateWithLifecycle(initialValue = UiHostPreferences())
+        V6VisualFrame(appearance) { V6SceneMotionFrame(state, content) }
     }
 
     private val pages = mapOf(

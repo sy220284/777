@@ -56,6 +56,7 @@ internal class LocalHostPreferencesUiAdapter @Inject constructor(
             transparency = prefs.wallpaperSurfaceTransparency, ambientGlow = prefs.ambientGlow,
             componentEmphasis = prefs.componentEmphasis, motionScale = prefs.motionDurationScale,
             adaptiveContrast = prefs.backgroundAdaptiveContrast,
+            backgroundPath = prefs.backgroundImagePath,
             notifyJobs = prefs.notifyLocalJobs, notifyResults = prefs.notifyJobResults,
             notifyFailures = prefs.notifyJobFailures, notifyNeedsAction = prefs.notifyNeedsAction,
             notifyChat = prefs.notifyChatMessages,

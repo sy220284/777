@@ -13,6 +13,8 @@ data class UiHostPreferences(
     val componentEmphasis: Float = .5f,
     val motionScale: Float = 1f,
     val adaptiveContrast: Boolean = true,
+    /** Optional app-private wallpaper source; each pack may ignore it. */
+    val backgroundPath: String? = null,
     val notifyJobs: Boolean = true,
     val notifyResults: Boolean = true,
     val notifyFailures: Boolean = true,
