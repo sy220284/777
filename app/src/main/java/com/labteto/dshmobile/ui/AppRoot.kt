@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.labteto.dshmobile.ui.host.LocalEncryptedUiDraftStore
 import com.labteto.dshmobile.ui.host.LocalProductionUiEntry
 import com.labteto.dshmobile.uihost.LocalUiPrivateTextCipher

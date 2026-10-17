@@ -87,7 +87,7 @@ def main() -> None:
     root = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt").read_text(encoding="utf-8")
     forbidden_root = ("DshTheme", "ThemePreference", "V6ApplicationScenePack", "LocalV6StandaloneViewModel")
     for symbol in forbidden_root:
-        if re.search(r"\\b" + symbol + r"\\b", root):
+        if re.search(r"\b" + symbol + r"\b", root):
             errors.append(f"AppRoot: pack-specific visual or owner reference {symbol}")
     entry = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/host/LocalProductionUiEntry.kt").read_text(encoding="utf-8")
     if "visualFrame = { content -> V6VisualBridge(appViewModel, content) }" not in entry:
