@@ -10,7 +10,7 @@ import com.shenyan.designsystem.foundation.SyColors
  * The backgrounds are composed over the canonical canvas so a nested page cannot
  * accidentally become a bright white plate or an unbacked transparent drawer.
  */
-internal fun DsColors.harmonizeV6(p: SyColors, preserveAccent: Boolean = false): DsColors {
+fun DsColors.harmonizeV6(p: SyColors, preserveAccent: Boolean = false): DsColors {
     val bar = p.materialL2.compositeOver(p.canvas)
     val card = p.materialL3.compositeOver(p.canvas)
     val overlay = p.materialL4.compositeOver(p.canvas)
@@ -47,7 +47,7 @@ internal fun DsColors.harmonizeV6(p: SyColors, preserveAccent: Boolean = false):
 /** Project the saved accent into the canonical controls as well as legacy page consumers.
  * Material tiers and semantic status colours still belong to the V6 palette.
  */
-internal fun SyColors.withV6Accent(source: DsColors): SyColors = copy(
+fun SyColors.withV6Accent(source: DsColors): SyColors = copy(
     primary = source.accent,
     primaryPressed = source.accentHover.compositeOver(source.bgBase),
     onPrimary = source.onAccent,

@@ -8,7 +8,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.labteto.dshmobile.R
+import com.labteto.dshmobile.uipack.v6.R
 
 /**
  * Mobile type roles: page titles, body, supporting text and code have independent metrics.

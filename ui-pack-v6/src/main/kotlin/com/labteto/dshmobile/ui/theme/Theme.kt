@@ -10,7 +10,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
-import com.labteto.dshmobile.connection.AppDisplayLimits
+import com.labteto.dshmobile.uicontract.UiReadingLimits
 import com.labteto.dshmobile.ui.shenyan.SyMode
 import com.labteto.dshmobile.ui.shenyan.SyThemeProvider
 import com.labteto.dshmobile.ui.shenyan.rememberSyReducedMotion
@@ -253,14 +253,14 @@ private fun materialDarkScheme(c: DsColors) = darkColorScheme(
  * Single palette resolution path shared by the app theme and JVM regression tests.
  * DsColors remains a host preference projection; production surfaces use [controls].
  */
-internal data class V6ThemeProjection(
+data class V6ThemeProjection(
     val dark: Boolean,
     val page: DsColors,
     val controls: com.shenyan.designsystem.foundation.SyColors,
     val isDefaultAccent: Boolean,
 )
 
-internal fun resolveV6ThemePalette(
+fun resolveV6ThemePalette(
     preference: ThemePreference,
     accentKey: String?,
     systemDark: Boolean,
@@ -327,9 +327,9 @@ fun DshTheme(
     val controlPalette = standardColors.copy(selected = emphasisFill)
     val scheme = if (dark) materialDarkScheme(themed) else materialLightScheme(themed)
     val currentDensity = LocalDensity.current
-    val clampedTextScale = textScale.coerceIn(AppDisplayLimits.MIN_READING_SCALE, AppDisplayLimits.MAX_READING_SCALE)
+    val clampedTextScale = textScale.coerceIn(UiReadingLimits.MIN_READING_SCALE, UiReadingLimits.MAX_READING_SCALE)
     val effectiveFontScale = (currentDensity.fontScale * clampedTextScale)
-        .coerceAtMost(AppDisplayLimits.MAX_EFFECTIVE_FONT_SCALE)
+        .coerceAtMost(UiReadingLimits.MAX_EFFECTIVE_FONT_SCALE)
     val readingPreferences = DsReadingPreferences(
         textScale = clampedTextScale,
         textWeightAdjustment = textWeightAdjustment.coerceIn(0, 2),

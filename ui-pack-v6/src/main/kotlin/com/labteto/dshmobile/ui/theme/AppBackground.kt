@@ -186,7 +186,7 @@ data class AppBackgroundState(
  * the result, but the user's choice now has enough range to be visible across cards, drawers,
  * sheets and dialogs instead of being almost completely clamped away.
  */
-internal fun resolveWallpaperAlpha(
+fun resolveWallpaperAlpha(
     adaptiveAlpha: Float,
     minAlpha: Float,
     maxAlpha: Float,
@@ -199,14 +199,14 @@ internal fun resolveWallpaperAlpha(
 }
 
 /** Use the same three vertical sample bands as the on-screen glass renderer. */
-internal fun BackgroundRegion.sampleY(): Float = when (this) {
+fun BackgroundRegion.sampleY(): Float = when (this) {
     BackgroundRegion.TOP -> .15f
     BackgroundRegion.MIDDLE, BackgroundRegion.ALL -> .50f
     BackgroundRegion.BOTTOM -> .88f
 }
 
 /** Bound decoded wallpaper size; keep high-resolution display but avoid huge full-size bitmaps. */
-internal fun wallpaperDecodeSample(width: Int, height: Int, maximumDimension: Int = 3072): Int {
+fun wallpaperDecodeSample(width: Int, height: Int, maximumDimension: Int = 3072): Int {
     if (width <= 0 || height <= 0 || maximumDimension <= 0) return 1
     var sample = 1
     while (maxOf(width, height) / sample > maximumDimension && sample <= Int.MAX_VALUE / 2) {
@@ -319,7 +319,7 @@ fun AppBackgroundHost(
 }
 
 /** Mobile floating surfaces need a strong veil because they overlay real page content. */
-internal fun fluidSurfaceColor(base: Color, level: WallpaperSurfaceLevel, dark: Boolean): Color {
+fun fluidSurfaceColor(base: Color, level: WallpaperSurfaceLevel, dark: Boolean): Color {
     if (level == WallpaperSurfaceLevel.PAGE || level == WallpaperSurfaceLevel.CHROME) return Color.Transparent
     val alpha = when (level) {
         WallpaperSurfaceLevel.CARD -> if (dark) 0.72f else 0.62f
@@ -393,7 +393,7 @@ private data class PixelSample(
  * constant for phone wallpapers of any resolution while still catching bright/dark, saturated and
  * visually busy areas.
  */
-internal fun analyzeBackground(bitmap: Bitmap, viewport: IntSize? = null): BackgroundAnalysis {
+fun analyzeBackground(bitmap: Bitmap, viewport: IntSize? = null): BackgroundAnalysis {
     if (bitmap.width <= 0 || bitmap.height <= 0) return BackgroundAnalysis()
 
     val visible = viewport?.takeIf { it.width > 0 && it.height > 0 }
