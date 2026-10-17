@@ -245,4 +245,48 @@ class LocalSessionEventLogTest {
             directory.deleteRecursively()
         }
     }
+    @Test
+    fun coldSnapshotStreamAndPagesApplyOneVersionMigrationAcrossCompressedSegments() {
+        val dir = Files.createTempDirectory("local-event-schema-upgrade").toFile()
+        val file = dir.resolve("session.events.jsonl")
+        val oldV0 = """{"schema_version":0,"seq":0,"event_type":"user/message","timestamp":100,"payload":{"text":"archived"}}"""
+        val oldV1 = """{"sequence":1,"type":"user/message","createdAt":101,"data":{"text":"legacy"}}"""
+        try {
+            java.util.zip.GZIPOutputStream(
+                dir.resolve("session.events.jsonl.part-0.gz").outputStream()
+            ).use { it.write((oldV0 + "\n" + oldV1 + "\n").toByteArray()) }
+            val log = LocalSessionEventLog(file, json, maxBytes = 700)
+            try {
+                val written = log.append("user/message", buildJsonObject { put("text", "current") })
+                assertEquals(2L, written.sequence)
+                val fromStream = log.withEvents { events ->
+                    events.map { it.sequence to it.data["text"]?.toString()?.trim('"') }.toList()
+                }
+                val fromPages = log.pageBeforeChronological(limit = 3)
+                    .map { it.sequence to it.data["text"]?.toString()?.trim('"') }
+                assertEquals(
+                    listOf(0L to "archived", 1L to "legacy", 2L to "current"),
+                    fromStream,
+                )
+                assertEquals(fromStream, fromPages)
+            } finally { log.close() }
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test
+    fun newerEventSchemaBlocksColdSessionOwnerInsteadOfDeletingOrSkippingHistory() {
+        val dir = Files.createTempDirectory("local-future-event").toFile()
+        val file = dir.resolve("session.events.jsonl")
+        val future = """{"sequence":0,"type":"user/message","createdAt":11,"data":{},"schema_version":14}"""
+        try {
+            file.writeText(future + "\n")
+            org.junit.Assert.assertThrows(
+                com.labteto.dshmobile.harness.session.UnsupportedSessionEventSchemaVersion::class.java
+            ) {
+                LocalSessionEventLog(file, json, maxBytes = 700)
+            }
+            assertEquals(future + "\n", file.readText())
+        } finally { dir.deleteRecursively() }
+    }
+
 }
