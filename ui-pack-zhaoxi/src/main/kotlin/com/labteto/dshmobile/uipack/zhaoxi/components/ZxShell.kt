@@ -249,8 +249,8 @@ fun ZxPortraitCard(
         }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ZxChip("重新生成", false, onRegenerate)
-            ZxChip("存为图集立绘", false, onSave)
+            ZxChip("重新生成", false, onClick = onRegenerate)
+            ZxChip("存为图集立绘", false, onClick = onSave)
         }
         ZxFooterNote("存图集 = chat.gallery_save · 重新生成消耗一次媒体额度")
     }
@@ -283,8 +283,8 @@ fun ZxStoryCard(
         Text(chapter.summary, fontSize = 12.5.sp, color = c.ink2, lineHeight = 19.sp)
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ZxChip("继续阅读", false, onOpen)
-            ZxChip("续写一节", false, onContinue)
+            ZxChip("继续阅读", false, onClick = onOpen)
+            ZxChip("续写一节", false, onClick = onContinue)
         }
     }
 }

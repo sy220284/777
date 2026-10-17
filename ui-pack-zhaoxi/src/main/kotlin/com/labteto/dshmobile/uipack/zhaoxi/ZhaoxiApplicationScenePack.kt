@@ -62,6 +62,15 @@ class ZhaoxiApplicationScenePack(
     private val secondary: ZhaoxiSecondaryPorts? = null,
 ) : UiApplicationScenePack {
 
+    private fun currentDocumentContext(): ZhaoxiDocumentContext? {
+        val ports = conversations ?: return null
+        val workMode = ports.workMode()
+        val snapshot = if (workMode) ports.work.snapshot() else ports.chat.snapshot()
+        val identity = snapshot.identity ?: return null
+        val messageId = snapshot.messages.lastOrNull()?.id ?: return null
+        return ZhaoxiDocumentContext(identity, workMode, messageId)
+    }
+
     // ---- 条件场景集合（镜像 V6ApplicationScenePack）----
 
     private val pages = setOf("settings.appearance", "settings.notifications",
@@ -291,8 +300,8 @@ class ZhaoxiApplicationScenePack(
             }
             "conversation.model_picker" -> ZhaoxiModelPickerScene(emptyList(), {},
                 { scope.onNavigate(UiSceneId("settings.models")) }, scope)
-            "conversation.ui_document" -> conv?.documents?.let { ZhaoxiUiDocumentScene(it, scope) }
-            "conversation.ui_document_generate" -> conv?.documents?.let { ZhaoxiUiDocumentGenerateScene(it, scope) }
+            "conversation.ui_document" -> conv?.documents?.let { ZhaoxiUiDocumentScene(it, scope, ::currentDocumentContext, manifest.scenes, { conversations?.work?.snapshot()?.approval?.pendingId }) }
+            "conversation.ui_document_generate" -> conv?.documents?.let { ZhaoxiUiDocumentGenerateScene(it, scope, ::currentDocumentContext) }
             "work.approval" -> conv?.let { ZhaoxiApprovalScene(it.work, scope) }
             "work.question" -> conv?.let { ZhaoxiQuestionScene(it.work, scope) }
             "work.plan_review" -> conv?.workReads?.let { ZhaoxiPlanReviewScene(it, sessionId, scope) }
@@ -385,12 +394,12 @@ class ZhaoxiApplicationScenePack(
         ZhaoxiTheme {
             Box(Modifier.fillMaxSize()) {
                 ZhaoxiBackground(Modifier.fillMaxSize())
-                val normal = ZhaoxiMotion.spec<Float>(ZhaoxiDuration.NORMAL)
+                val normal = ZhaoxiMotion.spec<androidx.compose.ui.unit.IntOffset>(ZhaoxiDuration.NORMAL)
                 val fast = ZhaoxiMotion.spec<Float>(ZhaoxiDuration.FAST)
                 androidx.compose.animation.AnimatedContent(
                     targetState = state.stack.lastOrNull(),
                     transitionSpec = {
-                        (androidx.compose.animation.fadeIn(normal) +
+                        (androidx.compose.animation.fadeIn(ZhaoxiMotion.spec<Float>(ZhaoxiDuration.NORMAL)) +
                             androidx.compose.animation.slideInVertically(normal) { it / 24 })
                             .togetherWith(androidx.compose.animation.fadeOut(fast))
                     },

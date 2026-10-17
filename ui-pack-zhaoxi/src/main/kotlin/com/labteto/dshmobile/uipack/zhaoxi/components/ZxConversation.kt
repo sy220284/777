@@ -252,7 +252,7 @@ fun ZxQuestionCard(
         if (question.options.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                question.options.forEach { ZxChip(it, answer == it, { onAnswerChange(it) }) }
+                question.options.forEach { ZxChip(it, answer == it, onClick = { onAnswerChange(it) }) }
             }
         }
         Spacer(Modifier.height(8.dp))

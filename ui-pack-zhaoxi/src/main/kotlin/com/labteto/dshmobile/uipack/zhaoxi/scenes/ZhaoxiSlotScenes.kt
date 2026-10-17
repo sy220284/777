@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -199,7 +200,9 @@ fun ZxGalleryProfileScene(name: String, summary: String, scope: UiSceneRenderSco
 /** chat.diary / route.diary — 日记（DiaryUiPort 只读 + 勘误）。 */
 @Composable
 fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRenderScope) {
-    val entries = remember(galleryId) { runCatching { diary.entries(galleryId) }.getOrDefault(emptyList()) }
+    val entries by produceState<List<com.labteto.dshmobile.uicontract.UiDiaryEntry>>(initialValue = emptyList(), galleryId, diary) {
+        value = runCatching { diary.entries(galleryId) }.getOrDefault(emptyList())
+    }
     ZxPage("日记", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         if (entries.isEmpty()) ZxEmpty("还没有日记", "日记由相处事件凝结 · 私密日记不可见")
