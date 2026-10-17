@@ -61,7 +61,7 @@ class {class_name} : UiApplicationScenePack {{
     )
     override val renderers: Map<UiSceneId, UiSceneRenderer> = emptyMap()
     val tokens = UiDesignTokenManifest(1, mapOf(
-{",\n".join(declarations)}
+{token_lines}
     ))
 }}
 '''
