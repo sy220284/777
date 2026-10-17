@@ -17,6 +17,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.labteto.dshmobile.uicontract.UiSceneId
+import com.labteto.dshmobile.uicontract.PlanChatAutomationCommand
 import com.labteto.dshmobile.uicontract.AutomationUiCommand
 import com.labteto.dshmobile.uicontract.AutomationUiPort
 import com.labteto.dshmobile.uicontract.UiAutomationSnapshot
@@ -46,7 +48,7 @@ fun ZhaoxiAutomationTasksScene(
     onOpenEditor: (String) -> Unit = {},
 ) {
     val co = rememberCoroutineScope()
-    val snap by automation.snapshots.collectAsState(initial = UiAutomationSnapshot(null, emptyList()))
+    val snap by automation.snapshots.collectAsState(initial = UiAutomationSnapshot(automation.context(), emptyList()))
     ZxPage("自动化", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         if (snap.tasks.isEmpty()) ZxEmpty("还没有自动化", "新建定时提醒、任务或人物互动编排")
@@ -55,12 +57,12 @@ fun ZhaoxiAutomationTasksScene(
                 .getOrDefault("任务")
             ZxRow(name, "", onClick = { onOpenEditor(name) }) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    ZxChip("运行", false) { co.launch { automation.submit(AutomationUiCommand.RunNow(t)) } }
+                    ZxChip("运行", false) { co.launch { automation.submit(AutomationUiCommand.RunNow(t.id)) } }
                     ZxSwitch(
                         checked = true,
                         onCheckedChange = { on ->
                             co.launch {
-                                automation.submit(if (on) AutomationUiCommand.Resume(t) else AutomationUiCommand.Pause(t))
+                                automation.submit(if (on) AutomationUiCommand.Resume(t.id) else AutomationUiCommand.Pause(t.id))
                             }
                         },
                     )
@@ -68,7 +70,7 @@ fun ZhaoxiAutomationTasksScene(
             }
         }
         Spacer(Modifier.height(8.dp))
-        ZxButton("＋ 新建自动化", {}, Modifier.fillMaxWidth())
+        ZxButton("＋ 新建自动化", { scope.onNavigate(UiSceneId("automation.editor")) }, Modifier.fillMaxWidth())
         ZxFooterNote("启停与运行均经 Owner 命令 · 结果以 receipt 呈现")
     }
 }
@@ -81,6 +83,7 @@ fun ZhaoxiAutomationEditorScene(
 ) {
     val co = rememberCoroutineScope()
     var draft by remember { mutableStateOf("") }
+    var feedback by remember { mutableStateOf<String?>(null) }
     ZxPage("自动化 · 编辑", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("触发")
@@ -91,9 +94,15 @@ fun ZhaoxiAutomationEditorScene(
             placeholder = "要自动做什么…")
         Spacer(Modifier.height(10.dp))
         ZxButton("保存", {
-            co.launch { automation.submit(AutomationUiCommand.Update(draft)) }
+            co.launch {
+                val context = automation.context()
+                feedback = if (context.canPlanChat && context.identity != null && draft.isNotBlank())
+                    automation.planAndSave(PlanChatAutomationCommand(context.identity, draft)).toString()
+                else "当前会话暂不支持自动化编排，请切换至有效聊天会话并输入任务说明。"
+            }
         }, Modifier.fillMaxWidth())
-        ZxFooterNote("planAndSave 走对话式编排 · 直改走 Update")
+        feedback?.let { Text(it.take(240)) }
+        ZxFooterNote("仅从真实会话通过 planAndSave 创建，Owner 校验身份和结果")
     }
 }
 
@@ -113,7 +122,7 @@ fun ZhaoxiPersonaInteractionScene(
         ZxFooterNote("互动占用各自人物的对话额度")
         Spacer(Modifier.height(10.dp))
         ZxButton("编排新互动", {
-            co.launch { automation.submit(AutomationUiCommand.Update("persona_interaction:new")) }
+            scope.onNavigate(UiSceneId("automation.editor"))
         }, Modifier.fillMaxWidth())
     }
 }

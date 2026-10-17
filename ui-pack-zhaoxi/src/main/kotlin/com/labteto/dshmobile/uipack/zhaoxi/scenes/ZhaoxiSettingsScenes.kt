@@ -12,6 +12,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -35,6 +36,7 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.ZxSwitchRow
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxValueRow
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 import com.labteto.dshmobile.uicontract.UiSceneId
+import kotlinx.coroutines.launch
 import com.labteto.dshmobile.uihost.UiSceneRenderScope
 
 /**
@@ -68,13 +70,18 @@ fun ZhaoxiSettingsHomeScene(scope: UiSceneRenderScope) {
 @Composable
 fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRenderScope) {
     val snap by preferences.snapshots.collectAsState(initial = UiHostPreferences("system", "stone", 1.0f))
+    val jobs = rememberCoroutineScope()
+    fun writeAppearance(theme: String = snap.theme, accent: String = snap.accent, textScale: Float = snap.textScale) {
+        jobs.launch { preferences.submit(UiHostPreferencesCommand.Appearance(theme, accent, textScale, snap.textWeight,
+            snap.transparency, snap.ambientGlow, snap.componentEmphasis, snap.motionScale, snap.adaptiveContrast)) }
+    }
     ZxPage("外观", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("主题")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("system" to "跟随系统", "light" to "浅色", "dark" to "深色").forEach { (k, l) ->
                 ZxChip(l, snap.theme == k) {
-                    preferences.submit(UiHostPreferencesCommand.Appearance(theme = k))
+                    writeAppearance(theme = k)
                 }
             }
         }
@@ -83,15 +90,15 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
             listOf("stone" to "石灰", "sage" to "鼠尾草", "steel" to "钢蓝", "mauve" to "藕紫", "dusk" to "暮橙")
                 .forEach { (k, l) ->
                     ZxChip(l, snap.accent == k) {
-                        preferences.submit(UiHostPreferencesCommand.Appearance(accent = k))
+                        writeAppearance(accent = k)
                     }
                 }
         }
         ZxSection("字号")
         ZxDetentSlider(
-            value = ((snap.textScale - 0.85f) / 0.15f).coerceIn(0f, 1f),
+            value = ((snap.textScale - 0.9f) / 0.6f).coerceIn(0f, 1f),
             onValueChange = { v ->
-                preferences.submit(UiHostPreferencesCommand.Appearance(textScale = 0.85f + v * 0.15f))
+                writeAppearance(textScale = 0.9f + v * 0.6f)
             },
             labels = listOf("小", "标准", "大"),
         )
