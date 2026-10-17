@@ -208,6 +208,9 @@ internal class LocalToolCompositionRoot @Inject constructor(
     override suspend fun servers(): List<McpServerSnapshot> = plugins.mcpServers()
     override fun serverChanges(): kotlinx.coroutines.flow.Flow<Unit> =
         kotlinx.coroutines.flow.combine(plugins.mcpLifecycleRevisions(), pinnedInvocations.selected) { _, _ -> Unit }
+    override suspend fun lifecycleHistory(
+        incarnation: String?, afterSequence: Long,
+    ) = plugins.mcpLifecycleHistory(incarnation, afterSequence)
     override suspend fun checkMcpHealth(serverId: String) = plugins.checkMcpHealth(serverId)
     override fun selectedConnectorIds(): Set<String> =
         pinnedInvocations.selected.value.asSequence()

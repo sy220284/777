@@ -158,18 +158,42 @@ fun V6ToolsManagementScene(
             } finally { busy = false }
         }
     }
-    // Follow the actual MCP registry and Composer selection Owners; no timer or shadow lifecycle.
+    // Ordered transport transitions prevent fast disconnect/reconnect from leaving a
+    // stale successful ping cached. The authoritative registry is still re-read.
     LaunchedEffect(owner, key.value) {
         if (key.value != "tools.mcp") return@LaunchedEffect
+        var incarnation: String? = null
+        var throughSequence = -1L
         owner.serverChanges().collect {
             try {
+                val oldCursor = throughSequence
+                var lifecycleChanged = false
+                withContext(Dispatchers.IO) {
+                    do {
+                        val page = owner.lifecycleHistory(incarnation, throughSequence) ?: break
+                        if (page.requiresSnapshot) {
+                            lifecycleChanged = true
+                            incarnation = page.incarnation
+                            throughSequence = page.latestSequence
+                            break
+                        }
+                        incarnation = page.incarnation
+                        if (page.events.isNotEmpty()) {
+                            lifecycleChanged = true
+                            throughSequence = page.events.last().sequence
+                        } else {
+                            throughSequence = page.latestSequence
+                        }
+                    } while (throughSequence < (owner.lifecycleHistory(incarnation, throughSequence)
+                        ?.latestSequence ?: throughSequence))
+                }
                 val refreshed = withContext(Dispatchers.IO) { owner.servers() }
                 if (refreshed != servers) {
                     val original = servers.associateBy(UiMcpServerSnapshot::id)
                     val connectionChanged = refreshed.any { now ->
                         original[now.id]?.let { it.connection != now.connection || it.registration != now.registration } ?: true
                     } || original.keys.any { id -> refreshed.none { it.id == id } }
-                    if (connectionChanged) healthResults = emptyMap()
+                    if (connectionChanged || lifecycleChanged) healthResults = emptyMap()
                     servers = refreshed
                 }
             } catch (cancelled: CancellationException) { throw cancelled }

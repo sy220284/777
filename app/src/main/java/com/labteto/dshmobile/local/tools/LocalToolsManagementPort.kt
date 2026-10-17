@@ -7,6 +7,9 @@ internal interface LocalToolsManagementPort {
     suspend fun servers(): List<McpServerSnapshot>
     /** Emitted by the authoritative MCP registry or Composer selection Owner. */
     fun serverChanges(): kotlinx.coroutines.flow.Flow<Unit>
+    suspend fun lifecycleHistory(
+        incarnation: String?, afterSequence: Long,
+    ): com.labteto.dshmobile.interop.mcp.McpLifecycleHistory
     suspend fun checkMcpHealth(serverId: String): com.labteto.dshmobile.interop.mcp.McpServerHealth
     /** Composer Owner's selected connector IDs; disconnected pins remain selected. */
     fun selectedConnectorIds(): Set<String> = emptySet()

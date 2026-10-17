@@ -13,6 +13,34 @@ class LocalToolsUiFacade @Inject internal constructor(
 ) : com.labteto.dshmobile.uicontract.ToolsUiPort {
     override fun serverChanges(): kotlinx.coroutines.flow.Flow<Unit> = tools.serverChanges()
 
+    override suspend fun lifecycleHistory(
+        incarnation: String?, afterSequence: Long,
+    ): com.labteto.dshmobile.uicontract.UiMcpLifecycleHistory {
+        val page = tools.lifecycleHistory(incarnation, afterSequence)
+        return com.labteto.dshmobile.uicontract.UiMcpLifecycleHistory(
+            page.incarnation, page.latestSequence,
+            page.events.map { change ->
+                com.labteto.dshmobile.uicontract.UiMcpLifecycleEvent(
+                    change.sequence, change.serverId,
+                    when (change.snapshot?.lifecycle) {
+                        com.labteto.dshmobile.interop.mcp.McpServerLifecycle.CONNECTING ->
+                            com.labteto.dshmobile.uicontract.UiToolConnection.CONNECTING
+                        com.labteto.dshmobile.interop.mcp.McpServerLifecycle.RECONNECTING ->
+                            com.labteto.dshmobile.uicontract.UiToolConnection.RECONNECTING
+                        com.labteto.dshmobile.interop.mcp.McpServerLifecycle.REGISTERED ->
+                            com.labteto.dshmobile.uicontract.UiToolConnection.HEALTH_UNCHECKED
+                        com.labteto.dshmobile.interop.mcp.McpServerLifecycle.DISCONNECTING ->
+                            com.labteto.dshmobile.uicontract.UiToolConnection.DISCONNECTING
+                        com.labteto.dshmobile.interop.mcp.McpServerLifecycle.FAILED ->
+                            com.labteto.dshmobile.uicontract.UiToolConnection.FAILED
+                        null -> null
+                    },
+                )
+            },
+            page.requiresSnapshot,
+        )
+    }
+
     override suspend fun servers(): List<com.labteto.dshmobile.uicontract.UiMcpServerSnapshot> {
         val selectedIds = tools.selectedConnectorIds()
         return tools.servers().map {

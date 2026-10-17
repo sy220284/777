@@ -299,6 +299,14 @@ internal class LocalPluginComposition(
      */
     fun mcpLifecycleRevisions(): kotlinx.coroutines.flow.StateFlow<Long> = mcpPlugin.lifecycleRevisions
 
+    suspend fun mcpLifecycleHistory(
+        incarnation: String?, afterSequence: Long,
+    ): com.labteto.dshmobile.interop.mcp.McpLifecycleHistory =
+        pluginManager.observeActivePlugin("mcp-bridge") { plugin ->
+            (plugin as? McpToolBridgePlugin
+                ?: error("MCP 插件管理接口不兼容")).lifecycleEventsSince(incarnation, afterSequence)
+        }
+
     suspend fun mcpServers(): List<McpServerSnapshot> =
         pluginManager.observeActivePlugin("mcp-bridge") { plugin ->
             (plugin as? McpToolBridgePlugin

@@ -17,6 +17,15 @@ data class UiMcpServerSnapshot(
     val connection: UiToolConnection = UiToolConnection.HEALTH_UNCHECKED,
     val authorization: UiToolAuthorization = UiToolAuthorization.REQUIRED_PER_CALL,
 )
+/** Ordered MCP Owner events are hints to invalidate cached health, never call permission. */
+data class UiMcpLifecycleEvent(
+    val sequence: Long, val serverId: String, val connection: UiToolConnection?,
+)
+data class UiMcpLifecycleHistory(
+    val incarnation: String, val latestSequence: Long,
+    val events: List<UiMcpLifecycleEvent>, val requiresSnapshot: Boolean,
+)
+
 enum class UiPluginLifecycleState { INSTALLING, ACTIVE, REPLACING, UNINSTALLING, FAILED }
 data class UiPluginLifecycle(val id: String, val state: UiPluginLifecycleState)
 
@@ -39,6 +48,10 @@ interface ToolsUiPort {
     suspend fun servers(): List<UiMcpServerSnapshot>
     /** Owner-issued lifecycle/selection changes; not a remote health or tool authorization grant. */
     fun serverChanges(): kotlinx.coroutines.flow.Flow<Unit>
+    /** A null implementation means the provider has no ordered lifecycle history. */
+    suspend fun lifecycleHistory(
+        incarnation: String?, afterSequence: Long,
+    ): UiMcpLifecycleHistory? = null
     suspend fun checkServerHealth(serverId: String): UiMcpHealth = UiMcpHealth.UNSUPPORTED
     suspend fun githubConfigured(): Boolean
     fun capabilityCatalogue(): List<UiToolCapabilitySnapshot>
