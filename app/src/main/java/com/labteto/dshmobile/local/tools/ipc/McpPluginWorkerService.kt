@@ -56,7 +56,7 @@ class McpPluginWorkerService : Service() {
                 try {
                     when (operation) {
                         McpWorkerWire.OPEN -> {
-                            check(token !in instances) { "IPC transport identity already exists" }
+                            check(!instances.containsKey(token)) { "IPC transport identity already exists" }
                             check(instances.size < 24) { "IPC transport budget exhausted" }
                             val transport = when (fields.getString("kind")) {
                                 "http" -> McpNegotiatingHttpTransport(
