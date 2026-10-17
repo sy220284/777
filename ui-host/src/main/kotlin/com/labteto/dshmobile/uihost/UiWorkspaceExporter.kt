@@ -63,7 +63,6 @@ fun rememberUiWorkspaceExporter(
             else scope.launch {
                 val request = ticket.request
                 val outcome = try {
-                try {
                     val bytes = withContext(Dispatchers.IO) {
                         requireNotNull(context.contentResolver.openOutputStream(uri, "wt")) {
                             "无法打开所选文件保存位置"
