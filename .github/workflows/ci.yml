@@ -177,6 +177,8 @@ jobs:
           python3 .github/scripts/check-build-baseline.py
           python3 .github/scripts/check-test-quality.py
           python3 .github/scripts/check-acceptance-matrix.py
+          python3 .github/scripts/check-v3-refactor-ledger.py --self-test
+          python3 .github/scripts/check-v3-refactor-ledger.py
           python3 .github/scripts/check-ui-r4-scene-matrix.py --self-test
           python3 .github/scripts/check-ui-r4-scene-matrix.py
           bash .github/scripts/run-android-instrumentation.sh --self-test

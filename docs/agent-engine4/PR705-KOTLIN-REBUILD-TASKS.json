@@ -531,10 +531,18 @@
       "depends_on": [
         "AE4V3-23"
       ],
-      "status": "not_started",
-      "code_evidence": [],
-      "tests_verified": [],
-      "notes": ""
+      "status": "in_progress",
+      "code_evidence": [
+        ".github/scripts/classify-ci-scope.py",
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-v3-refactor-ledger.py"
+      ],
+      "tests_verified": [
+        "local .github/scripts/check-v3-refactor-ledger.py --self-test and normal (exit 0)",
+        "local .github/scripts/classify-ci-scope.py --self-test (exit 0)",
+        "local .github/scripts/check-ci-repository-integrity.py (exit 0)"
+      ],
+      "notes": "2026-10-17：启动最终自动化验收门禁。新增 check-v3-refactor-ledger.py 验证24个唯一有序任务ID、依赖拓扑、可追溯文件路径、完成态先决工作包和证据要求；AE4V3-24 不得在任何上游未完成、最终 SHA/CI 结论未记录时标记完成。CI static-gates 实际执行正反例自测及权威台账检查，classify-ci-scope 将该台账从纯文档豁免改为至少静态检查，且新增分类回归。完整源码/设备/当前提交 SHA CI 与外部验收仍需后续闭环；不可将本次静态一致性门禁替代功能验收。"
     }
   ],
   "first_verified_fix": {
