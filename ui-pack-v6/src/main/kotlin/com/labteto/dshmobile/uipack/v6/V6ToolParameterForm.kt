@@ -119,7 +119,27 @@ internal fun v6ToolArgumentsJson(schema: JsonObject, values: Map<String, String>
         require(allowed == null || value in allowed) { "字段不在许可选项中：${field.label}" }
         putPath(tree, field.path, value)
     }
-    return JsonObject(tree).toString().also {
+    val arguments = JsonObject(tree)
+    // A missing optional parent is valid. Once that parent is provided, its own
+    // required descendants become mandatory; the flattened field labels alone
+    // cannot express this conditional requirement.
+    fun checkRequired(spec: JsonObject, actual: JsonObject, path: String) {
+        val required = (spec["required"] as? JsonArray).orEmpty().map {
+            (it as JsonPrimitive).content
+        }
+        for (name in required) {
+            require(name in actual) { "缺少必填字段：" + (path + name) }
+        }
+        val properties = spec["properties"] as? JsonObject ?: return
+        for ((name, value) in actual) {
+            val childSpec = properties[name] as? JsonObject ?: continue
+            if (value is JsonObject && childSpec["type"] == JsonPrimitive("object")) {
+                checkRequired(childSpec, value, path + name + ".")
+            }
+        }
+    }
+    checkRequired(schema, arguments, "")
+    return arguments.toString().also {
         require(it.toByteArray(Charsets.UTF_8).size <= 16_384) { "工具参数超过大小预算" }
     }
 }

@@ -156,6 +156,28 @@ class V6ToolParameterFormTest {
         }
     }
 
+    @Test fun optionalNestedObjectRequiresItsOwnFieldsOnlyWhenPresent() {
+        val nested = buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject {
+                put("filters", buildJsonObject {
+                    put("type", "object")
+                    put("required", buildJsonArray { add(JsonPrimitive("id")) })
+                    put("properties", buildJsonObject {
+                        put("id", buildJsonObject { put("type", "integer") })
+                        put("label", buildJsonObject { put("type", "string") })
+                    })
+                })
+            })
+        }
+        assertEquals("{}", v6ToolArgumentsJson(nested, emptyMap()))
+        assertEquals("""{"filters":{"id":1}}""",
+            v6ToolArgumentsJson(nested, mapOf("filters.id" to "1")))
+        assertThrows(IllegalArgumentException::class.java) {
+            v6ToolArgumentsJson(nested, mapOf("filters.label" to "selected"))
+        }
+    }
+
     @Test fun trustedEnumerationsAlsoRejectFreeformInput() {
         assertThrows(IllegalArgumentException::class.java) {
             v6ToolArgumentsJson(schema, mapOf("query" to "delete-all"))
