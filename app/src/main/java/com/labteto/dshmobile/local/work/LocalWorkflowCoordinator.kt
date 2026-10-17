@@ -142,11 +142,10 @@ internal class LocalWorkflowCoordinator(
             },
             onProgress = onProgress,
             shouldRetryError = { error ->
-                if (error is LocalWorkflowGoalSuperseded) return@run false
                 val delegated = error as? LocalSubagentExecutionException
-                delegated == null || (
+                error !is LocalWorkflowGoalSuperseded && (delegated == null || (
                     delegated.retryable && !isTerminalRouteFailure(delegated.errorCode.orEmpty())
-                )
+                ))
             },
         )
         val summary = results.joinToString("\n\n") { result ->
