@@ -65,6 +65,87 @@ internal fun v6ToolFormFields(schema: JsonObject): List<V6ToolFormField> {
     return result
 }
 
+/**
+ * Editable array items are strictly projections of the same registered schema
+ * consumed by v6ToolArgumentsJson. They are NOT tools or runnable commands.
+ *
+ * A raw array input can coexist with per-item editing: each edit round-trips
+ * through JSON without altering siblings or confusing keys containing dots.
+ */
+internal data class V6ToolArrayEditor(
+    val itemType: String,
+    val items: List<String>,
+    val maxItems: Int,
+    val minItems: Int,
+)
+
+internal fun v6ToolArrayEditor(
+    schema: JsonObject,
+    field: V6ToolFormField,
+    value: String?,
+): V6ToolArrayEditor? {
+    if (field.type != "array") return null
+    require(field.path.isNotEmpty() && field.path.size <= 6)
+    var node = schema
+    for (component in field.path) {
+        node = (node["properties"] as? JsonObject)?.get(component) as? JsonObject
+            ?: throw IllegalArgumentException("数组字段已不属于当前工具 Schema")
+    }
+    require((node["type"] as? JsonPrimitive)?.content == "array") {
+        "数组字段的可信类型已改变"
+    }
+    val itemSpec = node["items"] as? JsonObject ?: return null
+    val type = (itemSpec["type"] as? JsonPrimitive)?.content ?: return null
+    require(type in setOf("string", "integer", "number", "boolean", "object", "array")) {
+        "无法编辑未知的数组元素类型"
+    }
+    val min = (node["minItems"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+    val max = (node["maxItems"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 32
+    require(min in 0..32 && max in min..32) { "数组元素数量超出表单上限" }
+    val current = if (value.isNullOrBlank()) JsonArray(emptyList()) else
+        Json.parseToJsonElement(value) as? JsonArray
+            ?: throw IllegalArgumentException("当前数组草稿不是 JSON 数组")
+    require(current.size <= max) { "数组元素数量超出许可范围" }
+    return V6ToolArrayEditor(type, current.map { it.toString() }, max, min)
+}
+
+/** A replacement updates one item in the local draft, never the executing owner. */
+internal fun v6ToolArrayDraftChange(
+    editor: V6ToolArrayEditor,
+    index: Int,
+    raw: String?,
+): String {
+    val items = editor.items.toMutableList()
+    require(index in 0..items.size) { "数组行号已经失效" }
+    if (raw == null) {
+        require(index < items.size) { "删除不存在的数组行" }
+        items.removeAt(index)
+    } else {
+        require(raw.length <= 4_096) { "数组单项内容超过预算" }
+        // Do not accept an invalid/incomplete item on submit; this routine
+        // operates on an editable draft, so JSON syntax is checked immediately.
+        val item = if (editor.itemType == "string") JsonPrimitive(raw)
+            else Json.parseToJsonElement(raw)
+        val valid = when (editor.itemType) {
+            "string" -> item is JsonPrimitive && item.isString
+            "boolean" -> item is JsonPrimitive && !item.isString && item.content in setOf("true", "false")
+            "integer" -> item is JsonPrimitive && !item.isString &&
+                item.content.matches(Regex("-?(0|[1-9][0-9]*)"))
+            "number" -> item is JsonPrimitive && !item.isString &&
+                item.content.matches(Regex("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?"))
+            "object" -> item is JsonObject
+            "array" -> item is JsonArray
+            else -> false
+        }
+        require(valid) { "数组行类型不符，拒绝修改" }
+        if (index == items.size) items.add(item.toString())
+        else items[index] = item.toString()
+    }
+    require(items.size <= editor.maxItems) { "数组行数超过可信 Schema 上限" }
+    require(items.sumOf { it.length } <= 16_384) { "数组草稿超过大小预算" }
+    return "[" + items.joinToString(",") + "]"
+}
+
 /** This representation is preview text only, never a ToolContext or execution permission. */
 internal fun v6ToolArgumentsJson(schema: JsonObject, values: Map<String, String>): String {
     val fields = v6ToolFormFields(schema)
