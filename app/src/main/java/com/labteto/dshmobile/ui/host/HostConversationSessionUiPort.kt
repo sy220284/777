@@ -1,7 +1,5 @@
 package com.labteto.dshmobile.ui.host
 
-import com.labteto.dshmobile.ui.screens.local.LocalConversationReadingState
-import com.labteto.dshmobile.ui.screens.local.LocalConversationUiStateStore
 import com.labteto.dshmobile.uicontract.ConversationDraftUiPort
 import com.labteto.dshmobile.uicontract.SessionUiPort
 import com.labteto.dshmobile.uicontract.UiSessionDeletionReceipt

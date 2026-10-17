@@ -1,4 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
+import com.labteto.dshmobile.ui.host.LocalConversationReadingState
+import com.labteto.dshmobile.ui.host.LocalConversationUiStateStore
+import com.labteto.dshmobile.ui.host.LocalSessionDraftCache
 
 import android.content.Context
 import android.net.Uri

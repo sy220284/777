@@ -7,9 +7,6 @@ import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.local.LocalConversationUiPortComposition
 import com.labteto.dshmobile.local.presentation.LocalToolsUiFacade
 import com.labteto.dshmobile.local.presentation.LocalUiDocumentUiPortFactory
-import com.labteto.dshmobile.ui.screens.local.LocalSessionDraftCache
-import com.labteto.dshmobile.ui.screens.local.LocalConversationReadingState
-import com.labteto.dshmobile.ui.screens.local.LocalConversationUiStateStore
 import com.labteto.dshmobile.uicontract.*
 import com.labteto.dshmobile.uipack.v6.*
 import dagger.hilt.android.lifecycle.HiltViewModel

@@ -1,4 +1,5 @@
 package com.labteto.dshmobile.ui.screens.local
+import com.labteto.dshmobile.ui.host.LocalSessionDraftCache
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals

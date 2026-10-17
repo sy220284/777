@@ -1,4 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
+import com.labteto.dshmobile.ui.host.LocalConversationReadingState
+import com.labteto.dshmobile.ui.host.MAX_LOCAL_SESSION_PRESENTATION_STATES
 
 import com.labteto.dshmobile.uicontract.UiReadingAnchor
 import org.junit.Assert.assertEquals
