@@ -11,6 +11,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.BuildConfig
 import com.labteto.dshmobile.ui.AppViewModel
 import com.labteto.dshmobile.ui.theme.DshTheme
+import com.labteto.dshmobile.uihost.ProvideUiHostSystemOperationOwner
 import com.labteto.dshmobile.uicontract.UiCapabilityId
 import dagger.hilt.android.AndroidEntryPoint
 
