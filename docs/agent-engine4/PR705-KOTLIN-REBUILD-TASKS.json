@@ -262,10 +262,17 @@
         "AE4V3-07",
         "AE4V3-11"
       ],
-      "status": "not_started",
-      "code_evidence": [],
-      "tests_verified": [],
-      "notes": ""
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryCheckpoint.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTypedToolReferenceTest.kt"
+      ],
+      "tests_verified": [
+        "local :app:compileDebugKotlin",
+        "local :app:testDebugUnitTest (compaction and typed checkpoint regressions)",
+        "local 7-module JVM suite: 3176 tests, 0 failures"
+      ],
+      "notes": "2026-10-17：Work 模型历史检查点只从最新的受信任 Work envelope 恢复，若其损坏/无法解码则明确不使用检查点，不再退回更早有效但可能包含已撤销指令的旧总结；无关普通用户消息仍可保留最新有效 checkpoint，兼容既有 trusted/legacy 格式。新增损坏最新检查点、普通历史消息、有效新快照覆盖旧约束的回归。App Kotlin 编译和 7 模块 3176 JVM 测试(0失败)及架构/性能/测试质量门禁本地通过。只启动 AE4V3-13；Context 来源信任、Work/Chat 隔离、完整内存与压缩迁移及最终 SHA CI 尚未验收。"
     },
     {
       "id": "AE4V3-14",

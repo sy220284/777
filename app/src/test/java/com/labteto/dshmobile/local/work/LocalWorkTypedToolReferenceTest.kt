@@ -6,6 +6,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -33,6 +34,21 @@ class LocalWorkTypedToolReferenceTest {
 
     private fun restored(state: LocalWorkCheckpoint): JsonObject =
         buildTrustedWorkCheckpointModelMessage(state.toModelBlock())
+
+    @Test
+    fun invalidNewestTrustedCheckpointDoesNotResurrectOlderWorkInstructions() {
+        val old = blankCheckpoint(facts = listOf("旧的约束已被用户撤销"))
+        val original = restored(old)
+        val corrupted = buildTrustedWorkCheckpointModelMessage(
+            "<work-checkpoint>\n{invalid json}\n</work-checkpoint>",
+        )
+        // A newer trusted checkpoint supersedes all older snapshots, even if corrupt.
+        assertNull(LocalWorkCheckpoint.latestFrom(listOf(original, corrupted)))
+        assertEquals(old, LocalWorkCheckpoint.latestFrom(listOf(original, message("user", "继续工作"))))
+        val fresh = restored(blankCheckpoint(facts = listOf("新约束")))
+        assertEquals(listOf("新约束"),
+            requireNotNull(LocalWorkCheckpoint.latestFrom(listOf(original, fresh))).facts)
+    }
 
     @Test
     fun typedToolIdsSurviveCompactionAndDoNotDependOnTextualCallPattern() {

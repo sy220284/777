@@ -76,28 +76,29 @@ internal data class LocalWorkCheckpoint(
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
 
-        fun latestFrom(messages: List<JsonObject>): LocalWorkCheckpoint? =
-            messages.asReversed().firstNotNullOfOrNull { message ->
-                if (!isTrustedContextCheckpointModelMessage(message, LocalContextCheckpointKind.WORK)) {
-                    return@firstNotNullOfOrNull null
-                }
-                val content = (message["content"] as? JsonPrimitive)?.contentOrNull ?: return@firstNotNullOfOrNull null
-                // Trusted checkpoint messages always have one outer wrapper emitted by us.
-                // Payload fields may legitimately contain the same literal text, so the outer
-                // opening tag must be the first occurrence while the closing tag stays the last.
-                val start = content.indexOf("<work-checkpoint>")
-                val end = content.lastIndexOf("</work-checkpoint>")
-                if (start < 0 || end <= start) return@firstNotNullOfOrNull null
-                val payload = content
-                    .substring(start + "<work-checkpoint>".length, end)
-                    .trim()
-                runCatching {
-                    fromJsonObject(json.parseToJsonElement(payload) as JsonObject)
-                }.onFailure { error ->
-                    AppLog.warn("WorkCheckpoint",
-                        "failure=true operation=decode_work_checkpoint cause_type=${error.javaClass.simpleName}")
-                }.getOrNull()
-            }
+        fun latestFrom(messages: List<JsonObject>): LocalWorkCheckpoint? {
+            // Never fall back to an older snapshot when a newer trusted checkpoint is
+            // corrupt: old summaries can contain constraints the user has since revoked.
+            val message = messages.asReversed().firstOrNull {
+                isTrustedContextCheckpointModelMessage(it, LocalContextCheckpointKind.WORK)
+            } ?: return null
+            val content = (message["content"] as? JsonPrimitive)?.contentOrNull ?: return null
+            // Trusted checkpoint messages always have one outer wrapper emitted by us.
+            // Payload fields may legitimately contain the same literal text, so the outer
+            // opening tag must be the first occurrence while the closing tag stays the last.
+            val start = content.indexOf("<work-checkpoint>")
+            val end = content.lastIndexOf("</work-checkpoint>")
+            if (start < 0 || end <= start) return null
+            val payload = content
+                .substring(start + "<work-checkpoint>".length, end)
+                .trim()
+            return runCatching {
+                fromJsonObject(json.parseToJsonElement(payload) as JsonObject)
+            }.onFailure { error ->
+                AppLog.warn("WorkCheckpoint",
+                    "failure=true operation=decode_work_checkpoint cause_type=${error.javaClass.simpleName}")
+            }.getOrNull()
+        }
 
         private fun fromJsonObject(value: JsonObject): LocalWorkCheckpoint {
             fun list(key: String): List<String> =
