@@ -155,7 +155,12 @@ class McpPluginWorkerService : Service() {
         val pipe = if (bytes != null && bytes.size > McpWorkerWire.MAX_INLINE_RESPONSE_BYTES) {
             try { ParcelFileDescriptor.createPipe() }
             catch (_: java.io.IOException) {
+                // Creating a reply pipe failed before delivery. Return a bounded
+                // explicit error so the caller immediately marks this call unknown,
+                // instead of waiting for an absent Binder reply to time out.
                 invalidate(token)
+                send(to, kind, requestId, token,
+                    error = "IPC_REPLY_PIPE_FAILED", transportError = true)
                 return
             }
         } else null
