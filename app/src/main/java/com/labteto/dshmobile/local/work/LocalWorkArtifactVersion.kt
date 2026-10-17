@@ -26,12 +26,14 @@ internal fun localWorkArtifactFileVersion(root: File, toolName: String, content:
     val path = workToolResultFilePath(toolName, content) ?: return null
     return runCatching {
         val file = safeLocalWorkArtifactFile(root, path) ?: return null
-        LocalWorkFileVersion(path, fileSha256(file), file.length())
+        fileSha256AndLength(file).let { (digest, bytes) ->
+            LocalWorkFileVersion(path, digest, bytes)
+        }
     }.getOrNull()
 }
 
 internal fun localWorkFileSha256(root: File, path: String): String? = runCatching {
-    safeLocalWorkArtifactFile(root, path)?.let(::fileSha256)
+    safeLocalWorkArtifactFile(root, path)?.let { fileSha256AndLength(it).first }
 }.getOrNull()
 
 internal fun safeLocalWorkArtifactFile(root: File, relative: String): File? {
@@ -52,19 +54,26 @@ internal fun safeLocalWorkArtifactFile(root: File, relative: String): File? {
     return current.toFile()
 }
 
-private fun fileSha256(file: File): String {
+/** Digest and length are both derived from the same verified on-disk version. */
+private fun fileSha256AndLength(file: File): Pair<String, Long> {
     val path = file.toPath()
     fun stamp(): BasicFileAttributes =
         Files.readAttributes(path, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
     val before = stamp()
     require(before.isRegularFile) { "证据来源不是普通文件" }
     val digest = MessageDigest.getInstance("SHA-256")
-    file.inputStream().buffered().use { input ->
-        val buffer = ByteArray(32 * 1024)
-        while (true) {
-            val size = input.read(buffer)
-            if (size < 0) break
-            digest.update(buffer, 0, size)
+    // Opening by File.inputStream() follows a symlink swapped in after the first stat.
+    // NOFOLLOW_LINKS pins the final pathname as a regular file before reading any bytes.
+    Files.newByteChannel(path, setOf<java.nio.file.OpenOption>(
+        java.nio.file.StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS,
+    )).use { channel ->
+        java.nio.channels.Channels.newInputStream(channel).use { input ->
+            val buffer = ByteArray(32 * 1024)
+            while (true) {
+                val size = input.read(buffer)
+                if (size < 0) break
+                digest.update(buffer, 0, size)
+            }
         }
     }
     val after = stamp()
@@ -72,7 +81,7 @@ private fun fileSha256(file: File): String {
         before.size() == after.size() && before.lastModifiedTime() == after.lastModifiedTime()) {
         "证据文件在读取期间发生变化"
     }
-    return digest.digest().joinToString("") { "%02x".format(it) }
+    return digest.digest().joinToString("") { "%02x".format(it) } to before.size()
 }
 
 /** Read one immutable byte observation, matching the user-selected SHA exactly. */

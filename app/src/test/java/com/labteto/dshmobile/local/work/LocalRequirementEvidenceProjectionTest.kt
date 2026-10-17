@@ -91,6 +91,24 @@ class LocalRequirementEvidenceProjectionTest {
         assertEquals(null, checkRequirementEvidenceVersions(root, listOf(link)).single().versionNow)
     }
 
+
+    @Test fun toolArtifactDigestAndByteCountComeFromOneVerifiedFileSnapshot() {
+        val root = temp.newFolder("evidence-immutable-observation")
+        val text = "交付内容".repeat(100)
+        val file = File(root, "report.md").apply { writeText(text) }
+        val current = localWorkArtifactFileVersion(root, "write", "已写入 report.md（1200 字节）")
+        assertEquals("report.md", current?.path)
+        assertEquals(file.readBytes().size.toLong(), current?.bytes)
+        assertEquals(localWorkFileSha256(root, "report.md"), current?.sha256)
+
+        val alias = File(root, "other.md")
+        java.nio.file.Files.createSymbolicLink(alias.toPath(), file.toPath())
+        assertEquals(null, localWorkArtifactFileVersion(root, "write", "已写入 other.md（10 字节）"))
+
+        file.writeText("新文件版本")
+        assertFalse(current?.sha256 == localWorkFileSha256(root, "report.md"))
+    }
+
     private fun link(seq: Long, index: Int, title: String, sha: String) = LocalSessionEventLog.Event(
         sequence = seq, type = "work/requirement-evidence", createdAt = seq,
         data = buildJsonObject {
