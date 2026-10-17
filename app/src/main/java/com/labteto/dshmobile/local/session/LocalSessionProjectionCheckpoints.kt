@@ -36,7 +36,7 @@ internal class LocalSessionProjectionCheckpoints(private val logFile: File, priv
         val payload = json.encodeToString(LocalSessionProjectionCheckpoint.serializer(), checkpoint).toByteArray()
         require(payload.size <= MAX_CHECKPOINT_BYTES) { "会话投影检查点超过预算" }
         val target = fileFor(name)
-        val temporary = File(target.parentFile, target.name + ".tmp")
+        val temporary = File(target.parentFile, target.name + ".tmp-" + java.util.UUID.randomUUID())
         try {
             FileOutputStream(temporary).use { output -> output.write(payload); output.fd.sync() }
             Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING,
