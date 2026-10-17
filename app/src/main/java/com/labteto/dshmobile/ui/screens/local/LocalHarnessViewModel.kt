@@ -171,6 +171,8 @@ class LocalHarnessViewModel @Inject constructor(
             savedStateHandle.remove<List<String>>("conversation_drafts"))
         secureDrafts.migrateOldSavedStateOnce("attachment_drafts",
             savedStateHandle.remove<List<String>>("conversation_attachment_drafts"))
+        secureDrafts.migrateOldSavedStateOnce("ui_document_forms",
+            savedStateHandle.remove<List<String>>("ui_document_forms"))
     }
     val conversationDraftUiPort: com.labteto.dshmobile.uicontract.ConversationDraftUiPort =
         LocalSessionDraftCache.restore(secureDrafts.read("conversation_drafts")) {
@@ -187,8 +189,8 @@ class LocalHarnessViewModel @Inject constructor(
 
     val conversationReadingUiPort: com.labteto.dshmobile.uicontract.ConversationReadingUiPort get() = readingState
     private val formState = com.labteto.dshmobile.ui.host.LocalUiDocumentFormState(
-            savedStateHandle.get<List<String>>("ui_document_forms").orEmpty(),
-        ) { savedStateHandle["ui_document_forms"] = it }
+            secureDrafts.read("ui_document_forms"),
+        ) { secureDrafts.write("ui_document_forms", it) }
     val uiDocumentFormPort: com.labteto.dshmobile.uicontract.UiDocumentFormUiPort get() = formState
     val sessionUiPort: com.labteto.dshmobile.uicontract.SessionUiPort by lazy {
         com.labteto.dshmobile.ui.host.HostConversationSessionUiPort(businessSessions, conversationDraftUiPort,

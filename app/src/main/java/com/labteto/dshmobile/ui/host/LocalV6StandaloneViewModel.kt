@@ -59,6 +59,8 @@ internal class LocalV6StandaloneViewModel @Inject constructor(
             savedStateHandle.remove<List<String>>("v6_conversation_drafts"))
         secureDrafts.migrateOldSavedStateOnce("attachment_drafts",
             savedStateHandle.remove<List<String>>("v6_attachment_drafts"))
+        secureDrafts.migrateOldSavedStateOnce("ui_document_forms",
+            savedStateHandle.remove<List<String>>("v6_document_forms"))
     }
     val drafts: ConversationDraftUiPort =
         LocalSessionDraftCache.restore(secureDrafts.read("conversation_drafts")) {
@@ -72,8 +74,8 @@ internal class LocalV6StandaloneViewModel @Inject constructor(
         savedStateHandle.get<List<String>>("v6_reading").orEmpty()
     ) { savedStateHandle["v6_reading"] = ArrayList(it) }
     private val formState = LocalUiDocumentFormState(
-        savedStateHandle.get<List<String>>("v6_document_forms").orEmpty()
-    ) { savedStateHandle["v6_document_forms"] = it }
+        secureDrafts.read("ui_document_forms"),
+    ) { secureDrafts.write("ui_document_forms", it) }
     private val shellPreferences = LocalConversationUiStateStore(context, businessSessions)
     val sessions: SessionUiPort = HostConversationSessionUiPort(
         businessSessions, drafts, shellPreferences, readingState, formState,
