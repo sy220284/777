@@ -78,7 +78,15 @@ class LocalWorkflowCoordinatorTest {
     @Test
     fun graphPartialResultIsStructuredAndCannotMasqueradeAsFullyDelivered() = runTest {
         val workflow = LocalWorkflowCoordinator(
-            execute = { prompt -> if (prompt == "A") "" else "完成" },
+            execute = { prompt ->
+                // Retries add feedback to the original task; A must continue failing.
+                // Only the independent C is allowed to complete.
+                when (prompt.substringBefore("\\n")) {
+                    "A" -> ""
+                    "B" -> error("Dependent node B must stay blocked")
+                    else -> "完成"
+                }
+            },
             pruneOutput = { it }, onProgress = {},
         )
         val prepared = workflow.prepare(
@@ -94,6 +102,33 @@ class LocalWorkflowCoordinatorTest {
         assertEquals("partial", result.executionOutcome)
         assertTrue(result.summary.contains("工作流仍有未完成节点"))
         assertTrue(result.summary.contains("B"))
+    }
+
+    @Test
+    fun goalRevisionFenceRejectsChangedAcceptanceWithoutReplayingTheTask() {
+        val captured = com.labteto.dshmobile.local.work.LocalGoal(
+            description = "构建并验证", id = "goal-1",
+            artifactPaths = listOf("output.md"), verificationCommands = listOf("verify"),
+        )
+        com.labteto.dshmobile.local.work.requireCurrentWorkflowGoal(captured, captured)
+        val stale = runCatching {
+            com.labteto.dshmobile.local.work.requireCurrentWorkflowGoal(
+                captured, captured.copy(artifactPaths = listOf("new-output.md")))
+        }.exceptionOrNull()
+        assertTrue(stale is com.labteto.dshmobile.local.work.LocalWorkflowGoalSuperseded)
+        assertTrue(runCatching {
+            com.labteto.dshmobile.local.work.requireCurrentWorkflowGoal(
+                captured, captured.copy(status = "paused"))
+        }.exceptionOrNull() is com.labteto.dshmobile.local.work.LocalWorkflowGoalSuperseded)
+    }
+
+    @Test
+    fun graphWithNoGoalCannotSilentlyAttachToNewUserGoal() {
+        com.labteto.dshmobile.local.work.requireCurrentWorkflowGoal(null, null)
+        assertTrue(runCatching {
+            com.labteto.dshmobile.local.work.requireCurrentWorkflowGoal(
+                null, com.labteto.dshmobile.local.work.LocalGoal("后来建立的目标", id = "new"))
+        }.exceptionOrNull() is com.labteto.dshmobile.local.work.LocalWorkflowGoalSuperseded)
     }
 
     @Test

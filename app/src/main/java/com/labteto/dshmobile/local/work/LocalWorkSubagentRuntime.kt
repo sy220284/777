@@ -54,12 +54,17 @@ internal class LocalWorkSubagentRuntime(
         dependencies: List<List<Int>> = emptyList(),
     ): String {
         val workerSelection = LocalWorkerModelRouter.resolve(modelOverride, binding.aggregateSnapshot())
-        val goalIdAtStart = binding.workState.snapshot().goal?.id.orEmpty()
+        val goalAtStart = binding.workState.snapshot().goal
+        val goalIdAtStart = goalAtStart?.id.orEmpty()
+        val goalFingerprintAtStart = goalAtStart?.let(::localWorkGoalFingerprint)
+        fun checkGoalOwner() = requireCurrentWorkflowGoal(goalAtStart, binding.workState.snapshot().goal)
         // Preflight is pure and rejects cycles, missing nodes and capacity overflow
         // before the canonical EventLog may declare a graph started.
         val graphId = java.util.UUID.randomUUID().toString()
         val workflow = LocalWorkflowCoordinator(
             execute = { prompt ->
+                // Fence the real subagent launch, not merely its completion projection.
+                checkGoalOwner()
                 runner.runResult(
                     LocalSubagentLaunchSpec(
                         task = prompt,
@@ -78,6 +83,7 @@ internal class LocalWorkSubagentRuntime(
             },
             pruneOutput = { value -> pruneOutput(binding, value) },
             onProgress = { progress ->
+                checkGoalOwner()
                 // An emitted EventLog progress fact precedes every Work UI projection.
                 binding.eventLog.append("taskgraph/progress", kotlinx.serialization.json.buildJsonObject {
                     put("graph_id", graphId)
@@ -107,12 +113,24 @@ internal class LocalWorkSubagentRuntime(
             },
         )
         val prepared = workflow.prepare(tasks, mode, requiredEvidence, dependencies)
+        checkGoalOwner()
         binding.eventLog.append("taskgraph/start", kotlinx.serialization.json.buildJsonObject {
             put("graph_id", graphId)
             put("session_id", binding.sessionId)
             put("goal_id", goalIdAtStart)
             put("mode", mode)
             put("task_count", tasks.size)
+            goalFingerprintAtStart?.let { put("goal_fingerprint", it) }
+            put("nodes", kotlinx.serialization.json.buildJsonArray {
+                prepared.nodes.forEach { node ->
+                    add(kotlinx.serialization.json.buildJsonObject {
+                        put("node_id", node.id)
+                        put("depends_on", kotlinx.serialization.json.buildJsonArray {
+                            node.dependsOn.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) }
+                        })
+                    })
+                }
+            })
         })
         binding.workState.update { current -> current.copy(workflowProgress = null) }
 
@@ -125,6 +143,7 @@ internal class LocalWorkSubagentRuntime(
                 put("graph_id", graphId)
                 put("goal_id", goalIdAtStart)
                 put("outcome", outcome)
+                goalFingerprintAtStart?.let { put("goal_fingerprint", it) }
                 put("detail", detail.take(500))
                 result?.let {
                     put("total_nodes", it.total)

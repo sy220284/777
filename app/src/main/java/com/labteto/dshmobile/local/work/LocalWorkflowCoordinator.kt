@@ -7,6 +7,22 @@ import com.labteto.dshmobile.harness.workflow.TaskGraphOutcome
 import com.labteto.dshmobile.harness.workflow.TaskGraphProgress
 import com.labteto.dshmobile.local.agent.LocalSubagentExecutionException
 
+/**
+ * Work's current Goal is an immutable execution fence for one delegated graph.
+ * A changed acceptance contract, a pause, or a newly created Goal invalidates
+ * the previous work. This is a terminal policy failure, never a model retry.
+ */
+internal class LocalWorkflowGoalSuperseded : IllegalStateException(
+    "Work Goal 已发生变化或暂停，本次旧任务图已停止，请根据当前目标重新规划",
+)
+
+internal fun requireCurrentWorkflowGoal(expected: LocalGoal?, current: LocalGoal?) {
+    val same = if (expected == null) current == null else
+        current != null && current.status == "active" &&
+            localWorkGoalFingerprint(expected) == localWorkGoalFingerprint(current)
+    if (!same) throw LocalWorkflowGoalSuperseded()
+}
+
 /** Validated immutable Work execution request; safe to persist as started. */
 internal data class LocalPreparedWorkflow(
     val nodes: List<TaskGraphNode>,
@@ -126,6 +142,7 @@ internal class LocalWorkflowCoordinator(
             },
             onProgress = onProgress,
             shouldRetryError = { error ->
+                if (error is LocalWorkflowGoalSuperseded) return@run false
                 val delegated = error as? LocalSubagentExecutionException
                 delegated == null || (
                     delegated.retryable && !isTerminalRouteFailure(delegated.errorCode.orEmpty())
