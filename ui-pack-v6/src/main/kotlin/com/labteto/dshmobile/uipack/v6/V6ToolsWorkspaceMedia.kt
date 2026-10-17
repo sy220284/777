@@ -12,8 +12,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -706,13 +704,18 @@ fun V6MediaScene(media: MediaUiPort, settings: SettingsUiPort,
             finally { pending = false }
         }
     }
-    val audioPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        val original = offers.firstOrNull { it.id == audioRouteId && it.kind == LocalMediaKind.TRANSCRIBE }
-        audioRouteId = null
-        if (uri != null && original != null && !sessionId.isNullOrBlank()) {
-            frozenRequest = MediaUiCommand.Transcribe(original, uri.toString(), sessionId)
-        }
-    }
+    val audioPicker = com.labteto.dshmobile.uihost.rememberUiAttachmentPicker(
+        onSelected = { selectedUri ->
+            val original = offers.firstOrNull {
+                it.id == audioRouteId && it.kind == LocalMediaKind.TRANSCRIBE
+            }
+            audioRouteId = null
+            if (selectedUri != null && original != null && !sessionId.isNullOrBlank()) {
+                frozenRequest = MediaUiCommand.Transcribe(original, selectedUri, sessionId)
+            }
+        },
+        mimeTypes = arrayOf("audio/*"),
+    )
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("媒体", style = MaterialTheme.typography.titleLarge)
@@ -783,7 +786,7 @@ fun V6MediaScene(media: MediaUiPort, settings: SettingsUiPort,
                         style = MaterialTheme.typography.bodySmall)
                     SyButton("选择音频并转写", {
                         audioRouteId = offer.id
-                        audioPicker.launch(arrayOf("audio/*"))
+                        audioPicker()
                     }, enabled = !pending && !sessionId.isNullOrBlank())
                 } else {
                     SyButton(when(kind) {
