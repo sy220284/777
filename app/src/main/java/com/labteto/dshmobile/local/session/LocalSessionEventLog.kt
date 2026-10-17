@@ -76,8 +76,13 @@ class LocalSessionEventLog(
     @Synchronized
     internal fun writeProjectionCheckpoint(name: String, version: Int, throughSequence: Long,
         payload: String, generation: Long) {
-        if (isClosed || generation != resetGeneration || throughSequence > latestSequence()) return
-        checkpoints.write(name, LocalSessionProjectionCheckpoint(version, projectionIdentity(), throughSequence, payload))
+        if (isClosed || generation != resetGeneration) return
+        delegate.withWriterLease {
+            if (isClosed || generation != resetGeneration ||
+                throughSequence > latestSequence()) return@withWriterLease
+            checkpoints.write(name,
+                LocalSessionProjectionCheckpoint(version, projectionIdentity(), throughSequence, payload))
+        }
     }
 
     /** Shares the native Session Owner's compare/append lock with every adapter for this path. */
@@ -232,11 +237,13 @@ class LocalSessionEventLog(
         private set
 
     fun clear() = synchronized(this) {
-        delegate.clear()
-        resetGeneration += 1L
-        checkpointIdentity = null
-        checkpoints.clear()
-        mutableChanges.update { it + 1L }
+        delegate.withWriterLease {
+            delegate.clear()
+            resetGeneration += 1L
+            checkpointIdentity = null
+            checkpoints.clear()
+            mutableChanges.update { it + 1L }
+        }
     }
 
     private fun com.labteto.dshmobile.harness.session.SessionEvent.toLocalEvent() = Event(
