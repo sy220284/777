@@ -187,4 +187,44 @@ class SessionEventLogMultiInstanceTest {
         }
     }
 
+    @Test
+    fun foreignAppendInvalidatesWarmSequenceEvenWithLiveAdapter() {
+        val root = kotlin.io.path.createTempDirectory("session-log-foreign-writer-").toFile()
+        val file = File(root, "session.events.jsonl")
+        val log = SessionEventLog(file, json)
+        try {
+            assertEquals(0L, log.append("work/start", buildJsonObject { put("owner", "one") }).sequence)
+            // Simulate a second OS process that committed a valid event while this
+            // adapter was idle. The next writer must rebase from disk, never reuse 1.
+            file.appendText(json.encodeToString(
+                SessionEvent.serializer(),
+                SessionEvent(1L, "work/foreign", 1L, buildJsonObject { put("owner", "two") }),
+            ) + "\n")
+            assertEquals(1L, log.latestSequence())
+            assertEquals(2L, log.append("work/next", buildJsonObject { put("owner", "one") }).sequence)
+            assertEquals(listOf(0L, 1L, 2L), log.snapshot().map { it.sequence })
+            assertTrue(File(file.path + ".writer.lock").isFile)
+        } finally { log.close(); root.deleteRecursively() }
+    }
+
+    @Test
+    fun nestedCompareAndAppendHoldsOneDurableLeaseAcrossSeveralEvents() {
+        val root = kotlin.io.path.createTempDirectory("session-log-nested-lease-").toFile()
+        val file = File(root, "session.events.jsonl")
+        val log = SessionEventLog(file, json)
+        try {
+            val first = log.withWriterLease {
+                val initial = log.append("work/cas", buildJsonObject { put("stage", "one") })
+                val next = log.withWriterLease {
+                    log.append("work/cas", buildJsonObject { put("stage", "two") })
+                }
+                assertEquals(initial.sequence + 1L, next.sequence)
+                initial
+            }
+            assertEquals(0L, first.sequence)
+            assertEquals(2L, log.append("work/cas", buildJsonObject { put("stage", "three") }).sequence)
+            assertEquals(3, log.snapshot().size)
+        } finally { log.close(); root.deleteRecursively() }
+    }
+
 }

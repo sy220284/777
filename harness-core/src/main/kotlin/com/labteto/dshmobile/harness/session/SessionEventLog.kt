@@ -6,6 +6,9 @@ import java.io.InputStream
 import java.io.RandomAccessFile
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.StandardOpenOption
+import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.StandardCopyOption
 import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
@@ -80,13 +83,55 @@ class SessionEventLog(
     private val nextSequence = pathState.nextSequence
 
     init {
-        synchronized(lock) {
-            if (nextSequence.get() == UNINITIALIZED_SEQUENCE) {
-                repairTornActiveTailUnsafe()
-                nextSequence.set(readNextSequence())
+        synchronized(lock) { withProcessWriterLease { Unit } }
+    }
+
+    /**
+     * Real OS writer lease in addition to the in-process path lock. IPC/second-process
+     * adapters may not allocate a duplicate sequence, interleave a row or rotate a
+     * segment while another process is committing a document/evidence CAS.
+     * Nested append() reuses its outer lock rather than relocking the same inode.
+     */
+    private inline fun <T> withProcessWriterLease(block: () -> T): T {
+        if (pathState.fileLeaseDepth > 0) {
+            pathState.fileLeaseDepth++
+            try { return block() } finally { pathState.fileLeaseDepth-- }
+        }
+        file.parentFile?.mkdirs()
+        return java.nio.channels.FileChannel.open(
+            File(file.path + ".writer.lock").toPath(),
+            StandardOpenOption.CREATE, StandardOpenOption.WRITE,
+        ).use { channel ->
+            channel.lock().use {
+                // A foreign writer may have appended, reset or rotated this durable log.
+                // Avoid enumerating archived segments for every local append: an active
+                // inode/length/mtime change is the only foreign-write invalidation.
+                if (nextSequence.get() == UNINITIALIZED_SEQUENCE ||
+                    pathState.headStamp != durableHeadStamp()) {
+                    repairTornActiveTailUnsafe()
+                    nextSequence.set(readNextSequence())
+                }
+                pathState.fileLeaseDepth = 1
+                try { block() }
+                finally {
+                    pathState.headStamp = durableHeadStamp()
+                    pathState.fileLeaseDepth = 0
+                }
             }
         }
     }
+
+    private fun durableHeadStamp(): DurableHeadStamp? {
+        if (!Files.exists(file.toPath(), LinkOption.NOFOLLOW_LINKS)) return null
+        val attributes = Files.readAttributes(
+            file.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS,
+        )
+        check(attributes.isRegularFile) { "会话事件日志不是普通文件" }
+        return DurableHeadStamp(
+            attributes.fileKey()?.toString(), attributes.size(), attributes.lastModifiedTime().toMillis(),
+        )
+    }
+
 
     /**
      * Serializes a higher-level compare-and-append against all adapters for this durable path.
@@ -95,7 +140,7 @@ class SessionEventLog(
      */
     fun <T> withWriterLease(block: () -> T): T = synchronized(lock) {
         check(!closed.get()) { "事件日志已关闭，拒绝新的比较写入" }
-        block()
+        withProcessWriterLease(block)
     }
 
     fun diagnostics(): SessionEventLogDiagnostics = SessionEventLogDiagnostics(
@@ -105,6 +150,7 @@ class SessionEventLog(
     )
 
     fun append(type: String, data: JsonObject): SessionEvent = synchronized(lock) {
+        withProcessWriterLease {
         require(type.isNotBlank()) { "事件类型不能为空" }
         val event = SessionEvent(
             sequence = nextSequence.get(),
@@ -127,13 +173,14 @@ class SessionEventLog(
         }
         nextSequence.incrementAndGet()
         event
+        }
     }
 
     fun snapshot(): List<SessionEvent> = synchronized(lock) { readEventsUnsafe() }
 
     /** Latest durable event sequence, or -1 when the log is empty. */
     fun latestSequence(): Long = synchronized(lock) {
-        nextSequence.get().coerceAtLeast(0L) - 1L
+        withProcessWriterLease { nextSequence.get().coerceAtLeast(0L) - 1L }
     }
 
     /**
@@ -459,6 +506,7 @@ class SessionEventLog(
 
     fun clear() {
         synchronized(lock) {
+            withProcessWriterLease {
             val prefix = "${file.name}.part-"
             file.parentFile?.listFiles().orEmpty()
                 .filter { it.isFile && it.name.startsWith(prefix) }
@@ -467,6 +515,7 @@ class SessionEventLog(
             file.writeText("")
             nextSequence.set(0L)
             CompressedEventSegmentCache.invalidate(pathKey)
+            }
         }
     }
 
@@ -907,9 +956,15 @@ class SessionEventLog(
         }
     }
 
+    private data class DurableHeadStamp(
+        val fileKey: String?, val bytes: Long, val lastModifiedMillis: Long,
+    )
+
     private class SharedPathState {
         val lock = Any()
         val nextSequence = AtomicLong(UNINITIALIZED_SEQUENCE)
+        var headStamp: DurableHeadStamp? = null
+        var fileLeaseDepth: Int = 0
         var references: Int = 0
     }
 
