@@ -341,6 +341,10 @@ dependencies {
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    // Hilt/KSP processor graph otherwise selects old artifacts without verified binaries.
+    // Constrain that isolated processor classpath to checksum-pinned AndroidX versions.
+    ksp("androidx.collection:collection:1.5.0")
+    ksp("androidx.savedstate:savedstate:1.3.2")
 
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
