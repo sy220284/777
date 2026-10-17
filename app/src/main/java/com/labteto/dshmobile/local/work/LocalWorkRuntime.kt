@@ -202,6 +202,22 @@ class LocalWorkRuntime @Inject internal constructor(
     override fun requirementEvidenceForUi(sessionId: String): List<LocalRequirementEvidenceLink> =
         requirementEvidenceIndexForUi(sessionId).links
 
+    /** Read-only independent machine check against the existing Goal acceptance contract. */
+    internal fun machineEvidenceForUi(sessionId: String):
+        com.labteto.dshmobile.uicontract.UiWorkMachineVerification? {
+        val current = runtimeStateStore.state.value
+        val goal = current.work.goal ?: return null
+        if (current.sessionId != sessionId ||
+            current.usageMode != LocalUsageMode.WORK ||
+            runtimeStateStore.currentSessionId != sessionId) return null
+        val log = eventLogs.get(sessionId)
+        val sequence = log.latestSequence()
+        val delivery = localWorkDeliveryEvidence(log, goal, File(sessionFiles.workspace.path))
+        if (log.isClosed || log.latestSequence() != sequence ||
+            runtimeStateStore.state.value.work.goal != goal) return null
+        return projectLocalWorkMachineVerification(goal, delivery, sequence)
+    }
+
     /** Manual review is a separate, user-owned event and never a Work completion claim. */
     internal fun requirementEvidenceReviewsForUi(sessionId: String): List<LocalRequirementEvidenceReview> =
         requirementEvidenceIndexForUi(sessionId).reviews

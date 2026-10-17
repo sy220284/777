@@ -5,13 +5,23 @@ import com.labteto.dshmobile.local.work.LocalRequirementEvidenceLink
 import com.labteto.dshmobile.local.work.LocalRequirementEvidenceReview
 import com.labteto.dshmobile.local.work.LocalRequirementEvidenceTextCheck
 
+/** Only explicit original Goal file/command conditions are machine-checkable. */
+enum class UiWorkMachineVerificationStatus { NO_MACHINE_CONDITIONS, UNSATISFIED, VERIFIED_CONDITIONS }
+data class UiWorkMachineVerification(
+    val goalId: String, val goalRevision: Long, val sourceSequence: Long,
+    val status: UiWorkMachineVerificationStatus,
+    val artifactConditionCount: Int, val commandConditionCount: Int,
+    val missing: List<String>, val hiddenMissingCount: Int = 0,
+)
+
 /** Status is reported by Work; a selected reference never turns it into a verified pass. */
 data class UiWorkRequirement(val index: Int, val text: String, val reportedStatus: String)
 data class UiWorkEvidenceSnapshot(val identity: UiSessionIdentity, val requirements: List<UiWorkRequirement>,
     val artifacts: List<LocalArtifactUiItem>, val references: List<LocalRequirementEvidenceLink>,
     val goalId: String? = null,
     val reviews: List<LocalRequirementEvidenceReview> = emptyList(),
-    val textChecks: List<LocalRequirementEvidenceTextCheck> = emptyList())
+    val textChecks: List<LocalRequirementEvidenceTextCheck> = emptyList(),
+    val machine: UiWorkMachineVerification? = null)
 sealed interface UiWorkEvidenceReadReceipt {
     data class Available(val snapshot: UiWorkEvidenceSnapshot) : UiWorkEvidenceReadReceipt
     data class Rejected(val reason: UiCommandRejection) : UiWorkEvidenceReadReceipt

@@ -56,12 +56,19 @@ class LocalWorkEvidenceUiAdapter @Inject internal constructor(
             val references = evidence.links
             val reviews = evidence.reviews
             val textChecks = evidence.textChecks
+            val machine = work.machineEvidenceForUi(identity.sessionId)
             currentCoroutineContext().ensureActive()
             synchronized(state.foregroundRunHandle.lock) {
                 if (!current(identity) || state.state.value.work.goal?.id != goalId ||
                     state.state.value.work.todos.mapIndexed { index, todo -> UiWorkRequirement(index, todo.content, todo.status) } != requirements)
                     UiWorkEvidenceReadReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
-                else UiWorkEvidenceReadReceipt.Available(UiWorkEvidenceSnapshot(identity, requirements, artifacts, references, goalId, reviews, textChecks))
+                else if (machine != null &&
+                    (state.state.value.work.goal?.revision != machine.goalRevision ||
+                        work.eventSequenceForUi(identity.sessionId) != machine.sourceSequence))
+                    UiWorkEvidenceReadReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                else UiWorkEvidenceReadReceipt.Available(
+                    UiWorkEvidenceSnapshot(identity, requirements, artifacts, references,
+                        goalId, reviews, textChecks, machine))
             }
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) { UiWorkEvidenceReadReceipt.Failed(failure.message) }

@@ -107,6 +107,22 @@ fun V6WorkEvidencePanel(port: WorkEvidenceUiPort, identity: UiSessionIdentity,
     if (open) AlertDialog(onDismissRequest = { close() }, title = { Text(stringResource(R.string.v6_evidence)) },
         text = { LazyColumn(Modifier.heightIn(max = 360.dp)) {
             item { Text(stringResource(R.string.v6_evidence_not_verified)) }
+            snapshot?.machine?.let { machine ->
+                item(key = "machine-verification") {
+                    Text("机器检查来源：Goal ${machine.goalId} · revision ${machine.goalRevision} · Event #${machine.sourceSequence}")
+                    Text(when (machine.status) {
+                        UiWorkMachineVerificationStatus.NO_MACHINE_CONDITIONS ->
+                            "原始目标没有明确机器验收条件；不得推断已通过"
+                        UiWorkMachineVerificationStatus.UNSATISFIED ->
+                            "原始目标的机器验收条件仍有不满足项"
+                        UiWorkMachineVerificationStatus.VERIFIED_CONDITIONS ->
+                            "原始文件与测试命令条件已验证（不等于整个目标完成）"
+                    })
+                    Text("文件条件 ${machine.artifactConditionCount} 项 · 命令条件 ${machine.commandConditionCount} 项")
+                    machine.missing.take(8).forEach { Text(it) }
+                    if (machine.hiddenMissingCount > 0) Text("另有 ${machine.hiddenMissingCount} 项未满足")
+                }
+            }
             items(snapshot?.requirements.orEmpty(), key = { it.index }) { requirement ->
                 com.shenyan.designsystem.components.SyMaterialFrame {
                     TextButton(onClick = { selected = requirement; inspected = null }, enabled = !pending) { Text("${requirement.text} · ${requirement.reportedStatus}") }
