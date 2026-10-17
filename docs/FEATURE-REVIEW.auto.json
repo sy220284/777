@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "snapshot": "338e7e02fe50",
+  "snapshot": "fe77a70fcf8f",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
-  "code_files_scanned": 1727,
-  "production_sources_scanned": 1005,
+  "code_files_scanned": 1766,
+  "production_sources_scanned": 1025,
   "feature_nodes": 533,
   "functional_leaves": 440,
   "existing_executable_test_mappings": 125,
@@ -5758,13 +5758,13 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 无障碍与通知监听实时服务状态提示",
-      "verification": "历史生产文件仍存在（待入口复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "专属源码路径已核",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeviceCapabilitiesController.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [],
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
@@ -8282,8 +8282,8 @@
     "真实测试映射（仅局部）": 122,
     "具名源码声明存在（静态，待调用链复核）": 199,
     "没有可确认的现行入口证据": 17,
-    "历史生产文件仍存在（待入口复核）": 75,
-    "旧源码已失效，需核实迁移或退役": 1,
+    "历史生产文件仍存在（待入口复核）": 74,
+    "旧源码已失效，需核实迁移或退役": 2,
     "具名源码及仪表测试声明存在（静态，未执行）": 6,
     "真实测试映射及具名源码声明（静态）": 3,
     "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）": 14,
@@ -9198,29 +9198,13 @@
   "followup_production_or_compatibility": 10,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "ef40861ea037",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalDriver.kt",
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolInvocationContext.kt"
-    ],
+    "baseline": "0b6499d0df6c",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentInboxPersistence.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTurnSettlement.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkBuiltinToolRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkContinuation.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidence.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalTransitionPolicy.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkInterruptedToolEvent.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkModels.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnToolRuntime.kt",
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentInputQueue.kt",
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt",
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt"
+      "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiAttachmentPicker.kt",
+      "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiDocumentTransfer.kt",
+      "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6DocumentMedia.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
@@ -9496,7 +9480,7 @@
       "assessment": "不在现行树内但原有实现仍存在；可能改名、合并或重新归类"
     }
   ],
-  "current_tree_outdated_source_count": 2,
+  "current_tree_outdated_source_count": 3,
   "current_tree_outdated_sources": [
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 底部弹层、确认框和长表单",
@@ -9524,6 +9508,19 @@
       "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/components/DsButton.kt",
         "app/src/main/java/com/shenyan/designsystem/components/ShenyanBasics.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 无障碍与通知监听实时服务状态提示",
+      "historical_grade": "专属源码路径已核",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeviceCapabilitiesController.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeviceCapabilitiesController.kt"
       ],
       "remaining_production_sources": [],
       "historical_test_files": [],

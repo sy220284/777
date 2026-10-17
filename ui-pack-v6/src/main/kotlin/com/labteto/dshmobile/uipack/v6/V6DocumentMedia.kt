@@ -4,8 +4,6 @@ import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.widget.MediaController
 import android.widget.VideoView
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -24,11 +22,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.local.model.LocalMediaPage
+import com.labteto.dshmobile.uihost.rememberUiStreamDocumentSaver
+import com.labteto.dshmobile.uihost.UiDocumentWriteReceipt
 import com.labteto.dshmobile.uicontract.MediaUiPort
 import com.labteto.dshmobile.uicontract.MediaUiReceipt
 import com.labteto.dshmobile.uicontract.UiDocumentMediaKind
@@ -135,8 +134,6 @@ internal fun V6DocumentMediaNode(node: UiDocumentNode.Media, sessionId: String, 
 @Composable
 private fun V6MediaExport(node: UiDocumentNode.Media, sessionId: String, media: MediaUiPort,
     localPath: String) {
-    val resolver = LocalContext.current.contentResolver
-    val scope = rememberCoroutineScope()
     var exporting by remember(node.assetId, sessionId) { mutableStateOf(false) }
     var result by remember(node.assetId, sessionId) { mutableStateOf<String?>(null) }
     val mime = when (node.kind) {
@@ -159,31 +156,34 @@ private fun V6MediaExport(node: UiDocumentNode.Media, sessionId: String, media: 
         UiDocumentMediaKind.VIDEO -> "video"
     } + "-" + node.assetId.take(24).replace(Regex("[^a-zA-Z0-9_-]"), "_") +
         (extension?.let { "." + it } ?: "")
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mime)) { uri ->
-        if (uri == null) result = "已取消保存"
-        else {
-            exporting = true
-            scope.launch {
-                try {
-                    val outcome = withContext(Dispatchers.IO) {
-                        val output = resolver.openOutputStream(uri, "wt")
-                        if (output == null) MediaUiReceipt.Failed("无法打开目标文档")
-                        else output.use { media.exportToSessionAsset(node.assetId, sessionId, it) }
-                    }
-                    result = when (outcome) {
-                        MediaUiReceipt.Applied -> "已保存到选择的位置"
-                        is MediaUiReceipt.Failed -> outcome.message ?: "导出失败"
-                        else -> "未完成导出"
-                    }
-                } catch (cancelled: CancellationException) { throw cancelled }
-                catch (failure: Exception) { result = failure.message ?: "导出失败" }
-                finally { exporting = false }
+    val save = rememberUiStreamDocumentSaver(
+        mimeType = mime,
+        filename = { _: Pair<String, String> -> filename },
+        write = { request, output ->
+            when (val receipt = media.exportToSessionAsset(request.first, request.second, output)) {
+                MediaUiReceipt.Applied -> UiDocumentWriteReceipt.Saved
+                is MediaUiReceipt.Failed -> UiDocumentWriteReceipt.Failed(receipt.message)
+                else -> UiDocumentWriteReceipt.Failed("未完成导出")
             }
-        }
-    }
+        },
+        onRejected = { receipt ->
+            exporting = false
+            result = receipt.message
+        },
+        onResult = { request, receipt ->
+            if (request.first == node.assetId && request.second == sessionId) {
+                exporting = false
+                result = when (receipt) {
+                    UiDocumentWriteReceipt.Saved -> "已保存到选择的位置"
+                    UiDocumentWriteReceipt.Cancelled -> "已取消保存"
+                    is UiDocumentWriteReceipt.Failed -> receipt.message ?: "导出失败"
+                }
+            }
+        },
+    )
     SyButton("保存到设备", onClick = {
-        try { launcher.launch(filename) }
-        catch (failure: Exception) { result = failure.message ?: "无法打开保存位置" }
+        exporting = true
+        save(node.assetId to sessionId)
     }, enabled = !exporting, style = SyButtonStyle.SECONDARY)
     result?.let { Text(it) }
 }

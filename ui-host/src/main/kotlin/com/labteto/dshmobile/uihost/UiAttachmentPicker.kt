@@ -5,10 +5,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 
 /**
  * Host is the only Android document picker. Its request is admitted by the
@@ -22,33 +21,51 @@ fun rememberUiAttachmentPicker(
     onRejected: (String) -> Unit = {},
     onSelected: (String?) -> Unit,
 ): () -> Unit {
+    val pick = rememberUiAttachmentPickerFor<Unit>(mimeTypes, onRejected) { _, uri -> onSelected(uri) }
+    return { pick(Unit) }
+}
+
+/** Capture the Feature target before the Android picker leaves the application. */
+@Composable
+fun <T> rememberUiAttachmentPickerFor(
+    mimeTypes: Array<String> = arrayOf("*/*"),
+    onRejected: (String) -> Unit = {},
+    onSelected: (T, String?) -> Unit,
+): (T) -> Unit {
     require(mimeTypes.isNotEmpty()) { "文件选择器必须声明允许的类型" }
     val owner = LocalUiHostSystemOperationOwner.current
         ?: remember { UiHostSystemOperationOwner() }
     val latestSelected by rememberUpdatedState(onSelected)
     val latestRejected by rememberUpdatedState(onRejected)
-    var waiting by remember(owner) { mutableStateOf<UiHostSystemOperationOwner.Ticket?>(null) }
-    DisposableEffect(owner) {
-        onDispose {
-            waiting?.let(owner::finish)
-            waiting = null
-        }
+    val gate = remember(owner) { UiHostDocumentOperationGate<T>() }
+    val lease = remember(owner) { UiHostSystemOperationLease(owner, UiHostPlatformAction.PICK_ATTACHMENT) }
+    DisposableEffect(gate, lease) {
+        onDispose { if (gate.cancelSelection() != null) lease.finish() }
     }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        val ticket = waiting
-        waiting = null
-        if (ticket == null || !owner.finish(ticket)) latestRejected("HOST_PICKER_STALE_RESULT")
-        else latestSelected(uri?.toString())
-    }
-    return {
-        val ticket = owner.begin(UiHostPlatformAction.PICK_ATTACHMENT)
-        if (ticket == null) latestRejected("HOST_PLATFORM_OPERATION_BUSY")
+        val ticket = gate.cancelSelection()
+        if (ticket == null) latestRejected("HOST_PICKER_STALE_RESULT")
         else {
-            waiting = ticket
+            lease.finish()
+            latestSelected(ticket.request, uri?.toString())
+        }
+    }
+    return { request ->
+        val ticket = gate.begin(request)
+        if (ticket == null) latestRejected("HOST_PLATFORM_OPERATION_BUSY")
+        else if (!lease.begin()) {
+            gate.failToLaunch(ticket)
+            latestRejected("HOST_PLATFORM_OPERATION_BUSY")
+        } else {
             try { launcher.launch(mimeTypes) }
+            catch (cancelled: CancellationException) {
+                gate.failToLaunch(ticket)
+                lease.finish()
+                throw cancelled
+            }
             catch (failure: Exception) {
-                waiting = null
-                owner.finish(ticket)
+                gate.failToLaunch(ticket)
+                lease.finish()
                 latestRejected(failure.javaClass.simpleName)
             }
         }

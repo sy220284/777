@@ -1,8 +1,6 @@
 package com.labteto.dshmobile.uipack.v6
 
 import android.graphics.ImageDecoder
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -18,6 +16,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.labteto.dshmobile.uihost.rememberUiAttachmentPickerFor
 import com.labteto.dshmobile.uicontract.*
 import com.shenyan.designsystem.components.*
 import kotlinx.coroutines.CancellationException
@@ -452,14 +451,16 @@ fun V6PortraitScene(
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) { feedback = failure.message ?: "头像无法解码" }
     }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        val id = galleryId
-        if (id != null && uri != null && !busy) {
-            busy = true
+    val picker = rememberUiAttachmentPickerFor<String>(
+        mimeTypes = arrayOf("image/*"),
+        onRejected = { feedback = it; busy = false },
+    ) { id, uri ->
+        if (uri == null) busy = false
+        else {
             scope.launch {
                 try {
                     val result = withContext(Dispatchers.IO) {
-                        owner.submit(PersonaPortraitUiCommand.Import(id, uri.toString()))
+                        owner.submit(PersonaPortraitUiCommand.Import(id, uri))
                     }
                     if (galleryId == id) {
                         feedback = when(result) {
@@ -482,13 +483,13 @@ fun V6PortraitScene(
         SyButton("返回", onBack, style = SyButtonStyle.GHOST)
         feedback?.let { SyNote(it) }
         people.forEach { entry ->
-            SyButton(entry.name, { galleryId = entry.id },
+            SyButton(entry.name, { galleryId = entry.id }, enabled = !busy,
                 style = if (galleryId == entry.id) SyButtonStyle.PRIMARY else SyButtonStyle.GHOST)
         }
         val id = galleryId
         if (id != null) {
             image?.let { Image(it, "人物头像", Modifier.fillMaxWidth().heightIn(max = 340.dp)) }
-            SyButton("选择本地头像", { picker.launch(arrayOf("image/*")) }, enabled = !busy)
+            SyButton("选择本地头像", { busy = true; picker(id) }, enabled = !busy)
             SyButton("移除头像", { confirmRemoval = true },
                 enabled = !busy, style = SyButtonStyle.DANGER)
         }
