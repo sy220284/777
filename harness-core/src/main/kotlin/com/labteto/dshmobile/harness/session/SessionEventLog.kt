@@ -219,7 +219,7 @@ class SessionEventLog(
         sequenceExclusive: Long = Long.MAX_VALUE,
         limit: Int = DEFAULT_PAGE_EVENTS,
     ): List<SessionEvent> = synchronized(lock) {
-        pageBeforeNewestFirstUnsafe(sequenceExclusive, limit)
+        withProcessWriterLease { pageBeforeNewestFirstUnsafe(sequenceExclusive, limit) }
     }
 
     private fun pageBeforeNewestFirstUnsafe(
@@ -242,6 +242,7 @@ class SessionEventLog(
 
     /** One bounded chronological page newer than the cursor; old segments are skipped. */
     fun pageAfter(sequenceExclusive: Long, limit: Int = DEFAULT_PAGE_EVENTS): List<SessionEvent> = synchronized(lock) {
+        withProcessWriterLease {
         val wanted = limit.coerceIn(1, MAX_PAGE_EVENTS)
         val result = ArrayList<SessionEvent>(wanted)
         val sources = orderedFilesUnsafe()
@@ -266,6 +267,7 @@ class SessionEventLog(
             if (result.size >= wanted) break
         }
         result
+        }
     }
 
     /**
@@ -543,6 +545,7 @@ class SessionEventLog(
      * release this lock immediately and stream a consistent export without blocking future turns.
      */
     fun openDurableFileSnapshot(): List<SessionEventFileSnapshot> = synchronized(lock) {
+        withProcessWriterLease {
         val opened = mutableListOf<SessionEventFileSnapshot>()
         try {
             orderedFilesUnsafe().forEach { source ->
@@ -558,10 +561,12 @@ class SessionEventLog(
             opened.forEach { runCatching { it.close() } }
             throw error
         }
+        }
     }
 
     /** Compress a bounded amount of old history without requiring another message in this session. */
     fun archiveLegacySegments(limit: Int = 1): Int = synchronized(lock) {
+        withProcessWriterLease {
         require(limit in 1..16) { "单次归档分片数须在 1..16 之间" }
         var archived = 0
         segmentFilesUnsafe().filter { !it.name.endsWith(COMPRESSED_SUFFIX) }
@@ -570,6 +575,7 @@ class SessionEventLog(
                 archived++
             }
         archived
+        }
     }
 
     /**
