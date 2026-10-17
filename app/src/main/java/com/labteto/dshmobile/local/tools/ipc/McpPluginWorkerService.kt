@@ -34,10 +34,9 @@ import okhttp3.OkHttpClient
  * This is process/failure isolation (same app UID), NOT a separate-UID permission sandbox.
  */
 class McpPluginWorkerService : Service() {
-    private data class Instance(
-        val transport: McpTransport,
-        val terminalObserver: Job?,
-    )
+    private class Instance(val transport: McpTransport) {
+        @Volatile var terminalObserver: Job? = null
+    }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val instances = ConcurrentHashMap<String, Instance>()
     private val json = Json
@@ -80,22 +79,9 @@ class McpPluginWorkerService : Service() {
                                 }
                                 else -> error("unknown worker transport")
                             }
-                            // Events are only notifications. They can revoke registration but never
-                            // declare a remote tool successful or grant a call.
-                            val observer = (transport as? McpTerminationSource)
-                                ?.terminalEvents?.let { events ->
-                                    scope.launch {
-                                        events.collect { cause ->
-                                            invalidate(token)
-                                            send(sender, McpWorkerWire.TERMINATED, 0, token,
-                                                error = cause.javaClass.simpleName)
-                                        }
-                                    }
-                                }
-                            val instance = Instance(transport, observer)
+                            val instance = Instance(transport)
                             check(instances.putIfAbsent(token, instance) == null) {
                                 transport.close()
-                                observer?.cancel()
                                 "IPC duplicate transport"
                             }
                             send(sender, McpWorkerWire.RESPONSE, requestId, token, result = "{}")
@@ -109,6 +95,24 @@ class McpPluginWorkerService : Service() {
                             val result = instance.transport.request(
                                 method, json.parseToJsonElement(params) as? JsonObject
                                     ?: error("MCP arguments must be an object"))
+                            // The negotiating transport's terminal flow only exists *after*
+                            // its first negotiated call. Starting earlier silently loses SSE
+                            // deaths and can leave tools registered after a crash.
+                            synchronized(instance) {
+                                if (instance.terminalObserver == null) {
+                                    instance.terminalObserver =
+                                        (instance.transport as? McpTerminationSource)
+                                            ?.terminalEvents?.let { events ->
+                                                scope.launch {
+                                                    events.collect { cause ->
+                                                        invalidate(token)
+                                                        send(sender, McpWorkerWire.TERMINATED, 0,
+                                                            token, error = cause.javaClass.simpleName)
+                                                    }
+                                                }
+                                            }
+                                }
+                            }
                             val encoded = json.encodeToString(JsonObject.serializer(), result)
                             require(McpWorkerWire.validResponseSize(encoded)) {
                                 "MCP reply exceeds Binder budget; cannot declare success"

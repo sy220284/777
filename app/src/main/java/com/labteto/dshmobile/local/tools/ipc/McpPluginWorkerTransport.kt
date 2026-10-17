@@ -46,6 +46,7 @@ internal class McpPluginWorkerTransport(
     private val ids = AtomicInteger(1)
     private val pending = ConcurrentHashMap<Int, CompletableDeferred<Bundle>>()
     private val connected = CompletableDeferred<Messenger>()
+    @Volatile private var remoteMessenger: Messenger? = null
     private val mutex = Mutex()
     private val closed = AtomicBoolean(false)
     private val bound = AtomicBoolean(false)
@@ -67,7 +68,11 @@ internal class McpPluginWorkerTransport(
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             if (binder == null) terminate(IOException("MCP worker binder missing"))
-            else if (!closed.get()) connected.complete(Messenger(binder))
+            else if (!closed.get()) {
+                val peer = Messenger(binder)
+                remoteMessenger = peer
+                connected.complete(peer)
+            }
         }
         override fun onServiceDisconnected(name: ComponentName?) =
             terminate(IOException("MCP worker process disconnected"))
@@ -181,7 +186,7 @@ internal class McpPluginWorkerTransport(
                     replyTo = reply
                     data = Bundle().apply { putString("token", token) }
                 }
-                connected.getCompleted().send(message)
+                remoteMessenger?.send(message)
             }
         }
         if (bound.compareAndSet(true, false))

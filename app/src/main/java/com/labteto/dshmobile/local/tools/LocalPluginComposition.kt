@@ -152,6 +152,21 @@ internal class LocalPluginComposition(
         workspaceRoot = workspaceRoot,
         stdioCommandResolver = runtimeProcess::resolveCommand,
         stdioEnvironmentProvider = { runtimeProcess.processEnvironment() },
+        // Mandatory process boundary. In-process MCP factories are test-only; Android
+        // production uses this Binder transport or fails closed, never falls back.
+        transportFactory = { endpoint ->
+            com.labteto.dshmobile.local.tools.ipc.McpPluginWorkerTransport(
+                context.applicationContext, kind = "http", endpoint = endpoint,
+            )
+        },
+        stdioTransportFactory = { command, workingDirectory ->
+            com.labteto.dshmobile.local.tools.ipc.McpPluginWorkerTransport(
+                context.applicationContext, kind = "stdio",
+                command = runtimeProcess.resolveCommand(command),
+                cwd = workingDirectory,
+                environment = runtimeProcess.processEnvironment(),
+            )
+        },
     )
     private val githubPlugin = GitHubConnectorPlugin(
         http = http,
