@@ -216,8 +216,10 @@ class SessionEventLogMultiInstanceTest {
             val first = log.append("test/original", buildJsonObject { put("slot", "a") })
             val fileBytes = file.length()
             val before = java.nio.file.Files.getLastModifiedTime(file.toPath())
-            val replacement = SessionEvent(1L, "test/foreign!", first.createdAt,
-                buildJsonObject { put("slot", "b") })
+            // Preserve the actual writer's envelope version as well as its timestamp.
+            // Otherwise a schema upgrade changes the byte count before rebase is tested.
+            val replacement = first.copy(sequence = 1L, type = "test/foreign!",
+                data = buildJsonObject { put("slot", "b") })
             // Both byte count and timestamp are deliberately unchanged: metadata
             // equality cannot certify that a foreign writer kept the same sequence.
             file.writeText(json.encodeToString(SessionEvent.serializer(), replacement) + "\n")
