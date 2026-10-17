@@ -17,6 +17,7 @@ from xml.etree import ElementTree
 
 ROOT = Path(__file__).resolve().parents[2]
 UI = ROOT / "app/src/main/java/com/labteto/dshmobile/ui"
+V6_VISUAL = ROOT / "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/ui"
 
 RULES = (
     (re.compile(r"\bAlertDialog\s*\("), set(), "use SyDialog"),
@@ -141,14 +142,14 @@ CANONICAL_MOTION_FILES = (
 )
 INLINE_MOTION_DURATION = re.compile(r"\btween\s*(?:<[^>]+>)?\s*\(\s*[1-9][0-9]{1,3}\b")
 for relative in CANONICAL_MOTION_FILES:
-    file = UI / relative
+    file = (V6_VISUAL if relative.startswith("theme/") else UI) / relative
     source = mask_non_code(file.read_text(encoding="utf-8"))
     for match in INLINE_MOTION_DURATION.finditer(source):
         line = source.count("\n", 0, match.start()) + 1
         violations.append(f"{relative}:{line}: inline animation duration; use SyMotion semantic token")
 
 # The app and overlays must not drift into separate wallpaper/glow drawing algorithms.
-background_host = (UI / "theme/AppBackground.kt").read_text(encoding="utf-8")
+background_host = (V6_VISUAL / "theme/AppBackground.kt").read_text(encoding="utf-8")
 if "FluidGlassBackdrop(" in mask_non_code(background_host):
     violations.append("theme/AppBackground.kt: duplicate root background painter; use SySceneBackgroundSurface")
 if "SySceneBackgroundSurface(" not in mask_non_code(background_host):
