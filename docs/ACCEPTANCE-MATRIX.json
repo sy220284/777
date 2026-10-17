@@ -1,28 +1,13 @@
 {
   "version": 2,
   "baseline": "docs/FEATURE-TREE.zh-CN.md",
-  "status_explanation": "This index contains only executable repository evidence mapped to feature-tree leaves. Each automated_partial entry proves only named assertions; no entry means untested, not passed. External-only conditions are excluded from repository acceptance.",
+  "status_explanation": "Backend-only acceptance evidence index. Removed V6 UI/visual scenario tests and any leaf with no remaining executable evidence. Backend tests prove only their named assertions; there is no installed or signed-off user interface. Missing entries are unverified, never passed.",
   "items": [
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 本机聊天／工作模式切换",
       "state": "automated_partial",
       "evidence": [
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#enteringWorkRequiresAnExplicitUserAction",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#handoffDraftCanBeEditedAndCancelDoesNotStartWork",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#pendingModeTransitionCannotBeSubmittedAgainOrDismissed",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#configurationReturnAndRefreshPreserveDraftWithoutStartingWork",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#selectedHistoryRequiresUserClickAndNeverStartsWorkAutomatically",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#unconfiguredModelCanOpenSettingsWithoutStartingWork",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#missingDevicePermissionOpensSettingsAndDoesNotStartWork",
-        "app/src/test/java/com/labteto/dshmobile/local/session/LocalWorkHandoffMaterialsTest.kt#olderLoadedMessagesRemainSelectableAndSearchableAfterLongConversation",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#searchAndLoadEarlierKeepExplicitHandoffSelection"
-      ]
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 页面返回、抽屉和浮层管理",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/SidebarSystemBackRegressionTest.kt#personaGalleryAddPageConsumesSystemBackBeforeLeavingGallery"
+        "app/src/test/java/com/labteto/dshmobile/local/session/LocalWorkHandoffMaterialsTest.kt#olderLoadedMessagesRemainSelectableAndSearchableAfterLongConversation"
       ]
     },
     {
@@ -30,13 +15,6 @@
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/LocalInfiniteSessionScaleTest.kt#newestTranscriptPageStaysBoundedAcrossLargeHistories"
-      ]
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 触控、无障碍与输入法适配",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/components/TouchTargetRegressionTest.kt#thinkingDisclosureKeepsMinimumTouchTarget"
       ]
     },
     {
@@ -115,9 +93,7 @@
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/chat/ChatMemoryBindingTest.kt#galleryIdentityWinsOverPersonaIdentity",
         "app/src/test/java/com/labteto/dshmobile/local/chat/ChatDiaryStoreTest.kt#userCorrectionIsDurableTraceableAndVisibleInNextRecall",
-        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatDiaryStoreTest.kt#staleRevisionOrOtherCharacterCannotModifyOrDisableDiary",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryCorrectionRegressionTest.kt#editingDiaryRequiresExplicitSaveAndRefreshesCurrentCharacter",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryCorrectionRegressionTest.kt#deactivationNeedsConfirmationAndSourceNavigationHasExplicitAction"
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatDiaryStoreTest.kt#staleRevisionOrOtherCharacterCannotModifyOrDisableDiary"
       ]
     },
     {
@@ -208,13 +184,6 @@
       ]
     },
     {
-      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheetTest.kt#olderPageIsReachableAndUnknownOutcomeKeepsItsMeaning"
-      ]
-    },
-    {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 中断、失败和恢复提示",
       "state": "automated_partial",
       "evidence": [
@@ -226,16 +195,14 @@
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjectionTest.kt#pagesReachEarliestArtifactBeyond4096EventsWithoutDuplicates",
-        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjectionTest.kt#cursorRejectsResetAndAnotherSessionLog",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceArtifactPreviewTest.kt#requestedArtifactOpensEvenOutsideConversationFileList"
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjectionTest.kt#cursorRejectsResetAndAnotherSessionLog"
       ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 交付要求与真实成果事件来源绑定",
       "state": "automated_partial",
       "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/work/LocalRequirementEvidenceProjectionTest.kt#selectedVersionCannotSilentlyBindAFileChangedAfterSelection",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheetTest.kt#failedLinkRetainsSelectedVersionAndDoesNotClaimAcceptance"
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalRequirementEvidenceProjectionTest.kt#selectedVersionCannotSilentlyBindAFileChangedAfterSelection"
       ]
     },
     {
@@ -250,14 +217,6 @@
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/LocalHistoryCompactorTest.kt#workCompactionPersistsTypedCheckpointForResume"
-      ]
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务操作异常与受理回执",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementOperationTest.kt#failedAcknowledgementReadsCurrentFactsWithoutReplayingMutation",
-        "app/src/test/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementOperationTest.kt#rejectedCommandIsDifferentFromFailureAndReadFailureDoesNotInventEmptyTasks"
       ]
     },
     {
@@ -781,8 +740,7 @@
         "app/src/test/java/com/labteto/dshmobile/local/LocalChatContextRefreshRaceTest.kt#refreshUsageBelongsToProcessedTurnEvenWhenNewUserMessageArrives",
         "app/src/test/java/com/labteto/dshmobile/local/usage/LocalTokenUsageContextBridgeTest.kt#nestedAndResumedRunsKeepDirectParentAndAggregateUnderOriginalTaskAfterRestart",
         "app/src/test/java/com/labteto/dshmobile/local/usage/LocalTokenUsageContextBridgeTest.kt#oldAccountingPayloadRemainsReadableWithoutTaskRoot",
-        "app/src/test/java/com/labteto/dshmobile/local/TokenUsageAnalyticsTest.kt#turnUsageIncludesLateBackgroundAndRegenerationButNeverAnotherSession",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalChatTurnUsageTest.kt#lateUsageUpdatesSourceTurnAndSwitchingSessionClosesItsDetails"
+        "app/src/test/java/com/labteto/dshmobile/local/TokenUsageAnalyticsTest.kt#turnUsageIncludesLateBackgroundAndRegenerationButNeverAnotherSession"
       ]
     },
     {
