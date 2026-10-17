@@ -82,6 +82,16 @@ def main() -> None:
         for source in source_root.rglob("*.kt"):
             errors += [f"{source.relative_to(ROOT)}: {error}"
                        for error in import_errors(module, source.read_text(encoding="utf-8"))]
+    # AppRoot is a neutral application assembly, not the V6 visual owner.
+    # A future pack cannot be forced through AppRoot's DshTheme wrapper.
+    root = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt").read_text(encoding="utf-8")
+    forbidden_root = ("DshTheme", "ThemePreference", "V6ApplicationScenePack", "LocalV6StandaloneViewModel")
+    for symbol in forbidden_root:
+        if re.search(r"\b" + symbol + r"\b", root):
+            errors.append(f"AppRoot: pack-specific visual or owner reference {symbol}")
+    entry = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/host/LocalProductionUiEntry.kt").read_text(encoding="utf-8")
+    if "visualFrame = { content -> V6VisualBridge(appViewModel, content) }" not in entry:
+        errors.append("production V6 pack must own the appearance wrapper; neutral Host cannot do it")
     if errors:
         for issue in errors:
             print("::error::" + issue)
