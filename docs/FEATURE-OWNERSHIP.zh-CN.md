@@ -1,4 +1,8 @@
-# 777 功能归属与新增能力整合准则
+# 777 功能归属与新增能力整合准则（历史集成记录）
+
+> **2026-10-17 复核：本文为 #513—#517 的历史集成对照资料，不能作为当前生产 Feature/路由事实源。** 当前唯一架构权威为 [架构 3.0](ARCHITECTURE.md)：六个 Feature 所有权模块（Shell、Chat、Work、Automation、Tools、Settings），七条顶层路由（Home、PersonaGallery、Diary、Workspace、Tasks、Tools、Settings）。文中 `ProjectFeature` 与独立 `RunCenter` 入口均属于已退役历史，不得据此恢复入口或判定现行实现缺失。
+>
+> 现行入口由 `LocalFeatureCatalog` 与 `LocalUiSceneCatalog` 决定，UI 3.0 的独立渲染器由 `ui-pack-v6/V6ApplicationScenePack` 负责。下表仅用于追溯旧 PR 合并决策。
 
 > 本文记录现有功能与 #513—#517 集成后的逻辑归属、入口和唯一事实源。架构约束仍以 [架构 3.0](ARCHITECTURE.md) 为准。本整合分支须以最新代码的完整 CI 与 Android 设备测试结果验收。
 

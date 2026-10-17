@@ -9,6 +9,29 @@ import pathlib
 import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+
+V6_REGISTRY = "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt"
+V6_COVERAGE_TEST = (
+    "app/src/test/java/com/labteto/dshmobile/ui/host/"
+    "V6FullSceneCoverageTest.kt#allSeventyFiveRequiredScenesHaveDistinctNonPlaceholderRendererRegistrations"
+)
+
+
+def named_test_exists(reference: str) -> bool:
+    """Check a test *method* exists; naming a test file is not behavior evidence."""
+    if not isinstance(reference, str) or reference.count("#") != 1:
+        return False
+    relative_path, method = reference.split("#", 1)
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", method):
+        return False
+    path = (ROOT / relative_path).resolve()
+    if (not path.is_relative_to(ROOT) or not path.is_file() or
+        path.suffix != ".kt" or "/src/test/" not in str(path) and
+        "/src/androidTest/" not in str(path)):
+        return False
+    return re.search(r"\\bfun\\s+" + re.escape(method) + r"\\s*\\(",
+                     path.read_text(encoding="utf-8")) is not None
+
 MATRIX = ROOT / "docs/UI-SCENE-MATRIX.json"
 CATALOG = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalog.kt"
 CATALOG_LINE = re.compile(
@@ -69,6 +92,16 @@ def errors(matrix, catalog):
             source_file = (ROOT / source).resolve()
             if not source_file.is_relative_to(ROOT) or not source_file.is_file():
                 issues.append(f"missing/out-of-repository Scene source: {sid}/{source}")
+        # A historic App entry exists independently of the current V6 renderer.
+        # Source presence alone must never be counted as independent-pack coverage.
+        registration = scene.get("rendererRegistration")
+        if host:
+            if registration is not None:
+                issues.append(f"Host system scene incorrectly claims a V6 renderer: {sid}")
+        elif (not isinstance(registration, dict) or
+              registration.get("registrySource") != V6_REGISTRY or
+              registration.get("coverageTest") != V6_COVERAGE_TEST):
+            issues.append(f"missing/mismatched V6 renderer registration evidence: {sid}")
         for name, record in proof.items():
             if not isinstance(record, dict):
                 issues.append(f"invalid action evidence: {sid}/{name}")
@@ -76,11 +109,26 @@ def errors(matrix, catalog):
             status = record.get("status")
             if status not in ("PENDING_EVIDENCE", "VERIFIED"):
                 issues.append(f"unknown status: {sid}/{name}")
-            if status == "VERIFIED" and any(
-                not isinstance(record.get(key), str) or not record[key].strip()
-                for key in ("ownerPort", "receiptType", "restoreTest")
+            partial = record.get("partialContractTests", [])
+            if not isinstance(partial, list) or len(partial) != len(set(partial)) or any(
+                not named_test_exists(item) for item in partial
             ):
-                issues.append(f"claimed verified without owner/receipt/recovery proof: {sid}/{name}")
+                issues.append(f"invalid partial named-test evidence: {sid}/{name}")
+            if status == "VERIFIED":
+                if any(
+                    not isinstance(record.get(key), str) or not record[key].strip()
+                    for key in ("ownerPort", "receiptType", "restoreTest")
+                ):
+                    issues.append(f"claimed verified without owner/receipt/recovery proof: {sid}/{name}")
+                if not named_test_exists(record.get("restoreTest")):
+                    issues.append(f"verified action has no existing named restore test: {sid}/{name}")
+                if not re.fullmatch(r"[0-9a-f]{40}", str(record.get("verificationCommit", ""))) or (
+                    not isinstance(record.get("verificationRunId"), int) or
+                    record["verificationRunId"] <= 0
+                ):
+                    issues.append(f"verified action lacks fixed commit/CI run evidence: {sid}/{name}")
+    if not (ROOT / V6_REGISTRY).is_file() or not named_test_exists(V6_COVERAGE_TEST):
+        issues.append("independent V6 registry or its executable coverage test is missing")
     issues.extend(f"undocumented required scene: {sid}" for sid in sorted(actual.keys() - documented.keys()))
     # R4 final scope: only V6, seven owned routes, 21 Settings destinations,
     # 78 scene contracts, 75 Pack renderers and three Host-native system scenes.
@@ -143,6 +191,13 @@ def main():
         first = tampered["scenes"][0]["actions"][0]
         tampered["scenes"][0]["actionProof"][first]["status"] = "VERIFIED"
         assert any("claimed verified" in x for x in errors(tampered, catalog))
+        tampered = copy.deepcopy(data)
+        tampered["scenes"][0]["rendererRegistration"]["registrySource"] = "app/old.kt"
+        assert any("renderer registration" in x for x in errors(tampered, catalog))
+        tampered = copy.deepcopy(data)
+        tampered["scenes"][0]["actionProof"][first]["partialContractTests"] = [
+            "ui-pack-v6/src/test/kotlin/NotRealTest.kt#madeUp"]
+        assert any("invalid partial named-test" in x for x in errors(tampered, catalog))
         tampered = copy.deepcopy(data)
         tampered["scenes"][0]["actionProof"][first]["ownerPort"] = ""
         assert any("missing source mapped ownerPort" in x for x in errors(tampered, catalog))
