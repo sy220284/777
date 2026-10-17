@@ -90,66 +90,66 @@ fun AppRoot(
                     androidx.compose.ui.res.stringResource(R.string.v6_independent_host_unavailable))
             }
         } else {
-        // The application Host derives capabilities from actual Feature Owner composition,
-        // never from claims advertised by an installed UI pack.
-        val features: LocalHarnessViewModel = hiltViewModel()
-        val requestedHostScene by features.uiSceneRequest.collectAsStateWithLifecycle()
-        val hostCapabilities = com.labteto.dshmobile.ui.host.LocalUiConnectedCapabilities.from(
-            chat = features.chatUiPort,
-            work = features.workConversationUiPort,
-            drafts = features.conversationDraftUiPort,
-            documents = features.uiDocumentUiPort,
-            forms = features.uiDocumentFormPort,
-            attachments = features.attachmentUiPort,
-            transcript = features.messageHistoryUiPort,
-            groups = features.chatGroupUiPort,
-            team = features.workTeamUiPort,
-            shell = features.conversationShellUiPort,
-            evidence = features.workEvidenceUiPort,
-            gallery = features.personaGalleryUiPort,
-            personas = features.personaSelectionUiPort,
-            personaTransfer = features.personaTransferUiPort,
-            stories = features.personaStoryUiPort,
-            galleryDeletion = features.personaGalleryDeletionUiPort,
-            gallerySave = features.personaGallerySaveUiPort,
-            portraits = features.personaPortraitUiPort,
-            authoring = features.personaAuthoringUiPort, currentPersona = features.currentPersonaUiPort,
-            files = features.filesUiPort,
-            memory = features.memoryUiPort,
-            settings = features.settingsUiPort,
-            automation = features.automationUiPort,
-            media = features.mediaUiPort,
-            usage = features.usageUiPort,
-            diary = features.diaryUiPort,
-        )
+            // The application Host derives capabilities from actual Feature Owner composition,
+            // never from claims advertised by an installed UI pack.
+            val features: LocalHarnessViewModel = hiltViewModel()
+            val requestedHostScene by features.uiSceneRequest.collectAsStateWithLifecycle()
+            val hostCapabilities = com.labteto.dshmobile.ui.host.LocalUiConnectedCapabilities.from(
+                chat = features.chatUiPort,
+                work = features.workConversationUiPort,
+                drafts = features.conversationDraftUiPort,
+                documents = features.uiDocumentUiPort,
+                forms = features.uiDocumentFormPort,
+                attachments = features.attachmentUiPort,
+                transcript = features.messageHistoryUiPort,
+                groups = features.chatGroupUiPort,
+                team = features.workTeamUiPort,
+                shell = features.conversationShellUiPort,
+                evidence = features.workEvidenceUiPort,
+                gallery = features.personaGalleryUiPort,
+                personas = features.personaSelectionUiPort,
+                personaTransfer = features.personaTransferUiPort,
+                stories = features.personaStoryUiPort,
+                galleryDeletion = features.personaGalleryDeletionUiPort,
+                gallerySave = features.personaGallerySaveUiPort,
+                portraits = features.personaPortraitUiPort,
+                authoring = features.personaAuthoringUiPort, currentPersona = features.currentPersonaUiPort,
+                files = features.filesUiPort,
+                memory = features.memoryUiPort,
+                settings = features.settingsUiPort,
+                automation = features.automationUiPort,
+                media = features.mediaUiPort,
+                usage = features.usageUiPort,
+                diary = features.diaryUiPort,
+            )
 
-            com.labteto.dshmobile.ui.host.LocalApplicationUiHost(
-                installedPacks = remember(features, viewModel) {
-                    com.labteto.dshmobile.ui.host.LocalApplicationPackInstallations.fromOwners(
-                        features,
-                        updateStatus = viewModel.updateInstallStatus,
-                        checkForUpdate = {
-                            viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
-                        },
-                    )
-                },
-                availableCapabilities = hostCapabilities,
-                requestedSceneKey = requestedExternalSceneKey ?: requestedHostScene,
-                notificationSessionId = requestedLocalSessionId,
-                notificationSessions = features.sessionUiPort,
-                onNotificationSessionProcessed = onLocalSessionRequestConsumed,
-                onSceneRequestProcessed = { key, _ ->
-                    if (requestedExternalSceneKey == key) onExternalSceneRequestConsumed()
-                    else features.consumeUiSceneRequest(key)
-                },
-            ) {
-                LocalHarnessScreen(
-                    requestedSessionId = requestedLocalSessionId,
-                    onSessionRequestConsumed = onLocalSessionRequestConsumed,
-                    onCheckUpdate = { viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME) },
-                    updateStatus = updateInstallStatus,
+        com.labteto.dshmobile.ui.host.LocalApplicationUiHost(
+            installedPacks = remember(features, viewModel) {
+                com.labteto.dshmobile.ui.host.LocalApplicationPackInstallations.fromOwners(
+                    features,
+                    updateStatus = viewModel.updateInstallStatus,
+                    checkForUpdate = {
+                        viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
+                    },
                 )
-            }
+            },
+            availableCapabilities = hostCapabilities,
+            requestedSceneKey = requestedExternalSceneKey ?: requestedHostScene,
+            notificationSessionId = requestedLocalSessionId,
+            notificationSessions = features.sessionUiPort,
+            onNotificationSessionProcessed = onLocalSessionRequestConsumed,
+            onSceneRequestProcessed = { key, _ ->
+                if (requestedExternalSceneKey == key) onExternalSceneRequestConsumed()
+                else features.consumeUiSceneRequest(key)
+            },
+        ) {
+            LocalHarnessScreen(
+                requestedSessionId = requestedLocalSessionId,
+                onSessionRequestConsumed = onLocalSessionRequestConsumed,
+                onCheckUpdate = { viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME) },
+                updateStatus = updateInstallStatus,
+            )
+        }
         }
     }
 }
