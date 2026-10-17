@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.uipack.zhaoxi
 
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -346,7 +347,7 @@ class ZhaoxiApplicationScenePack(
             "automation.persona_interaction" -> sec?.automation?.let { ZhaoxiPersonaInteractionScene(it, scope) }
             "route.tools", "tools.mcp", "tools.github", "tools.plugins" ->
                 sec?.tools?.let { ZhaoxiToolsScene(it, scope) }
-            "media.creation" -> (sec?.media ?: conv?.media)?.let { ZhaoxiMediaCreationScene(it, scope) }
+            "media.creation" -> (sec?.media ?: conv?.media)?.let { ZxMediaCreationScene(it, scope) }
             "media.result" -> ZhaoxiMediaResultScene("media-asset", scope)
 
             // ---- 工作区 ----
@@ -384,15 +385,14 @@ class ZhaoxiApplicationScenePack(
         ZhaoxiTheme {
             Box(Modifier.fillMaxSize()) {
                 ZhaoxiBackground(Modifier.fillMaxSize())
+                val normal = ZhaoxiMotion.spec<Float>(ZhaoxiDuration.NORMAL)
+                val fast = ZhaoxiMotion.spec<Float>(ZhaoxiDuration.FAST)
                 androidx.compose.animation.AnimatedContent(
                     targetState = state.stack.lastOrNull(),
                     transitionSpec = {
-                        (androidx.compose.animation.fadeIn(
-                            ZhaoxiMotion.spec(ZhaoxiDuration.NORMAL)) +
-                            androidx.compose.animation.slideInVertically(
-                                ZhaoxiMotion.spec(ZhaoxiDuration.NORMAL)) { it / 24 })
-                            .togetherWith(androidx.compose.animation.fadeOut(
-                                ZhaoxiMotion.spec(ZhaoxiDuration.FAST)))
+                        (androidx.compose.animation.fadeIn(normal) +
+                            androidx.compose.animation.slideInVertically(normal) { it / 24 })
+                            .togetherWith(androidx.compose.animation.fadeOut(fast))
                     },
                     label = "zhaoxiScene",
                 ) { content() }

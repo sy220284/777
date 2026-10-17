@@ -89,24 +89,24 @@ fun ZxMessageRow(
                 .padding(horizontal = if (isUser) 12.dp else 0.dp, vertical = if (isUser) 9.dp else 0.dp),
         ) { Text(msg.text, fontSize = 15.sp, lineHeight = 23.sp, color = c.ink) }
         msg.branch?.let { b ->
-            if (b.count > 1) ZxBranchSwitcher(b.index, b.count, onBranchSelect)
+            if (b.count > 1) ZxBranchSwitcher(b.index, b.count, onSelect = onBranchSelect)
         }
     }
 }
 
 /** 分支/变体切换器（chat.branches / chat.select_variant）。 */
 @Composable
-fun ZxBranchSwitcher(index: Int, count: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+fun ZxBranchSwitcher(index: Int, count: Int, modifier: Modifier = Modifier, onSelect: (Int) -> Unit) {
     val c = ZhaoxiTheme.colors
     Row(
         modifier.padding(top = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        ZxChip("‹", false, { if (index > 0) onSelect(index - 1) })
+        ZxChip("‹", false, onClick = { if (index > 0) onSelect(index - 1) })
         Text("${index + 1} / $count", fontSize = 10.5.sp, color = c.accent,
             fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-        ZxChip("›", false, { if (index < count - 1) onSelect(index + 1) })
+        ZxChip("›", false, onClick = { if (index < count - 1) onSelect(index + 1) })
         Text("分支 · 变体可切换", fontSize = 10.sp, color = c.ink3)
     }
 }
@@ -184,8 +184,8 @@ fun rejectionHint(reason: UiCommandRejection?): String = when (reason) {
 fun ZxApprovalCard(
     approval: UiApprovalSnapshot,
     expired: Boolean,
-    onAnswer: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onAnswer: (Boolean) -> Unit,
 ) {
     val c = ZhaoxiTheme.colors
     Column(
@@ -235,8 +235,8 @@ fun ZxQuestionCard(
     question: UiQuestionSnapshot,
     answer: String,
     onAnswerChange: (String) -> Unit,
-    onAnswer: (String?) -> Unit,
     modifier: Modifier = Modifier,
+    onAnswer: (String?) -> Unit,
 ) {
     val c = ZhaoxiTheme.colors
     Column(

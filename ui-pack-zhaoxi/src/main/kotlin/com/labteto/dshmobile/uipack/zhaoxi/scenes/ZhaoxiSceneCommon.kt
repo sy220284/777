@@ -157,8 +157,8 @@ fun ZxRow(
     sub: String,
     modifier: Modifier = Modifier,
     mono: Boolean = false,
-    trailing: @Composable () -> Unit = { Text("›", fontSize = 12.sp, color = ZhaoxiTheme.colors.ink3) },
     onClick: (() -> Unit)? = null,
+    trailing: @Composable () -> Unit = { Text("›", fontSize = 12.sp, color = ZhaoxiTheme.colors.ink3) },
 ) {
     val c = ZhaoxiTheme.colors
     Row(

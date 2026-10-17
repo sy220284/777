@@ -198,8 +198,8 @@ fun ZxDetentSlider(
 fun ZxChip(
     label: String,
     selected: Boolean,
-    onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onClick: () -> Unit,
 ) {
     val c = ZhaoxiTheme.colors
     Box(
@@ -219,12 +219,12 @@ fun ZxChip(
 fun ZxTabRow(
     tabs: List<String>,
     selected: Int,
-    onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable RowScope.() -> Unit = {},
+    onSelect: (Int) -> Unit,
 ) {
     Row(modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        tabs.forEachIndexed { i, t -> ZxChip(t, i == selected, { onSelect(i) }) }
+        tabs.forEachIndexed { i, t -> ZxChip(t, i == selected, onClick = { onSelect(i) }) }
         content()
     }
 }

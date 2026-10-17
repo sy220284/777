@@ -155,7 +155,7 @@ object ZhaoxiMotion {
     fun <T> spec(d: ZhaoxiDuration, spring: Boolean = false): FiniteAnimationSpec<T> {
         val reduced = LocalReducedMotion.current
         @Suppress("UNCHECKED_CAST")
-        return if (reduced) tween(1) as FiniteAnimationSpec<T>
+        return if (reduced) androidx.compose.animation.core.tween<Float>(1) as FiniteAnimationSpec<T>
         else if (spring) SpringSpec as FiniteAnimationSpec<T>
         else tween(d) as FiniteAnimationSpec<T>
     }

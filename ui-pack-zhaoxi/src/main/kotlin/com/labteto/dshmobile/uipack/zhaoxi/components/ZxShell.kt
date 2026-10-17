@@ -208,8 +208,8 @@ fun ZxPlanReviewCard(
                     Text(step.ownerStatus, fontSize = 11.sp, color = c.ink3)
                 }
                 if (i == currentIndex && !step.confirmed) {
-                    ZxChip("确认", false, { onConfirmStep(i) })
-                    ZxChip("编辑", false, { onEditStep(i) })
+                    ZxChip("确认", false, onClick = { onConfirmStep(i) })
+                    ZxChip("编辑", false, onClick = { onEditStep(i) })
                 }
             }
         }
