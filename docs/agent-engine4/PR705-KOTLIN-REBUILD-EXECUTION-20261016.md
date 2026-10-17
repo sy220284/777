@@ -129,3 +129,15 @@ JVM 回归新增：
 新实现添加 Tool ID 空值检查、Turn Step 显式状态推进、工具批次结果与 durable event 先后约束，以及同步/并发混合工具顺序回归。保留既有 EventLog payload、StepBudget、Cancel 与 Tool 异常语义，避免影响存量 Session/Work 历史与 Chat 业务。
 
 此批 **只是执行内核真实替换的第一部分**：旧 Work/Agent 领域 orchestration、GoalDriver、TaskGraph、多模型专项等工作仍待分批重构。编译、参考差分、Android 构建必须等待最新 PR HEAD CI 通过，不能仅凭提交宣称完成所有 24 项。
+
+## 2026-10-17：Shared Session 执行所有权接管
+
+核对基线为 `9124e056a2571de54b87c3b6b38e23b71d1ffc80`，主线仍为 V3 的 `e03573fe`。本轮开始时台账 9 项 in_progress、15 项 not_started、0 项 completed；已有 AgentTurnEngine、TaskGraph 和 Goal 续轮切片不能视为 V3 全层重构完成。
+
+Session 的互斥、等待者、释放、输入准入和身份事实改由 `harness-core/session/SessionExecutionRegistry` 唯一持有。Android `LocalSessionRuntimeRegistry` 保留现有消费者 API，仅映射产品运行类型，不再持有第二份所有权状态。租约带 Session、进程 incarnation 和单调 epoch；释放后重入同会话不会复用身份，误传跨会话/跨类型/另一 Registry 的租约在进入执行体前拒绝，且不会释放别人的合法租约。
+
+`withOwner` 将确切租约放入协程上下文，前台 Work 与后台 Work Automation 使用同一合同；工具在审批、文件资源等待之后重验所有者，并将相同身份附到平台执行上下文和已有 `tool/execution-started`。已启动工具抛出异常时保留 executionId，异常回执与正常回执用同一执行实例归属。原 Session 日志、用户资产、模型凭据不迁写，ChatFeature/App Shell 文件不改。
+
+参考依据：Codex ZIP `codex-rs/core/src/agent/control.rs` 的会话绑定 Runtime；DeepSeek ZIP `packages/goal/goal-round-driver/src/index.ts` 的精确 Agent 生命周期及 queued/claimed/admitted 竞争语义；Claude 官方 ZIP `mods/README.md` 的扩展与权限分层。第三方历史还原包仅保留作研究材料，本轮没有移植其实现。
+
+验证新增：Shared Session ABA/错误会话/错误 Owner/外来 Registry/取消等待者/删除交接，Android 兼容入口及子协程身份传播，工具批准等待后旧租约失效，异常回执 executionId。静态架构、性能不变量及各自自测、测试质量检查已通过。Kotlin 编译/单测以本提交 CI 为准；AE4V3-06 保持 in_progress，持久恢复、Run/Goal epoch 提交合同及未知副作用核销仍未完成。无需新增功能树节点：既有 Session/Tool 能力的内部所有权迁移；源码索引随本次刷新。

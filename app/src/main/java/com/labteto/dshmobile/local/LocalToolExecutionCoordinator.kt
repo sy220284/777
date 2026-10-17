@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.harness.session.SessionExecutionContext
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
 import com.labteto.dshmobile.harness.tools.HarnessTool
@@ -356,15 +357,23 @@ internal class LocalToolExecutionCoordinator(
             )
         }
 
+        val executionOwner = currentCoroutineContext()[SessionExecutionContext]?.lease
         var approvalDenied = false
         var executionStarted = false
         val executionIdentity = LocalToolExecutionIdentity(
             executionId = executionIdFactory(),
             rootCallId = call.id,
-            attributes = executionAttributes.toMap(),
+            attributes = buildMap {
+                putAll(executionAttributes)
+                executionOwner?.identity?.let {
+                    put("session_owner_incarnation", it.incarnation)
+                    put("session_owner_epoch", it.epoch.toString())
+                }
+            },
         )
         var executionLease: LocalWorkspaceReadWriteGate.Lease? = null
         val invocation = try {
+            executionOwner?.requireCurrent(sessionId)
             registry.executeTracked(
                 name = call.name,
                 input = call.arguments,
@@ -373,6 +382,7 @@ internal class LocalToolExecutionCoordinator(
                     sessionId = sessionId,
                     allowMutation = allowMutation,
                     attributes = buildMap {
+                        putAll(executionIdentity.attributes)
                         put("call_id", call.id)
                         put("execution_id", executionIdentity.executionId)
                         put("root_call_id", executionIdentity.rootCallId)
@@ -389,12 +399,14 @@ internal class LocalToolExecutionCoordinator(
                     onExecutionStarted = { admittedTool ->
                         // A new correction can arrive while awaiting approval or resource admission.
                         // Reject the stale call before entering its executor, with no side effect.
+                        executionOwner?.requireCurrent(sessionId)
                         if (!beforeExecution()) throw LocalToolSampleSuperseded()
                         // The registry calls this only after schema checks and user approval.
                         // Waiting for approval must never hold a filesystem read/write lease.
                         executionLease = workspaceReadWriteGate.acquire(admittedTool)
                         // Admission can suspend behind another read/write operation. A correction
                         // committed during that wait must invalidate this still-unstarted call.
+                        executionOwner?.requireCurrent(sessionId)
                         if (!beforeExecution()) throw LocalToolSampleSuperseded()
                         // Approval may outlive the exact plugin registration. Re-check after waiting
                         // for the shared read/write gate and before writing the started fact.
@@ -417,7 +429,7 @@ internal class LocalToolExecutionCoordinator(
         } catch (cancelled: CancellationException) {
             if (!currentCoroutineContext().isActive) throw cancelled
             AppLog.info("LocalToolExecution", "operation=execute_tool_cancelled tool=${call.name} call_id=${call.id} session_id=$sessionId")
-            return thrownFailure(call, registered, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消", executionStarted, sessionId = sessionId)
+            return thrownFailure(call, registered, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消", executionStarted, sessionId = sessionId, executionId = executionIdentity.executionId)
         } catch (changed: LocalToolRegistrationChanged) {
             return AgentToolResult(
                 content = "工具已在执行接纳期间更新或卸载：${call.name}；旧审批与旧调用不再有效。",
@@ -438,10 +450,10 @@ internal class LocalToolExecutionCoordinator(
             )
         } catch (error: LocalWebException) {
             return thrownFailure(call, registered, error.code, error.message ?: "网页工具失败", executionStarted,
-                cause = error, sessionId = sessionId)
+                cause = error, sessionId = sessionId, executionId = executionIdentity.executionId)
         } catch (error: LocalModelException) {
             return thrownFailure(call, registered, error.code, error.message ?: "模型请求失败", executionStarted,
-                cause = error, sessionId = sessionId)
+                cause = error, sessionId = sessionId, executionId = executionIdentity.executionId)
         } catch (error: Exception) {
             val code = when {
                 error is java.io.FileNotFoundException ||
@@ -463,6 +475,7 @@ internal class LocalToolExecutionCoordinator(
             return thrownFailure(
                 call, registered, code, error.message ?: error::class.java.simpleName,
                 executionStarted, error::class.java.simpleName, cause = error, sessionId = sessionId,
+                executionId = executionIdentity.executionId,
             )
         } finally {
             executionLease?.close()
@@ -529,6 +542,7 @@ internal class LocalToolExecutionCoordinator(
         exceptionType: String? = null,
         cause: Throwable? = null,
         sessionId: String? = null,
+        executionId: String? = null,
     ): AgentToolResult {
         val baseResult = localToolFailure(code, message,
             readOnly = LocalToolPolicy.isReadOnlyInvocation(call.name, tool.access, call.arguments),
@@ -548,7 +562,7 @@ internal class LocalToolExecutionCoordinator(
         } else {
             AppLog.warn("LocalToolExecution", "failure=true operation=execute_tool tool=${call.name} call_id=${call.id} code=$code started=$executionStarted retryable=${result.retryable} exception_type=${exceptionType ?: "unknown"}")
         }
-        return result
+        return result.copy(executionId = executionId.takeIf { executionStarted })
     }
 
     private fun approvalSummary(call: LocalToolCall, tool: HarnessTool): String = when (tool.name) {

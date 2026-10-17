@@ -75,7 +75,10 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
         val sessionId = resolveSession(preferredSessionId, prompt).id
         val budget = LocalWorkAutomationTimeoutBudget(timeoutMillis, 15 * 60_000L)
         val sessionLease = budget.acquireSession(sessionId, LocalSessionRuntimeKind.AUTOMATION_WORK)
-        try {
+        return try {
+        LocalSessionRuntimeRegistry.withOwner(
+            sessionId, LocalSessionRuntimeKind.AUTOMATION_WORK, sessionLease,
+        ) {
         // Re-read after ownership so deletion cannot be undone by a stale preflight snapshot.
         val session = requireWorkAutomationSession(sessionStorage.coordinator.read(sessionId))
         val boundState = boundState(session)
@@ -95,7 +98,7 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
             }
         } catch (blocked: LocalHarnessBlockedException) {
             val detail = blocked.message ?: "后台任务需要人工处理"
-            return LocalWorkAutomationResult(
+            return@withOwner LocalWorkAutomationResult(
                 sessionId = sessionId,
                 output = detail,
                 status = LocalWorkAutomationStatus.BLOCKED,
@@ -108,7 +111,7 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
                 output = output,
                 eventLog = boundEventLog,
             )
-            return LocalWorkAutomationResult(sessionId = sessionId, output = output)
+            return@withOwner LocalWorkAutomationResult(sessionId = sessionId, output = output)
         }
         val executionTask = recovery.executionTask
         val recoveredProfile = recovery.profile
@@ -136,7 +139,7 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
             },
         )
 
-        return try {
+        try {
             val result = withTimeout(budget.remainingMillis()) {
                 val execute: suspend () -> LocalSubagentResult = {
                     runner.runResult(
@@ -166,7 +169,7 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
                     finalContent = reason,
                     eventLog = boundEventLog,
                 )
-                return LocalWorkAutomationResult(
+                return@withOwner LocalWorkAutomationResult(
                     sessionId = sessionId,
                     output = reason,
                     status = LocalWorkAutomationStatus.BLOCKED,
@@ -238,8 +241,8 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
                 detail = detail,
             )
         }
+        }
         } finally {
-            sessionLease.close()
             if (runtimeStateStore.currentSessionId == sessionId &&
                 runtimeStateStore.state.value.sessionId == sessionId
             ) {

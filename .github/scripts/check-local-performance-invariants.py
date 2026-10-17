@@ -536,7 +536,7 @@ for required_agent_owner_fact in (
         )
 
 for required_session_owner_api in (
-    "class LocalSessionRuntimeLease",
+    "typealias LocalSessionRuntimeLease = SessionExecutionLease",
     "suspend fun <T> withOwner(",
     "fun tryAcquire(",
     "suspend fun acquire(",
@@ -547,7 +547,12 @@ for required_session_owner_api in (
             "LocalSessionRuntimeRegistry lost process-wide session ownership API: "
             + required_session_owner_api
         )
-if re.search(r"\.distinct\s*\(\s*\)\s*\.sorted\s*\(\s*\)\s*\.forEach\s*\{", session_runtime_registry) is None:
+shared_session_execution = (
+    ROOT / "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionExecutionRegistry.kt"
+).read_text()
+if "executions.acquireAll(sessionIds, kind.owner())" not in session_runtime_registry:
+    violations.append("Android session adapter must use the single Shared Session registry")
+if re.search(r"\.distinct\s*\(\s*\)\s*\.sorted\s*\(\s*\)\s*\.forEach\s*\{", shared_session_execution) is None:
     violations.append(
         "multi-session ownership must acquire leases in stable order to avoid cross-session deadlock"
     )

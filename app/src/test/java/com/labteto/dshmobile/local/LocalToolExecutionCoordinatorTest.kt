@@ -588,6 +588,7 @@ class LocalToolExecutionCoordinatorTest {
         assertFalse(result.retryable)
         assertEquals(AgentToolSideEffect.POSSIBLE, result.sideEffect)
         assertEquals(1, executionStarts)
+        assertEquals("exec-test", result.executionId)
         assertTrue(result.recoveryHint.orEmpty().contains("不要直接重试"))
     }
 
@@ -630,6 +631,33 @@ class LocalToolExecutionCoordinatorTest {
             ),
             startedIdentity,
         )
+    }
+
+    @Test
+    fun releasedSessionOwnerCannotEnterToolAfterApprovalWait() = runBlocking {
+        val owners = com.labteto.dshmobile.harness.session.SessionExecutionRegistry()
+        val lease = owners.acquire("s1", com.labteto.dshmobile.harness.session.SessionExecutionOwner("run", true))
+        var executed = false
+        var started = false
+        val registry = ToolRegistry().apply {
+            register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) {
+                executed = true
+                ToolResult("ok")
+            })
+        }
+        val c = coordinator(registry, recordExecutionStarted = { _, _, _ -> started = true })
+        val result = withContext(com.labteto.dshmobile.harness.session.SessionExecutionContext(lease)) {
+            c.executeScoped(
+                LocalToolCall("stale", "write", JsonObject(emptyMap()), "{}"),
+                sessionId = "s1", allowMutation = true, planModeEnabled = false,
+                approval = { _, _, _ -> lease.close(); true },
+            )
+        }
+        assertTrue(result.isError)
+        assertFalse(executed)
+        assertFalse(started)
+        assertEquals(AgentToolSideEffect.NONE, result.sideEffect)
+        assertEquals(null, result.executionId)
     }
 
     @Test

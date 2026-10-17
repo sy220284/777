@@ -195,4 +195,31 @@ class LocalSessionRuntimeRegistryTest {
         assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner(sessionId))
     }
 
+    @Test
+    fun preownedLeaseIsBoundToSessionAndPropagatesToChildren() = runTest {
+        val lease = LocalSessionRuntimeRegistry.acquire("typed-session", LocalSessionRuntimeKind.FOREGROUND)
+        try {
+            var rejected = false
+            try {
+                LocalSessionRuntimeRegistry.withOwner("wrong-session", LocalSessionRuntimeKind.FOREGROUND, lease) {
+                    error("wrong owner entered")
+                }
+            } catch (expected: IllegalStateException) { rejected = true }
+            assertTrue(rejected)
+            lease.requireCurrent("typed-session")
+            LocalSessionRuntimeRegistry.withOwner("typed-session", LocalSessionRuntimeKind.FOREGROUND, lease) {
+                kotlinx.coroutines.coroutineScope {
+                    val child = launch {
+                        val context = kotlinx.coroutines.currentCoroutineContext()[
+                            com.labteto.dshmobile.harness.session.SessionExecutionContext]
+                        assertEquals(lease, context?.lease)
+                        context!!.lease.requireCurrent("typed-session")
+                    }
+                    child.join()
+                }
+            }
+            assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner("typed-session"))
+        } finally { lease.close() }
+    }
+
 }

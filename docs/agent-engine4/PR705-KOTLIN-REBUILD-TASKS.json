@@ -109,10 +109,14 @@
         "AE4V3-04",
         "AE4V3-05"
       ],
-      "status": "not_started",
-      "code_evidence": [],
+      "status": "in_progress",
+      "code_evidence": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionExecutionRegistry.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionRuntimeRegistry.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAutomationExecutionCoordinator.kt"
+      ],
       "tests_verified": [],
-      "notes": ""
+      "notes": "Session 唯一互斥、等待队列与所有权迁入 Shared Session；Android 原 API 保持兼容。租约绑定 session/incarnation/epoch/owner，跨会话、跨类型或外来注册表租约不能进入执行；withOwner 传播协程执行身份，前台 Work 与后台 Work 自动任务接入。只完成进程内所有权合同，不冒称跨进程恢复或完整 Run Owner 完成。当前 SHA Kotlin 编译及单测仍待 CI。"
     },
     {
       "id": "AE4V3-07",
@@ -163,10 +167,11 @@
         "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt",
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
         "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt",
-        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedgerTest.kt"
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedgerTest.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt"
       ],
       "tests_verified": [],
-      "notes": "共享 Kotlin ToolAttemptLedger 强类型状态机在 Work 和 SessionRecovery 真实生产路径接管工具执行事实；尚未重构平台 Tool Executor 权限/租约/未知副作用权威核销。；共享工具历史按单次声明保存独立 Attempt，并用 execution_id 精确对应异步回执；重复 provider callId 不能抹去先前未知副作用。SessionRecovery 保留执行实例字段，新增重复编号和乱序回执 JVM 测试。需当前 CI 验证。"
+      "notes": "共享 Kotlin ToolAttemptLedger 强类型状态机在 Work 和 SessionRecovery 真实生产路径接管工具执行事实；尚未重构平台 Tool Executor 权限/租约/未知副作用权威核销。；共享工具历史按单次声明保存独立 Attempt，并用 execution_id 精确对应异步回执；重复 provider callId 不能抹去先前未知副作用。SessionRecovery 保留执行实例字段，新增重复编号和乱序回执 JVM 测试。需当前 CI 验证。；工具审批和资源等待后的准入校验精确 Session 租约，执行上下文与 tool/execution-started 共享身份属性；抛出异常的已启动执行保留 executionId，避免重复 callId 乱序结算失配。待当前 SHA 单测和构建。"
     },
     {
       "id": "AE4V3-10",
@@ -410,13 +415,16 @@
   "status": "first incremental implementation, not entire refactor",
   "current_slice": {
     "date": "2026-10-17",
-    "component": "AE4V3-02 source-grounded ownership inventory + AE4V3-03 cross-runtime JVM baseline",
-    "previous_head": "85c164f1aaa5db1e3f1892bdb17eab3d0d124c6e",
-    "status": "code_submitted_ci_pending",
+    "component": "Shared Session 执行所有权与 Tool 执行身份接入",
+    "previous_head": "9124e056a2571de54b87c3b6b38e23b71d1ffc80",
+    "status": "local_static_verified_compile_pending",
     "code_evidence": [
-      "reference-validation/src/test/kotlin/com/labteto/dshmobile/reference/AgentEngine4ExecutionBaselineTest.kt",
-      "docs/agent-engine4/AE4V3-02-PRODUCTION-OWNERSHIP-INVENTORY.md"
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionExecutionRegistry.kt",
+      "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/SessionExecutionRegistryTest.kt"
     ],
-    "tests_verified": []
+    "tests_verified": [
+      "architecture-3 ownership/performance guards and self-tests",
+      "test-quality static gate"
+    ]
   }
 }
