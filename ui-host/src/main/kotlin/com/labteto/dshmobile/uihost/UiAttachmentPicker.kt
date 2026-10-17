@@ -19,8 +19,8 @@ import androidx.compose.runtime.setValue
 @Composable
 fun rememberUiAttachmentPicker(
     mimeTypes: Array<String> = arrayOf("*/*"),
-    onSelected: (String?) -> Unit,
     onRejected: (String) -> Unit = {},
+    onSelected: (String?) -> Unit,
 ): () -> Unit {
     require(mimeTypes.isNotEmpty()) { "文件选择器必须声明允许的类型" }
     val owner = LocalUiHostSystemOperationOwner.current
