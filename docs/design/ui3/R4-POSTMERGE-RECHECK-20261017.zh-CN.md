@@ -34,3 +34,10 @@
 - **LocalColdStartupRegressionTest：** 真正 V6 输入框已渲染，但测试仍定位旧 Shell 的 `SY_COMPOSER_FIELD_TAG`，始终等到超时。新 V6 输入框提供稳定标签，设备测试改定位新标签，保留真 Activity 冷启动验证。
 - **ShenyanMotionInteractionTest：** 原 `graphicsLayer.translationY` 对某些 Compose 语义树的位置不可见，入场和减少动效的断言失败。入场改用偏移定位配合透明度层，保留原上移/淡入及减少动效直达终态；设备测试仍验证实际位置变化。
 - **仍待进一步核实：** `V6AutomationContextInteractionTest.restartingEditorAfterSwitchBindsOnlyTheNewOwnerIdentity` 两台设备均等待新任务按钮超时；Android 17 `LocalChatTurnUsageTest` 另有一项超时。本 PR 不能因上述前三项代码调整就假报总门禁通过，需要针对新 Head 完整测试后继续修复。
+
+## 2026-10-17 设备回归统一排查：交互文案与测试契约
+
+- PR #734 的完整 [CI 39026818641](https://github.com/sy220284/777/actions/runs/39026818641)、子 PR #735 的 [CI 39027272452](https://github.com/sy220284/777/actions/runs/39027272452) 均在 Android 16/17 执行 312 项，各仅 2 项失败。均为 `LocalApplicationUiHostInstrumentedTest` 的 `invalidChoiceIsRejectedWithoutChangingTheV6RecoveryRule` 与 `corruptSavedPackHistoryRequiresExplicitRecovery`：测试寻找旧的 `R.string.ui_pack_back_to_stable`，但 #734 已改成“重试加载界面”。这四个设备作业属于**相同两项测试失败**，不是四个独立缺陷。旧动效、自动任务相关设备断言已在这组运行中通过。
+- 本轮查阅 UI Host、设置导航及返回、自动任务编辑与未保存保护、会话冷启动、弹窗与工作入口、文档重试、插件入口等已有设备交互测试的断言与标签。此前 312 项中 310 项通过，仅可证明已覆盖的行为；未执行到的人工视觉操作与全部 173 个 UI 动作不可据此标记验证完成。未在已核查的其他测试中确认相同的旧 UI Host 资源键误用。
+- **统一修复路径：** UI Host 的恢复提示、重试、退出提示均使用同一处 `R.string` 资源；两按钮建立稳定 Compose 语义标签，测试分别检查当前可见文案和真实点击目标，继续验证损坏快照恢复到 Home、无效 Pack 不进入旧 Shell 且持久化选择回到 V6。错误提示改为同时适用“包缺失”和“导航快照损坏”的中性描述，避免误导。
+- 必须按**修复后新提交 SHA** 重跑 Android 16、Android 17 和 merge-gate，必要时修复重试 Activity 重建与 Compose 测试生命周期不一致问题。不得将源代码修补、编译成功或旧 310/312 当作设备签收；不关闭失败测试、不下调门禁。
