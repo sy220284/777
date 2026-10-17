@@ -11,4 +11,3 @@ internal class LocalV6SessionBinding(private val sessions: SessionUiPort) {
     val workModeUpdates: kotlinx.coroutines.flow.Flow<Boolean> =
         sessions.snapshots.map { it.usageMode == LocalUsageMode.WORK }
 }
-

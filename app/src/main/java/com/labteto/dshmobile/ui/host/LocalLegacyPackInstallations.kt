@@ -67,4 +67,3 @@ internal object LocalApplicationPackInstallations {
         )
     }
 }
-
