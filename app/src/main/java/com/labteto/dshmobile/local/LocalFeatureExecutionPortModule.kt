@@ -18,7 +18,6 @@ import com.labteto.dshmobile.local.session.LocalSessionAccessScope
 import com.labteto.dshmobile.local.session.LocalSessionLifecyclePort
 import com.labteto.dshmobile.local.tools.LocalToolsManagementPort
 import com.labteto.dshmobile.local.work.LocalWorkAutomationExecutionAdapter
-import com.labteto.dshmobile.local.work.LocalWorkAgentUiPort
 import com.labteto.dshmobile.local.work.LocalWorkAutomationExecutionPort
 import com.labteto.dshmobile.local.work.LocalWorkExecutionCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkExecutionPort
@@ -40,6 +39,36 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 internal object LocalFeatureExecutionPortModule {
+    @Provides
+    @Singleton
+    fun providePersonaPortraitUiPort(owner: com.labteto.dshmobile.local.chat.LocalPersonaPortraitOwner):
+        com.labteto.dshmobile.uicontract.PersonaPortraitUiPort = owner
+    @Provides
+    @Singleton
+    fun providePersonaGallerySaveUiPort(runtime: com.labteto.dshmobile.local.chat.LocalChatRuntime):
+        com.labteto.dshmobile.uicontract.PersonaGallerySaveUiPort = runtime
+    @Provides
+    @Singleton
+    fun providePersonaGalleryDeletionUiPort(runtime: com.labteto.dshmobile.local.chat.LocalChatRuntime):
+        com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort = runtime
+    @Provides
+    @Singleton
+    fun providePersonaStoryUiPort(runtime: com.labteto.dshmobile.local.chat.LocalChatRuntime):
+        com.labteto.dshmobile.uicontract.PersonaStoryUiPort = runtime
+    @Provides
+    @Singleton
+    fun providePersonaTransferUiPort(owner: com.labteto.dshmobile.local.chat.LocalPersonaTransferOwner):
+        com.labteto.dshmobile.uicontract.PersonaTransferUiPort = owner
+    @Provides
+    @Singleton
+    fun providePersonaSelectionUiPort(runtime: com.labteto.dshmobile.local.chat.LocalChatRuntime):
+        com.labteto.dshmobile.uicontract.PersonaSelectionUiPort = runtime
+
+    @Provides
+    @Singleton
+    fun providePersonaGalleryUiPort(store: com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore):
+        com.labteto.dshmobile.uicontract.PersonaGalleryUiPort = store
+
     @Provides
     fun provideHistorySummaryProvider(): com.labteto.dshmobile.local.model.LocalHistorySummaryProvider =
         LocalFeatureHistorySummaries
@@ -70,14 +99,25 @@ internal object LocalFeatureExecutionPortModule {
 
     @Provides
     @Singleton
+    fun provideLocalWorkApprovalUiPort(
+        runtime: com.labteto.dshmobile.local.work.LocalWorkRuntime,
+    ): com.labteto.dshmobile.local.work.LocalWorkApprovalUiPort =
+        object : com.labteto.dshmobile.local.work.LocalWorkApprovalUiPort {
+            override fun pendingQuestion() = runtime.pendingQuestionForUi()
+            override fun answerQuestion(pendingId: String, answer: String?) = runtime.answerQuestionFromUi(pendingId, answer)
+            override fun pendingApproval() = runtime.pendingApprovalForUi()
+            override fun answerApproval(pendingId: String, approved: Boolean) = runtime.answerApproval(pendingId, approved)
+        }
+
+    @Provides
+    @Singleton
     fun provideLocalWorkExecutionPort(
         coordinator: LocalWorkExecutionCoordinator,
     ): LocalWorkExecutionPort = coordinator
 
     @Provides
     @Singleton
-    fun provideLocalWorkAgentUiPort(composition: LocalWorkComposition): LocalWorkAgentUiPort =
-        composition.agentUi
+    fun provideWorkTeamUiPort(composition: LocalWorkComposition): com.labteto.dshmobile.uicontract.WorkTeamUiPort = composition.agentUi
 
     @Provides
     @Singleton

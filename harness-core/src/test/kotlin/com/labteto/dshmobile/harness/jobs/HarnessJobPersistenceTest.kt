@@ -176,6 +176,100 @@ class HarnessJobPersistenceTest {
     }
 
     @Test
+    fun persistentResumeCannotTransferAnOwnedJobAcrossSessions() = runTest {
+        var launched = false
+        val manager = HarnessJobManager(
+            scope = backgroundScope,
+            onChanged = {},
+            initialSnapshots = listOf(JobSnapshot(
+                id = "job-owned", label = "子代理：持久工作", status = "interrupted",
+                resumeKind = "subagent_readonly", resumePayload = "{}", ownerId = "session-a",
+            )),
+        )
+        val original = manager.snapshots().single()
+        val denied = manager.resumePersistent("job-owned", ownerId = "session-b") { _, _ ->
+            launched = true
+            "unexpected"
+        }
+        assertTrue(denied.contains("不属于当前会话"))
+        assertEquals(original, manager.snapshots().single())
+        assertFalse(launched)
+        assertTrue(manager.availableSlots() > 0)
+
+        val allowed = manager.resumePersistent("job-owned", ownerId = "session-a") { _, _ ->
+            launched = true
+            "legitimate"
+        }
+        assertTrue(allowed.contains("已恢复"))
+        runCurrent()
+        assertTrue(launched)
+        assertEquals("session-a", manager.snapshots().single().ownerId)
+    }
+
+    @Test
+    fun previouslyUnownedLegacyJobMayAcquireItsFirstSessionOwnerOnResume() = runTest {
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = {},
+            initialSnapshots = listOf(JobSnapshot(
+                id = "legacy", label = "后台抓取", status = "interrupted",
+                resumeKind = "web_fetch", resumePayload = "{}", ownerId = null,
+            )),
+        )
+        assertTrue(manager.resumePersistent("legacy", "session-a") { _, _ -> "completed" }
+            .contains("已恢复"))
+        runCurrent()
+        assertEquals("session-a", manager.snapshots().single().ownerId)
+    }
+
+    @Test
+    fun subagentRequestSliceBoundaryPersistsAndCanResumeAfterExplicitRootAdmission() = runTest {
+        val durable = java.util.concurrent.atomic.AtomicReference<List<JobSnapshot>>(emptyList())
+        val manager = HarnessJobManager(
+            scope = this, onChanged = { }, onSnapshotsChanged = durable::set,
+            maxConcurrentJobs = 2,
+        )
+        val started = manager.startPersistent(
+            label = "子代理：预算边界",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerId = "session-A",
+            continuable = true,
+        ) { _, _ ->
+            throw JobExecutionSliceBoundaryException(IllegalStateException("WORK_BUDGET_EXHAUSTED"))
+        }
+        val id = started.substringAfterLast('：')
+        runCurrent()
+        assertEquals("waiting_slice", manager.snapshots().single().status)
+        assertEquals("waiting_slice", durable.get().single().status)
+        assertEquals(1, manager.resumableSnapshots().size)
+        assertEquals(2, manager.availableSlots())
+
+        val restored = HarnessJobManager(
+            scope = this, onChanged = { }, initialSnapshots = durable.get(),
+        )
+        assertEquals("waiting_slice", restored.snapshots().single().status)
+        assertTrue(restored.infos().single().canMessage)
+        assertTrue(restored.resumableSnapshots().any { it.id == id })
+        val queued = restored.sendInput(
+            id, QueuedAgentInput("从当前检查点继续", id = "msg-continue"), ownerId = "session-A",
+        )
+        assertTrue(queued.accepted)
+        assertTrue(queued.requiresResume)
+        assertEquals("msg-continue", restored.snapshots().single().inbox.single().id)
+        val stopped = HarnessJobManager(scope = this, onChanged = { }, initialSnapshots = durable.get())
+        assertTrue(stopped.kill(id, ownerId = "session-A").contains("已"))
+        assertEquals("cancelled", stopped.snapshots().single().status)
+        assertTrue(stopped.resumableSnapshots().isEmpty())
+        val resumed = restored.resumePersistent(id, ownerId = "session-A") { _, _ -> "已完成" }
+        assertTrue(resumed.contains("已恢复"))
+        runCurrent()
+        assertEquals("dormant", restored.snapshots().single().status)
+        assertEquals("已完成", restored.snapshots().single().output)
+        assertEquals("$id [dormant] 预算边界\n已完成", restored.output(id))
+    }
+
+    @Test
     fun restartedShellJobReportsInterruptionWithoutSuggestingRecovery() = runTest {
         val manager = HarnessJobManager(
             scope = this,

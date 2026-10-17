@@ -9,6 +9,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -25,6 +31,14 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.RequestBody.Companion.toRequestBody
+
+/**
+ * A 404 with a retained session ID can signal session expiry. Only explicitly
+ * side-effect-free discovery calls may be sent again after reinitialization.
+ * A tools/call may have committed on the server before the 404; NEVER replay it.
+ */
+internal fun canReplayMcpAfterSessionExpiry(method: String): Boolean =
+    method == "tools/list" || method == "ping" || method == "server/discover"
 
 /** MCP 2025-06-18 Streamable HTTP lifecycle and optional session-id support. */
 class McpLegacyStreamableHttpTransport(
@@ -46,8 +60,12 @@ class McpLegacyStreamableHttpTransport(
             sendRequest(method, params)
         } catch (error: McpHttpException) {
             if (error.statusCode == 404 && sessionId != null) {
+                // Session expiry invalidates our transport even when recovery of
+                // this specific call is unsafe. Never replay a mutation: the
+                // result remains unknown and the MCP Owner revokes tool admission.
                 initialized = false
                 sessionId = null
+                if (!canReplayMcpAfterSessionExpiry(method)) throw error
                 initializeIfNeeded()
                 sendRequest(method, params)
             } else {
@@ -153,9 +171,11 @@ class McpLegacyHttpSseTransport(
     private val json: Json,
     private val clientName: String = "777-android",
     private val clientVersion: String = "1",
-) : McpTransport {
+) : McpTransport, McpTerminationSource {
     private val ids = AtomicLong(1L)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mutableTerminalEvents = MutableSharedFlow<Throwable>(replay = 1)
+    override val terminalEvents: Flow<Throwable> = mutableTerminalEvents.asSharedFlow()
     private val connectMutex = Mutex()
     private val requestMutex = Mutex()
     private var endpoint = CompletableDeferred<String>()
@@ -217,10 +237,13 @@ class McpLegacyHttpSseTransport(
         scope.launch {
             try {
                 readSse(response.body?.byteStream() ?: error("MCP SSE 响应为空"))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 if (!endpoint.isCompleted) endpoint.completeExceptionally(error)
                 pending.values.forEach { it.completeExceptionally(error) }
                 pending.clear()
+                mutableTerminalEvents.tryEmit(error)
             } finally {
                 response.close()
                 sseResponse = null
@@ -345,7 +368,12 @@ class McpNegotiatingHttpTransport(
     endpoint: String,
     http: OkHttpClient,
     json: Json,
-) : McpTransport {
+) : McpTransport, McpTerminationSource {
+    // Modern request/response HTTP has no persistent stream to observe between calls.
+    // The legacy SSE variant has one and reports genuine transport termination.
+    override val terminalEvents: Flow<Throwable> = flow {
+        (selected as? McpTerminationSource)?.terminalEvents?.collect { emit(it) }
+    }
     private val modern = McpStreamableHttpTransport(endpoint, http, json)
     private val legacy = McpLegacyStreamableHttpTransport(endpoint, http, json)
     private val legacySse = McpLegacyHttpSseTransport(endpoint, http, json)
@@ -356,17 +384,25 @@ class McpNegotiatingHttpTransport(
         selected?.let { return it.request(method, params) }
         return selectionMutex.withLock {
             selected?.let { return@withLock it.request(method, params) }
-            try {
-                modern.request(method, params).also { selected = modern }
+            // Negotiation must never issue the first side-effecting RPC. A server can
+            // commit tools/call and still return an incompatible/expired HTTP status.
+            // Select the protocol using only explicitly replay-safe discovery; the
+            // mutation is sent exactly once, AFTER the transport is pinned.
+            val probing = !canReplayMcpAfterSessionExpiry(method)
+            val probeMethod = if (probing) "tools/list" else method
+            val probeParams = if (probing) JsonObject(emptyMap()) else params
+            val probe = try {
+                modern.request(probeMethod, probeParams).also { selected = modern }
             } catch (modernError: McpHttpException) {
                 if (!modernError.isProtocolNegotiationFailure()) throw modernError
                 try {
-                    legacy.request(method, params).also { selected = legacy }
+                    legacy.request(probeMethod, probeParams).also { selected = legacy }
                 } catch (legacyError: McpHttpException) {
                     if (!legacyError.isProtocolNegotiationFailure()) throw legacyError
-                    legacySse.request(method, params).also { selected = legacySse }
+                    legacySse.request(probeMethod, probeParams).also { selected = legacySse }
                 }
             }
+            if (probing) checkNotNull(selected).request(method, params) else probe
         }
     }
 
@@ -387,7 +423,7 @@ class McpLegacyStdioTransport(
     private val protocolVersion: String = LEGACY_MCP_PROTOCOL_VERSION,
     private val commandResolver: (List<String>) -> List<String> = { it },
     private val environmentProvider: () -> Map<String, String> = { emptyMap() },
-) : McpTransport {
+) : McpTransport, McpTerminationSource {
     private val ids = AtomicLong(1L)
     private val mutex = Mutex()
     private val lineProcess = McpLineProcess(
@@ -396,6 +432,7 @@ class McpLegacyStdioTransport(
         commandResolver = commandResolver,
         environmentProvider = environmentProvider,
     )
+    override val terminalEvents: Flow<Throwable> = lineProcess.terminalEvents
     private var initialized = false
 
     override suspend fun request(method: String, params: JsonObject): JsonObject = mutex.withLock {
@@ -476,7 +513,11 @@ class McpNegotiatingStdioTransport(
     workingDirectory: File? = null,
     commandResolver: (List<String>) -> List<String> = { it },
     environmentProvider: () -> Map<String, String> = { emptyMap() },
-) : McpTransport {
+) : McpTransport, McpTerminationSource {
+    override val terminalEvents: Flow<Throwable> = flow {
+        val stream = (selected as McpTerminationSource).terminalEvents
+        stream.collect { emit(it) }
+    }
     private val current = McpLegacyStdioTransport(
         command = command,
         json = json,
@@ -500,18 +541,24 @@ class McpNegotiatingStdioTransport(
         selected?.let { return it.request(method, params) }
         return selectionMutex.withLock {
             selected?.let { return@withLock it.request(method, params) }
-            try {
-                current.request(method, params).also { selected = current }
+            // A stdio command can finish its irreversible effect before protocol
+            // probing fails. Never fall back to a second process for that command.
+            val probing = !canReplayMcpAfterSessionExpiry(method)
+            val probeMethod = if (probing) "tools/list" else method
+            val probeParams = if (probing) JsonObject(emptyMap()) else params
+            val probe = try {
+                current.request(probeMethod, probeParams).also { selected = current }
             } catch (currentError: Exception) {
                 current.close()
                 try {
-                    legacy.request(method, params).also { selected = legacy }
+                    legacy.request(probeMethod, probeParams).also { selected = legacy }
                 } catch (legacyError: Exception) {
                     legacy.close()
                     legacyError.addSuppressed(currentError)
                     throw legacyError
                 }
             }
+            if (probing) checkNotNull(selected).request(method, params) else probe
         }
     }
 

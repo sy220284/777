@@ -23,7 +23,8 @@ class LocalRuntimeStateStoreTest {
         val store = LocalRuntimeStateStore()
         val initial = LocalHarnessState(sessionId = "session-a")
 
-        val mutable = store.initialize(initial)
+        store.initialize(initial)
+        val mutable = store.state
 
         assertEquals("session-a", mutable.value.sessionId)
         assertEquals("session-a", store.state.value.sessionId)
@@ -99,8 +100,10 @@ class LocalRuntimeStateStoreTest {
         store.foregroundRunHandle.pendingInputs.offer(
             com.labteto.dshmobile.harness.agent.QueuedAgentInput("queued", id = "queued"),
         )
-        val blocked = File(temporary.root, "blocked").apply { writeText("not a directory") }
-        val log = LocalSessionEventLog(File(blocked, "events.jsonl"), Json)
+        val blocked = temporary.newFolder("blocked")
+        val eventFile = File(blocked, "events.jsonl")
+        val log = LocalSessionEventLog(eventFile, Json)
+        com.labteto.dshmobile.local.blockEventLogWritesAfterOpen(eventFile)
         try {
             assertTrue(runCatching { store.cancelForegroundRun(log) }.isFailure)
             assertTrue(job.isCancelled)
@@ -123,8 +126,10 @@ class LocalRuntimeStateStoreTest {
             store.foregroundRunHandle.pendingInputs.offer(
                 com.labteto.dshmobile.harness.agent.QueuedAgentInput("queued", id = "queued"),
             )
-            val blocked = File(temporary.root, "blocked-join").apply { writeText("not a directory") }
-            val log = LocalSessionEventLog(File(blocked, "events.jsonl"), Json)
+            val blocked = temporary.newFolder("blocked-join")
+            val eventFile = File(blocked, "events.jsonl")
+            val log = LocalSessionEventLog(eventFile, Json)
+            com.labteto.dshmobile.local.blockEventLogWritesAfterOpen(eventFile)
             try {
                 assertTrue(runCatching { store.cancelForegroundRunAndJoin(log) }.isFailure)
                 assertTrue(job.isCompleted)
@@ -137,11 +142,11 @@ class LocalRuntimeStateStoreTest {
     @Test
     fun visibleOperationReportsFailureWithoutCrashingOrLeakingToAnotherSession() {
         val store = LocalRuntimeStateStore()
-        val ownerState = store.initialize(LocalHarnessState(sessionId = "session-a"))
+        store.initialize(LocalHarnessState(sessionId = "session-a"))
         store.performVisibleOperation("操作失败") { throw java.io.IOException("disk full") }
         assertTrue(store.state.value.error.orEmpty().contains("disk full"))
         store.performVisibleOperation("旧操作失败") {
-            ownerState.value = store.state.value.copy(sessionId = "session-b", error = null)
+            store.projection.update { it.copy(sessionId = "session-b", error = null) }
             throw java.io.IOException("old failure")
         }
         org.junit.Assert.assertNull(store.state.value.error)

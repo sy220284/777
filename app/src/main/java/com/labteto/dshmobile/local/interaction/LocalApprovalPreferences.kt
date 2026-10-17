@@ -17,12 +17,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
-enum class LocalApprovalMode {
-    DEFAULT,
-    MANUAL,
-    AUTO,
-}
-
 /**
  * Device-local authority for the global approval mode.
  *

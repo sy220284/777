@@ -20,6 +20,9 @@ internal data class GroupGeneratedReply(
     val persona: PersonaProfile,
     val content: String = "",
     val failure: Throwable? = null,
+    val uiDefinition: String? = null,
+    val requestId: String = "",
+    val uiUsageReported: Boolean = false,
 )
 
 /**

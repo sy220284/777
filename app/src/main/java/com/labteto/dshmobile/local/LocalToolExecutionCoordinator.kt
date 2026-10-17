@@ -1,9 +1,12 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.harness.agent.AgentRunExecutionContext
+import com.labteto.dshmobile.harness.session.SessionExecutionContext
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
+import com.labteto.dshmobile.harness.tools.ToolInvocationContext
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.local.agent.LocalAgentRunPolicy
@@ -19,6 +22,7 @@ import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -45,11 +49,17 @@ internal class LocalToolExecutionCoordinator(
         LocalToolCall,
         LocalToolExecutionIdentity,
     ) -> Unit = { _, _, _ -> },
+    /** Durable per-call decision, scoped to the owning session; never a reusable grant. */
+    private val recordAuthorizationDecision: suspend (
+        String, LocalToolCall, LocalToolExecutionIdentity, Boolean,
+    ) -> Unit = { _, _, _, _ -> },
     private val executionIdFactory: () -> String = { UUID.randomUUID().toString() },
     private val networkSearchEnabled: () -> Boolean = { true },
+    private val pinnedConnectorIds: () -> List<String> = { emptyList() },
+    private val pinnedSkillIds: () -> List<String> = { emptyList() },
+    private val workspaceReadWriteGate: LocalWorkspaceReadWriteGate = LocalWorkspaceReadWriteGate(),
 ) {
     // 前台 Lead 与所有后台成员共用此闸门，文件写入工具不得并行交错执行。
-    private val workspaceReadWriteGate = LocalWorkspaceReadWriteGate()
 
     internal fun isNetworkSearchPermitted(name: String): Boolean =
         networkSearchEnabled() || LocalToolPolicy.canonical(name) !in NETWORK_SEARCH_TOOLS
@@ -108,7 +118,7 @@ internal class LocalToolExecutionCoordinator(
         target: MutableSet<String>? = null,
     ) {
         val intent = LocalToolCapabilityIntent.from(input, history)
-        val enableGitHub = if (intent.requestsGitHub) {
+        val enableGitHub = if (intent.requestsGitHub || "github" in pinnedConnectorIds()) {
             try {
                 gitHubConfigured()
             } catch (cancelled: CancellationException) {
@@ -137,6 +147,10 @@ internal class LocalToolExecutionCoordinator(
         if (enableGitHub) enableGitHubConnectorTools(resolvedTarget)
         enableTaskRelevantOptionalTools(taskContext, resolvedTarget, prioritize = prioritizeTask)
         if (networkSearchEnabled()) enableOptionalTools(DEFAULT_NETWORK_TOOLS, resolvedTarget)
+        // Preserve explicit user choices after ALL heuristic re-ranking, not before it.
+        // The credential gate above determines whether GitHub is admitted.
+        enablePinnedMediaTools(resolvedTarget)
+        prioritizePinnedConnectorTools(resolvedTarget, enableGitHub)
     }
 
     fun enableGitHubConnectorTools(target: MutableSet<String> = enabledOptionalTools) {
@@ -146,6 +160,45 @@ internal class LocalToolExecutionCoordinator(
             }
             .map(HarnessTool::name)
         enableOptionalTools(githubTools, target)
+    }
+
+    /** Reassert explicit pins after each model-step heuristic rerank, including step-2+ schemas. */
+    fun prioritizePinnedForModelStep(target: MutableSet<String> = enabledOptionalTools) {
+        // Only re-order tools already credential-admitted during prepare().
+        // Avoid adding GitHub tools after an unavailable/auth-failed preflight.
+        val admittedGithub = synchronized(target) {
+            target.any { name -> registry.get(name)?.let(::isGitHubConnectorTool) == true }
+        }
+        enablePinnedMediaTools(target)
+        prioritizePinnedConnectorTools(target, enableGitHub = admittedGithub)
+    }
+
+    private fun enablePinnedMediaTools(target: MutableSet<String>) {
+        if (pinnedSkillIds().none { it == "imagegen" || it == "minimax-media" }) return
+        enableOptionalTools(listOf("media_image_options", "media_image_status", "media_image_create"), target)
+    }
+
+    private fun prioritizePinnedConnectorTools(target: MutableSet<String>, enableGitHub: Boolean) {
+        val pins = pinnedConnectorIds().distinct()
+        if (pins.isEmpty()) return
+        val registered = registry.names().mapNotNull(registry::get)
+        val preferred = pins.flatMap { id ->
+            if (id == "github") {
+                if (enableGitHub) registered.filter(::isGitHubConnectorTool).map(HarnessTool::name)
+                else emptyList()
+            } else if (Regex("[A-Za-z0-9_-]{1,48}").matches(id)) {
+                registered.filter { it.metadata.family.equals("MCP", ignoreCase = true) &&
+                    it.name.startsWith("mcp_${id}_") }.map(HarnessTool::name)
+            } else emptyList()
+        }
+        // Registration, network policy and approval are still the single execution authority.
+        enableOptionalTools(preferred, target)
+        synchronized(target) {
+            val previous = target.toList()
+            target.clear()
+            target.addAll(preferred.filter { it in previous })
+            target.addAll(previous)
+        }
     }
 
     private fun isGitHubConnectorTool(tool: HarnessTool): Boolean =
@@ -311,56 +364,89 @@ internal class LocalToolExecutionCoordinator(
             )
         }
 
+        val executionOwner = currentCoroutineContext()[SessionExecutionContext]?.lease
+        val runOwner = currentCoroutineContext()[AgentRunExecutionContext]
+        var authorizationRecorded = false
         var approvalDenied = false
         var executionStarted = false
         val executionIdentity = LocalToolExecutionIdentity(
             executionId = executionIdFactory(),
             rootCallId = call.id,
-            attributes = executionAttributes.toMap(),
+            attributes = buildMap {
+                putAll(executionAttributes)
+                runOwner?.let {
+                    put("run_id", it.identity.runId)
+                    it.parentRunId?.let { parent -> put("parent_run_id", parent) }
+                }
+                executionOwner?.identity?.let {
+                    put("session_owner_incarnation", it.incarnation)
+                    put("session_owner_epoch", it.epoch.toString())
+                }
+            },
+            verifiedReadOnly = readLike,
         )
         var executionLease: LocalWorkspaceReadWriteGate.Lease? = null
         val invocation = try {
-            registry.executeTracked(
-                name = call.name,
-                input = call.arguments,
-                rawArguments = call.rawArguments,
-                context = ToolContext(
-                    sessionId = sessionId,
-                    allowMutation = allowMutation,
-                    attributes = buildMap {
-                        put("call_id", call.id)
-                        put("execution_id", executionIdentity.executionId)
-                        put("root_call_id", executionIdentity.rootCallId)
-                        put("plan_mode", planModeEnabled)
-                        executionIdentity.parentExecutionId?.let { put("parent_execution_id", it) }
-                        currentCoroutineContext()[LocalModelRunContext]?.profile?.let { put("model_profile", it) }
-                    },
-                    expectedRegistration = registered,
-                    approval = { tool ->
-                        val granted = approval(call, tool, approvalSummary(call, tool))
-                        if (!granted) approvalDenied = true
-                        granted
-                    },
-                    onExecutionStarted = { admittedTool ->
-                        // A new correction can arrive while awaiting approval or resource admission.
-                        // Reject the stale call before entering its executor, with no side effect.
-                        if (!beforeExecution()) throw LocalToolSampleSuperseded()
-                        // The registry calls this only after schema checks and user approval.
-                        // Waiting for approval must never hold a filesystem read/write lease.
-                        executionLease = workspaceReadWriteGate.acquire(admittedTool)
-                        // Admission can suspend behind another read/write operation. A correction
-                        // committed during that wait must invalidate this still-unstarted call.
-                        if (!beforeExecution()) throw LocalToolSampleSuperseded()
-                        // Approval may outlive the exact plugin registration. Re-check after waiting
-                        // for the shared read/write gate and before writing the started fact.
-                        if (registry.get(call.name) !== admittedTool) {
-                            throw LocalToolRegistrationChanged()
-                        }
-                        recordExecutionStarted(sessionId, call, executionIdentity)
-                        executionStarted = true
-                    },
-                ),
-            ).let { invocation ->
+            executionOwner?.requireCurrent(sessionId)
+            runOwner?.requireCurrent(sessionId)
+            withContext(ToolInvocationContext(sessionId, call.id, executionIdentity.executionId)) {
+                registry.executeTracked(
+                    name = call.name,
+                    input = call.arguments,
+                    rawArguments = call.rawArguments,
+                    context = ToolContext(
+                        sessionId = sessionId,
+                        allowMutation = allowMutation,
+                        attributes = buildMap {
+                            putAll(executionIdentity.attributes)
+                            put("call_id", call.id)
+                            put("execution_id", executionIdentity.executionId)
+                            put("root_call_id", executionIdentity.rootCallId)
+                            put("plan_mode", planModeEnabled)
+                            executionIdentity.parentExecutionId?.let { put("parent_execution_id", it) }
+                            currentCoroutineContext()[LocalModelRunContext]?.profile?.let { put("model_profile", it) }
+                        },
+                        expectedRegistration = registered,
+                        approval = { tool ->
+                            val granted = approval(call, tool, approvalSummary(call, tool))
+                            // No tool may start if the exact user's decision failed to
+                            // persist. Do not reuse a previous call's selection/grant.
+                            recordAuthorizationDecision(sessionId, call, executionIdentity, granted)
+                            authorizationRecorded = true
+                            if (!granted) approvalDenied = true
+                            granted
+                        },
+                        onExecutionStarted = { admittedTool ->
+                            // A new correction can arrive while awaiting approval or resource admission.
+                            // Reject the stale call before entering its executor, with no side effect.
+                            executionOwner?.requireCurrent(sessionId)
+                            runOwner?.requireCurrent(sessionId)
+                            if (!beforeExecution()) throw LocalToolSampleSuperseded()
+                            // The registry calls this only after schema checks and user approval.
+                            // Waiting for approval must never hold a filesystem read/write lease.
+                            executionLease = workspaceReadWriteGate.acquire(admittedTool)
+                            // Admission can suspend behind another read/write operation. A correction
+                            // committed during that wait must invalidate this still-unstarted call.
+                            executionOwner?.requireCurrent(sessionId)
+                            runOwner?.requireCurrent(sessionId)
+                            if (!beforeExecution()) throw LocalToolSampleSuperseded()
+                            // Approval may outlive the exact plugin registration. Re-check after waiting
+                            // for the shared read/write gate and before writing the started fact.
+                            if (registry.get(call.name) !== admittedTool) {
+                                throw LocalToolRegistrationChanged()
+                            }
+                            // NEVER/automatic policies still produce a decision for this exact
+                            // execution. Registry admission is the authority, not UI selection.
+                            if (!authorizationRecorded) {
+                                recordAuthorizationDecision(sessionId, call, executionIdentity, true)
+                                authorizationRecorded = true
+                            }
+                            recordExecutionStarted(sessionId, call, executionIdentity)
+                            executionStarted = true
+                        },
+                    ),
+                )
+            }.let { invocation ->
                 // Observe while the real workspace lease is still held. The caller owns
                 // what to observe; this neutral coordinator never interprets goal semantics.
                 if (invocation.executionStarted && executionLease != null && !invocation.result.isError) {
@@ -372,7 +458,7 @@ internal class LocalToolExecutionCoordinator(
         } catch (cancelled: CancellationException) {
             if (!currentCoroutineContext().isActive) throw cancelled
             AppLog.info("LocalToolExecution", "operation=execute_tool_cancelled tool=${call.name} call_id=${call.id} session_id=$sessionId")
-            return thrownFailure(call, registered, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消", executionStarted, sessionId = sessionId)
+            return thrownFailure(call, registered, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消", executionStarted, sessionId = sessionId, executionId = executionIdentity.executionId)
         } catch (changed: LocalToolRegistrationChanged) {
             return AgentToolResult(
                 content = "工具已在执行接纳期间更新或卸载：${call.name}；旧审批与旧调用不再有效。",
@@ -393,10 +479,10 @@ internal class LocalToolExecutionCoordinator(
             )
         } catch (error: LocalWebException) {
             return thrownFailure(call, registered, error.code, error.message ?: "网页工具失败", executionStarted,
-                cause = error, sessionId = sessionId)
+                cause = error, sessionId = sessionId, executionId = executionIdentity.executionId)
         } catch (error: LocalModelException) {
             return thrownFailure(call, registered, error.code, error.message ?: "模型请求失败", executionStarted,
-                cause = error, sessionId = sessionId)
+                cause = error, sessionId = sessionId, executionId = executionIdentity.executionId)
         } catch (error: Exception) {
             val code = when {
                 error is java.io.FileNotFoundException ||
@@ -418,6 +504,7 @@ internal class LocalToolExecutionCoordinator(
             return thrownFailure(
                 call, registered, code, error.message ?: error::class.java.simpleName,
                 executionStarted, error::class.java.simpleName, cause = error, sessionId = sessionId,
+                executionId = executionIdentity.executionId,
             )
         } finally {
             executionLease?.close()
@@ -484,6 +571,7 @@ internal class LocalToolExecutionCoordinator(
         exceptionType: String? = null,
         cause: Throwable? = null,
         sessionId: String? = null,
+        executionId: String? = null,
     ): AgentToolResult {
         val baseResult = localToolFailure(code, message,
             readOnly = LocalToolPolicy.isReadOnlyInvocation(call.name, tool.access, call.arguments),
@@ -503,7 +591,7 @@ internal class LocalToolExecutionCoordinator(
         } else {
             AppLog.warn("LocalToolExecution", "failure=true operation=execute_tool tool=${call.name} call_id=${call.id} code=$code started=$executionStarted retryable=${result.retryable} exception_type=${exceptionType ?: "unknown"}")
         }
-        return result
+        return result.copy(executionId = executionId.takeIf { executionStarted })
     }
 
     private fun approvalSummary(call: LocalToolCall, tool: HarnessTool): String = when (tool.name) {
@@ -537,6 +625,7 @@ internal data class LocalToolExecutionIdentity(
     val rootCallId: String,
     val parentExecutionId: String? = null,
     val attributes: Map<String, String> = emptyMap(),
+    val verifiedReadOnly: Boolean = false,
 )
 
 private fun JsonObject.optionalStringForCoordinator(key: String): String? =

@@ -41,6 +41,7 @@ internal object LocalToolPolicy {
      */
     fun exposure(name: String): ToolExposure = when (canonical(name)) {
         "web_search", "web_fetch", "http_request", "download_file", "network_diagnose",
+        "media_image_options", "media_image_create", "media_image_status",
         "job_list", "job_output", "job_kill", "json_query", "environment_info",
         "todo_write", "create_goal", "get_goal", "update_goal",
         "skill", "subagent_fork", "list_agents", "send_message",
@@ -108,8 +109,9 @@ internal object LocalToolPolicy {
         "team_task_create", "team_task_update", "team_interrupt", "team_disable_member",
         "team_dismiss_member", "team_stop_all" -> ToolAccess.AGENT_CONTROL
         "web_search", "web_fetch", "network_diagnose" -> ToolAccess.NETWORK
-        "http_request" -> ToolAccess.PRIVILEGED
+        "http_request", "media_image_create" -> ToolAccess.PRIVILEGED
         "read", "tool_output_read", "file_inspect", "list_files", "glob", "grep", "job_list", "job_output", "json_query",
+        "media_image_options", "media_image_status",
         "environment_info", "capability_search", "get_goal", "skill", "list_subagent_models", "list_agents",
         "session_event_search", "session_search", "memory_search", "memory_list",
         "session_trace", "session_event_trace", "session_event_read",
@@ -125,6 +127,7 @@ internal object LocalToolPolicy {
             "apply_patch", "download_file", "json_query", "present" -> "文件"
             "bash", "job_list", "job_output", "job_kill" -> "运行时"
             "web_search", "web_fetch", "http_request", "network_diagnose" -> "网络"
+            "media_image_options", "media_image_create", "media_image_status" -> "媒体创作"
             "environment_info", "capability_search" -> "环境"
             "update_plan", "exit_plan_mode", "todo_write", "create_goal", "get_goal", "update_goal",
             "ask_user_question" -> "任务"
@@ -152,6 +155,8 @@ internal object LocalToolPolicy {
             else -> emptyList()
         }
         val discoveryKeywords = when (canonical) {
+            "media_image_options", "media_image_create", "media_image_status" ->
+                setOf("生图", "绘图", "生成图片", "生成图像", "图片创作", "修图", "原图编辑", "imagegen")
             "web_search" -> setOf("联网", "网页搜索", "最新信息", "web", "search")
             "web_fetch" -> setOf("网页", "网址", "url", "抓取", "web")
             "http_request" -> setOf("http", "https", "api", "接口请求")
@@ -218,7 +223,7 @@ internal object LocalToolPolicy {
     fun approval(name: String): ToolApprovalPolicy = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file", "bash", "job_kill", "send_message", "interrupt_agent",
         "team_send_message", "team_interrupt", "team_disable_member", "team_dismiss_member", "team_stop_all",
-        "http_request", "session_event_search", "session_trace", "session_event_trace", "session_event_read",
+        "http_request", "media_image_create", "session_event_search", "session_trace", "session_event_trace", "session_event_read",
         "memory_update", "memory_forget" -> ToolApprovalPolicy.ALWAYS
         else -> { access(name); ToolApprovalPolicy.NEVER }
     }

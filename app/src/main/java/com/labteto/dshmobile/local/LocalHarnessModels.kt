@@ -13,11 +13,7 @@ import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.work.LocalWorkState
 import kotlinx.serialization.Serializable
 
-@Serializable
-enum class LocalUsageMode {
-    CHAT,
-    WORK,
-}
+
 
 data class LocalHarnessState(
     val loading: Boolean = true,

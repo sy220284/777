@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.session.SessionEvent
+import com.labteto.dshmobile.harness.workflow.TaskGraphTopology
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -302,17 +303,11 @@ internal object LocalAgentTeamReducer {
     }
 
     private fun hasDependencyCycle(tasks: List<LocalTeamTaskSnapshot>): Boolean {
-        val map = tasks.filter { it.status != LocalTeamTaskStatus.DELETED }.associateBy { it.id }
-        val visiting = hashSetOf<String>()
-        val visited = hashSetOf<String>()
-        fun visit(id: String): Boolean {
-            if (!visiting.add(id)) return true
-            if (!visited.add(id)) { visiting.remove(id); return false }
-            val cycle = map[id]?.blockedBy.orEmpty().any(::visit)
-            visiting.remove(id)
-            return cycle
-        }
-        return map.keys.any(::visit)
+        val active = tasks.filter { it.status != LocalTeamTaskStatus.DELETED }
+            .associateBy { it.id }
+        return TaskGraphTopology.containsCycle(active.mapValues { (_, task) ->
+            task.blockedBy.filter { it in active }
+        })
     }
 
 }

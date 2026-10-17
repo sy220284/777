@@ -11,7 +11,9 @@ import com.labteto.dshmobile.harness.plugin.PluginDescriptor
 import com.labteto.dshmobile.harness.plugin.PluginLifecycleState
 import com.labteto.dshmobile.harness.plugin.PluginManager
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -344,6 +346,155 @@ class PluginManagerTest {
             manager.lifecycleSnapshot("replaceable")?.state,
         )
         assertTrue(runCatching { manager.install("replaceable") }.isFailure)
+    }
+
+    @Test
+    fun readOnlyPluginObservationDoesNotWaitForRemoteCommandAndStopsAfterDisable() = runTest {
+        val manager = manager(definition("mcp-bridge"))
+        manager.install("mcp-bridge")
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val remoteCommand = async {
+            manager.withActivePlugin("mcp-bridge") { _, _ ->
+                started.complete(Unit)
+                release.await()
+            }
+        }
+        started.await()
+        assertEquals("mcp-bridge", manager.observeActivePlugin("mcp-bridge") { it.id })
+        val disable = async { manager.disable("mcp-bridge") }
+        yield()
+        assertFalse(disable.isCompleted)
+        release.complete(Unit)
+        remoteCommand.await()
+        assertTrue(disable.await())
+        assertTrue(runCatching {
+            manager.observeActivePlugin("mcp-bridge") { it.id }
+        }.isFailure)
+    }
+
+    @Test
+    fun pluginObservationRejectsInstanceReplacedDuringSuspendedRead() = runTest {
+        val manager = manager(definition("mcp-bridge"))
+        manager.install("mcp-bridge")
+        val reading = CompletableDeferred<Unit>()
+        val resume = CompletableDeferred<Unit>()
+        val observation = async {
+            runCatching {
+                manager.observeActivePlugin("mcp-bridge") { plugin ->
+                    reading.complete(Unit)
+                    resume.await()
+                    plugin.id
+                }
+            }
+        }
+        reading.await()
+        manager.replace(definition("mcp-bridge", version = 2))
+        resume.complete(Unit)
+        assertTrue(observation.await().isFailure)
+        assertEquals("mcp-bridge", manager.observeActivePlugin("mcp-bridge") { it.id })
+    }
+
+    @Test
+    fun failedPluginCanBeRecoveredWithoutRestartingOrReplayingUnrelatedPlugins() = runTest {
+        var attempts = 0
+        var healthyInstalls = 0
+        val manager = manager(
+            definition("healthy", onInstall = { healthyInstalls++ }),
+            definition("recoverable", onInstall = {
+                if (++attempts == 1) error("temporary plugin failure")
+                it.events.register("recovered", true)
+            }, onUninstall = { it.events.unregister("recovered") }),
+        )
+        manager.install("healthy")
+        assertTrue(runCatching { manager.install("recoverable") }.isFailure)
+        assertEquals(PluginLifecycleState.FAILED, manager.lifecycleSnapshot("recoverable")?.state)
+        assertTrue("healthy plugin must remain active", "healthy" in manager.installedPluginIds())
+        assertEquals(listOf("recoverable"), manager.recoverFailed("recoverable"))
+        assertEquals(PluginLifecycleState.ACTIVE, manager.lifecycleSnapshot("recoverable")?.state)
+        assertEquals(true, manager.context.events.get("recovered"))
+        assertEquals(1, healthyInstalls)
+        assertTrue(runCatching { manager.recoverFailed("healthy") }.isFailure)
+    }
+
+    @Test
+    fun batchRollbackExposesEveryPluginWhoseCleanupFailed() = runTest {
+        var cleanupAttempts = 0
+        val registry = PluginRegistry()
+        val manager = manager(
+            definition("leaky-provider",
+                onInstall = { it.events.register("provider", "staged") },
+                onUninstall = {
+                    if (++cleanupAttempts == 1) error("resource teardown unavailable")
+                    it.events.unregister("provider")
+                }),
+            definition("dependent-broken",
+                dependencies = listOf(PluginDependency("leaky-provider")),
+                onInstall = { error("dependent setup failed") },
+            ),
+            registry = registry,
+        )
+        assertTrue(runCatching { manager.install("dependent-broken") }.isFailure)
+        assertEquals(PluginLifecycleState.FAILED,
+            manager.lifecycleSnapshot("leaky-provider")?.state)
+        assertEquals(PluginLifecycleState.FAILED,
+            manager.lifecycleSnapshot("dependent-broken")?.state)
+        val blocked = registry.context.tools.execute(
+            "unregistered", kotlinx.serialization.json.buildJsonObject { },
+        )
+        assertEquals("TOOL_LIFECYCLE_UNAVAILABLE", blocked.errorCode)
+        assertEquals(listOf("leaky-provider"), manager.recoverFailed("leaky-provider"))
+        assertEquals(2, cleanupAttempts)
+        assertEquals(PluginLifecycleState.ACTIVE,
+            manager.lifecycleSnapshot("leaky-provider")?.state)
+    }
+
+    @Test
+    fun failedInstallCleanupBlocksToolsUntilRecoveryRetriesExternalCleanup() = runTest {
+        val registry = PluginRegistry()
+        var installs = 0
+        var cleanupAttempts = 0
+        val manager = manager(
+            definition("leaky", onInstall = {
+                installs++
+                it.events.register("attempt", installs)
+                if (installs == 1) error("remote setup failed")
+            }, onUninstall = {
+                cleanupAttempts++
+                if (cleanupAttempts == 1) error("remote teardown failed")
+                it.events.unregister("attempt")
+            }),
+            registry = registry,
+        )
+        assertTrue(runCatching { manager.install("leaky") }.isFailure)
+        assertEquals(PluginLifecycleState.FAILED, manager.lifecycleSnapshot("leaky")?.state)
+        val blocked = registry.context.tools.execute(
+            "unregistered", kotlinx.serialization.json.buildJsonObject { },
+        )
+        assertEquals("TOOL_LIFECYCLE_UNAVAILABLE", blocked.errorCode)
+        assertEquals(listOf("leaky"), manager.recoverFailed("leaky"))
+        assertEquals(2, cleanupAttempts)
+        assertEquals(2, installs)
+        assertEquals(PluginLifecycleState.ACTIVE, manager.lifecycleSnapshot("leaky")?.state)
+        val restored = registry.context.tools.execute(
+            "unregistered", kotlinx.serialization.json.buildJsonObject { },
+        )
+        assertEquals("UNKNOWN_TOOL", restored.errorCode)
+    }
+
+    @Test
+    fun failedRecoveryNeverClaimsAnActivePluginOrPublishesPartialResources() = runTest {
+        val manager = manager(
+            definition("broken", onInstall = {
+                it.events.register("incomplete", "should-rollback")
+                error("still broken")
+            }),
+        )
+        assertTrue(runCatching { manager.install("broken") }.isFailure)
+        assertTrue(runCatching { manager.recoverFailed("broken") }.isFailure)
+        assertEquals(PluginLifecycleState.FAILED, manager.lifecycleSnapshot("broken")?.state)
+        assertTrue("broken" !in manager.installedPluginIds())
+        assertEquals(null, manager.context.events.get("incomplete"))
     }
 
     private fun manager(

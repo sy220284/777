@@ -21,6 +21,11 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun localShellFeatureUiContribution(
     shell: LocalHarnessShellState,
+    documents: com.labteto.dshmobile.uicontract.UiDocumentUiPort,
+    documentForms: com.labteto.dshmobile.uicontract.UiDocumentFormUiPort,
+    documentIdentity: com.labteto.dshmobile.uicontract.UiSessionIdentity?,
+    reading: com.labteto.dshmobile.uicontract.ConversationReadingUiPort,
+    drafts: com.labteto.dshmobile.uicontract.ConversationDraftUiPort,
     state: StateFlow<LocalConversationSurfaceState>,
     activeModelProfile: LocalModelProfile?,
     sendFeedback: LocalSendFeedbackState,
@@ -37,6 +42,9 @@ internal fun localShellFeatureUiContribution(
     onNewSession: () -> Unit,
     composerHandoff: List<String>,
     skillDisplayNames: Map<String, String>,
+    invocationOptions: List<com.labteto.dshmobile.uicontract.UiInvocationOption>,
+    pinnedInvocations: List<com.labteto.dshmobile.uicontract.UiInvocationRef>,
+    onToggleInvocation: (com.labteto.dshmobile.uicontract.UiInvocationRef) -> Unit,
     onUseWorkCapability: (String) -> Unit,
     onLocateMemoryForMessage: (String) -> Unit,
     onConsumeComposerHandoff: () -> Unit,
@@ -54,6 +62,11 @@ internal fun localShellFeatureUiContribution(
         check(page == LocalFeaturePage.HOME) { "Shell received non-HOME route: $page" }
         LocalConversationSurface(
             state = surface,
+            documents = documents,
+            documentForms = documentForms,
+            documentIdentity = documentIdentity,
+            reading = reading,
+            drafts = drafts,
             workActions = workActions,
             onOpenWorkArtifact = onOpenWorkArtifact,
             usageRevision = actions.usageRevision,
@@ -62,6 +75,9 @@ internal fun localShellFeatureUiContribution(
             loadUsageRequest = actions.requestUsage,
             composerHandoff = composerHandoff,
             skillDisplayNames = skillDisplayNames,
+            invocationOptions = invocationOptions,
+            pinnedInvocations = pinnedInvocations,
+            onToggleInvocation = onToggleInvocation,
             onUseWorkCapability = onUseWorkCapability,
             onConsumeComposerHandoff = onConsumeComposerHandoff,
             onOpenDrawer = onOpenDrawer,

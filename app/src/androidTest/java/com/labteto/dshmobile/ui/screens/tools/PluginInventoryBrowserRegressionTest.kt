@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -14,7 +15,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DshTheme
-import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
+import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -29,7 +30,7 @@ class PluginInventoryBrowserRegressionTest {
         compose.setContent {
             DshTheme {
                 PluginInventoryBrowser(
-                    localIds = listOf("local-builtin"),
+                    localIds = listOf("android-local-builtins"),
 
                     onBack = {},
                     onManageConnections = {},
@@ -48,7 +49,7 @@ class PluginInventoryBrowserRegressionTest {
             DshTheme {
                 PluginInventoryBrowser(
                     localIds = emptyList(),
-                    connectedServices = listOf(McpServerSnapshot(
+                    connectedServices = listOf(UiMcpServerSnapshot(
                         id = "local-mcp", transport = "http", target = "http://127.0.0.1:4312",
                         tools = listOf("search"),
                     )),
@@ -61,6 +62,9 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithTag("plugin-category-list").performScrollToIndex(1)
         compose.onNodeWithText("服务扩展 · 1").performClick()
         compose.onNodeWithText("local-mcp").assertIsDisplayed().performClick()
+        // A discovered registry entry is not a fresh connection-health observation.
+        compose.onNodeWithTag("plugin-detail-description")
+            .assertTextContains("连接健康未检测", substring = true).assertIsDisplayed()
         compose.onNodeWithTag("plugin-detail-primary-action").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, openedConnections) }
     }
@@ -105,7 +109,7 @@ class PluginInventoryBrowserRegressionTest {
             DshTheme {
                 PluginInventoryBrowser(
                     localIds = listOf("local-builtin"),
-                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry("report", "Build a report", true)),
+                    skills = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot("report", "Build a report", true)),
                     skillsOnly = true, onBack = {}, onManageConnections = {}, onReturnToChat = {},
                 )
             }
@@ -122,7 +126,7 @@ class PluginInventoryBrowserRegressionTest {
             DshTheme {
                 PluginInventoryBrowser(
                     localIds = emptyList(),
-                    presets = listOf(com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry(
+                    presets = listOf(com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot(
                         "research-check", "资料研究与核实", "查证材料", false,
                     )),
                     skillsOnly = true, onBack = {},
@@ -143,7 +147,7 @@ class PluginInventoryBrowserRegressionTest {
             DshTheme {
                 PluginInventoryBrowser(
                     localIds = emptyList(),
-                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                    skills = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot(
                         "my-skill", "My instructions", true,
                     )),
                     skillsOnly = true, onBack = {},
@@ -167,7 +171,7 @@ class PluginInventoryBrowserRegressionTest {
             DshTheme {
                 PluginInventoryBrowser(
                     localIds = emptyList(), skillsOnly = true,
-                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                    skills = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot(
                         "manual-review", "Only on user request", false,
                     )),
                     onBack = {}, onManageConnections = {}, onReturnToChat = {},
@@ -243,7 +247,7 @@ class PluginInventoryBrowserRegressionTest {
             DshTheme {
                 PluginInventoryBrowser(
                     localIds = emptyList(),
-                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                    skills = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot(
                         "research-check", "核查改动正确性并追踪异常、复盘及验证修复结果", true,
                     )),
                     skillsOnly = true,
@@ -285,7 +289,7 @@ class PluginInventoryBrowserRegressionTest {
             DshTheme {
                 PluginInventoryBrowser(
                     localIds = emptyList(),
-                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                    skills = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot(
                         "research-check", "核查改动正确性", true,
                     )),
                     skillsOnly = true, loading = true,

@@ -21,6 +21,11 @@ class JobContinuationPersistenceException(
     cause: Throwable,
 ) : IllegalStateException(message, cause)
 
+/** Persisted child execution pauses until a newly admitted root Work slice is available. */
+class JobExecutionSliceBoundaryException(
+    cause: Throwable,
+) : IllegalStateException("模型请求执行片已用尽；子任务检查点已保存，等待根任务下一执行片", cause)
+
 data class JobInfo(
     val id: String,
     val label: String,
@@ -117,6 +122,7 @@ class HarnessJobManager(
         job?.isCompleted != false &&
             (
                 status == "interrupted" ||
+                    status == "waiting_slice" ||
                     (isIdleContinuableAgent() && inbox.isNotEmpty())
             )
 
@@ -237,6 +243,11 @@ class HarnessJobManager(
         var previousJob: Job? = null
         val record = synchronized(lock) {
             val found = records[id] ?: return "后台任务不存在：$id"
+            // A supplied owner may bind an unowned legacy job, but must never steal a
+            // durable job belonging to another session during recovery.
+            if (ownerId != null && found.ownerId != null && ownerId != found.ownerId) {
+                return "后台任务不属于当前会话：$id"
+            }
             if ((ownerId ?: found.ownerId) in removingOwners) return "会话正在移除，无法恢复后台任务"
             if (found.resumeKind.isNullOrBlank()) return "后台任务不可恢复：$id"
             if (!found.isResumable()) {
@@ -251,7 +262,7 @@ class HarnessJobManager(
             previousUpdatedAt = found.updatedAt
             previousOwnerId = found.ownerId
             previousJob = found.job
-            if (found.isIdleContinuableAgent() && found.job?.isCompleted != false) {
+            if (found.job?.isCompleted != false) {
                 found.job = null
             }
             if (!ownerId.isNullOrBlank()) found.ownerId = ownerId
@@ -297,7 +308,7 @@ class HarnessJobManager(
             .filter { record ->
                 record.isContinuableAgent() &&
                     record.inbox.isNotEmpty() &&
-                    record.status in setOf("running", "dormant", "completed", "interrupted")
+                    record.status in setOf("running", "dormant", "completed", "interrupted", "waiting_slice")
             }
             .map(::snapshot)
     }
@@ -564,6 +575,13 @@ class HarnessJobManager(
                     }
                 }
                 throw cancelled
+            } catch (error: JobExecutionSliceBoundaryException) {
+                synchronized(lock) {
+                    if (record.status != "running") return@synchronized
+                    record.status = "waiting_slice"
+                    record.output = error.message.orEmpty()
+                    record.updatedAt = System.currentTimeMillis()
+                }
             } catch (error: JobContinuationPersistenceException) {
                 synchronized(lock) {
                     if (record.status != "running") return@synchronized
@@ -774,6 +792,7 @@ class HarnessJobManager(
                 !record.resumeKind.isNullOrBlank() &&
                     (
                         record.status == "interrupted" ||
+                            record.status == "waiting_slice" ||
                             record.isIdleContinuableAgent()
                         )
             if (record.status != "running" && !dormantPersistent) {
@@ -857,6 +876,7 @@ class HarnessJobManager(
                 persistent &&
                     (
                         found.status == "interrupted" ||
+                            found.status == "waiting_slice" ||
                             found.isIdleContinuableAgent()
                         )
             if (found.status != "running" && !requiresResume) {
@@ -1074,7 +1094,7 @@ class HarnessJobManager(
     }
 
     private fun Record.mustRetainForContinuation(): Boolean =
-        (status == "interrupted" && !resumeKind.isNullOrBlank()) ||
+        (status in setOf("interrupted", "waiting_slice") && !resumeKind.isNullOrBlank()) ||
             isIdleContinuableAgent()
 
     private fun Record.toJobInfo(): JobInfo {
@@ -1084,6 +1104,7 @@ class HarnessJobManager(
                 (
                     status == "running" ||
                         status == "interrupted" ||
+                        status == "waiting_slice" ||
                         isIdleContinuableAgent()
                     )
         return JobInfo(

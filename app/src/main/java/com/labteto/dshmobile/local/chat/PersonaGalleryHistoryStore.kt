@@ -18,6 +18,9 @@ import kotlinx.serialization.json.Json
 internal data class PersonaGalleryHistoryPage(
     val messages: List<LocalHarnessMessage>,
     val totalCount: Int,
+    val nextOffset: Long? = null,
+    val archiveLength: Long = 0,
+    val archiveModified: Long = 0,
 )
 
 /**
@@ -111,6 +114,17 @@ internal class PersonaGalleryHistoryStore(
         val file = archiveFile(entryId, storyId)
         repairTornTail(file)
         return tailInternal(file, limit.coerceIn(1, MAX_HISTORY_PAGE))
+    }
+
+    /** A byte boundary issued by the previous reverse read; results remain oldest-first. */
+    @Synchronized
+    fun pageBeforeChronological(entryId: String, storyId: String, before: Long?,
+        expectedLength: Long?, expectedModified: Long?, checkActive: () -> Unit): PersonaGalleryHistoryPage? {
+        val file = archiveFile(entryId, storyId)
+        repairTornTail(file)
+        if (before != null && (before !in 1..file.length() ||
+                expectedLength != file.length() || expectedModified != file.lastModified())) return null
+        return tailInternal(file, HOT_GALLERY_HISTORY_MESSAGES, beforeOffset = before, checkActive = checkActive)
     }
 
     @Synchronized
@@ -242,15 +256,36 @@ internal class PersonaGalleryHistoryStore(
         file: File,
         limit: Int,
         knownTotal: Int? = null,
+        beforeOffset: Long? = null,
+        checkActive: () -> Unit = {},
     ): PersonaGalleryHistoryPage {
         if (!file.isFile || file.length() == 0L) {
             return PersonaGalleryHistoryPage(emptyList(), knownTotal ?: 0)
         }
         val newestFirst = ArrayList<LocalHarnessMessage>(limit)
+        var nextOffset: Long? = null
         RandomAccessFile(file, "r").use { input ->
-            var cursor = input.length()
+            var cursor = beforeOffset ?: input.length()
+            require(cursor in 0..input.length()) { "人物归档分页位置已失效" }
+            if (cursor > 0L) {
+                input.seek(cursor - 1)
+                require(input.read() == '\n'.code) { "人物归档分页边界已失效" }
+            }
             val reversed = ByteArrayOutputStream()
             var skipTrailingNewline = true
+            val block = ByteArray(16 * 1024)
+            var blockStart = -1L
+            var blockSize = 0
+            fun readByte(position: Long): Int {
+                if (position < blockStart || position >= blockStart + blockSize) {
+                    checkActive()
+                    blockStart = maxOf(0L, position - block.size + 1L)
+                    blockSize = (position - blockStart + 1L).toInt()
+                    input.seek(blockStart)
+                    input.readFully(block, 0, blockSize)
+                }
+                return block[(position - blockStart).toInt()].toInt() and 0xff
+            }
 
             fun consume(): Boolean {
                 if (reversed.size() == 0) return true
@@ -264,12 +299,12 @@ internal class PersonaGalleryHistoryStore(
 
             while (cursor > 0L && newestFirst.size < limit) {
                 cursor--
-                input.seek(cursor)
-                val value = input.read()
+                val value = readByte(cursor)
                 if (value == '\n'.code) {
                     if (skipTrailingNewline) {
                         skipTrailingNewline = false
                     } else if (!consume()) {
+                        nextOffset = (cursor + 1).takeIf { cursor > 0L }
                         break
                     }
                 } else {
@@ -282,11 +317,11 @@ internal class PersonaGalleryHistoryStore(
             }
             if (newestFirst.size < limit) consume()
         }
-        val total = knownTotal ?: countRows(file)
-        return PersonaGalleryHistoryPage(newestFirst.asReversed(), total)
+        val total = knownTotal ?: countRows(file, checkActive)
+        return PersonaGalleryHistoryPage(newestFirst.asReversed(), total, nextOffset, file.length(), file.lastModified())
     }
 
-    private fun countRows(file: File): Int {
+    private fun countRows(file: File, checkActive: () -> Unit = {}): Int {
         val length = file.length()
         val modified = file.lastModified()
         rowCounts[file.absolutePath]?.let { previous ->
@@ -297,6 +332,7 @@ internal class PersonaGalleryHistoryStore(
             val buffer = ByteArray(16 * 1024)
             var sawBytes = false
             while (true) {
+                checkActive()
                 val read = input.read(buffer)
                 if (read < 0) break
                 if (read > 0) sawBytes = true

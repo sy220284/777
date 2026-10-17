@@ -6,6 +6,9 @@ import java.io.InputStream
 import java.io.RandomAccessFile
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.StandardOpenOption
+import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.StandardCopyOption
 import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
@@ -23,6 +26,8 @@ data class SessionEvent(
     val type: String,
     val createdAt: Long,
     val data: JsonObject,
+    @kotlinx.serialization.SerialName("schema_version")
+    val schemaVersion: Int = 1,
 )
 
 data class SessionEventFileSnapshot(
@@ -80,12 +85,83 @@ class SessionEventLog(
     private val nextSequence = pathState.nextSequence
 
     init {
-        synchronized(lock) {
-            if (nextSequence.get() == UNINITIALIZED_SEQUENCE) {
-                repairTornActiveTailUnsafe()
-                nextSequence.set(readNextSequence())
+        try {
+            synchronized(lock) { withProcessWriterLease { Unit } }
+        } catch (failure: Throwable) {
+            // A newer schema blocks opening this reader. Undo the path-reference
+            // allocated during field initialization so a later upgraded process
+            // is never attached to a leaked half-constructed log instance.
+            PATH_STATES.computeIfPresent(pathKey) { _, current ->
+                synchronized(current.lock) {
+                    current.references -= 1
+                    check(current.references >= 0) { "Session path lock reference underflow" }
+                    current.takeIf { it.references > 0 }
+                }
+            }
+            throw failure
+        }
+    }
+
+    /**
+     * Real OS writer lease in addition to the in-process path lock. IPC/second-process
+     * adapters may not allocate a duplicate sequence, interleave a row or rotate a
+     * segment while another process is committing a document/evidence CAS.
+     * Nested append() reuses its outer lock rather than relocking the same inode.
+     */
+    private inline fun <T> withProcessWriterLease(block: () -> T): T {
+        if (pathState.fileLeaseDepth > 0) {
+            pathState.fileLeaseDepth++
+            try { return block() } finally { pathState.fileLeaseDepth-- }
+        }
+        file.parentFile?.mkdirs()
+        return java.nio.channels.FileChannel.open(
+            File(file.path + ".writer.lock").toPath(),
+            StandardOpenOption.CREATE, StandardOpenOption.WRITE,
+        ).use { channel ->
+            channel.lock().use {
+                // A foreign process can clear and rewrite an equal-length event inside
+                // the same filesystem timestamp tick. Metadata alone is not a CAS proof.
+                // The OS lease pins the mutable tail while we read its last *actual*
+                // sequence, then append under that same lease. This is O(last event),
+                // not an unbounded scan of the archived session.
+                if (nextSequence.get() == UNINITIALIZED_SEQUENCE ||
+                    pathState.headStamp != durableHeadStamp()) {
+                    repairTornActiveTailUnsafe()
+                }
+                val committedNext = readActiveTailNextSequence()
+                if (nextSequence.get() != committedNext) nextSequence.set(committedNext)
+                pathState.fileLeaseDepth = 1
+                try { block() }
+                finally {
+                    // Even if the storage stat fails, do not keep a stale re-entrant
+                    // lease flag that could bypass all future OS writer locks.
+                    pathState.fileLeaseDepth = 0
+                    pathState.headStamp = durableHeadStamp()
+                }
             }
         }
+    }
+
+    private fun durableHeadStamp(): DurableHeadStamp? {
+        if (!Files.exists(file.toPath(), LinkOption.NOFOLLOW_LINKS)) return null
+        val attributes = Files.readAttributes(
+            file.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS,
+        )
+        check(attributes.isRegularFile) { "会话事件日志不是普通文件" }
+        return DurableHeadStamp(
+            attributes.fileKey()?.toString(), attributes.size(), attributes.lastModifiedTime().toMillis(),
+        )
+    }
+
+
+    /**
+     * Serializes a higher-level compare-and-append against all adapters for this durable path.
+     * The body must not suspend or leave the session lock. This is an in-process CAS lease;
+     * cross-process writers still require OS-level file coordination.
+     */
+    fun <T> withWriterLease(block: () -> T): T = synchronized(lock) {
+        check(!closed.get()) { "事件日志已关闭，拒绝新的比较写入" }
+        withProcessWriterLease(block)
     }
 
     fun diagnostics(): SessionEventLogDiagnostics = SessionEventLogDiagnostics(
@@ -95,12 +171,14 @@ class SessionEventLog(
     )
 
     fun append(type: String, data: JsonObject): SessionEvent = synchronized(lock) {
+        withProcessWriterLease {
         require(type.isNotBlank()) { "事件类型不能为空" }
         val event = SessionEvent(
             sequence = nextSequence.get(),
             type = type,
             createdAt = clock(),
             data = data,
+            schemaVersion = SessionEventSchemaCodec.CURRENT_VERSION,
         )
         val encoded = json.encodeToString(SessionEvent.serializer(), event) + "\n"
         val incomingBytes = encoded.toByteArray().size.toLong()
@@ -117,13 +195,14 @@ class SessionEventLog(
         }
         nextSequence.incrementAndGet()
         event
+        }
     }
 
     fun snapshot(): List<SessionEvent> = synchronized(lock) { readEventsUnsafe() }
 
     /** Latest durable event sequence, or -1 when the log is empty. */
     fun latestSequence(): Long = synchronized(lock) {
-        nextSequence.get().coerceAtLeast(0L) - 1L
+        withProcessWriterLease { nextSequence.get().coerceAtLeast(0L) - 1L }
     }
 
     /**
@@ -162,7 +241,7 @@ class SessionEventLog(
         sequenceExclusive: Long = Long.MAX_VALUE,
         limit: Int = DEFAULT_PAGE_EVENTS,
     ): List<SessionEvent> = synchronized(lock) {
-        pageBeforeNewestFirstUnsafe(sequenceExclusive, limit)
+        withProcessWriterLease { pageBeforeNewestFirstUnsafe(sequenceExclusive, limit) }
     }
 
     private fun pageBeforeNewestFirstUnsafe(
@@ -185,6 +264,7 @@ class SessionEventLog(
 
     /** One bounded chronological page newer than the cursor; old segments are skipped. */
     fun pageAfter(sequenceExclusive: Long, limit: Int = DEFAULT_PAGE_EVENTS): List<SessionEvent> = synchronized(lock) {
+        withProcessWriterLease {
         val wanted = limit.coerceIn(1, MAX_PAGE_EVENTS)
         val result = ArrayList<SessionEvent>(wanted)
         val sources = orderedFilesUnsafe()
@@ -203,12 +283,15 @@ class SessionEventLog(
                         if (event.sequence > sequenceExclusive) result += event
                     }
                 }
+            } catch (future: UnsupportedSessionEventSchemaVersion) {
+                throw future
             } catch (error: Exception) {
                 reportSegmentReadFailure(source, error)
             }
             if (result.size >= wanted) break
         }
         result
+        }
     }
 
     /**
@@ -449,6 +532,7 @@ class SessionEventLog(
 
     fun clear() {
         synchronized(lock) {
+            withProcessWriterLease {
             val prefix = "${file.name}.part-"
             file.parentFile?.listFiles().orEmpty()
                 .filter { it.isFile && it.name.startsWith(prefix) }
@@ -457,6 +541,7 @@ class SessionEventLog(
             file.writeText("")
             nextSequence.set(0L)
             CompressedEventSegmentCache.invalidate(pathKey)
+            }
         }
     }
 
@@ -484,6 +569,7 @@ class SessionEventLog(
      * release this lock immediately and stream a consistent export without blocking future turns.
      */
     fun openDurableFileSnapshot(): List<SessionEventFileSnapshot> = synchronized(lock) {
+        withProcessWriterLease {
         val opened = mutableListOf<SessionEventFileSnapshot>()
         try {
             orderedFilesUnsafe().forEach { source ->
@@ -499,10 +585,12 @@ class SessionEventLog(
             opened.forEach { runCatching { it.close() } }
             throw error
         }
+        }
     }
 
     /** Compress a bounded amount of old history without requiring another message in this session. */
     fun archiveLegacySegments(limit: Int = 1): Int = synchronized(lock) {
+        withProcessWriterLease {
         require(limit in 1..16) { "单次归档分片数须在 1..16 之间" }
         var archived = 0
         segmentFilesUnsafe().filter { !it.name.endsWith(COMPRESSED_SUFFIX) }
@@ -511,6 +599,7 @@ class SessionEventLog(
                 archived++
             }
         archived
+        }
     }
 
     /**
@@ -546,10 +635,46 @@ class SessionEventLog(
                 }
                 cursor--
             }
+            // A valid event with a missing terminal newline is NOT a torn
+            // command. Earlier writers may have fsynced its entire JSON body
+            // before dying, so discarding it can lose a committed mutation and
+            // permit the same action to be replayed. Verify under the OS lease.
+            val remaining = length - truncateTo
+            if (remaining in 1L..maxEventBytes && remaining <= Int.MAX_VALUE) {
+                active.seek(truncateTo)
+                val bytes = ByteArray(remaining.toInt())
+                active.readFully(bytes)
+                try {
+                    val recovered = SessionEventSchemaCodec.decode(
+                        json, String(bytes, Charsets.UTF_8).trimEnd('\r'),
+                    )
+                    check(recovered.sequence >= 0L)
+                    active.seek(length)
+                    active.writeByte('\n'.code)
+                    diagnosticSink("complete-tail-newline-restored", null)
+                    return
+                } catch (future: UnsupportedSessionEventSchemaVersion) {
+                    // Do not erase a complete future-format row or claim an
+                    // obsolete reader successfully recovered newer commands.
+                    throw future
+                } catch (_: Exception) {
+                    // An incomplete/invalid JSON body is crash-torn and may
+                    // safely be discarded; never append after an unclosed row.
+                }
+            }
             active.setLength(truncateTo)
         }
         malformedRows.incrementAndGet()
         diagnosticSink("torn-tail-truncated", null)
+    }
+
+    private fun readActiveTailNextSequence(): Long {
+        // The uncompressed active tail is the common case; immutable archives are
+        // consulted only for an empty/rotated/crash-damaged tail.
+        if (file.isFile && file.length() > 0L) {
+            readLastValidEventUnsafe(file)?.let { return it.sequence + 1L }
+        }
+        return readNextSequence()
     }
 
     private fun readNextSequence(): Long {
@@ -568,6 +693,8 @@ class SessionEventLog(
                     decodeEventOrNull(line)?.let { return it }
                 }
             }
+        } catch (future: UnsupportedSessionEventSchemaVersion) {
+            throw future
         } catch (error: Exception) {
             reportSegmentReadFailure(source, error)
         }
@@ -754,7 +881,9 @@ class SessionEventLog(
                         afterRemaining -= 1
                     }
                 }
-            } catch (error: Exception) {
+            } catch (future: UnsupportedSessionEventSchemaVersion) {
+            throw future
+        } catch (error: Exception) {
                 reportSegmentReadFailure(source, error)
             }
             right += 1
@@ -787,12 +916,17 @@ class SessionEventLog(
     }
 
     private fun decodeEventOrNull(line: String): SessionEvent? =
-        runCatching { json.decodeFromString(SessionEvent.serializer(), line) }
-            .getOrElse { error ->
-                malformedRows.incrementAndGet()
-                reportDiagnostic("malformed-row", error)
-                null
-            }
+        try {
+            SessionEventSchemaCodec.decode(json, line)
+        } catch (future: UnsupportedSessionEventSchemaVersion) {
+            // A newer writer could have committed commands this reader cannot
+            // understand. Do NOT silently skip/replay them.
+            throw future
+        } catch (error: Exception) {
+            malformedRows.incrementAndGet()
+            reportDiagnostic("malformed-row", error)
+            null
+        }
 
     private fun reportSegmentReadFailure(source: File, error: Throwable) {
         segmentReadFailures.incrementAndGet()
@@ -892,14 +1026,22 @@ class SessionEventLog(
     private inline fun File.forEachEventLine(block: (String) -> Unit) {
         try {
             eventReader().useLines { lines -> lines.forEach(block) }
+        } catch (future: UnsupportedSessionEventSchemaVersion) {
+            throw future
         } catch (error: Exception) {
             reportSegmentReadFailure(this, error)
         }
     }
 
+    private data class DurableHeadStamp(
+        val fileKey: String?, val bytes: Long, val lastModifiedMillis: Long,
+    )
+
     private class SharedPathState {
         val lock = Any()
         val nextSequence = AtomicLong(UNINITIALIZED_SEQUENCE)
+        var headStamp: DurableHeadStamp? = null
+        var fileLeaseDepth: Int = 0
         var references: Int = 0
     }
 

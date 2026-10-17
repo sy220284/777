@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <!-- Debug-only real V6 entry, never installed in release builds. -->
+        <activity
+            android:name=".ui.host.V6StandaloneDebugActivity"
+            android:exported="true"
+            android:theme="@style/Theme.DshMobile"
+            android:windowSoftInputMode="adjustResize" />
         <activity
             android:name=".ui.screens.local.ReadmeScreenshotActivity"
             android:excludeFromRecents="true"

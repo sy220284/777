@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.DeepSeekTokenUsage
+import com.labteto.dshmobile.local.usage.normalizedForAccounting
 import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.model.LocalModelRouteIdentity
@@ -14,6 +16,34 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TokenUsageAnalyticsTest {
+    @Test
+    fun conflictingProviderCacheCountersCannotExceedRealInputTokens() {
+        val contradictory = TokenUsageRecord(
+            requestId = "bad-breakdown", timestamp = 1L, model = "provider",
+            inputTokens = 10L, cacheHitTokens = 9L,
+            cacheMissTokens = 99L, cacheWriteTokens = 88L,
+        ).normalizedForAccounting()
+        assertEquals(10L, contradictory.inputTokens)
+        assertEquals(9L, contradictory.cacheHitTokens)
+        assertEquals(1L, contradictory.cacheMissTokens)
+        assertEquals(1L, contradictory.cacheWriteTokens)
+
+        val allCached = DeepSeekTokenUsage(
+            promptTokens = 10L, cacheHitTokens = 99L,
+            cacheMissTokens = 88L, cacheWriteTokens = 77L,
+        ).normalizedForAccounting()
+        assertEquals(10L, allCached.cacheHitTokens)
+        assertEquals(0L, allCached.cacheMissTokens)
+        assertEquals(0L, allCached.cacheWriteTokens)
+
+        val split = DeepSeekTokenUsage(
+            promptTokens = 10L, cacheHitTokens = 4L,
+            cacheMissTokens = 50L, cacheWriteTokens = 30L,
+        ).normalizedForAccounting()
+        assertEquals(6L, split.cacheMissTokens)
+        assertEquals(6L, split.cacheWriteTokens)
+    }
+
     @Test
     fun modelViewsIncludeWorkSubagentsAndChatWithoutCrossModelLeakage() {
         val t = Instant.parse("2026-10-11T00:00:00Z").toEpochMilli()

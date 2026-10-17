@@ -15,12 +15,14 @@ SKIP = {".git", ".gradle", "build", "node_modules", ".venv", "__pycache__"}
 DECL = r"(?:fun|class|object|interface|val|var|enum\s+class)\s+%s\b"
 GRADES = {
     "真实测试映射（仅局部）": "test_method_mapping",
+    "真实测试映射及具名源码声明（静态）": "test_and_named_code_declaration",
     "具名源码声明存在（静态，待调用链复核）": "named_code_declaration",
     "具名源码及仪表测试声明存在（静态，未执行）": "unexecuted_instrumentation",
     "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）": "ci_workflow_configuration",
     "历史生产文件仍存在（待入口复核）": "historical_file_only",
     "候选生产文件仍存在（不足以证明功能）": "candidate_file_only",
     "没有可确认的现行入口证据": "no_code_entry",
+    "旧源码已失效，需核实迁移或退役": "stale_production_source",
 }
 PROVIDERS = {
     "device": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
@@ -166,8 +168,10 @@ def audit():
         for symbol in item["named_symbols"]:
             if symbol["declaration_found"] and not any(declares(sources[src], symbol["symbol"]) for src in item["existing_production_sources"]):
                 raise ValueError("功能具名声明在真实源码中不存在：" + path)
-        if label in ("named_code_declaration", "unexecuted_instrumentation") and not any(x["declaration_found"] for x in item["named_symbols"]):
+        if label in ("named_code_declaration", "test_and_named_code_declaration", "unexecuted_instrumentation") and not any(x["declaration_found"] for x in item["named_symbols"]):
             raise ValueError("具名实现证据没有真实入口：" + path)
+        if label == "test_and_named_code_declaration" and not item["test_reference_count"]:
+            raise ValueError("混合证据等级缺少真实测试方法引用：" + path)
         if label == "ci_workflow_configuration" and not item.get("workflow_evidence"):
             raise ValueError("工程CI证据实际上无作业：" + path)
         by_grade[label] += 1
@@ -207,19 +211,37 @@ def audit():
         raise ValueError("矩阵中有测试方法映射的功能数不一致")
     if len(identities["bindings"]) != review["tracked_legacy_identities"]:
         raise ValueError("静态功能ID数量不一致")
+    # A missing legacy path is a *reported* migration/retirement question, not a
+    # valid active identity. The independent tree verifier separately recomputes the
+    # precise stale reasons. Never suppress or silently "repair" these stable IDs.
+    recorded_stale = {item["id"]: item for item in review["stale_legacy_identities"]}
+    if len(recorded_stale) != len(review["stale_legacy_identities"]):
+        raise ValueError("过期功能身份出现重复编号")
+    stale_identifiers = []
     for item in identities["bindings"]:
-        if item["path"] not in leaves or item["source"] not in sources or not declares(sources[item["source"]], item["entry"]):
-            raise ValueError("只读功能ID失效：" + item["id"])
+        valid = (item["path"] in leaves and item["source"] in sources
+                 and declares(sources[item["source"]], item["entry"]))
+        if valid and item["id"] in recorded_stale:
+            raise ValueError("已恢复的功能身份仍被标为过期：" + item["id"])
+        if not valid:
+            stale = recorded_stale.get(item["id"])
+            if stale is None or any(stale.get(k) != item[k] for k in ("path", "source", "entry")):
+                raise ValueError("只读功能ID失效却未完整登记待核迁移：" + item["id"])
+            stale_identifiers.append(item["id"])
+    if set(stale_identifiers) != set(recorded_stale):
+        raise ValueError("过期身份报告包含未在真实源码失效的记录")
     layers = Counter(v.split(" / ", 1)[0] for v in leaves)
     if not set(layers).issubset({"第一层｜产品功能与界面", "第二层｜共享运行能力", "第三层｜平台与工程保障"}):
         raise ValueError("功能树架构层级无效")
     unproven = [r["path"] for r in crosswalk if r["evidence_level"] == "no_code_entry"]
     if unproven != [r["path"] for r in review["unproven_feature_triage"]]:
         raise ValueError("旧工作流无证据功能清单遗漏")
-    specific = sum(by_grade[k] for k in ("test_method_mapping", "named_code_declaration",
-                                        "unexecuted_instrumentation", "ci_workflow_configuration"))
+    specific = sum(by_grade[k] for k in ("test_method_mapping", "test_and_named_code_declaration",
+                                        "named_code_declaration", "unexecuted_instrumentation",
+                                        "ci_workflow_configuration"))
     weak = by_grade["historical_file_only"] + by_grade["candidate_file_only"]
-    if specific + weak + len(unproven) != len(leaves):
+    pending_migration = by_grade["stale_production_source"]
+    if sum(by_grade.values()) != len(leaves) or specific + weak + len(unproven) + pending_migration != len(leaves):
         raise ValueError("各项证据数量没有完整覆盖全部树叶")
     return {
         "version": 1, "type": "independent_code_first_static_audit",
@@ -246,12 +268,15 @@ def audit():
         "comparison": {"categories": dict(sorted(by_grade.items())),
                        "concrete_static_source_or_test_or_job_evidence": specific,
                        "weak_file_only_evidence": weak, "no_confirmed_entry": len(unproven),
+                       "pending_source_migration": pending_migration,
                        "stable_static_identities": len(identities["bindings"]),
-                       "unproven_paths": unproven, "all_444_paths_crosschecked": True,
+                       "stale_legacy_identity_count": len(stale_identifiers),
+                       "stale_legacy_identity_ids": stale_identifiers,
+                       "unproven_paths": unproven, "all_paths_crosschecked": True,
                        "runtime_verified_independent_feature_count": None,
                        "runtime_count_limitation": "未逐功能证明调用可达、真实设备行为和模型效果；其中有工程及共享服务条目"},
         "per_leaf": crosswalk,
-        "interpretation": "444是功能树末级描述，不是已验收的独立产品功能总数。路由、工具和页面数量口径不同不能相加。",
+        "interpretation": f"{len(leaves)}项是功能树末级描述，不是已验收的独立产品功能总数。路由、工具和页面数量口径不同不能相加。",
     }
 
 def render_md(data):
@@ -277,7 +302,11 @@ def render_md(data):
         "",
         f"具有具体静态源码、测试方法或CI作业证据：{comp['concrete_static_source_or_test_or_job_evidence']}项；"
         f"只有生产文件存在线索：{comp['weak_file_only_evidence']}项；"
-        f"缺少可确认入口：{comp['no_confirmed_entry']}项。三类相加覆盖全部功能树叶节点。",
+        f"缺少可确认入口：{comp['no_confirmed_entry']}项；"
+        f"源码迁移或退役待复核：{comp['pending_source_migration']}项。四类相加覆盖全部功能树叶节点。",
+        "",
+        f"历史静态身份中有{comp['stale_legacy_identity_count']}项因原路径或代码变动待核迁移/退役；"
+        "它们仍保留原始编号，不据此删除或伪造现行能力。",
         "",
         "## 精确证据分层",
         "",
@@ -290,8 +319,8 @@ def render_md(data):
         f"验收矩阵映射{tests['mapped_tree_leaves']}项描述和{tests['unique_test_method_refs']}条唯一测试方法，"
         f"其中Android仪表测试源码{tests['android_test_methods_in_matrix']}条、单元测试源码{tests['unit_test_methods_in_matrix']}条。",
         "",
-        "代码级结论：444是产品与工程功能描述数量；具备具体静态证据的条目另行计数。"
-        "现阶段无法把444认定为独立、可达、已运行的功能总数；部分条目为共享代码或工程门禁。"
+        f"代码级结论：{tree['leaf_descriptions']}项是产品与工程功能描述数量；具备具体静态证据的条目另行计数。"
+        f"现阶段无法把这{tree['leaf_descriptions']}项认定为独立、可达、已运行的功能总数；部分条目为共享代码或工程门禁。"
         "对于缺少证据的条目，只列待核，不能仅凭扫描器删功能。",
         "",
         "## 未核实入口的功能描述",
@@ -312,6 +341,12 @@ def main():
     assert declares("class Hello() {}", "Hello")
     assert not declares("class Hello() {}", "World")
     if args.self_test:
+        # Every producer grade is recognized; mixed test/code and pending migration are distinct.
+        assert GRADES["真实测试映射及具名源码声明（静态）"] == "test_and_named_code_declaration"
+        assert GRADES["旧源码已失效，需核实迁移或退役"] == "stale_production_source"
+        sample = Counter(GRADES.values())
+        assert sum(sample.values()) == len(GRADES)
+        assert len(GRADES) == len(set(GRADES.values()))
         print("独立功能审计自测通过")
         return
     data = audit()

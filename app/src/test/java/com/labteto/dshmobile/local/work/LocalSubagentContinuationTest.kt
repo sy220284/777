@@ -6,10 +6,28 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 class LocalSubagentContinuationTest {
+    @Test
+    fun pausedSliceRequiresRootAdmissionAndDoesNotBecomeWritableCrashReplay() {
+        assertFalse(canResumeSubagentAtRootSlice("waiting_slice", rootSliceAdmitted = false))
+        assertTrue(canResumeSubagentAtRootSlice("waiting_slice", rootSliceAdmitted = true))
+        assertTrue(canResumeSubagentAtRootSlice("interrupted", rootSliceAdmitted = false))
+        assertFalse(requiresLeadVerificationForSubagentResume(
+            teamManaged = true, allowMutation = true, status = "waiting_slice",
+        ))
+        assertTrue(requiresLeadVerificationForSubagentResume(
+            teamManaged = true, allowMutation = true, status = "interrupted",
+        ))
+        assertFalse(requiresLeadVerificationForSubagentResume(
+            teamManaged = false, allowMutation = true, status = "interrupted",
+        ))
+    }
+
     @Test
     fun historyCheckpointRoundTripsHistoryClaimedMessagesAndStep() {
         val encoded = encodeLocalSubagentHistoryCheckpoint(

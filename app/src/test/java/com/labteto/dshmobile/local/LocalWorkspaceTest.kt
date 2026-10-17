@@ -332,6 +332,32 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun missingCommandExit127CarriesStderrAndConcreteRuntimeDiagnosis() = runBlocking {
+        val isolated = LocalWorkspace(root = root, shellExecutable = "/bin/sh")
+        val result = isolated.shellResult("this_777_command_does_not_exist", 5)
+        assertTrue(result.isError)
+        assertEquals(127, result.processExitCode)
+        assertEquals("PROCESS_EXIT_127", result.errorCode)
+        assertTrue(result.content.contains("标准错误："))
+        assertTrue(result.content.contains("PATH"))
+        assertTrue(result.recoveryHint.orEmpty().contains("内置运行时"))
+    }
+
+    @Test
+    fun nonExecutableFileExit126PreservesPermissionEvidence() = runBlocking {
+        val isolated = LocalWorkspace(root = root, shellExecutable = "/bin/sh")
+        val result = isolated.shellResult(
+            "printf 'echo ready\\n' > ./not_executable.sh; chmod 0644 ./not_executable.sh; ./not_executable.sh",
+            5,
+        )
+        assertTrue(result.isError)
+        assertEquals(126, result.processExitCode)
+        assertEquals("PROCESS_EXIT_126", result.errorCode)
+        assertTrue(result.content.contains("标准错误："))
+        assertTrue(result.recoveryHint.orEmpty().contains("执行权限"))
+    }
+
+    @Test
     fun backgroundShellFailureModeRejectsNonZeroExit() = runBlocking {
         val isolated = LocalWorkspace(root = root, shellExecutable = "/bin/sh")
 
@@ -477,6 +503,51 @@ class LocalWorkspaceTest {
         assertThrows(IllegalArgumentException::class.java) {
             workspace.readSkill("volatile")
         }
+    }
+
+    @Test
+    fun exportFileForUiStreamsRealBytesWithoutOpeningSharedOrParentDirectories() {
+        val original = ByteArray(300_000) { (it % 253).toByte() }
+        val nested = root.resolve("exports").apply { mkdirs() }
+        nested.resolve("large.bin").writeBytes(original)
+        val target = java.io.ByteArrayOutputStream()
+
+        assertEquals(original.size.toLong(),
+            workspace.exportFileForUi("exports/large.bin", target))
+        assertTrue(original.contentEquals(target.toByteArray()))
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.exportFileForUi("../other.txt", java.io.ByteArrayOutputStream())
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.exportFileForUi(root.resolve("exports/large.bin").absolutePath,
+                java.io.ByteArrayOutputStream())
+        }
+    }
+
+    @Test
+    fun exportFileForUiRejectsSymlinkEvenWhenTargetIsInsideWorkspace() {
+        root.resolve("original.txt").writeText("real-value")
+        Files.createSymbolicLink(root.resolve("alias.txt").toPath(),
+            root.resolve("original.txt").toPath())
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.exportFileForUi("alias.txt", java.io.ByteArrayOutputStream())
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.exportFileForUi("missing.bin", java.io.ByteArrayOutputStream())
+        }
+    }
+
+    @Test
+    fun exportFileForUiCannotReadOutsideSandboxThroughSymlink() {
+        external = Files.createTempDirectory("local-workspace-export-private").toFile().apply {
+            resolve("private.txt").writeText("do-not-export")
+        }
+        Files.createSymbolicLink(root.resolve("outside").toPath(), external!!.toPath())
+        val target = java.io.ByteArrayOutputStream()
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.exportFileForUi("outside/private.txt", target)
+        }
+        assertEquals(0, target.size())
     }
 
 }

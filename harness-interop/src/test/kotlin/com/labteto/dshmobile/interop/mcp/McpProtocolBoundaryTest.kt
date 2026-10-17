@@ -8,11 +8,13 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
+import okio.Buffer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -145,6 +147,80 @@ class McpProtocolBoundaryTest {
                 assertEquals(1, requests)
             } finally { transport.close() }
         }
+    }
+
+    @Test
+    fun initialMutatingRpcNeverTriggersHttpProtocolFallbackAfterServerError() = runTest {
+        val methods = mutableListOf<String>()
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            val buffer = Buffer()
+            chain.request().body!!.writeTo(buffer)
+            val payload = Json.parseToJsonElement(buffer.readUtf8()).jsonObject
+            val method = payload["method"]!!.jsonPrimitive.content
+            methods += method
+            val id = payload["id"]!!.jsonPrimitive.content
+            val code = if (method == "tools/call") 404 else 200
+            val body = if (code == 404) "{}" else
+                """{"jsonrpc":"2.0","id":$id,"result":{"tools":[]}}"""
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(code).message("simulated").body(body.toResponseBody()).build()
+        }.build()
+        val transport = McpNegotiatingHttpTransport("http://example.com/mcp", http, Json)
+        try {
+            val error = runCatching { transport.request("tools/call", buildJsonObject {
+                put("name", "irreversible"); put("arguments", buildJsonObject { })
+            }) }.exceptionOrNull()
+            assertTrue(error is McpHttpException)
+            assertEquals(404, (error as McpHttpException).statusCode)
+            assertEquals(listOf("tools/list", "tools/call"), methods)
+        } finally { transport.close() }
+    }
+
+    @Test
+    fun legacyFallbackProbesDiscoveryAndNeverReplaysARejectedMutation() = runTest {
+        val requests = mutableListOf<String>()
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            val buffer = Buffer()
+            chain.request().body!!.writeTo(buffer)
+            val payload = Json.parseToJsonElement(buffer.readUtf8()).jsonObject
+            val method = payload["method"]!!.jsonPrimitive.content
+            val protocol = chain.request().header("MCP-Protocol-Version")
+            requests += "$method@$protocol"
+            val id = payload["id"]?.jsonPrimitive?.content
+            val code: Int
+            val body: String
+            when {
+                method == "tools/list" && protocol == CURRENT_MCP_PROTOCOL_VERSION -> {
+                    code = 405; body = "{}"
+                }
+                method == "initialize" -> {
+                    code = 200
+                    body = """{"jsonrpc":"2.0","id":$id,"result":{"protocolVersion":"2025-06-18"}}"""
+                }
+                method == "notifications/initialized" -> { code = 202; body = "" }
+                method == "tools/list" -> {
+                    code = 200; body = """{"jsonrpc":"2.0","id":$id,"result":{"tools":[]}}"""
+                }
+                method == "tools/call" -> { code = 404; body = "{}" }
+                else -> error("unexpected method $method")
+            }
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(code).message("simulated")
+                .header("Mcp-Session-Id", "session")
+                .body(body.toResponseBody()).build()
+        }.build()
+        val transport = McpNegotiatingHttpTransport("http://example.com/mcp", http, Json)
+        try {
+            assertTrue(runCatching {
+                transport.request("tools/call", buildJsonObject { put("name", "write") })
+            }.exceptionOrNull() is McpHttpException)
+            assertEquals(
+                listOf("tools/list@$CURRENT_MCP_PROTOCOL_VERSION", "initialize@null",
+                    "notifications/initialized@$LEGACY_MCP_PROTOCOL_VERSION",
+                    "tools/list@$LEGACY_MCP_PROTOCOL_VERSION",
+                    "tools/call@$LEGACY_MCP_PROTOCOL_VERSION"), requests,
+            )
+        } finally { transport.close() }
     }
 
     @Test

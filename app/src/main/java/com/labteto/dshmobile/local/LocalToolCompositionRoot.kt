@@ -51,6 +51,8 @@ internal class LocalToolCompositionRoot @Inject constructor(
     private val activityProjection: LocalToolActivityProjectionRuntime,
     private val networkSearchSettings: LocalNetworkSearchSettings,
     private val skillManager: com.labteto.dshmobile.local.tools.LocalSkillManager,
+    private val pinnedInvocations: com.labteto.dshmobile.local.tools.LocalPinnedInvocationStore,
+    private val workspaceGate: com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate,
 ) : LocalToolsManagementPort {
     internal val workspace = sessionStorage.files.workspace
     internal val toolOutputStore = LocalToolOutputStore(
@@ -149,11 +151,36 @@ internal class LocalToolCompositionRoot @Inject constructor(
     internal val execution: LocalToolExecutionCoordinator by lazy {
         LocalToolExecutionCoordinator(
             registry = registry,
+            workspaceReadWriteGate = workspaceGate,
             currentSessionId = runtimeStateStore::currentSessionId,
             planMode = { runtimeStateStore.state.value.work.planMode },
             networkSearchEnabled = networkSearchSettings::isEnabled,
+            pinnedConnectorIds = {
+                pinnedInvocations.selected.value
+                    .filter { it.kind == com.labteto.dshmobile.local.tools.LocalPinnedInvocation.Kind.CONNECTOR }
+                    .map { it.id }
+            },
+            pinnedSkillIds = {
+                pinnedInvocations.selected.value
+                    .filter { it.kind == com.labteto.dshmobile.local.tools.LocalPinnedInvocation.Kind.SKILL }
+                    .map { it.id }
+            },
             requestApproval = { call, tool, summary ->
                 approvalRuntime.approve(call, tool, summary)
+            },
+            recordAuthorizationDecision = { sessionId, call, identity, approved ->
+                sessionStorage.eventLogs.get(sessionId).append(
+                    "tool/authorization-decision",
+                    buildJsonObject {
+                        put("session_id", sessionId)
+                        put("id", call.id)
+                        put("name", call.name)
+                        put("execution_id", identity.executionId)
+                        put("root_call_id", identity.rootCallId)
+                        put("approved", approved)
+                        identity.attributes["run_id"]?.let { put("run_id", it) }
+                    },
+                )
             },
             recordExecutionStarted = { sessionId, call, identity ->
                 sessionStorage.eventLogs.get(sessionId).append(
@@ -162,6 +189,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
                         put("id", call.id)
                         put("name", call.name)
                         put("execution_id", identity.executionId)
+                        put("read_only", identity.verifiedReadOnly)
                         put("attributes", kotlinx.serialization.json.JsonObject(identity.attributes.mapValues { kotlinx.serialization.json.JsonPrimitive(it.value) }))
                         put("root_call_id", identity.rootCallId)
                         identity.parentExecutionId?.let { put("parent_execution_id", it) }
@@ -181,7 +209,19 @@ internal class LocalToolCompositionRoot @Inject constructor(
     internal suspend fun installStartup() = plugins.installStartup()
 
     override suspend fun servers(): List<McpServerSnapshot> = plugins.mcpServers()
+    override fun serverChanges(): kotlinx.coroutines.flow.Flow<Unit> =
+        kotlinx.coroutines.flow.combine(plugins.mcpLifecycleRevisions(), pinnedInvocations.selected) { _, _ -> Unit }
+    override suspend fun lifecycleHistory(
+        incarnation: String?, afterSequence: Long,
+    ) = plugins.mcpLifecycleHistory(incarnation, afterSequence)
+    override suspend fun checkMcpHealth(serverId: String) = plugins.checkMcpHealth(serverId)
+    override fun selectedConnectorIds(): Set<String> =
+        pinnedInvocations.selected.value.asSequence()
+            .filter { it.kind == com.labteto.dshmobile.local.tools.LocalPinnedInvocation.Kind.CONNECTOR }
+            .map { it.id }.toSet()
 
+    override fun pluginLifecycleSnapshots() = plugins.lifecycleSnapshots()
+    override suspend fun recoverFailedPlugin(id: String) = plugins.recoverFailedPlugin(id)
     override fun installedPluginIds(): List<String> = plugins.installedPluginIds()
     override fun capabilityCatalogue(): List<com.labteto.dshmobile.local.tools.LocalToolCatalogueEntry> =
         registry.names().sorted().mapNotNull { name ->
@@ -191,9 +231,18 @@ internal class LocalToolCompositionRoot @Inject constructor(
                 com.labteto.dshmobile.local.tools.LocalToolCatalogueEntry(
                     tool.name, tool.metadata.family, tool.access.name, tool.approvalPolicy.name,
                     tool.metadata.requirements,
+                    (tool.schema["function"] as kotlinx.serialization.json.JsonObject)["parameters"]
+                        as kotlinx.serialization.json.JsonObject,
                 )
             }
         }
+
+    override fun validateCapabilityDraft(
+        name: String, expectedSchema: kotlinx.serialization.json.JsonObject, argumentsJson: String,
+    ): com.labteto.dshmobile.uicontract.UiToolDraftValidation =
+        com.labteto.dshmobile.local.tools.validateCapabilityDraftAgainstRegistry(
+            registry, name, expectedSchema, argumentsJson,
+        )
 
     override fun installedSkills() = skillManager.installed()
     override fun presetSkills() = skillManager.presets()

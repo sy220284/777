@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.harness.agent.QueuedAgentInputKind
+import com.labteto.dshmobile.harness.agent.AgentContinuationRef
 import com.labteto.dshmobile.local.agent.decodeLocalAgentInboxPending
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import kotlinx.serialization.json.buildJsonObject
@@ -37,6 +39,64 @@ class LocalAgentInboxPersistenceTest {
         )
 
         assertEquals(pending, decodeLocalAgentInboxPending(encoded))
+    }
+
+    @Test
+    fun internalWorkContinuationSurvivesQueueEventRecovery() {
+        val input = QueuedAgentInput(
+            content = "resume",
+            memoryInput = "",
+            modelMessage = buildJsonObject {
+                put("role", "system")
+                put("content", "resume")
+            },
+            id = "continuation-run-1",
+            kind = QueuedAgentInputKind.WORK_CONTINUATION,
+            continuation = AgentContinuationRef("run-1", 177L, "MODEL_STREAM_STALLED", 1, "message-42"),
+        )
+        val encoded = encodeLocalAgentInboxEvent("queued", listOf(input))
+        assertEquals(listOf(input), decodeLocalAgentInboxPending(encoded))
+        val recovered = decodeLocalAgentInboxPending(encoded)?.single()
+        assertEquals(QueuedAgentInputKind.WORK_CONTINUATION, recovered?.kind)
+        assertEquals(177L, recovered?.continuation?.checkpointSequence)
+        assertEquals("run-1", recovered?.continuation?.sourceRunId)
+        assertEquals("message-42", recovered?.continuation?.sourceMessageId)
+    }
+
+    @Test
+    fun incompleteGoalRevisionInRecoveredContinuationFailsClosed() {
+        val broken = buildJsonObject {
+            put("version", 1)
+            put("action", "queued")
+            put("pending", kotlinx.serialization.json.JsonArray(listOf(buildJsonObject {
+                put("id", "continuation-run-1")
+                put("content", "progress")
+                put("kind", "WORK_CONTINUATION")
+                put("continuation", buildJsonObject {
+                    put("source_run_id", "run-1")
+                    put("checkpoint_sequence", 42L)
+                    put("failure_code", "WORK_GOAL_PROGRESS")
+                    put("index", 1)
+                    put("goal_id", "goal-current")
+                    // Contract fingerprint is missing, so the command must not be resumed.
+                })
+            })))
+        }
+        assertNull(decodeLocalAgentInboxPending(broken))
+    }
+
+    @Test
+    fun malformedInputKindDoesNotBecomeUserRequest() {
+        val payload = buildJsonObject {
+            put("version", 1)
+            put("action", "queued")
+            put("pending", kotlinx.serialization.json.JsonArray(listOf(buildJsonObject {
+                put("id", "continuation-unknown")
+                put("content", "resume")
+                put("kind", "UNKNOWN_EXECUTION_ORIGIN")
+            })))
+        }
+        assertNull(decodeLocalAgentInboxPending(payload))
     }
 
     @Test

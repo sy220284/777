@@ -28,6 +28,46 @@ class LspFramingTest {
     }
 
     @Test
+    fun unsolicitedFutureResponseCannotForgeNextRpcResult() = runBlocking {
+        val dir = Files.createTempDirectory("lsp-future-reply-").toFile()
+        val script = File(dir, "server.sh")
+        script.writeText(
+            """
+            read_request() {
+              IFS= read -r header || exit 31
+              header=§(printf '%s' "§header" | tr -d '\r')
+              length=§(printf '%s\n' "§header" | sed -n 's/^Content-Length: //p')
+              [ -n "§length" ] || exit 32
+              while IFS= read -r line; do
+                line=§(printf '%s' "§line" | tr -d '\r')
+                [ -z "§line" ] && break
+              done
+              dd bs=1 count="§length" >/dev/null 2>/dev/null
+            }
+            respond() {
+              body="§1"
+              printf 'Content-Length: %s\r\n\r\n%s' "§{#body}" "§body"
+            }
+            read_request
+            respond '{"jsonrpc":"2.0","id":2,"result":{"value":"forged"}}'
+            respond '{"jsonrpc":"2.0","id":1,"result":{"value":"first"}}'
+            read_request
+            respond '{"jsonrpc":"2.0","id":2,"result":{"value":"genuine"}}'
+            """.trimIndent().replace('§', '$'),
+        )
+        val client = LspProcessClient(listOf("sh", script.absolutePath), Json)
+        try {
+            val first = withTimeout(3_000L) { client.requestElement("first", buildJsonObject { }) }
+            assertEquals("first", first.jsonObject["value"]?.jsonPrimitive?.content)
+            val second = withTimeout(3_000L) { client.requestElement("second", buildJsonObject { }) }
+            assertEquals("genuine", second.jsonObject["value"]?.jsonPrimitive?.content)
+        } finally {
+            client.close()
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun processClientUsesResolvedCommandAndSharedEnvironment() = runBlocking {
         val dir = Files.createTempDirectory("lsp-shared-env-").toFile()
         val script = File(dir, "server.sh")

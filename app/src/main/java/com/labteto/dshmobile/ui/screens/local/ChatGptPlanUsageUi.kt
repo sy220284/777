@@ -32,6 +32,8 @@ internal fun isChatGptModelRecoveryError(message: String?): Boolean =
     message.orEmpty().let {
         it.contains("ChatGPT 模型已不可用") ||
             it.contains("ChatGPT 账户授权") ||
+            it.contains("CHATGPT_PLAN_UNSUPPORTED_CAPABILITY") ||
+            it.contains("CHATGPT_PLAN_ROUTE_NOT_SUPPORTED") ||
             it.contains("ChatGPT 套餐请求未通过身份或授权校验") ||
             it.contains("ChatGPT 套餐请求被权限") ||
             it.contains("当前 ChatGPT 用户、工作区或策略") ||

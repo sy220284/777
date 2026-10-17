@@ -81,12 +81,15 @@ class OpenAiResponsesClient @Inject constructor(
                 requested = allowImageGeneration,
             ),
         )
-        validateRequestPayload(payload)
+        validateRequestPayload(payload, planSharing)
         val admissionTracker = LocalModelAdmissionTracker()
         val request = Request.Builder()
             .url(responsesEndpoint(baseUrl, planSharing))
             .header("Authorization", "Bearer $accessToken")
             .header("Content-Type", "application/json")
+            .apply {
+                if (planSharing) header("x-openai-internal-codex-responses-lite", "true")
+            }
             .post(payload.toString().toRequestBody(JSON_MEDIA).withModelAdmissionTracking(admissionTracker))
             .build()
         var admittedRequestId: String? = null
@@ -224,15 +227,51 @@ class OpenAiResponsesClient @Inject constructor(
     internal fun supportsOpenAiImageGenerationTool(model: String): Boolean =
         supportsOpenAiImageGenerationModel(model)
 
-    internal fun validateRequestPayload(payload: JsonObject) {
+    internal fun validateRequestPayload(payload: JsonObject, planSharing: Boolean = false) {
         val input = payload["input"] as? JsonArray
-        if (input.isNullOrEmpty()) {
+        val hasExecutableInput = input?.any { element ->
+            val item = element as? JsonObject
+            item != null && item["type"]?.jsonPrimitive?.contentOrNull != "additional_tools" &&
+                item["role"]?.jsonPrimitive?.contentOrNull != "developer"
+        } == true
+        if (!hasExecutableInput) {
             throw LocalModelException(
                 code = "RESPONSES_INPUT_REQUIRED",
                 message = "Responses API 请求缺少 input；后台任务必须提供至少一条实际输入，不能只发送 instructions。",
                 retryable = false,
             )
         }
+        if (!planSharing) return
+        if ((payload["tools"] as? JsonArray)?.isNotEmpty() == true) {
+            throw LocalModelException(
+                code = "CHATGPT_PLAN_UNSUPPORTED_CAPABILITY",
+                message = "ChatGPT 套餐 Responses Lite 只接受 input.additional_tools，禁止顶层 tools",
+                retryable = false,
+            )
+        }
+        val unsupportedTools = setOf(
+            "image_generation", "file_search", "code_interpreter", "computer",
+            "mcp", "tool_search", "programmatic_tool_calling",
+        )
+        val unsupported = input.mapNotNull { it as? JsonObject }
+            .filter { it["type"]?.jsonPrimitive?.contentOrNull == "additional_tools" }
+            .flatMap { (it["tools"] as? JsonArray).orEmpty() }
+            .mapNotNull { it as? JsonObject }
+            .firstOrNull { it["type"]?.jsonPrimitive?.contentOrNull in unsupportedTools }
+        if (unsupported != null) throw LocalModelException(
+            code = "CHATGPT_PLAN_UNSUPPORTED_CAPABILITY",
+            message = "ChatGPT 套餐授权不支持请求的 OpenAI 托管工具，请使用已配置的本地工具或其他服务。",
+            retryable = false,
+        )
+        val hasFileId = input.mapNotNull { it as? JsonObject }
+            .flatMap { (it["content"] as? JsonArray).orEmpty() }
+            .mapNotNull { it as? JsonObject }
+            .any { it["type"]?.jsonPrimitive?.contentOrNull == "input_file" && "file_id" in it }
+        if (hasFileId) throw LocalModelException(
+            code = "CHATGPT_PLAN_UNSUPPORTED_CAPABILITY",
+            message = "ChatGPT 套餐授权不支持 Files 上传接口的 file_id，请直接附加本地文件。",
+            retryable = false,
+        )
     }
 
     internal fun streamInterruptedAfterAdmission(
@@ -275,9 +314,11 @@ class OpenAiResponsesClient @Inject constructor(
         promptCacheTtl: String? = null,
         enableImageGenerationTool: Boolean = false,
     ): JsonObject = buildJsonObject {
+        // Do not trust caller opt-in: plan sharing never accepts image_generation.
+        val nativeImageToolEnabled = enableImageGenerationTool && !planSharing
         put("model", model)
-        responseInstructions(messages).takeIf(String::isNotBlank)?.let { put("instructions", it) }
-        put("input", responseInput(messages))
+        val systemInstructions = responseInstructions(messages)
+        if (!planSharing) systemInstructions.takeIf(String::isNotBlank)?.let { put("instructions", it) }
         put("store", false)
         put("stream", true)
         reasoningEffort?.let { effort ->
@@ -289,6 +330,7 @@ class OpenAiResponsesClient @Inject constructor(
             }
         }
         val cacheComparison = promptCacheComparisonResponseId
+            ?.takeIf { !planSharing }
             ?.trim()
             ?.takeIf(String::isNotBlank)
         val cacheTtl = promptCacheTtl
@@ -307,10 +349,43 @@ class OpenAiResponsesClient @Inject constructor(
             put("include", buildJsonArray { add(JsonPrimitive("reasoning.encrypted_content")) })
         }
         val adaptedTools = responseTools(tools, planSharing, enforceOpenAiToolSchema)
-        if (adaptedTools.isNotEmpty() || enableImageGenerationTool) {
+        // Codex Responses Lite accepts executable namespaces as a developer input item.
+        // Top-level tools belongs exclusively to the standard API-key Responses route.
+        if (planSharing && adaptedTools.isEmpty() && explicitNativeWebSearchRequested(messages)) {
+            throw LocalModelException(
+                code = "CHATGPT_PLAN_UNSUPPORTED_CAPABILITY",
+                message = "套餐共享 Responses Lite 不支持直接请求托管 web_search，请通过已配置的本地搜索工具执行",
+                retryable = false,
+            )
+        }
+        put("input", buildJsonArray {
+            if (planSharing && adaptedTools.isNotEmpty()) {
+                add(buildJsonObject {
+                    put("type", "additional_tools")
+                    put("id", "at_" + UUID.nameUUIDFromBytes(adaptedTools.toString().toByteArray(Charsets.UTF_8)))
+                    put("role", "developer")
+                    put("tools", adaptedTools)
+                })
+            }
+            if (planSharing && systemInstructions.isNotBlank()) {
+                add(buildJsonObject {
+                    put("type", "message")
+                    put("id", "msg_" + UUID.nameUUIDFromBytes(systemInstructions.toByteArray(Charsets.UTF_8)))
+                    put("role", "developer")
+                    put("content", buildJsonArray {
+                        add(buildJsonObject {
+                            put("type", "input_text")
+                            put("text", systemInstructions)
+                        })
+                    })
+                })
+            }
+            responseInput(messages).forEach(::add)
+        })
+        if (!planSharing && (adaptedTools.isNotEmpty() || nativeImageToolEnabled)) {
             put("tools", buildJsonArray {
                 adaptedTools.forEach(::add)
-                if (enableImageGenerationTool) {
+                if (nativeImageToolEnabled) {
                     add(buildJsonObject {
                         put("type", "image_generation")
                         if (explicitImageEditRequested(messages)) put("action", "edit")
@@ -320,7 +395,7 @@ class OpenAiResponsesClient @Inject constructor(
         }
         // Explicit image commands must invoke the actual built-in tool, not return a text-only workaround.
         // Only force when the current Responses request already passed native-tool eligibility.
-        if (enableImageGenerationTool && explicitImageGenerationRequested(messages)) {
+        if (nativeImageToolEnabled && explicitImageGenerationRequested(messages)) {
             put("tool_choice", buildJsonObject { put("type", LOCAL_NATIVE_TOOL_IMAGE_GENERATION) })
         }
         if (!planSharing) temperature?.let { put("temperature", it) }
@@ -361,6 +436,29 @@ class OpenAiResponsesClient @Inject constructor(
             else -> ""
         }
         return isExplicitImageGenerationRequest(text)
+    }
+
+    private fun explicitNativeWebSearchRequested(messages: List<JsonObject>): Boolean {
+        val latest = messages.lastOrNull() ?: return false
+        if (latest["role"]?.jsonPrimitive?.contentOrNull != "user") return false
+        val text = when (val content = latest["content"]) {
+            is JsonPrimitive -> content.contentOrNull.orEmpty()
+            is JsonArray -> content.mapNotNull { part ->
+                val obj = part as? JsonObject ?: return@mapNotNull null
+                if (obj["type"]?.jsonPrimitive?.contentOrNull in setOf("text", "input_text"))
+                    obj["text"]?.jsonPrimitive?.contentOrNull else null
+            }.joinToString(" ")
+            else -> ""
+        }.trim()
+        if (text.isEmpty() || text.length > 2_048 ||
+            text.startsWith("不要") || text.startsWith("别")) return false
+        val command = text.replaceFirst(
+            Regex("""^(?:请|帮我|帮忙|麻烦|现在|先|给我)\s*"""), "",
+        )
+        return Regex(
+            """^(?:联网搜索|上网搜索|网上搜索|网络搜索|联网查|上网查|网上查|搜索一下|搜一下|查一下最新|查找最新|search the web|browse the web)""",
+            RegexOption.IGNORE_CASE,
+        ).containsMatchIn(command)
     }
 
     private fun responseInstructions(messages: List<JsonObject>): String =
@@ -482,7 +580,7 @@ class OpenAiResponsesClient @Inject constructor(
                         if (source is JsonObject) source["detail"]?.let { put("detail", it) }
                     })
                 }
-                "input_text", "input_image" -> add(obj)
+                "input_text", "input_image", "input_file" -> add(obj)
                 else -> throw responseProtocolError("不支持的输入内容类型：${obj["type"]}")
             }
         }
@@ -519,6 +617,7 @@ class OpenAiResponsesClient @Inject constructor(
         val reasoning = StringBuilder()
         val toolCalls = mutableListOf<LocalToolCall>()
         val visibleParts = mutableListOf<JsonObject>()
+        val webSources = linkedMapOf<String, String>()
         var generatedImageCount = 0
         output.forEach { item ->
             val obj = item as? JsonObject ?: return@forEach
@@ -536,6 +635,17 @@ class OpenAiResponsesClient @Inject constructor(
                             visibleParts += buildJsonObject {
                                 put("type", "output_text")
                                 put("text", text)
+                            }
+                        }
+                        (visible["annotations"] as? JsonArray).orEmpty().forEach { item ->
+                            val annotation = item as? JsonObject ?: return@forEach
+                            if (annotation["type"]?.jsonPrimitive?.contentOrNull != "url_citation") return@forEach
+                            val url = annotation["url"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                            if (url.length in 12..2048 && runCatching {
+                                val parsed = java.net.URI(url)
+                                parsed.scheme in setOf("http", "https") && !parsed.host.isNullOrBlank()
+                            }.getOrDefault(false)) {
+                                webSources[url] = annotation["title"]?.jsonPrimitive?.contentOrNull.orEmpty()
                             }
                         }
                     }
@@ -579,8 +689,13 @@ class OpenAiResponsesClient @Inject constructor(
                 }
             }
         }
-        val settledContent = content.toString().takeIf(String::isNotBlank)
+        val rawContent = content.toString().takeIf(String::isNotBlank)
             ?: streamedContent.takeIf(String::isNotBlank)
+        val settledContent = if (webSources.isEmpty()) rawContent else buildString {
+            rawContent?.let { append(it).append("\n\n") }
+            append("参考来源：\n")
+            webSources.keys.take(8).forEach { append(it).append('\n') }
+        }.trimEnd()
         val settledReasoning = reasoning.toString().takeIf(String::isNotBlank)
             ?: streamedReasoning.takeIf(String::isNotBlank)
         val message = buildJsonObject {

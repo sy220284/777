@@ -93,16 +93,20 @@ internal fun recordWorkCompletionQuality(
     state: LocalHarnessState,
     eventLog: LocalSessionEventLog,
     workspaceRoot: java.io.File? = null,
-) {
-    if (state.usageMode != LocalUsageMode.WORK) return
+): LocalWorkGoalAssessment? {
+    if (state.usageMode != LocalUsageMode.WORK) return null
     val evidence = localWorkCompletionEvidence(
         state.work,
         state.work.goal?.let { localWorkDeliveryEvidence(eventLog, it, workspaceRoot) },
     )
+    // Work's official goal admission and turn settlement consume one evidence snapshot.
+    val assessment = assessLocalWorkGoal(state.work, evidence)
     val result = LocalWorkCompletionClaimGuard.inspectWithEvidence(text, evidence)
-    if (result.findings.isEmpty()) return
-    appendWorkOutputQuality(eventLog, result, evidence, state.work.goal?.status,
-        teamFailureDetail = state.work.team.failure, deliveryBlocked = result.changed)
+    if (result.findings.isNotEmpty()) {
+        appendWorkOutputQuality(eventLog, result, evidence, state.work.goal?.status,
+            teamFailureDetail = state.work.team.failure, deliveryBlocked = result.changed)
+    }
+    return assessment
 }
 
 /** Exactly one log projection for final display correction and turn-completed diagnostics. */

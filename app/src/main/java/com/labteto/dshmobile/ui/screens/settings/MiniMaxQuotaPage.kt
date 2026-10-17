@@ -193,7 +193,7 @@ private fun MiniMaxProviderUsage.Window.display(): String = when {
     notInPlan -> stringResource(R.string.minimax_quota_not_in_plan)
     unlimited -> stringResource(R.string.minimax_quota_unlimited)
     remaining != null && total != null ->
-        stringResource(R.string.minimax_quota_remaining_count, remaining, total)
+        stringResource(R.string.minimax_quota_remaining_count, requireNotNull(remaining), requireNotNull(total))
     remainingPercent != null ->
         stringResource(R.string.minimax_quota_remaining_percent,
             "%.1f".format(java.util.Locale.ROOT, remainingPercent))

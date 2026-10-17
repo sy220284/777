@@ -25,6 +25,47 @@ class ProcessRuntimeTest {
         assertFalse(result.timedOut)
     }
 
+    @Test(timeout = 15000)
+    fun shortLivedFailingCommandsRetainCompleteStderrToEof() = kotlinx.coroutines.runBlocking {
+        val runtime = AndroidProcessRuntime()
+        repeat(12) { attempt ->
+            val output = runtime.execute(ProcessRequest(
+                command = listOf(
+                    "sh", "-c", "printf start; printf permission-" + attempt + " >&2; exit 126",
+                ),
+                timeoutMillis = 3_000,
+            ))
+            assertEquals(126, output.exitCode)
+            assertEquals("start", output.stdout)
+            assertEquals("permission-$attempt", output.stderr)
+            assertFalse(output.timedOut)
+        }
+    }
+
+    @Test
+    fun executableDirectoriesCannotShadowRealCommandsOnLaterSearchPaths() = runTest {
+        val root = kotlin.io.path.createTempDirectory("runtime-command-type-").toFile()
+        try {
+            val first = File(root, "first").apply { assertTrue(mkdir()) }
+            val second = File(root, "second").apply { assertTrue(mkdir()) }
+            assertTrue(File(first, "my-tool").mkdir())
+            val executable = File(second, "my-tool").apply {
+                writeText("#!/bin/sh\nprintf real-executable")
+                assertTrue(setExecutable(true))
+            }
+            val runtime = AndroidProcessRuntime(extraSearchPaths = listOf(first, second))
+            assertFalse(runtime.isCommandAvailable("./missing-command"))
+            assertFalse(runtime.isCommandAvailable(File(first, "my-tool").absolutePath))
+            assertTrue(runtime.isCommandAvailable("my-tool"))
+            assertEquals(executable.absolutePath, runtime.resolveCommand(listOf("my-tool")).first())
+            val result = runtime.execute(ProcessRequest(listOf("my-tool"), timeoutMillis = 3_000))
+            assertEquals(0, result.exitCode)
+            assertEquals("real-executable", result.stdout)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test
     fun extraSearchPathCommandCanActuallyExecute() = runTest {
         val dir = kotlin.io.path.createTempDirectory("runtime-path-").toFile()

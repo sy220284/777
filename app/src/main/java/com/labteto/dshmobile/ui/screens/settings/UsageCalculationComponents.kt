@@ -533,6 +533,7 @@ internal fun actionLabel(action: TokenUsageAction): String = stringResource(
         TokenUsageAction.AUTOMATION_CHAT -> R.string.usage_action_automation_chat
         TokenUsageAction.WEB_SEARCH -> R.string.usage_action_web_search
         TokenUsageAction.VISION -> R.string.usage_action_vision
+        TokenUsageAction.UI_STRUCTURE_GENERATION -> R.string.usage_action_ui_generation
         TokenUsageAction.OTHER -> R.string.usage_action_other
     },
 )

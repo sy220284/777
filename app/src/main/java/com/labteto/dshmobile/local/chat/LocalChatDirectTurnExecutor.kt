@@ -72,6 +72,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
     private val postTurn: LocalChatContextRefreshCoordinator,
     private val queue: LocalChatQueueRuntime,
     private val webContext: LocalChatWebContextProvider,
+    private val replyDocuments: com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPublisher,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val imageCapabilities
@@ -127,6 +128,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             context = context,
             sessionId = sessionId,
             error = { runtimeStateStore.state.value.error },
+            onRejected = { runtimeStateStore.projection.publishError("系统拒绝前台执行，聊天回合未启动") },
         ) { runOwned(sessionId, input, memoryInput, sourceMessageId, replacingMessageId) }
     }
 
@@ -167,7 +169,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     requested = true,
                 )
             ) {
-                error("当前 GPT 套餐模型 ${snapshot.modelState.model} 未接通聊天生图工具。请切换支持生图的 GPT 型号，或在「+」中选择已配置的图片生成服务。")
+                error("ChatGPT 套餐授权暂不支持图片生成或编辑。请在「+」中选择已配置的独立图片生成服务，不会自动改为付费 API。")
             }
 
             val branchEligible = snapshot.transcriptIndex.branchingEligible
@@ -207,7 +209,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     currentFacts = snapshot.chat.chatContext.canonicalFactLines(),
                 ),
                 stableContext = turnContext.stablePrompt,
-                dynamicContext = dynamicContext,
+                dynamicContext = dynamicContext + "\n" + com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.instruction,
             )
             val selectedMode = resolveLocalImageInputMode(
                 snapshot.modelState.imageInputMode,
@@ -235,6 +237,8 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 ),
                 model = snapshot.modelState.model,
                 baseUrl = snapshot.modelState.baseUrl,
+                planSharing = snapshot.modelState.modelSelection.activeProfile?.authKind ==
+                    com.labteto.dshmobile.local.model.LocalModelAuthKind.CHATGPT_PLAN,
             )
             val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
 
@@ -244,6 +248,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 put("persona_id", turnContext.persona.id)
             })
 
+            val replyCards = LocalChatReplyUiDocuments()
             val rawReply = try {
                 modelRequests.complete(
                     snapshot = snapshot,
@@ -287,14 +292,14 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
 
             val reply = replyCoordinator.finalizeDirect(
                 snapshot = snapshot,
-                reply = rawReply,
+                reply = replyCards.capture(rawReply),
                 userMessage = input,
                 step = 1,
                 usage = ForegroundTokenUsageSeed(
                     turnId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
                 ),
                 retryRaw = { repairHint ->
-                    modelRequests.complete(
+                    replyCards.capture(modelRequests.complete(
                         snapshot = snapshot,
                         messages = withEphemeralContext(requestMessages, repairHint),
                         step = 1,
@@ -313,7 +318,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                                 runtimeStateStore.state.value.sessionId == sessionId
                         },
                         ),
-                    )
+                    ))
                 },
                 appendEvent = { type, data -> eventLog.append(type, data) },
             )
@@ -355,6 +360,15 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     JsonObject(assistantData + ("replaces" to JsonPrimitive(replacingMessageId)))
                 },
             )
+
+            assistantTranscript?.let { message ->
+                replyDocuments.publish(replyCards.definitionFor(reply.content.orEmpty()),
+                    com.labteto.dshmobile.uicontract.UiDocumentSource(sessionId, message.id,
+                        snapshot.chat.chatContext.generation,
+                        snapshot.modelState.modelSelection.activeProfileId, snapshot.projectId, false),
+                    replyCards.requestIdFor(reply.content.orEmpty()), snapshot.modelState.model,
+                    replyCards.reportedFor(reply.content.orEmpty()))
+            }
 
             if (replacingMessageId != null) {
                 check(

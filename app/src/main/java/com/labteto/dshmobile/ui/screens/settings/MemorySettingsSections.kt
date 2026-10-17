@@ -62,7 +62,7 @@ import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelCapability
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelProtocol
-import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
+import com.labteto.dshmobile.uicontract.UiSettingsSnapshot as LocalHarnessSettingsState
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
@@ -386,6 +386,7 @@ internal fun MemoryManagementCard(
                 }
             }
         }
+        page.notice?.let { Text(it, color = colors.textSecondary) }
         if (page.loading) Text(stringResource(R.string.common_loading), color = colors.textSecondary)
         page.error?.let { error ->
             Text(error, color = colors.dangerInk)

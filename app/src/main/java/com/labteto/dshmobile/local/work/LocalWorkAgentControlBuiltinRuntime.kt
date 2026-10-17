@@ -157,6 +157,20 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                     ?.mapNotNull { it.jsonPrimitive.contentOrNull }
                     .orEmpty(),
                 mode = args.optionalString("mode") ?: "parallel",
+                dependencies = args["dependencies"]?.let { matrix ->
+                    require(matrix is JsonArray) { "dependencies 必须为二维整数数组" }
+                    matrix.map { row ->
+                        require(row is JsonArray) { "dependencies 每项必须为整数数组" }
+                        row.map { cell ->
+                            val rawIndex = (cell as? JsonPrimitive)?.contentOrNull
+                            val index = rawIndex?.toIntOrNull()
+                            require(index != null && index >= 0 && rawIndex == index.toString()) {
+                                "dependencies 只接受零基非负整数索引"
+                            }
+                            index
+                        }
+                    }
+                } ?: emptyList(),
                 requiredEvidence = args["required_evidence"]
                     ?.jsonArray
                     ?.mapNotNull { it.jsonPrimitive.contentOrNull }

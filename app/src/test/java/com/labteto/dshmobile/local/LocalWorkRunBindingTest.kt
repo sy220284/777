@@ -101,7 +101,8 @@ class LocalWorkRunBindingTest {
 
     @Test fun schedulerChangeUpdatesDetachedWorkWithoutCopyingItsExecutionIntoChat() = runTest {
         val runtime = LocalRuntimeStateStore()
-        val visible = runtime.initialize(LocalHarnessState(sessionId = "chat", usageMode = LocalUsageMode.CHAT))
+        runtime.initialize(LocalHarnessState(sessionId = "chat", usageMode = LocalUsageMode.CHAT))
+        val visible = runtime.state
         val binding = binding(LocalHarnessState(
             sessionId = "work",
             kernel = LocalKernelState(running = true, queuedInputCount = 2, contextChars = 32_000),
@@ -165,8 +166,10 @@ class LocalWorkRunBindingTest {
 
     @Test fun failedCancellationLogCannotPreventRealWorkStopOrTeardown() = runTest {
         for (join in listOf(false, true)) {
-            val blocked = File(temporary.newFolder(), "blocked").apply { writeText("not a directory") }
-            val log = LocalSessionEventLog(File(blocked, "events.jsonl"), Json)
+            val blocked = temporary.newFolder("blocked-$join")
+            val eventFile = File(blocked, "events.jsonl")
+            val log = LocalSessionEventLog(eventFile, Json)
+            blockEventLogWritesAfterOpen(eventFile)
             val binding = LocalWorkRunBinding(
                 sessionId = "work",
                 initialState = LocalHarnessState(

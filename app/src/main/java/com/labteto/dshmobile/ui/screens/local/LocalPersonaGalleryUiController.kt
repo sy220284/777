@@ -1,9 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import android.content.Context
-import android.graphics.BitmapFactory
 import android.net.Uri
-import android.webkit.MimeTypeMap
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.ChatCharacterState
@@ -12,6 +10,8 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.presentation.PersonaPresetCatalog
+import com.labteto.dshmobile.local.presentation.toUiAuthoringDraft
+import com.labteto.dshmobile.local.presentation.toDomainPersona
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
@@ -21,7 +21,6 @@ import com.labteto.dshmobile.local.presentation.samePersonaIdentity
 import com.labteto.dshmobile.local.presentation.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.presentation.LocalChatUiFacade
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
-import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,16 +33,34 @@ import kotlinx.coroutines.withContext
 internal class LocalPersonaGalleryUiController(
     private val runtime: LocalUiRuntime,
     private val chatUi: LocalChatUiFacade,
+    private val galleryPort: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort,
+    private val selectionPort: com.labteto.dshmobile.uicontract.PersonaSelectionUiPort,
+    private val savePort: com.labteto.dshmobile.uicontract.PersonaGallerySaveUiPort,
+    private val portraitPort: com.labteto.dshmobile.uicontract.PersonaPortraitUiPort,
+    private val deletionPort: com.labteto.dshmobile.uicontract.PersonaGalleryDeletionUiPort,
+    private val currentPort: com.labteto.dshmobile.uicontract.CurrentPersonaUiPort,
+    private val authoringPort: com.labteto.dshmobile.uicontract.PersonaAuthoringUiPort,
+    private val transferPort: com.labteto.dshmobile.uicontract.PersonaTransferUiPort,
     private val appContext: Context,
     private val scope: CoroutineScope,
 ) {
+    private var lastInspection: com.labteto.dshmobile.uicontract.UiPersonaInspection? = null
     private val state = runtime.state
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
-    private val transfer = LocalPersonaTransferCoordinator(runtime, chatUi)
     val gallery: StateFlow<List<PersonaGalleryEntry>> = _gallery.asStateFlow()
     val personaPresets: List<PersonaPreset> = PersonaPresetCatalog.presets
-    suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = runSuspendResult {
-        runtime.chat.configureChatPersona(profile).getOrThrow()
+    suspend fun refresh() { _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() } }
+    suspend fun configureChatPersona(profile: PersonaProfile, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Result<Unit> = runSuspendResult {
+        val snapshot = (currentPort.read() as? com.labteto.dshmobile.uicontract.UiCurrentPersonaReceipt.Loaded)?.snapshot
+            ?: error(appContext.getString(R.string.ui_r4_gallery_inspection_stale))
+        check(expected != null && snapshot.target.identity == expected && snapshot.target.personaId == profile.id && snapshot.target.revision == profile.updatedAt) {
+            appContext.getString(R.string.ui_r4_gallery_inspection_stale)
+        }
+        when (val result = currentPort.save(snapshot.target, profile.toUiAuthoringDraft())) {
+            com.labteto.dshmobile.uicontract.UiCurrentPersonaReceipt.Saved -> Unit
+            is com.labteto.dshmobile.uicontract.UiCurrentPersonaReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_create_incomplete))
+            else -> error(appContext.getString(R.string.ui_r4_gallery_inspection_stale))
+        }
         _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
     }
     init {
@@ -57,44 +74,22 @@ suspend fun saveCurrentToGallery(
     existingId: String? = null,
     existingStoryId: String? = null,
     forceNewStory: Boolean = false,
-): Result<PersonaGalleryEntry> = runCatching {
-    val snapshot = state.value
-    check(
-        !snapshot.loading &&
-            !snapshot.kernel.running &&
-            snapshot.usageMode == LocalUsageMode.CHAT &&
-            !snapshot.chat.groupChat.enabled
-    ) {
-        "请在单人聊天空闲时保存人设与故事"
-    }
-    val completeHistory = withContext(Dispatchers.IO) {
-        runtime.session.completeTranscriptForUi(snapshot.sessionId)
-    }
-    val archiveHistory = if (
-        snapshot.chat.galleryStoryId == null &&
-        snapshot.chat.gallerySaveSuppressedThrough > 0L
-    ) {
-        completeHistory.filter { message ->
-            message.createdAt > snapshot.chat.gallerySaveSuppressedThrough
+    expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?,
+): Result<PersonaGalleryEntry> = runSuspendResult {
+    val identity = expected ?: error(appContext.getString(R.string.ui_r4_gallery_session_not_ready))
+    when (val result = savePort.save(com.labteto.dshmobile.uicontract.SavePersonaGalleryCommand(identity, notes, existingId, existingStoryId, forceNewStory))) {
+        is com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt.Saved -> {
+            if (result.sessionSync == com.labteto.dshmobile.uicontract.UiStorySessionSync.DEFERRED) {
+                withContext(Dispatchers.Main.immediate) {
+                    android.widget.Toast.makeText(appContext, R.string.local_gallery_story_saved_sync_pending, android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+            refresh()
+            gallery.value.firstOrNull { it.id == result.galleryId } ?: error(appContext.getString(R.string.ui_r4_gallery_saved_changed))
         }
-    } else {
-        completeHistory
+        com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt.Rejected -> error(appContext.getString(R.string.ui_r4_gallery_save_idle_single))
+        is com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_save_uncertain))
     }
-    val outcome = withContext(Dispatchers.IO) {
-        chatUi.saveGallery(
-            persona = snapshot.chat.chatPersona,
-            sourceSessionId = snapshot.sessionId,
-            history = archiveHistory,
-            chatState = snapshot.chat.chatState.withoutLegacyConversationContext(),
-            notes = notes,
-            chatContext = snapshot.chat.chatContext,
-            existingId = existingId ?: snapshot.chat.galleryId,
-            existingStoryId = existingStoryId ?: snapshot.chat.galleryStoryId,
-            forceNewStory = forceNewStory,
-        ).also { _gallery.value = chatUi.galleryEntries() }
-    }
-    runtime.chat.bindChatGallery(outcome.entry.id, outcome.storyId)
-    outcome.entry
 }
 
 fun hasUnsavedCurrentPersona(): Boolean {
@@ -143,184 +138,92 @@ fun currentGalleryNeedsUpdate(): Boolean =
 
 fun currentGalleryHasUnsavedChanges(): Boolean = hasUnsavedCurrentPersona()
 
-fun selectGalleryPersonaForCurrentChat(id: String): Boolean {
-    val snapshot = state.value
-    if (
-        snapshot.loading ||
-        snapshot.kernel.running ||
-        snapshot.usageMode != LocalUsageMode.CHAT ||
-        snapshot.transcriptIndex.hasDialogue
-    ) return false
-    val entry = gallery.value.firstOrNull { it.id == id } ?: return false
-    runtime.chat.selectChatPersona(entry.persona, galleryId = entry.id)
-    return true
+fun selectGalleryPersonaForCurrentChat(id: String, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Boolean {
+    val identity = expected ?: return false
+    return selectionPort.submit(com.labteto.dshmobile.uicontract.PersonaSelectionUiCommand.SelectForCurrentChat(identity, id)) ==
+        com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued
 }
 
-suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGalleryEntry> = runCatching {
-    check(!state.value.loading && !state.value.kernel.running) { "请在聊天空闲时新建人物" }
-    require(isMeaningfulGalleryPersona(profile)) { "请填写人物名称和至少一项人物设定" }
-    val entry = withContext(Dispatchers.IO) {
-        chatUi.saveGallery(
-            persona = profile,
-            sourceSessionId = "",
-            history = emptyList(),
-            chatState = ChatCharacterState(),
-            notes = "",
-        ).entry.also { _gallery.value = chatUi.galleryEntries() }
-    }
-    // Preserve the old create-and-use flow for an empty one-to-one chat.
-    // In an existing conversation or a group, creating a gallery card must not replace the cast.
-    if (!state.value.chat.groupChat.enabled) selectGalleryPersonaForCurrentChat(entry.id)
+suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGalleryEntry> = runSuspendResult {
+    val originalIdentity = selectionPort.snapshot().identity
+    val receipt = authoringPort.create(profile.toUiAuthoringDraft())
+    val saved = receipt as? com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Saved
+        ?: error((receipt as? com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Failed)?.message
+            ?: appContext.getString(R.string.ui_r4_gallery_create_incomplete))
+    refresh()
+    val entry = gallery.value.firstOrNull { it.id == saved.galleryId }
+        ?: error(appContext.getString(R.string.ui_r4_gallery_entry_gone))
+    selectGalleryPersonaForCurrentChat(entry.id, originalIdentity)
     entry
 }
 suspend fun autoFillNewPersona(current: PersonaProfile, description: String): Result<PersonaProfile> = runSuspendResult {
-    val snapshot = state.value
-    check(!snapshot.loading && !snapshot.kernel.running && snapshot.modelState.configured) { "请先配置模型并等待当前回复结束" }
-    chatUi.autoFillPersona(
-        model = snapshot.modelState.model, baseUrl = snapshot.modelState.baseUrl,
-        profileId = snapshot.modelState.modelSelection.activeProfileId,
-        current = current,
-        recentMessages = emptyList(),
-        description = description,
-    )
+    val identity = selectionPort.snapshot().identity
+        ?: error(appContext.getString(R.string.ui_r4_gallery_session_not_ready))
+    when (val result = authoringPort.suggest(identity, current.toUiAuthoringDraft(), description)) {
+        is com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Suggested -> result.draft.toDomainPersona(current)
+        is com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_model_not_ready))
+        else -> error(appContext.getString(R.string.ui_r4_gallery_model_not_ready))
+    }
 }
 
-suspend fun inspectGalleryPersona(
-    id: String,
-    storyId: String?,
-): Result<PersonaInspectionResult> {
-    val snapshot = state.value
-    if (snapshot.loading || snapshot.kernel.running || snapshot.usageMode != LocalUsageMode.CHAT) {
-        return Result.failure(IllegalStateException("请在聊天空闲时检查人物"))
-    }
-    if (!snapshot.modelState.configured) {
-        return Result.failure(IllegalStateException("请先配置聊天模型"))
-    }
-    val entry = gallery.value.firstOrNull { it.id == id }
-        ?: return Result.failure(IllegalStateException("图集条目已不存在"))
-    val story = entry.story(storyId)
-    val archived = story?.history.orEmpty()
-    val dialogue = if (
-        snapshot.chat.galleryId == id &&
-        snapshot.chat.galleryStoryId == story?.id
-    ) {
-        val recent = withContext(Dispatchers.IO) {
-            runtime.session.transcriptTailForUi(snapshot.sessionId, PERSONA_INSPECTION_RECENT_MESSAGES)
+suspend fun inspectGalleryPersona(id: String, storyId: String?): Result<PersonaInspectionResult> = runSuspendResult {
+    lastInspection = null
+    val identity = selectionPort.snapshot().identity
+        ?: error(appContext.getString(R.string.ui_r4_gallery_session_not_ready))
+    when (val result = authoringPort.inspect(identity, id, storyId)) {
+        is com.labteto.dshmobile.uicontract.UiPersonaInspectionReceipt.Inspected -> {
+            lastInspection = result.inspection
+            PersonaInspectionResult(
+                result.inspection.conflicts.map { com.labteto.dshmobile.local.chat.PersonaConflictFinding(it.field, it.fixedValue, it.observedValue, it.reason) },
+                result.inspection.suggestions.map { PersonaAppendSuggestion(it.field, it.value, it.evidence) })
         }
-        (archived + recent)
-            .distinctBy { it.id.ifBlank { "${it.role}|${it.createdAt}|${it.content}" } }
-    } else {
-        archived
-    }
-    return runSuspendResult {
-        chatUi.inspectPersona(
-            model = snapshot.modelState.model, baseUrl = snapshot.modelState.baseUrl,
-            profileId = snapshot.modelState.modelSelection.activeProfileId,
-            persona = entry.persona,
-            messages = dialogue,
-            chatContext = story?.chatContext,
-        )
+        is com.labteto.dshmobile.uicontract.UiPersonaInspectionReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_model_not_ready))
+        else -> error(appContext.getString(R.string.ui_r4_gallery_inspection_stale))
     }
 }
 
-suspend fun applyGallerySuggestions(
-    id: String,
-    suggestions: List<PersonaAppendSuggestion>,
-): Result<PersonaGalleryEntry> = runCatching {
-    val updated = withContext(Dispatchers.IO) {
-        check(suggestions.isNotEmpty()) { "请先选择要追加的内容" }
-        chatUi.applyGallerySuggestions(id, suggestions)
-            ?: error("图集条目已不存在")
+suspend fun applyGallerySuggestions(id: String, suggestions: List<PersonaAppendSuggestion>): Result<PersonaGalleryEntry> = runSuspendResult {
+    val inspection = lastInspection?.takeIf { it.galleryId == id }
+        ?: error(appContext.getString(R.string.ui_r4_gallery_inspection_stale))
+    val selected = suggestions.map { com.labteto.dshmobile.uicontract.UiPersonaSuggestion(it.field, it.value, it.evidence) }
+    check(selected.isNotEmpty() && selected.all { it in inspection.suggestions }) {
+        appContext.getString(R.string.ui_r4_gallery_inspection_stale)
     }
-    _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
-    if (state.value.chat.galleryId == id) {
-        runtime.chat.configureChatPersona(updated.persona)
-    }
-    updated
-}
-
-suspend fun setGalleryPortrait(id: String, uri: Uri): Result<PersonaGalleryEntry> = runCatching {
-    val previous = gallery.value.firstOrNull { it.id == id }
-        ?: error("图集条目已不存在")
-    val updated = withContext(Dispatchers.IO) {
-        val resolver = appContext.contentResolver
-        val mimeType = resolver.getType(uri).orEmpty()
-        require(mimeType.startsWith("image/")) { "请选择图片文件" }
-        val extension = MimeTypeMap.getSingleton()
-            .getExtensionFromMimeType(mimeType)
-            ?.lowercase()
-            ?.takeIf { it in setOf("jpg", "jpeg", "png", "webp", "heic", "heif") }
-            ?: "jpg"
-        val portraitDir = File(appContext.filesDir, "local-harness/chat/persona-portraits").apply {
-            check(exists() || mkdirs()) { appContext.getString(R.string.persona_gallery_portrait_dir_failed) }
+    when (val result = authoringPort.applySuggestions(id, inspection.revision, selected)) {
+        is com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Saved -> {
+            lastInspection = null
+            refresh()
+            gallery.value.firstOrNull { it.id == result.galleryId }
+                ?: error(appContext.getString(R.string.ui_r4_gallery_saved_changed))
         }
-        val safeId = id.replace(Regex("""[^A-Za-z0-9._-]"""), "_").take(80)
-        val target = File(portraitDir, "$safeId-${System.currentTimeMillis()}.$extension")
-        try {
-            resolver.openInputStream(uri)?.use { input ->
-                target.outputStream().buffered().use { output ->
-                    val buffer = ByteArray(16 * 1024)
-                    var total = 0L
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        total += count
-                        require(total <= MAX_PERSONA_PORTRAIT_BYTES) { "人物形象图过大，请选择 20MB 以内的图片" }
-                        output.write(buffer, 0, count)
-                    }
-                }
-            } ?: error("无法读取人物形象图")
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeFile(target.absolutePath, bounds)
-            require(bounds.outWidth > 0 && bounds.outHeight > 0) { "人物形象图无法识别" }
-            val saved = chatUi.updateGalleryPortrait(id, target.absolutePath)
-                ?: error("图集条目已不存在")
-            deleteManagedPortrait(previous.portraitPath, keepPath = target.absolutePath)
-            saved
-        } catch (error: Throwable) {
-            target.delete()
-            throw error
+        is com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_create_incomplete))
+        else -> error(appContext.getString(R.string.ui_r4_gallery_inspection_stale))
+    }
+}
+
+suspend fun setGalleryPortrait(id: String, uri: Uri): Result<PersonaGalleryEntry> =
+    updatePortrait(com.labteto.dshmobile.uicontract.PersonaPortraitUiCommand.Import(id, uri.toString()))
+
+suspend fun removeGalleryPortrait(id: String): Result<PersonaGalleryEntry> =
+    updatePortrait(com.labteto.dshmobile.uicontract.PersonaPortraitUiCommand.Remove(id))
+
+private suspend fun updatePortrait(command: com.labteto.dshmobile.uicontract.PersonaPortraitUiCommand): Result<PersonaGalleryEntry> = runSuspendResult {
+    when (val result = portraitPort.submit(command)) {
+        is com.labteto.dshmobile.uicontract.UiPersonaPortraitReceipt.Updated -> {
+            result.cleanupWarning?.let { warning -> withContext(Dispatchers.Main.immediate) {
+                android.widget.Toast.makeText(appContext, warning, android.widget.Toast.LENGTH_LONG).show()
+            } }
+            refresh()
+            gallery.value.firstOrNull { it.id == result.galleryId } ?: error(appContext.getString(R.string.ui_r4_gallery_portrait_changed))
         }
-    }
-    _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
-    updated
-}
-
-suspend fun removeGalleryPortrait(id: String): Result<PersonaGalleryEntry> = runCatching {
-    val previous = gallery.value.firstOrNull { it.id == id }
-        ?: error("图集条目已不存在")
-    val updated = withContext(Dispatchers.IO) {
-        chatUi.updateGalleryPortrait(id, "")
-            ?: error("图集条目已不存在")
-    }
-    deleteManagedPortrait(previous.portraitPath)
-    _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
-    updated
-}
-
-private fun deleteManagedPortrait(path: String, keepPath: String? = null) {
-    if (path.isBlank() || path == keepPath) return
-    runCatching {
-        val root = File(appContext.filesDir, "local-harness/chat/persona-portraits").canonicalFile
-        val candidate = File(path).canonicalFile
-        if (candidate.path.startsWith(root.path + File.separator)) candidate.delete()
+        com.labteto.dshmobile.uicontract.UiPersonaPortraitReceipt.Missing -> error(appContext.getString(R.string.ui_r4_gallery_persona_gone))
+        is com.labteto.dshmobile.uicontract.UiPersonaPortraitReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_portrait_uncertain))
     }
 }
 
-suspend fun editGalleryStoryDetails(id: String, storyId: String, notes: String, storyStage: String): Result<Unit> = runCatching {
+suspend fun renameGalleryStory(id: String, storyId: String, title: String): Result<Unit> = runSuspendResult {
+    requireGalleryCommit(galleryPort.submit(com.labteto.dshmobile.uicontract.PersonaGalleryUiCommand.RenameStory(id, storyId, title)))
     withContext(Dispatchers.IO) {
-        check(chatUi.updateStoryDetails(id, storyId, notes, storyStage)) { "图集故事已不存在" }
-        _gallery.value = chatUi.galleryEntries()
-    }
-    // The gallery owns persisted stage data. Update the active copy through Chat's
-    // session owner only when this very story is bound and the turn is idle.
-    runtime.chat.updateBoundStoryStage(id, storyId, storyStage)
-    Unit
-}
-
-suspend fun renameGalleryStory(id: String, storyId: String, title: String): Result<Unit> = runCatching {
-    withContext(Dispatchers.IO) {
-        check(chatUi.renameStory(id, storyId, title)) { "图集故事已不存在" }
         _gallery.value = chatUi.galleryEntries()
     }
 }
@@ -328,55 +231,56 @@ suspend fun renameGalleryStory(id: String, storyId: String, title: String): Resu
 internal suspend fun exportGalleryPersona(
     id: String,
     format: PersonaTransferFormat,
-): Result<PersonaTransferDocument> = runCatching { transfer.export(id, format) }
+): Result<PersonaTransferDocument> = runSuspendResult {
+    when (val result = transferPort.export(com.labteto.dshmobile.uicontract.ExportPersonaDocumentCommand(id, format))) {
+        is com.labteto.dshmobile.uicontract.UiPersonaExportReceipt.Ready -> result.document
+        is com.labteto.dshmobile.uicontract.UiPersonaExportReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_export_fail))
+    }
+}
 
 internal suspend fun importGalleryPersona(
     bytes: ByteArray,
     fileName: String?,
     mimeType: String?,
-): Result<PersonaGalleryEntry> = runCatching {
-    transfer.import(bytes, fileName, mimeType).also {
-        _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
-    }
-}
-
-suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runCatching {
-    val preset = PersonaPresetCatalog.find(id) ?: error("人物预置不存在")
-    val entry = withContext(Dispatchers.IO) {
-        PersonaPresetArtworkInstaller(appContext, chatUi).install(preset).also {
-            _gallery.value = runCatching { chatUi.galleryEntries() }.getOrDefault(_gallery.value)
+): Result<PersonaGalleryEntry> = runSuspendResult {
+    val result = transferPort.import(com.labteto.dshmobile.uicontract.ImportPersonaDocumentCommand(bytes, fileName, mimeType))
+    when (result) {
+        is com.labteto.dshmobile.uicontract.UiPersonaImportReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_import_uncertain))
+        is com.labteto.dshmobile.uicontract.UiPersonaImportReceipt.Imported -> {
+            _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
+            gallery.value.firstOrNull { it.id == result.galleryId } ?: error(appContext.getString(R.string.ui_r4_gallery_import_changed))
         }
     }
-    entry
 }
 
-suspend fun deleteGalleryEntry(id: String): Result<Unit> = runCatching {
-    val portraitPath = gallery.value.firstOrNull { it.id == id }?.portraitPath.orEmpty()
-    withContext(Dispatchers.IO) {
-        check(chatUi.deleteGallery(id)) { "图集条目已不存在" }
-        _gallery.value = chatUi.galleryEntries()
+suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runSuspendResult {
+    when (val result = authoringPort.installPreset(id)) {
+        is com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Saved -> {
+            refresh()
+            gallery.value.firstOrNull { it.id == result.galleryId }
+                ?: error(appContext.getString(R.string.ui_r4_gallery_saved_changed))
+        }
+        is com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt.Failed -> error(result.message ?: appContext.getString(R.string.ui_r4_gallery_create_incomplete))
+        else -> error(appContext.getString(R.string.ui_r4_gallery_preset_missing))
     }
-    deleteManagedPortrait(portraitPath)
-    runtime.chat.removeGroupChatMemberByGalleryId(id)
-    runtime.chat.clearChatGalleryBinding(expectedGalleryId = id)
-}
-
-suspend fun deleteGalleryStory(id: String, storyId: String): Result<Unit> = runCatching {
-    withContext(Dispatchers.IO) {
-        check(chatUi.deleteStory(id, storyId)) { "图集故事已不存在" }
-        _gallery.value = chatUi.galleryEntries()
-    }
-    runtime.chat.clearChatGalleryBinding(expectedGalleryId = id, expectedStoryId = storyId, keepCharacter = true)
 }
 
 suspend fun deleteGalleryHistoryMessage(
     id: String,
     storyId: String,
     messageKey: String,
-): Result<Unit> = runCatching {
+): Result<Unit> = runSuspendResult {
+    requireGalleryCommit(galleryPort.submit(com.labteto.dshmobile.uicontract.PersonaGalleryUiCommand.DeleteHistoryMessage(id, storyId, messageKey)))
     withContext(Dispatchers.IO) {
-        check(chatUi.deleteHistoryMessage(id, storyId, messageKey)) { "gallery_archive_missing" }
         _gallery.value = chatUi.galleryEntries()
+    }
+}
+
+private fun requireGalleryCommit(receipt: com.labteto.dshmobile.uicontract.UiCommandReceipt) {
+    when (receipt) {
+        com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted -> Unit
+        is com.labteto.dshmobile.uicontract.UiCommandReceipt.Failed -> error(receipt.message)
+        else -> error(appContext.getString(R.string.ui_r4_gallery_story_missing))
     }
 }
 
@@ -384,15 +288,11 @@ fun startFromGallery(
     id: String,
     storyId: String?,
     freshStory: Boolean,
+    expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?,
 ): Boolean {
-    val snapshot = state.value
-    if (snapshot.loading || snapshot.kernel.running || snapshot.usageMode != LocalUsageMode.CHAT) return false
-    val entry = gallery.value.firstOrNull { it.id == id } ?: return false
-    return runtime.chat.startSessionFromGallery(
-        entry = entry,
-        storyId = storyId,
-        freshStory = freshStory,
-    )
+    val identity = expected ?: return false
+    return selectionPort.submit(com.labteto.dshmobile.uicontract.PersonaSelectionUiCommand.StartStory(identity, id, storyId, freshStory)) ==
+        com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
 }
 
 

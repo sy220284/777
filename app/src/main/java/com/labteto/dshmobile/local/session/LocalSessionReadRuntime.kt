@@ -28,16 +28,19 @@ class LocalSessionReadRuntime @Inject internal constructor(
         eventLogFor = eventLogs::get,
     )
 
-    internal fun transcriptPage(
-        sessionId: String,
-        cursor: LocalTranscriptPageCursor? = null,
-        limit: Int = 200,
-    ): LocalTranscriptPage = LocalSessionTranscriptPager(
-        eventLog = access.authorizedLog(sessionId),
-    ).page(
-        cursor = cursor,
-        limit = limit,
-    )
+    internal data class ReadPage(val page: LocalTranscriptPage, val instance: String, val reset: Long)
+
+    internal fun transcriptPage(sessionId: String, cursor: LocalTranscriptPageCursor? = null,
+        limit: Int = 200): LocalTranscriptPage = transcriptReadPage(sessionId, cursor, limit).page
+
+    internal fun transcriptReadPage(sessionId: String, cursor: LocalTranscriptPageCursor?, limit: Int): ReadPage {
+        val log = access.authorizedLog(sessionId)
+        val instance = log.historyInstanceIdentity
+        val reset = log.resetGeneration
+        val page = LocalSessionTranscriptPager(log).page(cursor, limit)
+        check(!log.isClosed && log.resetGeneration == reset) { "历史已更新，请重新加载" }
+        return ReadPage(page, instance, reset)
+    }
 
     internal fun transcriptTail(sessionId: String, limit: Int): List<LocalHarnessMessage> =
         LocalSessionTranscriptPager(

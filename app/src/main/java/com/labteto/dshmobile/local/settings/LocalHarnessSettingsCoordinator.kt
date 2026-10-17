@@ -85,23 +85,26 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
 
     internal fun readUserProfile(): UserProfile = userProfileStore.read()
 
+    @Synchronized
     fun configureRuntimeLimits(
         mainMaxSteps: Int,
         subagentMaxSteps: Int,
         modelAttempts: Int,
     ) {
         val current = state
-        val agent = LocalAgentRuntimeSettings.write(
-            preferences = preferences,
-            mainMaxSteps = mainMaxSteps,
-            subagentMaxSteps = subagentMaxSteps,
-        )
-        val model = LocalModelExecutionSettings.write(
-            preferences = preferences,
+        // Validate both domains before staging anything. One editor publishes all
+        // runtime-limit keys together, so an invalid worker identity cannot leave
+        // only Agent limits updated while Model settings fail.
+        val agent = LocalAgentRuntimeSettings.prepare(mainMaxSteps, subagentMaxSteps)
+        val model = LocalModelExecutionSettings.prepare(
             modelAttempts = modelAttempts,
             workerProfileId = current.modelState.modelSelection.workerProfileId,
             availableProfiles = current.modelState.modelSelection.profiles,
         )
+        preferences.edit().also { editor ->
+            LocalAgentRuntimeSettings.stage(editor, agent)
+            LocalModelExecutionSettings.stage(editor, model)
+        }.apply()
         statePort.updateRuntimeLimits(
             mainMaxSteps = agent.mainMaxSteps,
             subagentMaxSteps = agent.subagentMaxSteps,

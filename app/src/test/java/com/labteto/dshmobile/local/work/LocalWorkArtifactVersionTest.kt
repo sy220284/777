@@ -3,6 +3,9 @@ package com.labteto.dshmobile.local.work
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import java.nio.file.Files
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -22,6 +25,20 @@ class LocalWorkArtifactVersionTest {
         assertEquals(version.sha256, localWorkFileSha256(root, version.path))
         file.writeText("version two")
         assertNotEquals(version.sha256, localWorkFileSha256(root, version.path))
+    }
+
+    @Test fun symbolicLinksInsideWorkspaceCannotForgeAnEvidenceHash() {
+        val root = tmp.newFolder("symlink-workspace")
+        val outside = tmp.newFile("outside.txt").apply { writeText("external") }
+        val link = root.resolve("fake.md")
+        Files.createSymbolicLink(link.toPath(), outside.toPath())
+        assertNull(localWorkFileSha256(root, "fake.md"))
+        val folder = root.resolve("folder").also { it.mkdir() }
+        folder.resolve("ok.md").writeText("inside")
+        Files.createSymbolicLink(root.resolve("alias").toPath(), folder.toPath())
+        assertNull(localWorkFileSha256(root, "alias/ok.md"))
+        assertNull(localWorkFileSha256(root, "fake.md/../folder/ok.md"))
+        assertTrue(localWorkFileSha256(root, "folder/ok.md")?.length == 64)
     }
 
     @Test fun unsafeAndUnconfirmedToolResultsCannotManufactureFileVersion() {

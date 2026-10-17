@@ -20,14 +20,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
 /** Bounded UI page; hasMore means older charged results remain available, not evicted. */
-data class LocalMediaPage(
-    val results: List<LocalMediaResult> = emptyList(),
-    val jobs: List<LocalMediaCreationJob> = emptyList(),
-    val videos: List<LocalMediaVideoTask> = emptyList(),
-    val hasMore: Boolean = false,
-    val unavailable: Boolean = false,
-)
-
 /** Media owns migration, atomic receipt/result state, indexed reads and recoverable deletion. */
 @Singleton
 class LocalMediaStore @Inject constructor(@ApplicationContext private val context: Context, private val json: Json) {
@@ -159,17 +151,36 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
     fun updateVideo(id: String, transition: (LocalMediaVideoTask) -> LocalMediaVideoTask) = update(id) { row ->
         row.copy(video = transition(row.video ?: error("视频任务不存在")))
     }
-    /** Immutable lookup of a saved local image before starting a new billable edit. */
-    @Synchronized
-    fun result(id: String): LocalMediaResult? = operation {
-        initialize()
-        database.get(id)?.takeUnless { it.deleted }?.result
-    }
-
+    /** Saved local media results are retrieved by the single result() lookup below. */
     @Synchronized
     fun videosNeedingDelivery(): List<LocalMediaVideoTask> = operation {
         initialize(); database.pending().mapNotNull { it.video }.filter { it.phase == LocalMediaVideoPhase.SUCCEEDED && it.fileName == null }
     }
+    @Synchronized
+    fun result(id: String): LocalMediaResult? = operation {
+        initialize(); database.get(id)?.takeUnless { it.deleted }?.result
+    }
+    /** Atomically attach a downloaded original image, rejecting deletion or changed provenance. */
+    @Synchronized
+    fun attachDownloadedImage(id: String, sessionId: String, expectedUrl: String, file: File): Boolean = operation {
+        initialize()
+        require(file.isFile && file.canonicalFile.parentFile == directory.canonicalFile) {
+            "下载图片不在媒体存储目录"
+        }
+        var attached = false
+        database.transaction {
+            val row = database.get(id)?.takeUnless { it.deleted } ?: return@transaction
+            val original = row.result ?: return@transaction
+            if (original.kind != LocalMediaKind.IMAGE.name || original.sessionId != sessionId ||
+                original.remoteUrl != expectedUrl || this@LocalMediaStore.file(original.fileName) != null)
+                return@transaction
+            database.put(row.copy(result = original.copy(fileName = file.name, remoteUrl = null)))
+            attached = true
+        }
+        if (attached) changed()
+        attached
+    }
+
     fun file(name: String?): File? = managedFile(name)?.takeIf(File::isFile)
     private fun managedFile(name: String?): File? = name?.takeIf { it.matches(Regex("[A-Za-z0-9._-]{1,180}")) && it !in setOf(".", "..") }
         ?.let { File(directory, it).takeIf { f -> f.canonicalFile.parentFile == directory.canonicalFile } }
@@ -184,6 +195,38 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
             database.put(row.copy(deleted = true))
         }
         changed() // Logical removal of receipt + result is one commit, before any file deletion.
+        cleanupDeleted()
+    }
+    /** Remove a visible result and all same-kind revisions so old audio cannot reappear. */
+    @Synchronized
+    fun removeRevisionFamily(id: String) = operation {
+        initialize()
+        val target = database.get(id)?.takeUnless { it.deleted } ?: return@operation
+        val sessionId = target.sessionId ?: return@operation
+        val rows = database.activeForSession(sessionId)
+        val byId = rows.associateBy { it.id }
+        fun kind(row: LocalMediaRecord): String? = row.result?.kind ?: row.video?.let { "VIDEO" } ?: row.job?.kind
+        fun parent(row: LocalMediaRecord): String? =
+            row.result?.revisionOf ?: row.video?.revisionOf ?: row.job?.revisionOf
+        val mediaKind = kind(target)
+        fun root(row: LocalMediaRecord): String {
+            var current = row
+            val seen = mutableSetOf(row.id)
+            repeat(100) {
+                val prior = parent(current)?.let(byId::get) ?: return current.id
+                if (kind(prior) != mediaKind || !seen.add(prior.id)) return current.id
+                current = prior
+            }
+            return current.id
+        }
+        val rootId = root(target)
+        val family = rows.filter { kind(it) == mediaKind && root(it) == rootId }
+        require(family.none { row ->
+            row.job?.phase in setOf(LocalMediaCreationPhase.PREPARING, LocalMediaCreationPhase.SUBMITTING, LocalMediaCreationPhase.SAVING) ||
+                row.video?.phase in setOf(LocalMediaVideoPhase.SUBMITTING, LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING)
+        }) { "同一成果仍在生成中，请等待完成后删除" }
+        database.transaction { family.forEach { database.put(it.copy(deleted = true)) } }
+        changed()
         cleanupDeleted()
     }
     @Synchronized

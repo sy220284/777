@@ -1,0 +1,2643 @@
+{
+  "contractVersion": 1,
+  "baseline": "8d4855ff",
+  "scope": "R4 单独 V6 UI Pack + 中立 Host/Feature Port；CODE_ONLY 当前仅以源码、Kotlin/Compose/JVM 契约与架构门禁签收，不要求设备/视觉验收。场景登记和Owner映射不等于173项动作行为签收。",
+  "scenes": [
+    {
+      "id": "conversation.chat",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "actions": [
+        "send",
+        "edit",
+        "resend",
+        "regenerate",
+        "select_variant"
+      ],
+      "recovery": "Shared Session + Chat branch + draft + reading anchor",
+      "v6": 1,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "send": {
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.SendMessage)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit": {
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.EditUserMessage)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "resend": {
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.EditUserMessage)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "regenerate": {
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.RegenerateReply)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "select_variant": {
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.SelectVariant)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "conversation.work",
+      "owner": "WORK",
+      "route": "HOME",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "actions": [
+        "send",
+        "stop",
+        "answer_question"
+      ],
+      "recovery": "Shared Session + Work run identity + draft",
+      "v6": 2,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "send": {
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.SendMessage)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "stop": {
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.Stop)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "answer_question": {
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.AnswerQuestion)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "conversation.header",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationHeaders.kt",
+      "actions": [
+        "rename",
+        "pin",
+        "delete"
+      ],
+      "recovery": "Session metadata + explicit delete confirmation",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "rename": {
+          "ownerPort": "ConversationShellUiPort.submit(ConversationShellUiCommand.Rename)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "pin": {
+          "ownerPort": "ConversationShellUiPort.submit(ConversationShellUiCommand.SetPinned)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "delete": {
+          "ownerPort": "SessionUiPort.delete",
+          "receiptType": "UiSessionDeletionReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "conversation.timeline",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptPresentation.kt",
+      "actions": [
+        "load_older",
+        "locate_message"
+      ],
+      "recovery": "Session EventLog cursor + message/branch anchor",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "load_older": {
+          "ownerPort": "UiMessageHistoryPort.messagePage(sessionId, cursor, limit) [V6 Session Owner]",
+          "receiptType": "UiMessagePage (owner-issued UiTranscriptCursor; bounded history)",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "locate_message": {
+          "ownerPort": "ConversationReadingUiPort.anchor(sessionId) / rememberAnchor(sessionId, anchor)",
+          "receiptType": "UiReadingAnchor",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "conversation.composer",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt",
+      "actions": [
+        "send",
+        "queue",
+        "import_attachment"
+      ],
+      "recovery": "Session-keyed draft; rejected send retains input",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "send": {
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.SendMessage) / WorkConversationUiPort.submit(WorkConversationUiCommand.SendMessage)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "queue": {
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.SendMessage) / WorkConversationUiPort.submit(WorkConversationUiCommand.SendMessage)",
+          "receiptType": "UiCommandReceipt.Queued / UiCommandReceipt.Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "import_attachment": {
+          "ownerPort": "AttachmentUiPort.import(ImportUiAttachmentCommand)",
+          "receiptType": "UiAttachmentReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "conversation.reply_status",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStreamingComponents.kt",
+      "actions": [
+        "stop"
+      ],
+      "recovery": "Model request/Work events; no invented percentages",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "stop": {
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.Stop) / WorkConversationUiPort.submit(WorkConversationUiCommand.Stop)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "conversation.message_actions",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationActionsMenu.kt",
+      "actions": [
+        "edit",
+        "regenerate",
+        "copy",
+        "select_variant"
+      ],
+      "recovery": "Message ID + branch/variant; old interactions invalidated",
+      "v6": 11,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "edit": {
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.EditUserMessage) / WorkConversationUiPort.submit(WorkConversationUiCommand.EditUserMessage)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "regenerate": {
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.RegenerateReply) / WorkConversationUiPort.submit(WorkConversationUiCommand.RegenerateReply)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "copy": {
+          "ownerPort": "Android LocalClipboardManager.setText(AnnotatedString(message.text))",
+          "receiptType": "OS clipboard write; screen-local feedback",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "select_variant": {
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.SelectVariant)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "conversation.edit",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalChatEditMessageSheet.kt",
+      "actions": [
+        "edit_and_resend"
+      ],
+      "recovery": "Message ID + edit draft; owner admission",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "edit_and_resend": {
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.EditUserMessage) / WorkConversationUiPort.submit(WorkConversationUiCommand.EditUserMessage)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "conversation.reader",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "actions": [
+        "read",
+        "close"
+      ],
+      "recovery": "Reading position + drawer origin",
+      "v6": 5,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "read": {
+          "ownerPort": "UiMessageHistoryPort.messagePage(sessionId, cursor, limit)",
+          "receiptType": "UiMessagePage",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "close": {
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "conversation.model_picker",
+      "owner": "SETTINGS",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalModelPickerSheet.kt",
+      "actions": [
+        "select_profile"
+      ],
+      "recovery": "Exact account/profile; running admission",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "select_profile": {
+          "ownerPort": "SettingsUiPort.submit(SettingsUiCommand.SelectModel(profileId))",
+          "receiptType": "SettingsUiReceipt.Submitted / Rejected / Failed",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "conversation.attachments",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SYSTEM",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "actions": [
+        "import_attachment"
+      ],
+      "recovery": "Android picker + attachment import owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "import_attachment": {
+          "ownerPort": "AttachmentUiPort.import(ImportUiAttachmentCommand)",
+          "receiptType": "UiAttachmentReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "chat.persona_picker",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDialogs.kt",
+      "actions": [
+        "select_persona"
+      ],
+      "recovery": "Gallery/persona identity",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "select_persona": {
+          "ownerPort": "PersonaSelectionUiPort.submit(PersonaSelectionUiCommand.SelectForCurrentChat)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "chat.persona_editor",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDialogs.kt",
+      "actions": [
+        "configure_persona",
+        "auto_fill"
+      ],
+      "recovery": "Persona draft; explicitly frozen model request",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "configure_persona": {
+          "ownerPort": "PersonaAuthoringUiPort.create(draft) / save(galleryId, expectedRevision, draft)",
+          "receiptType": "UiPersonaAuthoringReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "auto_fill": {
+          "ownerPort": "PersonaAuthoringUiPort.suggest(identity, draft, description)",
+          "receiptType": "UiPersonaAuthoringReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "chat.character_tuning",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterBehaviorTuningDialog.kt",
+      "actions": [
+        "configure_behavior"
+      ],
+      "recovery": "Chat profile values; no invented relationship facts",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "configure_behavior": {
+          "ownerPort": "CurrentPersonaUiPort.save(target, draft)",
+          "receiptType": "UiCurrentPersonaReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "chat.group_members",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/GroupChatMemberPicker.kt",
+      "actions": [
+        "configure_members",
+        "remove_member",
+        "enter_group_mode",
+        "leave_group_mode"
+      ],
+      "recovery": "Member gallery IDs + current session",
+      "v6": 10,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "configure_members": {
+          "ownerPort": "ChatGroupUiPort.submit(ChatGroupUiCommand.ConfigureMembers)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "remove_member": {
+          "ownerPort": "ChatGroupUiPort.submit(ChatGroupUiCommand.RemoveMember)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "enter_group_mode": {
+          "ownerPort": "ChatGroupUiPort.submit(ChatGroupUiCommand.SetGroupMode)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "leave_group_mode": {
+          "ownerPort": "ChatGroupUiPort.submit(ChatGroupUiCommand.SetGroupMode)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "chat.group_announcement",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/GroupAnnouncementSheet.kt",
+      "actions": [
+        "save_announcement"
+      ],
+      "recovery": "Current group session + owner validation",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "save_announcement": {
+          "ownerPort": "ChatGroupUiPort.submit(ChatGroupUiCommand.SaveAnnouncement)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "chat.reply_suggestions",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "actions": [
+        "generate_suggestions",
+        "send"
+      ],
+      "recovery": "Current turn + bounded generated suggestions",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "generate_suggestions": {
+          "ownerPort": "ReplySuggestionsUiPort.generate(identity)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "send": {
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.SendText(identity, selectedSuggestion.text)); optional draft prep via ConversationDraftUiPort.updateDraft",
+          "receiptType": "UiCommandReceipt (Accepted / Queued / NotAdmitted / Rejected / Failed / OutcomeUnknown)",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "chat.branches",
+      "owner": "CHAT",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "actions": [
+        "select_variant",
+        "regenerate"
+      ],
+      "recovery": "Chat branch identity + context generation",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "select_variant": {
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.SelectVariant)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "regenerate": {
+          "ownerPort": "ChatUiPort.submit(ChatUiCommand.RegenerateReply)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "work.approval",
+      "owner": "WORK",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalDialogComponents.kt",
+      "actions": [
+        "approve",
+        "deny"
+      ],
+      "recovery": "Existing pending callId + interaction waiter",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "approve": {
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.AnswerApproval)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "deny": {
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.AnswerApproval)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "work.steering_choice",
+      "owner": "WORK",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkSteeringChoice.kt",
+      "actions": [
+        "select_steering",
+        "dismiss_steering"
+      ],
+      "recovery": "Composer draft + explicit steering choice; queue/execution remain original Work owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "select_steering": {
+          "ownerPort": "WorkPolicyUiPort.submit(WorkPolicyUiCommand.SetApprovalMode(identity, mode))",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "dismiss_steering": {
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "work.question",
+      "owner": "WORK",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalDialogComponents.kt",
+      "actions": [
+        "answer_question",
+        "cancel_question"
+      ],
+      "recovery": "Existing question callId + owner waiter",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "answer_question": {
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.AnswerQuestion)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "cancel_question": {
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.AnswerQuestion)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "work.plan_review",
+      "owner": "WORK",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPlanReviewCard.kt",
+      "actions": [
+        "answer_question"
+      ],
+      "recovery": "Real pending plan question ID",
+      "v6": 19,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "answer_question": {
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.AnswerQuestion)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "work.team",
+      "owner": "WORK",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt",
+      "actions": [
+        "start_team",
+        "message_member",
+        "stop_member",
+        "stop_team",
+        "read_output"
+      ],
+      "recovery": "Team run/member identities + EventLog projection",
+      "v6": 17,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "start_team": {
+          "ownerPort": "WorkConversationUiPort.submit(WorkConversationUiCommand.SendWithTeam)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "message_member": {
+          "ownerPort": "WorkTeamUiPort.submit(WorkTeamUiCommand.SendMessage)",
+          "receiptType": "UiWorkTeamResult",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "stop_member": {
+          "ownerPort": "WorkTeamUiPort.submit(WorkTeamUiCommand.StopMember)",
+          "receiptType": "UiWorkTeamResult",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "stop_team": {
+          "ownerPort": "WorkTeamUiPort.submit(WorkTeamUiCommand.StopTeam)",
+          "receiptType": "UiWorkTeamResult",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "read_output": {
+          "ownerPort": "WorkTeamUiPort.readOutput",
+          "receiptType": "UiWorkTeamResult",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "work.capabilities",
+      "owner": "TOOLS",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheet.kt",
+      "actions": [
+        "use_capability"
+      ],
+      "recovery": "Tool descriptions; execution authority remains owner",
+      "v6": 14,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "use_capability": {
+          "ownerPort": "WorkConversationUiPort.snapshot() + ConversationDraftUiPort.updateDraft(sessionId, userProvidedCapabilityRequest) + UiHostSceneNavigation.navigate(conversation.work) [draft only; subsequent Work send is separate]",
+          "receiptType": "UiSceneNavigationResult / actual WorkConversationUiCommand.SendMessage receipt on separate user send",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "workspace.preview",
+      "owner": "WORK",
+      "route": "WORKSPACE",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt",
+      "actions": [
+        "preview",
+        "share",
+        "open_artifact"
+      ],
+      "recovery": "Workspace relative path + project identity",
+      "v6": 16,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "preview": {
+          "ownerPort": "FilesUiPort.previewWorkspaceFile(relativePath)",
+          "receiptType": "LocalWorkspaceFilePreview (read-only projection)",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "share": {
+          "ownerPort": "FilesUiPort.exportWorkspaceFile(relativePath, userSelectedSAFOutput) + Host Android ACTION_SEND with URI grant",
+          "receiptType": "Long bytes actually copied by original workspace Owner; explicit SAF picker grant; ACTION_SEND/VIEW host dispatch",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "open_artifact": {
+          "ownerPort": "FilesUiPort.exportWorkspaceFile(relativePath, userSelectedSAFOutput) + Host Android ACTION_VIEW with URI grant",
+          "receiptType": "Long bytes actually copied by original workspace Owner; explicit SAF picker grant; ACTION_SEND/VIEW host dispatch",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "chat.gallery",
+      "owner": "CHAT",
+      "route": "PERSONA_GALLERY",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryDialog.kt",
+      "actions": [
+        "save",
+        "import",
+        "export",
+        "start_story",
+        "read_archive",
+        "rename_story",
+        "delete_history_message",
+        "edit_story_details"
+      ],
+      "recovery": "Gallery/story identities + revision",
+      "v6": 6,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "save": {
+          "ownerPort": "PersonaGallerySaveUiPort.save(SavePersonaGalleryCommand)",
+          "receiptType": "UiPersonaGallerySaveReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "import": {
+          "ownerPort": "PersonaTransferUiPort.import(ImportPersonaDocumentCommand)",
+          "receiptType": "UiPersonaImportReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "export": {
+          "ownerPort": "PersonaTransferUiPort.export(ExportPersonaDocumentCommand)",
+          "receiptType": "UiPersonaExportReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "start_story": {
+          "ownerPort": "PersonaSelectionUiPort.submit(PersonaSelectionUiCommand.StartStory)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "read_archive": {
+          "ownerPort": "PersonaGalleryUiPort.read",
+          "receiptType": "UiPersonaGalleryReadReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "rename_story": {
+          "ownerPort": "PersonaGalleryUiPort.submit(PersonaGalleryUiCommand.RenameStory)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "delete_history_message": {
+          "ownerPort": "PersonaGalleryUiPort.submit(PersonaGalleryUiCommand.DeleteHistoryMessage)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_story_details": {
+          "ownerPort": "PersonaStoryUiPort.submit(PersonaStoryUiCommand.SaveDetails)",
+          "receiptType": "UiPersonaStoryReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "chat.gallery_profile",
+      "owner": "CHAT",
+      "route": "PERSONA_GALLERY",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryDialog.kt",
+      "actions": [
+        "edit",
+        "inspect",
+        "apply_suggestions"
+      ],
+      "recovery": "Saved profile/story identity; draft",
+      "v6": 7,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "edit": {
+          "ownerPort": "PersonaStoryUiPort.submit(PersonaStoryUiCommand.SaveDetails) / PersonaGalleryUiPort.submit(PersonaGalleryUiCommand.RenameStory)",
+          "receiptType": "UiPersonaStoryReceipt / UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "inspect": {
+          "ownerPort": "PersonaAuthoringUiPort.inspect(identity, galleryId, storyId)",
+          "receiptType": "UiPersonaInspectionReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "apply_suggestions": {
+          "ownerPort": "PersonaAuthoringUiPort.applySuggestions(galleryId, expectedRevision, selectedSuggestions)",
+          "receiptType": "UiPersonaAuthoringReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "chat.world_book",
+      "owner": "CHAT",
+      "route": "PERSONA_GALLERY",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaWorldBookEditor.kt",
+      "actions": [
+        "edit_world_book"
+      ],
+      "recovery": "Owner profile data; no second memory store",
+      "v6": 8,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "edit_world_book": {
+          "ownerPort": "PersonaAuthoringUiPort.save(galleryId, expectedRevision, draft.copy(lore=...))",
+          "receiptType": "UiPersonaAuthoringReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "chat.gallery_delete",
+      "owner": "CHAT",
+      "route": "PERSONA_GALLERY",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryDialog.kt",
+      "actions": [
+        "delete_persona",
+        "delete_story",
+        "delete_history"
+      ],
+      "recovery": "Explicit target IDs + confirmation",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "delete_persona": {
+          "ownerPort": "PersonaGalleryDeletionUiPort.delete(DeletePersonaGalleryCommand)",
+          "receiptType": "UiPersonaGalleryDeletionReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "delete_story": {
+          "ownerPort": "PersonaStoryUiPort.submit(PersonaStoryUiCommand.Delete)",
+          "receiptType": "UiPersonaStoryReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "delete_history": {
+          "ownerPort": "PersonaGalleryUiPort.submit(PersonaGalleryUiCommand.DeleteHistoryMessage)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "chat.gallery_portrait",
+      "owner": "CHAT",
+      "route": "PERSONA_GALLERY",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryDialog.kt",
+      "actions": [
+        "import_portrait",
+        "remove_portrait"
+      ],
+      "recovery": "Android file picker + gallery identity",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "import_portrait": {
+          "ownerPort": "PersonaPortraitUiPort.submit(PersonaPortraitUiCommand.Import)",
+          "receiptType": "UiPersonaPortraitReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "remove_portrait": {
+          "ownerPort": "PersonaPortraitUiPort.submit(PersonaPortraitUiCommand.Remove)",
+          "receiptType": "UiPersonaPortraitReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "chat.diary",
+      "owner": "CHAT",
+      "route": "DIARY",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalChatUiContribution.kt",
+      "actions": [
+        "correct_diary",
+        "deactivate_diary"
+      ],
+      "recovery": "Subject ID + entry ID + expected revision",
+      "v6": 9,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "correct_diary": {
+          "ownerPort": "DiaryUiPort.correct(UiDiaryCorrection)",
+          "receiptType": "UiDiaryReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "deactivate_diary": {
+          "ownerPort": "DiaryUiPort.deactivate(galleryId, diaryId, expectedUpdatedAt)",
+          "receiptType": "UiDiaryReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "automation.tasks",
+      "owner": "AUTOMATION",
+      "route": "TASKS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt",
+      "actions": [
+        "create",
+        "edit",
+        "enable",
+        "run",
+        "delete"
+      ],
+      "recovery": "Task ID + durable schedule generation",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "create": {
+          "ownerPort": "AutomationUiPort.submit(AutomationUiCommand.Create)",
+          "receiptType": "AutomationUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit": {
+          "ownerPort": "AutomationUiPort.submit(AutomationUiCommand.Update)",
+          "receiptType": "AutomationUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "enable": {
+          "ownerPort": "AutomationUiPort.submit(AutomationUiCommand.Pause|Resume)",
+          "receiptType": "AutomationUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "run": {
+          "ownerPort": "AutomationUiPort.submit(AutomationUiCommand.RunNow)",
+          "receiptType": "AutomationUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "delete": {
+          "ownerPort": "AutomationUiPort.submit(AutomationUiCommand.Delete)",
+          "receiptType": "AutomationUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "automation.editor",
+      "owner": "AUTOMATION",
+      "route": "TASKS",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskEditorComponents.kt",
+      "actions": [
+        "save_task"
+      ],
+      "recovery": "Task draft + generation; scheduler remains owner",
+      "v6": 13,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "save_task": {
+          "ownerPort": "AutomationUiPort.submit(AutomationUiCommand.Create|Update)",
+          "receiptType": "AutomationUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "automation.persona_interaction",
+      "owner": "AUTOMATION",
+      "route": "TASKS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/ChatAutomationScreen.kt",
+      "actions": [
+        "configure_schedule"
+      ],
+      "recovery": "Chat target + Automation task generation",
+      "v6": 12,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "configure_schedule": {
+          "ownerPort": "AutomationUiPort.submit(AutomationUiCommand.Create/Update/UpdatePolicy)",
+          "receiptType": "AutomationUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "tools.mcp",
+      "owner": "TOOLS",
+      "route": "TOOLS",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
+      "actions": [
+        "connect",
+        "disconnect",
+        "list_tools"
+      ],
+      "recovery": "Registry snapshot; connection health unknown until observed",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "connect": {
+          "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.ConnectHttp / ToolsUiCommand.ConnectStdio)",
+          "receiptType": "ToolsUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "disconnect": {
+          "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.Disconnect)",
+          "receiptType": "ToolsUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "list_tools": {
+          "ownerPort": "ToolsUiPort.servers()",
+          "receiptType": "List<UiMcpServerSnapshot>",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "tools.github",
+      "owner": "TOOLS",
+      "route": "TOOLS",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
+      "actions": [
+        "save_credentials",
+        "clear_credentials"
+      ],
+      "recovery": "Existing encrypted credential owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "save_credentials": {
+          "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.ConfigureGitHub)",
+          "receiptType": "ToolsUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "clear_credentials": {
+          "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.ClearGitHub)",
+          "receiptType": "ToolsUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "tools.plugins",
+      "owner": "TOOLS",
+      "route": "TOOLS",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
+      "actions": [
+        "install",
+        "enable",
+        "disable",
+        "remove"
+      ],
+      "recovery": "Plugin lifecycle/resource admission",
+      "v6": 18,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "install": {
+          "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.InstallPreset/CreateSkill/InstallGitHubSkill)",
+          "receiptType": "ToolsUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "enable": {
+          "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.SetSkillModelInvocable(id, true))",
+          "receiptType": "ToolsUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "disable": {
+          "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.SetSkillModelInvocable(id, false))",
+          "receiptType": "ToolsUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "remove": {
+          "ownerPort": "ToolsUiPort.submit(ToolsUiCommand.RemoveSkill)",
+          "receiptType": "ToolsUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "media.creation",
+      "owner": "MEDIA",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioSheet.kt",
+      "actions": [
+        "create",
+        "query",
+        "save"
+      ],
+      "recovery": "Media owner task/profile identity; unknown outcome no blind replay",
+      "v6": 38,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "create": {
+          "ownerPort": "MediaUiPort.submit(MediaUiCommand.Image|Speech|Transcribe|Video)",
+          "receiptType": "MediaUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "query": {
+          "ownerPort": "MediaUiPort.submit(MediaUiCommand.PollVideo)",
+          "receiptType": "MediaUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "save": {
+          "ownerPort": "MediaUiPort.assetForSession(resultId, sessionId) + exportToSessionAsset via user-picked Android SAF after creation result exists",
+          "receiptType": "MediaUiReceipt; V6DocumentMediaNode on creation/results page",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "media.result",
+      "owner": "MEDIA",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalGeneratedMediaMessage.kt",
+      "actions": [
+        "preview",
+        "save",
+        "play"
+      ],
+      "recovery": "Media sidecar task ID + session origin",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "preview": {
+          "ownerPort": "MediaUiPort.assetForSession(resultId, sessionId) -> V6DocumentMediaNode",
+          "receiptType": "UiMediaAsset? (Owner-scoped)",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "save": {
+          "ownerPort": "MediaUiPort.exportToSessionAsset(resultId, sessionId, userSelectedOutput)",
+          "receiptType": "MediaUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "play": {
+          "ownerPort": "MediaUiPort.assetForSession(resultId, sessionId) -> V6AudioPlayback / V6VideoPlayback",
+          "receiptType": "UiMediaAsset? + Android MediaPlayer/VideoView local playback state",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "shell.new_session",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDialogs.kt",
+      "actions": [
+        "create_chat",
+        "create_work",
+        "create_group"
+      ],
+      "recovery": "Committed session selects mode; draft not silently dropped",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "create_chat": {
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.Create(mode=INDEPENDENT, usageMode=CHAT))",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "create_work": {
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.Create(mode=INDEPENDENT, usageMode=WORK))",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "create_group": {
+          "ownerPort": "ChatGroupUiPort.submit(ChatGroupUiCommand.CreateGroupSession)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "shell.search",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6AutomationShellScene.kt",
+      "actions": [
+        "search",
+        "open_result"
+      ],
+      "recovery": "Source session/task/file anchor + return chain",
+      "v6": 33,
+      "implementation": "独立V6 Renderer通过原Owner Port已接线；待验证",
+      "acceptance": "待代码验证（本轮不要求设备验收）",
+      "actionProof": {
+        "search": {
+          "ownerPort": "UiMessageHistoryPort.searchMessages(sessionId, query, cursor)",
+          "receiptType": "UiMessageSearchReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "open_result": {
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.Open(sessionId))",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "shell.onboarding",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6AutomationShellScene.kt",
+      "actions": [
+        "configure",
+        "finish"
+      ],
+      "recovery": "Explicit onboarding preference",
+      "v6": 31,
+      "implementation": "独立V6 Renderer通过原Owner Port已接线；待验证",
+      "acceptance": "待代码验证（本轮不要求设备验收）",
+      "actionProof": {
+        "configure": {
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.SelectMode)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "finish": {
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.Create)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "shell.empty",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6AutomationShellScene.kt",
+      "actions": [
+        "configure",
+        "create_session"
+      ],
+      "recovery": "No inferred successful state",
+      "v6": 34,
+      "implementation": "独立V6 Renderer通过原Owner Port已接线；待验证",
+      "acceptance": "待代码验证（本轮不要求设备验收）",
+      "actionProof": {
+        "configure": {
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.SelectMode)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "create_session": {
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.Create)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "shell.error",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6AutomationShellScene.kt",
+      "actions": [
+        "retry_if_owner_allows"
+      ],
+      "recovery": "Owner error/retry capability; sensitive values excluded",
+      "v6": 35,
+      "implementation": "独立V6 Renderer通过原Owner Port已接线；待验证",
+      "acceptance": "待代码验证（本轮不要求设备验收）",
+      "actionProof": {
+        "retry_if_owner_allows": {
+          "ownerPort": "SessionUiPort.submit(SessionUiCommand.Open(currentSessionId)) guarded by current UiSessionIdentity [reopen only; no tool/model retry]",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "shell.notifications",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SYSTEM",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalApplicationUiHost.kt",
+      "actions": [
+        "open_session"
+      ],
+      "recovery": "Notification source session + consumed deep link",
+      "v6": 36,
+      "implementation": "中立Host系统服务已接线；待验证",
+      "acceptance": "待代码验证（本轮不要求设备验收）",
+      "actionProof": {
+        "open_session": {
+          "ownerPort": "MainActivity.notificationLocalSession(intent) -> AppRoot -> LocalApplicationUiHost notificationSessions.snapshots.first(!loading) -> SessionUiPort.submit(SessionUiCommand.Open(id)) with catalog membership; UiHostSceneNavigation.openDeepLink(route.home)",
+          "receiptType": "UiCommandReceipt.Accepted / Queued -> UiSceneNavigationResult.Changed; invalid/missing targets explicitly rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "system.permissions",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "SYSTEM",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalHostDeviceCapabilitiesOwner.kt",
+      "actions": [
+        "request_permission"
+      ],
+      "recovery": "Android grants; UI cannot manufacture authorization",
+      "v6": 32,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "request_permission": {
+          "ownerPort": "HostPreferencesUiPort.openSystemPermissions()",
+          "receiptType": "Boolean (Host native system permission page)",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.root",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, childSettingsScene)",
+          "receiptType": "UiSceneNavigationResult",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.session",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": "V6SessionSettingsScene -> UiHostSceneNavigation.navigate(settings.chat)",
+          "receiptType": "UiSceneNavigationResult; SettingsUiPort.submit in child scene",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.appearance",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": "HostPreferencesUiPort.submit(UiHostPreferencesCommand.Appearance)",
+          "receiptType": "Boolean (Host DataStore 保存结果)",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.chat",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": "SettingsUiPort.submit(SettingsUiCommand.StyleGuard/AddStylePhrase/RemoveStylePhrase/ClearStyleHits)",
+          "receiptType": "SettingsUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.models",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": "SettingsUiPort.save(SettingsUiCommand.SaveModel) / submit(SelectModel/RemoveModel)",
+          "receiptType": "SettingsUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.model_performance",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": "ModelPerformanceUiPort.submit(SetReasoning / SetTemperature)",
+          "receiptType": "ModelPerformanceUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.account",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": "SettingsUiPort.connectChatGpt / selectChatGptAccount / disconnectChatGptAccount / removeChatGptAccount",
+          "receiptType": "suspend Owner outcome + ChatGptUiState flow",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.model_usage",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "filter_usage_by_model"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "filter_usage_by_model": {
+          "ownerPort": "UsageUiPort.snapshot().byModel / requestDetail(requestId); UI-only model filter",
+          "receiptType": "TokenUsageAnalyticsSnapshot / TokenUsageRecord? read-only",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.minimax_quota",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "query_provider_quota"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "query_provider_quota": {
+          "ownerPort": "SettingsUiPort.queryMiniMaxQuota(configuredProfile)",
+          "receiptType": "MiniMaxProviderUsage, or explicit network error",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.pricing",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "refresh_official_prices"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "refresh_official_prices": {
+          "ownerPort": "PricingUiPort.refreshOfficial() + PricingUiPort.snapshots",
+          "receiptType": "PricingUiReceipt / UiProviderPricingSnapshot",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.usage",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "inspect_usage_summary"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "inspect_usage_summary": {
+          "ownerPort": "UsageUiPort.snapshot().tracked / chat / work",
+          "receiptType": "TokenUsageAnalyticsSnapshot read-only",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.usage_log",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "inspect_request_log"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "inspect_request_log": {
+          "ownerPort": "UsageUiPort.snapshot().recentRecords with optional model filter",
+          "receiptType": "TokenUsageRecord read-only",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.usage_detail",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "inspect_request_detail"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "inspect_request_detail": {
+          "ownerPort": "UsageUiPort.requestDetail(requestId)",
+          "receiptType": "TokenUsageRecord? read-only",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.memory",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": "SettingsUiPort.submit(SettingsUiCommand.Personalization)",
+          "receiptType": "SettingsUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.memory_settings",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": "SettingsUiPort.submit(SettingsUiCommand.Personalization)",
+          "receiptType": "SettingsUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.memory_management",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": "MemoryUiPort.submit(MemoryUiCommand.Update/Forget)",
+          "receiptType": "MemoryUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.permissions",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": "HostPreferencesUiPort.openSystemPermissions() in V6PreferencesScene",
+          "receiptType": "Boolean from Host-native OS settings entry",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.notifications",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": "HostPreferencesUiPort.submit(UiHostPreferencesCommand.Notifications)",
+          "receiptType": "Boolean (Host DataStore 保存结果)",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.advanced",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": "SettingsUiPort.submit(SettingsUiCommand.RuntimeLimits)",
+          "receiptType": "SettingsUiReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.session_storage",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": "SettingsUiPort.compactSessionStorage() following explicit confirmation",
+          "receiptType": "LocalSessionStorageStatus",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.diagnostics",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "open",
+        "edit_owner_configuration"
+      ],
+      "recovery": "Settings destination + selected record/profile; persisted facts remain original owner",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "open": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "edit_owner_configuration": {
+          "ownerPort": "SettingsUiPort.environmentInfo() / diagnosticReport() / diagnoseNetwork(userTarget)",
+          "receiptType": "suspend String result; Owner-thrown errors rendered explicitly",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "settings.update",
+      "owner": "SETTINGS",
+      "route": "SETTINGS",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "actions": [
+        "check_update",
+        "observe_download_install_status"
+      ],
+      "recovery": "Settings ROOT; existing update owner retains download/install status; standalone page retired in #697",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "check_update": {
+          "ownerPort": "LocalApplicationUiHost.checkForUpdate callback passed into V6SettingsSuiteScene",
+          "receiptType": "Owner updateStatus StateFlow",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "observe_download_install_status": {
+          "ownerPort": "V6SettingsSuiteScene.updateStatus.collectAsStateWithLifecycle()",
+          "receiptType": "StateFlow<String?> observed Owner status",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "route.home",
+      "owner": "CATALOG",
+      "route": "HOME",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "navigate": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "back": {
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected / AtRoot",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "route.persona_gallery",
+      "owner": "CATALOG",
+      "route": "PERSONA_GALLERY",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "navigate": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "back": {
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected / AtRoot",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "route.diary",
+      "owner": "CATALOG",
+      "route": "DIARY",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "navigate": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "back": {
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected / AtRoot",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "route.workspace",
+      "owner": "CATALOG",
+      "route": "WORKSPACE",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "navigate": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "back": {
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected / AtRoot",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "route.tasks",
+      "owner": "CATALOG",
+      "route": "TASKS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "navigate": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "back": {
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected / AtRoot",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "route.tools",
+      "owner": "CATALOG",
+      "route": "TOOLS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "navigate": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "back": {
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected / AtRoot",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "route.settings",
+      "owner": "CATALOG",
+      "route": "SETTINGS",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "独立 V6 Renderer / Host 已登记；真实 Owner 行为与失败恢复待按动作验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "navigate": {
+          "ownerPort": "UiHostSceneNavigation.navigate(state, UiSceneId)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "back": {
+          "ownerPort": "UiHostSceneNavigation.back(state)",
+          "receiptType": "UiSceneNavigationResult.Changed / Rejected / AtRoot",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "conversation.ui_document",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalDynamicDocument.kt",
+      "actions": [
+        "prepare_user_input",
+        "open_registered_scene",
+        "answer_current_approval"
+      ],
+      "recovery": "Shared Session ui.document.published sidecar + source message/context/profile/project identity; Host SavedStateHandle form values",
+      "v6": null,
+      "implementation": "独立 V6 文档 Renderer 接入原 Session/Work Owner；动态发布及动作契约仍需逐项核证",
+      "acceptance": "协议/Schema 自动化校验；真实模型、恢复和双包业务旅程待验收",
+      "actionProof": {
+        "prepare_user_input": {
+          "ownerPort": "UiDocumentUiPort.submit(UiDocumentAction.SendUserInput)",
+          "receiptType": "UiDocumentReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "open_registered_scene": {
+          "ownerPort": "UiDocumentUiPort.submit(UiDocumentAction.OpenKnownScene)",
+          "receiptType": "UiDocumentReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "answer_current_approval": {
+          "ownerPort": "UiDocumentUiPort.submit(UiDocumentAction.AnswerApproval)",
+          "receiptType": "UiDocumentReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "conversation.ui_document_generate",
+      "owner": "SHELL",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalUiDocumentGenerateButton.kt",
+      "actions": [
+        "acknowledge_additional_model_request",
+        "generate_document"
+      ],
+      "recovery": "One captured model route/request; actual provider usage; cancelled generation is not replayed",
+      "v6": null,
+      "implementation": "独立 V6 通过原 Owner 显式确认后生成；不隐式追加收费调用或授予工具权限，组合行为待验证",
+      "acceptance": "编译/协议自动化验证；真实模型收费与取消旅程待验收",
+      "actionProof": {
+        "acknowledge_additional_model_request": {
+          "ownerPort": "UiDocumentUiPort.generate(GenerateUiDocumentCommand.acknowledgedAdditionalModelRequest=true) [explicit UI confirmation]",
+          "receiptType": "UiDocumentReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "generate_document": {
+          "ownerPort": "UiDocumentUiPort.generate(GenerateUiDocumentCommand)",
+          "receiptType": "UiDocumentReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    },
+    {
+      "id": "work.requirement_evidence",
+      "owner": "WORK",
+      "route": "HOME",
+      "kind": "OVERLAY",
+      "source": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6WorkEvidencePanel.kt",
+      "actions": [
+        "read_references",
+        "link_reference"
+      ],
+      "recovery": "Owner session identity + requirement text + origin event/log generation + file versions; selected reference is not verification",
+      "v6": null,
+      "implementation": "独立 V6 通过 Work Port 渲染；行为待 CODE_ONLY 契约验证",
+      "acceptance": "待 CODE_ONLY Owner/Host/UiPack 行为契约验证",
+      "actionProof": {
+        "read_references": {
+          "ownerPort": "WorkEvidenceUiPort.read",
+          "receiptType": "UiWorkEvidenceReadReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        },
+        "link_reference": {
+          "ownerPort": "WorkEvidenceUiPort.submit(LinkWorkEvidenceReferenceCommand)",
+          "receiptType": "UiCommandReceipt",
+          "restoreTest": null,
+          "status": "PENDING_EVIDENCE"
+        }
+      }
+    }
+  ],
+  "v6ReferenceCoverage": [
+    {
+      "referenceScene": 1,
+      "semanticScene": "conversation.chat",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 2,
+      "semanticScene": "conversation.work",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 3,
+      "semanticScene": "route.run_center",
+      "acceptance": "主线 #698 已退役；历史参考保留，不计入必需场景"
+    },
+    {
+      "referenceScene": 4,
+      "semanticScene": "settings.usage",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 5,
+      "semanticScene": "conversation.reader",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 6,
+      "semanticScene": "chat.gallery",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 7,
+      "semanticScene": "chat.gallery_profile",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 8,
+      "semanticScene": "chat.world_book",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 9,
+      "semanticScene": "chat.diary",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 10,
+      "semanticScene": "chat.group_members",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 11,
+      "semanticScene": "conversation.message_actions",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 12,
+      "semanticScene": "automation.persona_interaction",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 13,
+      "semanticScene": "automation.editor",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 14,
+      "semanticScene": "work.capabilities",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 15,
+      "semanticScene": "work.history",
+      "acceptance": "主线 #698 已退役；历史参考保留，不计入必需场景"
+    },
+    {
+      "referenceScene": 16,
+      "semanticScene": "workspace.preview",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 17,
+      "semanticScene": "work.team",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 18,
+      "semanticScene": "tools.plugins",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 19,
+      "semanticScene": "work.plan_review",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 20,
+      "semanticScene": "settings.root",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 21,
+      "semanticScene": "settings.models",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 22,
+      "semanticScene": "settings.model_performance",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 23,
+      "semanticScene": "settings.account",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 24,
+      "semanticScene": "settings.memory",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 25,
+      "semanticScene": "settings.session_storage",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 26,
+      "semanticScene": "settings.appearance",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 27,
+      "semanticScene": "settings.permissions",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 28,
+      "semanticScene": "settings.notifications",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 29,
+      "semanticScene": "settings.diagnostics",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 30,
+      "semanticScene": "settings.update",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 31,
+      "semanticScene": "shell.onboarding",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 32,
+      "semanticScene": "system.permissions",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 33,
+      "semanticScene": "shell.search",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 34,
+      "semanticScene": "shell.empty",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 35,
+      "semanticScene": "shell.error",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 36,
+      "semanticScene": "shell.notifications",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    },
+    {
+      "referenceScene": 37,
+      "semanticScene": "work.delivery",
+      "acceptance": "主线 #698 已退役；历史参考保留，不计入必需场景"
+    },
+    {
+      "referenceScene": 38,
+      "semanticScene": "media.creation",
+      "acceptance": "视觉参考保留为非阻塞项；R4仅验收源码/契约行为"
+    }
+  ],
+  "retiredScenes": [
+    {
+      "id": "work.history",
+      "owner": "WORK",
+      "route": "RUN_CENTER",
+      "kind": "OVERLAY",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkHistorySheet.kt",
+      "actions": [
+        "load_history",
+        "open_evidence"
+      ],
+      "recovery": "EventLog cursor + run/session identity",
+      "v6": 15,
+      "implementation": "主线 #698 已退役；仅作历史索引",
+      "acceptance": "不计入当前场景覆盖"
+    },
+    {
+      "id": "work.delivery",
+      "owner": "WORK",
+      "route": "RUN_CENTER",
+      "kind": "SLOT",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalRunCenterScreen.kt",
+      "actions": [
+        "open_artifact",
+        "open_evidence"
+      ],
+      "recovery": "Available/missing/unchecked; cancelled distinct from unknown",
+      "v6": 37,
+      "implementation": "主线 #698 已退役；仅作历史索引",
+      "acceptance": "不计入当前场景覆盖"
+    },
+    {
+      "id": "route.run_center",
+      "owner": "CATALOG",
+      "route": "RUN_CENTER",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "主线 #698 已退役；仅作历史索引",
+      "acceptance": "不计入当前场景覆盖"
+    },
+    {
+      "id": "route.project",
+      "owner": "CATALOG",
+      "route": "PROJECT",
+      "kind": "PAGE",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "actions": [
+        "navigate",
+        "back"
+      ],
+      "recovery": "LocalFeatureCatalog + contribution restore policy",
+      "v6": null,
+      "implementation": "主线 #702 已退役；仅作历史索引",
+      "acceptance": "不计入当前场景覆盖"
+    }
+  ],
+  "actionProofStatus": "PENDING_END_TO_END_VERIFICATION"
+}

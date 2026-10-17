@@ -26,6 +26,7 @@ internal data class LocalWorkCompletionEvidence(
     val pendingApproval: Boolean,
     val pendingQuestion: Boolean,
     val deliveryEvidence: LocalWorkDeliveryEvidence? = null,
+    val blockedWorkflow: Boolean = false,
 ) {
     val findings: List<String> get() = buildList {
         if (openTodos > 0) add("完成声明与未完成任务清单冲突")
@@ -37,6 +38,7 @@ internal data class LocalWorkCompletionEvidence(
         if (teamFailure) add("完成声明与 Agent Team 异常状态冲突")
         if (teamRebuilding) add("完成声明与正在恢复的 Agent Team 状态冲突")
         if (blockedGoal) add("完成声明与阻塞目标状态冲突")
+        if (blockedWorkflow) add("完成声明与尚未解决的工作流阻塞冲突")
         if (pendingApproval) add("完成声明与待审批操作冲突")
         if (pendingQuestion) add("完成声明与待回答问题冲突")
         deliveryEvidence?.missing?.forEach { add("完成声明缺少正向验收证据：$it") }
@@ -52,6 +54,7 @@ internal data class LocalWorkCompletionEvidence(
         if (teamFailure) add("Agent Team 当前存在异常状态")
         if (teamRebuilding) add("Agent Team 正在恢复状态")
         if (blockedGoal) add("目标仍处于阻塞状态")
+        if (blockedWorkflow) add("还有工作流节点执行受阻，必须先重新执行或处理结果")
         if (pendingApproval) add("还有工具操作等待审批")
         if (pendingQuestion) add("还有待回答的问题")
         deliveryEvidence?.missing?.let(::addAll)
@@ -87,6 +90,7 @@ internal fun localWorkCompletionEvidence(
         pendingApproval = work.pendingApproval != null,
         pendingQuestion = work.pendingQuestion != null,
         deliveryEvidence = deliveryEvidence,
+        blockedWorkflow = work.workflowProgress?.needsUserAction == true,
     )
 }
 
@@ -107,8 +111,73 @@ internal fun LocalWorkCompletionEvidence.toDiagnosticJson(): JsonObject = buildJ
     put("team_has_failure", teamFailure)
     put("team_rebuilding", teamRebuilding)
     put("blocked_goal", blockedGoal)
+    put("blocked_workflow", blockedWorkflow)
     put("pending_approval", pendingApproval)
     put("pending_question", pendingQuestion)
     put("delivery_missing", JsonArray(deliveryEvidence?.missing.orEmpty().map(::JsonPrimitive)))
     put("user_reasons", JsonArray(userReasons.map(::JsonPrimitive)))
+}
+
+/**
+ * Typed Work-only goal disposition, derived from the current authoritative Work snapshot.
+ *
+ * A model turn ending does not imply a delivered goal. READY_FOR_SETTLEMENT indicates that
+ * known obligations are clear, but Work has not yet committed the goal's completed status.
+ * This is a read-only projection, not another persisted goal, scheduler or execution owner.
+ * Unknown side effects are handled by Shared Tool/Run settlement, not guessed here.
+ */
+internal enum class LocalWorkGoalDisposition {
+    NO_GOAL,
+    PAUSED,
+    BLOCKED,
+    WAITING_APPROVAL,
+    WAITING_USER,
+    WAITING_TEAM,
+    NEEDS_EXECUTION,
+    READY_FOR_SETTLEMENT,
+    COMPLETED,
+}
+
+internal data class LocalWorkGoalAssessment(
+    val disposition: LocalWorkGoalDisposition,
+    val goalId: String?,
+    val goalStatus: String?,
+    val evidence: LocalWorkCompletionEvidence,
+) {
+    /** Candidate for a future GoalDriver; admission must still verify current run ownership. */
+    val hasRunnableRemainingWork: Boolean
+        get() = disposition == LocalWorkGoalDisposition.NEEDS_EXECUTION
+
+    fun toTurnEventFields(): JsonObject = buildJsonObject {
+        put("goal_disposition", disposition.name.lowercase())
+        goalId?.let { put("goal_id", it) }
+        goalStatus?.let { put("goal_status", it) }
+        put("goal_outstanding_count", evidence.userReasons.size)
+        put("goal_ready_for_settlement",
+            disposition == LocalWorkGoalDisposition.READY_FOR_SETTLEMENT ||
+                disposition == LocalWorkGoalDisposition.COMPLETED)
+    }
+}
+
+internal fun assessLocalWorkGoal(
+    work: LocalWorkState,
+    evidence: LocalWorkCompletionEvidence = localWorkCompletionEvidence(work),
+): LocalWorkGoalAssessment {
+    val goal = work.goal
+    val team = work.team
+    val disposition = when {
+        goal == null -> LocalWorkGoalDisposition.NO_GOAL
+        goal.status == "paused" -> LocalWorkGoalDisposition.PAUSED
+        goal.status == "blocked" || !team.failure.isNullOrBlank() || evidence.blockedWorkflow ->
+            LocalWorkGoalDisposition.BLOCKED
+        work.pendingApproval != null -> LocalWorkGoalDisposition.WAITING_APPROVAL
+        work.pendingQuestion != null -> LocalWorkGoalDisposition.WAITING_USER
+        team.rebuilding || evidence.activeTeamMembers > 0 ||
+            evidence.pendingTeamMessages > 0 || evidence.awaitingReviewMembers > 0 ->
+            LocalWorkGoalDisposition.WAITING_TEAM
+        !evidence.readyForGoalCompletion -> LocalWorkGoalDisposition.NEEDS_EXECUTION
+        goal.status == "completed" -> LocalWorkGoalDisposition.COMPLETED
+        else -> LocalWorkGoalDisposition.READY_FOR_SETTLEMENT
+    }
+    return LocalWorkGoalAssessment(disposition, goal?.id, goal?.status, evidence)
 }

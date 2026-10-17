@@ -26,12 +26,12 @@ internal data class LocalChatAutomationPolicy(
     }
 
     companion object {
-        const val DEFAULT_QUIET_START_HOUR = 23
-        const val DEFAULT_QUIET_START_MINUTE = 0
-        const val DEFAULT_QUIET_END_HOUR = 7
-        const val DEFAULT_QUIET_END_MINUTE = 0
-        const val DEFAULT_PROACTIVE_MIN_GAP_MINUTES = 6L * 60L
-        const val DEFAULT_PROACTIVE_MAX_UNANSWERED = 2
+        const val DEFAULT_QUIET_START_HOUR = com.labteto.dshmobile.automation.AutomationUiDefaults.DEFAULT_QUIET_START_HOUR
+        const val DEFAULT_QUIET_START_MINUTE = com.labteto.dshmobile.automation.AutomationUiDefaults.DEFAULT_QUIET_START_MINUTE
+        const val DEFAULT_QUIET_END_HOUR = com.labteto.dshmobile.automation.AutomationUiDefaults.DEFAULT_QUIET_END_HOUR
+        const val DEFAULT_QUIET_END_MINUTE = com.labteto.dshmobile.automation.AutomationUiDefaults.DEFAULT_QUIET_END_MINUTE
+        const val DEFAULT_PROACTIVE_MIN_GAP_MINUTES = com.labteto.dshmobile.automation.AutomationUiDefaults.DEFAULT_PROACTIVE_MIN_GAP_MINUTES
+        const val DEFAULT_PROACTIVE_MAX_UNANSWERED = com.labteto.dshmobile.automation.AutomationUiDefaults.DEFAULT_PROACTIVE_MAX_UNANSWERED
 
         const val MIN_PROACTIVE_GAP_MINUTES = 60L
         const val MIN_PROACTIVE_MAX_UNANSWERED = 1

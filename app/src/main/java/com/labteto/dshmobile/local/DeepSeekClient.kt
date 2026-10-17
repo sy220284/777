@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.model.DeepSeekTokenUsage
 import com.labteto.dshmobile.local.model.ModelStreamLineReader
+import com.labteto.dshmobile.local.model.LocalModelStreamProgressMonitor
 import com.labteto.dshmobile.local.model.ModelStreamLimitException
 import com.labteto.dshmobile.local.model.ModelStreamLimitKind
 import com.labteto.dshmobile.local.model.LocalModelAdmissionState
@@ -270,6 +271,7 @@ class DeepSeekClient @Inject constructor(
                 var streamUsage: JsonObject? = null
                                 var sawStreamData = false
                 var sawTerminalFrame = false
+                val usefulProgress = LocalModelStreamProgressMonitor()
                 // Response 统一由 withCancellableModelResponse 收尾，避免成功后 reader.close()
                 // 的连接异常覆盖已完成结果并触发重复请求。
                 val reader = ModelStreamLineReader(responseBody.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_MODEL_RESPONSE_BYTES)
@@ -288,6 +290,13 @@ class DeepSeekClient @Inject constructor(
                                 retryable = false,
                             )
                         } ?: break
+                        if (usefulProgress.isStalled()) {
+                            throw modelPostAdmissionFailure(
+                                code = "MODEL_STREAM_STALLED_AFTER_ADMISSION",
+                                detail = "模型流仍有网络活动，但连续八分钟没有产生任何有效文本、推理或工具调用数据",
+                                requestId = requestId,
+                            )
+                        }
                         if (!line.startsWith("data:")) {
                             if (line.isNotBlank()) fallback.append(line)
                             continue
@@ -360,6 +369,9 @@ class DeepSeekClient @Inject constructor(
                         val callDeltas = delta["tool_calls"]?.takeUnless { it == JsonNull }?.let {
                             it as? JsonArray ?: throw streamProtocolError("tool_calls 必须是数组")
                         }
+                        if (textDelta.isNotEmpty() || reasoningDelta.isNotEmpty() ||
+                            callDeltas?.isNotEmpty() == true
+                        ) usefulProgress.recordProgress()
                         callDeltas.orEmpty().forEach { element ->
                             val item = element as? JsonObject
                                 ?: throw streamProtocolError("模型流式工具调用数据帧格式错误")

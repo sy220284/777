@@ -347,6 +347,9 @@ if (System.getenv("CI") == "true") {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":ui-contract"))
+    implementation(project(":ui-host"))
+    implementation(project(":ui-pack-v6"))
     implementation(project(":harness-core"))
     implementation(project(":harness-runtime-android"))
     implementation(project(":harness-interop"))

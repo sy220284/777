@@ -2,18 +2,6 @@ package com.labteto.dshmobile.local.model.chatgpt
 
 import kotlinx.serialization.Serializable
 
-enum class ChatGptAuthPhase {
-    DISCONNECTED,
-    PREPARING,
-    WAITING_FOR_BROWSER,
-    EXCHANGING_CODE,
-    VALIDATING_IDENTITY,
-    LOADING_MODELS,
-    CONNECTED,
-    UNVERIFIED,
-    ERROR,
-}
-
 @Serializable
 data class ChatGptAccountRecord(
     val id: String,
@@ -30,6 +18,7 @@ data class ChatGptAccountRecord(
     val scopes: Set<String> = emptySet(),
     val accessTokenExpiresAtEpochSeconds: Long,
     val savedAtEpochSeconds: Long,
+    val earliestRefreshAtEpochSeconds: Long? = null,
 ) {
     val sharingEnabled: Boolean
         get() = CHATGPT_PLAN_SCOPE in scopes && CHATGPT_RESOURCE_INVOKE_SCOPE in scopes
@@ -41,46 +30,6 @@ data class ChatGptAccountRecord(
             "savedAtEpochSeconds=$savedAtEpochSeconds, credentials=<redacted>)"
 }
 
-data class ChatGptAccountSummary(
-    val id: String,
-    val clientId: String,
-    val email: String?,
-    val displayName: String?,
-    val signedIn: Boolean,
-    val sharingEnabled: Boolean,
-)
-
-data class ChatGptModelOption(
-    val slug: String,
-    val displayName: String,
-)
-
-data class ChatGptUiState(
-    val phase: ChatGptAuthPhase = ChatGptAuthPhase.DISCONNECTED,
-    val accounts: List<ChatGptAccountSummary> = emptyList(),
-    val selectedAccountId: String? = null,
-    val models: List<ChatGptModelOption> = emptyList(),
-    val error: String? = null,
-    val pendingAccountId: String? = null,
-) {
-    val selectedAccount: ChatGptAccountSummary?
-        get() = accounts.firstOrNull { it.id == selectedAccountId }
-
-    val signedIn: Boolean
-        get() = selectedAccount?.signedIn == true && phase != ChatGptAuthPhase.DISCONNECTED
-
-    val connected: Boolean
-        get() = selectedAccount?.let { account ->
-            account.signedIn &&
-                account.sharingEnabled &&
-                phase == ChatGptAuthPhase.CONNECTED
-        } == true
-}
-
-internal class ChatGptOAuthTokenException(
-    val oauthCode: String?,
-    message: String,
-) : java.io.IOException(message)
 
 internal fun shouldRetryChatGptAuthorization(oauthCode: String?, allowed: Boolean): Boolean =
     allowed && oauthCode == "invalid_grant"
@@ -108,7 +57,17 @@ internal data class ChatGptTokenResponse(
     val tokenType: String,
     val expiresInSeconds: Long,
     val scopes: Set<String>,
+    val earliestRefreshAtEpochSeconds: Long? = null,
 )
+
+/** Preserve a still-valid token until the server's earliest permitted refresh time. */
+internal fun shouldRefreshChatGptToken(record: ChatGptAccountRecord, now: Long): Boolean {
+    if (record.accessTokenExpiresAtEpochSeconds > now + 90L) return false
+    val earliest = record.earliestRefreshAtEpochSeconds
+    if (earliest != null && now < earliest &&
+        record.accessTokenExpiresAtEpochSeconds > now + 5L) return false
+    return true
+}
 
 internal data class VerifiedChatGptIdentity(
     val issuer: String,
@@ -139,3 +98,8 @@ internal const val CHATGPT_USAGE_URL = "https://chatgpt.com/#settings/Usage"
 internal const val CHATGPT_DYNAMIC_CLIENT_ID = "dynamic_agent_client"
 internal const val CHATGPT_AGENT_NAME = "神言神语"
 internal const val CHATGPT_SCOPES = "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct"
+
+internal class ChatGptOAuthTokenException(
+    val oauthCode: String?,
+    message: String,
+) : java.io.IOException(message)

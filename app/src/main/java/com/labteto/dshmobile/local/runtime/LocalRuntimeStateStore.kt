@@ -84,6 +84,7 @@ class LocalRuntimeStateStore internal constructor(
     )
 
     private val foregroundInteractionState = object : LocalInteractionStatePort {
+        override fun pendingQuestion() = mutable.value.work.pendingQuestion
         override fun pendingApproval(): LocalApproval? = mutable.value.work.pendingApproval
 
         override fun setPendingApproval(approval: LocalApproval?) {
@@ -209,14 +210,17 @@ class LocalRuntimeStateStore internal constructor(
     ).maxHistoryChars
 
     internal suspend fun <T> withModelRequestResource(block: suspend () -> T): T =
+        withNamedModelRequestResource("automation-planning", block)
+
+    internal suspend fun <T> withNamedModelRequestResource(label: String, block: suspend () -> T): T =
         resourceScheduler.withResource(
             HarnessResourceKind.MODEL_REQUEST,
-            "automation-planning",
+            label,
             block,
         )
 
     @Synchronized
-    internal fun initialize(initialState: LocalHarnessState): MutableStateFlow<LocalHarnessState> {
+    internal fun initialize(initialState: LocalHarnessState) {
         check(!initialized) { "LocalRuntimeStateStore 已完成初始化" }
         require(initialState.sessionId.isNotBlank()) { "初始会话编号不能为空" }
         foregroundRunHandle.rebindSession(initialState.sessionId)
@@ -227,7 +231,6 @@ class LocalRuntimeStateStore internal constructor(
             resourceScheduler.snapshot(),
         )
         initialized = true
-        return mutable
     }
 
     internal fun publishSendFeedback(feedback: LocalSendFeedbackState) {

@@ -91,7 +91,7 @@ internal fun recoverTeamStartPhase(
     if (job.status in setOf("failed", "cancelled", "killed")) return LocalTeamMemberPhase.FAILED
     if (
         previous == LocalTeamMemberPhase.CREATED || admitted ||
-        job.pendingMessageCount > 0 || job.status in setOf("running", "stopping")
+        job.pendingMessageCount > 0 || job.status in setOf("running", "stopping", "waiting_slice")
     ) return LocalTeamMemberPhase.ACTIVE
     return if (cancelled) previous else LocalTeamMemberPhase.FAILED
 }
@@ -411,29 +411,39 @@ internal class LocalAgentTeamRuntime(
         )
     }
 
+    internal fun outputForUi(sessionId: String, memberId: String, expectedJobId: String): String = synchronized(commandLock) {
+        val member = project(sessionId).members.singleOrNull { it.id == memberId && it.jobId == expectedJobId }
+            ?: error("TEAM_MEMBER_EXPIRED：助手执行身份已改变")
+        jobs.output(member.jobId, sessionId)
+    }
+
     internal fun sendUiMessage(
         sessionId: String,
         memberId: String,
         message: String,
-    ): String {
+        expectedJobId: String? = null,
+    ): String = synchronized(commandLock) {
         synchronizeTeamRuntime(sessionId)
         val member = project(sessionId).members.singleOrNull {
             it.id == memberId && it.phase == LocalTeamMemberPhase.ACTIVE
         } ?: error("TEAM_MEMBER_NOT_FOUND：该助手当前不可接收消息")
-        return sendMessage(sessionId, member.name, message)
+        require(expectedJobId == null || member.jobId == expectedJobId) { "TEAM_MEMBER_EXPIRED：助手执行身份已改变" }
+        sendMessage(sessionId, member.name, message)
     }
 
-    internal fun interruptUiMember(sessionId: String, memberId: String): String {
+    internal fun interruptUiMember(sessionId: String, memberId: String, expectedJobId: String? = null): String = synchronized(commandLock) {
         synchronizeTeamRuntime(sessionId)
         val member = project(sessionId).members.singleOrNull {
             it.id == memberId && it.phase == LocalTeamMemberPhase.ACTIVE
         } ?: error("TEAM_MEMBER_NOT_FOUND：该助手当前不可停止")
-        return jobs.interruptContinuableAgent(member.jobId, sessionId)
+        require(expectedJobId == null || member.jobId == expectedJobId) { "TEAM_MEMBER_EXPIRED：助手执行身份已改变" }
+        jobs.interruptContinuableAgent(member.jobId, sessionId)
     }
 
-    internal fun interruptAllUi(sessionId: String): String {
+    internal fun interruptAllUi(sessionId: String, expectedJobIds: Set<String>? = null): String = synchronized(commandLock) {
         synchronizeTeamRuntime(sessionId)
         val state = project(sessionId)
+        require(expectedJobIds == null || state.members.map { it.jobId }.toSet() == expectedJobIds) { "TEAM_CHANGED：团队成员已改变" }
         val jobStatus = jobs.snapshotInfos().associateBy(LocalJobInfo::id)
         val runningIds = state.members
             .filter { member ->
@@ -441,8 +451,8 @@ internal class LocalAgentTeamRuntime(
                     jobStatus[member.jobId]?.status == "running"
             }
             .mapTo(linkedSetOf(), LocalTeamMemberSnapshot::jobId)
-        if (runningIds.isEmpty()) return "当前没有正在运行的助手"
-        return jobs.interruptContinuableAgents(runningIds, sessionId)
+        if (runningIds.isEmpty()) "当前没有正在运行的助手"
+        else jobs.interruptContinuableAgents(runningIds, sessionId)
     }
 
     private fun requireMemberCapacity(state: LocalTeamProjection) {

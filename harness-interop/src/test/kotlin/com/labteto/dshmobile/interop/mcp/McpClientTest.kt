@@ -31,6 +31,20 @@ import org.junit.Test
 
 class McpClientTest {
     @Test
+    fun pingChecksRemoteResponseWithoutListingOrCallingTools() = runTest {
+        val requests = mutableListOf<String>()
+        val transport = object : McpTransport {
+            override suspend fun request(method: String, params: JsonObject): JsonObject {
+                requests += method
+                return buildJsonObject { put("result", buildJsonObject { }) }
+            }
+            override fun close() = Unit
+        }
+        McpClient(transport).ping()
+        assertEquals(listOf("ping"), requests)
+    }
+
+    @Test
     fun listsAndCallsToolsThroughTransport() = runTest {
         val requests = mutableListOf<Pair<String, JsonObject>>()
         val transport = object : McpTransport {
@@ -137,7 +151,7 @@ class McpClientTest {
     }
 
     @Test
-    fun cancelledStdioRequestRestartsAndReinitializesBeforeNextCall() = runBlocking {
+    fun cancelledStdioRequestRequiresExplicitNewTransportBeforeAnyNextCall() = runBlocking {
         val dir = Files.createTempDirectory("mcp-cancel-").toFile()
         val countFile = File(dir, "count")
         val markerFile = File(dir, "blocked")
@@ -191,11 +205,25 @@ class McpClientTest {
             }
             assertTrue(blocked.isCancelled)
 
-            val recovered = withTimeout(3_000L) {
-                transport.request("tools/list")
+            // The old transport must never start another process after a
+            // cancellation that may have already caused remote side effects.
+            val refused = runCatching {
+                withTimeout(3_000L) { transport.request("tools/list") }
             }
-            assertTrue(recovered["result"] != null)
-            assertEquals("2", countFile.readText().trim())
+            assertTrue(refused.isFailure)
+            assertEquals("1", countFile.readText().trim())
+
+            // Only explicit Owner/user reconnection creates another process
+            // incarnation and re-discovers its tools from scratch.
+            val fresh = McpLegacyStdioTransport(
+                command = listOf("sh", script.absolutePath, countFile.absolutePath, markerFile.absolutePath),
+                json = Json, protocolVersion = CURRENT_MCP_PROTOCOL_VERSION,
+            )
+            try {
+                val recovered = withTimeout(3_000L) { fresh.request("tools/list") }
+                assertTrue(recovered["result"] != null)
+                assertEquals("2", countFile.readText().trim())
+            } finally { fresh.close() }
         } finally {
             transport.close()
             dir.deleteRecursively()
@@ -203,7 +231,7 @@ class McpClientTest {
     }
 
     @Test
-    fun crashedStdioProcessIsReinitializedOnRestart() = runBlocking {
+    fun crashedStdioProcessFailsClosedUntilExplicitNewTransport() = runBlocking {
         val dir = Files.createTempDirectory("mcp-restart-").toFile()
         val countFile = File(dir, "count")
         val script = File(dir, "server.sh")
@@ -247,11 +275,20 @@ class McpClientTest {
             }
             assertTrue(first.isFailure)
 
-            val recovered = withTimeout(3_000L) {
-                transport.request("tools/list")
+            val refused = runCatching {
+                withTimeout(3_000L) { transport.request("tools/list") }
             }
-            assertTrue(recovered["result"] != null)
-            assertEquals("2", countFile.readText().trim())
+            assertTrue(refused.isFailure)
+            assertEquals("1", countFile.readText().trim())
+            val fresh = McpLegacyStdioTransport(
+                command = listOf("sh", script.absolutePath, countFile.absolutePath),
+                json = Json, protocolVersion = CURRENT_MCP_PROTOCOL_VERSION,
+            )
+            try {
+                val recovered = withTimeout(3_000L) { fresh.request("tools/list") }
+                assertTrue(recovered["result"] != null)
+                assertEquals("2", countFile.readText().trim())
+            } finally { fresh.close() }
         } finally {
             transport.close()
             dir.deleteRecursively()

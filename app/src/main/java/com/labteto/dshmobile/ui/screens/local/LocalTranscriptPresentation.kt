@@ -45,16 +45,20 @@ internal sealed interface LocalTranscriptItem {
 
     /** One event per lazy-list row; the persisted transcript remains unchanged. */
     /** Sidecar media timeline rows are visible but never replayed as model/persona dialogue. */
-    data class MediaResult(val result: LocalMediaResult) : LocalTranscriptItem {
-        override val key: String = "media-result:${result.id}"
+    data class MediaResult(
+        val result: LocalMediaResult,
+        val slotId: String = result.id,
+        val revisionJob: LocalMediaCreationJob? = null,
+    ) : LocalTranscriptItem {
+        override val key: String = "media-result:${slotId}"
     }
 
-    data class CreationJob(val job: LocalMediaCreationJob) : LocalTranscriptItem {
-        override val key: String = "media-result:${job.id}"
+    data class CreationJob(val job: LocalMediaCreationJob, val slotId: String = job.id) : LocalTranscriptItem {
+        override val key: String = "media-result:${slotId}"
     }
 
-    data class VideoTask(val task: LocalMediaVideoTask) : LocalTranscriptItem {
-        override val key: String = "media-video:${task.id}"
+    data class VideoTask(val task: LocalMediaVideoTask, val slotId: String = task.id) : LocalTranscriptItem {
+        override val key: String = "media-video:${slotId}"
     }
 
     data class WorkArtifact(val artifact: LocalArtifactUiItem) : LocalTranscriptItem {
@@ -230,23 +234,68 @@ internal fun mergeLocalMediaTimeline(
 ): List<LocalTranscriptItem> {
     if (sessionId.isBlank()) return transcript
     val delivered = results.filter { it.sessionId == sessionId }
-    val finishedIds = delivered.mapTo(mutableSetOf()) { it.id }
-    val media = delivered.map { LocalTranscriptItem.MediaResult(it) } +
-        jobs.filter { it.sessionId == sessionId && it.id !in finishedIds }
-            .map { LocalTranscriptItem.CreationJob(it) } +
-        videoTasks.filter { it.sessionId == sessionId }.map { LocalTranscriptItem.VideoTask(it) }
+    val sessionJobs = jobs.filter { it.sessionId == sessionId }
+    val sessionVideos = videoTasks.filter { it.sessionId == sessionId }
+    val kinds = buildMap<String, String> {
+        delivered.forEach { put(it.id, it.kind) }
+        sessionJobs.forEach { put(it.id, it.kind) }
+        sessionVideos.forEach { put(it.id, "VIDEO") }
+    }
+    val parents = buildMap<String, String> {
+        delivered.forEach { it.revisionOf?.let { parent -> put(it.id, parent) } }
+        sessionJobs.forEach { it.revisionOf?.let { parent -> put(it.id, parent) } }
+        sessionVideos.forEach { it.revisionOf?.let { parent -> put(it.id, parent) } }
+    }
+    // Same-kind revisions replace the visible slot, never duplicate it.
+    fun root(id: String): String {
+        var current = id
+        val seen = mutableSetOf(current)
+        repeat(64) {
+            val parent = parents[current] ?: return current
+            if (kinds[parent] != kinds[id] || !seen.add(parent)) return current
+            current = parent
+        }
+        return current
+    }
+    val earliest = mutableMapOf<String, Long>()
+    val operations = sessionJobs.associate { it.id to it.createdAtMillis }
+    fun track(id: String, time: Long) {
+        val key = root(id)
+        earliest[key] = minOf(earliest[key] ?: Long.MAX_VALUE, time)
+    }
+    delivered.forEach { track(it.id, operations[it.id] ?: it.createdAtMillis) }
+    sessionJobs.forEach { track(it.id, it.createdAtMillis) }
+    sessionVideos.forEach { track(it.id, it.startedAtMillis) }
+    val media = buildList {
+        val successful = delivered.groupBy { root(it.id) }
+        val unfinished = sessionJobs.filter { job -> delivered.none { it.id == job.id } }
+            .groupBy { root(it.id) }
+        (successful.keys + unfinished.keys).forEach { slot ->
+            val completed = successful[slot]?.maxWithOrNull(compareBy<LocalMediaResult> { it.createdAtMillis }.thenBy { it.id })
+            val newest = unfinished[slot]?.maxWithOrNull(compareBy<LocalMediaCreationJob> { it.createdAtMillis }.thenBy { it.id })
+            if (completed != null) {
+                // Once a newer version succeeds, an older failed attempt cannot reappear
+                // as a stale error under the new audio.
+                val completedAt = operations[completed.id] ?: completed.createdAtMillis
+                add(LocalTranscriptItem.MediaResult(completed, slot,
+                    newest?.takeIf { it.createdAtMillis > completedAt }))
+            }
+            else if (newest != null) add(LocalTranscriptItem.CreationJob(newest, slot))
+        }
+        sessionVideos.groupBy { root(it.id) }.forEach { (slot, versions) ->
+            val latest = versions.maxWithOrNull(compareBy<LocalMediaVideoTask> { it.startedAtMillis }.thenBy { it.id })
+            if (latest != null) add(LocalTranscriptItem.VideoTask(latest, slot))
+        }
+    }
     if (media.isEmpty()) return transcript
-    // A pending media card must not jump below newer chat messages after completion.
-    val operationTimestamps = jobs.associate { it.id to it.createdAtMillis }
     fun timestamp(item: LocalTranscriptItem): Long = when (item) {
         is LocalTranscriptItem.Message -> item.message.createdAt
         is LocalTranscriptItem.Thinking -> item.messages.first().createdAt
         is LocalTranscriptItem.WorkProcess -> item.messages.first().createdAt
         is LocalTranscriptItem.WorkStep -> item.message.createdAt
-        is LocalTranscriptItem.MediaResult ->
-            operationTimestamps[item.result.id] ?: item.result.createdAtMillis
-        is LocalTranscriptItem.CreationJob -> item.job.createdAtMillis
-        is LocalTranscriptItem.VideoTask -> item.task.startedAtMillis
+        is LocalTranscriptItem.MediaResult -> earliest[item.slotId] ?: item.result.createdAtMillis
+        is LocalTranscriptItem.CreationJob -> earliest[item.slotId] ?: item.job.createdAtMillis
+        is LocalTranscriptItem.VideoTask -> earliest[item.slotId] ?: item.task.startedAtMillis
         is LocalTranscriptItem.WorkArtifact -> Long.MAX_VALUE
     }
     // Stable sort preserves original transcript order when event timestamps tie.
@@ -265,3 +314,19 @@ internal fun appendWorkArtifactsToTranscript(
         .distinctBy { it.category to it.reference }.asReversed()
     return transcript + unique.map(LocalTranscriptItem::WorkArtifact)
 }
+
+/** Message anchors survive pack layouts and Work row compaction; sidecars keep their own identity. */
+internal fun LocalTranscriptItem.readingMessageId(): String? = when (this) {
+    is LocalTranscriptItem.Message -> message.id
+    is LocalTranscriptItem.Thinking -> messages.first().id
+    is LocalTranscriptItem.WorkProcess -> messages.first().id
+    is LocalTranscriptItem.WorkStep -> message.id
+    else -> null
+}
+
+internal fun LocalTranscriptItem.containsReadingMessage(messageId: String?): Boolean =
+    messageId != null && when (this) {
+        is LocalTranscriptItem.Thinking -> messages.any { it.id == messageId }
+        is LocalTranscriptItem.WorkProcess -> messages.any { it.id == messageId }
+        else -> readingMessageId() == messageId
+    }

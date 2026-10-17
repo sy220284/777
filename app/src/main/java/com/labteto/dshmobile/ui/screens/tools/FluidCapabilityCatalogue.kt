@@ -31,17 +31,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.presentation.LocalCapabilityUiEntry
+import com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot
 import com.labteto.dshmobile.ui.components.*
 import com.labteto.dshmobile.ui.theme.*
 
 /** Design 14: real discovery groups, compact cache summary and a detail rail as a Sheet. */
 @Composable
-internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loading: Boolean, failed: Boolean,
+internal fun FluidCapabilityCatalogue(entries: List<UiToolCapabilitySnapshot>, loading: Boolean, failed: Boolean,
     connections: Int, onRefresh: () -> Unit, onBack: () -> Unit, onManage: () -> Unit,
     onPlugins: () -> Unit, onSkills: () -> Unit, onUseCapability: ((String) -> Unit)?) {
     var query by rememberSaveable { mutableStateOf("") }
-    var selected by remember { mutableStateOf<LocalCapabilityUiEntry?>(null) }
+    var selected by remember { mutableStateOf<UiToolCapabilitySnapshot?>(null) }
     val families = entries.groupBy { it.family }.toSortedMap()
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         SyTopBar(stringResource(R.string.tools_title), onBack = onBack,

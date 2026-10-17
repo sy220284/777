@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.runtime
 
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.serialization.json.JsonObject
 
@@ -19,6 +20,11 @@ internal class LocalAgentRunHandle(
     maxPendingInputs: Int,
 ) {
     val lock: Any = Any()
+
+    /** Process-local activation fence for UI intents; never a persisted execution ledger. */
+    @Volatile
+    var activationId: String = UUID.randomUUID().toString()
+        private set
     val modelHistory = LocalModelHistoryBuffer().apply { reset(initialHistory) }
     val pendingInputs = AgentInputQueue(maxPendingInputs)
 
@@ -64,6 +70,7 @@ internal class LocalAgentRunHandle(
             modelHistory.reset()
             transcriptProjectionCursor = null
             turnsSinceModelHistoryCheckpoint = 0
+            activationId = UUID.randomUUID().toString()
             sessionId = nextSessionId
         }
     }

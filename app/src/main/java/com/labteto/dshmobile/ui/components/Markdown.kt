@@ -1,6 +1,13 @@
 package com.labteto.dshmobile.ui.components
 
 import com.shenyan.designsystem.foundation.SyMetric
+import com.labteto.dshmobile.uicontract.UiMarkdownBlock
+import com.labteto.dshmobile.uicontract.UiMarkdownInline
+import com.labteto.dshmobile.uicontract.parseUiMarkdown
+import com.labteto.dshmobile.uicontract.parseUiMarkdownInline
+import com.labteto.dshmobile.uicontract.isUiMarkdownTableSeparator
+import com.labteto.dshmobile.uicontract.parseUiMarkdownTableAlignments
+import com.labteto.dshmobile.uicontract.splitUiMarkdownTableRow
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -104,9 +111,6 @@ internal fun markdownParagraphDisplayText(lines: List<String>, preserveSoftLineB
 
 // ---- Parser (deterministic, line-based) ------------------------------------
 
-private val HEADING_REGEX = Regex("^(#{1,4})\\s+(.*)$")
-private val ORDERED_REGEX = Regex("^\\d+\\.\\s+")
-
 internal enum class TableAlignment { START, CENTER, END }
 
 internal sealed interface MdBlock {
@@ -120,247 +124,26 @@ internal sealed interface MdBlock {
     ) : MdBlock
     data class Blockquote(val lines: List<String>) : MdBlock
     data class Code(val lang: String?, val code: String) : MdBlock
-    data class Table(
-        val header: List<String>,
-        val rows: List<List<String>>,
-        val alignments: List<TableAlignment>,
-    ) : MdBlock
+    data class Table(val header: List<String>, val rows: List<List<String>>, val alignments: List<TableAlignment>) : MdBlock
 }
 
-internal fun parseMarkdown(markdown: String): List<MdBlock> {
-    val blocks = mutableListOf<MdBlock>()
-    val lines = markdown.replace("\r\n", "\n").split("\n")
-    var i = 0
-    while (i < lines.size) {
-        val line = lines[i]
-        val trimmed = line.trimStart()
-        when {
-            trimmed.startsWith("```") -> {
-                val lang = trimmed.removePrefix("```").trim().ifEmpty { null }
-                val code = StringBuilder()
-                i++
-                while (i < lines.size && !lines[i].trimStart().startsWith("```")) {
-                    code.append(lines[i]).append('\n')
-                    i++
-                }
-                i++ // skip closing fence
-                blocks += MdBlock.Code(lang, code.toString().trimEnd('\n'))
-            }
-            HEADING_REGEX.matches(trimmed) -> {
-                val match = checkNotNull(HEADING_REGEX.matchEntire(trimmed))
-                val level = match.groupValues[1].length
-                val text = match.groupValues[2].trim().trimEnd('#').trim()
-                blocks += MdBlock.Heading(level, text)
-                i++
-            }
-            isMarkdownListItem(trimmed) -> {
-                val items = mutableListOf<String>()
-                val levels = mutableListOf<Int>()
-                val numbered = mutableListOf<Boolean>()
-                while (i < lines.size) {
-                    val source = lines[i]
-                    val item = source.trimStart()
-                    if (!isMarkdownListItem(item)) break
-                    val isNumbered = ORDERED_REGEX.containsMatchIn(item)
-                    numbered += isNumbered
-                    levels += ((source.length - item.length) / 2).coerceIn(0, 6)
-                    items += if (isNumbered) ORDERED_REGEX.replace(item, "").trim()
-                        else item.drop(2).trim()
-                    i++
-                }
-                blocks += MdBlock.MdList(items, numbered.firstOrNull() == true, levels, numbered)
-            }
-            trimmed.startsWith(">") -> {
-                val quote = mutableListOf<String>()
-                while (i < lines.size && lines[i].trimStart().startsWith(">")) {
-                    quote += lines[i].trim().removePrefix(">").trim()
-                    i++
-                }
-                blocks += MdBlock.Blockquote(quote)
-            }
-            isMarkdownTableStart(lines, i) -> {
-                val header = splitTableRow(lines[i])
-                val alignments = parseTableAlignments(lines[i + 1], header.size)
-                val rows = mutableListOf<List<String>>()
-                i += 2
-                while (i < lines.size && lines[i].trimStart().startsWith("|")) {
-                    val cells = splitTableRow(lines[i])
-                    rows += List(header.size) { column -> cells.getOrElse(column) { "" } }
-                    i++
-                }
-                blocks += MdBlock.Table(header, rows, alignments)
-            }
-            line.isBlank() -> i++
-            else -> {
-                val para = mutableListOf(line)
-                i++
-                while (i < lines.size && lines[i].isNotBlank() && !isSpecialLine(lines[i])) {
-                    para += lines[i]
-                    i++
-                }
-                blocks += MdBlock.Paragraph(para)
-            }
-        }
-    }
-    return blocks
-}
-
-private fun isMarkdownListItem(text: String): Boolean =
-    text.startsWith("- ") || text.startsWith("* ") || text.startsWith("+ ") ||
-        ORDERED_REGEX.containsMatchIn(text)
-
-private fun isSpecialLine(line: String): Boolean {
-    val trimmed = line.trimStart()
-    return trimmed.startsWith("```") ||
-        HEADING_REGEX.matches(trimmed) ||
-        isMarkdownListItem(trimmed) ||
-        trimmed.startsWith(">") ||
-        trimmed.startsWith("|")
-}
-
-private fun isMarkdownTableStart(lines: List<String>, index: Int): Boolean =
-    index + 1 < lines.size &&
-        lines[index].trimStart().startsWith("|") &&
-        isTableSeparator(lines[index + 1])
-
-/** A separator cell is at least three dashes with optional leading/trailing alignment colons. */
-internal fun isTableSeparator(line: String): Boolean {
-    if (!line.trimStart().startsWith("|")) return false
-    val cells = splitTableRow(line)
-    return cells.isNotEmpty() && cells.all { it.trim().matches(Regex("^:?-{3,}:?$")) }
-}
-
-internal fun parseTableAlignments(line: String, columns: Int): List<TableAlignment> {
-    val cells = splitTableRow(line)
-    return List(columns) { index ->
-        val cell = cells.getOrElse(index) { "" }.trim()
-        when {
-            cell.startsWith(":") && cell.endsWith(":") -> TableAlignment.CENTER
-            cell.endsWith(":") -> TableAlignment.END
-            else -> TableAlignment.START
-        }
+/** Retain V6 public test/renderer shapes while both packs use the same neutral parser. */
+internal fun parseMarkdown(markdown: String): List<MdBlock> = parseUiMarkdown(markdown).map { block ->
+    when (block) {
+        is UiMarkdownBlock.Paragraph -> MdBlock.Paragraph(block.lines)
+        is UiMarkdownBlock.Heading -> MdBlock.Heading(block.level, block.text)
+        is UiMarkdownBlock.MdList -> MdBlock.MdList(block.items, block.ordered, block.levels, block.numbered)
+        is UiMarkdownBlock.Blockquote -> MdBlock.Blockquote(block.lines)
+        is UiMarkdownBlock.Code -> MdBlock.Code(block.lang, block.code)
+        is UiMarkdownBlock.Table -> MdBlock.Table(block.header, block.rows, block.alignments.map { TableAlignment.valueOf(it.name) })
     }
 }
-
-/**
- * Split one pipe row while respecting escaped pipes and pipes inside inline code.
- * Outer pipes are syntax and are not returned as empty cells.
- */
-internal fun splitTableRow(line: String): List<String> {
-    val source = line.trim().removePrefix("|").removeSuffix("|")
-    val cells = mutableListOf<String>()
-    val current = StringBuilder()
-    var escaped = false
-    var inCode = false
-    source.forEach { char ->
-        when {
-            escaped -> {
-                current.append(char)
-                escaped = false
-            }
-            char == '\\' -> escaped = true
-            char == '`' -> {
-                inCode = !inCode
-                current.append(char)
-            }
-            char == '|' && !inCode -> {
-                cells += current.toString().trim()
-                current.clear()
-            }
-            else -> current.append(char)
-        }
-    }
-    if (escaped) current.append('\\')
-    cells += current.toString().trim()
-    return cells
-}
+internal fun isTableSeparator(line: String): Boolean = isUiMarkdownTableSeparator(line)
+internal fun parseTableAlignments(line: String, columns: Int): List<TableAlignment> =
+    parseUiMarkdownTableAlignments(line, columns).map { TableAlignment.valueOf(it.name) }
+internal fun splitTableRow(line: String): List<String> = splitUiMarkdownTableRow(line)
 
 // ---- Inline rendering ------------------------------------------------------
-
-private sealed interface InlineSegment {
-    data class Plain(val text: String) : InlineSegment
-    data class Bold(val text: String) : InlineSegment
-    data class Italic(val text: String) : InlineSegment
-    data class Strikethrough(val text: String) : InlineSegment
-    data class Code(val text: String) : InlineSegment
-    data class Link(val text: String, val url: String) : InlineSegment
-}
-
-private fun parseInlineSegments(text: String): List<InlineSegment> {
-    val segments = mutableListOf<InlineSegment>()
-    val sb = StringBuilder()
-    var i = 0
-    fun flush() {
-        if (sb.isNotEmpty()) {
-            segments += InlineSegment.Plain(sb.toString())
-            sb.clear()
-        }
-    }
-    while (i < text.length) {
-        when {
-            text.startsWith("`", i) -> {
-                val end = text.indexOf('`', i + 1)
-                if (end != -1) {
-                    flush()
-                    segments += InlineSegment.Code(text.substring(i + 1, end))
-                    i = end + 1
-                } else {
-                    sb.append(text[i]); i++
-                }
-            }
-            text.startsWith("**", i) -> {
-                val end = text.indexOf("**", i + 2)
-                if (end != -1) {
-                    flush()
-                    segments += InlineSegment.Bold(text.substring(i + 2, end))
-                    i = end + 2
-                } else {
-                    sb.append(text[i]); i++
-                }
-            }
-            text.startsWith("~~", i) -> {
-                val end = text.indexOf("~~", i + 2)
-                if (end != -1) {
-                    flush()
-                    segments += InlineSegment.Strikethrough(text.substring(i + 2, end))
-                    i = end + 2
-                } else {
-                    sb.append(text[i]); i++
-                }
-            }
-            text.startsWith("*", i) -> {
-                val end = text.indexOf("*", i + 1)
-                if (end != -1) {
-                    flush()
-                    segments += InlineSegment.Italic(text.substring(i + 1, end))
-                    i = end + 1
-                } else {
-                    sb.append(text[i]); i++
-                }
-            }
-            text.startsWith("[", i) -> {
-                val close = text.indexOf("](", i + 1)
-                if (close != -1) {
-                    val end = text.indexOf(')', close + 2)
-                    if (end != -1) {
-                        flush()
-                        segments += InlineSegment.Link(text.substring(i + 1, close), text.substring(close + 2, end))
-                        i = end + 1
-                    } else {
-                        sb.append(text[i]); i++
-                    }
-                } else {
-                    sb.append(text[i]); i++
-                }
-            }
-            else -> {
-                sb.append(text[i]); i++
-            }
-        }
-    }
-    flush()
-    return segments
-}
 
 /** Renders one line of markdown with bold/italic/code/link spans. */
 @Composable
@@ -393,16 +176,16 @@ private fun buildInlineContent(
     colors: SyColors,
 ): AnnotatedString {
     val builder = AnnotatedString.Builder()
-    parseInlineSegments(text).forEach { segment ->
+    parseUiMarkdownInline(text).forEach { segment ->
         when (segment) {
-            is InlineSegment.Plain -> builder.append(segment.text)
-            is InlineSegment.Bold -> builder.withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(segment.text) }
-            is InlineSegment.Italic -> builder.withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(segment.text) }
-            is InlineSegment.Strikethrough -> builder.withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { append(segment.text) }
-            is InlineSegment.Code -> builder.withStyle(
+            is UiMarkdownInline.Plain -> builder.append(segment.text)
+            is UiMarkdownInline.Bold -> builder.withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(segment.text) }
+            is UiMarkdownInline.Italic -> builder.withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(segment.text) }
+            is UiMarkdownInline.Strikethrough -> builder.withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { append(segment.text) }
+            is UiMarkdownInline.Code -> builder.withStyle(
                 SpanStyle(fontFamily = codeStyle.fontFamily, color = codeStyle.color, background = colors.materialL1),
             ) { append(segment.text) }
-            is InlineSegment.Link -> {
+            is UiMarkdownInline.Link -> {
                 builder.pushStringAnnotation("url", segment.url)
                 builder.withStyle(SpanStyle(color = colors.primary)) { append(segment.text) }
                 builder.pop()

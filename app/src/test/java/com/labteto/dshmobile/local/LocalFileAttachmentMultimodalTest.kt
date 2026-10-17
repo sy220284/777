@@ -7,13 +7,58 @@ import com.labteto.dshmobile.local.model.buildLocalUserModelMessage
 import com.labteto.dshmobile.local.model.prepareLocalMultimodalMessages
 import java.io.File
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalFileAttachmentMultimodalTest {
+    @Test
+    fun officialResponsesRouteSendsNativePdfWithoutReplayingItToHistory() = runTest {
+        val root = kotlin.io.path.createTempDirectory("siwc-file-").toFile()
+        try {
+            val file = File(root, ".dsh/attachments/manual.pdf").apply {
+                parentFile?.mkdirs()
+                writeBytes("%PDF-1.4\\n1 0 obj\\n<< >>\\nendobj".toByteArray())
+            }
+            val source = buildLocalUserModelMessage(
+                "总结附件", listOf(LocalImportedAttachment(
+                    name = "manual.pdf", relativePath = file.relativeTo(root).invariantSeparatorsPath,
+                    mediaType = "application/pdf", bytes = file.length(),
+                )),
+            )
+            val prepared = prepareLocalMultimodalMessages(
+                messages = listOf(source), workspaceRoot = root,
+                mode = LocalImageInputMode.NATIVE, model = "gpt-6-astra",
+                baseUrl = "https://api.openai.com/v1", planSharing = true,
+            )
+            val part = ((prepared.single()["content"] as JsonArray)[1] as JsonObject)
+            assertEquals("input_file", part["type"]?.jsonPrimitive?.content)
+            assertTrue(part["file_data"]!!.jsonPrimitive.content.startsWith("data:application/pdf;base64,"))
+            assertFalse(source.toString().contains("base64"))
+            assertFalse(com.labteto.dshmobile.local.model.redactModelImages(prepared).toString().contains("base64"))
+            val older = prepareLocalMultimodalMessages(
+                messages = listOf(source, buildJsonObject { put("role", "assistant"); put("content", "好了") },
+                    buildJsonObject { put("role", "user"); put("content", "继续") }),
+                workspaceRoot = root, mode = LocalImageInputMode.NATIVE,
+                model = "gpt-6-astra", baseUrl = "https://api.openai.com/v1", planSharing = true,
+            )
+            assertFalse(older.first().toString().contains("base64"))
+            val fallback = prepareLocalMultimodalMessages(
+                messages = listOf(source), workspaceRoot = root, mode = LocalImageInputMode.TOOL,
+                model = "gpt-6-astra", baseUrl = "https://api.openai.com/v1", planSharing = true,
+            )
+            assertFalse(fallback.single().toString().contains("file_data"))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test
     fun activeTextFileIsMaterializedForDirectChatWithoutToolAccess() = runTest {
         val root = kotlin.io.path.createTempDirectory("file-multimodal-").toFile()

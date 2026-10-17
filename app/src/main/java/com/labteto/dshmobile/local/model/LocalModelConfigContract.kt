@@ -50,8 +50,7 @@ internal object LocalModelExecutionSettings {
         )
     }
 
-    fun write(
-        preferences: SharedPreferences,
+    fun prepare(
         modelAttempts: Int,
         workerProfileId: String?,
         availableProfiles: List<LocalModelProfile>,
@@ -60,18 +59,30 @@ internal object LocalModelExecutionSettings {
         require(
             normalizedWorker == null || availableProfiles.any { it.id == normalizedWorker },
         ) { "子代理工作模型已不存在，请重新选择" }
-        val snapshot = LocalModelExecutionSettingsSnapshot(
+        return LocalModelExecutionSettingsSnapshot(
             modelAttempts = LocalModelConfigContract.normalizeModelAttempts(modelAttempts),
             workerProfileId = normalizedWorker,
         )
-        preferences.edit().apply {
-            putInt(LocalModelConfigContract.KEY_MODEL_ATTEMPTS, snapshot.modelAttempts)
-            if (snapshot.workerProfileId == null) {
-                remove(LocalModelConfigContract.KEY_WORKER_PROFILE_ID)
-            } else {
-                putString(LocalModelConfigContract.KEY_WORKER_PROFILE_ID, snapshot.workerProfileId)
-            }
-        }.apply()
+    }
+
+    /** Stage Model-owned keys without a separate persistence roundtrip. */
+    fun stage(editor: SharedPreferences.Editor, snapshot: LocalModelExecutionSettingsSnapshot) {
+        editor.putInt(LocalModelConfigContract.KEY_MODEL_ATTEMPTS, snapshot.modelAttempts)
+        if (snapshot.workerProfileId == null) {
+            editor.remove(LocalModelConfigContract.KEY_WORKER_PROFILE_ID)
+        } else {
+            editor.putString(LocalModelConfigContract.KEY_WORKER_PROFILE_ID, snapshot.workerProfileId)
+        }
+    }
+
+    fun write(
+        preferences: SharedPreferences,
+        modelAttempts: Int,
+        workerProfileId: String?,
+        availableProfiles: List<LocalModelProfile>,
+    ): LocalModelExecutionSettingsSnapshot {
+        val snapshot = prepare(modelAttempts, workerProfileId, availableProfiles)
+        preferences.edit().also { stage(it, snapshot) }.apply()
         return snapshot
     }
 }

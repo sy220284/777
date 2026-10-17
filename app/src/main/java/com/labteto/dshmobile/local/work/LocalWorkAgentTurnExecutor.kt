@@ -3,7 +3,7 @@ package com.labteto.dshmobile.local.work
 import android.content.Context
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.AgentEventSink
-import com.labteto.dshmobile.harness.agent.AgentLoop
+import com.labteto.dshmobile.harness.agent.AgentTurnEngine
 import com.labteto.dshmobile.harness.agent.AgentModel
 import com.labteto.dshmobile.harness.agent.AgentModelReply
 import com.labteto.dshmobile.harness.agent.AgentToolBatchExecutor
@@ -57,7 +57,6 @@ import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import com.labteto.dshmobile.local.tools.LocalModelToolStepSurface
 import com.labteto.dshmobile.local.tools.LocalRunToolSurface
 import com.labteto.dshmobile.local.tools.pendingToolSettlements
-import com.labteto.dshmobile.local.tools.startedToolCallIdsForActiveStep
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -68,6 +67,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -75,13 +75,14 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
 /**
- * WorkFeature owner of the foreground AgentLoop for one bound Work run.
+ * WorkFeature owner of the foreground AgentTurnEngine for one bound Work run.
  *
  * Session/run identity and resources stay Shared; Work owns prompt composition, tool policy,
  * history/inbox transactions, completion truthfulness, continuation and run teardown.
  */
 internal class LocalWorkAgentTurnExecutor(
     private val context: Context,
+    private val pinnedInvocations: com.labteto.dshmobile.local.tools.LocalPinnedInvocationStore,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val modelGateway: LocalModelGateway,
@@ -94,6 +95,9 @@ internal class LocalWorkAgentTurnExecutor(
     private val workSessionProjection: LocalWorkSessionProjectionRuntime,
     private val workToolResultRuntime: LocalWorkToolResultRuntime,
     private val workTurnToolRuntime: LocalWorkTurnToolRuntime,
+    private val workUiDocumentPublisher: LocalWorkUiDocumentPublisher,
+    private val replyDocuments: com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPublisher,
+    private val onRootExecutionSliceStarted: (String) -> Unit = {},
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val resourceScheduler
@@ -122,9 +126,15 @@ internal class LocalWorkAgentTurnExecutor(
         sourceMessageId: String? = null,
         binding: LocalWorkRunBinding,
         preownedLease: LocalSessionRuntimeLease? = null,
+        continuation: com.labteto.dshmobile.harness.agent.AgentContinuationRef? = null,
     ) {
         val ownerJob = currentCoroutineContext()[Job]
-        var heldSession: String? = null
+        // Preserve the Work turn's origin even when the live transcript window is compacted.
+        val uiSourceMessageId = workDocumentSourceOrLastUser(
+            sourceMessageId, resolveWorkUiDocumentSource(binding.eventLog, sourceMessageId),
+            binding.state.value.messages.lastOrNull { it.role == "user" }?.id,
+        )
+        var foregroundLease: LocalExecutionService.Companion.TurnLease? = null
         var serviceReleased = false
         try {
             LocalSessionRuntimeRegistry.withOwner(
@@ -134,6 +144,16 @@ internal class LocalWorkAgentTurnExecutor(
             ) {
             val runState = BoundRunState(binding)
             val runEventLog = binding.eventLog
+            // Final Goal fence: a user can change Work after inbox consumption but
+            // before this lazy coroutine obtains its Session runtime ownership.
+            if (!isCurrentWorkGoalContinuation(continuation, runState.value.work)) {
+                runEventLog.append("turn/goal-continuation-stale", buildJsonObject {
+                    put("source_run_id", continuation?.sourceRunId ?: "")
+                    put("goal_id", continuation?.goalId ?: "")
+                    put("reason", "goal_changed_before_model_start")
+                })
+                return@withOwner
+            }
             val runHistory = binding.runHandle.modelHistory
             val runTranscript = binding.transcriptRuntime
             val runSessionId = binding.sessionId
@@ -162,11 +182,18 @@ internal class LocalWorkAgentTurnExecutor(
             workTurnToolRuntime.prepare(binding, input)
             val foregroundSessionId = runSessionId
             var foregroundOutcome = LocalExecutionService.OUTCOME_COMPLETED
-            heldSession = foregroundSessionId
-            if (!LocalExecutionService.holdTurn(context, foregroundSessionId)) {
-                binding.state.update { it.copy(error = "前台执行服务启动失败，当前 Work 回合已停止") }
-                error("前台执行服务启动失败")
+            val lease = LocalExecutionService.acquireTurn(context, foregroundSessionId)
+            if (lease == null) {
+                val message = "系统未准许前台执行，当前 Work 回合未启动；进度已保留"
+                runEventLog.append("turn/foreground-start-rejected", buildJsonObject {
+                    put("session_id", foregroundSessionId)
+                    put("source_message_id", uiSourceMessageId)
+                    put("reason", "foreground_service_not_ready")
+                })
+                binding.state.update { it.copy(error = message, kernel = it.kernel.copy(running = false)) }
+                return@withOwner
             }
+            foregroundLease = lease
             binding.state.update {
                 it.copy(
                     work = it.work.copy(
@@ -178,6 +205,7 @@ internal class LocalWorkAgentTurnExecutor(
                 )
             }
             val repliesByStep = mutableMapOf<Int, LocalModelReply>()
+            val uiDefinitionsByStep = mutableMapOf<Int, String?>()
             var modelStep = 0
             var latestAcceptedSamplingRevision = binding.steeringRevision.value
             val modelToolStepSurface = LocalModelToolStepSurface()
@@ -185,6 +213,8 @@ internal class LocalWorkAgentTurnExecutor(
             var workPromptContext = LocalWorkTurnPromptContext()
             var projectedSteeringRevision = binding.steeringRevision.value
             val runSnapshot = runState.value
+            val goalAtTurnStart = runSnapshot.work.goal
+            val steeringRevisionAtTurnStart = binding.steeringRevision.value
             val runToolSurface = LocalRunToolSurface(
                 runSnapshot.modelState.modelSelection.activeProfile?.toRunModelSurface(),
             )
@@ -231,12 +261,14 @@ internal class LocalWorkAgentTurnExecutor(
             var activeStep: Int? = null
             var activeToolCalls = emptyList<AgentToolCall>()
             val completedToolCallIds = linkedSetOf<String>()
+            var hadSuccessfulToolReceipt = false
+            var hadToolFailure = false
+            var completedGoalDisposition: LocalWorkGoalDisposition? = null
 
             fun settlePendingTools(reason: String) {
-                val actuallyStarted = startedToolCallIdsForActiveStep(runEventLog, activeToolCalls)
                 val settlements = pendingToolSettlements(
                     calls = activeToolCalls,
-                    startedCallIds = actuallyStarted,
+                    eventLog = runEventLog,
                     completedCallIds = completedToolCallIds,
                 )
                 if (settlements.isEmpty()) return
@@ -246,24 +278,10 @@ internal class LocalWorkAgentTurnExecutor(
                         name = settlement.call.name,
                         step = activeStep,
                         started = settlement.started,
-                        verifiedReadOnly = workTurnToolRuntime.isVerifiedReadOnly(settlement.call.name),
+                        verifiedReadOnly = settlement.verifiedReadOnly,
+                        executionId = settlement.executionId,
                     )
-                    runEventLog.append("tool/result", buildJsonObject {
-                        result.step?.let { put("step", it) }
-                        put("id", result.callId)
-                        result.name?.let { put("name", it) }
-                        put("content", result.content)
-                        put("model_content", result.modelContent)
-                        put("is_error", true)
-                        put("error_code", result.code)
-                        put("retryable", result.code != SessionRecovery.TOOL_OUTCOME_UNKNOWN)
-                        put(
-                            "side_effect",
-                            if (result.code == SessionRecovery.TOOL_OUTCOME_UNKNOWN) "possible" else "none",
-                        )
-                        put("runtime_settlement", true)
-                        put("reason", reason)
-                    })
+                    runEventLog.append("tool/result", interruptedWorkToolEvent(result, uiSourceMessageId, reason))
                     runHistory.append(
                         buildJsonObject {
                             put("role", "tool")
@@ -275,7 +293,7 @@ internal class LocalWorkAgentTurnExecutor(
                 }
             }
 
-            val loop = AgentLoop(
+            val loop = AgentTurnEngine(
                 model = AgentModel {
                     agentRunCoordinator.ensureCurrentOwner(runContext)
                     // Persistent history stays compact; user rules, recalled memory and handoff are
@@ -287,7 +305,10 @@ internal class LocalWorkAgentTurnExecutor(
                             input = input,
                             snapshot = snapshot,
                             workspacePath = workspacePath,
-                            skillGuidance = resolveLocalWorkSkillGuidance(sessionStorage.files.workspace, input),
+                            skillGuidance = resolveLocalWorkSkillGuidance(
+                                sessionStorage.files.workspace, input,
+                                selectedInvocations = pinnedInvocations.selected.value,
+                            ),
                         )
                         workMemoryRuntime.captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                         requestPrepared = true
@@ -307,6 +328,7 @@ internal class LocalWorkAgentTurnExecutor(
                             workspacePath = workspacePath,
                             skillGuidance = resolveLocalWorkSkillGuidance(
                                 sessionStorage.files.workspace, effectiveInput,
+                                selectedInvocations = pinnedInvocations.selected.value,
                             ),
                         )
                         projectedSteeringRevision = observedSteer
@@ -327,7 +349,7 @@ internal class LocalWorkAgentTurnExecutor(
                     val durableRequestMessages = withWorkTurnContext(
                         withLocalWorkExecutionMode(runHistory.snapshot()),
                         workPromptContext.stable,
-                        workPromptContext.dynamic,
+                        workPromptContext.dynamic + "\n" + com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.instruction,
                         workPromptContext.skill,
                     )
                     val selectedMode = resolveLocalImageInputMode(
@@ -348,6 +370,8 @@ internal class LocalWorkAgentTurnExecutor(
                         maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.modelState.model, snapshot.modelState.baseUrl),
                 model = snapshot.modelState.model,
                 baseUrl = snapshot.modelState.baseUrl,
+                planSharing = snapshot.modelState.modelSelection.activeProfile?.authKind ==
+                    com.labteto.dshmobile.local.model.LocalModelAuthKind.CHATGPT_PLAN,
                     )
                     val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
                     agentRunCoordinator.ensureCurrentOwner(runContext)
@@ -360,6 +384,10 @@ internal class LocalWorkAgentTurnExecutor(
                             options = com.labteto.dshmobile.local.LocalModelRequestOptions(
                                 toolsOverride = tools,
                                 publishPreviewEnabled = true,
+                                previewDeltaTransformFactory = {
+                                    val preview = com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPreview()
+                                    preview::append
+                                },
                                 persistOverflowHistory = true,
                                 requestLog = runEventLog,
                                 previewGuard = {
@@ -424,9 +452,13 @@ internal class LocalWorkAgentTurnExecutor(
                             step = modelStep + 1,
                         )
                     }
-                    val deliveryReply = guardWorkCompletionDelivery(reply, runState.value, runEventLog, File(workspacePath))
+                    val parts = com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.split(reply.content.orEmpty())
+                    val cleanReply = if (parts.text == reply.content) reply else
+                        com.labteto.dshmobile.local.model.withLocalReplyContent(reply, parts.text).copy(providerContentForReplay = null)
+                    val deliveryReply = guardWorkCompletionDelivery(cleanReply, runState.value, runEventLog, File(workspacePath))
                     modelStep += 1
                     repliesByStep[modelStep] = deliveryReply
+                    uiDefinitionsByStep[modelStep] = parts.definition.takeIf { deliveryReply.content == cleanReply.content }
                     return@AgentModel AgentModelReply(
                         content = deliveryReply.content.orEmpty(),
                         toolCalls = if (runPolicy.allowToolExecution) {
@@ -480,12 +512,16 @@ internal class LocalWorkAgentTurnExecutor(
                     when (event) {
                         is AgentEvent.TurnStarted -> {
                             runEventLog.append("turn/start", buildJsonObject {
+                                put("run_id", runContext.runId)
+                                put("source_message_id", uiSourceMessageId)
                                 put("model", runState.value.modelState.model)
                             })
+                            onRootExecutionSliceStarted(runSessionId)
+                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_progress")
                         }
                         is AgentEvent.StepStarted -> {
                             activeStep = event.step
-                            check(LocalExecutionService.holdTurn(context, foregroundSessionId, event.step)) { "前台执行保护更新失败" }
+                            check(lease.updateStep(event.step)) { "前台服务已失去执行租约，Work 回合已停止" }
                             activeToolCalls = emptyList()
                             completedToolCallIds.clear()
                             runEventLog.append("step/start", buildJsonObject {
@@ -513,16 +549,26 @@ internal class LocalWorkAgentTurnExecutor(
                             activeToolCalls = event.toolCalls
                             completedToolCallIds.clear()
                             val assistantEvent = runEventLog.append(
-                                "assistant/message", runTranscript.withTranscript(reply.message, transcriptMessages)
+                                "assistant/message", runTranscript.withTranscript(
+                                    kotlinx.serialization.json.JsonObject(reply.message + ("source_message_id" to JsonPrimitive(uiSourceMessageId))), transcriptMessages)
                                     .withModelToolCallEventData(reply.toolCalls),
                             )
+                            uiSourceMessageId?.let { source ->
+                                replyDocuments.publish(uiDefinitionsByStep.remove(event.step),
+                                    com.labteto.dshmobile.uicontract.UiDocumentSource(binding.sessionId, source, 0L,
+                                        beforeAssistant.modelState.modelSelection.activeProfileId,
+                                        beforeAssistant.projectId, true), reply.requestId,
+                                    beforeAssistant.modelState.model, reply.usage.reported)
+                            }
                             runHistory.append(reply.message)
                             workModelHistoryRuntime.updateContextMetrics(binding)
                             runTranscript.applyMessages(transcriptMessages, assistantEvent.sequence)
                             workModelHistoryRuntime.persist(binding)
+                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_progress")
                         }
                         is AgentEvent.ToolStarted -> {
                             runEventLog.append("tool/call", buildJsonObject {
+                                put("source_message_id", uiSourceMessageId)
                                 put("goal_id", binding.workState.snapshot().goal?.id ?: "")
                                 put("step", event.step)
                                 put("id", event.call.id)
@@ -530,6 +576,8 @@ internal class LocalWorkAgentTurnExecutor(
                                 put("arguments", event.call.arguments)
                                 put("execution_started", false)
                             })
+                            // Pending tool status is durable before the Work card observes it.
+                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_tool_started")
                         }
                         is AgentEvent.ToolFinished -> {
                             progressTracker.recordToolResult(event.call, event.output, event.isError)
@@ -559,6 +607,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 java.io.File(sessionStorage.files.workspace.path), event.call.name, event.output,
                             ) else null
                             val toolEvent = runEventLog.append("tool/result", buildJsonObject {
+                                put("source_message_id", uiSourceMessageId)
                                 event.executionId?.let { put("execution_id", it) }
                                 event.processExitCode?.let { put("process_exit_code", it) }
                                 put("file_versions", kotlinx.serialization.json.JsonObject(event.fileVersions.mapValues { kotlinx.serialization.json.JsonPrimitive(it.value) }))
@@ -587,9 +636,14 @@ internal class LocalWorkAgentTurnExecutor(
                             })
                             runHistory.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention))
                             completedToolCallIds += event.call.id
+                            // Count only real tool receipts after their authoritative event is durable.
+                            if (event.isError) hadToolFailure = true else hadSuccessfulToolReceipt = true
                             workModelHistoryRuntime.updateContextMetrics(binding)
                             runTranscript.applyMessages(listOf(transcriptMessage), toolEvent.sequence)
                             workModelHistoryRuntime.persist(binding)
+                            // Event is durable before exposing a UI snapshot. A broken card must
+                            // never abort a completed tool or alter its execution result.
+                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_tool_progress")
                         }
                         is AgentEvent.StepFinished -> {
                             runEventLog.append("step/end", buildJsonObject {
@@ -600,13 +654,22 @@ internal class LocalWorkAgentTurnExecutor(
                             completedToolCallIds.clear()
                         }
                         is AgentEvent.TurnCompleted -> {
-                            recordWorkCompletionQuality(event.answer, runState.value, runEventLog, File(workspacePath))
+                            val goalAssessment = recordWorkCompletionQuality(
+                                event.answer, runState.value, runEventLog, File(workspacePath))
+                            // Preserve approval/question/team blockers observed BEFORE teardown.
                             runEventLog.append("turn/end", buildJsonObject {
+                                put("source_message_id", uiSourceMessageId)
+                                // The model finished this turn; Work goal completion is independent.
                                 put("reason", "completed")
                                 put("steps", event.steps)
                                 put("messages", runState.value.transcriptIndex.totalMessageCount)
+                                goalAssessment?.toTurnEventFields()?.forEach { (key, value) ->
+                                    put(key, value)
+                                }
                             })
                             workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/completed")
+                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_completed_turn")
+                            completedGoalDisposition = goalAssessment?.disposition
                         }
                         is AgentEvent.TurnStepLimit -> {
                             val transcriptMessage = runTranscript.newMessage(
@@ -614,6 +677,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 "当前任务已无法继续扩展执行预算，已在第 ${event.steps} 步暂停；已有进度已保留。",
                             )
                             val turnEnd = runEventLog.append("turn/end", buildJsonObject {
+                                    put("source_message_id", uiSourceMessageId)
                                 put("reason", "step_limit")
                                 put("steps", event.steps)
                                 put("messages", runState.value.transcriptIndex.totalMessageCount + 1L)
@@ -622,6 +686,7 @@ internal class LocalWorkAgentTurnExecutor(
                             runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
                             workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/step-limit")
                             workModelHistoryRuntime.persist(binding)
+                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_step_limit")
                         }
                         is AgentEvent.TurnFailed -> {
                             settlePendingTools("failed")
@@ -634,6 +699,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 )
                             if (continuationEligible) {
                                 runEventLog.append("turn/end", buildJsonObject {
+                                    put("source_message_id", uiSourceMessageId)
                                     put("reason", if (lastModelError?.code == "WORK_BUDGET_EXHAUSTED") {
                                         "budget_exhausted_continuation"
                                     } else {
@@ -648,6 +714,7 @@ internal class LocalWorkAgentTurnExecutor(
                             } else {
                                 val transcriptMessage = runTranscript.newMessage("system", "执行失败：$detail")
                                 val turnEnd = runEventLog.append("turn/end", buildJsonObject {
+                                    put("source_message_id", uiSourceMessageId)
                                     put("reason", "error")
                                     put("detail", detail)
                                     put("messages", runState.value.transcriptIndex.totalMessageCount + 1L)
@@ -657,11 +724,13 @@ internal class LocalWorkAgentTurnExecutor(
                                 workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/failed")
                             }
                             workModelHistoryRuntime.persist(binding)
+                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_failed_turn")
                         }
                         is AgentEvent.TurnCancelled -> {
                             settlePendingTools("cancelled")
                             val transcriptMessage = runTranscript.newMessage("system", "本轮已停止。")
                             val turnEnd = runEventLog.append("turn/end", buildJsonObject {
+                                    put("source_message_id", uiSourceMessageId)
                                 put("reason", "aborted")
                                 put("messages", runState.value.transcriptIndex.totalMessageCount + 1L)
                                 put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
@@ -669,6 +738,7 @@ internal class LocalWorkAgentTurnExecutor(
                             runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
                             workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/cancelled")
                             workModelHistoryRuntime.persist(binding)
+                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_cancelled_turn")
                         }
                     }
                     agentRunCoordinator.recordEvent(runContext, event)
@@ -691,7 +761,9 @@ internal class LocalWorkAgentTurnExecutor(
                     profileId = runSnapshot.modelState.modelSelection.activeProfileId,
                     model = runSnapshot.modelState.model,
                     baseUrl = runSnapshot.modelState.baseUrl,
-                ) { loop.run(input) }
+                ) {
+                    withContext(agentRunCoordinator.executionContext(runContext)) { loop.run(input) }
+                }
             } catch (timeout: TimeoutCancellationException) {
                 // Only an actual nested operation may now time out; foreground work has no wall-clock stop.
                 foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
@@ -706,7 +778,7 @@ internal class LocalWorkAgentTurnExecutor(
                 foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
                 val modelError = error as? LocalModelException
                 val queued = if (modelError != null) {
-                    queueAutomaticWorkContinuation(binding, runContext.runId, modelError)
+                    queueAutomaticWorkContinuation(binding, runContext.runId, modelError, uiSourceMessageId)
                 } else {
                     false
                 }
@@ -726,7 +798,6 @@ internal class LocalWorkAgentTurnExecutor(
                         kernel = it.kernel.copy(running = false),
                     )
                 }
-                val completedJob = currentCoroutineContext()[Job]
                 try {
                     workModelHistoryRuntime.persist(binding)
                 } catch (error: Exception) {
@@ -736,16 +807,39 @@ internal class LocalWorkAgentTurnExecutor(
                     binding.state.update { current -> current.copy(error = "Work 回合已结束，快照保存失败：${error.message}") }
                 } finally {
                     try {
-                        try { LocalExecutionService.releaseTurn(context, foregroundSessionId, foregroundOutcome) }
+                        try { lease.release(foregroundOutcome) }
                         finally { serviceReleased = true }
                     } finally {
-                        workRunRegistry.finishTurn(binding, completedJob) { next, ownedBinding ->
+                        workRunRegistry.finishTurn(binding, ownerJob, onIdle = {
+                            if (completedGoalDisposition == LocalWorkGoalDisposition.NEEDS_EXECUTION ||
+                                completedGoalDisposition == LocalWorkGoalDisposition.READY_FOR_SETTLEMENT) {
+                                driveLocalWorkGoalAfterTurn(
+                                    binding = binding,
+                                    originalGoal = goalAtTurnStart,
+                                    sourceRunId = runContext.runId,
+                                    sourceMessageId = uiSourceMessageId,
+                                    originalSteeringRevision = steeringRevisionAtTurnStart,
+                                    hadSuccessfulTool = hadSuccessfulToolReceipt,
+                                    hadToolFailure = hadToolFailure,
+                                    workspaceRoot = File(workspacePath),
+                                    completeGoal = { expected ->
+                                        LocalWorkProgressCoordinator(
+                                            state = binding.workState,
+                                            eventLog = runEventLog,
+                                            workspaceRoot = File(workspacePath),
+                                            persist = { sessionStorage.enqueueSnapshot(binding.persistenceSnapshot()) },
+                                        ).completeVerifiedGoal(expected)
+                                    },
+                                )
+                            }
+                        }) { next, ownedBinding ->
                             scope.launch(start = CoroutineStart.LAZY) {
                                 run(
                                     input = next.content,
                                     memoryInput = next.memoryInput,
-                                    sourceMessageId = next.id,
+                                    sourceMessageId = next.continuation?.sourceMessageId ?: next.id,
                                     binding = ownedBinding,
+                                    continuation = next.continuation,
                                 )
                             }
                         }?.start()
@@ -755,9 +849,7 @@ internal class LocalWorkAgentTurnExecutor(
         }
     } finally {
         try {
-            if (!serviceReleased) heldSession?.let { sessionId ->
-                LocalExecutionService.releaseTurn(context, sessionId, LocalExecutionService.OUTCOME_FAILED)
-            }
+            if (!serviceReleased) foregroundLease?.release(LocalExecutionService.OUTCOME_FAILED)
         } finally {
             if (ownerJob != null) workRunRegistry.releaseCompletedTurn(binding, ownerJob)
         }

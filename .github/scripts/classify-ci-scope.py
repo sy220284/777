@@ -216,6 +216,10 @@ def classify(
 
         architecture = architecture or is_architecture_3_path(path)
 
+        if path == "docs/agent-engine4/PR705-KOTLIN-REBUILD-TASKS.json":
+            audit_index = True
+            continue
+
         if path in {"docs/FEATURE-TREE.zh-CN.md", "docs/FEATURE-TREE.zh-CN.html",
                     "docs/ACCEPTANCE-MATRIX.json", "docs/FUNCTION-AUDIT.zh-CN.md"}:
             audit_index = True
@@ -383,6 +387,8 @@ def self_test() -> None:
            excluded=("unit", "build", "device"), release=False)
     verify(["docs/ACCEPTANCE-MATRIX.json"], required=("static",),
            excluded=("unit", "build"), release=False)
+    verify(["docs/agent-engine4/PR705-KOTLIN-REBUILD-TASKS.json"],
+           required=("static",), excluded=("unit", "build"), release=False)
     verify(["app/src/androidTest/java/com/labteto/dshmobile/local/ExampleTest.kt"],
            required=("device", "android16", "android17"), release=False)
     verify(["harness-core/src/test/kotlin/example/Test.kt"],

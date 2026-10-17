@@ -22,10 +22,12 @@
 | [ANDROID-HARNESS-STATUS.zh-CN.md](ANDROID-HARNESS-STATUS.zh-CN.md) | 当前 Android 原生 Harness 已实现能力与平台限制 |
 | [ANDROID-HARNESS-ROADMAP.zh-CN.md](ANDROID-HARNESS-ROADMAP.zh-CN.md) | 当前版本之后仍需继续收敛的架构与工程工作 |
 | [VALIDATION.md](VALIDATION.md) | CI、差分验证、Android 16 / 17、架构与性能门禁 |
+| [design/UI-3.0.zh-CN.md](design/UI-3.0.zh-CN.md) | UI 最高权威：Feature Port、Host、独立 UI Pack 与双包验收规则 |
+| [UI-3.0-IMPLEMENTATION.zh-CN.md](UI-3.0-IMPLEMENTATION.zh-CN.md) | UI 3.0-R4 首批代码、场景清单、迁移边界与真实验收状态 |
 | [UI-UX.zh-CN.md](UI-UX.zh-CN.md) | 当前聊天 / 工作模式、人物调节、Token 页面与交互规范 |
 | [UI-ARTIFACTS.md](UI-ARTIFACTS.md) | 当前效果图清单与截图归档规则 |
-| [design/mobile-ui.md](design/mobile-ui.md) | 手机交互规范与当前 V6 唯一设计源的映射 |
-| [design/v6/README.zh-CN.md](design/v6/README.zh-CN.md)／[视觉验收台账](design/v6/STATUS.zh-CN.md) | V6 唯一手机设计入口、设计资源和原生待验收状态 |
+| [design/mobile-ui.md](design/mobile-ui.md) | 当前发布 V6 包的手机交互与设计源映射 |
+| [design/v6/README.zh-CN.md](design/v6/README.zh-CN.md)／[视觉验收台账](design/v6/STATUS.zh-CN.md) | 当前发布 V6 包的手机设计、资源与原生待验收状态 |
 
 ## 历史归档与扫描证据
 

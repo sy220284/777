@@ -25,12 +25,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
-data class LocalSettingsMemoryContext(
-    val conversationMode: LocalConversationMode,
-    val projectId: String?,
-    val lineageId: String,
-)
-
 @Singleton
 class LocalSettingsRuntime @Inject internal constructor(
     private val diagnostics: LocalDiagnosticsPort,
@@ -44,51 +38,64 @@ class LocalSettingsRuntime @Inject internal constructor(
     private val sessionStorage: LocalSessionStorageRuntime,
     private val approvalPreferences: LocalApprovalPreferences,
     runtimeStateStore: LocalRuntimeStateStore,
-) {
+) : com.labteto.dshmobile.uicontract.SettingsUiPort {
     private val runtimeState = runtimeStateStore.state
-    val state: Flow<LocalHarnessSettingsState> = runtimeState.map { it.toSettingsUiState() }.distinctUntilChanged()
-    val initialState get() = runtimeState.value.toSettingsUiState()
-    val chatGptState: StateFlow<ChatGptUiState> = chatGpt.state
-    val chatStyleGuardBuiltInPhrases: List<String> get() = chatStyleGuardSettings.builtInPhrases
-    val approvalMode: StateFlow<LocalApprovalMode> = approvalPreferences.approvalMode
+    override val state: Flow<com.labteto.dshmobile.uicontract.UiSettingsSnapshot> = runtimeState.map { it.toSettingsUiState().toNeutralSnapshot() }.distinctUntilChanged()
+    override val initialState get() = runtimeState.value.toSettingsUiState().toNeutralSnapshot()
+    override val chatGptState: StateFlow<ChatGptUiState> = chatGpt.state
+    override val chatStyleGuardBuiltInPhrases: List<String> get() = chatStyleGuardSettings.builtInPhrases
+    override val approvalMode: StateFlow<LocalApprovalMode> = approvalPreferences.approvalMode
 
-    fun configureApprovalMode(mode: LocalApprovalMode) = approvalPreferences.setApprovalMode(mode)
+    override fun configureApprovalMode(mode: LocalApprovalMode) = approvalPreferences.setApprovalMode(mode)
 
-    fun memoryContext(): LocalSettingsMemoryContext = runtimeState.value.let {
+    override fun memoryContext(): LocalSettingsMemoryContext = runtimeState.value.let {
         LocalSettingsMemoryContext(it.conversationMode, it.projectId, it.lineageId)
     }
-    suspend fun refreshChatGpt() = chatGpt.refresh()
-    suspend fun connectChatGpt(existingAccountId: String? = null, requestPlanConsent: Boolean = false) =
+    override suspend fun refreshChatGpt() = chatGpt.refresh()
+    override suspend fun connectChatGpt(existingAccountId: String?, requestPlanConsent: Boolean) =
         chatGpt.connect(existingAccountId, requestPlanConsent)
-    suspend fun restartChatGptAuthorization(existingAccountId: String? = null) = chatGpt.restart(existingAccountId)
-    suspend fun cancelChatGptAuthorization() = chatGpt.cancelAuthorization()
-    suspend fun testChatGptAccount(id: String): String = chatGpt.test(id)
-    suspend fun selectChatGptAccount(id: String) = chatGpt.select(id)
-    suspend fun disconnectChatGptAccount(id: String): String? = chatGpt.disconnect(id)
-    suspend fun removeChatGptAccount(id: String): String? = chatGpt.remove(id)
-    fun configureModel(apiKey: String, model: String, baseUrl: String) = modelRuntime.configure(apiKey, model, baseUrl)
-    suspend fun saveModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null, credentialSourceProfileId: String? = null) = modelRuntime.saveConfiguration(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride, credentialSourceProfileId)
-    internal suspend fun queryMiniMaxQuota(profile: LocalModelProfile): MiniMaxProviderUsage = miniMaxQuota.query(profile)
-    fun selectModel(id: String) = modelRuntime.selectModel(id)
-    fun removeModel(id: String) = modelRuntime.removeModel(id)
-    suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, credentialSourceProfileId: String? = null) = modelRuntime.testConfiguration(apiKey, model, baseUrl, protocol, profileId, credentialSourceProfileId)
-    suspend fun discoverApiModels(apiKey: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol, credentialSourceProfileId: String? = null): List<String> = modelRuntime.discoverApiModels(apiKey, baseUrl, protocol, credentialSourceProfileId)
-    fun configureImageInputMode(mode: LocalImageInputMode) = modelSettings.configureImageInputMode(mode)
-    fun configureRuntimeLimits(main: Int, subagent: Int, attempts: Int, workerProfileId: String?) =
+    override suspend fun restartChatGptAuthorization(existingAccountId: String?) = chatGpt.restart(existingAccountId)
+    override suspend fun cancelChatGptAuthorization() = chatGpt.cancelAuthorization()
+    override suspend fun testChatGptAccount(id: String): String = chatGpt.test(id)
+    override suspend fun selectChatGptAccount(id: String) = chatGpt.select(id)
+    override suspend fun disconnectChatGptAccount(id: String): String? = chatGpt.disconnect(id)
+    override suspend fun removeChatGptAccount(id: String): String? = chatGpt.remove(id)
+    override fun configureModel(apiKey: String, model: String, baseUrl: String) = modelRuntime.configure(apiKey, model, baseUrl)
+    override suspend fun saveModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol?, profileId: String?, contextWindowTokensOverride: Int?, credentialSourceProfileId: String?) = modelRuntime.saveConfiguration(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride, credentialSourceProfileId)
+    override suspend fun queryMiniMaxQuota(profile: LocalModelProfile): MiniMaxProviderUsage = miniMaxQuota.query(profile)
+    override fun selectModel(id: String) = modelRuntime.selectModel(id)
+    override fun removeModel(id: String) = modelRuntime.removeModel(id)
+    override suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol?, profileId: String?, credentialSourceProfileId: String?) = modelRuntime.testConfiguration(apiKey, model, baseUrl, protocol, profileId, credentialSourceProfileId)
+    override suspend fun discoverApiModels(apiKey: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol, credentialSourceProfileId: String?): List<String> = modelRuntime.discoverApiModels(apiKey, baseUrl, protocol, credentialSourceProfileId)
+    override fun configureImageInputMode(mode: LocalImageInputMode) = modelSettings.configureImageInputMode(mode)
+    override fun configureRuntimeLimits(main: Int, subagent: Int, attempts: Int, workerProfileId: String?) =
         settingsCoordinator.configureRuntimeLimits(main, subagent, attempts).also {
             settingsCoordinator.configureWorkerProfile(workerProfileId)
         }
-    fun configurePersonalization(rules: String, autoRecall: Boolean, autoMemory: Boolean) =
+    override fun configurePersonalization(rules: String, autoRecall: Boolean, autoMemory: Boolean) =
         settingsCoordinator.configurePersonalization(rules, autoRecall, autoMemory)
-    fun configureChatStyleGuard(enabled: Boolean) = chatStyleGuardSettings.configureEnabled(enabled)
-    fun addChatStyleGuardPhrase(value: String) = chatStyleGuardSettings.addPhrase(value)
-    fun removeChatStyleGuardPhrase(value: String) = chatStyleGuardSettings.removePhrase(value)
-    fun clearChatStyleGuardHits() = chatStyleGuardSettings.clearHits()
-    suspend fun diagnoseNetwork(target: String) = web.diagnose(target)
-    suspend fun sessionStorageStatus(): LocalSessionStorageStatus = sessionStorage.storageStatus()
-    suspend fun compactSessionStorage(): LocalSessionStorageStatus = sessionStorage.compactStorage()
-    suspend fun exportSessionStorage(output: OutputStream) = sessionStorage.exportStorage(output)
-    suspend fun environmentInfo() = diagnostics.environmentInfo()
-    suspend fun diagnosticReport() = diagnostics.diagnosticReport()
-    fun clearCredential() = modelRuntime.clearCredential()
+    override fun configureChatStyleGuard(enabled: Boolean) = chatStyleGuardSettings.configureEnabled(enabled)
+    override fun addChatStyleGuardPhrase(value: String) = chatStyleGuardSettings.addPhrase(value)
+    override fun removeChatStyleGuardPhrase(value: String) = chatStyleGuardSettings.removePhrase(value)
+    override fun clearChatStyleGuardHits() = chatStyleGuardSettings.clearHits()
+    override suspend fun diagnoseNetwork(target: String) = web.diagnose(target)
+    override suspend fun sessionStorageStatus(): LocalSessionStorageStatus = sessionStorage.storageStatus()
+    override suspend fun compactSessionStorage(): LocalSessionStorageStatus = sessionStorage.compactStorage()
+    override suspend fun exportSessionStorage(output: OutputStream) = sessionStorage.exportStorage(output)
+    override suspend fun environmentInfo() = diagnostics.environmentInfo()
+    override suspend fun diagnosticReport() = diagnostics.diagnosticReport()
+    override fun clearCredential() = modelRuntime.clearCredential()
+}
+
+private fun LocalHarnessSettingsState.toNeutralSnapshot() = com.labteto.dshmobile.uicontract.UiSettingsSnapshot(
+    loading, model, baseUrl, modelSelection, mainMaxSteps, subagentMaxSteps, modelAttempts,
+    imageInputMode, userRules, autoRecall, autoMemory, chatStyleGuardEnabled, chatStyleGuardCustomPhrases,
+    styleGuardHits, chatPersona.name, usage, error, miniMaxQuotaProfile, chatPersona.bannedPhrases,
+)
+
+@dagger.Module
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+abstract class LocalSettingsUiBindings {
+    @dagger.Binds @Singleton
+    abstract fun settings(implementation: LocalSettingsRuntime): com.labteto.dshmobile.uicontract.SettingsUiPort
 }

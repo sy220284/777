@@ -63,6 +63,7 @@ internal class LocalWorkReplyRegenerator @Inject constructor(
                     context,
                     ownedSessionId,
                     { runtimeStateStore.state.value.error },
+                    onRejected = { runtimeStateStore.projection.publishError("系统拒绝前台执行，回复重新生成未启动") },
                 ) {
                     regenerate(messageId)
                 }

@@ -152,6 +152,7 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
         bypassProactivePolicy: Boolean,
     ): LocalChatAutomationResult {
         val trigger = instruction.trim()
+        val usageRunId = "automation-chat:$targetSessionId:${recoveryStartedAt ?: System.currentTimeMillis()}"
         require(trigger.isNotEmpty()) { "定时互动意图不能为空" }
         withTimeout(15_000L) {
             while (state.value.loading) delay(50)
@@ -418,7 +419,7 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                     snapshot = boundState,
                     persona = persona,
                     reply = rawReply,
-                    recordUsage = { candidate -> usageTracker.recordAutomation(boundState, candidate, TokenUsageAction.AUTOMATION_CHAT, proactiveDirective) },
+                    recordUsage = { candidate -> usageTracker.recordAutomation(boundState, candidate, TokenUsageAction.AUTOMATION_CHAT, proactiveDirective, usageRunId) },
                     onGuardEvent = { action, violations ->
                         styleGuardSettings.recordHits(violations)
                         boundEventLog.append("chat/style-guard", buildJsonObject {

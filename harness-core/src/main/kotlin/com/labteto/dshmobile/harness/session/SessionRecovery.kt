@@ -19,6 +19,7 @@ data class RecoveredToolResult(
     val code: String,
     val content: String,
     val modelContent: String,
+    val executionId: String? = null,
 )
 
 data class SessionRepairResult(
@@ -30,21 +31,13 @@ data class SessionRepairResult(
 
 /**
  * Closes a persisted tail turn after process loss without guessing whether a side-effecting tool
- * completed. A recorded tool/call becomes TOOL_OUTCOME_UNKNOWN; an assistant-declared call that
- * never reached tool/call becomes TOOL_NOT_STARTED.
+ * completed. An admitted mutation (or legacy admission without a read-only contract) becomes
+ * TOOL_OUTCOME_UNKNOWN. A verified read remains safely retryable; unadmitted calls are NOT_STARTED.
  */
 object SessionRecovery {
-    private const val MODEL_TOOL_CALLS_EVENT_KEY = "model_tool_calls"
     const val TOOL_NOT_STARTED = "TOOL_NOT_STARTED"
     const val TOOL_OUTCOME_UNKNOWN = "TOOL_OUTCOME_UNKNOWN"
     const val TOOL_READ_RESULT_UNKNOWN = "TOOL_READ_RESULT_UNKNOWN"
-
-    private data class PendingCall(
-        val id: String,
-        var name: String?,
-        var step: Int?,
-        var started: Boolean,
-    )
 
     /**
      * Build the model-visible settlement for a tool call interrupted before a durable result exists.
@@ -58,6 +51,7 @@ object SessionRecovery {
         step: Int?,
         started: Boolean,
         verifiedReadOnly: Boolean = false,
+        executionId: String? = null,
     ): RecoveredToolResult {
         val code = when {
             !started -> TOOL_NOT_STARTED
@@ -87,10 +81,17 @@ object SessionRecovery {
                 "本次操作尚无成功结果，可安全重新执行只读操作或未开始的调用。"
             },
         ).modelVisibleContent()
-        return RecoveredToolResult(callId, name, step, code, content, modelContent)
+        return RecoveredToolResult(callId, name, step, code, content, modelContent, executionId)
     }
 
-    fun repairInterruptedTail(log: SessionEventLog): SessionRepairResult {
+    fun repairInterruptedTail(log: SessionEventLog): SessionRepairResult = log.withWriterLease {
+        // The unfinished-turn check and every recovery receipt must share the durable
+        // per-session writer lease. Otherwise two processes can both see an open turn,
+        // append conflicting synthetic tool results, and close it twice.
+        repairInterruptedTailUnderLease(log)
+    }
+
+    private fun repairInterruptedTailUnderLease(log: SessionEventLog): SessionRepairResult {
         // A restart only needs to inspect the newest unfinished turn. Replaying the complete
         // append-only archive here used to duplicate years of session history in the Android heap
         // and could OOM before the Harness reached its incremental projection checkpoints.
@@ -100,91 +101,50 @@ object SessionRecovery {
             return SessionRepairResult()
         }
 
-        val latestStepStart = log.latest("step/start")
-        val latestStepEnd = log.latest("step/end")
-        val openStepEvent = latestStepStart?.takeIf { stepStart ->
-            stepStart.sequence > turnStart.sequence &&
-                (latestStepEnd == null || latestStepEnd.sequence < stepStart.sequence)
+        val latestStepStart = log.latest("step/start")?.takeIf {
+            it.sequence > turnStart.sequence
         }
-        val openStep = openStepEvent?.data?.get("step")?.jsonPrimitive?.intOrNull
-        val pending = linkedMapOf<String, PendingCall>()
-
-        if (openStepEvent != null) {
-            // Stream only the current open step. No List of historical SessionEvent objects is
-            // created, and events from completed steps cannot leak pending calls into recovery.
-            log.forEachAfter(openStepEvent.sequence) { event ->
-                when (event.type) {
-                    "assistant/message" -> {
-                        val genericCalls = event.data[MODEL_TOOL_CALLS_EVENT_KEY] as? JsonArray
-                        if (genericCalls != null) {
-                            for (element in genericCalls) {
-                                val call = element as? JsonObject ?: continue
-                                val id = call["id"]?.jsonPrimitive?.contentOrNull ?: continue
-                                val name = call["name"]?.jsonPrimitive?.contentOrNull
-                                pending[id] = PendingCall(id, name, openStep, started = false)
-                            }
-                        } else {
-                            // Backward compatibility for sessions written before provider-neutral
-                            // model metadata was added.
-                            val legacyCalls = event.data["tool_calls"] as? JsonArray ?: return@forEachAfter
-                            for (element in legacyCalls) {
-                                val call = element as? JsonObject ?: continue
-                                val id = call["id"]?.jsonPrimitive?.contentOrNull ?: continue
-                                val function = call["function"] as? JsonObject
-                                val name = function?.get("name")?.jsonPrimitive?.contentOrNull
-                                pending[id] = PendingCall(id, name, openStep, started = false)
-                            }
-                        }
-                    }
-                    "tool/call" -> {
-                        val id = event.data["id"]?.jsonPrimitive?.contentOrNull ?: return@forEachAfter
-                        val name = event.data["name"]?.jsonPrimitive?.contentOrNull
-                        val step = event.data["step"]?.jsonPrimitive?.intOrNull ?: openStep
-                        val legacyOrStarted = event.data["execution_started"]?.jsonPrimitive?.booleanOrNull ?: true
-                        val existing = pending[id]
-                        if (existing == null) {
-                            pending[id] = PendingCall(id, name, step, started = legacyOrStarted)
-                        } else {
-                            existing.name = name ?: existing.name
-                            existing.step = step ?: existing.step
-                            existing.started = existing.started || legacyOrStarted
-                        }
-                    }
-                    "tool/execution-started" -> {
-                        val id = event.data["id"]?.jsonPrimitive?.contentOrNull ?: return@forEachAfter
-                        val name = event.data["name"]?.jsonPrimitive?.contentOrNull
-                        val existing = pending[id]
-                        if (existing == null) {
-                            pending[id] = PendingCall(id, name, openStep, started = true)
-                        } else {
-                            existing.name = name ?: existing.name
-                            existing.started = true
-                        }
-                    }
-                    "tool/result" -> {
-                        event.data["id"]?.jsonPrimitive?.contentOrNull?.let(pending::remove)
-                    }
-                }
+        val latestStepNumber = latestStepStart?.data?.get("step")?.jsonPrimitive?.intOrNull
+        val latestStepEnd = log.latest("step/end")
+        val endedCurrentStep = latestStepStart != null && latestStepEnd != null &&
+            latestStepEnd.sequence > latestStepStart.sequence &&
+            // Legacy step/end omitted the step number. A numbered end, however,
+            // must match the newest start; stale end events cannot close it.
+            (latestStepEnd.data["step"]?.jsonPrimitive?.intOrNull?.let { it == latestStepNumber }
+                ?: true)
+        val openStep = latestStepNumber.takeUnless { endedCurrentStep }
+        val pending = ToolAttemptLedger()
+        if (latestStepStart != null) {
+            // A durable step/end cannot prove an earlier tool result was flushed.
+            // Always fold the newest step's tool facts, even when it has an end,
+            // so a crash between the two writes cannot silently lose a mutation.
+            log.forEachAfter(latestStepStart.sequence) { event ->
+                pending.observe(event, latestStepNumber)
             }
         }
 
         val appended = mutableListOf<SessionEvent>()
         val recovered = mutableListOf<RecoveredToolResult>()
-        for (call in pending.values) {
+        for (call in pending.pending()) {
             val result = interruptedToolResult(
                 callId = call.id,
                 name = call.name,
                 step = call.step,
                 started = call.started,
+                verifiedReadOnly = call.verifiedReadOnly,
+                executionId = call.executionId,
             )
             recovered += result
             appended += log.append("tool/result", buildJsonObject {
                 result.step?.let { put("step", it) }
                 put("id", result.callId)
+                result.executionId?.let { put("execution_id", it) }
                 result.name?.let { put("name", it) }
                 put("content", result.content)
                 put("model_content", result.modelContent)
                 put("is_error", true)
+                put("retryable", result.code != TOOL_OUTCOME_UNKNOWN)
+                put("side_effect", if (result.code == TOOL_OUTCOME_UNKNOWN) "possible" else "none")
                 put("error_code", result.code)
                 put("recovered", true)
             })

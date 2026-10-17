@@ -20,32 +20,6 @@ import okhttp3.Request
 import kotlin.math.abs
 
 /** Provider quota is an external account fact. It must never be mixed into the local token ledger. */
-internal sealed interface MiniMaxProviderUsage {
-    data class TokenPlan(val models: List<ModelQuota>) : MiniMaxProviderUsage
-    data class AccountBalance(
-        val available: String,
-        val cash: String,
-        val voucher: String,
-        val credit: String,
-    ) : MiniMaxProviderUsage
-
-    data class ModelQuota(
-        val name: String,
-        val interval: Window,
-        val weekly: Window,
-        val intervalResetMillis: Long?,
-        val weeklyResetMillis: Long?,
-    )
-
-    data class Window(
-        val remaining: Long?,
-        val total: Long?,
-        val remainingPercent: Double?,
-        val unlimited: Boolean = false,
-        val notInPlan: Boolean = false,
-    )
-}
-
 /** The older API calls usage_count "remaining"; some new versions use it as "used".
  * Prefer the server's remaining-percent field; never invent a count when they disagree.
  */

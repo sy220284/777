@@ -3,12 +3,19 @@ package com.labteto.dshmobile.interop.mcp
 import java.io.File
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.tools.ToolContext
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.jsonObject
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -24,6 +31,152 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class McpToolBridgePluginTest {
+    @Test fun agentSubscriptionAndLifecycleToolUseTheSameOrderedOwnerCursor() = runBlocking {
+        val plugin = McpToolBridgePlugin(http = OkHttpClient(), json = Json,
+            transportFactory = {
+                object : McpTransport {
+                    override suspend fun request(method: String, params: JsonObject) = buildJsonObject {
+                        put("result", buildJsonObject { put("tools", buildJsonArray { }) })
+                    }
+                    override fun close() = Unit
+                }
+            })
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        try {
+            val observer = async(start = CoroutineStart.UNDISPATCHED) {
+                plugin.observeLifecycle().first { page ->
+                    page.events.any { it.snapshot?.lifecycle == McpServerLifecycle.REGISTERED }
+                }
+            }
+            plugin.connectHttpFromUi(registry.context, "observed", "https://example.com/mcp")
+            val event = withTimeout(5_000) { observer.await() }
+            assertTrue(event.events.any { it.serverId == "observed" })
+            val result = registry.context.tools.execute("mcp_lifecycle_events", buildJsonObject {
+                put("incarnation", "retired-owner"); put("after_sequence", event.latestSequence)
+            })
+            val payload = Json.parseToJsonElement(result.content).jsonObject
+            assertEquals("true", payload["requires_snapshot"]?.jsonPrimitive?.content)
+            assertEquals(event.incarnation, payload["incarnation"]?.jsonPrimitive?.content)
+            assertTrue(payload.containsKey("servers"))
+        } finally { registry.uninstall("mcp-bridge") }
+    }
+
+    @Test
+    fun unsolicitedTransportExitRevokesOnlyThatServerWithoutReplayingItsTool() = runBlocking {
+        val termination = MutableSharedFlow<Throwable>(replay = 1)
+        var remoteCalls = 0
+        var closed = 0
+        val plugin = McpToolBridgePlugin(
+            http = OkHttpClient(), json = Json,
+            transportFactory = { endpoint ->
+                object : McpTransport, McpTerminationSource {
+                    override val terminalEvents = termination
+                    override suspend fun request(method: String, params: JsonObject): JsonObject = when (method) {
+                        "tools/list" -> buildJsonObject {
+                            put("result", buildJsonObject {
+                                put("tools", buildJsonArray {
+                                    add(buildJsonObject {
+                                        put("name", "write")
+                                        put("inputSchema", buildJsonObject { put("type", "object") })
+                                    })
+                                })
+                            })
+                        }
+                        "tools/call" -> {
+                            remoteCalls++
+                            buildJsonObject { put("result", buildJsonObject { put("isError", false) }) }
+                        }
+                        else -> error("unexpected call: $method")
+                    }
+                    override fun close() { closed++ }
+                }
+            },
+        )
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        plugin.connectHttpFromUi(registry.context, "server", "https://example.com/mcp")
+        val registered = plugin.serverSnapshots().single().tools
+        assertEquals(1, registered.size)
+        assertTrue(registry.context.tools.get(registered.single()) != null)
+        val revision = plugin.lifecycleRevisions.value
+        termination.emit(java.io.IOException("stream ended without a request"))
+        withTimeout(5_000) {
+            while (plugin.lifecycleSnapshots().singleOrNull()?.lifecycle != McpServerLifecycle.FAILED) delay(10)
+        }
+        assertTrue(plugin.lifecycleRevisions.value > revision)
+        assertNull(registry.context.tools.get(registered.single()))
+        assertEquals(McpServerLifecycle.FAILED, plugin.lifecycleSnapshots().single().lifecycle)
+        val changes = plugin.lifecycleEventsSince(null, -1L)
+        assertEquals(listOf(
+            McpServerLifecycle.CONNECTING,
+            McpServerLifecycle.REGISTERED,
+            McpServerLifecycle.FAILED,
+        ), changes.events.map { it.snapshot?.lifecycle })
+        assertTrue(changes.events.zipWithNext().all { (before, after) ->
+            before.sequence < after.sequence && before.serverId == "server" && after.serverId == "server"
+        })
+        assertTrue(plugin.lifecycleEventsSince("previous-process", changes.latestSequence)
+            .requiresSnapshot)
+        assertEquals(0, remoteCalls)
+        assertEquals(1, closed)
+        plugin.uninstall(registry.context)
+    }
+
+    @Test
+    fun explicitHealthPingDoesNotExecuteToolsOrClaimRemoteAuthorization() = runTest {
+        val requests = mutableListOf<String>()
+        val plugin = McpToolBridgePlugin(
+            http = OkHttpClient(),
+            json = Json,
+            transportFactory = {
+                object : McpTransport {
+                    override suspend fun request(method: String, params: JsonObject): JsonObject {
+                        requests += method
+                        return when (method) {
+                            "tools/list" -> buildJsonObject {
+                                put("result", buildJsonObject { put("tools", buildJsonArray { }) })
+                            }
+                            "ping" -> buildJsonObject { put("result", buildJsonObject { }) }
+                            else -> error("Health must never call $method")
+                        }
+                    }
+                    override fun close() = Unit
+                }
+            },
+        )
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        assertEquals(McpServerHealth.NOT_CONNECTED, plugin.checkServerHealthFromUi("health"))
+        plugin.connectHttpFromUi(registry.context, "health", "https://example.com/mcp")
+        assertEquals(McpServerHealth.RESPONDED, plugin.checkServerHealthFromUi("health"))
+        assertEquals(listOf("tools/list", "ping"), requests)
+        plugin.uninstall(registry.context)
+    }
+
+    @Test
+    fun rejectedHealthProbeIsUnconfirmedNotAFalseAuthorizationClaim() = runTest {
+        val plugin = McpToolBridgePlugin(
+            http = OkHttpClient(),
+            json = Json,
+            transportFactory = {
+                object : McpTransport {
+                    override suspend fun request(method: String, params: JsonObject): JsonObject =
+                        if (method == "tools/list") buildJsonObject {
+                            put("result", buildJsonObject { put("tools", buildJsonArray { }) })
+                        } else throw java.io.IOException("health endpoint unreachable")
+                    override fun close() = Unit
+                }
+            },
+        )
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        plugin.connectHttpFromUi(registry.context, "unconfirmed", "https://example.com/mcp")
+        assertEquals(McpServerHealth.UNCONFIRMED,
+            plugin.checkServerHealthFromUi("unconfirmed"))
+        plugin.uninstall(registry.context)
+    }
+
     @Test
     fun oversizedToolResultIsBoundedBeforeEnteringHarnessHistory() {
         val result = buildJsonObject {
@@ -89,6 +242,10 @@ class McpToolBridgePluginTest {
         assertEquals("MCP_CONNECTION_BUSY", duplicate.errorCode)
         assertEquals("MCP_CONNECTION_BUSY", disconnect.errorCode)
         assertEquals(2, connections)
+        assertEquals(
+            listOf("guarded" to McpServerLifecycle.RECONNECTING),
+            plugin.lifecycleSnapshots().map { it.id to it.lifecycle },
+        )
         release.complete(Unit)
         assertFalse(running.await().isError)
         assertEquals(listOf("guarded"), plugin.serverSnapshots().map { it.id })
@@ -145,6 +302,12 @@ class McpToolBridgePluginTest {
         assertFalse(failed.retryable)
         assertEquals(1, remoteCalls)
         assertEquals(1, connections)
+        assertEquals(
+            listOf("broken" to McpServerLifecycle.FAILED),
+            plugin.lifecycleSnapshots().map { it.id to it.lifecycle },
+        )
+        assertNull(registry.context.tools.get("mcp_broken_write"))
+        assertEquals(McpServerHealth.NOT_CONNECTED, plugin.checkServerHealthFromUi("broken"))
 
         val reconnected = registry.context.tools.execute(
             "mcp_reconnect",
@@ -155,6 +318,7 @@ class McpToolBridgePluginTest {
         assertTrue(oldClosed)
         assertEquals(2, connections)
         assertEquals(1, remoteCalls)
+        assertEquals(McpServerLifecycle.REGISTERED, plugin.lifecycleSnapshots().single().lifecycle)
         val recovered = registry.context.tools.execute(
             "mcp_broken_write", buildJsonObject { },
             context = ToolContext(approval = { true }),
@@ -328,6 +492,10 @@ class McpToolBridgePluginTest {
 
         assertFalse(disconnect.isCompleted)
         assertFalse(closed)
+        assertEquals(
+            listOf("slow-server" to McpServerLifecycle.DISCONNECTING),
+            plugin.lifecycleSnapshots().map { it.id to it.lifecycle },
+        )
 
         release.complete(Unit)
         assertFalse(call.await().isError)
@@ -365,18 +533,31 @@ class McpToolBridgePluginTest {
         val registry = PluginRegistry()
         registry.install(plugin)
         plugin.connectHttpFromUi(registry.context, "fast", "https://example.com/fast")
+        val revisionAfterFast = plugin.lifecycleRevisions.value
 
         val slow = async {
             plugin.connectHttpFromUi(registry.context, "slow", "https://example.com/slow")
         }
         slowEntered.await()
+        val revisionConnecting = plugin.lifecycleRevisions.value
+        assertTrue(revisionConnecting > revisionAfterFast)
 
         val snapshots = plugin.serverSnapshots()
         assertEquals(listOf("fast"), snapshots.map(McpServerSnapshot::id))
+        assertEquals(
+            listOf("fast" to McpServerLifecycle.REGISTERED, "slow" to McpServerLifecycle.CONNECTING),
+            plugin.lifecycleSnapshots().map { it.id to it.lifecycle },
+        )
         assertFalse(slow.isCompleted)
 
         slowRelease.complete(Unit)
         assertTrue(slow.await().contains("已连接"))
+        assertTrue(plugin.lifecycleRevisions.value > revisionConnecting)
+        assertEquals(McpServerLifecycle.REGISTERED, plugin.lifecycleSnapshots().last().lifecycle)
+        val revisionRegistered = plugin.lifecycleRevisions.value
+        plugin.disconnectFromUi(registry.context, "slow")
+        assertTrue(plugin.lifecycleRevisions.value > revisionRegistered)
+        assertEquals(listOf("fast"), plugin.lifecycleSnapshots().map(McpServerSnapshot::id))
     }
 
     @Test

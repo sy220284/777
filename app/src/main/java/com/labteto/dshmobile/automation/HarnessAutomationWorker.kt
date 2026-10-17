@@ -83,16 +83,18 @@ class HarnessAutomationWorker(
             HarnessAutomationScheduler.KEY_SCHEDULE_GENERATION,
             preflightTask.scheduleGeneration,
         )
+        val manualExecutionId = this.id.toString().takeIf { manualRun }
         if (
             preflightTask.scheduleGeneration != requestedGeneration ||
-            (preflightTask.status in setOf(AutomationStatus.PAUSED, AutomationStatus.WAITING_USER) && !manualRun)
+            (manualRun && preflightTask.activeManualRunId != manualExecutionId) ||
+            (!manualRun && !mayStartScheduledAutomation(preflightTask, requestedGeneration))
         ) return Result.success()
 
         // A manual request is a real user action, not a disposable probe. If another trigger owns
         // the task, keep this WorkManager request pending instead of reporting a false success.
         val lease = AutomationExecutionRegistry.tryAcquire(id) ?: return Result.retry()
         return try {
-            doOwnedWork(id, manualRun, entry, requestedGeneration)
+            doOwnedWork(id, manualRun, manualExecutionId, entry, requestedGeneration)
         } finally {
             lease.close()
         }
@@ -101,6 +103,7 @@ class HarnessAutomationWorker(
     private suspend fun doOwnedWork(
         id: String,
         manualRun: Boolean,
+        manualExecutionId: String?,
         entry: WorkerEntryPoint,
         requestedGeneration: Long,
     ): Result {
@@ -118,7 +121,8 @@ class HarnessAutomationWorker(
         var task = store.get(id) ?: return Result.success()
         if (
             task.scheduleGeneration != requestedGeneration ||
-            (task.status in setOf(AutomationStatus.PAUSED, AutomationStatus.WAITING_USER) && !manualRun)
+            (manualRun && task.activeManualRunId != manualExecutionId) ||
+            (!manualRun && !mayStartScheduledAutomation(task, requestedGeneration))
         ) return Result.success()
 
         val recovering = !manualRun && task.status == AutomationStatus.RUNNING && task.lastRunAt != null
@@ -127,14 +131,16 @@ class HarnessAutomationWorker(
             task = store.updateIf(
                 id,
                 predicate = {
-                    it.scheduleGeneration == requestedGeneration &&
-                        it.status !in setOf(AutomationStatus.PAUSED, AutomationStatus.WAITING_USER)
+                    mayStartScheduledAutomation(it, requestedGeneration)
                 },
             ) {
                 it.copy(
                     status = AutomationStatus.RUNNING,
                     lastRunAt = started,
                     lastError = null,
+                    // A scheduled worker that was admitted later invalidates any
+                    // pending manual receipt from a previous execution epoch.
+                    activeManualRunId = null,
                 )
             } ?: return Result.success()
         }
@@ -148,7 +154,9 @@ class HarnessAutomationWorker(
                 ).also { sessionId ->
                     task = store.updateIf(
                         id,
-                        predicate = { it.scheduleGeneration == requestedGeneration },
+                        predicate = {
+                            ownsAutomationSettlement(it, requestedGeneration, started, manualRun, manualExecutionId)
+                        },
                     ) { current ->
                         current.copy(workSessionId = sessionId)
                     } ?: return Result.success()
@@ -198,6 +206,7 @@ class HarnessAutomationWorker(
                     task = task,
                     manualRun = manualRun,
                     started = started,
+                    manualExecutionId = manualExecutionId,
                     run = run,
                 )
                 LocalAutomationRunStatus.BLOCKED -> settlement.settleBlocked(
@@ -206,6 +215,7 @@ class HarnessAutomationWorker(
                     task = task,
                     manualRun = manualRun,
                     started = started,
+                    manualExecutionId = manualExecutionId,
                     sessionId = run.sessionId,
                     detail = run.detail ?: run.output,
                 )
@@ -215,6 +225,7 @@ class HarnessAutomationWorker(
                     task = task,
                     manualRun = manualRun,
                     started = started,
+                    manualExecutionId = manualExecutionId,
                     sessionId = run.sessionId,
                     detail = run.detail ?: run.output,
                     persistWorkSessionId = task.mode == AutomationMode.WORK,
@@ -226,6 +237,7 @@ class HarnessAutomationWorker(
                     task = task,
                     manualRun = manualRun,
                     started = started,
+                    manualExecutionId = manualExecutionId,
                     sessionId = run.sessionId,
                     detail = run.detail ?: run.output,
                     persistWorkSessionId = task.mode == AutomationMode.WORK,
@@ -241,6 +253,7 @@ class HarnessAutomationWorker(
                 task = task,
                 manualRun = manualRun,
                 started = started,
+                manualExecutionId = manualExecutionId,
                 sessionId = task.workSessionId ?: task.targetSessionId,
                 detail = error.message ?: error::class.java.simpleName,
                 persistWorkSessionId = false,

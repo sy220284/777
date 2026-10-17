@@ -90,9 +90,11 @@ class LocalSessionTranscriptProjectionTest {
             sequenceExclusive = 5L,
         )
 
-        assertEquals(listOf("m-old", "m-reason", "m-answer"), projected.messages.map { it.id })
+        // An undecodable event halts replay: a later event must not be
+        // projected past the invalid sequence until the transcript is repaired.
+        assertEquals(listOf("m-old", "m-reason"), projected.messages.map { it.id })
         assertEquals("旧消息", projected.messages.first().content)
-        assertEquals(9L, projected.projectedThroughSequence)
+        assertEquals(7L, projected.projectedThroughSequence)
         org.junit.Assert.assertTrue(AppLog.snapshot().any {
             it.tag == "TranscriptRestore" && it.message.contains("event_seq=8") &&
                 it.message.contains("operation=replay_transcript_event")

@@ -33,9 +33,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.shenyan.designsystem.foundation.LocalSyColors
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.model.LocalModelPresets
-import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_RESOURCE
-import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
+import com.labteto.dshmobile.uicontract.UiSettingsSnapshot as LocalHarnessSettingsState
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_USAGE_URL
@@ -389,6 +387,13 @@ internal fun ChatGptAccountPanel(
                             color = colors.textTertiary,
                         )
                     }
+                    if (planModels.isNotEmpty()) {
+                        Text(
+                            "以下是授权账户可见的模型，不能据此认定所有能力均已开放；可通过「测试连接」验证当前模型，套餐授权暂不提供图片生成。",
+                            style = DsType.caption11.withReadingWeight(),
+                            color = colors.textTertiary,
+                        )
+                    }
                     if (planModels.isEmpty()) {
                         Text(
                             stringResource(
@@ -435,9 +440,7 @@ internal fun ChatGptAccountPanel(
                                             color = colors.textTertiary,
                                         )
                                     }
-                                    ModelCapabilityTags(
-                                        LocalModelPresets.clientCapabilitiesFor(model.slug, CHATGPT_RESOURCE),
-                                    )
+                                    // Do not infer plan entitlements from API-key preset capability tags.
                                 }
                                 if (!model.active && state.connected) {
                                     model.profileId?.let { profileId ->

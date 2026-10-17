@@ -32,6 +32,7 @@ internal class AutomationWorkerSettlementCoordinator(
         task: AutomationTask,
         manualRun: Boolean,
         started: Long,
+        manualExecutionId: String?,
         run: LocalAutomationRunResult,
     ) {
         val finished = System.currentTimeMillis()
@@ -50,7 +51,9 @@ internal class AutomationWorkerSettlementCoordinator(
         var committedWaiting = false
         val updated = store.updateIf(
             id,
-            predicate = { it.scheduleGeneration == requestedGeneration },
+            predicate = {
+                ownsAutomationSettlement(it, requestedGeneration, started, manualRun, manualExecutionId)
+            },
         ) { current ->
             val userActivityDuringRun = current.lastUserActivityAt
                 ?.takeIf { it >= started }
@@ -67,7 +70,7 @@ internal class AutomationWorkerSettlementCoordinator(
                 )
                 deferredOneShot -> run.nextRunAtHint
                 current.recurringMinutes != null ->
-                    checkedAutomationFutureMillis(finished, current.recurringMinutes, "任务周期")
+                    checkedAutomationFutureMillis(finished, requireNotNull(current.recurringMinutes), "任务周期")
                 else -> current.nextRunAt
             }
             val nextStatus = when {
@@ -77,6 +80,7 @@ internal class AutomationWorkerSettlementCoordinator(
                 else -> AutomationStatus.COMPLETED
             }
             current.copy(
+                activeManualRunId = if (manualRun) null else current.activeManualRunId,
                 workSessionId = if (current.mode == AutomationMode.WORK) {
                     run.sessionId
                 } else {
@@ -110,11 +114,7 @@ internal class AutomationWorkerSettlementCoordinator(
                 resultText = run.output,
             )
         }
-        if (
-            updated?.status == AutomationStatus.SCHEDULED &&
-            committedNext != null &&
-            (usesChainedAutomationScheduling(updated) || updated.recurringMinutes == null)
-        ) {
+        if (mayEnqueueNextAfterAutomationSettlement(manualRun, updated, committedNext)) {
             scheduler.enqueueNextChained(id, requireNotNull(committedNext), requestedGeneration)
         }
         if (updated != null && committedWaiting) {
@@ -129,15 +129,19 @@ internal class AutomationWorkerSettlementCoordinator(
         task: AutomationTask,
         manualRun: Boolean,
         started: Long,
+        manualExecutionId: String?,
         sessionId: String?,
         detail: String,
     ) {
         val finished = System.currentTimeMillis()
         val updated = store.updateIf(
             id,
-            predicate = { it.scheduleGeneration == requestedGeneration },
+            predicate = {
+                ownsAutomationSettlement(it, requestedGeneration, started, manualRun, manualExecutionId)
+            },
         ) { current ->
             current.copy(
+                activeManualRunId = if (manualRun) null else current.activeManualRunId,
                 workSessionId = sessionId ?: current.workSessionId,
                 status = if (manualRun) current.status else AutomationStatus.BLOCKED,
                 lastError = truncateWithoutSplittingSurrogatePair(detail, 4_000),
@@ -168,6 +172,7 @@ internal class AutomationWorkerSettlementCoordinator(
         task: AutomationTask,
         manualRun: Boolean,
         started: Long,
+        manualExecutionId: String?,
         sessionId: String?,
         detail: String,
         persistWorkSessionId: Boolean,
@@ -177,9 +182,12 @@ internal class AutomationWorkerSettlementCoordinator(
         if (manualRun) {
             val updated = store.updateIf(
                 id,
-                predicate = { it.scheduleGeneration == requestedGeneration },
+                predicate = {
+                ownsAutomationSettlement(it, requestedGeneration, started, manualRun, manualExecutionId)
+            },
             ) { current ->
                 current.copy(
+                    activeManualRunId = null,
                     workSessionId = if (persistWorkSessionId) sessionId else current.workSessionId,
                     lastError = truncateWithoutSplittingSurrogatePair(detail, 4_000),
                     runReceipts = appendAutomationReceipt(
@@ -208,7 +216,9 @@ internal class AutomationWorkerSettlementCoordinator(
         var committedNext: Long? = null
         val updated = store.updateIf(
             id,
-            predicate = { it.scheduleGeneration == requestedGeneration },
+            predicate = {
+                ownsAutomationSettlement(it, requestedGeneration, started, manualRun, manualExecutionId)
+            },
         ) { current ->
             val nextFailureStreak = current.failureStreak.saturatingIncrement()
             autoPaused = shouldAutoPauseChatAutomation(current, nextFailureStreak)

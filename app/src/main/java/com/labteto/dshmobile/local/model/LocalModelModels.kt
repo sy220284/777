@@ -6,12 +6,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonElement
 
-enum class LocalImageInputMode {
-    AUTO,
-    NATIVE,
-    TOOL,
-}
-
 /** One OpenAI-compatible function call emitted by the model. */
 data class LocalToolCall(
     val id: String,
@@ -26,16 +20,6 @@ data class LocalModelDelta(
 )
 
 /** Provider/account identity of the exact route that produced one model reply. */
-@Serializable
-data class LocalModelRouteIdentity(
-    val profileId: String? = null,
-    val provider: String = "",
-    val model: String = "",
-    val baseUrl: String = "",
-    val authKind: String = "",
-    val protocol: String = "",
-    val fingerprint: String = "",
-)
 
 data class LocalPromptCacheDiagnostic(
     val type: String,

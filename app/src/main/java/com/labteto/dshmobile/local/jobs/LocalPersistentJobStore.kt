@@ -114,12 +114,19 @@ internal class LocalPersistentJobStore(
 
     private fun readFrom(source: File): List<JobSnapshot> = readFromText(source.readText())
 
-    private fun readFromText(text: String): List<JobSnapshot> =
-        json.parseToJsonElement(text).jsonArray.mapNotNull { raw ->
+    private fun readFromText(text: String): List<JobSnapshot> {
+        val ids = mutableSetOf<String>()
+        return json.parseToJsonElement(text).jsonArray.map { raw ->
             val item = raw.jsonObject
-            val id = item["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-            val label = item["label"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-            val status = item["status"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            // A valid JSON document is not necessarily a complete Job snapshot.
+            // Silently skipping an incomplete job permanently loses it on the next write.
+            val id = item["id"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+                ?: error("后台任务快照缺少有效 id")
+            val label = item["label"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+                ?: error("后台任务快照缺少有效 label：$id")
+            val status = item["status"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+                ?: error("后台任务快照缺少有效 status：$id")
+            check(ids.add(id)) { "后台任务快照存在重复 id：$id" }
             val resumeKind = item["resume_kind"]?.jsonPrimitive?.contentOrNull
             val resumePayload = item["resume_payload"]?.jsonPrimitive?.contentOrNull
             val inbox = item["inbox"]?.jsonArray?.map { rawMessage ->
@@ -154,6 +161,7 @@ internal class LocalPersistentJobStore(
                 continuable = item["continuable"]?.jsonPrimitive?.booleanOrNull ?: false,
             )
         }
+    }
 
     private fun inferLegacyOwnerId(resumeKind: String?, resumePayload: String?): String? {
         if (resumeKind !in LEGACY_OWNER_INFERENCE_KINDS || resumePayload.isNullOrBlank()) return null

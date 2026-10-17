@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.attachment.LocalAttachmentImporter
+import com.labteto.dshmobile.local.attachment.inspectImportedAttachmentFile
+import com.labteto.dshmobile.uicontract.UiAttachmentInspectionReceipt
 import com.labteto.dshmobile.local.files.LocalWorkspace
 import com.labteto.dshmobile.local.files.LocalWorkspaceToolGuide
 import com.labteto.dshmobile.observability.AppLog
@@ -32,7 +34,7 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     bundledRuntimeManager: LocalBundledRuntimeManager,
     runtimeStateStore: LocalRuntimeStateStore,
     eventLogs: LocalSessionEventLogRegistry,
-) {
+) : com.labteto.dshmobile.uicontract.FilesUiPort {
     internal val workspace = LocalWorkspace(
         root = File(context.filesDir, "local-harness/workspace"),
         extraSearchPaths = bundledRuntimeManager::searchPaths,
@@ -64,12 +66,25 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment =
         withContext(Dispatchers.IO) { attachmentImporter.import(uri) }
 
-    internal suspend fun workspaceFiles(): List<LocalWorkspaceFile> =
+    internal suspend fun inspectAttachment(item: LocalImportedAttachment): UiAttachmentInspectionReceipt =
+        withContext(Dispatchers.IO) { inspectImportedAttachmentFile(File(workspace.path), item) }
+
+    override suspend fun workspaceFiles(): List<LocalWorkspaceFile> =
         withContext(Dispatchers.IO) { coordinator.workspaceFiles() }
 
-    internal suspend fun conversationFiles(sessionId: String): LocalConversationFiles =
+    override suspend fun conversationFiles(sessionId: String): LocalConversationFiles =
         withContext(Dispatchers.IO) { coordinator.conversationFiles(sessionId) }
 
-    internal suspend fun previewWorkspaceFile(path: String): LocalWorkspaceFilePreview =
+    override suspend fun previewWorkspaceFile(path: String): LocalWorkspaceFilePreview =
         withContext(Dispatchers.IO) { coordinator.preview(path) }
+
+    override suspend fun exportWorkspaceFile(path: String, output: java.io.OutputStream): Long =
+        withContext(Dispatchers.IO) { workspace.exportFileForUi(path, output) }
+}
+
+@dagger.Module
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+internal abstract class LocalFilesUiPortBindings {
+    @dagger.Binds @Singleton
+    abstract fun files(implementation: LocalSessionFilesRuntime): com.labteto.dshmobile.uicontract.FilesUiPort
 }

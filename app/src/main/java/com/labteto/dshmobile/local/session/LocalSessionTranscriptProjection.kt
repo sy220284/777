@@ -140,18 +140,23 @@ internal fun projectSessionTranscriptTail(
         .toMutableList()
     val knownIds = messages.mapTo(linkedSetOf(), LocalHarnessMessage::id)
     var projectedThrough = sequenceExclusive
+    var undecodableTranscript = false
 
     events
         .asSequence()
         .filter { event -> event.sequence > sequenceExclusive }
         .sortedBy { event -> event.sequence }
         .forEach { event ->
+            // An unreadable transcript cannot be marked as durably projected.
+            if (undecodableTranscript) return@forEach
             if (event.type == "chat/active-transcript" || event.type == "work/active-transcript") {
                 val decoded = decodeTranscriptMessages(event.data)
                 if (decoded == null) {
                     AppLog.warn("TranscriptRestore",
                         "failure=true operation=replay_active_transcript event_type=${event.type} " +
                             "event_seq=${event.sequence} cause_type=InvalidTranscript")
+                    undecodableTranscript = true
+                    return@forEach
                 }
                 if (decoded != null) {
                     messages.clear()
@@ -162,18 +167,20 @@ internal fun projectSessionTranscriptTail(
                 projectedThrough = maxOf(projectedThrough, event.sequence)
                 return@forEach
             }
+            val decoded = decodeTranscriptMessages(event.data)
+            if (decoded == null && event.data.containsKey("transcript")) {
+                AppLog.warn("TranscriptRestore",
+                    "failure=true operation=replay_transcript_event event_type=${event.type.take(64)} " +
+                        "event_seq=${event.sequence} cause_type=InvalidTranscript")
+                undecodableTranscript = true
+                return@forEach
+            }
             if (event.type == "assistant/message") {
                 val replacedId = (event.data["replaces"] as? JsonPrimitive)?.contentOrNull
                 if (replacedId != null) {
                     messages.removeAll { it.id == replacedId }
                     knownIds.remove(replacedId)
                 }
-            }
-            val decoded = decodeTranscriptMessages(event.data)
-            if (decoded == null && event.data.containsKey("transcript")) {
-                AppLog.warn("TranscriptRestore",
-                    "failure=true operation=replay_transcript_event event_type=${event.type.take(64)} " +
-                        "event_seq=${event.sequence} cause_type=InvalidTranscript")
             }
             if (decoded != null) {
                 decoded.forEach { message ->

@@ -49,6 +49,31 @@ class LocalRequirementEvidenceProjectionTest {
         assertEquals(null, selectedRequirementEvidenceVersion(root, source, refreshed))
     }
 
+    @Test fun evidencePreparedAgainstOlderBytesIsRejectedBeforeOwnerCommit() {
+        val root = temp.newFolder("evidence-final-check")
+        val file = File(root, "report.md").apply { writeText("version A") }
+        val selectedVersion = localWorkFileSha256(root, "report.md")!!
+        assertTrue(preparedRequirementEvidenceVersionMatches(root, "report.md", selectedVersion))
+
+        // Simulate an external tool updating the file while the user is choosing a requirement.
+        file.writeText("version B")
+        assertFalse(preparedRequirementEvidenceVersionMatches(root, "report.md", selectedVersion))
+        assertFalse(preparedRequirementEvidenceVersionMatches(root, "../escape", selectedVersion))
+        assertFalse(preparedRequirementEvidenceVersionMatches(root, "report.md", "not-a-hash"))
+        assertTrue(preparedRequirementEvidenceVersionMatches(root, "report.md",
+            localWorkFileSha256(root, "report.md")!!))
+    }
+
+    @Test fun evidenceReferenceCanNeverResolveThroughAnAlias() {
+        val root = temp.newFolder("evidence-link-alias")
+        val actual = File(root, "source.txt").apply { writeText("trusted") }
+        val alias = File(root, "reference.txt")
+        java.nio.file.Files.createSymbolicLink(alias.toPath(), actual.toPath())
+        val digest = localWorkFileSha256(root, "source.txt")!!
+        assertFalse(preparedRequirementEvidenceVersionMatches(root, "reference.txt", digest))
+        assertTrue(preparedRequirementEvidenceVersionMatches(root, "source.txt", digest))
+    }
+
     @Test fun archivedEvidenceReadsCurrentFileWithoutRecentArtifactProjection() {
         val root = temp.newFolder("workspace")
         val file = File(root, "reports/one.md").also { it.parentFile.mkdirs() }
@@ -64,6 +89,24 @@ class LocalRequirementEvidenceProjectionTest {
         assertEquals(link.artifactSequence, changed.artifactSequence)
         file.delete()
         assertEquals(null, checkRequirementEvidenceVersions(root, listOf(link)).single().versionNow)
+    }
+
+
+    @Test fun toolArtifactDigestAndByteCountComeFromOneVerifiedFileSnapshot() {
+        val root = temp.newFolder("evidence-immutable-observation")
+        val text = "交付内容".repeat(100)
+        val file = File(root, "report.md").apply { writeText(text) }
+        val current = localWorkArtifactFileVersion(root, "write", "已写入 report.md（1200 字节）")
+        assertEquals("report.md", current?.path)
+        assertEquals(file.readBytes().size.toLong(), current?.bytes)
+        assertEquals(localWorkFileSha256(root, "report.md"), current?.sha256)
+
+        val alias = File(root, "other.md")
+        java.nio.file.Files.createSymbolicLink(alias.toPath(), file.toPath())
+        assertEquals(null, localWorkArtifactFileVersion(root, "write", "已写入 other.md（10 字节）"))
+
+        file.writeText("新文件版本")
+        assertFalse(current?.sha256 == localWorkFileSha256(root, "report.md"))
     }
 
     private fun link(seq: Long, index: Int, title: String, sha: String) = LocalSessionEventLog.Event(
@@ -108,6 +151,123 @@ class LocalRequirementEvidenceProjectionTest {
         assertTrue(projectRequirementEvidenceLinks(listOf(link(1, 0, "交付", "madeup")), tasks).isEmpty())
     }
 
+    @Test fun userReviewColdRestoresWithoutPromotingRequirementToCompleted() {
+        val root = temp.newFolder("manual-work-review")
+        val file = File(root, "session.events.jsonl")
+        val json = kotlinx.serialization.json.Json
+        val log = LocalSessionEventLog(file, json)
+        val digest = "a".repeat(64)
+        val link = log.append("work/requirement-evidence", buildJsonObject {
+            put("goal_id", "goal-a"); put("requirement_index", 0)
+            put("requirement", "报告"); put("artifact_path", "report.md")
+            put("origin_sequence", 0L); put("source_call_id", "call-a")
+            put("sha256", digest); put("assertion", "user_selected_reference_only")
+        })
+        log.append("work/requirement-evidence-review", buildJsonObject {
+            put("goal_id", "goal-a"); put("requirement_index", 0)
+            put("requirement", "报告"); put("artifact_path", "report.md")
+            put("link_sequence", link.sequence); put("sha256", digest)
+            put("approved_by_user", true); put("assertion", "manual_content_review_only")
+        })
+        log.close()
+        val restored = LocalSessionEventLog(file, json)
+        try {
+            val tasks = listOf(LocalTodoItem("报告", "pending"))
+            val links = restored.withEvents { projectRequirementEvidenceLinks(it, tasks, "goal-a") }
+            val reviews = restored.withEvents { projectRequirementEvidenceReviews(it, links, "goal-a") }
+            assertEquals("pending", tasks.single().status)
+            assertEquals(link.sequence, reviews.single().linkSequence)
+            assertTrue(reviews.single().approvedByUser)
+            assertTrue(restored.withEvents { projectRequirementEvidenceReviews(it, links, "goal-b") }.isEmpty())
+        } finally { restored.close() }
+    }
+
+    @Test fun literalContentCheckUsesVerifiedBytesAndCannotClaimWorkCompletion() {
+        val root = temp.newFolder("literal-check")
+        val actual = File(root, "output.txt").apply { writeText("written report content") }
+        val sha = localWorkFileSha256(root, "output.txt")!!
+        assertEquals(true, inspectLocalWorkEvidenceText(root, "output.txt", sha, "report"))
+        assertEquals(false, inspectLocalWorkEvidenceText(root, "output.txt", sha, "signed"))
+        assertEquals(null, inspectLocalWorkEvidenceText(root, "output.txt", sha, ""))
+        actual.writeText("changed bytes")
+        assertEquals(null, inspectLocalWorkEvidenceText(root, "output.txt", sha, "report"))
+        assertEquals(null, inspectLocalWorkEvidenceText(root, "../output.txt", sha, "report"))
+    }
+
+    @Test fun contentCheckEventsAreExactLinkGoalScopedAndCanBeColdRebuilt() {
+        val sha = "a".repeat(64)
+        val evidence = LocalSessionEventLog.Event(10L, "work/requirement-evidence", 10L, buildJsonObject {
+            put("goal_id", "goal"); put("requirement_index", 0)
+            put("requirement", "交付报告"); put("artifact_path", "output.txt")
+            put("origin_sequence", 1L); put("source_call_id", "call"); put("sha256", sha)
+        })
+        val todos = listOf(LocalTodoItem("交付报告", "pending"))
+        val links = projectRequirementEvidenceLinks(sequenceOf(evidence), todos, "goal")
+        fun check(seq: Long, goal: String, matched: Boolean) =
+            LocalSessionEventLog.Event(seq, "work/requirement-evidence-text-check", seq, buildJsonObject {
+                put("goal_id", goal); put("requirement_index", 0)
+                put("artifact_path", "output.txt"); put("link_sequence", 10L)
+                put("sha256", sha); put("condition_sha256", "b".repeat(64))
+                put("contains_required_text", matched)
+            })
+        val checks = projectRequirementEvidenceTextChecks(sequenceOf(
+            check(11L, "goal", true), check(12L, "other", true), check(13L, "goal", false)
+        ), links, "goal")
+        assertEquals(1, checks.size)
+        assertFalse(checks.single().containsRequiredText)
+        assertEquals(13L, checks.single().checkSequence)
+        assertEquals("pending", todos.single().status)
+        assertTrue(projectRequirementEvidenceTextChecks(sequenceOf(check(14L, "goal", true)),
+            emptyList(), "goal").isEmpty())
+    }
+
+    @Test fun manualReviewRequiresExactGoalLinkRevisionAndDigest() {
+        val digest = "a".repeat(64)
+        val tasks = listOf(LocalTodoItem("交付报告", "completed"))
+        fun goalLink(sequence: Long, path: String = "reports/one.md") = link(
+            sequence, 0, "交付报告", digest,
+        ).copy(data = buildJsonObject {
+            put("requirement_index", 0)
+            put("requirement", "交付报告")
+            put("artifact_path", path)
+            put("origin_sequence", 10L)
+            put("source_call_id", "call-1")
+            put("sha256", digest)
+            put("goal_id", "goal-a")
+        })
+        fun review(sequence: Long, linkSequence: Long = 20L, goal: String = "goal-a",
+            sha: String = digest, approved: Boolean = true,
+        ) = LocalSessionEventLog.Event(sequence, "work/requirement-evidence-review", sequence,
+            buildJsonObject {
+                put("goal_id", goal)
+                put("requirement_index", 0)
+                put("requirement", "交付报告")
+                put("artifact_path", "reports/one.md")
+                put("link_sequence", linkSequence)
+                put("sha256", sha)
+                put("approved_by_user", approved)
+            })
+        val selected = projectRequirementEvidenceLinks(sequenceOf(goalLink(20L)), tasks, "goal-a")
+        assertEquals(1, selected.size)
+        val accepted = projectRequirementEvidenceReviews(
+            sequenceOf(review(21L), review(22L, goal = "other"), review(23L, sha = "b".repeat(64))),
+            selected, "goal-a")
+        assertTrue(accepted.single().approvedByUser)
+        assertEquals(21L, accepted.single().reviewSequence)
+        val withdrawn = projectRequirementEvidenceReviews(
+            sequenceOf(review(21L), review(24L, approved = false)), selected, "goal-a")
+        assertFalse(withdrawn.single().approvedByUser)
+        assertEquals(24L, withdrawn.single().reviewSequence)
+        assertTrue(projectRequirementEvidenceReviews(sequenceOf(review(25L)), selected, "goal-b").isEmpty())
+        // A new reference supersedes its old event ID even if the file path and task text repeat.
+        val newer = projectRequirementEvidenceLinks(
+            sequenceOf(goalLink(20L), goalLink(26L)), tasks, "goal-a")
+        assertEquals(26L, newer.single().eventSequence)
+        assertTrue(projectRequirementEvidenceReviews(sequenceOf(review(27L)), newer, "goal-a").isEmpty())
+        assertTrue(projectRequirementEvidenceReviews(
+            sequenceOf(review(20L)), selected, "goal-a").isEmpty())
+    }
+
     @Test fun scopedLinksCannotMoveToAnotherGoalAndLegacyReferencesRemainReadable() {
         val todos = listOf(LocalTodoItem("交付", "completed"))
         val legacy = link(20, 0, "交付", "a".repeat(64))
@@ -117,6 +277,7 @@ class LocalRequirementEvidenceProjectionTest {
         })
         assertEquals(21L, projectRequirementEvidenceLinks(sequenceOf(scoped), todos, "goal-a").single().eventSequence)
         assertTrue(projectRequirementEvidenceLinks(sequenceOf(scoped), todos, "goal-b").isEmpty())
-        assertEquals(20L, projectRequirementEvidenceLinks(sequenceOf(legacy), todos, "goal-b").single().eventSequence)
+        assertTrue(projectRequirementEvidenceLinks(sequenceOf(legacy), todos, "goal-b").isEmpty())
+        assertEquals(20L, projectRequirementEvidenceLinks(sequenceOf(legacy), todos, null).single().eventSequence)
     }
 }

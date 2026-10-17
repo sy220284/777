@@ -66,13 +66,21 @@ class LocalChatTurnUsageTest {
         compose.runOnIdle { session.value = "chat-b" }
         awaitText(context.getString(R.string.local_chat_turn_usage_incomplete, 7L))
         assertEquals(0, compose.onAllNodesWithText("回合-chat-a").fetchSemanticsNodes().size)
+        // The previous session's modal window must finish detaching before a new
+        // tap can open a second sheet. Android 17 is slow enough that text removal
+        // can precede dialog-window removal by several animation frames.
+        compose.waitUntil(20_000) {
+            compose.onAllNodesWithTag("bottomSheetScrollBody").fetchSemanticsNodes().isEmpty()
+        }
         compose.onNodeWithText(context.getString(R.string.local_chat_turn_usage_incomplete, 7L)).performClick()
         awaitText("回合-chat-b")
         assertEquals("chat-b/user-1", opened.get())
     }
 
     private fun awaitText(text: String) {
-        compose.waitUntil(5_000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        // Media-backed sheets may finish first-frame layout later on Android 16 emulators.
+        // Keep an actual semantic assertion rather than relying on a fixed delay.
+        compose.waitUntil(20_000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText(text).assertIsDisplayed()
     }
 }

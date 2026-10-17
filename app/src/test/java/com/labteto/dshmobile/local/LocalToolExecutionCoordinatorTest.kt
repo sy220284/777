@@ -32,6 +32,166 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalToolExecutionCoordinatorTest {
+    @Test fun workEvidenceReadAndCommitExcludeActualCoordinatorWorkspaceMutation() = runBlocking {
+        val gate = com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate()
+        val source = java.nio.file.Files.createTempFile("work-proof", ".txt").toFile()
+        val commit = CompletableDeferred<Unit>()
+        val order = mutableListOf<String>()
+        source.writeText("original")
+        try {
+            val registry = ToolRegistry().apply {
+                register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.NEVER) {
+                    order += "write"
+                    source.writeText("replacement")
+                    ToolResult("written")
+                })
+            }
+            val evidence = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                gate.withRead {
+                    val read = source.readText()
+                    order += "read"
+                    commit.await()
+                    assertEquals(read, source.readText())
+                    order += "commit"
+                }
+            }
+            val write = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                coordinator(registry, workspaceGate = gate).executeScoped(
+                    LocalToolCall("write-proof", "write", JsonObject(emptyMap()), "{}"),
+                    "session-proof", true, false, approval = { _, _, _ -> true })
+            }
+            assertFalse(write.isCompleted)
+            commit.complete(Unit)
+            evidence.await()
+            assertFalse(write.await().isError)
+            assertEquals(listOf("read", "commit", "write"), order)
+            assertEquals("replacement", source.readText())
+        } finally { source.delete() }
+    }
+
+    @Test fun automaticReadAdmissionStillRecordsExactCallBeforeExecutorAndAuditFailureStopsIt() = runBlocking {
+        var executions = 0
+        val registry = ToolRegistry().apply {
+            register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                executions++
+                ToolResult("read result")
+            })
+        }
+        val decisions = mutableListOf<String>()
+        val owner = coordinator(registry, recordAuthorizationDecision = { session, call, execution, approved ->
+            assertTrue(approved)
+            assertEquals(0, executions)
+            decisions += "$session:${call.id}:${execution.executionId}"
+        })
+        val result = owner.executeScoped(LocalToolCall("call-read", "read", JsonObject(emptyMap()), "{}"),
+            "session-read", false, false, approval = { _, _, _ -> error("read does not ask approval") })
+        assertFalse(result.isError)
+        assertEquals(listOf("session-read:call-read:exec-test"), decisions)
+        assertEquals(1, executions)
+        val blocked = coordinator(registry, recordAuthorizationDecision = { _, _, _, _ ->
+            throw IllegalStateException("storage failed")
+        }).executeScoped(LocalToolCall("call-blocked", "read", JsonObject(emptyMap()), "{}"),
+            "session-read", false, false, approval = { _, _, _ -> true })
+        assertTrue(blocked.isError)
+        assertEquals(1, executions)
+    }
+
+    @Test
+    fun pinnedGitHubIsLoadedAcrossTurnsAndNeverBypassesCredentialGate() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("github_list_prs", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, family = "GitHub", keywords = setOf("github")) { ToolResult("ok") })
+            register(tool("unrelated_task", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, keywords = setOf("处理")) { ToolResult("ok") })
+        }
+        var pinned = listOf("github")
+        val coordinator = coordinator(registry, pinnedConnectorIds = { pinned })
+        coordinator.prepareWorkTurnCapabilities("处理当前项目", emptyList(), { true })
+        assertEquals("github_list_prs", coordinator.enabledOptionalSnapshot().first())
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", emptyList(), { true })
+        assertTrue("github_list_prs" in coordinator.enabledOptionalSnapshot())
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", emptyList(), { false })
+        assertFalse("github_list_prs" in coordinator.enabledOptionalSnapshot())
+        pinned = emptyList()
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", emptyList(), { true })
+        assertFalse("github_list_prs" in coordinator.enabledOptionalSnapshot())
+    }
+
+    @Test
+    fun pinnedMcpLoadsOnlyRegisteredServiceToolsAheadOfHeuristicTools() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("mcp_figma_get_file", ToolAccess.NETWORK, ToolApprovalPolicy.ALWAYS,
+                exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("figma")) { ToolResult("ok") })
+            register(tool("mcp_other_get_file", ToolAccess.NETWORK, ToolApprovalPolicy.ALWAYS,
+                exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("figma")) { ToolResult("ok") })
+            register(tool("mcp_figma_fake", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, family = "Other", keywords = setOf("fake")) { ToolResult("ok") })
+            register(tool("background_job", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, keywords = setOf("设计")) { ToolResult("ok") })
+        }
+        var pinned = listOf("figma")
+        val coordinator = coordinator(registry, pinnedConnectorIds = { pinned })
+        coordinator.prepareWorkTurnCapabilities("设计", emptyList(), { false })
+        val selected = coordinator.enabledOptionalSnapshot().toList()
+        assertEquals("mcp_figma_get_file", selected.first())
+        assertTrue("background_job" in selected)
+        assertFalse("mcp_other_get_file" in selected)
+        assertFalse("mcp_figma_fake" in selected)
+        pinned = emptyList()
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", emptyList(), { false })
+        assertFalse("mcp_figma_get_file" in coordinator.enabledOptionalSnapshot())
+    }
+
+    @Test
+    fun pinnedConnectorRecoversPriorityAfterLaterModelStepHeuristics() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("mcp_figma_frame", ToolAccess.NETWORK, ToolApprovalPolicy.ALWAYS,
+                exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("figma")) { ToolResult("ok") })
+            register(tool("autodiscovered", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, keywords = setOf("查找")) { ToolResult("ok") })
+            register(tool("github_prs", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL, family = "GitHub", keywords = setOf("github")) { ToolResult("ok") })
+        }
+        val c = coordinator(registry, pinnedConnectorIds = { listOf("figma", "github") })
+        c.prepareWorkTurnCapabilities("继续", emptyList(), { false })
+        c.enableTaskRelevantOptionalTools("查找", prioritize = true)
+        assertEquals("autodiscovered", c.enabledOptionalSnapshot().first())
+        c.prioritizePinnedForModelStep()
+        assertEquals("mcp_figma_frame", c.enabledOptionalSnapshot().first())
+        // A fixed but unauthenticated GitHub may never appear during a later model step.
+        assertFalse("github_prs" in c.enabledOptionalSnapshot())
+    }
+
+    @Test
+    fun pinnedImagegenMakesRealMediaToolsVisibleAcrossStepsWithoutAutoSubmitting() = runBlocking {
+        val registry = ToolRegistry().apply {
+            for (name in listOf("media_image_options", "media_image_create", "media_image_status")) {
+                register(tool(
+                    name, if (name == "media_image_create") ToolAccess.PRIVILEGED else ToolAccess.READ_ONLY,
+                    if (name == "media_image_create") ToolApprovalPolicy.ALWAYS else ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL, family = "媒体创作",
+                    keywords = setOf("生图"),
+                ) { ToolResult("stub") })
+            }
+        }
+        var selected = listOf("imagegen")
+        val coordinator = coordinator(registry, pinnedSkillIds = { selected })
+        coordinator.prepareWorkTurnCapabilities("继续", enableGitHub = false)
+        assertTrue("media_image_create" in coordinator.enabledOptionalSnapshot())
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", enableGitHub = false)
+        coordinator.prioritizePinnedForModelStep()
+        assertTrue("media_image_options" in coordinator.enabledOptionalSnapshot())
+        selected = emptyList()
+        coordinator.clearTurnCapabilities()
+        coordinator.prepareWorkTurnCapabilities("继续", enableGitHub = false)
+        assertFalse("media_image_create" in coordinator.enabledOptionalSnapshot())
+    }
+
     @Test
     fun githubKeywordPreactivationCannotBypassNegationOrCredentialGate() = runBlocking {
         val registry = ToolRegistry().apply {
@@ -492,6 +652,7 @@ class LocalToolExecutionCoordinatorTest {
         assertFalse(result.retryable)
         assertEquals(AgentToolSideEffect.POSSIBLE, result.sideEffect)
         assertEquals(1, executionStarts)
+        assertEquals("exec-test", result.executionId)
         assertTrue(result.recoveryHint.orEmpty().contains("不要直接重试"))
     }
 
@@ -531,9 +692,96 @@ class LocalToolExecutionCoordinatorTest {
             LocalToolExecutionIdentity(
                 executionId = "exec-fixed",
                 rootCallId = "call-root",
+                verifiedReadOnly = true,
             ),
             startedIdentity,
         )
+    }
+
+    @Test
+    fun releasedSessionOwnerCannotEnterToolAfterApprovalWait() = runBlocking {
+        val owners = com.labteto.dshmobile.harness.session.SessionExecutionRegistry()
+        val lease = owners.acquire("s1", com.labteto.dshmobile.harness.session.SessionExecutionOwner("run", true))
+        var executed = false
+        var started = false
+        val registry = ToolRegistry().apply {
+            register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) {
+                executed = true
+                ToolResult("ok")
+            })
+        }
+        val c = coordinator(registry, recordExecutionStarted = { _, _, _ -> started = true })
+        val result = withContext(com.labteto.dshmobile.harness.session.SessionExecutionContext(lease)) {
+            c.executeScoped(
+                LocalToolCall("stale", "write", JsonObject(emptyMap()), "{}"),
+                sessionId = "s1", allowMutation = true, planModeEnabled = false,
+                approval = { _, _, _ -> lease.close(); true },
+            )
+        }
+        assertTrue(result.isError)
+        assertFalse(executed)
+        assertFalse(started)
+        assertEquals(AgentToolSideEffect.NONE, result.sideEffect)
+        assertEquals(null, result.executionId)
+    }
+
+    @Test
+    fun runHandoffDuringApprovalCannotExecuteOldTool() = runBlocking {
+        val owners = com.labteto.dshmobile.harness.agent.AgentRunOwnership()
+        val first = com.labteto.dshmobile.harness.agent.AgentRunIdentity("s1", "main", "old")
+        val next = first.copy(runId = "new")
+        owners.claim(first) { }
+        var executed = false
+        val registry = ToolRegistry().apply {
+            register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) {
+                executed = true
+                ToolResult("ok")
+            })
+        }
+        val result = withContext(owners.executionContext(first)) {
+            coordinator(registry).executeScoped(
+                LocalToolCall("call", "write", JsonObject(emptyMap()), "{}"),
+                sessionId = "s1", allowMutation = true, planModeEnabled = false,
+                approval = { _, _, _ -> owners.claim(next) { }; true },
+            )
+        }
+        assertFalse(executed)
+        assertEquals("TASK_CANCELLED", result.errorCode)
+        assertEquals(AgentToolSideEffect.NONE, result.sideEffect)
+        assertTrue(owners.isCurrent(next))
+    }
+
+    @Test
+    fun permissionDecisionIsExactToSessionCallAndExecutionAndCannotExecuteWithoutAudit() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("mcp_demo_write", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS,
+                exposure = ToolExposure.OPTIONAL, family = "MCP",
+                keywords = setOf("demo")) { ToolResult("remote ok") })
+        }
+        data class Decision(val session: String, val call: String, val execution: String, val approved: Boolean)
+        val decisions = mutableListOf<Decision>()
+        val coordinator = coordinator(registry, recordAuthorizationDecision = { session, call, execution, granted ->
+            decisions += Decision(session, call.id, execution.executionId, granted)
+        })
+        suspend fun run(session: String, callId: String, approved: Boolean) =
+            coordinator.executeScoped(LocalToolCall(callId, "mcp_demo_write", JsonObject(emptyMap()), "{}"),
+                sessionId = session, allowMutation = true, planModeEnabled = false,
+                approval = { _, _, _ -> approved })
+        assertFalse(run("session-a", "call-a", true).isError)
+        assertEquals("APPROVAL_DENIED", run("session-b", "call-b", false).errorCode)
+        assertEquals(listOf(
+            Decision("session-a", "call-a", "exec-test", true),
+            Decision("session-b", "call-b", "exec-test", false),
+        ), decisions)
+        val missingRecord = coordinator(registry, recordAuthorizationDecision = { _, _, _, _ ->
+            throw IllegalStateException("EventLog unavailable")
+        })
+        val blocked = missingRecord.executeScoped(
+            LocalToolCall("call-c", "mcp_demo_write", JsonObject(emptyMap()), "{}"),
+            sessionId = "session-c", allowMutation = true, planModeEnabled = false,
+            approval = { _, _, _ -> true })
+        assertTrue(blocked.isError)
+        assertTrue(decisions.none { it.session == "session-c" })
     }
 
     @Test
@@ -1255,8 +1503,15 @@ class LocalToolExecutionCoordinatorTest {
             LocalToolCall,
             LocalToolExecutionIdentity,
         ) -> Unit = { _, _, _ -> },
+        recordAuthorizationDecision: suspend (
+            String, LocalToolCall, LocalToolExecutionIdentity, Boolean,
+        ) -> Unit = { _, _, _, _ -> },
         executionIdFactory: () -> String = { "exec-test" },
         networkSearchEnabled: () -> Boolean = { true },
+        pinnedConnectorIds: () -> List<String> = { emptyList() },
+        pinnedSkillIds: () -> List<String> = { emptyList() },
+        workspaceGate: com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate =
+            com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate(),
     ) = LocalToolExecutionCoordinator(
         registry = registry,
         currentSessionId = { "s1" },
@@ -1264,8 +1519,12 @@ class LocalToolExecutionCoordinatorTest {
         enabledOptionalTools = linkedSetOf(),
         requestApproval = { _, _, _ -> true },
         recordExecutionStarted = recordExecutionStarted,
+        recordAuthorizationDecision = recordAuthorizationDecision,
         executionIdFactory = executionIdFactory,
         networkSearchEnabled = networkSearchEnabled,
+        pinnedConnectorIds = pinnedConnectorIds,
+        pinnedSkillIds = pinnedSkillIds,
+        workspaceReadWriteGate = workspaceGate,
     )
 
     private fun webFetchTool(execute: suspend () -> ToolResult) = HarnessTool(

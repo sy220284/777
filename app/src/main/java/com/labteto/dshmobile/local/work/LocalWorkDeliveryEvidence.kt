@@ -25,20 +25,78 @@ internal data class LocalWorkDeliveryEvidence(
 
 private fun JsonObject.value(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
 
+
+/**
+ * Latest graph execution for this Goal is a Work-owned delivery precondition.
+ * Graph success is not Goal success. An incomplete, cancelled, or blocked graph
+ * cannot be laundered into a successful Goal by a model completion message.
+ *
+ * The latest graph may represent an explicit corrective rerun. Older sessions
+ * with a generic 'settled' outcome retain progress-event compatibility.
+ */
+internal fun localWorkGraphDeliveryMissing(log: LocalSessionEventLog, goal: LocalGoal): List<String> {
+    if (goal.id.isBlank()) return emptyList()
+    val graphStart = log.latestMatching(setOf("taskgraph/start")) { data ->
+        data.value("goal_id") == goal.id
+    }?.takeIf { goal.startedAtSequence < 0L || it.sequence > goal.startedAtSequence }
+        ?: return emptyList()
+    val graphId = graphStart.data.value("graph_id")?.takeIf(String::isNotBlank)
+        ?: return listOf("工作流启动记录缺少可信任务图身份")
+    val graphExecutionId = graphStart.data.value("graph_execution_id")
+    val graphFingerprint = graphStart.data.value("goal_fingerprint")
+    val end = log.latestMatching(setOf("taskgraph/end")) { data ->
+        data.value("graph_id") == graphId && data.value("goal_id") == goal.id &&
+            data.value("graph_execution_id") == graphExecutionId &&
+            (graphFingerprint == null || data.value("goal_fingerprint") == graphFingerprint)
+    }?.takeIf { it.sequence > graphStart.sequence }
+        ?: return listOf("当前目标的工作流已启动但尚未形成可核验的终态")
+    val outcome = end.data.value("outcome")
+    return when (outcome) {
+        "nodes_completed" -> emptyList()
+        // Earlier graphs were written with the untyped "settled" outcome.
+        // Their durable node-progress events still reveal blocked descendants.
+        "settled" -> {
+            val blocked = log.latestMatching(setOf("taskgraph/progress")) { data ->
+                data.value("graph_id") == graphId &&
+                    data.value("graph_execution_id") == graphExecutionId &&
+                    data.value("stage") == "受阻"
+            }?.takeIf { it.sequence > graphStart.sequence }
+            if (blocked != null) listOf("工作流包含受阻节点，历史结算缺少明确验收结论")
+            else emptyList()
+        }
+        "partial", "blocked" -> listOf("工作流存在未完成或依赖受阻的子任务")
+        "failed" -> listOf("工作流执行失败，需要核对工具执行结果")
+        "cancelled" -> listOf("工作流已取消，不能视为完成")
+        else -> listOf("工作流结算状态无法核实：${outcome ?: "missing"}")
+    }
+}
+
 internal fun localWorkDeliveryEvidence(
     log: LocalSessionEventLog,
     goal: LocalGoal,
     workspaceRoot: File? = null,
+    executingToolId: String? = null,
 ): LocalWorkDeliveryEvidence {
     val needsArtifact = goal.artifactPaths.isNotEmpty()
     val needsTest = goal.verificationCommands.isNotEmpty()
+    val graphMissing = buildList {
+        addAll(localWorkGraphDeliveryMissing(log, goal))
+        if (hasUnsettledWorkGoalTaskGraphs(log, goal)) add("目标仍有关联工作流未结算")
+        if (hasUnresolvedWorkGoalToolEffects(log, goal, executingToolId)) add("目标仍有关联工具副作用未核实")
+    }
     if (goal.id.isBlank() && goal.status != "completed") return LocalWorkDeliveryEvidence(needsArtifact, needsTest,
         unmetRequirements = listOf("旧目标尚未明确验收要求；请依据原任务重新声明成果与验收，不适用时显式为空，已完成进度保留"))
-    if (!needsArtifact && !needsTest) return LocalWorkDeliveryEvidence(false, false)
+    if (!needsArtifact && !needsTest) return LocalWorkDeliveryEvidence(false, false,
+        unmetRequirements = graphMissing)
     val start = goal.startedAtSequence.takeIf { it >= 0L } ?: log.latestMatching(setOf("goal/state")) {
         it.value("id") == goal.id && goal.id.isNotBlank()
     }?.sequence ?: -1L
-    if (start < 0) return LocalWorkDeliveryEvidence(needsArtifact, needsTest)
+    if (start < 0) return LocalWorkDeliveryEvidence(needsArtifact, needsTest,
+        unmetRequirements = buildList {
+            if (needsArtifact) add("缺少本次目标的真实文件版本或可核验提交证据")
+            if (needsTest) add("缺少本次目标的实际测试/构建成功结果")
+            addAll(graphMissing)
+        })
 
     fun callFor(result: JsonObject, before: Long): LocalSessionEventLog.Event? {
         val id = result.value("id")?.takeIf(String::isNotBlank) ?: return null
@@ -60,7 +118,7 @@ internal fun localWorkDeliveryEvidence(
     fun version(data: JsonObject, path: String): String? =
         (data["file_versions"] as? JsonObject)?.value(path)
     val now = goal.artifactPaths.associateWith { path -> workspaceRoot?.let { localWorkFileSha256(it, path) } }
-    val missing = mutableListOf<String>()
+    val missing = graphMissing.toMutableList()
     var artifactId: String? = null
     for (path in goal.artifactPaths) {
         val result = log.latestMatching(setOf("tool/result")) { data ->

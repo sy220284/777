@@ -237,10 +237,19 @@ class ChatPersonaStore internal constructor(
     }
 
     @Synchronized
-    fun upsert(profile: PersonaProfile): PersonaProfile {
-        val clean = sanitize(profile).copy(updatedAt = System.currentTimeMillis())
+    internal fun restoreIfCurrent(id: String, expected: List<PersonaProfile>, previous: PersonaProfile?) {
+        val current = read().personas.firstOrNull { it.id == id } ?: return
+        if (current in expected) restore(id, previous)
+    }
+
+    @Synchronized
+    fun upsert(profile: PersonaProfile, beforeWrite: (PersonaProfile) -> Unit = {}): PersonaProfile {
         val document = read()
+        val previousRevision = document.personas.firstOrNull { it.id == profile.id }?.updatedAt ?: 0L
+        check(previousRevision < Long.MAX_VALUE) { "人物版本已耗尽" }
+        val clean = sanitize(profile).copy(updatedAt = maxOf(System.currentTimeMillis(), previousRevision + 1L))
         val personas = document.personas.filterNot { it.id == clean.id } + clean
+        beforeWrite(clean)
         write(document.copy(personas = personas))
         return clean
     }

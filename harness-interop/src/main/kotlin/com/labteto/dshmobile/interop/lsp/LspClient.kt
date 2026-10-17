@@ -49,7 +49,6 @@ class LspProcessClient(
     private val messagesLock = Object()
     private val writeLock = Any()
     private val pendingReplies = mutableMapOf<String, CompletableFuture<JsonObject>>()
-    private val earlyReplies = linkedMapOf<String, JsonObject>()
     private val latestDiagnostics = mutableMapOf<String, Pair<Long, JsonObject>>()
     private var diagnosticSerial = 0L
     private var readerFailure: Throwable? = null
@@ -241,7 +240,6 @@ class LspProcessClient(
             readerFailure = stopped
             pendingReplies.values.forEach { it.completeExceptionally(stopped) }
             pendingReplies.clear()
-            earlyReplies.clear()
             latestDiagnostics.clear()
             messagesLock.notifyAll()
         }
@@ -289,8 +287,10 @@ class LspProcessClient(
         val future = CompletableFuture<JsonObject>()
         synchronized(messagesLock) {
             readerFailure?.let { throw IllegalStateException("语言服务已断开", it) }
-            earlyReplies.remove(id)?.let(future::complete)
-            if (!future.isDone) pendingReplies[id] = future
+            // Register before writing. Any response without this outstanding request
+            // is unsolicited: caching it would let a server forge a future call's
+            // result by predicting the monotonic JSON-RPC request ID.
+            pendingReplies[id] = future
         }
         try {
             synchronized(writeLock) {
@@ -328,14 +328,9 @@ class LspProcessClient(
                     val message = json.parseToJsonElement(LspFraming.read(reader)).jsonObject
                     val id = message["id"]?.jsonPrimitive?.content
                     if (id != null && message["method"] == null) {
-                        val reply = synchronized(messagesLock) {
-                            val pending = pendingReplies.remove(id)
-                            if (pending == null) {
-                                if (earlyReplies.size >= 32) earlyReplies.remove(earlyReplies.keys.first())
-                                earlyReplies[id] = message
-                            }
-                            pending
-                        }
+                        // A response can only settle a request that has already been
+                        // sent/registered. Drop unsolicited future or duplicate IDs.
+                        val reply = synchronized(messagesLock) { pendingReplies.remove(id) }
                         reply?.complete(message)
                     } else if (id != null && message["method"] != null) {
                         // A server-initiated request must not wedge the JSON-RPC transport.

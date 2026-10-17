@@ -49,7 +49,7 @@ import com.labteto.dshmobile.automation.AutomationStatus
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalAutomationPolicyProjection
-import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
+import com.labteto.dshmobile.uicontract.UiAutomationContext
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.shenyan.designsystem.components.SySwitchControl
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
@@ -115,7 +115,7 @@ internal fun sortChatAutomationTasks(tasks: List<AutomationTask>): List<Automati
 @Composable
 internal fun ChatAutomationScreen(
     state: TasksUiState,
-    harnessState: LocalHarnessTaskState,
+    harnessState: UiAutomationContext,
     viewModel: TasksViewModel,
     onClose: () -> Unit,
     onOpenSession: (String) -> Unit,
@@ -125,7 +125,7 @@ internal fun ChatAutomationScreen(
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val canPlan = harnessState.usageMode == LocalUsageMode.CHAT &&
-        !harnessState.groupChat.enabled &&
+        !harnessState.groupChatEnabled &&
         harnessState.sessionId.isNotBlank()
     val tasks = remember(state.tasks) {
         sortChatAutomationTasks(state.tasks.filter { it.mode == AutomationMode.CHAT })
@@ -191,7 +191,7 @@ internal fun ChatAutomationScreen(
                         subtitle = if (canPlan) {
                             stringResource(
                                 R.string.tasks_chat_target,
-                                harnessState.chatPersona.name.ifBlank {
+                                harnessState.personaName.ifBlank {
                                     stringResource(R.string.tasks_chat_character_fallback)
                                 },
                             )

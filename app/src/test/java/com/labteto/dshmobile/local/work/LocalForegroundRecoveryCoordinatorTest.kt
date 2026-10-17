@@ -33,8 +33,10 @@ class LocalForegroundRecoveryCoordinatorTest {
     }
 
     @Test fun recoveryCommitFailureKeepsOriginalInboxAndDoesNotAdmitNewInput() = runTest {
-        val blocked = File(temporary.root, "blocked").apply { writeText("file") }
-        val log = LocalSessionEventLog(File(blocked, "events.jsonl"), Json)
+        val blocked = temporary.newFolder("blocked")
+        val eventFile = File(blocked, "events.jsonl")
+        val log = LocalSessionEventLog(eventFile, Json)
+        com.labteto.dshmobile.local.blockEventLogWritesAfterOpen(eventFile)
         val queue = AgentInputQueue(4)
         queue.offer(QueuedAgentInput("old", id = "old"))
         try {

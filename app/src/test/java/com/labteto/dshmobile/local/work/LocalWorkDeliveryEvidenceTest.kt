@@ -44,6 +44,100 @@ class LocalWorkDeliveryEvidenceTest {
     }
     private fun artifact(root: File, text: String = "actual source") = File(root, "src/main.kt").apply { parentFile.mkdirs(); writeText(text) }
 
+
+    @Test
+    fun persistedGraphBlockersPreventGoalCompletionAfterTransientUiProgressIsCleared() =
+        scenario(artifacts = emptyList(), commands = emptyList()) { log, goal, root ->
+            log.append("taskgraph/start", buildJsonObject {
+                put("graph_id", "graph-1")
+                put("goal_id", goal.id)
+                put("task_count", 2)
+            })
+            assertTrue(localWorkDeliveryEvidence(log, goal, root).missing.any {
+                it.contains("尚未形成")
+            })
+            log.append("taskgraph/end", buildJsonObject {
+                put("graph_id", "graph-1")
+                put("goal_id", goal.id)
+                put("outcome", "partial")
+                put("completed_nodes", 1)
+                put("failed_nodes", 1)
+                put("blocked_nodes", 0)
+            })
+            val evidence = localWorkDeliveryEvidence(log, goal, root)
+            assertTrue(evidence.missing.any { it.contains("未完成") })
+            assertFalse(resolveWorkGoalTransition(
+                goal, goal.copy(status = "completed"), LocalWorkState(goal = goal), evidence,
+            ).accepted)
+            // A completed corrective graph is a new, independently identified execution.
+            log.append("taskgraph/start", buildJsonObject {
+                put("graph_id", "graph-2")
+                put("goal_id", goal.id)
+                put("task_count", 2)
+            })
+            log.append("taskgraph/end", buildJsonObject {
+                put("graph_id", "graph-2")
+                put("goal_id", goal.id)
+                put("outcome", "nodes_completed")
+                put("completed_nodes", 2)
+                put("failed_nodes", 0)
+                put("blocked_nodes", 0)
+            })
+            val corrected = localWorkDeliveryEvidence(log, goal, root)
+            assertTrue(corrected.missing.isEmpty())
+        }
+
+    @Test
+    fun delayedGraphTerminalCannotValidateNewExecutionWithReusedGraphId() =
+        scenario(artifacts = emptyList(), commands = emptyList()) { log, goal, root ->
+            fun event(execution: String, outcome: String? = null) = buildJsonObject {
+                put("graph_id", "reused-graph")
+                put("goal_id", goal.id)
+                put("goal_fingerprint", "unchanged")
+                put("graph_execution_id", execution)
+                outcome?.let { put("outcome", it) }
+            }
+            log.append("taskgraph/start", event("first"))
+            log.append("taskgraph/start", event("second"))
+            log.append("taskgraph/end", event("first", "nodes_completed"))
+            assertTrue(localWorkGraphDeliveryMissing(log, goal).any { it.contains("尚未形成") })
+            assertTrue(hasUnsettledWorkGoalTaskGraphs(log, goal))
+            log.append("taskgraph/end", event("second", "nodes_completed"))
+            assertFalse(hasUnsettledWorkGoalTaskGraphs(log, goal))
+            assertTrue(localWorkGraphDeliveryMissing(log, goal).isEmpty())
+        }
+
+    @Test
+    fun unrelatedGraphAndLegacyBlockedGraphCannotLaunderDelivery() =
+        scenario(artifacts = emptyList(), commands = emptyList()) { log, goal, root ->
+            log.append("taskgraph/start", buildJsonObject {
+                put("graph_id", "unrelated")
+                put("goal_id", "other-goal")
+            })
+            log.append("taskgraph/end", buildJsonObject {
+                put("graph_id", "unrelated")
+                put("goal_id", "other-goal")
+                put("outcome", "blocked")
+            })
+            assertTrue(localWorkDeliveryEvidence(log, goal, root).missing.isEmpty())
+            log.append("taskgraph/start", buildJsonObject {
+                put("graph_id", "legacy")
+                put("goal_id", goal.id)
+            })
+            log.append("taskgraph/progress", buildJsonObject {
+                put("graph_id", "legacy")
+                put("stage", "受阻")
+            })
+            log.append("taskgraph/end", buildJsonObject {
+                put("graph_id", "legacy")
+                put("goal_id", goal.id)
+                put("outcome", "settled")
+            })
+            assertTrue(localWorkDeliveryEvidence(log, goal, root).missing.any {
+                it.contains("受阻")
+            })
+        }
+
     @Test fun completedTodoWithoutRealArtifactIsNotEnoughForCodeGoal() = scenario { log, goal, root ->
         assertEquals(2, localWorkDeliveryEvidence(log, goal, root).missing.size)
         val state = LocalWorkState(goal = goal, todos = listOf(LocalTodoItem("implement", "completed")))

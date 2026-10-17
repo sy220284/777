@@ -65,6 +65,9 @@ internal class LocalMediaDatabase(context: Context, private val json: Json, name
             buildList { while (cursor.moveToNext()) add(decode(cursor.getString(0))) }
         }
     }
+    fun activeForSession(sessionId: String): List<LocalMediaRecord> =
+        readableDatabase.rawQuery("SELECT payload FROM media WHERE deleted=0 AND session_id=?", arrayOf(sessionId))
+            .use { cursor -> buildList { while (cursor.moveToNext()) add(decode(cursor.getString(0))) } }
     fun pending(): List<LocalMediaRecord> = select("deleted=0 AND pending=1")
     fun deletions(): List<LocalMediaRecord> = select("deleted=1")
     private fun select(where: String): List<LocalMediaRecord> = readableDatabase.rawQuery("SELECT payload FROM media WHERE $where", null)

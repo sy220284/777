@@ -31,6 +31,8 @@ import com.labteto.dshmobile.local.tools.string
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
+import javax.inject.Provider
+import com.labteto.dshmobile.local.presentation.LocalMediaCreationRuntime
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -53,10 +55,13 @@ internal class LocalWorkComposition @Inject constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val modelGateway: LocalModelGateway,
+    mediaRuntime: Provider<LocalMediaCreationRuntime>,
     modelRequests: LocalModelRequestCoordinator,
     usageTracker: DeepSeekUsageTracker,
     contextComposer: ContextComposer,
     private val workRunRegistry: LocalWorkRunRegistry,
+    private val workUiDocumentPublisher: LocalWorkUiDocumentPublisher,
+    replyDocuments: com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPublisher,
     workMemoryRuntime: LocalWorkMemoryRuntime,
     workModelHistoryRuntime: LocalWorkModelHistoryRuntime,
     workSessionProjection: LocalWorkSessionProjectionRuntime,
@@ -65,8 +70,10 @@ internal class LocalWorkComposition @Inject constructor(
     memoryStore: MemoryStore,
     memoryManager: MemoryManager,
     private val toolApproval: LocalToolApprovalRuntime,
+    private val pinnedInvocations: com.labteto.dshmobile.local.tools.LocalPinnedInvocationStore,
     json: Json,
 ) {
+    private val workMediaTools = LocalWorkMediaToolRuntime(modelGateway, mediaRuntime)
     private val backgroundTools = LocalWorkBackgroundToolExecutor(runtimeStateStore, sessionStorage,
         approvalPreferences, tools, toolApproval)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -264,6 +271,7 @@ internal class LocalWorkComposition @Inject constructor(
     }
     private val turnExecutor = LocalWorkAgentTurnExecutor(
         context = context,
+        pinnedInvocations = pinnedInvocations,
         runtimeStateStore = runtimeStateStore,
         sessionStorage = sessionStorage,
         modelGateway = modelGateway,
@@ -276,6 +284,11 @@ internal class LocalWorkComposition @Inject constructor(
         workSessionProjection = workSessionProjection,
         workToolResultRuntime = toolResultRuntime,
         workTurnToolRuntime = turnToolRuntime,
+        workUiDocumentPublisher = workUiDocumentPublisher,
+        replyDocuments = replyDocuments,
+        onRootExecutionSliceStarted = { sessionId ->
+            persistentJobs.schedule(sessionId, rootSliceAdmitted = true)
+        },
     )
 
     internal val turnStarter = LocalWorkTurnStarter(
@@ -286,7 +299,7 @@ internal class LocalWorkComposition @Inject constructor(
     )
 
     private val teamUiProjection by lazy { LocalWorkTeamUiProjection(agentTeams, workRunRegistry, runtimeStateStore) }
-    internal val agentUi: LocalWorkAgentUiPort by lazy {
+    internal val agentUi: LocalWorkAgentController by lazy {
         LocalWorkAgentController(runtimeStateStore, agentTeams, teamUiProjection)
     }
     private val teamLifecycle by lazy { LocalWorkTeamLifecycle(runtimeStateStore, agentTeams, persistentJobs, teamUiProjection, scope) }
@@ -299,6 +312,7 @@ internal class LocalWorkComposition @Inject constructor(
         binding: LocalWorkRunBinding?,
     ): String? {
         taskBuiltins.execute(call, binding)?.let { return it }
+        workMediaTools.execute(call, allowMutation, binding)?.let { return it }
         return agentControlBuiltins.execute(call, allowMutation, binding)
     }
 

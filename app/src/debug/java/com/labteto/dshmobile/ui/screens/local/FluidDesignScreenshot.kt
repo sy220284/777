@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot
+
 import com.shenyan.designsystem.foundation.SyMetric
 
 import com.labteto.dshmobile.ui.shenyan.SyButton
@@ -25,10 +27,10 @@ internal fun FluidDesignScreenshot(screen: String) {
         screen == "gallery" -> FluidGalleryScreenshot()
         screen == "capability" -> FluidCapabilityCatalogue(
             listOf(
-                LocalCapabilityUiEntry("read", "workspace", "READ_ONLY", "NEVER", emptyList()),
-                LocalCapabilityUiEntry("edit", "workspace", "WORKSPACE_WRITE", "MUTATION", emptyList()),
-                LocalCapabilityUiEntry("web_search", "network", "NETWORK", "NEVER", emptyList()),
-                LocalCapabilityUiEntry("mcp_github_fetch", "mcp", "NETWORK", "NEVER", listOf("连接 GitHub")),
+                UiToolCapabilitySnapshot("read", "workspace", "READ_ONLY", "NEVER", emptyList()),
+                UiToolCapabilitySnapshot("edit", "workspace", "WORKSPACE_WRITE", "MUTATION", emptyList()),
+                UiToolCapabilitySnapshot("web_search", "network", "NETWORK", "NEVER", emptyList()),
+                UiToolCapabilitySnapshot("mcp_github_fetch", "mcp", "NETWORK", "NEVER", listOf("连接 GitHub")),
             ), false, false, 1, {}, {}, {}, {}, {}, null)
     }
 }

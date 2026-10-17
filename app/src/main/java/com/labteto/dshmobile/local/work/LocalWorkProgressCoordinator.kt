@@ -18,11 +18,17 @@ internal class LocalWorkProgressCoordinator(
     private val state: LocalWorkStatePort,
     private val eventLog: LocalSessionEventLog,
     private val workspaceRoot: java.io.File? = null,
+    private val executingToolId: String? = null,
     private val persist: () -> Unit,
 ) {
+    /** One Work owner transaction: log, projection and persist cannot interleave across ports. */
+    private fun <T> commitWorkMutation(action: () -> T): T = eventLog.withWriterLease {
+        synchronized(state) { action() }
+    }
+
     fun updatePlan(
         args: JsonObject,
-    ): String {
+    ): String = commitWorkMutation {
         // A replacement must be intentional. Missing or malformed payloads cannot erase a
         // durable Work plan; explicit items=[] or plan="" still clears it.
         val items = when {
@@ -53,12 +59,12 @@ internal class LocalWorkProgressCoordinator(
         })
         state.update { it.copy(plan = normalized) }
         persist()
-        return if (normalized.isEmpty()) "计划已清空" else "计划已更新，共 ${normalized.size} 项"
+        if (normalized.isEmpty()) "计划已清空" else "计划已更新，共 ${normalized.size} 项"
     }
 
     fun updateTodos(
         args: JsonObject,
-    ): String {
+    ): String = commitWorkMutation {
         // todo_write replaces the *whole* list. Silently dropping one pending task can
         // make the authoritative goal-completion projection report false success.
         val raw = args["items"] as? JsonArray
@@ -92,16 +98,17 @@ internal class LocalWorkProgressCoordinator(
         })
         state.update { it.copy(todos = items) }
         persist()
-        return if (items.isEmpty()) "任务清单已清空" else "任务清单已更新，共 ${items.size} 项"
+        if (items.isEmpty()) "任务清单已清空" else "任务清单已更新，共 ${items.size} 项"
     }
 
     fun createGoal(
         description: String,
         artifactPaths: List<String> = emptyList(),
         verificationCommands: List<String> = emptyList(),
-    ): String {
+    ): String = commitWorkMutation {
         require(description.isNotBlank()) { "目标不能为空" }
         val goal = LocalGoal(description.trim().take(2_000), id = java.util.UUID.randomUUID().toString(),
+            revision = 1L,
             artifactPaths = artifactPaths.distinct().onEach { path ->
                 require(path.isNotBlank() && !path.startsWith("/") && !path.contains('\\') &&
                     !path.contains(':') && path.split('/').none { it.isBlank() || it == "." || it == ".." }) {
@@ -113,7 +120,7 @@ internal class LocalWorkProgressCoordinator(
         val event = eventLog.append("goal/state", workGoalEvent(goal))
         state.update { it.copy(goal = goal.copy(startedAtSequence = event.sequence)) }
         persist()
-        return "目标已创建：${goal.description}\n成果：${goal.artifactPaths.joinToString()}\n验收命令：${goal.verificationCommands.joinToString()}"
+        "目标已创建：${goal.description}\n成果：${goal.artifactPaths.joinToString()}\n验收命令：${goal.verificationCommands.joinToString()}"
     }
 
     fun getGoal(): String {
@@ -124,22 +131,31 @@ internal class LocalWorkProgressCoordinator(
     fun updateGoal(
         status: String,
         note: String?,
-    ): String {
+    ): String = commitWorkMutation {
         require(status in setOf("active", "paused", "completed", "blocked")) { "目标状态无效" }
-        val updated = resolveWorkGoalUpdate(state.snapshot(), status, note, eventLog, workspaceRoot)
-        val delivery = if (status == "completed") localWorkDeliveryEvidence(eventLog, updated, workspaceRoot) else null
+        val updated = resolveWorkGoalUpdate(state.snapshot(), status, note, eventLog, workspaceRoot, executingToolId)
+        val delivery = if (status == "completed") localWorkDeliveryEvidence(eventLog, updated, workspaceRoot, executingToolId) else null
         eventLog.append("goal/state", buildJsonObject {
             workGoalEvent(updated).forEach { (key, value) -> put(key, value) }
             put("description", updated.description)
             put("status", updated.status)
             updated.note?.let { put("note", it) }
+            executingToolId?.let { put("origin_execution_id", it) }
             delivery?.successfulToolCallId?.let { put("executed_tool_call_id", it) }
             delivery?.artifactCallId?.let { put("artifact_tool_call_id", it) }
             delivery?.testCallId?.let { put("verification_tool_call_id", it) }
         })
         state.update { it.copy(goal = updated) }
         persist()
-        return "目标状态已更新为 $status"
+        "目标状态已更新为 $status"
+    }
+
+    /** Uses the same Work command and verifier as explicit updates; never writes a second Goal. */
+    fun completeVerifiedGoal(expected: LocalGoal): Boolean = commitWorkMutation {
+        if (state.snapshot().goal != expected || expected.status != "active") return@commitWorkMutation false
+        if (expected.artifactPaths.isEmpty() && expected.verificationCommands.isEmpty()) return@commitWorkMutation false
+        updateGoal("completed", expected.note)
+        true
     }
 }
 
@@ -147,6 +163,7 @@ internal fun workGoalEvent(goal: LocalGoal): JsonObject = buildJsonObject {
     put("description", goal.description); put("status", goal.status)
     goal.note?.let { put("note", it) }
     put("id", goal.id); put("startedAtSequence", goal.startedAtSequence)
+    put("revision", goal.revision)
     put("artifactPaths", JsonArray(goal.artifactPaths.map(::JsonPrimitive)))
     put("verificationCommands", JsonArray(goal.verificationCommands.map(::JsonPrimitive)))
 }

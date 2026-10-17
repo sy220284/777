@@ -127,6 +127,8 @@ internal class LocalSessionComposition @Inject constructor(
 
     override fun switchSession(sessionId: String): Boolean = coordinator.switchSession(sessionId)
 
+    override suspend fun deleteSessionIds(ids: Set<String>): Set<String> = coordinator.deleteSessionIds(ids)
+
     override suspend fun deleteSessions(ids: Set<String>): Int = coordinator.deleteSessions(ids)
 
     private suspend fun cancelWorkRunsAndJoin(sessionIds: Set<String>) {

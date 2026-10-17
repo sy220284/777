@@ -38,9 +38,9 @@ class LocalWorkerModelRouterTest {
     }
 
     @Test
-    fun singleApiKeyWorkerIsSafeFallbackForPlanParent() {
+    fun singleApiKeyWorkerNeverChangesPlanBillingWithoutSelection() {
         val state = state(listOf(primaryPlan, worker), null)
-        assertEquals(worker.id, LocalWorkerModelRouter.resolve(null, state))
+        assertNull(LocalWorkerModelRouter.resolve(null, state))
     }
 
     @Test

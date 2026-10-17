@@ -1,4 +1,6 @@
 package com.labteto.dshmobile.ui.screens.settings
+import com.labteto.dshmobile.ui.host.DeviceCapabilitiesController
+import com.labteto.dshmobile.ui.host.DeviceCapabilitiesState
 
 import android.content.Context
 import android.graphics.BitmapFactory
@@ -19,9 +21,13 @@ import com.labteto.dshmobile.local.model.DeepSeekPricingState
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.MiniMaxProviderUsage
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
-import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
+import com.labteto.dshmobile.uicontract.UiSettingsSnapshot as LocalHarnessSettingsState
 import com.labteto.dshmobile.local.presentation.LocalSettingsDataFacade
-import com.labteto.dshmobile.local.presentation.LocalSettingsRuntime
+import com.labteto.dshmobile.uicontract.SettingsUiPort
+import com.labteto.dshmobile.uicontract.SettingsUiCommand
+import com.labteto.dshmobile.uicontract.SettingsUiReceipt
+import com.labteto.dshmobile.uicontract.submit
+import com.labteto.dshmobile.uicontract.save
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_DIR
 import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_FILE
@@ -36,6 +42,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -46,14 +53,16 @@ import kotlinx.coroutines.withContext
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val hostsStore: HostsStore,
-    private val localHarness: LocalSettingsRuntime,
+    private val localHarness: SettingsUiPort,
     private val settingsData: LocalSettingsDataFacade,
+    private val memoryUi: com.labteto.dshmobile.uicontract.MemoryUiPort,
+    private val usageUi: com.labteto.dshmobile.uicontract.UsageUiPort,
     @ApplicationContext context: Context,
 ) : ViewModel() {
 
     private val appContext = context.applicationContext
     private val deviceCapabilitiesController = DeviceCapabilitiesController(appContext)
-    private val memorySettingsController = MemorySettingsController(viewModelScope, localHarness::memoryContext, settingsData::memoryPage, settingsData::updateMemory, settingsData::forgetMemory)
+    private val memorySettingsController = MemorySettingsController(viewModelScope, localHarness, memoryUi)
     private val backgroundChangeMutex = Mutex()
 
     private val _state = MutableStateFlow(AppSettings())
@@ -69,9 +78,9 @@ class SettingsViewModel @Inject constructor(
     val chatStyleGuardBuiltInPhrases: List<String> get() = localHarness.chatStyleGuardBuiltInPhrases
     val approvalMode: StateFlow<LocalApprovalMode> = localHarness.approvalMode
     val deepSeekPricing: StateFlow<DeepSeekPricingState> = settingsData.deepSeekPricing
-    val usageAnalytics: StateFlow<TokenUsageAnalyticsSnapshot> = settingsData.usageRevision
+    val usageAnalytics: StateFlow<TokenUsageAnalyticsSnapshot> = usageUi.revision
         .mapLatest {
-            withContext(Dispatchers.IO) { settingsData.usageSnapshot() }
+            withContext(Dispatchers.IO) { usageUi.snapshot() }
         }
         .stateIn(
             scope = viewModelScope,
@@ -80,6 +89,8 @@ class SettingsViewModel @Inject constructor(
         )
 
     internal val memoryManagement = memorySettingsController.state
+    val memories: StateFlow<List<MemoryRecord>> = memoryManagement.map { it.records }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val deviceCapabilities: StateFlow<DeviceCapabilitiesState> =
         deviceCapabilitiesController.state
@@ -96,25 +107,34 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { hostsStore.setSetting(transform) }
     }
 
-    fun configureApprovalMode(mode: LocalApprovalMode) = localHarness.configureApprovalMode(mode)
+    private fun applySetting(command: com.labteto.dshmobile.uicontract.SettingsUiCommand): Boolean {
+        return when (val receipt = localHarness.submit(command)) {
+            com.labteto.dshmobile.uicontract.SettingsUiReceipt.Applied,
+            com.labteto.dshmobile.uicontract.SettingsUiReceipt.Submitted -> true
+            com.labteto.dshmobile.uicontract.SettingsUiReceipt.Rejected -> false
+            is com.labteto.dshmobile.uicontract.SettingsUiReceipt.Failed -> throw IllegalStateException(receipt.message)
+        }
+    }
+
+    fun configureApprovalMode(mode: LocalApprovalMode) = applySetting(SettingsUiCommand.ApprovalMode(mode))
 
     fun configureChatStyleGuard(enabled: Boolean) {
-        localHarness.configureChatStyleGuard(enabled)
+        applySetting(SettingsUiCommand.StyleGuard(enabled))
     }
 
     fun configureImageInputMode(mode: com.labteto.dshmobile.local.model.LocalImageInputMode) {
-        localHarness.configureImageInputMode(mode)
+        applySetting(SettingsUiCommand.ImageInputMode(mode))
     }
 
     fun addChatStyleGuardPhrase(phrase: String): Boolean =
-        localHarness.addChatStyleGuardPhrase(phrase)
+        applySetting(SettingsUiCommand.AddStylePhrase(phrase))
 
     fun removeChatStyleGuardPhrase(phrase: String) {
-        localHarness.removeChatStyleGuardPhrase(phrase)
+        applySetting(SettingsUiCommand.RemoveStylePhrase(phrase))
     }
 
     fun clearChatStyleGuardHits() {
-        localHarness.clearChatStyleGuardHits()
+        applySetting(SettingsUiCommand.ClearStyleHits)
     }
 
     /**
@@ -198,12 +218,19 @@ class SettingsViewModel @Inject constructor(
     }
 
     suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null, credentialSourceProfileId: String? = null) =
-        withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride, credentialSourceProfileId) }
+        withContext(Dispatchers.IO) {
+            when (val receipt = localHarness.save(SettingsUiCommand.SaveModel(apiKey, model, baseUrl, protocol,
+                profileId, contextWindowTokensOverride, credentialSourceProfileId))) {
+                SettingsUiReceipt.Applied -> Unit
+                is SettingsUiReceipt.Failed -> throw IllegalStateException(receipt.message)
+                else -> error("Model configuration was not applied")
+            }
+        }
 
     internal suspend fun queryMiniMaxQuota(profile: LocalModelProfile): MiniMaxProviderUsage =
         withContext(Dispatchers.IO) { localHarness.queryMiniMaxQuota(profile) }
 
-    fun selectLocalModel(id: String) = localHarness.selectModel(id)
+    fun selectLocalModel(id: String) = applySetting(SettingsUiCommand.SelectModel(id))
 
     fun connectChatGpt(existingAccountId: String? = null, requestPlanConsent: Boolean = false, onDone: (String?) -> Unit = {}) {
         viewModelScope.launch {
@@ -288,7 +315,7 @@ class SettingsViewModel @Inject constructor(
     fun refreshChatGpt() {
         viewModelScope.launch { localHarness.refreshChatGpt() }
     }
-    fun removeLocalModel(id: String) = localHarness.removeModel(id)
+    fun removeLocalModel(id: String) = applySetting(SettingsUiCommand.RemoveModel(id))
 
     suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, credentialSourceProfileId: String? = null): String =
         localHarness.testModel(apiKey, model, baseUrl, protocol, profileId, credentialSourceProfileId)
@@ -297,13 +324,12 @@ class SettingsViewModel @Inject constructor(
         withContext(Dispatchers.IO) { localHarness.discoverApiModels(apiKey, baseUrl, protocol, credentialSourceProfileId) }
 
     fun configureLocalMemory(userRules: String, autoRecall: Boolean, autoMemory: Boolean) {
-        localHarness.configurePersonalization(userRules, autoRecall, autoMemory)
+        applySetting(SettingsUiCommand.Personalization(userRules, autoRecall, autoMemory))
     }
 
     fun refreshMemories() = memorySettingsController.refresh()
     fun loadOlderMemories() = memorySettingsController.loadOlder()
-    fun searchMemories(query: String, kinds: Set<com.labteto.dshmobile.local.memory.MemoryKind>) =
-        memorySettingsController.search(query, kinds)
+    fun searchMemories(query: String, kinds: Set<com.labteto.dshmobile.local.memory.MemoryKind>) = memorySettingsController.search(query, kinds)
     fun focusMemorySourceMessage(sessionId: String?, messageId: String?) =
         memorySettingsController.focusSourceMessage(sessionId, messageId)
 
@@ -318,7 +344,7 @@ class SettingsViewModel @Inject constructor(
         memorySettingsController.forget(id, onDone)
 
     fun configureLocalAgent(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int, workerProfileId: String?) {
-        localHarness.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts, workerProfileId)
+        applySetting(SettingsUiCommand.RuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts, workerProfileId))
     }
 
     suspend fun diagnoseNetwork(target: String): String = localHarness.diagnoseNetwork(target)
@@ -344,11 +370,11 @@ class SettingsViewModel @Inject constructor(
         key: String,
         modelFilter: String? = null,
     ): TokenUsageGroupDetail? = withContext(Dispatchers.IO) {
-        settingsData.usageGroupDetail(kind, key, modelFilter)
+        usageUi.groupDetail(kind, key, modelFilter)
     }
 
     suspend fun usageRecord(requestId: String): TokenUsageRecord? = withContext(Dispatchers.IO) {
-        settingsData.usageRecord(requestId)
+        usageUi.requestDetail(requestId)
     }
 
     fun refreshDeviceCapabilities() = deviceCapabilitiesController.refresh()

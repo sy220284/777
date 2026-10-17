@@ -45,6 +45,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
@@ -54,7 +55,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -98,6 +98,7 @@ import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalMessageBlock
 import com.labteto.dshmobile.local.session.visibleBlocks
+import com.labteto.dshmobile.local.session.plainTextProjection
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
@@ -136,6 +137,11 @@ internal data class LocalModeIntro(val usageMode: LocalUsageMode)
  */
 internal class LocalConversationSurfaceArgs(
     val state: LocalConversationSurfaceState,
+    val documents: com.labteto.dshmobile.uicontract.UiDocumentUiPort,
+    val documentForms: com.labteto.dshmobile.uicontract.UiDocumentFormUiPort,
+    val documentIdentity: com.labteto.dshmobile.uicontract.UiSessionIdentity?,
+    val reading: com.labteto.dshmobile.uicontract.ConversationReadingUiPort,
+    val drafts: com.labteto.dshmobile.uicontract.ConversationDraftUiPort,
     val workActions: LocalWorkFeatureUiActions?,
     val onOpenWorkArtifact: (String) -> Unit,
     val activeModelProfile: LocalModelProfile?,
@@ -167,10 +173,10 @@ internal class LocalConversationSurfaceArgs(
     val onTogglePinSession: () -> Unit,
     val onRenameSession: (String) -> Boolean,
     val onDeleteSession: () -> Unit,
-    val onConfigureChatPersona: suspend (PersonaProfile) -> Result<Unit>,
+    val onConfigureChatPersona: suspend (PersonaProfile, com.labteto.dshmobile.uicontract.UiSessionIdentity?) -> Result<Unit>,
     val onConfigureGroupMembers: (List<String>) -> Boolean,
     val onSelectGalleryPersona: (String) -> Boolean,
-    val onAutoFillChatPersona: suspend (PersonaProfile, String) -> Result<PersonaProfile>,
+    val onAutoFillChatPersona: suspend (PersonaProfile, String, com.labteto.dshmobile.uicontract.UiSessionIdentity?) -> Result<PersonaProfile>,
     val onSaveGroupAnnouncement: suspend (String) -> Result<Unit>,
     val onUndoPersonaCorrection: (Long, String, String) -> Unit,
     val onPlanModeChange: (Boolean) -> Unit,
@@ -183,6 +189,9 @@ internal class LocalConversationSurfaceArgs(
     val onCancelQuestion: (String) -> Unit,
     val composerHandoff: List<String>,
     val skillDisplayNames: Map<String, String>,
+    val invocationOptions: List<com.labteto.dshmobile.uicontract.UiInvocationOption>,
+    val pinnedInvocations: List<com.labteto.dshmobile.uicontract.UiInvocationRef>,
+    val onToggleInvocation: (com.labteto.dshmobile.uicontract.UiInvocationRef) -> Unit,
     val onConsumeComposerHandoff: () -> Unit,
     val onOpenDrawer: (() -> Unit)?,
     val onOpenGlobalSearch: () -> Unit,
@@ -198,6 +207,11 @@ internal class LocalConversationSurfaceArgs(
 @Composable
 internal fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
+    documents: com.labteto.dshmobile.uicontract.UiDocumentUiPort,
+    documentForms: com.labteto.dshmobile.uicontract.UiDocumentFormUiPort,
+    documentIdentity: com.labteto.dshmobile.uicontract.UiSessionIdentity?,
+    reading: com.labteto.dshmobile.uicontract.ConversationReadingUiPort,
+    drafts: com.labteto.dshmobile.uicontract.ConversationDraftUiPort,
     workActions: LocalWorkFeatureUiActions? = null,
     onOpenWorkArtifact: (String) -> Unit = {},
     activeModelProfile: LocalModelProfile?,
@@ -229,10 +243,10 @@ internal fun LocalConversationSurface(
     onTogglePinSession: () -> Unit,
     onRenameSession: (String) -> Boolean,
     onDeleteSession: () -> Unit,
-    onConfigureChatPersona: suspend (PersonaProfile) -> Result<Unit>,
+    onConfigureChatPersona: suspend (PersonaProfile, com.labteto.dshmobile.uicontract.UiSessionIdentity?) -> Result<Unit>,
     onConfigureGroupMembers: (List<String>) -> Boolean,
     onSelectGalleryPersona: (String) -> Boolean,
-    onAutoFillChatPersona: suspend (PersonaProfile, String) -> Result<PersonaProfile>,
+    onAutoFillChatPersona: suspend (PersonaProfile, String, com.labteto.dshmobile.uicontract.UiSessionIdentity?) -> Result<PersonaProfile>,
     onSaveGroupAnnouncement: suspend (String) -> Result<Unit>,
     onUndoPersonaCorrection: (Long, String, String) -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
@@ -245,6 +259,9 @@ internal fun LocalConversationSurface(
     onCancelQuestion: (String) -> Unit,
     composerHandoff: List<String> = emptyList(),
     skillDisplayNames: Map<String, String> = emptyMap(),
+    invocationOptions: List<com.labteto.dshmobile.uicontract.UiInvocationOption> = emptyList(),
+    pinnedInvocations: List<com.labteto.dshmobile.uicontract.UiInvocationRef> = emptyList(),
+    onToggleInvocation: (com.labteto.dshmobile.uicontract.UiInvocationRef) -> Unit = {},
     onConsumeComposerHandoff: () -> Unit = {},
     onOpenDrawer: (() -> Unit)? = null,
     onOpenGlobalSearch: () -> Unit = {},
@@ -258,6 +275,11 @@ internal fun LocalConversationSurface(
 ) {
     val args = LocalConversationSurfaceArgs(
         state = state,
+        documents = documents,
+        documentForms = documentForms,
+        documentIdentity = documentIdentity,
+        reading = reading,
+        drafts = drafts,
         workActions = workActions,
         onOpenWorkArtifact = onOpenWorkArtifact,
         activeModelProfile = activeModelProfile,
@@ -305,6 +327,9 @@ internal fun LocalConversationSurface(
         onCancelQuestion = onCancelQuestion,
         composerHandoff = composerHandoff,
         skillDisplayNames = skillDisplayNames,
+        invocationOptions = invocationOptions,
+        pinnedInvocations = pinnedInvocations,
+        onToggleInvocation = onToggleInvocation,
         onConsumeComposerHandoff = onConsumeComposerHandoff,
         onOpenDrawer = onOpenDrawer,
         onOpenGlobalSearch = onOpenGlobalSearch,
@@ -322,6 +347,11 @@ internal fun LocalConversationSurface(
 @Composable
 private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val state = args.state
+    val documents = args.documents
+    val documentForms = args.documentForms
+    val documentIdentity = args.documentIdentity
+    val reading = args.reading
+    val drafts = args.drafts
     val workActions = args.workActions
     val onOpenWorkArtifact = args.onOpenWorkArtifact
     val activeModelProfile = args.activeModelProfile
@@ -369,6 +399,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val onCancelQuestion = args.onCancelQuestion
     val composerHandoff = args.composerHandoff
     val skillDisplayNames = args.skillDisplayNames
+    val invocationOptions = args.invocationOptions
+    val pinnedInvocations = args.pinnedInvocations
+    val onToggleInvocation = args.onToggleInvocation
     val onConsumeComposerHandoff = args.onConsumeComposerHandoff
     val onOpenDrawer = args.onOpenDrawer
     val onOpenGlobalSearch = args.onOpenGlobalSearch
@@ -411,26 +444,25 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     }
     var temperatureSaving by remember(state.sessionId) { mutableStateOf(false) }
     var temperatureSaveFailed by remember(state.sessionId) { mutableStateOf(false) }
-    val drafts = rememberSaveable(
-        saver = listSaver(
-            save = { cache -> cache.save() },
-            restore = { saved -> LocalSessionDraftCache.restore(saved) },
-        ),
-    ) { LocalSessionDraftCache() }
+    val documentSnapshot by documents.snapshots.collectAsStateWithLifecycle(initialValue = remember(documents) { documents.snapshot() })
+    val draftValues by drafts.drafts.collectAsStateWithLifecycle()
     LaunchedEffect(composerHandoff, state.sessionId) {
         if (composerHandoff.size == 2 && composerHandoff[0] == state.sessionId) {
-            val previous = drafts[state.sessionId].orEmpty()
-            drafts.putBoundedLocalDraft(state.sessionId, listOf(composerHandoff[1], previous).filter(String::isNotBlank).joinToString("\n\n"))
+            val previous = draftValues[state.sessionId].orEmpty()
+            drafts.updateDraft(state.sessionId, listOf(composerHandoff[1], previous).filter(String::isNotBlank).joinToString("\n\n"))
             onConsumeComposerHandoff()
         }
     }
-    val input = drafts[state.sessionId].orEmpty()
+    val input = draftValues[state.sessionId].orEmpty()
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
     var showMediaStudio by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var mediaRevision by rememberSaveable(state.sessionId) { mutableStateOf<LocalMediaRevisionDraft?>(null) }
     var mediaInitialPrompt by rememberSaveable(state.sessionId) { mutableStateOf("") }
     var mediaSourceMessageId by rememberSaveable(state.sessionId) { mutableStateOf<String?>(null) }
+    var mediaSourceReply by rememberSaveable(state.sessionId) { mutableStateOf<String?>(null) }
+    var mediaSourcePersonaName by rememberSaveable(state.sessionId) { mutableStateOf("") }
+    var mediaSourcePersonaIdentity by rememberSaveable(state.sessionId) { mutableStateOf("") }
     var mediaInitialKind by rememberSaveable(state.sessionId) {
         mutableStateOf(com.labteto.dshmobile.local.model.LocalMediaKind.IMAGE.name)
     }
@@ -445,19 +477,21 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
     var showWorkEvidence by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showCharacterTuning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
-    var showGroupMemberPicker by rememberSaveable { mutableStateOf(false) }
-    var showGroupAnnouncement by rememberSaveable { mutableStateOf(false) }
+    var showGroupMemberPicker by remember(documentIdentity) { mutableStateOf(false) }
+    var showGroupAnnouncement by remember(documentIdentity) { mutableStateOf(false) }
     var showPersonaEditor by rememberSaveable { mutableStateOf(false) }
-    var personaEditorDraft by remember { mutableStateOf<PersonaProfile?>(null) }
+    val personaEditor = rememberLocalPersonaEditorState()
+    val personaEditorDraft = personaEditor.profile
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
     var editingUserMessage by remember { mutableStateOf<LocalHarnessMessage?>(null) }
     var renameSessionOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
-    val attachments = remember(state.sessionId) { mutableStateListOf<LocalImportedAttachment>() }
+    val attachmentDrafts by drafts.attachments.collectAsStateWithLifecycle()
+    val attachments = attachmentDrafts[state.sessionId].orEmpty()
     val listState = rememberLazyListState()
     var composerTailViewportAnchor by remember(state.sessionId) { mutableStateOf<Int?>(null) }
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
     var transcriptInitialPositionReady by rememberSaveable(state.sessionId) { mutableStateOf(false) }
-    var planReviewBusy by remember(state.pendingQuestion?.callId) { mutableStateOf(false) }
+    var planReviewBusy by remember(state.pendingQuestion?.requestId) { mutableStateOf(false) }
     val pagedOlderMessages = if (transcriptHistory.sessionId == state.sessionId) {
         transcriptHistory.olderMessages
     } else {
@@ -603,8 +637,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             scope.launch {
                 try {
                     val imported = onImportAttachment(uri)
-                    attachmentError = when (localComposerAttachmentDecision(attachments, imported)) {
-                        LocalComposerAttachmentDecision.ACCEPT -> { attachments += imported; null }
+                    attachmentError = when (localComposerAttachmentDecision(drafts.attachments.value[state.sessionId].orEmpty(), imported)) {
+                        LocalComposerAttachmentDecision.ACCEPT -> { drafts.addAttachment(state.sessionId, imported); null }
                         LocalComposerAttachmentDecision.DUPLICATE -> null
                         LocalComposerAttachmentDecision.IMAGE_LIMIT -> imageLimitMessage
                     }
@@ -632,8 +666,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 uris.take(available).forEach { uri ->
                     try {
                         val imported = onImportAttachment(uri)
-                        when (localComposerAttachmentDecision(attachments, imported)) {
-                            LocalComposerAttachmentDecision.ACCEPT -> attachments += imported
+                        when (localComposerAttachmentDecision(drafts.attachments.value[state.sessionId].orEmpty(), imported)) {
+                            LocalComposerAttachmentDecision.ACCEPT -> drafts.addAttachment(state.sessionId, imported)
                             LocalComposerAttachmentDecision.DUPLICATE -> Unit
                             LocalComposerAttachmentDecision.IMAGE_LIMIT -> failure = imageLimitMessage
                         }
@@ -652,9 +686,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             scope.launch {
                 try {
                     val imported = onImportAttachment(uri)
-                    attachmentError = when (localComposerAttachmentDecision(attachments, imported)) {
+                    attachmentError = when (localComposerAttachmentDecision(drafts.attachments.value[state.sessionId].orEmpty(), imported)) {
                         LocalComposerAttachmentDecision.ACCEPT -> {
-                            attachments += imported
+                            drafts.addAttachment(state.sessionId, imported)
                             null
                         }
                         LocalComposerAttachmentDecision.DUPLICATE -> null
@@ -669,16 +703,45 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         }
     }
 
+    val workReaderPaused = remember(state.sessionId) { mutableStateOf(false) }
+    var readingAnchorMissing by remember(state.sessionId) { mutableStateOf(false) }
+    val readingItemsByKey = remember(transcriptItems) { transcriptItems.associateBy { it.key } }
+    var previousChatTailIndex by remember(state.sessionId) { mutableStateOf(-1) }
     LaunchedEffect(state.sessionId) {
         transcriptInitialPositionReady = false
         scrollHint.hide()
-        attachments.clear()
         attachmentError = null
         showReplySuggestions = false
-        if (transcriptItems.isNotEmpty()) {
+    }
+    LaunchedEffect(state.sessionId, state.loading, transcriptItems.isNotEmpty()) {
+        if (state.loading || transcriptInitialPositionReady) return@LaunchedEffect
+        val anchor = reading.anchor(state.sessionId)
+        val itemIndex = transcriptItems.indexOfFirst { it.containsReadingMessage(anchor?.messageId) }
+        if (anchor != null && !anchor.followingTail && itemIndex >= 0) {
+            val prefix = listOf(mediaPage.unavailable, mediaPage.hasMore, showTranscriptPagingRow,
+                showEmptyWorkbench, showEmptyGroupSetup, planReview != null).count { it }
+            listState.scrollToItem(prefix + itemIndex, anchor.offsetPx)
+            workReaderPaused.value = true
+            previousChatTailIndex = transcriptLastListIndex
+        } else if (transcriptItems.isNotEmpty()) {
+            readingAnchorMissing = anchor != null && !anchor.followingTail && itemIndex < 0
             listState.scrollToItem(transcriptLastListIndex)
         }
         transcriptInitialPositionReady = true
+    }
+    LaunchedEffect(state.sessionId, transcriptItems, transcriptInitialPositionReady) {
+        if (!transcriptInitialPositionReady || state.loading) return@LaunchedEffect
+        snapshotFlow {
+            val first = listState.layoutInfo.visibleItemsInfo.firstOrNull { visible ->
+                readingItemsByKey[visible.key] != null
+            }
+            val messageId = readingItemsByKey[first?.key]?.readingMessageId()
+            com.labteto.dshmobile.uicontract.UiReadingAnchor(
+                messageId, -(first?.offset ?: 0), listState.isConversationTailVisible(),
+            )
+        }.collect { anchor ->
+            if (anchor.messageId != null || anchor.followingTail) reading.rememberAnchor(state.sessionId, anchor)
+        }
     }
 
     LocalTranscriptAutoPager(
@@ -695,7 +758,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         anchoredViewportExtent = composerTailViewportAnchor,
     )
     val workTailFollowing = remember(state.sessionId) { mutableStateOf(false) }
-    val workReaderPaused = remember(state.sessionId) { mutableStateOf(false) }
     LocalWorkStreamingTailFollower(
         listState = listState,
         enabled = showStreamingTail && !workTailFollowing.value &&
@@ -714,8 +776,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         )
     } else {
         // Chat mode retains its established scrolling behavior.
-        var previousChatTailIndex by remember(state.sessionId) { mutableStateOf(-1) }
-        LaunchedEffect(state.messages.size, transcriptItems.size, state.running) {
+        LaunchedEffect(state.messages.size, transcriptItems.size, state.running, transcriptInitialPositionReady) {
+            if (!transcriptInitialPositionReady) return@LaunchedEffect
             if (transcriptItems.isNotEmpty()) {
                 val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
                 val wasNearTail = previousChatTailIndex < 0 ||
@@ -727,6 +789,14 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     }
 
     Column(Modifier.fillMaxSize().background(rootSurfaceColor).safeDrawingPadding().imePadding()) {
+        if (documentSnapshot.error != null) Text(
+            stringResource(R.string.ui_document_history_unavailable),
+            style = DsType.std14.withReadingWeight(), color = colors.textSecondary,
+        )
+        if (readingAnchorMissing) Text(
+            stringResource(R.string.local_reading_anchor_unavailable),
+            style = DsType.std14.withReadingWeight(), color = colors.textSecondary,
+        )
         Column(
             Modifier.fillMaxWidth()
                 .padding(horizontal = DsMetrics.screenHorizontal, vertical = SyMetric.gapMd),
@@ -765,7 +835,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 if (state.groupChat.enabled) showGroupMemberPicker = true
                                 else showPersonaPicker = true
                             },
-                            onOpenCharacterTuning = { showCharacterTuning = true },
+                            onOpenCharacterTuning = { personaEditor.captureTuning(documentIdentity); showCharacterTuning = true },
                             onExitGroupChat = onExitGroupChat,
                             onNewSession = onNewSession,
                             sessionPinned = sessionPinned,
@@ -806,6 +876,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         }
 
         LocalModeIntroBanner(modeIntro)
+        if (state.usageMode == LocalUsageMode.WORK && documentIdentity != null) {
+            workActions?.let { com.labteto.dshmobile.uipack.v6.V6WorkEvidencePanel(it.evidence, documentIdentity) }
+        }
 
         if (state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled) {
             GroupAnnouncementCard(
@@ -934,7 +1007,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     item {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
                             EmptyLocalHarness { suggestion ->
-                                drafts.putBoundedLocalDraft(state.sessionId, suggestion)
+                                drafts.updateDraft(state.sessionId, suggestion)
                             }
                         }
                     }
@@ -962,20 +1035,20 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             busy = planReviewBusy,
                             onApprove = {
                                 if (!planReviewBusy) {
-                                    val callId = state.pendingQuestion?.callId
+                                    val callId = state.pendingQuestion?.requestId
                                     if (callId != null && onAnswerQuestion(callId, review.approve)) planReviewBusy = true
                                 }
                             },
                             onDecline = {
                                 review.decline?.let { decline ->
                                     if (!planReviewBusy) {
-                                        val callId = state.pendingQuestion?.callId
+                                        val callId = state.pendingQuestion?.requestId
                                         if (callId != null && onAnswerQuestion(callId, decline)) planReviewBusy = true
                                     }
                                 }
                             },
                             onRegenerate = {
-                                val callId = state.pendingQuestion?.callId
+                                val callId = state.pendingQuestion?.requestId
                                 if (!planReviewBusy && callId != null && onAnswerQuestion(callId, review.regenerate)) {
                                     planReviewBusy = true
                                 }
@@ -1030,9 +1103,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                     } else {
                                         attachmentError = when (localComposerAttachmentDecision(attachments, reusable)) {
                                             LocalComposerAttachmentDecision.ACCEPT -> {
-                                                attachments += reusable
-                                                val current = drafts[state.sessionId].orEmpty()
-                                                drafts.putBoundedLocalDraft(state.sessionId,
+                                                drafts.addAttachment(state.sessionId, reusable)
+                                                val current = draftValues[state.sessionId].orEmpty()
+                                                drafts.updateDraft(state.sessionId,
                                                     listOf(generatedImageEditPrompt, current)
                                                         .filter(String::isNotBlank).joinToString("\n\n"))
                                                 null
@@ -1045,10 +1118,16 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 onCreateMedia = { message, kind ->
                                     mediaRevision = null
                                     mediaSourceMessageId = message.id
+                                    // Derive creative input from visible text blocks, not the
+                                    // compatibility/raw transcript field (which may differ).
+                                    val visibleReply = message.visibleBlocks().plainTextProjection()
+                                    mediaSourceReply = visibleReply.take(12_000)
+                                    mediaSourcePersonaName = if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled)
+                                        state.chatPersona.name else ""
+                                    mediaSourcePersonaIdentity = if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled)
+                                        state.chatPersona.coreIdentity else ""
                                     mediaInitialPrompt = mediaCreativeDraft(
-                                        kind, message.content,
-                                        if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) state.chatPersona.name else "",
-                                        if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) state.chatPersona.coreIdentity else "",
+                                        kind, visibleReply, mediaSourcePersonaName, mediaSourcePersonaIdentity,
                                     )
                                     mediaInitialKind = kind.name
                                     showMediaStudio = true
@@ -1060,6 +1139,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 onSelectVariant = onSelectMessageVariant,
                                 onRegenerate = onRegenerate,
                             )
+                            if (state.messages.lastOrNull()?.id == transcriptItem.message.id && !state.loading) {
+                                LocalUiDocumentGenerateButton(documentIdentity, state.usageMode == LocalUsageMode.WORK,
+                                    transcriptItem.message.id, transcriptItem.message.content, documents, allowAiDesign = !state.running)
+                            }
+                            documentSnapshot.documents.filter { it.document.source.messageId == transcriptItem.message.id }.forEach {
+                                LocalDynamicDocument(it, documentIdentity, documents, documentForms, mediaStudioViewModel.mediaPort)
+                            }
                             if (state.usageMode == LocalUsageMode.CHAT && transcriptItem.message.role == "user") {
                                 turnUsage.summaries[transcriptItem.message.id]?.let { aggregate ->
                                     LocalChatTurnUsageButton(aggregate) { turnUsage.open(transcriptItem.message.id) }
@@ -1069,16 +1155,20 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         is LocalTranscriptItem.MediaResult -> LocalGeneratedMediaResultRow(
                             result = transcriptItem.result,
                             viewModel = mediaStudioViewModel,
+                            revisionJob = transcriptItem.revisionJob,
                             onRevise = { draft ->
                                 mediaRevision = draft
                                 mediaInitialPrompt = draft.prompt
                                 mediaSourceMessageId = draft.sourceMessageId
+                                mediaSourceReply = null
+                                mediaSourcePersonaName = ""
+                                mediaSourcePersonaIdentity = ""
                                 mediaInitialKind = draft.kind.name
                                 showMediaStudio = true
                             },
                             onInsertText = { text ->
-                                val previous = drafts[state.sessionId].orEmpty()
-                                drafts.putBoundedLocalDraft(
+                                val previous = draftValues[state.sessionId].orEmpty()
+                                drafts.updateDraft(
                                     state.sessionId,
                                     listOf(previous, text).filter(String::isNotBlank).joinToString("\n\n"),
                                 )
@@ -1090,12 +1180,15 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         )
                         is LocalTranscriptItem.VideoTask -> LocalGeneratedVideoTaskRow(
                             task = transcriptItem.task,
-                            offers = com.labteto.dshmobile.local.model.LocalMediaCatalog.offers(state.modelProfiles),
+                            offers = mediaStudioViewModel.offers(state.modelProfiles),
                             viewModel = mediaStudioViewModel,
                             onRevise = { draft ->
                                 mediaRevision = draft
                                 mediaInitialPrompt = draft.prompt
                                 mediaSourceMessageId = draft.sourceMessageId
+                                mediaSourceReply = null
+                                mediaSourcePersonaName = ""
+                                mediaSourcePersonaIdentity = ""
                                 mediaInitialKind = draft.kind.name
                                 showMediaStudio = true
                             },
@@ -1234,7 +1327,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 sendFeedback.rejectReason == LocalSendRejectReason.UNCONFIGURED,
             stateError = state.error,
             restoreRequest = state.messages.lastOrNull { it.role == "user" }?.content,
-            onRestoreRequest = { drafts.putBoundedLocalDraft(state.sessionId, it) },
+            onRestoreRequest = { drafts.updateDraft(state.sessionId, it) },
             onSwitchModelSource = {
                 if (state.modelProfiles.isNotEmpty()) showModelPicker = true else onConfigure()
             },
@@ -1264,7 +1357,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     key = { suggestion -> suggestion.label + "|" + suggestion.text },
                 ) { suggestion ->
                     SyMaterialSurface(
-                        onClick = { drafts.putBoundedLocalDraft(state.sessionId, suggestion.text) },
+                        onClick = { drafts.updateDraft(state.sessionId, suggestion.text) },
                         shape = DsShapes.pillFull,
                         tier = SyMaterialTier.L4_OVERLAY,
                         border = BorderStroke(1.dp, colors.border),
@@ -1302,12 +1395,15 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         LocalConversationComposer(
             state = state,
             skillDisplayNames = skillDisplayNames,
+            invocationOptions = invocationOptions,
+            pinnedInvocations = pinnedInvocations,
+            onToggleInvocation = onToggleInvocation,
             activeModelProfile = activeModelProfile,
             input = input,
             attachments = attachments,
-            onInputChange = { drafts.putBoundedLocalDraft(state.sessionId, it) },
-            onRemoveAttachment = { index -> attachments.removeAt(index) },
-            onClearAttachments = attachments::clear,
+            onInputChange = { drafts.updateDraft(state.sessionId, it) },
+            onRemoveAttachment = { index -> attachments.getOrNull(index)?.let { drafts.removeAttachment(state.sessionId, it.relativePath) } },
+            onClearAttachments = { drafts.clearAttachments(state.sessionId) },
             onOpenAttachmentPicker = { showAttachmentPicker = true },
             onShowReplySuggestions = { showReplySuggestions = true },
             onGenerateReplySuggestions = onGenerateReplySuggestions,
@@ -1353,7 +1449,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             val proposed = state.chatPersona.copy(
                                 behaviorTuning = state.chatState.behaviorTuning.withComposerTemperatureLevel(level),
                             )
-                            temperatureSaveFailed = onConfigureChatPersona(proposed).isFailure
+                            temperatureSaveFailed = onConfigureChatPersona(proposed, documentIdentity).isFailure
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (_: Exception) {
@@ -1397,10 +1493,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         ApprovalDialog(
             approval = approval,
             safeAutoApprovalEnabled = state.safeAutoApprovalEnabled,
-            onApprove = { onApprove(approval.callId) },
-            onDeny = { onDeny(approval.callId) },
-            onAutoApprove = { onAutoApprovePending(approval.callId) },
-            onApproveDeviceTurn = { onApproveDeviceTurn(approval.callId) },
+            onApprove = { onApprove(approval.requestId.orEmpty()) },
+            onDeny = { onDeny(approval.requestId.orEmpty()) },
+            onAutoApprove = { onAutoApprovePending(approval.requestId.orEmpty()) },
+            onApproveDeviceTurn = { onApproveDeviceTurn(approval.requestId.orEmpty()) },
         )
     }
     state.pendingQuestion
@@ -1410,10 +1506,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         QuestionDialog(
             question = question.question,
             options = question.options,
-            onAnswer = { answer -> onAnswerQuestion(question.callId, answer) },
-            onDismiss = { onCancelQuestion(question.callId) },
+            onAnswer = { answer -> onAnswerQuestion(question.requestId.orEmpty(), answer) },
+            onDismiss = { onCancelQuestion(question.requestId.orEmpty()) },
             requireConfirmation = workActions != null,
-            questionId = question.callId,
+            questionId = question.requestId ?: question.callId,
         )
     }
     if (
@@ -1447,7 +1543,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         state = state.chatState,
         temperatureTuningAvailable = temperatureUi.tuningAvailable,
         temperatureRange = temperatureUi.range,
-        onConfigurePersona = onConfigureChatPersona,
+        onConfigurePersona = { profile -> onConfigureChatPersona(profile, personaEditor.tuningIdentity) },
         onDismiss = { showCharacterTuning = false },
     )
     if (
@@ -1464,7 +1560,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             onSelect = onSelectGalleryPersona,
             onEditCurrent = {
                 showPersonaPicker = false
-                personaEditorDraft = state.chatPersona
+                personaEditor.open(state.chatPersona, documentIdentity)
                 showPersonaEditor = true
             },
             onDismiss = { showPersonaPicker = false },
@@ -1474,12 +1570,12 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         ChatPersonaDialog(
             profile = personaEditorDraft ?: state.chatPersona,
             onSave = { profile ->
-                onConfigureChatPersona(profile).onSuccess { personaEditorDraft = null }
+                onConfigureChatPersona(profile, personaEditor.identity).onSuccess { personaEditor.clear() }
             },
-            onAutoFill = onAutoFillChatPersona,
+            onAutoFill = { profile, description -> onAutoFillChatPersona(profile, description, personaEditor.identity) },
             onDismiss = {
                 showPersonaEditor = false
-                personaEditorDraft = null
+                personaEditor.clear()
             },
         )
     }
@@ -1523,7 +1619,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             state.replySuggestions.filter { it.text.isNotBlank() }.forEach { suggestion ->
                 Surface(
                     onClick = {
-                        drafts.putBoundedLocalDraft(state.sessionId, suggestion.text)
+                        drafts.updateDraft(state.sessionId, suggestion.text)
                         showReplySuggestions = false
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -1621,6 +1717,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         mediaRevision = null
                         mediaInitialPrompt = ""
                         mediaSourceMessageId = null
+                        mediaSourceReply = null
+                        mediaSourcePersonaName = ""
+                        mediaSourcePersonaIdentity = ""
                         mediaInitialKind = com.labteto.dshmobile.local.model.LocalMediaKind.IMAGE.name
                         showMediaStudio = true
                     },
@@ -1673,6 +1772,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 viewModel = mediaStudioViewModel,
                 onDelivered = { showMediaStudio = false },
                 initialPrompt = mediaInitialPrompt,
+                sourceReply = mediaSourceReply,
+                sourcePersonaName = mediaSourcePersonaName,
+                sourcePersonaIdentity = mediaSourcePersonaIdentity,
                 sourceMessageId = mediaSourceMessageId,
                 revision = mediaRevision,
                 personaVoiceStyle = if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled)
@@ -1680,8 +1782,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 else "",
                 initialKind = com.labteto.dshmobile.local.model.LocalMediaKind.valueOf(mediaInitialKind),
                 onInsertTranscript = { transcription ->
-                    val previous = drafts[state.sessionId].orEmpty()
-                    drafts.putBoundedLocalDraft(
+                    val previous = draftValues[state.sessionId].orEmpty()
+                    drafts.updateDraft(
                         state.sessionId,
                         listOf(previous, transcription).filter(String::isNotBlank).joinToString("\n\n"),
                     )
@@ -1709,8 +1811,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     if (memberName.isBlank()) R.string.local_team_lead_followup_request else R.string.local_team_lead_recover_request,
                     memberName,
                 )
-                val previous = drafts[state.sessionId].orEmpty()
-                drafts.putBoundedLocalDraft(state.sessionId, listOf(request, previous).filter(String::isNotBlank).joinToString("\n\n"))
+                val previous = draftValues[state.sessionId].orEmpty()
+                drafts.updateDraft(state.sessionId, listOf(request, previous).filter(String::isNotBlank).joinToString("\n\n"))
                 teamDispatchSelected = true
                 showTeamPanel = false
             },

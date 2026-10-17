@@ -107,6 +107,19 @@ SHARED_BOUNDARY_FILES = (
 )
 
 RUNTIME_PROJECTION_UPDATE_OWNER = "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeProjection.kt"
+RUNTIME_AGGREGATE_WRITE_ADAPTERS = {
+    RUNTIME_PROJECTION_UPDATE_OWNER,
+    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeKernel.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/LocalForegroundSessionLoader.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/LocalRuntimeBootstrapComposition.kt",
+}
+
+def writes_runtime_aggregate(source: str) -> bool:
+    # Match Kotlin's trailing lambda and parenthesized calls, ignoring comments.
+    return re.search(
+        r"\bruntimeStateStore\s*\.\s*projection\s*\.\s*update\s*(?:\(|\{)",
+        strip_comments(source),
+    ) is not None
 
 NARROW_PORT_PATHS = (
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatExecutionPort.kt",
@@ -272,6 +285,9 @@ def self_test() -> None:
               "localShellFeatureUiContribution(), localToolsFeatureUiContribution())")
     factories = {"localShellFeatureUiContribution", "localToolsFeatureUiContribution"}
     assert assembled_feature_factories(sample, factories) == factories
+    assert writes_runtime_aggregate("runtimeStateStore.projection.update { it }")
+    assert writes_runtime_aggregate("runtimeStateStore.projection.update({ it })")
+    assert not writes_runtime_aggregate("// runtimeStateStore.projection.update { it }")
     for invalid in (
         sample.replace(", localToolsFeatureUiContribution()", ""),
         sample.replace("localToolsFeatureUiContribution()", "localShellFeatureUiContribution()"),
@@ -577,12 +593,16 @@ for required in (
         die("app Runtime bootstrap composition is incomplete: " + required)
 
 application = strip_comments(read(APPLICATION_PATH))
-for required in (
-    "LocalRuntimeKernel",
-    "localRuntimeKernel.start()",
-):
-    if required not in application:
-        die("DshApplication must eagerly start the process Runtime Kernel: " + required)
+if "LocalRuntimeKernel" not in application:
+    die("DshApplication must inject the process Runtime Kernel")
+kernel_direct = "localRuntimeKernel.start()"
+kernel_provider = "localRuntimeKernelProvider.get().start()"
+if kernel_direct not in application and kernel_provider not in application:
+    die("DshApplication must eagerly start the main-process Runtime Kernel")
+if kernel_provider in application:
+    worker_guard = "if (isMcpWorkerProcess(Application.getProcessName(), packageName)) return"
+    if worker_guard not in application or application.index(worker_guard) >= application.index(kernel_provider):
+        die("MCP worker process must return before eager main-process Runtime Kernel start")
 
 
 # Session owns transaction ordering; provider Features own domain interpretation.
@@ -653,13 +673,17 @@ for required in (
 aggregate_models = strip_comments(read(
     "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessModels.kt"
 ))
-allowed_root_types = {"LocalHarnessState", "LocalUsageMode"}
+allowed_root_types = {"LocalHarnessState"}
 root_types = declared_top_level_types(aggregate_models)
 if root_types != allowed_root_types:
     die(
-        "root aggregate file may only declare LocalHarnessState/LocalUsageMode; found extra types: "
+        "root aggregate file may only declare LocalHarnessState; found extra types: "
         + ", ".join(sorted(root_types - allowed_root_types))
     )
+
+usage_api = strip_comments(read("ui-contract/src/main/kotlin/com/labteto/dshmobile/local/LocalUsageMode.kt"))
+if declared_top_level_types(usage_api) != {"LocalUsageMode"}:
+    die("the neutral usage mode API must declare exactly LocalUsageMode")
 
 aggregate_fields = data_class_fields(aggregate_models, "LocalHarnessState")
 domain_sources = (
@@ -732,11 +756,18 @@ for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT):
     relative = path.relative_to(ROOT).as_posix()
     if "runtimeStateStore.mutableState" in source or "runtime.mutableState" in source:
         die(f"{relative} bypasses the Runtime projection with writable aggregate state")
-    if "runtimeStateStore.projection.update(" in source and relative != RUNTIME_PROJECTION_UPDATE_OWNER:
+    if writes_runtime_aggregate(source) and relative not in RUNTIME_AGGREGATE_WRITE_ADAPTERS:
         die(
             f"{relative} introduces a new aggregate write seam; "
             "use a domain StatePort or explicit Runtime projection command"
         )
+    allowed_aggregate_flow_declarations = {
+        "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeProjection.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureStatePortComposition.kt",
+    }
+    if re.search(r"\bMutableStateFlow\s*<\s*LocalHarnessState\s*>", source) and relative not in allowed_aggregate_flow_declarations:
+        die(f"{relative} declares an aggregate writable flow outside the Runtime/adapter owner")
 
 for feature_name in ("chat", "work"):
     for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / feature_name):
@@ -947,34 +978,10 @@ for module_id, relative in feature_contribution_paths.items():
             if required not in contribution:
                 die(f"Feature UI contribution {module_id} lost {required.strip(' =')} ownership")
 
-feature_shell = strip_comments(read(
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
-))
-contribution_factories: dict[str, str] = {}
-for module_id, relative in feature_contribution_paths.items():
-    declared = re.findall(
-        r"\bfun\s+(local[A-Za-z_0-9]+FeatureUiContribution)\s*\(",
-        strip_comments(read(relative)),
-    )
-    if len(declared) != 1:
-        die(f"{relative} must define exactly one Feature contribution factory: {declared}")
-    contribution_factories[module_id] = declared[0]
-if len(set(contribution_factories.values())) != len(module_ids):
-    die("Feature UI contribution factories must have unique names")
-try:
-    assembled_feature_factories(feature_shell, set(contribution_factories.values()))
-except ValueError as error:
-    die(str(error))
-
-for required in (
-    "localFeatureOwnedBackAction(",
-    "localFeatureRestoreStack(",
-    "localFeatureDrawerAction(entry, featureContributions)",
-):
-    if required not in feature_shell:
-        die("Shell lost Feature-owned navigation contract: " + required)
-if re.search(r"openFeatureFromDrawer\(\s*LocalFeaturePage\.", feature_shell):
-    die("Shell must not hard-code product Drawer route ownership")
+# The old callback-composing Shell is retired. Route ownership is still checked
+# above against FeatureCatalog; the sole application renderer is now the Scene Host.
+if (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt").exists():
+    die("Retired Shell source must not be restored; shared feedback belongs to LocalSendFeedback")
 
 plugin_composition = strip_comments(read(
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt"
@@ -992,5 +999,30 @@ for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT):
             f"{relative} depends directly on AndroidDeviceProvider; "
             "platform provider construction belongs to the plugin composition root"
         )
+
+# ---- R4 genuine isolated MCP process + standalone V6 boot --------------------
+# These are production wiring invariants, not claims that device tests passed.
+worker_manifest = read("app/src/main/AndroidManifest.xml")
+if not (
+    'android:name=".local.tools.ipc.McpPluginWorkerService"' in worker_manifest
+    and 'android:process=":mcp_worker"' in worker_manifest
+    and 'android:exported="false"' in worker_manifest
+):
+    die("R4 MCP worker must be non-exported in an independent Android process")
+if "transportFactory = { endpoint ->" not in plugin_composition or (
+    "stdioTransportFactory = { command, workingDirectory ->" not in plugin_composition
+) or plugin_composition.count("McpPluginWorkerTransport(") < 2:
+    die("R4 production MCP HTTP and stdio must both use Binder worker without local fallback")
+v6_boot = strip_comments(read("app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt"))
+if "LocalV6StandaloneViewModel = hiltViewModel()" not in v6_boot:
+    die("R4 AppRoot must compose the real Feature Port application owner")
+for retired in ("LocalHarnessViewModel", "LocalHarnessScreen", "LocalLegacyApplicationEntry"):
+    for path, source in kotlin_sources_under(ROOT / "app/src/main/java"):
+        if references_type(source, retired) or re.search(r"\b(?:class|fun)\s+" + retired + r"\b", source):
+            die(f"R4 retired Shell entry is still executable: {path}: {retired}")
+
+worker_process_guard = strip_comments(read(APPLICATION_PATH))
+if "if (isMcpWorkerProcess(Application.getProcessName(), packageName)) return" not in worker_process_guard:
+    die("R4 isolated worker must not bootstrap the full Agent runtime")
 
 print("[architecture-3] OK: current ownership, dependency direction, state boundaries, and runtime contracts hold")

@@ -18,6 +18,33 @@ class AgentInputQueueTest {
     }
 
     @Test
+    fun opportunisticAutoFollowUpCannotQueueBehindUserInput() {
+        val queue = AgentInputQueue(capacity = 4)
+        val user = QueuedAgentInput("用户的新要求", id = "user")
+        assertTrue(queue.offer(user))
+        var committed = false
+        assertFalse(queue.offerIfEmpty(QueuedAgentInput("自动续轮", id = "auto")) {
+            committed = true
+        })
+        assertFalse(committed)
+        assertEquals(listOf("user"), queue.snapshot().map { it.id })
+        queue.pollCommitted { _, _ -> }
+        assertTrue(queue.offerIfEmpty(QueuedAgentInput("自动续轮", id = "auto")))
+        assertEquals(listOf("auto"), queue.snapshot().map { it.id })
+    }
+
+    @Test
+    fun failedAutonomousAdmissionRollsBackBeforeAnyConsumerSeesIt() {
+        val queue = AgentInputQueue(capacity = 4)
+        assertTrue(runCatching {
+            queue.offerIfEmpty(QueuedAgentInput("自动续轮", id = "auto")) {
+                throw java.io.IOException("log unavailable")
+            }
+        }.isFailure)
+        assertTrue(queue.snapshot().isEmpty())
+    }
+
+    @Test
     fun pollAndClearAreDeterministic() {
         val queue = AgentInputQueue(capacity = 4)
         queue.offer(QueuedAgentInput("一", id = "q1"))

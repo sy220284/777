@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot_scope": "14个旧报告无确认入口条目的人工源码和测试溯源",
+  "snapshot_scope": "历史待确认入口与 UI 3.0 新增迁移切片的源码及测试溯源；未合并新增项不得认作主线交付",
   "limits": "独立存在按是否具有产品级单独入口；静态可到达与真实能用须结合设备/模型运行验证，单元或仪表测试方法的存在不能视为通过",
   "items": [
     {
@@ -298,6 +298,94 @@
         }
       ],
       "conclusion": "对应交付要求、成果版本和记忆来源三个既有能力的跨模块回归集合；独立测试源码存在，执行成功待确认。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送、分支与交互端口（迁移中）",
+      "kind": "ui_contract_migration_slice",
+      "independent": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt",
+          "symbol": "LocalConversationUiPortComposition"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/LocalConversationUiPortTest.kt",
+          "method": "staleActivationTransitionAndModeCannotInvokeEitherOwner"
+        }
+      ],
+      "conclusion": "生产端口接入 V6/Next 的文本与附件发送、编辑、重生成、停止、Chat 分支及 Work 审批/提问；业务准入仍由原 Owner 执行。完整 Feature 端口及真实双包旅程尚未完成。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / UI 场景覆盖清单与兼容性检查（迁移中）",
+      "kind": "ui_contract_migration_slice",
+      "independent": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalog.kt",
+          "symbol": "LocalUiSceneCatalog"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalogTest.kt",
+          "method": "verificationPackCannotBeSelectedAsACompleteApplicationPack"
+        }
+      ],
+      "conclusion": "已建立源码场景索引及版本/覆盖兼容检查；缺场景的验证包不能宣称整包兼容。真实完整应用 UI Pack 切换与全量场景迁移尚未实现。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）",
+      "kind": "ui_contract_migration_slice",
+      "independent": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "source": [
+        {
+          "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilder.kt",
+          "symbol": "LocalUiDocumentBuilder"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiDocumentUiAdapter.kt",
+          "symbol": "LocalUiDocumentUiAdapter"
+        }
+      ],
+      "test": [
+        {
+          "path": "ui-contract/src/test/kotlin/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilderTest.kt",
+          "method": "freeTextCannotAcquireActionsOrBecomeACompletionFact"
+        }
+      ],
+      "conclusion": "本地类型输入可制作状态、原文清单和回复表单，复用生产 Codec/Session 定义 Owner；新增模型调用为零的实现路径不依赖模型网关。工具 Schema 与结构化结果自动适配、媒体/证据节点及真实设备验收仍待实现。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 原回复内交互卡片（迁移中）",
+      "kind": "ui_contract_migration_slice",
+      "independent": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/document/LocalReplyUiDocument.kt",
+          "symbol": "LocalReplyUiDocumentPublisher"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDirectTurnExecutor.kt",
+          "symbol": "LocalChatDirectTurnExecutor"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
+          "symbol": "LocalWorkAgentTurnExecutor"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/presentation/document/LocalReplyUiDocumentTest.kt",
+          "method": "automaticCardRestoresExactOwnerSourceAndCannotReviveAfterDeletion"
+        }
+      ],
+      "conclusion": "Chat单聊/群聊与Work从原回复抽取封闭卡片，经原Session日志存储和恢复；原生确认文本后交原会话Owner发送。自动卡不增加模型调用，不授予工具/支付/审批权限。实际设备和完整跨包恢复仍待验收。"
     }
   ]
 }

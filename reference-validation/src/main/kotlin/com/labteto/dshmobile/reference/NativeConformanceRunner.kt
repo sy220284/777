@@ -2,7 +2,7 @@ package com.labteto.dshmobile.reference
 
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.AgentEventSink
-import com.labteto.dshmobile.harness.agent.AgentLoop
+import com.labteto.dshmobile.harness.agent.AgentTurnEngine
 import com.labteto.dshmobile.harness.agent.AgentModel
 import com.labteto.dshmobile.harness.agent.AgentModelReply
 import com.labteto.dshmobile.harness.agent.AgentToolCall
@@ -15,7 +15,7 @@ class NativeConformanceRunner {
 
         val events = mutableListOf<AgentEvent>()
         var replyIndex = 0
-        val loop = AgentLoop(
+        val loop = AgentTurnEngine(
             model = AgentModel {
                 val fixture = vector.modelReplies.getOrNull(replyIndex)
                     ?: error("模型回复脚本已耗尽：${vector.id}")

@@ -19,15 +19,122 @@ class LocalInteractionCoordinatorTest {
         var approval: LocalApproval? = null
         var question: LocalQuestion? = null
         var deviceLease: Boolean = false
+        var failApprovalPublish = false
+        var failQuestionPublish = false
+        var onApprovalPublish: (() -> Unit)? = null
 
+        override fun pendingQuestion() = question
         override fun pendingApproval(): LocalApproval? = approval
-        override fun setPendingApproval(approval: LocalApproval?) { this.approval = approval }
+        override fun setPendingApproval(approval: LocalApproval?) {
+            onApprovalPublish?.invoke()
+            this.approval = approval
+            if (failApprovalPublish) throw IllegalStateException("UI projection failed")
+        }
         override fun clearPendingApproval(callId: String) { if (approval?.callId == callId) approval = null }
-        override fun setPendingQuestion(question: LocalQuestion?) { this.question = question }
+        override fun setPendingQuestion(question: LocalQuestion?) {
+            this.question = question
+            if (failQuestionPublish) throw IllegalStateException("UI projection failed")
+        }
         override fun clearPendingQuestion(callId: String) { if (question?.callId == callId) question = null }
         override fun clearPendingInteractions() { approval = null; question = null }
         override fun deviceApprovalLeaseEnabled(): Boolean = deviceLease
         override fun setDeviceApprovalLease(enabled: Boolean) { deviceLease = enabled }
+    }
+
+    @Test
+    fun failedUiPublicationDoesNotStrandApprovalOrQuestionWaiters() = runTest {
+        val state = TestState()
+        val coordinator = LocalInteractionCoordinator(state)
+        state.failApprovalPublish = true
+        assertTrue(runCatching {
+            coordinator.awaitApproval(LocalApproval("a", "write", "write", "{}", "workspace_write"))
+        }.isFailure)
+        assertNull(state.approval)
+        assertNull(coordinator.pendingApprovalForUi())
+        state.failApprovalPublish = false
+        val approval = async {
+            coordinator.awaitApproval(LocalApproval("b", "write", "write", "{}", "workspace_write"))
+        }
+        runCurrent()
+        assertTrue(coordinator.answerApprovalFromUi(
+            requireNotNull(coordinator.pendingApprovalForUi()?.requestId), true))
+        assertTrue(approval.await())
+
+        state.failQuestionPublish = true
+        assertTrue(runCatching {
+            coordinator.awaitQuestion(LocalQuestion("q", "continue?"))
+        }.isFailure)
+        assertNull(state.question)
+        assertNull(coordinator.pendingQuestionForUi())
+        state.failQuestionPublish = false
+        val question = async { coordinator.awaitQuestion(LocalQuestion("next", "continue?")) }
+        runCurrent()
+        assertTrue(coordinator.answerQuestionFromUi(
+            requireNotNull(coordinator.pendingQuestionForUi()?.requestId), "continue"))
+        assertEquals("continue", question.await())
+    }
+
+    @Test
+    fun cancellationDuringApprovalPublicationCannotResurrectStaleUiDecision() = runTest {
+        val state = TestState()
+        val coordinator = LocalInteractionCoordinator(state)
+        state.onApprovalPublish = { coordinator.cancelAll() }
+        val result = runCatching {
+            coordinator.awaitApproval(LocalApproval("race", "write", "write", "{}", "workspace_write"))
+        }
+        assertTrue(result.isFailure)
+        assertNull(state.approval)
+        assertNull(coordinator.pendingApprovalForUi())
+        state.onApprovalPublish = null
+        val replacement = async {
+            coordinator.awaitApproval(LocalApproval("new", "write", "write", "{}", "workspace_write"))
+        }
+        runCurrent()
+        assertTrue(coordinator.answerApprovalFromUi(
+            requireNotNull(coordinator.pendingApprovalForUi()?.requestId), true))
+        assertTrue(replacement.await())
+    }
+
+    @Test fun reusedQuestionCallIdDoesNotReuseUiAnswerAuthority() = runTest {
+        val state = TestState()
+        val coordinator = LocalInteractionCoordinator(state)
+        val modelQuestion = LocalQuestion("same-call", "Continue?", requestId = "untrusted")
+        val first = async { coordinator.awaitQuestion(modelQuestion) }
+        runCurrent()
+        val firstId = requireNotNull(coordinator.pendingQuestionForUi()?.requestId)
+        assertFalse(firstId == "untrusted")
+        assertTrue(coordinator.answerQuestionFromUi(firstId, "first"))
+        assertFalse(coordinator.answerQuestionFromUi(firstId, "replay"))
+        assertEquals("first", first.await())
+        val second = async { coordinator.awaitQuestion(modelQuestion) }
+        runCurrent()
+        val secondId = requireNotNull(coordinator.pendingQuestionForUi()?.requestId)
+        assertFalse(firstId == secondId)
+        assertFalse(coordinator.answerQuestionFromUi(firstId, "stale"))
+        assertTrue(coordinator.answerQuestionFromUi(secondId, null))
+        assertEquals(LOCAL_QUESTION_CANCELLED_RESPONSE, second.await())
+    }
+
+    @Test
+    fun reusedModelCallIdCannotReuseUiApprovalAuthority() = runTest {
+        val state = TestState()
+        val coordinator = LocalInteractionCoordinator(state)
+        val approval = LocalApproval("same-model-id", "write", "write", "{}", "workspace_write", requestId = "untrusted-id")
+        val first = async { coordinator.awaitApproval(approval) }
+        runCurrent()
+        val firstId = requireNotNull(coordinator.pendingApprovalForUi()?.requestId)
+        assertFalse(coordinator.answerApprovalFromUi("untrusted-id", true))
+        assertTrue(coordinator.answerApprovalFromUi(firstId, true))
+        assertTrue(first.await())
+        val second = async { coordinator.awaitApproval(approval) }
+        runCurrent()
+        assertFalse(coordinator.answerApprovalFromUi(firstId, true))
+        assertFalse(second.isCompleted)
+        assertEquals(approval.copy(requestId = null), state.approval?.copy(requestId = null))
+        val secondId = requireNotNull(coordinator.pendingApprovalForUi()?.requestId)
+        assertTrue(coordinator.answerApprovalFromUi(secondId, false))
+        assertFalse(second.await())
+        assertNull(coordinator.pendingApprovalForUi())
     }
 
     @Test

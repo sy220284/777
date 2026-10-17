@@ -5,20 +5,86 @@ import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadinessProjector
 import javax.inject.Inject
 import javax.inject.Singleton
 
-data class LocalCapabilityUiEntry(val name: String, val family: String, val access: String,
-    val approval: String, val requirements: List<String>)
-
-data class LocalSkillUiEntry(val name: String, val description: String, val modelInvocable: Boolean, val displayName: String = name)
-data class LocalPresetSkillUiEntry(val id: String, val title: String, val description: String, val installed: Boolean)
-data class LocalSkillEditorUiEntry(val id: String, val document: String)
-
 /** Tools page boundary; plugin/runtime implementations stay outside UI. */
 @Singleton
-class LocalToolsUiFacade @Inject constructor(
+class LocalToolsUiFacade @Inject internal constructor(
     private val tools: LocalToolsRuntime,
-) {
-    internal suspend fun servers() = tools.servers()
-    internal suspend fun githubConfigured() = tools.githubConfigured()
+    private val gitHubSkillImporter: com.labteto.dshmobile.local.tools.LocalGitHubSkillImporter,
+) : com.labteto.dshmobile.uicontract.ToolsUiPort {
+    override fun serverChanges(): kotlinx.coroutines.flow.Flow<Unit> = tools.serverChanges()
+
+    override suspend fun lifecycleHistory(
+        incarnation: String?, afterSequence: Long,
+    ): com.labteto.dshmobile.uicontract.UiMcpLifecycleHistory {
+        val page = tools.lifecycleHistory(incarnation, afterSequence)
+        return com.labteto.dshmobile.uicontract.UiMcpLifecycleHistory(
+            page.incarnation, page.latestSequence,
+            page.events.map { change ->
+                com.labteto.dshmobile.uicontract.UiMcpLifecycleEvent(
+                    change.sequence, change.serverId,
+                    when (change.snapshot?.lifecycle) {
+                        com.labteto.dshmobile.interop.mcp.McpServerLifecycle.CONNECTING ->
+                            com.labteto.dshmobile.uicontract.UiToolConnection.CONNECTING
+                        com.labteto.dshmobile.interop.mcp.McpServerLifecycle.RECONNECTING ->
+                            com.labteto.dshmobile.uicontract.UiToolConnection.RECONNECTING
+                        com.labteto.dshmobile.interop.mcp.McpServerLifecycle.REGISTERED ->
+                            com.labteto.dshmobile.uicontract.UiToolConnection.HEALTH_UNCHECKED
+                        com.labteto.dshmobile.interop.mcp.McpServerLifecycle.DISCONNECTING ->
+                            com.labteto.dshmobile.uicontract.UiToolConnection.DISCONNECTING
+                        com.labteto.dshmobile.interop.mcp.McpServerLifecycle.FAILED ->
+                            com.labteto.dshmobile.uicontract.UiToolConnection.FAILED
+                        null -> null
+                    },
+                )
+            },
+            page.requiresSnapshot,
+        )
+    }
+
+    override suspend fun servers(): List<com.labteto.dshmobile.uicontract.UiMcpServerSnapshot> {
+        val selectedIds = tools.selectedConnectorIds()
+        return tools.servers().map {
+        val lifecycle = it.lifecycle
+        val registration = when (lifecycle) {
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.REGISTERED ->
+                com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.DISCONNECTING ->
+                com.labteto.dshmobile.uicontract.UiToolRegistration.REMOVING
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.FAILED ->
+                com.labteto.dshmobile.uicontract.UiToolRegistration.FAILED
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.CONNECTING,
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.RECONNECTING ->
+                com.labteto.dshmobile.uicontract.UiToolRegistration.PENDING
+        }
+        val connection = when (lifecycle) {
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.REGISTERED ->
+                com.labteto.dshmobile.uicontract.UiToolConnection.HEALTH_UNCHECKED
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.CONNECTING ->
+                com.labteto.dshmobile.uicontract.UiToolConnection.CONNECTING
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.RECONNECTING ->
+                com.labteto.dshmobile.uicontract.UiToolConnection.RECONNECTING
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.DISCONNECTING ->
+                com.labteto.dshmobile.uicontract.UiToolConnection.DISCONNECTING
+            com.labteto.dshmobile.interop.mcp.McpServerLifecycle.FAILED ->
+                com.labteto.dshmobile.uicontract.UiToolConnection.FAILED
+        }
+        com.labteto.dshmobile.uicontract.UiMcpServerSnapshot(it.id, it.transport, it.target, it.tools,
+            registration = registration, connection = connection,
+            selection = com.labteto.dshmobile.uicontract.uiMcpToolSelection(it.id, selectedIds))
+        }
+    }
+    override suspend fun checkServerHealth(serverId: String): com.labteto.dshmobile.uicontract.UiMcpHealth =
+        when (tools.checkMcpHealth(serverId)) {
+            com.labteto.dshmobile.interop.mcp.McpServerHealth.RESPONDED ->
+                com.labteto.dshmobile.uicontract.UiMcpHealth.RESPONDED
+            com.labteto.dshmobile.interop.mcp.McpServerHealth.BUSY ->
+                com.labteto.dshmobile.uicontract.UiMcpHealth.BUSY
+            com.labteto.dshmobile.interop.mcp.McpServerHealth.NOT_CONNECTED ->
+                com.labteto.dshmobile.uicontract.UiMcpHealth.NOT_CONNECTED
+            com.labteto.dshmobile.interop.mcp.McpServerHealth.UNCONFIRMED ->
+                com.labteto.dshmobile.uicontract.UiMcpHealth.UNCONFIRMED
+        }
+    override suspend fun githubConfigured() = tools.githubConfigured()
     /** Work handoff UI projection; capability hints do not grant execution permissions. */
     internal fun workHandoffCapabilityReadiness(
         task: String,
@@ -35,34 +101,55 @@ class LocalToolsUiFacade @Inject constructor(
         showModelStatus, modelConfigured, mcpToolsAvailable, pluginsInstalled,
         accessibilityActive, notificationAccessActive,
     )
-    internal suspend fun configureGitHub(token: String) = tools.configureGitHub(token)
-    internal suspend fun clearGitHub() = tools.clearGitHub()
-    internal fun capabilityCatalogue() = tools.capabilityCatalogue().map {
-        LocalCapabilityUiEntry(it.name, it.family, it.access, it.approval, it.requirements)
+    override suspend fun configureGitHub(token: String) { tools.configureGitHub(token) }
+    override suspend fun clearGitHub() = tools.clearGitHub()
+    override fun capabilityCatalogue() = tools.capabilityCatalogue().map {
+        com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot(it.name, it.family, it.access, it.approval, it.requirements, it.parameterSchema)
     }
-    internal fun installedPluginIds() = tools.installedPluginIds()
+    override fun validateCapabilityDraft(
+        name: String, expectedSchema: kotlinx.serialization.json.JsonObject, argumentsJson: String,
+    ): com.labteto.dshmobile.uicontract.UiToolDraftValidation =
+        tools.validateCapabilityDraft(name, expectedSchema, argumentsJson)
+
+    override fun pluginLifecycleSnapshots(): List<com.labteto.dshmobile.uicontract.UiPluginLifecycle> =
+        tools.pluginLifecycleSnapshots().map { state ->
+            com.labteto.dshmobile.uicontract.UiPluginLifecycle(
+                state.id, com.labteto.dshmobile.uicontract.UiPluginLifecycleState.valueOf(state.state.name),
+            )
+        }
+    override suspend fun recoverFailedPlugin(id: String): List<String> =
+        tools.recoverFailedPlugin(id)
+    override fun installedPluginIds() = tools.installedPluginIds()
     /** Registry presence is a configuration hint, not an execution grant. */
     internal suspend fun handoffExternalReadiness(): Pair<Boolean, Boolean> {
         val hasMcpTools = tools.servers().any { it.tools.isNotEmpty() }
-        val hasThirdPartyPlugin = tools.installedPluginIds().any { it != "local-builtin" }
+        val hasThirdPartyPlugin = tools.installedPluginIds().any { it != "android-local-builtins" }
         return hasMcpTools to hasThirdPartyPlugin
     }
-    internal suspend fun installedSkills() = tools.installedSkills().map {
-        LocalSkillUiEntry(it.name, it.description, it.modelInvocable, it.displayName)
+    override suspend fun installedSkills() = tools.installedSkills().map {
+        com.labteto.dshmobile.uicontract.UiSkillSnapshot(it.name, it.description, it.modelInvocable, it.displayName)
     }
-    internal suspend fun presetSkills() = tools.presetSkills().map {
-        LocalPresetSkillUiEntry(it.id, it.title, it.description, it.installed)
+    override suspend fun presetSkills() = tools.presetSkills().map {
+        com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot(it.id, it.title, it.description, it.installed)
     }
-    internal suspend fun installPreset(id: String) = tools.installPreset(id)
-    internal suspend fun createSkill(id: String, displayName: String, description: String, instructions: String) =
+    override suspend fun curatedGitHubSkills() = gitHubSkillImporter.curatedSkills()
+    override suspend fun installGitHubSkill(link: String) = gitHubSkillImporter.install(link)
+    override suspend fun installPreset(id: String) = tools.installPreset(id)
+    override suspend fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         tools.createSkill(id, displayName, description, instructions)
-    internal suspend fun importSkill(filename: String, bytes: ByteArray) = tools.importSkill(filename, bytes)
-    internal suspend fun removeSkill(id: String) = tools.removeSkill(id)
-    internal suspend fun readSkillDocument(id: String) = tools.readSkillDocument(id)
-    internal suspend fun updateSkillDocument(id: String, document: String) = tools.updateSkillDocument(id, document)
-    internal suspend fun setSkillModelInvocable(id: String, enabled: Boolean) = tools.setSkillModelInvocable(id, enabled)
-    internal suspend fun connectHttp(serverId: String, endpoint: String) = tools.connectHttp(serverId, endpoint)
-    internal suspend fun connectStdio(serverId: String, command: List<String>, workingDirectory: String?) =
+    override suspend fun importSkill(filename: String, bytes: ByteArray) = tools.importSkill(filename, bytes)
+    override suspend fun removeSkill(id: String) = tools.removeSkill(id)
+    override suspend fun readSkillDocument(id: String) = tools.readSkillDocument(id)
+    override suspend fun updateSkillDocument(id: String, document: String) = tools.updateSkillDocument(id, document)
+    override suspend fun setSkillModelInvocable(id: String, enabled: Boolean) = tools.setSkillModelInvocable(id, enabled)
+    override suspend fun connectHttp(serverId: String, endpoint: String) = tools.connectHttp(serverId, endpoint)
+    override suspend fun connectStdio(serverId: String, command: List<String>, workingDirectory: String?) =
         tools.connectStdio(serverId, command, workingDirectory)
-    internal suspend fun disconnect(serverId: String) = tools.disconnect(serverId)
+    override suspend fun disconnect(serverId: String) = tools.disconnect(serverId)
+}
+
+@dagger.Module
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+internal abstract class LocalToolsUiBindings {
+    @dagger.Binds abstract fun bindToolsUiPort(facade: LocalToolsUiFacade): com.labteto.dshmobile.uicontract.ToolsUiPort
 }

@@ -1,4 +1,5 @@
 package com.labteto.dshmobile.ui.screens.settings
+import com.labteto.dshmobile.ui.host.DeviceCapabilitiesState
 
 import com.shenyan.designsystem.foundation.SyMetric
 
@@ -50,7 +51,7 @@ import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelCapability
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelProtocol
-import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
+import com.labteto.dshmobile.uicontract.UiSettingsSnapshot as LocalHarnessSettingsState
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize

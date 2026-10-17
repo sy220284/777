@@ -12,6 +12,10 @@ import java.security.MessageDigest
 import java.io.FilterInputStream
 import java.io.InputStream
 import java.util.zip.GZIPInputStream
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -45,6 +49,11 @@ class LocalSessionEventLog(
         onSegmentRotated = { LocalSessionArchiveMaintenance.request(file, json) },
     )
 
+    // The durable log is the only publisher of committed event revisions.
+    // Consumers receive the current revision immediately, then each successful append/reset.
+    private val mutableChanges = MutableStateFlow(0L)
+    internal val changes: StateFlow<Long> = mutableChanges.asStateFlow()
+
     internal val historyInstanceIdentity: String = java.util.UUID.randomUUID().toString()
 
     private val checkpoints = LocalSessionProjectionCheckpoints(file, json)
@@ -67,12 +76,38 @@ class LocalSessionEventLog(
     @Synchronized
     internal fun writeProjectionCheckpoint(name: String, version: Int, throughSequence: Long,
         payload: String, generation: Long) {
-        if (isClosed || generation != resetGeneration || throughSequence > latestSequence()) return
-        checkpoints.write(name, LocalSessionProjectionCheckpoint(version, projectionIdentity(), throughSequence, payload))
+        if (isClosed || generation != resetGeneration) return
+        delegate.withWriterLease {
+            if (isClosed || generation != resetGeneration ||
+                throughSequence > latestSequence()) return@withWriterLease
+            checkpoints.write(name,
+                LocalSessionProjectionCheckpoint(version, projectionIdentity(), throughSequence, payload))
+        }
     }
 
-    fun append(type: String, data: JsonObject): Event =
-        delegate.append(type, data).toLocalEvent()
+    @Synchronized
+    internal fun writeProjectionCheckpointIfFits(name: String, version: Int, throughSequence: Long,
+        payload: String, generation: Long) {
+        val value = LocalSessionProjectionCheckpoint(version, projectionIdentity(), throughSequence, payload)
+        if (!checkpoints.fits(value)) return
+        try {
+            writeProjectionCheckpoint(name, version, throughSequence, payload, generation)
+        } catch (failure: java.io.IOException) {
+            // This optional acceleration must never turn a successful authoritative read
+            // into a failed history load (for example when storage fills during fsync).
+            AppLog.warn("SessionProjection", "派生检查点写入失败，保留原事件日志读取结果 name=$name", failure)
+        }
+    }
+
+    /** Shares the native Session Owner's compare/append lock with every adapter for this path. */
+    internal fun <T> withWriterLease(block: () -> T): T =
+        delegate.withWriterLease(block)
+
+    fun append(type: String, data: JsonObject): Event {
+        val committed = delegate.append(type, data).toLocalEvent()
+        mutableChanges.update { it + 1L }
+        return committed
+    }
 
     fun snapshot(): List<Event> = delegate.snapshot().map { event ->
         event.toLocalEvent()
@@ -91,10 +126,16 @@ class LocalSessionEventLog(
         isClosed = true
         resetGeneration += 1L
         delegate.close()
+        mutableChanges.update { it + 1L }
     }
 
     fun snapshotAfter(sequenceExclusive: Long): List<Event> = delegate.snapshotAfter(sequenceExclusive).map { event ->
         event.toLocalEvent()
+    }
+
+    /** Streaming projection over committed Session facts. Never copy a whole historical tail. */
+    fun forEachAfter(sequenceExclusive: Long, visitor: (Event) -> Unit) {
+        delegate.forEachAfter(sequenceExclusive) { visitor(it.toLocalEvent()) }
     }
 
     /** 按 sequence 递增返回旧事件页，适合 Projection / fold 等从旧到新的消费路径。 */
@@ -135,8 +176,11 @@ class LocalSessionEventLog(
                     while (true) {
                         val line = readBoundedLine(reader, MAX_DURABLE_EVENT_LINE_CHARS) ?: break
                         val event = runCatching {
-                            json.decodeFromString(Event.serializer(), line)
+                            com.labteto.dshmobile.harness.session.SessionEventSchemaCodec
+                                .decode(json, line).toLocalEvent()
                         }.onFailure { error ->
+                            if (error is com.labteto.dshmobile.harness.session.UnsupportedSessionEventSchemaVersion)
+                                throw error
                             malformedRows += 1
                             if (malformedRows <= MAX_DECODE_FAILURE_SAMPLES) {
                                 // Event bodies may contain private prompts and credentials: never export parser snippets.
@@ -210,10 +254,13 @@ class LocalSessionEventLog(
         private set
 
     fun clear() = synchronized(this) {
-        delegate.clear()
-        resetGeneration += 1L
-        checkpointIdentity = null
-        checkpoints.clear()
+        delegate.withWriterLease {
+            delegate.clear()
+            resetGeneration += 1L
+            checkpointIdentity = null
+            checkpoints.clear()
+            mutableChanges.update { it + 1L }
+        }
     }
 
     private fun com.labteto.dshmobile.harness.session.SessionEvent.toLocalEvent() = Event(

@@ -50,12 +50,36 @@
       "test": "app/src/androidTest/java/com/labteto/dshmobile/local/model/LocalMediaStoreAndroidTest.kt#receiptAndResultCommitTogetherAndLateWriterCannotResurrectDeletion"
     },
     {
-      "id": "work.history-evidence-ui",
-      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheet.kt",
-      "entry": "LocalWorkEvidenceSheet",
-      "owner": "WORK",
-      "test": "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheetTest.kt#olderPageIsReachableAndUnknownOutcomeKeepsItsMeaning"
+      "id": "ui.conversation.ports",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送、分支与交互端口（迁移中）",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt",
+      "entry": "LocalConversationUiPortComposition",
+      "owner": "SHELL",
+      "test": "app/src/test/java/com/labteto/dshmobile/local/LocalConversationUiPortTest.kt#staleActivationTransitionAndModeCannotInvokeEitherOwner"
+    },
+    {
+      "id": "ui.document.inline_reply",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 原回复内交互卡片（迁移中）",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/presentation/document/LocalReplyUiDocument.kt",
+      "entry": "LocalReplyUiDocumentPublisher",
+      "owner": "SHELL",
+      "test": "app/src/test/java/com/labteto/dshmobile/local/presentation/document/LocalReplyUiDocumentTest.kt#automaticCardRestoresExactOwnerSourceAndCannotReviveAfterDeletion"
+    },
+    {
+      "id": "ui.document.local_builder",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）",
+      "source": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilder.kt",
+      "entry": "LocalUiDocumentBuilder",
+      "owner": "SHELL",
+      "test": "ui-contract/src/test/kotlin/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilderTest.kt#freeTextCannotAcquireActionsOrBecomeACompletionFact"
+    },
+    {
+      "id": "ui.scene.catalog",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / UI 场景覆盖清单与兼容性检查（迁移中）",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalog.kt",
+      "entry": "LocalUiSceneCatalog",
+      "owner": "SHELL",
+      "test": "app/src/test/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalogTest.kt#verificationPackCannotBeSelectedAsACompleteApplicationPack"
     }
   ]
 }

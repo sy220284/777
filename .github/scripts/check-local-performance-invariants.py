@@ -526,7 +526,8 @@ if not frozen_model_route_contract(model_request_coordinator, model_request_conf
 # uses the previously bound, locally frozen run surface.
 
 for required_agent_owner_fact in (
-    "foregroundOwners",
+    "runOwners = AgentRunOwnership()",
+    "runOwners.commit(context.ownership(), terminal = terminal)",
     "fun isCurrentOwner(context: LocalAgentRunContext)",
     "fun ensureCurrentOwner(context: LocalAgentRunContext)",
 ):
@@ -536,7 +537,7 @@ for required_agent_owner_fact in (
         )
 
 for required_session_owner_api in (
-    "class LocalSessionRuntimeLease",
+    "typealias LocalSessionRuntimeLease = SessionExecutionLease",
     "suspend fun <T> withOwner(",
     "fun tryAcquire(",
     "suspend fun acquire(",
@@ -547,9 +548,41 @@ for required_session_owner_api in (
             "LocalSessionRuntimeRegistry lost process-wide session ownership API: "
             + required_session_owner_api
         )
-if re.search(r"\.distinct\s*\(\s*\)\s*\.sorted\s*\(\s*\)\s*\.forEach\s*\{", session_runtime_registry) is None:
+shared_session_execution = (
+    ROOT / "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionExecutionRegistry.kt"
+).read_text()
+if "executions.acquireAll(sessionIds, kind.owner())" not in session_runtime_registry:
+    violations.append("Android session adapter must use the single Shared Session registry")
+
+def stable_bulk_session_lease_order(source: str) -> bool:
+    """Recognize a sorted bulk lease plan and reject silent ID filtering."""
+    if "suspend fun acquireAll(" not in source or "\n    fun requireOwner(" not in source:
+        return False
+    bulk = source.split("suspend fun acquireAll(", 1)[1].split("\n    fun requireOwner(", 1)[0]
+    # Validate the entire batch before reserving any session.
+    if not re.search(r"require\s*\(\s*sessionIds\.none\s*\(\s*String::isBlank\s*\)\s*\)", bulk):
+        return False
+    planned = re.search(
+        r"\bval\s+(\w+)\s*=\s*sessionIds\.distinct\s*\(\s*\)\s*\.sorted\s*\(\s*\)",
+        bulk,
+    )
+    if planned:
+        variable = re.escape(planned.group(1))
+        return re.search(
+            rf"\b{variable}\.forEach\s*\{{[^}}]*\bacquire\s*\(\s*it\s*,\s*owner\s*\)",
+            bulk,
+            re.S,
+        ) is not None
+    return re.search(
+        r"sessionIds\.distinct\s*\(\s*\)\s*\.sorted\s*\(\s*\)\s*\.forEach\s*\{[^}]*\bacquire\s*\(\s*it\s*,\s*owner\s*\)",
+        bulk,
+        re.S,
+    ) is not None
+
+
+if not stable_bulk_session_lease_order(shared_session_execution):
     violations.append(
-        "multi-session ownership must acquire leases in stable order to avoid cross-session deadlock"
+        "multi-session ownership must reject blank IDs and acquire leases in stable order"
     )
 
 
@@ -654,6 +687,17 @@ if "--self-test" in sys.argv:
     assert not frozen_model_route_contract(model_external_ok, model_external_helper.replace("selected.toRunModelSurface()", "profile.toRunModelSurface()"))
     assert not frozen_model_route_contract(model_external_ok.replace("surface = fixed", "surface = mutableSurface"), model_external_helper)
     assert not frozen_model_route_contract(model_external_ok, model_external_helper + "\\nclass Bad { val state: LocalHarnessState? = null }")
+    # A stable named plan is valid; removing sorting, validation or the exact lease is not.
+    assert stable_bulk_session_lease_order(shared_session_execution)
+    assert not stable_bulk_session_lease_order(
+        shared_session_execution.replace("sessionIds.distinct().sorted()", "sessionIds.distinct()")
+    )
+    assert not stable_bulk_session_lease_order(
+        shared_session_execution.replace("sessionIds.none(String::isBlank)", "sessionIds.any(String::isBlank)")
+    )
+    assert not stable_bulk_session_lease_order(
+        shared_session_execution.replace("leases += acquire(it, owner)", "leases += acquire(other, owner)")
+    )
     print("[architecture-3] execution guard self-test passed")
     sys.exit(0)
 

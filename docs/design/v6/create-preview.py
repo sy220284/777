@@ -9,7 +9,7 @@ import re
 
 root = Path(__file__).resolve().parent
 repo = root.parents[2]
-source = (repo / "app/src/main/java/com/shenyan/designsystem/foundation/ShenyanFoundation.kt").read_text(encoding="utf-8")
+source = (repo / "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/foundation/ShenyanFoundation.kt").read_text(encoding="utf-8")
 fields = ("canvas", "topBar", "text", "materialL1", "materialL2", "materialL3", "materialL4", "materialL5", "border")
 def read_theme(name):
     m = re.search(r"private val " + name + r" = SyColors\((.*?)\n\)", source, re.S)

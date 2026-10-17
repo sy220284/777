@@ -16,6 +16,9 @@ import com.labteto.dshmobile.local.files.LocalWorkspace
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
+import java.nio.file.FileAlreadyExistsException
+import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -79,6 +82,10 @@ internal class LocalAttachmentImporter(
             throw error
         }
 
+        // Every failure after the initial copy must release temporary files, including
+        // metadata probing, hashing, cancellation and a failed final rename.
+        var normalizedTemp: File? = null
+        try {
         val probe = inspectImportedImage(incoming, declaredMediaType)
         if (declaredMediaType.startsWith("image/") && probe == null) {
             incoming.delete()
@@ -105,6 +112,7 @@ internal class LocalAttachmentImporter(
             throw error
         }
 
+        normalizedTemp = normalized.file
         val imageMetadata = normalized.imageMetadata
         if (imageMetadata != null) {
             try {
@@ -135,13 +143,7 @@ internal class LocalAttachmentImporter(
             throw error
         }
         val target = File(dir, attachmentId + extension?.let { ".$it" }.orEmpty())
-        if (target.exists()) {
-            normalized.file.delete()
-        } else if (!normalized.file.renameTo(target)) {
-            normalized.file.copyTo(target, overwrite = false)
-            normalized.file.delete()
-        }
-        if (normalized.file != incoming) incoming.delete()
+        commitImportedAttachmentFile(normalized.file, target)
 
         return LocalImportedAttachment(
             name = displayName ?: safeName,
@@ -152,6 +154,10 @@ internal class LocalAttachmentImporter(
             width = imageMetadata?.width,
             height = imageMetadata?.height,
         )
+        } finally {
+            incoming.delete()
+            normalizedTemp?.takeIf { it != incoming }?.delete()
+        }
     }
 
     private data class ImportedImageProbe(
@@ -274,4 +280,55 @@ internal suspend fun copyAttachmentCancellably(
         output.write(buffer, 0, read)
     }
     total
+}
+
+/**
+ * Commit a content-addressed attachment without ever replacing an existing target. A private
+ * temp file is fully written first; createLink atomically publishes a *complete* inode and
+ * fails if another import has already published the same digest. This also prevents an Android
+ * rename race from overwriting an existing attachment. If hard links are unsupported, refuse
+ * the import rather than exposing a partially copied public target.
+ *
+ * The caller owns and always cleans the source temporary file.
+ */
+internal fun commitImportedAttachmentFile(source: File, target: File) {
+    require(Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+        "附件临时文件不存在或不是普通文件"
+    }
+    val sameDirectory = source.parentFile.canonicalFile == target.parentFile.canonicalFile
+    val staged = if (sameDirectory) source
+        else File(target.parentFile, ".commit-${UUID.randomUUID()}")
+    try {
+        if (!sameDirectory) source.copyTo(staged, overwrite = false)
+        try {
+            Files.createLink(target.toPath(), staged.toPath())
+        } catch (_: FileAlreadyExistsException) {
+            // Shared hashes are immutable: a conflicting or symlinked destination is a
+            // failed import, never a silent acceptance or replacement.
+            require(Files.isRegularFile(target.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+                sameImportedAttachmentContent(staged, target)) {
+                "同名附件内容不匹配或目标文件无效，已拒绝覆盖"
+            }
+        }
+    } finally {
+        if (!sameDirectory) staged.delete()
+    }
+}
+
+/** Compare existing duplicate bytes without trusting its name or loading the file into RAM. */
+private fun sameImportedAttachmentContent(first: File, second: File): Boolean {
+    if (first.length() != second.length()) return false
+    fun digest(file: File): ByteArray {
+        val sha = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(32 * 1024)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                sha.update(buffer, 0, read)
+            }
+        }
+        return sha.digest()
+    }
+    return MessageDigest.isEqual(digest(first), digest(second))
 }

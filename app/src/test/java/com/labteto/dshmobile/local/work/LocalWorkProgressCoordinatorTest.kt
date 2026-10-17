@@ -2,6 +2,9 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -26,6 +29,28 @@ class LocalWorkProgressCoordinatorTest {
     private fun eventLog(file: File) = LocalSessionEventLog(file, Json).also(logs::add)
 
     @Test
+    fun pausedAndReactivatedGoalCannotReviveItsOldDurableContinuation() {
+        val state = MutableStateFlow(LocalWorkRunState(sessionId = "revision"))
+        val log = eventLog(File(temporary.root, "revision.jsonl"))
+        val commands = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) { }
+        commands.createGoal("完成任务")
+        val original = requireNotNull(state.value.work.goal)
+        val queued = LocalWorkResumeCommand("run", log.latestSequence(), WORK_GOAL_PROGRESS_CONTINUATION,
+            1, "source", goalId = original.id, goalRevision = original.revision).toQueueInput()
+        val replayed = requireNotNull(com.labteto.dshmobile.local.agent.decodeLocalAgentInboxPending(
+            com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent("queued", listOf(queued)))).single()
+        assertEquals(original.revision, replayed.continuation?.goalRevision)
+        assertTrue(isCurrentWorkGoalContinuation(replayed.continuation, state.value.work))
+        commands.updateGoal("paused", null)
+        commands.updateGoal("active", null)
+        assertEquals(original.revision + 2L, state.value.work.goal?.revision)
+        org.junit.Assert.assertFalse(isCurrentWorkGoalContinuation(replayed.continuation, state.value.work))
+        val before = state.value.work.goal
+        commands.updateGoal("active", null)
+        assertEquals(before, state.value.work.goal)
+    }
+
+    @Test
     fun backgroundProgressStaysInCapturedSessionAndPersistsAfterItsEvent() {
         val visible = MutableStateFlow(LocalWorkRunState(sessionId = "visible"))
         val run = MutableStateFlow(LocalWorkRunState(sessionId = "background"))
@@ -46,6 +71,63 @@ class LocalWorkProgressCoordinatorTest {
         assertEquals("blocked", run.value.work.goal?.status)
         assertEquals(2, writes)
         assertEquals("blocked", log.snapshot().last().data["status"]?.toString()?.trim('"'))
+    }
+
+    @Test
+    fun simultaneousWorkPortsCannotOvertakeAnUnfinishedPlanCommit() {
+        val state = MutableStateFlow(LocalWorkRunState(sessionId = "parallel-progress"))
+        val file = File(temporary.root, "parallel-progress.jsonl")
+        // Two independent adapters represent concurrent Feature entrypoints sharing one Session.
+        val firstLog = eventLog(file)
+        val secondLog = eventLog(file)
+        val firstInPersist = CountDownLatch(1)
+        val releaseFirst = CountDownLatch(1)
+        val secondStarted = CountDownLatch(1)
+        val secondFinished = CountDownLatch(1)
+        val failure = AtomicReference<Throwable?>()
+        val first = LocalWorkProgressCoordinator(localWorkRunStatePort(state), firstLog) {
+            firstInPersist.countDown()
+            check(releaseFirst.await(5, TimeUnit.SECONDS)) { "first Work commit timed out" }
+        }
+        val second = LocalWorkProgressCoordinator(localWorkRunStatePort(state), secondLog) {}
+        val planThread = Thread {
+            runCatching { first.updatePlan(buildJsonObject {
+                put("items", JsonArray(listOf(JsonPrimitive("prepare"))))
+            }) }.onFailure(failure::set)
+        }
+        val todoThread = Thread {
+            secondStarted.countDown()
+            try {
+                second.updateTodos(buildJsonObject {
+                    put("items", JsonArray(listOf(buildJsonObject {
+                        put("content", "verify")
+                        put("status", "pending")
+                    })))
+                })
+            } catch (error: Throwable) {
+                failure.set(error)
+            } finally {
+                secondFinished.countDown()
+            }
+        }
+        try {
+            planThread.start()
+            assertTrue("first mutation must reach durable commit", firstInPersist.await(5, TimeUnit.SECONDS))
+            todoThread.start()
+            assertTrue(secondStarted.await(5, TimeUnit.SECONDS))
+            assertTrue("second port must wait until the first Work mutation has persisted",
+                !secondFinished.await(200, TimeUnit.MILLISECONDS))
+        } finally {
+            releaseFirst.countDown()
+            planThread.join(5_000)
+            todoThread.join(5_000)
+        }
+        assertTrue("Work worker threads must have completed", !planThread.isAlive && !todoThread.isAlive)
+        failure.get()?.let { throw AssertionError("concurrent Work mutation failed", it) }
+        assertEquals(listOf("plan/state", "todo/state"), firstLog.snapshot().map { it.type })
+        val projected = projectWorkSessionControls(LocalWorkState(), firstLog.snapshot())
+        assertEquals(state.value.work.plan, projected.plan)
+        assertEquals(state.value.work.todos, projected.todos)
     }
 
     @Test
@@ -248,8 +330,7 @@ class LocalWorkProgressCoordinatorTest {
         val state = MutableStateFlow(initial)
         val parent = temporary.newFolder("not-a-directory")
         val log = eventLog(File(parent, "goal.jsonl"))
-        assertTrue(parent.delete())
-        assertTrue(parent.createNewFile())
+        com.labteto.dshmobile.local.blockEventLogWritesAfterOpen(File(parent, "goal.jsonl"))
         var persisted = false
         val coordinator = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) { persisted = true }
         val mutations = listOf<() -> Unit>(

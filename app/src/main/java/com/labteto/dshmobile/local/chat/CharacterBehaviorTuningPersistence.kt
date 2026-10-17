@@ -22,18 +22,9 @@ internal fun persistGalleryBehaviorTuning(
     store: ChatPersonaGalleryStore,
     galleryId: String,
     tuning: CharacterBehaviorTuning,
+    beforeWrite: (CharacterBehaviorTuning) -> Unit = {},
 ): CharacterBehaviorTuning? {
-    val current = store.list().firstOrNull { it.id == galleryId } ?: return null
-    val resolved = resolveCharacterBehaviorTuning(current.persona.behaviorTuning, tuning)
-    if (resolved == current.persona.behaviorTuning.normalized()) return resolved
-    return store.save(
-        persona = current.persona.copy(behaviorTuning = resolved),
-        sourceSessionId = "",
-        history = emptyList(),
-        chatState = ChatCharacterState(),
-        notes = "",
-        existingId = galleryId,
-    ).entry.persona.behaviorTuning.normalized()
+    return store.updateBehaviorTuning(galleryId, tuning, beforeWrite)
 }
 
 internal data class CharacterBehaviorTuningSave(
@@ -48,18 +39,20 @@ internal fun persistCharacterBehaviorTuning(
     personaId: String,
     galleryId: String?,
     profile: PersonaProfile,
+    onPersonaWrite: (PersonaProfile) -> Unit = {},
+    onGalleryWrite: (CharacterBehaviorTuning) -> Unit = {},
 ): CharacterBehaviorTuningSave {
-    var saved = personaStore.upsert(profile.copy(id = personaId))
+    var saved = personaStore.upsert(profile.copy(id = personaId), onPersonaWrite)
     // An already-bound persona keeps its tuning even when it has no authored
     // V4 identity yet. Automatic name-based gallery merging stays conservative.
     val sameDurableProfile = currentPersona.id == personaId && saved.id == personaId &&
         currentPersona.name.trim() == saved.name.trim()
     val sameBoundCharacter = sameDurableProfile || samePersonaIdentity(currentPersona, saved)
     if (sameBoundCharacter) galleryId?.let { id ->
-        persistGalleryBehaviorTuning(galleryStore, id, saved.behaviorTuning)
+        persistGalleryBehaviorTuning(galleryStore, id, saved.behaviorTuning, onGalleryWrite)
             ?.takeIf { it != saved.behaviorTuning }
             ?.let { tuning ->
-                saved = personaStore.upsert(saved.copy(behaviorTuning = tuning))
+                saved = personaStore.upsert(saved.copy(behaviorTuning = tuning), onPersonaWrite)
             }
     }
     return CharacterBehaviorTuningSave(saved, sameBoundCharacter)

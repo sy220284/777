@@ -7,9 +7,6 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -82,20 +79,13 @@ suspend fun executeManagedProcess(
                 val output = ByteArrayOutputStream()
                 val buffer = ByteArray(8192)
                 var truncated = false
-                var remainingAfterExit: Int? = null
                 while (true) {
-                    currentCoroutineContext().ensureActive()
-                    val available = runCatching { input.available() }.getOrDefault(0)
-                    if (!process.isAlive && remainingAfterExit == null) remainingAfterExit = available
-                    if (remainingAfterExit == 0) break
-                    if (available == 0) {
-                        if (!process.isAlive) break
-                        delay(10)
-                        continue
-                    }
-                    val count = input.read(buffer, 0, minOf(buffer.size, available, remainingAfterExit ?: Int.MAX_VALUE))
+                    // available()==0 does not imply EOF, even after waitFor() returns.
+                    // Drain both pipes until their writers actually close; otherwise fast
+                    // failing commands can lose their final permission/path diagnostics.
+                    // Process-group teardown closes the writers on timeout/cancellation.
+                    val count = runInterruptible { input.read(buffer) }
                     if (count < 0) break
-                    remainingAfterExit = remainingAfterExit?.minus(count)
                     val keep = minOf(count, (maxChars * 4 - output.size()).coerceAtLeast(0))
                     output.write(buffer, 0, keep)
                     if (keep < count) truncated = true

@@ -9,12 +9,27 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import com.labteto.dshmobile.uicontract.PersonaGalleryUiPort
+import com.labteto.dshmobile.uicontract.PersonaGalleryUiCommand
+import com.labteto.dshmobile.uicontract.UiCommandReceipt
+import com.labteto.dshmobile.uicontract.UiMessageSnapshot
+import com.labteto.dshmobile.uicontract.UiMessageRole
+import com.labteto.dshmobile.uicontract.UiPersonaGalleryHistoryPage
+import com.labteto.dshmobile.uicontract.UiPersonaGalleryHistoryReceipt
+import com.labteto.dshmobile.uicontract.UiPersonaGalleryEntry
+import com.labteto.dshmobile.uicontract.UiPersonaGalleryStory
+import com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.coroutineContext
 
 @Singleton
 class ChatPersonaGalleryStore internal constructor(
     private val file: File,
     private val json: Json,
-) {
+) : PersonaGalleryUiPort {
     @Inject constructor(@ApplicationContext context: Context, json: Json) :
         this(File(context.filesDir, "local-harness/chat/persona-gallery-v6.json"), json)
 
@@ -26,6 +41,78 @@ class ChatPersonaGalleryStore internal constructor(
     private val archiveDeletionJournal = PersonaGalleryArchiveDeletionJournal(file, json)
 
     private var excludedHistoryReconciled = false
+
+    override suspend fun read(): UiPersonaGalleryReadReceipt = withContext(Dispatchers.IO) {
+        try {
+            UiPersonaGalleryReadReceipt.Available(list().map { entry ->
+                UiPersonaGalleryEntry(entry.id, entry.persona.name, entry.stories.map { story ->
+                    UiPersonaGalleryStory(story.id, story.title, story.notes, story.historyTotalCount,
+                        story.chatContext.storyStage, story.chatContext.visibleStoryStages().toList())
+                })
+            })
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            UiPersonaGalleryReadReceipt.Failed(failure.message)
+        }
+    }
+
+    @Serializable
+    private data class HistoryCursor(val galleryId: String, val storyId: String,
+        val revision: Long, val offset: Long, val length: Long, val modified: Long)
+
+    override suspend fun history(galleryId: String, storyId: String, cursor: String?): UiPersonaGalleryHistoryReceipt =
+        withContext(Dispatchers.IO) {
+            val requestContext = coroutineContext
+            try { readHistoryForUi(galleryId, storyId, cursor) { requestContext.ensureActive() } }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { UiPersonaGalleryHistoryReceipt.Failed(failure.message) }
+        }
+
+    @Synchronized
+    private fun readHistoryForUi(galleryId: String, storyId: String, cursor: String?, checkActive: () -> Unit): UiPersonaGalleryHistoryReceipt {
+        checkActive()
+        val entry = readNormalized().entries.firstOrNull { it.id == galleryId }
+            ?: return UiPersonaGalleryHistoryReceipt.Missing
+        val story = entry.stories.firstOrNull { it.id == storyId }
+            ?: return UiPersonaGalleryHistoryReceipt.Missing
+        val before = cursor?.let {
+            val decoded = runCatching { json.decodeFromString(HistoryCursor.serializer(), it) }.getOrNull()
+                ?: return UiPersonaGalleryHistoryReceipt.Stale
+            if (decoded.galleryId != galleryId || decoded.storyId != storyId || decoded.revision != story.updatedAt)
+                return UiPersonaGalleryHistoryReceipt.Stale
+            decoded
+        }
+        val page = history.pageBeforeChronological(entry, storyId, before?.offset, before?.length, before?.modified, checkActive)
+            ?: return UiPersonaGalleryHistoryReceipt.Stale
+        val next = page.nextOffset?.let {
+            json.encodeToString(HistoryCursor.serializer(), HistoryCursor(galleryId, storyId, story.updatedAt, it, page.archiveLength, page.archiveModified))
+        }
+        return UiPersonaGalleryHistoryReceipt.Available(UiPersonaGalleryHistoryPage(
+            page.messages.map { message -> UiMessageSnapshot(galleryMessageArchiveKey(message),
+                when (message.role) {
+                    "user" -> UiMessageRole.USER
+                    "assistant" -> UiMessageRole.ASSISTANT
+                    "tool" -> UiMessageRole.TOOL
+                    else -> UiMessageRole.SYSTEM
+                }, message.content, message.createdAt) }, page.totalCount, next))
+    }
+
+    override suspend fun submit(command: PersonaGalleryUiCommand): UiCommandReceipt = withContext(Dispatchers.IO) {
+        try {
+            val changed = when (command) {
+                is PersonaGalleryUiCommand.RenameStory -> renameStory(command.galleryId, command.storyId, command.title)
+                is PersonaGalleryUiCommand.DeleteHistoryMessage -> deleteHistoryMessage(command.galleryId, command.storyId, command.messageKey)
+            }
+            if (changed) UiCommandReceipt.Accepted else UiCommandReceipt.NotAdmitted
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            // Archive deletion may already have durably recorded its exclusion before an IO failure.
+            // Failed is not a claim that nothing was written; the next read performs owner recovery.
+            UiCommandReceipt.Failed(failure.message ?: "人物图库写入失败，请重新读取确认状态")
+        }
+    }
 
     private fun recoverDurableHistoryExclusions(document: GalleryDocument): GalleryDocument {
         if (excludedHistoryReconciled) return document
@@ -60,6 +147,38 @@ class ChatPersonaGalleryStore internal constructor(
         previous?.let(restored::add)
         documentStore.write(document.copy(version = 5, entries = restored))
         excludedHistoryReconciled = false
+    }
+
+    @Synchronized
+    internal fun updateBehaviorTuning(id: String, incoming: CharacterBehaviorTuning,
+        beforeWrite: (CharacterBehaviorTuning) -> Unit): CharacterBehaviorTuning? {
+        val document = readNormalized()
+        val current = document.entries.firstOrNull { it.id == id } ?: return null
+        val resolved = resolveCharacterBehaviorTuning(current.persona.behaviorTuning, incoming)
+        if (resolved == current.persona.behaviorTuning.normalized()) return resolved
+        check(current.updatedAt < Long.MAX_VALUE) { "人物版本已耗尽" }
+        val revision = maxOf(System.currentTimeMillis(), current.updatedAt + 1L)
+        val updated = current.copy(persona = current.persona.copy(behaviorTuning = resolved,
+            updatedAt = revision), updatedAt = revision)
+        beforeWrite(resolved)
+        documentStore.write(document.copy(entries = document.entries.map { if (it.id == id) updated else it }))
+        return resolved
+    }
+
+    @Synchronized
+    internal fun restoreTuningIfCurrent(id: String, expected: CharacterBehaviorTuning, previous: PersonaGalleryEntry) {
+        val document = readNormalized()
+        val current = document.entries.firstOrNull { it.id == id } ?: return
+        if (current.persona.behaviorTuning != expected) return
+        val onlyTuningChanged = current.copy(persona = previous.persona, updatedAt = previous.updatedAt) == previous &&
+            current.persona.copy(behaviorTuning = previous.persona.behaviorTuning, updatedAt = previous.persona.updatedAt) == previous.persona
+        val restored = if (onlyTuningChanged) previous else {
+            check(current.updatedAt < Long.MAX_VALUE) { "人物版本已耗尽" }
+            val revision = maxOf(System.currentTimeMillis(), current.updatedAt + 1L)
+            current.copy(persona = current.persona.copy(behaviorTuning = previous.persona.behaviorTuning,
+                updatedAt = revision), updatedAt = revision)
+        }
+        documentStore.write(document.copy(entries = document.entries.map { if (it.id == id) restored else it }))
     }
 
     @Synchronized
@@ -279,6 +398,38 @@ class ChatPersonaGalleryStore internal constructor(
         return PersonaGallerySaveOutcome(entry = entry, storyId = storyId)
     }
 
+    /** Whole profile edit checks the user's captured archive version under the sole Store lock. */
+    /** Profile and optional staged artwork commit in one document write; existing stories survive. */
+    @Synchronized
+    internal fun installPresetForUi(persona: PersonaProfile, portraitPath: String?): PersonaGalleryEntry {
+        val document = readNormalized()
+        val canonical = persona.canonicalV4().let { it.copy(loreEntries = uniqueLoreEntryIds(it.loreEntries)) }
+        val matched = document.entries.filter { samePersonaIdentity(it.persona, canonical) }.singleOrNull()
+        val id = matched?.id ?: "gallery-${UUID.randomUUID()}"
+        val base = matched ?: PersonaGalleryEntry(id = id, persona = canonical.copy(id = id))
+        check(base.updatedAt < Long.MAX_VALUE) { "人物版本已耗尽" }
+        val revision = maxOf(System.currentTimeMillis(), base.updatedAt + 1L)
+        val entry = base.copy(
+            persona = mergePersonaProfiles(base.persona, canonical).copy(id = id, updatedAt = revision),
+            portraitPath = base.portraitPath.ifBlank { portraitPath.orEmpty() }, updatedAt = revision,
+        )
+        documentStore.write(document.copy(entries = document.entries.filterNot { it.id == id } + entry))
+        return entry
+    }
+
+    @Synchronized
+    internal fun editProfile(id: String, expectedRevision: Long, transform: (PersonaProfile) -> PersonaProfile): PersonaGalleryEntry? {
+        val document = readNormalized()
+        val current = document.entries.firstOrNull { it.id == id && it.updatedAt == expectedRevision } ?: return null
+        val profile = transform(current.persona).canonicalV4()
+        require(isMeaningfulGalleryPersona(profile)) { "人物设定内容不足，无法保存" }
+        check(current.updatedAt < Long.MAX_VALUE) { "人物版本已耗尽" }
+        val revision = maxOf(System.currentTimeMillis(), current.updatedAt + 1L)
+        val updated = current.copy(persona = profile.copy(id = current.persona.id, updatedAt = revision), updatedAt = revision)
+        documentStore.write(document.copy(entries = document.entries.map { if (it.id == id) updated else it }))
+        return updated
+    }
+
     @Synchronized
     fun applySuggestions(id: String, suggestions: List<PersonaAppendSuggestion>): PersonaGalleryEntry? {
         if (suggestions.isEmpty()) return readNormalized().entries.firstOrNull { it.id == id }
@@ -306,6 +457,12 @@ class ChatPersonaGalleryStore internal constructor(
         )
         documentStore.write(doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) updated else it }))
         return updated
+    }
+
+    @Synchronized
+    internal fun replacePortraitForUi(id: String, portraitPath: String): String? {
+        val previous = findEntry(id) ?: return null
+        return if (updatePortraitPath(id, portraitPath) != null) previous.portraitPath else null
     }
 
     /**
@@ -462,6 +619,24 @@ class ChatPersonaGalleryStore internal constructor(
         documentStore.write(updated)
         archiveDeletionJournal.drain(updated, history)
         return true
+    }
+
+    /** Capture the actual deleted entry under the original writer lock, never a stale UI list. */
+    @Synchronized
+    internal fun deleteEntryForUi(id: String): PersonaGalleryEntry? {
+        val entry = findEntry(id) ?: return null
+        return entry.takeIf { delete(id) }
+    }
+
+    @Synchronized
+    internal fun cleanupDeletedPortrait(path: String) {
+        if (path.isBlank()) return
+        val root = File(requireNotNull(file.parentFile), "persona-portraits").canonicalFile
+        val candidate = File(path).canonicalFile
+        if (readNormalized().entries.any { it.portraitPath.isNotBlank() && File(it.portraitPath).canonicalFile == candidate }) return
+        if (candidate.path.startsWith(root.path + File.separator) && candidate.exists()) {
+            check(candidate.delete()) { "人物已删除，旧立绘清理未完成" }
+        }
     }
 
     @Synchronized

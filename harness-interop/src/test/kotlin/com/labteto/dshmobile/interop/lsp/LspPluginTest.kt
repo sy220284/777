@@ -24,6 +24,33 @@ import org.junit.rules.TemporaryFolder
 class LspPluginTest {
     @get:Rule val temporary = TemporaryFolder()
 
+    /** Only respond when the matching request was actually received. Notifications are not RPCs. */
+    private fun requestDrivenMockLsp(vararg replies: String): String {
+        val prelude = """
+            read_rpc() {
+              while :; do
+                IFS= read -r header || exit 31
+                header=§(printf '%s' "§header" | tr -d '\r')
+                length=§(printf '%s\n' "§header" | sed -n 's/^Content-Length: //p')
+                [ -n "§length" ] || exit 32
+                while IFS= read -r line; do
+                  line=§(printf '%s' "§line" | tr -d '\r')
+                  [ -z "§line" ] && break
+                done
+                payload=§(dd bs=1 count="§length" 2>/dev/null)
+                case "§payload" in
+                  *'"id":'*) return 0 ;;
+                esac
+              done
+            }
+        """.trimIndent().replace('§', '$')
+        val responses = replies.joinToString("\n") { json ->
+            val framed = "Content-Length: ${json.toByteArray().size}\r\n\r\n$json"
+            "read_rpc\nprintf '%s' '$framed'"
+        }
+        return "$prelude\n$responses\nwhile IFS= read -r line; do :; done\n"
+    }
+
     @Test fun defaultInitializeCapabilitiesEnablePushDiagnostics() {
         val textDocument = DEFAULT_LSP_CLIENT_CAPABILITIES["textDocument"] as? JsonObject
         assertTrue("客户端必须声明 textDocument 能力", textDocument != null)
@@ -71,9 +98,7 @@ class LspPluginTest {
         val hover2 = """{"jsonrpc":"2.0","id":3,"result":{"contents":"example type again"}}"""
         fun frame(message: String) = "Content-Length: ${message.toByteArray().size}\r\n\r\n$message"
         val script = temporary.newFile("server.sh")
-        script.writeText(
-            "printf '%s' '" + frame(initialized) + frame(hover1) + frame(hover2) + "'\nwhile IFS= read -r line; do :; done\n",
-        )
+        script.writeText(requestDrivenMockLsp(initialized, hover1, hover2))
         temporary.newFile("example.txt").writeText("example")
         var approvals = 0
         val context = HarnessContext()
@@ -187,10 +212,7 @@ class LspPluginTest {
             val initialized = """{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}"""
             val hover = """{"jsonrpc":"2.0","id":2,"result":{"contents":"$name"}}"""
             return temporary.newFile("$name.sh").apply {
-                writeText(
-                    "printf '%s' '" + frame(initialized) + frame(hover) +
-                        "'\nwhile IFS= read -r line; do :; done\n",
-                )
+                writeText(requestDrivenMockLsp(initialized, hover))
             }
         }
 
@@ -255,13 +277,11 @@ class LspPluginTest {
         fun frame(json: String) =
             "Content-Length: " + json.toByteArray().size + "\r\n\r\n" + json
         val server = temporary.newFile("on-demand-server.sh")
-        server.writeText(
-            "printf '%s' '" +
-                frame("""{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}""") +
-                frame("""{"jsonrpc":"2.0","id":2,"result":{"contents":"first"}}""") +
-                frame("""{"jsonrpc":"2.0","id":3,"result":{"contents":"second"}}""") +
-                "'\nwhile IFS= read -r line; do :; done\n",
-        )
+        server.writeText(requestDrivenMockLsp(
+            """{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}""",
+            """{"jsonrpc":"2.0","id":2,"result":{"contents":"first"}}""",
+            """{"jsonrpc":"2.0","id":3,"result":{"contents":"second"}}""",
+        ))
         temporary.newFile("sample.ts").writeText("const answer = 42")
         var installs = 0
         var approvals = 0

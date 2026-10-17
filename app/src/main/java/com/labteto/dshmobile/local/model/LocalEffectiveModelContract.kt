@@ -112,6 +112,9 @@ internal object LocalEffectiveModelContracts {
             preset == null -> LocalEffectiveCapability(
                 LocalEffectiveCapabilityStatus.UNKNOWN, "unverified-route",
             )
+            authKind == LocalModelAuthKind.CHATGPT_PLAN -> LocalEffectiveCapability(
+                LocalEffectiveCapabilityStatus.UNKNOWN, "subscription-sharing-tools-require-account-verification",
+            )
             else -> LocalEffectiveCapability(
                 LocalEffectiveCapabilityStatus.SUPPORTED, "client-protocol",
             )

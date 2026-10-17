@@ -152,6 +152,21 @@ internal class LocalPluginComposition(
         workspaceRoot = workspaceRoot,
         stdioCommandResolver = runtimeProcess::resolveCommand,
         stdioEnvironmentProvider = { runtimeProcess.processEnvironment() },
+        // Mandatory process boundary. In-process MCP factories are test-only; Android
+        // production uses this Binder transport or fails closed, never falls back.
+        transportFactory = { endpoint ->
+            com.labteto.dshmobile.local.tools.ipc.McpPluginWorkerTransport(
+                context.applicationContext, kind = "http", endpoint = endpoint,
+            )
+        },
+        stdioTransportFactory = { command, workingDirectory ->
+            com.labteto.dshmobile.local.tools.ipc.McpPluginWorkerTransport(
+                context.applicationContext, kind = "stdio",
+                command = runtimeProcess.resolveCommand(command),
+                cwd = workingDirectory,
+                environment = runtimeProcess.processEnvironment(),
+            )
+        },
     )
     private val githubPlugin = GitHubConnectorPlugin(
         http = http,
@@ -253,6 +268,11 @@ internal class LocalPluginComposition(
 
     suspend fun enablePlugin(id: String): List<String> = pluginManager.enable(id)
 
+    suspend fun recoverFailedPlugin(id: String): List<String> {
+        requireReloadablePlugin(id)
+        return pluginManager.recoverFailed(id)
+    }
+
     suspend fun disablePlugin(id: String): Boolean {
         requireReloadablePlugin(id)
         return pluginManager.disable(id)
@@ -288,7 +308,28 @@ internal class LocalPluginComposition(
             (plugin as? GitHubConnectorPlugin ?: error("GitHub 插件管理接口不兼容")).validateCredential(token)
         }
 
-    suspend fun mcpServers(): List<McpServerSnapshot> = withMcp { plugin, _ -> plugin.serverSnapshots() }
+    /**
+     * Read-only status must remain responsive while MCP connect/reconnect holds the command lock.
+     * No permission is granted, and "registered" does not imply a healthy remote endpoint.
+     */
+    fun mcpLifecycleRevisions(): kotlinx.coroutines.flow.StateFlow<Long> = mcpPlugin.lifecycleRevisions
+
+    suspend fun mcpLifecycleHistory(
+        incarnation: String?, afterSequence: Long,
+    ): com.labteto.dshmobile.interop.mcp.McpLifecycleHistory =
+        pluginManager.observeActivePlugin("mcp-bridge") { plugin ->
+            (plugin as? McpToolBridgePlugin
+                ?: error("MCP 插件管理接口不兼容")).lifecycleEventsSince(incarnation, afterSequence)
+        }
+
+    suspend fun mcpServers(): List<McpServerSnapshot> =
+        pluginManager.observeActivePlugin("mcp-bridge") { plugin ->
+            (plugin as? McpToolBridgePlugin
+                ?: error("MCP 插件管理接口不兼容")).lifecycleSnapshots()
+        }
+
+    suspend fun checkMcpHealth(serverId: String): com.labteto.dshmobile.interop.mcp.McpServerHealth =
+        withMcp { plugin, _ -> plugin.checkServerHealthFromUi(serverId) }
 
     suspend fun connectMcpHttp(serverId: String, endpoint: String): String = withMcp { plugin, active ->
         plugin.connectHttpFromUi(active, serverId, endpoint)

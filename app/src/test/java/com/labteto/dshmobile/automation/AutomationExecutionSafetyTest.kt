@@ -1,10 +1,15 @@
 package com.labteto.dshmobile.automation
 
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AutomationExecutionSafetyTest {
@@ -60,6 +65,216 @@ class AutomationExecutionSafetyTest {
             assertNull(store.get("task-a")!!.lastResult)
         } finally {
             directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun overlappingManualRequestsSubmitInTheirDurableClaimOrder() {
+        val dir = Files.createTempDirectory("automation-submit-order").toFile()
+        val executor = Executors.newFixedThreadPool(2)
+        val firstSubmitted = CountDownLatch(1)
+        val secondStarted = CountDownLatch(1)
+        val allowFirstReturn = CountDownLatch(1)
+        try {
+            val store = AutomationStore(dir.resolve("automations.json"), json)
+            val admitted = store.upsert(AutomationTask(
+                id = "task", prompt = "run", createdAt = 1L, nextRunAt = 2L,
+            )).admitted
+            val submitted = java.util.Collections.synchronizedList(mutableListOf<String>())
+            val first = executor.submit<String?> {
+                store.claimAndSubmitManualRun("task", admitted.scheduleGeneration, "request-a") {
+                    submitted.add("request-a")
+                    firstSubmitted.countDown()
+                    check(allowFirstReturn.await(5, TimeUnit.SECONDS))
+                    "submitted-a"
+                }
+            }
+            assertTrue(firstSubmitted.await(5, TimeUnit.SECONDS))
+            val second = executor.submit<String?> {
+                secondStarted.countDown()
+                store.claimAndSubmitManualRun("task", admitted.scheduleGeneration, "request-b") {
+                    submitted.add("request-b")
+                    "submitted-b"
+                }
+            }
+            // While A's enqueue call is held, B cannot publish a newer claim
+            // and submit a second request that A might later REPLACE.
+            // The second enqueue must not finish while the first is still inside
+            // the store's critical section. Avoid read() here: it shares the lock.
+            assertTrue(secondStarted.await(5, TimeUnit.SECONDS))
+            assertFalse(second.isDone)
+            assertEquals(listOf("request-a"), submitted.toList())
+            allowFirstReturn.countDown()
+            assertEquals("submitted-a", first.get(5, TimeUnit.SECONDS))
+            assertEquals("submitted-b", second.get(5, TimeUnit.SECONDS))
+            assertEquals(listOf("request-a", "request-b"), submitted.toList())
+            assertEquals("request-b", store.get("task")!!.activeManualRunId)
+        } finally {
+            allowFirstReturn.countDown()
+            executor.shutdownNow()
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun failedManualAdmissionCompensatesOnlyItsExactClaim() {
+        val dir = Files.createTempDirectory("automation-submit-failure").toFile()
+        try {
+            val store = AutomationStore(dir.resolve("automations.json"), json)
+            val task = store.upsert(AutomationTask(
+                id = "task", prompt = "run", createdAt = 1L, nextRunAt = 2L,
+            )).admitted
+            assertTrue(runCatching {
+                store.claimAndSubmitManualRun("task", task.scheduleGeneration, "failed") {
+                    error("simulate synchronous WorkManager rejection")
+                }
+            }.isFailure)
+            assertNull(store.get("task")!!.activeManualRunId)
+            assertEquals("queued", store.claimAndSubmitManualRun(
+                "task", task.scheduleGeneration, "current",
+            ) { "queued" })
+            // An asynchronously rejected old request may clear only its own claim.
+            assertFalse(store.compensateManualEnqueueFailure(
+                "task", task.scheduleGeneration, "failed", "old async failure",
+            ))
+            assertEquals("current", store.get("task")!!.activeManualRunId)
+            assertTrue(store.compensateManualEnqueueFailure(
+                "task", task.scheduleGeneration, "current", "current async failure",
+            ))
+            assertNull(store.get("task")!!.activeManualRunId)
+            assertEquals("current async failure", store.get("task")!!.lastError)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun manualSettlementNeverReplacesAlreadyScheduledNextRun() {
+        val task = AutomationTask(
+            id = "scheduled", prompt = "work", createdAt = 1L, nextRunAt = 99L,
+            status = AutomationStatus.SCHEDULED,
+        )
+        assertFalse(mayEnqueueNextAfterAutomationSettlement(true, task, 99L))
+        assertTrue(mayEnqueueNextAfterAutomationSettlement(false, task, 99L))
+        assertFalse(mayEnqueueNextAfterAutomationSettlement(false,
+            task.copy(status = AutomationStatus.PAUSED), 99L))
+        assertFalse(mayEnqueueNextAfterAutomationSettlement(false, task, null))
+    }
+
+    @Test
+    fun scheduledAutomationCannotRestartAfterTerminalSettlement() {
+        val generation = 42L
+        val active = AutomationTask(
+            id = "scheduled", prompt = "work", createdAt = 1L, nextRunAt = 2L,
+            scheduleGeneration = generation, status = AutomationStatus.RUNNING, lastRunAt = 1_000L,
+        )
+        assertTrue(mayStartScheduledAutomation(active, generation))
+        assertTrue(ownsAutomationSettlement(active, generation, 1_000L, manualRun = false))
+        for (terminal in listOf(
+            AutomationStatus.COMPLETED, AutomationStatus.FAILED,
+            AutomationStatus.PAUSED, AutomationStatus.BLOCKED, AutomationStatus.WAITING_USER,
+        )) {
+            val finished = active.copy(status = terminal)
+            assertFalse(mayStartScheduledAutomation(finished, generation))
+            assertFalse(ownsAutomationSettlement(finished, generation, 1_000L, manualRun = false))
+        }
+    }
+
+    @Test
+    fun staleScheduledWorkerCannotSettleAnotherRunOfTheSameGeneration() {
+        val directory = Files.createTempDirectory("automation-attempt-fencing").toFile()
+        try {
+            val store = AutomationStore(directory.resolve("automations.json"), json)
+            val admitted = store.upsert(AutomationTask(
+                id = "scheduled", prompt = "work", createdAt = 1L, nextRunAt = 2L,
+                status = AutomationStatus.RUNNING, lastRunAt = 200L,
+            )).admitted
+            val generation = admitted.scheduleGeneration
+            // The next run uses the same schedule generation: that is not a run identity.
+            store.updateIf("scheduled", predicate = { it.scheduleGeneration == generation }) {
+                it.copy(status = AutomationStatus.RUNNING, lastRunAt = 300L)
+            }
+            assertNull(store.updateIf("scheduled", predicate = {
+                ownsAutomationSettlement(it, generation, 200L, manualRun = false)
+            }) { it.copy(status = AutomationStatus.COMPLETED, lastResult = "stale") })
+            assertEquals(AutomationStatus.RUNNING, store.get("scheduled")!!.status)
+            assertNull(store.get("scheduled")!!.lastResult)
+            assertNotNull(store.updateIf("scheduled", predicate = {
+                ownsAutomationSettlement(it, generation, 300L, manualRun = false)
+            }) { it.copy(status = AutomationStatus.COMPLETED, lastResult = "current") })
+            assertNull(store.updateIf("scheduled", predicate = {
+                ownsAutomationSettlement(it, generation, 300L, manualRun = false)
+            }) { it.copy(lastResult = "duplicate") })
+            assertEquals("current", store.get("scheduled")!!.lastResult)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun automationSettlementRequiresExactDurableManualExecutionIdentity() {
+        val task = AutomationTask(
+            id = "manual", prompt = "work", createdAt = 1L, nextRunAt = 2L,
+            scheduleGeneration = 10L, status = AutomationStatus.PAUSED,
+        )
+        val claimed = task.copy(activeManualRunId = "work-request-a")
+        assertFalse(ownsAutomationSettlement(claimed, 9L, 10L, manualRun = true, manualExecutionId = "work-request-a"))
+        assertFalse(ownsAutomationSettlement(claimed, 10L, 10L, manualRun = true))
+        assertFalse(ownsAutomationSettlement(claimed, 10L, 10L, manualRun = true, manualExecutionId = "work-request-b"))
+        assertTrue(ownsAutomationSettlement(claimed, 10L, 10L, manualRun = true, manualExecutionId = "work-request-a"))
+        assertFalse(ownsAutomationSettlement(claimed, 10L, 10L, manualRun = false))
+        // Replacing a manual WorkManager request revokes every late settlement of
+        // its predecessor even when the scheduler generation is unchanged.
+        val replacement = claimed.copy(activeManualRunId = "work-request-b")
+        assertFalse(ownsAutomationSettlement(replacement, 10L, 10L, manualRun = true, manualExecutionId = "work-request-a"))
+        assertTrue(ownsAutomationSettlement(replacement, 10L, 10L, manualRun = true, manualExecutionId = "work-request-b"))
+        assertFalse(ownsAutomationSettlement(replacement.copy(activeManualRunId = null), 10L, 10L,
+            manualRun = true, manualExecutionId = "work-request-b"))
+    }
+
+    @Test
+    fun manualRunDurableClaimSurvivesReopenAndFencesReplacedReceipt() {
+        val dir = Files.createTempDirectory("automation-manual-identity").toFile()
+        try {
+            val file = dir.resolve("automations.json")
+            val firstProcess = AutomationStore(file, json)
+            val task = firstProcess.upsert(AutomationTask(
+                id = "manual", prompt = "one shot", createdAt = 1L,
+                nextRunAt = 2L, status = AutomationStatus.PAUSED,
+            )).admitted
+            assertNull(task.activeManualRunId)
+            assertNotNull(firstProcess.updateIf("manual", predicate = {
+                it.scheduleGeneration == task.scheduleGeneration
+            }) { it.copy(activeManualRunId = "request-a") })
+
+            val restarted = AutomationStore(file, json)
+            assertEquals("request-a", restarted.get("manual")!!.activeManualRunId)
+            assertNotNull(restarted.updateIf("manual", predicate = {
+                it.scheduleGeneration == task.scheduleGeneration
+            }) { it.copy(activeManualRunId = "request-b") })
+            val staleCommit = restarted.updateIf("manual", predicate = {
+                ownsAutomationSettlement(it, task.scheduleGeneration, 100L,
+                    manualRun = true, manualExecutionId = "request-a")
+            }) { it.copy(lastResult = "stale", activeManualRunId = null) }
+            assertNull(staleCommit)
+            assertEquals("request-b", restarted.get("manual")!!.activeManualRunId)
+            assertNull(restarted.get("manual")!!.lastResult)
+            val currentCommit = restarted.updateIf("manual", predicate = {
+                ownsAutomationSettlement(it, task.scheduleGeneration, 200L,
+                    manualRun = true, manualExecutionId = "request-b")
+            }) { it.copy(lastResult = "genuine", activeManualRunId = null) }
+            assertNotNull(currentCommit)
+            assertNull(restarted.updateIf("manual", predicate = {
+                ownsAutomationSettlement(it, task.scheduleGeneration, 200L,
+                    manualRun = true, manualExecutionId = "request-b")
+            }) { it.copy(lastResult = "duplicate") })
+            assertEquals("genuine", AutomationStore(file, json).get("manual")!!.lastResult)
+            val edited = restarted.upsert(requireNotNull(restarted.get("manual"))
+                .copy(prompt = "edited", activeManualRunId = "old-request")).admitted
+            assertTrue(edited.scheduleGeneration > task.scheduleGeneration)
+            assertNull(edited.activeManualRunId)
+        } finally {
+            dir.deleteRecursively()
         }
     }
 

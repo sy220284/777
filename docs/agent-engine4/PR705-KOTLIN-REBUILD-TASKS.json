@@ -1,0 +1,585 @@
+{
+  "title": "777 Agent Engine 4.0 / #705 Kotlin 重构执行台账",
+  "based_on_v3": "docs/agent-engine4/PR705-KOTLIN-REBUILD-EXECUTION-20261016.md",
+  "baseline": {
+    "pr": 705,
+    "branch": "feat/ui-r4-pluggable",
+    "head_at_planning": "cd0dbc0604996cf0b64fee8fd5a484dbbed42b85",
+    "base_at_planning": "e03573fed4a3a77f9f6db850fb0522e367a678d2"
+  },
+  "rules": {
+    "protected": [
+      "App Shell/V6 UI",
+      "ChatFeature domain logic",
+      "user data, credentials and history"
+    ],
+    "backend": "Kotlin native",
+    "tests": "JVM/Compose/contract/CI; no manual device validation milestone",
+    "status_definition": "仅实际生产代码、测试、最终SHA验证后记为完成"
+  },
+  "tasks": [
+    {
+      "id": "AE4V3-01",
+      "title": "范围冻结与保护域基线",
+      "area": "docs/ARCHITECTURE.md, Feature public Ports",
+      "depends_on": [],
+      "status": "in_progress",
+      "code_evidence": [],
+      "tests_verified": [],
+      "notes": "完成PR基线/边界核查并修复工作流准入缺陷，架构完整审计仍待继续"
+    },
+    {
+      "id": "AE4V3-02",
+      "title": "真实入口与旧实现去留盘点",
+      "area": "Work/Auto/Tools/Settings/Shared/Platform",
+      "depends_on": [
+        "AE4V3-01"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "docs/agent-engine4/AE4V3-02-PRODUCTION-OWNERSHIP-INVENTORY.md"
+      ],
+      "tests_verified": [],
+      "notes": "基于当前生产调用与唯一 Owner 的入口逐项核实，尚需完备其他消费者清理证据。"
+    },
+    {
+      "id": "AE4V3-03",
+      "title": "复杂任务行为基准",
+      "area": "Task trace, tools, recovery, chat regression",
+      "depends_on": [
+        "AE4V3-01",
+        "AE4V3-02"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "docs/agent-engine4/AE4V3-02-PRODUCTION-OWNERSHIP-INVENTORY.md",
+        "reference-validation/src/test/kotlin/com/labteto/dshmobile/reference/AgentEngine4ExecutionBaselineTest.kt"
+      ],
+      "tests_verified": [],
+      "notes": "新增真实 Kotlin/JVM 跨 Agent/Tool/Session/TaskGraph 行为基准，待当前提交 CI 验收。"
+    },
+    {
+      "id": "AE4V3-04",
+      "title": "Run/Turn/Goal/Tool typed contract",
+      "area": "harness-core and shared API",
+      "depends_on": [
+        "AE4V3-02",
+        "AE4V3-03"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionEvidence.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionClaimGuard.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentExecutionContracts.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentTurnState.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentToolDispatch.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentTurnEngine.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunner.kt",
+        "reference-validation/src/main/kotlin/com/labteto/dshmobile/reference/NativeConformanceRunner.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentRunOwnership.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolInvocationContext.kt"
+      ],
+      "tests_verified": [],
+      "notes": "已对 Work 实际 turn/end 事件增加 Kotlin 强类型 GoalDisposition（NO_GOAL/PAUSED/BLOCKED/WAITING_* /NEEDS_EXECUTION/READY_FOR_SETTLEMENT/COMPLETED），与真实 Work 验收证据共享同一快照；仅首个可交付切片，完整 Run/Turn/Tool typed contract 尚未完成。 本批直接替换平台中立 Agent 执行核心及 Work/Subagent/参考验证消费者，旧 AgentLoop 源码移除；待新 SHA CI 验证，不能标 completed。；新增共享强类型 AgentRunIdentity/AgentRunExecutionContext 与 ToolAttemptState；保持原事件兼容读取，不另建持久事实源。 此批按用户要求只做代码实现与静态复查，Kotlin 编译/测试未执行，不提高整项完成状态。 本批：Goal 增加持久单调 revision，Shared 只传播中立工具 invocation 身份；旧指纹续轮保持读取兼容。 仅执行静态检查，未运行 Kotlin 编译/单测。"
+    },
+    {
+      "id": "AE4V3-05",
+      "title": "Session/EventLog/持久化重构",
+      "area": "harness-core/session, app/local/session",
+      "depends_on": [
+        "AE4V3-04"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphRecovery.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/workflow/TaskGraphExecutor.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSubagentRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalAgentRunCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTurnSettlement.kt",
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/SessionRecoveryTest.kt",
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedgerTest.kt"
+      ],
+      "tests_verified": [],
+      "notes": "将 Work Goal 的工具副作用核验与 SessionRecovery 的异常工具补写统一到 harness-core/session/ToolAttemptLedger；读取原有 EventLog 不另立账本，原有历史兼容测试和新投影单测待最新 SHA CI。；ToolAttemptLedger 的 Work 投影改为 Session EventLog 流式 forEachAfter，不再将长会话事件档案整体 materialize 到 Android 堆内存。；新增任务图冷重建 projector：未结算的 taskgraph/start 在 GoalDriver 自动续轮前明确阻断；跨目标终态不可错误核销。当前提交 CI 待验证；不等于完整自主恢复。；TaskGraph 进度协议扩展稳定 nodeId，Work 事件携带 nodeId，冷重建 projector 可还原节点最新阶段且不冒充任务完成；JVM 回归待最新 CI。；恢复排队/阻塞状态保留原检查点模型身份、原始任务和配置；重新启动从持久工具事实重判未知副作用，不能依赖上次 repair 的临时返回。核实只读调用在冷恢复时保持安全重读语义。 此批按用户要求只做代码实现与静态复查，Kotlin 编译/测试未执行，不提高整项完成状态。 本批：取消结算与冷恢复共用 ToolAttemptLedger 的 admission/read_only/execution_id；移除按当前工具名推断只读的旧路径。 仅执行静态检查，未运行 Kotlin 编译/单测。 2026-10-17：SessionRecovery 读取开放 Turn、折叠未结算工具、提交中断回执及终态现在全部进入 SessionEventLog OS writer lease；避免并发/跨进程恢复为同一回合生成重复结算。新增双适配器并发 JVM 回归，针对性测试与应用 Kotlin 编译通过，最新提交 CI 待验收。 2026-10-17：历史工具调用的 provider callId 只在请求内唯一；新增 Shared ToolAttemptLedger 的重复旧 ID 栅栏，禁止缺 execution_id 的迟到回执结算较新写入；有 execution_id 的结果继续按精确执行实例结算，唯一历史 ID 仍可读取。冷恢复保持不明副作用为未结算，并新增 4 项正反 JVM 回归。已验证本地同源 Shared 核心与 reference-validation 共 268 个 JVM 测试及 App Kotlin compileDebugKotlin（均通过）；需该提交 SHA CI 复核，整项继续 in_progress。 2026-10-17：SessionRecovery 针对最新 Step 严格核对 step/end 的序号；迟到旧 step/end 不得提前关闭当前未结算 Step。即使最新 Step 已有 end，仍流式扫描其 ToolAttemptLedger，以防崩溃中 tool/result 缺失造成未知写入漏报。新增 2 个 JVM 反例；本地 harness-core 265 与 reference-validation 5 项测试、App compileDebugKotlin 通过；最新 SHA CI 尚待复核，整项 in_progress。"
+    },
+    {
+      "id": "AE4V3-06",
+      "title": "Run Owner/Kernel/RecoveryLease",
+      "area": "app/local/runtime",
+      "depends_on": [
+        "AE4V3-04",
+        "AE4V3-05"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionExecutionRegistry.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionRuntimeRegistry.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAutomationExecutionCoordinator.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentRunOwnership.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalAgentRunCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/SessionExecutionRegistryTest.kt"
+      ],
+      "tests_verified": [
+        "2026-10-17: :harness-core:test --tests SessionExecutionRegistryTest (0 failures), includes atomic bulk admission rejection"
+      ],
+      "notes": "Session 唯一互斥、等待队列与所有权迁入 Shared Session；Android 原 API 保持兼容。租约绑定 session/incarnation/epoch/owner，跨会话、跨类型或外来注册表租约不能进入执行；withOwner 传播协程执行身份，前台 Work 与后台 Work 自动任务接入。只完成进程内所有权合同，不冒称跨进程恢复或完整 Run Owner 完成。当前 SHA Kotlin 编译及单测仍待 CI。；Shared AgentRunOwnership 接管前台/自动任务/子代理运行提交权；同槽检查与持久提交/交接原子化，不跨会话持有 IO 锁；落盘失败不转移旧 Owner，终态只结算一次。持久恢复完整事务与外部核销仍未完成。 此批按用户要求只做代码实现与静态复查，Kotlin 编译/测试未执行，不提高整项完成状态。 本批：修复 withContext 后协程 Job 改变导致 finishTurn 拒绝原 Owner、续轮无法交接的问题；使用进入执行域前捕获的注册 Job。 仅执行静态检查，未运行 Kotlin 编译/单测。 2026-10-17：复核批量 Session acquireAll 原先对空白会话 ID 做 filter 丢弃，可能让删除/维护只锁住请求的一部分会话却返回成功。现一次性验证整批 ID，非法则在获取任何租约前拒绝；合法输入仍去重排序，异常/取消释放维持原机制。新增拒绝混合合法+空白 ID、合法重复 ID 正反 JVM 测试，Shared 核心定向测试通过；跨进程真实删除迁移与本 SHA CI 仍待整项验收。"
+    },
+    {
+      "id": "AE4V3-07",
+      "title": "Model adapters/streaming/retry/account",
+      "area": "app/local/model",
+      "depends_on": [
+        "AE4V3-04",
+        "AE4V3-06"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRequestAttemptPolicy.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelAttemptStreamEvidence.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/model/LocalModelAttemptStreamEvidenceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/model/LocalModelRequestAttemptPolicyTest.kt"
+      ],
+      "tests_verified": [],
+      "notes": "按 V3 模型能力任务启动：模型流式重试依据同时观察正文与 reasoning delta，防止只输出推理内容却被当作零输出重放，降低双次推理/付费风险；只持有 reasoningObserved 布尔事实，绝不将推理正文写入诊断 tail。生产消费者 LocalModelRequestCoordinator 已接入，新增 reasoning-only / mixed / retry reset 回归，定向 App JVM 测试、compileDebugKotlin 及架构/性能/测试质量/Kotlin 风险门禁已在本地通过。全域 Gateway/adapters/account/route freeze 与完整 CI 仍待施工验收。"
+    },
+    {
+      "id": "AE4V3-08",
+      "title": "Kotlin Turn/Step/Steering",
+      "area": "harness-core/agent, app/local/work",
+      "depends_on": [
+        "AE4V3-05",
+        "AE4V3-06",
+        "AE4V3-07"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentExecutionContracts.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentTurnState.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentToolDispatch.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentTurnEngine.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunner.kt",
+        "reference-validation/src/main/kotlin/com/labteto/dshmobile/reference/NativeConformanceRunner.kt"
+      ],
+      "tests_verified": [],
+      "notes": " 本批直接替换平台中立 Agent 执行核心及 Work/Subagent/参考验证消费者，旧 AgentLoop 源码移除；待新 SHA CI 验证，不能标 completed。；Work 与子代理实际 AgentTurnEngine 接入精确 Run 协程上下文；模型返回后核对原 Run，旧结果不得成为正文或触发工具；审批和资源等待后共用相同身份。 此批按用户要求只做代码实现与静态复查，Kotlin 编译/测试未执行，不提高整项完成状态。"
+    },
+    {
+      "id": "AE4V3-09",
+      "title": "Tool admission/execution/settlement",
+      "area": "harness-core/tools, LocalToolExecutionCoordinator",
+      "depends_on": [
+        "AE4V3-05",
+        "AE4V3-06",
+        "AE4V3-08"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt",
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedgerTest.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt",
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/SessionRecoveryTest.kt"
+      ],
+      "tests_verified": [],
+      "notes": "共享 Kotlin ToolAttemptLedger 强类型状态机在 Work 和 SessionRecovery 真实生产路径接管工具执行事实；尚未重构平台 Tool Executor 权限/租约/未知副作用权威核销。；共享工具历史按单次声明保存独立 Attempt，并用 execution_id 精确对应异步回执；重复 provider callId 不能抹去先前未知副作用。SessionRecovery 保留执行实例字段，新增重复编号和乱序回执 JVM 测试。需当前 CI 验证。；工具审批和资源等待后的准入校验精确 Session 租约，执行上下文与 tool/execution-started 共享身份属性；抛出异常的已启动执行保留 executionId，避免重复 callId 乱序结算失配。待当前 SHA 单测和构建。；实际执行准入记录 read_only 与 Run/parentRun 身份，Shared ledger 区分声明/读取/外部待结算/已结算/外部未知；未知结果不被只读提示改写。后台重放检查复用 ledger 单次流式折叠，移除旧 callId 集合和全档 materialize。 此批按用户要求只做代码实现与静态复查，Kotlin 编译/测试未执行，不提高整项完成状态。 本批：明确 execution_id 不匹配或 callId 归属不符的回执不能结算当前写入。中断回执保留精确 execution_id。 仅执行静态检查，未运行 Kotlin 编译/单测。 2026-10-17：Shared ToolAttemptLedger 的准入身份在第一次真实 tool/execution-started 后不可重绑；重复、跨调用执行 ID 及迟到准入不能改写 Run/read_only 或清除未知副作用。新增 3 个 JVM 正反例；本地 :harness-core:test 和架构/性能/测试质量静态检查通过，待最新 PR SHA CI 验证；整项仍为 in_progress。 2026-10-17：历史工具调用的 provider callId 只在请求内唯一；新增 Shared ToolAttemptLedger 的重复旧 ID 栅栏，禁止缺 execution_id 的迟到回执结算较新写入；有 execution_id 的结果继续按精确执行实例结算，唯一历史 ID 仍可读取。冷恢复保持不明副作用为未结算，并新增 4 项正反 JVM 回归。已验证本地同源 Shared 核心与 reference-validation 共 268 个 JVM 测试及 App Kotlin compileDebugKotlin（均通过）；需该提交 SHA CI 复核，整项继续 in_progress。"
+    },
+    {
+      "id": "AE4V3-10",
+      "title": "ToolsFeature/MCP/Skill management",
+      "area": "app/local/tools",
+      "depends_on": [
+        "AE4V3-09"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalGitHubSkillImporter.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/tools/PublicGitHubSkillChildPathTest.kt"
+      ],
+      "tests_verified": [],
+      "notes": "按 V3 Tools/MCP/Skill management 任务启动：生产 GitHub 技能安装严格核对每级子条目的 path 必须等于当前选定目录/name，拒绝跨目录返回和重复文件静默覆盖；保留既有 ZIP 入口、资源预算及 UI。新增路径伪装、非法名称和合法嵌套路径回归；本地定向 JVM 测试和 App Kotlin 编译通过。MCP 生命周期、完整技能治理、CI 最终 SHA 验证未完成。"
+    },
+    {
+      "id": "AE4V3-11",
+      "title": "GoalDriver+Verifier 任务闭环",
+      "area": "app/local/work, shared Agent",
+      "depends_on": [
+        "AE4V3-08",
+        "AE4V3-09"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentInputQueue.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkContinuation.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistry.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentInboxPersistence.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistryTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuationTest.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionEvidence.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidence.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphRecovery.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalDriver.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalDriverTest.kt"
+      ],
+      "tests_verified": [],
+      "notes": "已接入生产 Turn 终态→Work Run Owner onIdle→持久 agent/inbox→自动下一轮的安全 Goal 进度续轮；仅在已存在身份明确的 active Goal、真实成功工具回执、无工具错误、无用户新输入/steer/取消、无持久化错误、现有证据仍为 NEEDS_EXECUTION 时准入；复用已有最多 2 次续轮预算和 checkpoint；新增 8 个 JVM 场景但最终 SHA 编译/CI 未验证。仍缺多轮动态进度证明、跨进程目标 revision/fencing、工具未知结算与完整 GoalDriver。 新增 Goal 合同 SHA-256 存储于可选 AgentContinuationRef 字段，持久恢复前重验；用户指令若比续轮后到，出队时仍可优先，过期续轮通过 inbox 事件原子丢弃、不进入模型历史；已补相关测试，CI 仍待最新提交验收。 本批新增持久 Goal ID/验收合同 SHA-256 栅栏、Work Run Owner pollCommitted 出队时校验并将过期续轮持久登记丢弃，保留用户队列；LocalWorkAgentTurnExecutor.run 在懒协程模型启动前再次校验，避免出队与启动之间目标变更。新增 Work Run Registry JVM 用例；须等最新 CI。；本轮补 fail-closed 未结算/未知副作用扫描（关联当前 Goal 的 tool/call、tool/execution-started、tool/result），并让模型失败续轮走 offerIfEmpty 原子用户优先准入；测试和 ARM64 CI 尚待当前 SHA 验收。 GoalDriver 自动续轮由固定2轮上限改为工作证据进展驱动：文件 SHA-256/待办/团队/验收证据组成稳定 proof，写入权威 agent/inbox 同一提交；连续两轮无证明变化停止，最多96轮；已给出对应 JVM 行为测试。尚未实现 Goal 自动标记完成、完整恢复、UNKNOWN 结算。；Work 结构化工作流阻塞已正式参与 Goal 完成门禁，历史 Session EventLog 最新图终态可在 UI 临时状态清理后继续阻断假完成，含兼容旧 settled 事件。；新增任务图冷重建 projector：未结算的 taskgraph/start 在 GoalDriver 自动续轮前明确阻断；跨目标终态不可错误核销。当前提交 CI 待验证；不等于完整自主恢复。 本批：本批新增实际 GoalDriver：正常 Turn 结束后，在原 Work Owner 交接处重新验收；有显式机器验收合同且证据满足时通过原 Work 命令自动完成，否则续轮/部分/等待/需验证。显式及自动完成均检查未结算工具与孤立图；update_goal 只排除自己精确 invocation，不能排除其他写入。新增 revision 持久队列往返、暂停再激活旧续轮作废、验收完成/未知副作用阻塞回归源码。完整跨进程续执行与外部副作用核销尚未完成。 仅执行静态检查，未运行 Kotlin 编译/单测。"
+    },
+    {
+      "id": "AE4V3-12",
+      "title": "WorkFeature 全域业务",
+      "area": "app/local/work",
+      "depends_on": [
+        "AE4V3-11"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinatorTest.kt"
+      ],
+      "tests_verified": [
+        "local :app:compileDebugKotlin",
+        "local :app:testDebugUnitTest (LocalWorkProgressCoordinatorTest and full JVM suite)",
+        "local 7-module JVM suite: 3175 passed, 0 failed"
+      ],
+      "notes": "2026-10-17：WorkFeature 领域进度变更建立唯一 commitWorkMutation 入口，Plan/Todo/Goal 的 EventLog 写入、运行投影更新与持久回调在同一 Session OS writer lease 中完成，独立 Work Ports 不可并发越过前次持久提交。新增双适配器多线程并发正反回归；本地 App Kotlin compileDebugKotlin、7 模块 3175 项 JVM 测试(0失败)及架构/性能/测试质量门禁通过。只启动 AE4V3-12，WorkSend、RunCenter、后台任务、完整领域迁移与最终提交 SHA CI 尚未验收。"
+    },
+    {
+      "id": "AE4V3-13",
+      "title": "Context/Memory/Compaction",
+      "area": "app/local/model, app/local/context, app/local/memory",
+      "depends_on": [
+        "AE4V3-05",
+        "AE4V3-07",
+        "AE4V3-11"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryCheckpoint.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTypedToolReferenceTest.kt"
+      ],
+      "tests_verified": [
+        "local :app:compileDebugKotlin",
+        "local :app:testDebugUnitTest (compaction and typed checkpoint regressions)",
+        "local 7-module JVM suite: 3176 tests, 0 failures"
+      ],
+      "notes": "2026-10-17：Work 模型历史检查点只从最新的受信任 Work envelope 恢复，若其损坏/无法解码则明确不使用检查点，不再退回更早有效但可能包含已撤销指令的旧总结；无关普通用户消息仍可保留最新有效 checkpoint，兼容既有 trusted/legacy 格式。新增损坏最新检查点、普通历史消息、有效新快照覆盖旧约束的回归。App Kotlin 编译和 7 模块 3176 JVM 测试(0失败)及架构/性能/测试质量门禁本地通过。只启动 AE4V3-13；Context 来源信任、Work/Chat 隔离、完整内存与压缩迁移及最终 SHA CI 尚未验收。"
+    },
+    {
+      "id": "AE4V3-14",
+      "title": "TaskGraph/Agent Team",
+      "area": "app/local/work/LocalAgentTeamRuntime",
+      "depends_on": [
+        "AE4V3-09",
+        "AE4V3-11",
+        "AE4V3-12",
+        "AE4V3-13"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/workflow/TaskGraphExecutor.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkflowCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentControlBuiltinRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSubagentRuntime.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkflowCoordinatorTest.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/workflow/TaskGraphTopology.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamReducer.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionEvidence.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidence.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphRecovery.kt",
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/workflow/TaskGraphExecutorTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuationTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidenceTest.kt"
+      ],
+      "tests_verified": [],
+      "notes": "本轮重构并接入 DAG 图调度器（不可变拓扑、依赖条件、环与容量原子拒绝、执行并发上限、独立分支隔离、阻塞传播、Work 只读委托验收）。删除旧 HarnessWorkflowRunner 及旧测试；Agent Team 的持久 TaskGraph/恢复仍待统一，不能标记完成。 本批为 Work 模型工具 workflow 增加 graph 模式及零基有向依赖数组，接到 LocalWorkSubagentRuntime 和 TaskGraphExecutor 正式执行路径；循环/重复/自依赖/缺失/越界在执行前拒绝，并为汇总任务提供已验收的前置结果。当前 SHA CI 未验收。；Work Graph 与 Agent Team 统一使用 TaskGraphTopology 环检测。Work Graph 委托的每个节点状态变化写入 Session EventLog，UI 从事件之后读取；完整持久恢复与单元回归仍待最终 CI。；Work 图在写入 taskgraph/start 前完成统一拓扑预检；每条合法工作图均写入 start/progress/end(settled/failed/cancelled) EventLog 完整生命周期，取消不转为成功。仍待最新 HEAD CI。；TaskGraph 将 executor/acceptor 的可重试失败与 Session EventLog 的 onProgress 持久提交故障分离；事件落盘失败即停止整张图、禁止重复触发已成功工具。新增两项 JVM 回归待 CI。；TaskGraph 在 Work 消费端新增结构化 LocalWorkflowRunResult，failed/blocked 节点形成 node counts 与 durable taskgraph/end 的 nodes_completed/partial/blocked 终态，Goal 验收仍独立；新增部分失败及全成功 JVM 回归。；Work 结构化工作流阻塞已正式参与 Goal 完成门禁，历史 Session EventLog 最新图终态可在 UI 临时状态清理后继续阻断假完成，含兼容旧 settled 事件。；本轮修复 graphPartialResult 错误测试桩（重试提示改变输入），真实生产图执行加入 Goal 验收合同指纹栅栏，阻断目标暂停/修改后继续派发子代理，持久 taskgraph/start 记录 DAG 节点依赖与目标指纹以利恢复审计；待最新 CI 验证。；TaskGraph 进度协议扩展稳定 nodeId，Work 事件携带 nodeId，冷重建 projector 可还原节点最新阶段且不冒充任务完成；JVM 回归待最新 CI。；本轮将 Wave/barrier 执行替换为有界 Coroutine DAG，节点前驱完成后立即启动，无需等待不相关慢分支；新增延迟分支并发回归与依赖失败传播测试。等待本次 SHA 构建/CI，TaskGraph 整体尚未验收完成。 2026-10-17：TaskGraph 冷投影按 graphId+goalId+候选激活保护，旧图复用 ID 不得覆盖未完成图；有指纹的终态只能核销匹配目标合同，缺指纹的歧义旧回执保持阻塞；节点进展仅唯一归属时投影。增加重复 ID、过期结束回执和旧格式正反测试，针对性测试与应用 Kotlin 编译通过，最新提交 CI 待验收。 2026-10-17：TaskGraph start/progress/end 采用独立持久 graph_execution_id；Goal 验收及冷恢复严格匹配本次激活，阻止重复 graphId、相同 Goal 合同的迟到进度和终态冒充新执行。旧历史无身份时仅接受无歧义核销。新增 2 项跨激活/证据正反回归；在 d957a0b 基线本地 :app:compileDebugKotlin、7 模块 JVM 共 3168 测试、架构/性能/测试质量/Kotlin 风险门禁通过；提交 SHA 的 CI 仍待复核，整项继续 in_progress。"
+    },
+    {
+      "id": "AE4V3-15",
+      "title": "Resource/Jobs/Interaction",
+      "area": "harness-core/resource, app/local/jobs",
+      "depends_on": [
+        "AE4V3-06",
+        "AE4V3-09",
+        "AE4V3-14"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/resource/HarnessResourceScheduler.kt",
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/resource/HarnessResourceSchedulerTest.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/jobs/HarnessJobManager.kt",
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/jobs/HarnessJobPersistenceTest.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/interaction/LocalInteractionCoordinator.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalInteractionCoordinatorTest.kt"
+      ],
+      "tests_verified": [
+        "local :harness-core:test complete",
+        "local :reference-validation:test complete",
+        "local :app:compileDebugKotlin complete",
+        "local resource/jobs targeted JUnit regression",
+        "local architecture/performance/test-quality/Kotlin-risk/CI-integrity gates",
+        "local :app:compileDebugKotlin + :app:testDebugUnitTest --tests LocalInteractionCoordinatorTest (9 passed, 0 failed)"
+      ],
+      "notes": "2026-10-17：启动 Resource/Jobs/Interaction 领域重构。Shared HarnessResourceScheduler 的租约清单与活跃计数改为同一临界区原子投影，并串行资源观察者通知，避免慢观察者让旧快照反向覆盖新状态；新增并发回调及快照不变量测试。Shared HarnessJobManager 持久任务恢复加入 ownerId 会话隔离：有归属的任务不可被另一会话接管，仍保留无归属旧任务首次绑定兼容，新增拒绝/合法恢复正反例。本地 harness-core 全量测试、reference-validation 测试、App Kotlin 编译和 5 个静态门禁通过；七模块全量 JVM 测试运行至 App 层时执行窗口超时，未冒称全套完成。本切片只覆盖 Resource 与 Jobs，Interaction 全链路、跨进程持久所有权、当前提交 SHA CI 尚未整项验收。 2026-10-17：Interaction 生命周期补强：注册 waiter 与 UI 待决状态发布共用 cancellation generation 锁；审批/提问发布异常时原子清理已注册 waiter 和 UI 状态；取消发生在发布中时禁止复活旧审批。新增失败发布和取消竞态 2 项用例，9 项定向 App 测试与 Kotlin 编译通过（本地 in-process JVM 堆 1850MiB），5 类静态门禁通过，未构建 APK。完整跨进程 Interaction 恢复和本提交 SHA CI 尚未验收。"
+    },
+    {
+      "id": "AE4V3-16",
+      "title": "Automation 任务与结算",
+      "area": "app/automation",
+      "depends_on": [
+        "AE4V3-11",
+        "AE4V3-12",
+        "AE4V3-15"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/automation/AutomationRun.kt",
+        "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationWorker.kt",
+        "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkerSettlementCoordinator.kt",
+        "app/src/test/java/com/labteto/dshmobile/automation/AutomationExecutionSafetyTest.kt",
+        "ui-contract/src/main/kotlin/com/labteto/dshmobile/automation/AutomationValues.kt",
+        "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt",
+        "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomation.kt"
+      ],
+      "tests_verified": [
+        "local App compileDebugKotlin",
+        "local AutomationExecutionSafetyTest (new replay/ownership regressions)",
+        "local 7-module JVM suite: 3165 tests, 0 failures",
+        "local architecture, performance, test-quality, Kotlin risk, CI integrity checks",
+        "2026-10-17: local 9-module JVM suite: 3323 tests, zero failures (PR snapshot with exact Automation patch)",
+        "2026-10-17: App Kotlin compile and AutomationExecutionSafetyTest manual-run claim/restart/replaced/duplicate receipt cases",
+        "2026-10-17: local architecture, performance, test quality, Kotlin risk, CI integrity and ledger gates",
+        "2026-10-17: local app Kotlin compile + AutomationExecutionSafetyTest: schedule generation edit revokes old manual work request (exit 0)",
+        "2026-10-17: local 9-module JVM suite 3360 tests, 0 failures; :app:compileDebugKotlin success; no APK",
+        "2026-10-17: AutomationExecutionSafetyTest 13 tests including concurrent manual enqueue ordering, admission compensation, and manual/periodic scheduling separation",
+        "2026-10-17: architecture, performance, test quality, Kotlin risk, CI repository integrity and V3 ledger checks passed"
+      ],
+      "notes": "2026-10-17：启动 Automation 任务与结算重构；排程 Worker 的入场仅允许 SCHEDULED 或 RUNNING 冷恢复，历史终态不得由迟到 WorkManager 请求重启。同一 scheduleGeneration 内以原始 lastRunAt + RUNNING 构成本次执行的持久结算栅栏，所有 delivered/blocked/failed/cancelled 更新、Work session 回写通过 AutomationStore.updateIf 原子核验，防止旧 Worker 跨轮覆盖新的成功/失败及重复结算。手动运行维持 generation 合同，新增 3 项正反回归。本地 App Kotlin 编译及七模块 3165 JVM 测试 0 失败，五项静态检查通过；完整 Automation 调度/跨进程结算及本提交 SHA CI 待验收，整项 in_progress。 2026-10-17 三源深度优化：参考 Codex 的运行身份/持久提交栅栏与 DeepSeek Goal Round 的逐次 attempt 边界，手动 Automation 现在在 enqueue 前持久认领 WorkManager request UUID；Worker 入场与 Work session 回写、所有成功/失败/阻塞结算必须同时匹配排程代际和当前 manualExecutionId。替换手动请求撤销旧授权，结算一次即消费授权，重启从 AutomationStore 读取身份；定时 Worker 首次准入清除旧手动声明，旧数据缺省 null 保持读取兼容。新增跨新 Store 实例恢复、旧回执、替换与重复结算回归。按当前 Kotlin 原生功能保留 Shared Run/Store 单一事实源，未声明跨设备沙箱与最终 CI 完整验收，AE4V3-16 仍 in_progress。 2026-10-17：进一步修复新排程生成代际时意外继承旧 activeManualRunId；AutomationStore.upsert 强制重置旧请求身份，新增保存后验证代际增加且授权已撤销的回归；App Kotlin 编译与 Automation 定向测试成功。 2026-10-17 V3 审计 P1/P2 修复：手动 runTaskNow 原先 claim(A),claim(B),enqueue(B),enqueue(A) 可逆转最新请求，且 WorkManager enqueueUniqueWork 的异步失败未被观察，手动 settleSuccess 可能重排定时链。现在 AutomationStore.claimAndSubmitManualRun 在同一 @Synchronized Store Owner 临界区提交持久 UUID 与 WorkManager enqueue 请求，顺序可验证；异步 Operation.result 回执失败通过准确 generation+requestId 栅栏清除已失败认领并持久记录 lastError，绝不误清较新认领；手动结算禁止 enqueueNextChained。新增多线程顺序与失败/替换补偿、手动定时互不干扰正反例。基线 84f8f589 上本地 9 模块 JVM 3360 项 0 失败，App Kotlin 编译及静态门禁通过；调用返回 true 仅表示本地请求已提交，最终异步入队和宿主崩溃恢复仍以真实 WorkManager 事实及此提交 SHA CI 验收。AE4V3-16 仍 in_progress。"
+    },
+    {
+      "id": "AE4V3-17",
+      "title": "Settings 配置与身份治理",
+      "area": "settings + shared config",
+      "depends_on": [
+        "AE4V3-07",
+        "AE4V3-10",
+        "AE4V3-15"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentRuntimeSettings.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelConfigContract.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/settings/LocalHarnessSettingsCoordinator.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/settings/LocalHarnessSettingsCoordinatorTest.kt"
+      ],
+      "tests_verified": [
+        "local :app:compileDebugKotlin",
+        "local LocalHarnessSettingsCoordinatorTest including shared editor atomicity",
+        "local 7-module JVM suite (pending current run)",
+        "local architecture/performance/test-quality/Kotlin-risk/CI-integrity static gates"
+      ],
+      "notes": "2026-10-17：启动 Settings 配置与身份治理。Agent 与 Model 的执行配置各自暴露 prepare（先验证与归一化）和 stage（写入本领域键）合同；Settings 的 runtime limits + model attempts 在单一 SharedPreferences 编辑事务中应用，并在验证成功后更新运行投影，避免 Model workerProfile 身份失效时仅 Agent 设置写入一半。保留既有独立 Settings API 和非阻塞 apply 语义。新增 Mock SharedPreferences 断言单一 edit/apply、三个字段一起提交和 UI 投影归一化。App Kotlin 编译与定向测试和静态门禁通过；完整配置身份迁移、跨进程持久一致性和提交 SHA CI 尚未验收，整项 in_progress。"
+    },
+    {
+      "id": "AE4V3-18",
+      "title": "Usage/Event/Diagnostics",
+      "area": "usage, session and diagnostics",
+      "depends_on": [
+        "AE4V3-05",
+        "AE4V3-07",
+        "AE4V3-09",
+        "AE4V3-16"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/local/usage/UsageArithmetic.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/TokenUsageAnalyticsTest.kt"
+      ],
+      "tests_verified": [
+        "local App compileDebugKotlin",
+        "local TokenUsageAnalyticsTest cache accounting regression",
+        "local 7-module JVM: 3167 passed, 0 failures",
+        "local architecture/performance/test-quality/Kotlin-risk/CI-integrity static checks"
+      ],
+      "notes": "2026-10-17：启动 Usage/Event/Diagnostics 领域重构。TokenUsageRecord 归一化将缓存命中、未命中、缓存写入严格限制于实际输入 Token 子集；DeepSeekTokenUsage 对异常显式 miss 同样按剩余 prompt 上限裁剪，避免错误 Provider 数值夸大模型/会话累计用量与计费分项，缺省 miss 仍按原有逻辑推算。新增异常缓存数值与正常分区正反回归。App Kotlin 编译、七模块 3167 项 JVM 测试 0 失败及 5 项静态门禁通过；全链路 Usage 持久迁移、事件诊断与最新 SHA CI 尚未验收，整项 in_progress。"
+    },
+    {
+      "id": "AE4V3-19",
+      "title": "Files/Git/Shell/Process",
+      "area": "harness-runtime-android and platform tools",
+      "depends_on": [
+        "AE4V3-09",
+        "AE4V3-15"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/ProcessRuntime.kt",
+        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/ProcessRuntimeTest.kt"
+      ],
+      "tests_verified": [
+        "local harness-runtime-android compileKotlin + ProcessRuntimeTest",
+        "local App compileDebugKotlin",
+        "local 7-module JVM: 3168 passed, 0 failed",
+        "local 5 static gates"
+      ],
+      "notes": "2026-10-17：启动 Files/Git/Shell/Process 重构；ProcessRuntime 可用性与命令解析只接受普通可执行文件，跳过前置同名目录，避免假可用状态或 ProcessBuilder 启动失败。新增目录/真可执行文件/绝对路径正反测试。App Kotlin 编译、七模块 3168 JVM 测试(0失败)和五项静态门禁通过；整个 Files/Git/Shell/Process 沙箱与跨进程执行合同、提交 SHA CI 仍待验收，整项 in_progress。"
+    },
+    {
+      "id": "AE4V3-20",
+      "title": "MCP/LSP/Network/Device",
+      "area": "harness-interop, harness-device-android",
+      "depends_on": [
+        "AE4V3-09",
+        "AE4V3-15",
+        "AE4V3-19"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpLegacyTransports.kt",
+        "harness-interop/src/test/kotlin/com/labteto/dshmobile/interop/mcp/McpProtocolBoundaryTest.kt",
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt",
+        "harness-interop/src/test/kotlin/com/labteto/dshmobile/interop/lsp/LspFramingTest.kt",
+        "harness-interop/src/test/kotlin/com/labteto/dshmobile/interop/lsp/LspPluginTest.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/VirtualDisplayOwnership.kt",
+        "harness-device-android/src/test/java/com/labteto/dshmobile/device/VirtualDisplayOwnershipTest.kt"
+      ],
+      "tests_verified": [
+        "local :harness-interop:test (69 tests, 0 failures)",
+        "local :harness-core:test (268 tests, 0 failures)",
+        "local :reference-validation:test (5 tests, 0 failures)",
+        "local 7 static architecture/performance/security/CI/quality/Kotlin/UI boundary checks",
+        "local :harness-interop:test after LSP integrity fix (70 tests, 0 failures)",
+        "local seven static architecture/security/performance/CI/UI/Kotlin/test-quality checks after LSP fix",
+        "local :harness-device-android:compileDebugKotlin + testDebugUnitTest (success)",
+        "local :app:compileDebugKotlin + :harness-core:test + :harness-interop:test + :reference-validation:test (success, snapshot baseline)",
+        "local seven architecture/performance/security/quality/Kotlin/UI/CI boundary checks (success)"
+      ],
+      "notes": "2026-10-17：MCP HTTP 与 stdio 首次协议协商改由只读 tools/list 选定传输，工具调用 tools/call 仅在传输版本确定后发出一次，禁止 404/不兼容等错误造成跨协议双次远端写入。新增现代 HTTP 错误与旧协议回退各 1 个正反回归；基线 470f2cf harness-interop 69、harness-core 268、reference-validation 5 项 JVM 测试全部通过，0 失败；7 类静态门禁通过。App Kotlin 编译另被 V6StandaloneDebugActivity 的 ProvideUiHostSystemOperationOwner 未解析阻断，尚未验收全应用编译、跨进程 Device/LSP 生命周期或提交 SHA CI。整体仍 in_progress。 2026-10-17：LSP 客户端只允许已注册 pendingReplies 的 JSON-RPC 请求 ID 结算，拒绝缓存未发送请求的无主/提前回复；防止恶意语言服务器用预测 ID 伪造下次请求结果。3 个旧夹具改为真实收到 request 后才回复，保留原行为覆盖；新增先发送伪造 id=2、再回复真实 id=1/id=2 的进程级攻防回归。harness-interop 70 项 JVM 测试 0 失败，七项静态门禁通过；App Debug 编译独立 UI Host 未解析缺口仍待合并修复与该 SHA CI 验收。 2026-10-17：AndroidDeviceProvider 的虚拟屏 Device 访问引入与真实 display id 绑定的 Tool/Agent 所有权隔离；Tool 的 list/status/launch/tap/swipe/screenshot/close 均不可访问 Agent 专用显示，Agent release 不可销毁工具显示。创建、关闭和 Provider 清理时同步释放所有权与租约，失败回滚关闭已经创建的显示。新增非法跨域访问、伪造 ID、错误释放和 ID 复用正反单测；本地 Device Kotlin 编译与测试、App Kotlin 编译及多模块 JVM/7 静态门禁成功；跨进程完全接管与 PR SHA CI 未验收。"
+    },
+    {
+      "id": "AE4V3-21",
+      "title": "705 V6 Port 与 Chat 保护适配",
+      "area": "app/local/* ports, no Chat business rewrite",
+      "depends_on": [
+        "AE4V3-12",
+        "AE4V3-14",
+        "AE4V3-16",
+        "AE4V3-17",
+        "AE4V3-18",
+        "AE4V3-20"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiDocumentTransfer.kt",
+        "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiWorkspaceExporter.kt",
+        "app/src/test/java/com/labteto/dshmobile/ui/host/UiHostDocumentOperationGateTest.kt"
+      ],
+      "tests_verified": [
+        "local :ui-host:compileDebugKotlin :app:compileDebugKotlin :app:testDebugUnitTest --tests UiHostDocumentOperationGateTest (exit=0)",
+        "local seven architecture/performance/CI/security/test-quality/UI/Kotlin static gates (success)"
+      ],
+      "notes": "2026-10-17：启动 V6 Port/Chat 保护适配：Host Document Import/Save/Workspace Export 的 Compose 页面销毁时同时 cancelSelection 并释放 Host 系统操作租约，旧 ActivityResult 回调不能继续拿到被销毁场景的文件请求；READING/TRANSFERRING 仍由原协程 finally 关闭，避免提前释放活跃 IO 的全局租约。新增跨 Feature 租约移交与旧请求失效正反回归，V6 Host 和 App Kotlin 编译、定向 JVM 与 7 类静态检查通过。Chat 保护全域及 PR 提交 SHA CI 尚未验收，整项 in_progress。"
+    },
+    {
+      "id": "AE4V3-22",
+      "title": "历史迁移/异常恢复",
+      "area": "storage/codecs/recovery",
+      "depends_on": [
+        "AE4V3-05",
+        "AE4V3-12",
+        "AE4V3-16",
+        "AE4V3-21"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/local/jobs/LocalPersistentJobStore.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalJobManagerTest.kt"
+      ],
+      "tests_verified": [
+        "local :app:compileDebugKotlin and LocalJobManagerTest with 2 new negative corruption cases (success)",
+        "local 7-module JVM suite: 3221 tests, 0 failures",
+        "local 7 architecture/performance/security/quality/Kotlin/UI/CI static gates (success)"
+      ],
+      "notes": "2026-10-17：启动历史迁移与异常恢复。LocalPersistentJobStore 解析合法 JSON 快照时不再 mapNotNull 静默忽略缺 id/label/status 的任务，改为严格校验必需身份及去重 id；损坏主文件触发已存在的上代有效快照恢复/隔离留痕，无可用备份则显式拒绝读写、保留原始损坏文件，防止任务记录不可察觉地永久消失或旧 ID 覆盖。新增不完整记录从有效备份恢复、重复 ID 无备份时失败关闭且拒绝盲写的正反回归；本地 App Kotlin 编译、七模块 3221 项 JVM 全量 0 失败和 7 类静态门禁通过，提交 SHA CI 与历史大规模迁移尚待验收。"
+    },
+    {
+      "id": "AE4V3-23",
+      "title": "旧路径/重复机制退场",
+      "area": "production DI, feature index, obsolete docs",
+      "depends_on": [
+        "AE4V3-21",
+        "AE4V3-22"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalRuntimeBootstrapComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalLegacySessionMigration.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/session/LocalLegacySessionMigrationTest.kt"
+      ],
+      "tests_verified": [
+        "local :app:compileDebugKotlin and :app:testDebugUnitTest --tests LocalLegacySessionMigrationTest (3 passed)",
+        "local 7-module JVM suite 3224 tests, 0 failures, no APK build",
+        "local 7 static architecture/performance/quality/Kotlin/CI/UI/Android security gates"
+      ],
+      "notes": "2026-10-17：开始旧路径/重复机制清退。删除 LocalRuntimeBootstrapComposition 中直接 copyTo 的旧会话双文件迁移逻辑，Session 存储域统一持有 LocalLegacySessionMigration，采用进程间 FileLock、持久唯一迁移 owner 标记与同目录 staging+atomic move，固定旧历史所属 Session。中断后只补齐同一目标缺失文件，不覆盖已有 canonical Session，切换当前会话不可重复复制旧私有历史；旧文件 JSON 无效或越界 id 则失败关闭并保留原数据。新增 3 项 Owner/重启续迁/错误输入回归；本地 Kotlin 编译和七模块 3224 JVM 全量 0 失败，7 静态门禁通过。原 Legacy Shell 与 MCP 旧协议仍有活跃兼容调用者不可删除；完整 AE4V3-21/22/23 依赖验收和本 SHA CI 未完成。"
+    },
+    {
+      "id": "AE4V3-24",
+      "title": "最终自动化任务/CI闭环",
+      "area": "unit/contract/architecture/build and adversarial cases",
+      "depends_on": [
+        "AE4V3-23"
+      ],
+      "status": "in_progress",
+      "code_evidence": [
+        ".github/scripts/classify-ci-scope.py",
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-v3-refactor-ledger.py"
+      ],
+      "tests_verified": [
+        "local .github/scripts/check-v3-refactor-ledger.py --self-test and normal (exit 0)",
+        "local .github/scripts/classify-ci-scope.py --self-test (exit 0)",
+        "local .github/scripts/check-ci-repository-integrity.py (exit 0)"
+      ],
+      "notes": "2026-10-17：启动最终自动化验收门禁。新增 check-v3-refactor-ledger.py 验证24个唯一有序任务ID、依赖拓扑、可追溯文件路径、完成态先决工作包和证据要求；AE4V3-24 不得在任何上游未完成、最终 SHA/CI 结论未记录时标记完成。CI static-gates 实际执行正反例自测及权威台账检查，classify-ci-scope 将该台账从纯文档豁免改为至少静态检查，且新增分类回归。完整源码/设备/当前提交 SHA CI 与外部验收仍需后续闭环；不可将本次静态一致性门禁替代功能验收。"
+    }
+  ],
+  "first_verified_fix": {
+    "component": "HarnessWorkflowRunner",
+    "reason": "blank/over-capacity work was silently dropped",
+    "behavior": "atomic rejection before execution; all valid admitted work retained; bounded concurrency unchanged",
+    "pr_head_before_commit": "cd0dbc0604996cf0b64fee8fd5a484dbbed42b85"
+  },
+  "status": "first incremental implementation, not entire refactor",
+  "current_slice": {
+    "date": "2026-10-17",
+    "component": "Work Goal 验收、版本续轮与中断工具结算闭环",
+    "previous_head": "799bfb00704ac130c887dbc4f7970989193d279f",
+    "status": "code_implemented_static_verified",
+    "code_evidence": [
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalDriver.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt",
+      "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalDriverTest.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTurnSettlement.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolInvocationContext.kt"
+    ],
+    "tests_verified": [
+      "architecture/performance gates and self-tests",
+      "test-quality/risk/security/CI-integrity static checks; Kotlin tests not executed"
+    ]
+  }
+}

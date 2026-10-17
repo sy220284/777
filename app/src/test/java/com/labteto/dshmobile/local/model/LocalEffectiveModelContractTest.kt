@@ -102,6 +102,10 @@ class LocalEffectiveModelContractTest {
         assertNotEquals(planContract.routeFingerprint, apiContract.routeFingerprint)
         assertTrue(planContract.runtime.promptCacheDiagnostics)
         assertFalse(apiContract.runtime.promptCacheDiagnostics)
+        assertEquals(LocalEffectiveCapabilityStatus.UNKNOWN, planContract.toolCalling.status)
+        assertEquals("subscription-sharing-tools-require-account-verification", planContract.toolCalling.source)
+        // Protocol schema support is distinct from the actual subscription's authorization.
+        assertTrue(planContract.runtime.toolCalling)
         assertEquals(
             LocalReasoningRequestPolicy.resolve(plan),
             planContract.reasoning,

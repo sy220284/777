@@ -36,6 +36,10 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.Calendar
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executor
+import kotlin.coroutines.EmptyCoroutineContext
+import kotlinx.coroutines.Dispatchers
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.random.Random
@@ -402,13 +406,44 @@ class HarnessAutomationScheduler @Inject constructor(
             )
             .addTag(WORK_TAG)
             .build()
-        return store.withCurrentGeneration(id, task.scheduleGeneration) {
+        // Submit and persist under the SAME AutomationStore monitor. Two callers can
+        // no longer reorder claim(A)/enqueue(A) with claim(B)/enqueue(B).
+        val claimId = request.id.toString()
+        val operation = store.claimAndSubmitManualRun(id, task.scheduleGeneration, claimId) {
             workManager.enqueueUniqueWork(
                 manualWorkName(id, task.scheduleGeneration),
                 ExistingWorkPolicy.REPLACE,
                 request,
             )
-        }
+        } ?: return false
+        // enqueueUniqueWork returns immediately, before the WorkManager database
+        // transaction finishes. A synchronous try/catch cannot observe an async
+        // rejection. Compensate the exact failed claim without erasing a successor.
+        operation.result.addListener({
+            val failure = try {
+                operation.result.get()
+                null
+            } catch (error: ExecutionException) {
+                error.cause ?: error
+            } catch (error: InterruptedException) {
+                Thread.currentThread().interrupt()
+                error
+            } catch (error: Exception) {
+                error
+            }
+            if (failure != null) {
+                store.compensateManualEnqueueFailure(
+                    id, task.scheduleGeneration, claimId,
+                    "手动任务提交失败：${failure.javaClass.simpleName}",
+                )
+                com.labteto.dshmobile.observability.AppLog.failure(
+                    "AutomationScheduler", "enqueue_manual", failure,
+                )
+            }
+        }, Executor { runnable -> Dispatchers.IO.dispatch(EmptyCoroutineContext, runnable) })
+        // This means the enqueue request was accepted locally, not that an async
+        // WorkManager transaction or user task execution has already succeeded.
+        return true
     }
 
     fun updateTask(
@@ -428,8 +463,10 @@ class HarnessAutomationScheduler @Inject constructor(
         proactiveMinGapMinutes: Long = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
         proactiveMaxUnanswered: Int = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MAX_UNANSWERED,
         notify: Boolean? = null,
+        expectedGeneration: Long? = null,
     ): Boolean {
         val current = store.get(id) ?: return false
+        if (expectedGeneration != null && current.scheduleGeneration != expectedGeneration) return false
         require(prompt.isNotBlank()) { "任务提示词不能为空" }
         validateChatPolicy(
             mode = current.mode,
@@ -542,8 +579,10 @@ class HarnessAutomationScheduler @Inject constructor(
         proactiveMinGapMinutes: Long,
         proactiveMaxUnanswered: Int,
         notify: Boolean,
+        expectedGeneration: Long? = null,
     ): Boolean {
         val current = store.get(id) ?: return false
+        if (expectedGeneration != null && current.scheduleGeneration != expectedGeneration) return false
         require(current.mode == AutomationMode.CHAT) { "互动策略仅支持聊天模式" }
         validateChatPolicy(
             mode = current.mode,

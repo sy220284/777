@@ -14,8 +14,9 @@ import java.io.IOException
 internal fun canRetryModelAttemptAfterOutput(
     error: Exception,
     streamedChars: Int,
+    reasoningObserved: Boolean = false,
 ): Boolean {
-    if (streamedChars > 0) return false
+    if (streamedChars > 0 || reasoningObserved) return false
     return when (error) {
         is LocalModelException -> error.retryable && when (error.admissionState) {
             LocalModelAdmissionState.NOT_SENT,

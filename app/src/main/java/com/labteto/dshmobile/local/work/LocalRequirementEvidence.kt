@@ -9,19 +9,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.longOrNull
 
-/** User-selected evidence reference. The link by itself does not assert a test or task passed. */
-internal data class LocalRequirementEvidenceLink(
-    val requirementIndex: Int,
-    val requirement: String,
-    val artifactPath: String,
-    val artifactSequence: Long,
-    val sourceCallId: String,
-    val versionAtLink: String,
-    val eventSequence: Long,
-    /** SHA-256 of the actual current file, null when unreadable or removed. */
-    val versionNow: String? = null,
-)
-
 internal fun projectRequirementEvidenceLinks(
     events: List<LocalSessionEventLog.Event>,
     todos: List<LocalTodoItem>,
@@ -37,7 +24,9 @@ internal fun projectRequirementEvidenceLinks(
         if (event.type != "work/requirement-evidence") return@forEach
         val data = event.data
         val savedGoal = (data["goal_id"] as? JsonPrimitive)?.contentOrNull
-        if (savedGoal != null && savedGoal != goalId) return@forEach
+        // Legacy unscoped references are readable only while there is no active goal.
+        // Reusing an identical task title in another goal must never inherit evidence.
+        if (savedGoal != goalId) return@forEach
         val index = (data["requirement_index"] as? JsonPrimitive)?.intOrNull ?: return@forEach
         val text = (data["requirement"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
         val path = (data["artifact_path"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
@@ -52,6 +41,65 @@ internal fun projectRequirementEvidenceLinks(
         )
     }
     return linked.values.toList().sortedBy(LocalRequirementEvidenceLink::requirementIndex)
+}
+
+/** Reviews bind to one exact current link/goal/version. Replacing a link invalidates old reviews. */
+internal fun projectRequirementEvidenceReviews(
+    events: Sequence<LocalSessionEventLog.Event>,
+    links: List<LocalRequirementEvidenceLink>,
+    goalId: String?,
+): List<LocalRequirementEvidenceReview> {
+    val current = links.associateBy { it.eventSequence }
+    val reviews = linkedMapOf<Long, LocalRequirementEvidenceReview>()
+    events.forEach { event ->
+        if (event.type != "work/requirement-evidence-review") return@forEach
+        val data = event.data
+        val savedGoal = (data["goal_id"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
+        if (savedGoal != goalId) return@forEach
+        val linkSequence = (data["link_sequence"] as? JsonPrimitive)?.longOrNull ?: return@forEach
+        val link = current[linkSequence] ?: return@forEach
+        val index = (data["requirement_index"] as? JsonPrimitive)?.intOrNull ?: return@forEach
+        val text = (data["requirement"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
+        val path = (data["artifact_path"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
+        val version = (data["sha256"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
+        val decision = (data["approved_by_user"] as? JsonPrimitive)?.contentOrNull
+        if (index != link.requirementIndex || text != link.requirement ||
+            path != link.artifactPath || version != link.versionAtLink ||
+            event.sequence <= linkSequence || decision !in setOf("true", "false")) return@forEach
+        reviews[linkSequence] = LocalRequirementEvidenceReview(
+            index, text, path, linkSequence, version, event.sequence, decision == "true",
+        )
+    }
+    return reviews.values.sortedBy(LocalRequirementEvidenceReview::requirementIndex)
+}
+
+/** Latest exact-link literal assertion, never an overall Work task completion claim. */
+internal fun projectRequirementEvidenceTextChecks(
+    events: Sequence<LocalSessionEventLog.Event>,
+    links: List<LocalRequirementEvidenceLink>,
+    goalId: String?,
+): List<LocalRequirementEvidenceTextCheck> {
+    val current = links.associateBy { it.eventSequence }
+    val latest = linkedMapOf<Long, LocalRequirementEvidenceTextCheck>()
+    events.forEach { event ->
+        if (event.type != "work/requirement-evidence-text-check") return@forEach
+        val data = event.data
+        if ((data["goal_id"] as? JsonPrimitive)?.contentOrNull != goalId) return@forEach
+        val linkId = (data["link_sequence"] as? JsonPrimitive)?.longOrNull ?: return@forEach
+        val link = current[linkId] ?: return@forEach
+        val index = (data["requirement_index"] as? JsonPrimitive)?.intOrNull ?: return@forEach
+        val path = (data["artifact_path"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
+        val version = (data["sha256"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
+        val needleHash = (data["condition_sha256"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
+        val matched = (data["contains_required_text"] as? JsonPrimitive)?.contentOrNull
+        if (event.sequence <= linkId || index != link.requirementIndex ||
+            path != link.artifactPath || version != link.versionAtLink ||
+            !needleHash.matches(Regex("[a-f0-9]{64}")) || matched !in setOf("true", "false"))
+            return@forEach
+        latest[linkId] = LocalRequirementEvidenceTextCheck(
+            index, path, linkId, version, event.sequence, needleHash, matched == "true")
+    }
+    return latest.values.sortedBy(LocalRequirementEvidenceTextCheck::requirementIndex)
 }
 
 /** Exact selected source event; no fuzzy matching by filename or task wording. */
@@ -79,6 +127,16 @@ internal fun selectedRequirementEvidenceVersion(
     return localWorkFileSha256(workspaceRoot, selected.reference)
         ?.takeIf { it == displayedVersion }
 }
+
+/**
+ * Recheck the exact selected bytes immediately before committing the reference. Preparation may
+ * perform expensive hashing outside the foreground lock, during which the workspace can change.
+ * This is a rejection gate, not a declaration that a requirement has passed verification.
+ */
+internal fun preparedRequirementEvidenceVersionMatches(
+    workspaceRoot: File, artifactPath: String, preparedVersion: String,
+): Boolean = preparedVersion.matches(Regex("[a-f0-9]{64}")) &&
+    localWorkFileSha256(workspaceRoot, artifactPath) == preparedVersion
 
 /** Check exact file bytes; historic evidence may be absent from the recent artifact window. */
 internal fun checkRequirementEvidenceVersions(

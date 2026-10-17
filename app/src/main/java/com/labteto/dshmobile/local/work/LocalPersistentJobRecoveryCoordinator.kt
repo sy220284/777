@@ -64,6 +64,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
 ) {
     private val lock = Any()
     private val pendingRecoverySessions = linkedSetOf<String>()
+    private val rootAdmittedSessions = linkedSetOf<String>()
     private var recoveryJob: Job? = null
 
     suspend fun startReadonlySubagent(
@@ -226,19 +227,25 @@ internal class LocalPersistentJobRecoveryCoordinator(
         return result
     }
 
-    fun schedule(sessionId: String = currentSessionId()) {
+    fun schedule(
+        sessionId: String = currentSessionId(),
+        rootSliceAdmitted: Boolean = false,
+    ) {
         val targetSession = sessionId.trim()
         if (targetSession.isEmpty()) return
         synchronized(lock) {
             pendingRecoverySessions += targetSession
+            if (rootSliceAdmitted) rootAdmittedSessions += targetSession
             if (recoveryJob?.isActive == true) return
             recoveryJob = scope.launch {
                 try {
                     while (true) {
-                        val nextSession = synchronized(lock) {
-                            pendingRecoverySessions.firstOrNull()?.also { pendingRecoverySessions.remove(it) }
+                        val next = synchronized(lock) {
+                            val session = pendingRecoverySessions.firstOrNull()
+                                ?.also { pendingRecoverySessions.remove(it) }
+                            session?.let { it to rootAdmittedSessions.remove(it) }
                         } ?: break
-                        resumePass(nextSession)
+                        resumePass(next.first, resumeSlicePaused = next.second)
                     }
                 } finally {
                     val completed = currentCoroutineContext()[Job]
@@ -255,8 +262,10 @@ internal class LocalPersistentJobRecoveryCoordinator(
         }
     }
 
-    private fun resumePass(targetSession: String) {
+    private fun resumePass(targetSession: String, resumeSlicePaused: Boolean = false) {
         jobs.resumableSnapshots().forEach { snapshot ->
+            // Startup/UI rehydration cannot grant new model request slots.
+            if (!canResumeSubagentAtRootSlice(snapshot.status, resumeSlicePaused)) return@forEach
             val payload = decodePayload(snapshot, targetSession) ?: return@forEach
             val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull ?: targetSession
             if (sessionId != targetSession || jobs.availableSlots() <= 0) return@forEach
@@ -365,8 +374,14 @@ internal class LocalPersistentJobRecoveryCoordinator(
         ) {
             return
         }
-        // 可写代理已经产生的副作用不能跨进程无条件重放；恢复前交由 Lead 核验并重派。
-        if (capabilities.teamManaged && capabilities.allowMutation) {
+        // Crash interruption can leave a writable side effect unresolved: require the Lead
+        // to inspect it before reassigning work. A typed local request-slice boundary is
+        // reached before provider admission, after the last completed tool checkpoint.
+        // The latter resumes only with a newly admitted root Work slice.
+        if (requiresLeadVerificationForSubagentResume(
+                capabilities.teamManaged, capabilities.allowMutation, snapshot.status,
+            )
+        ) {
             jobs.failResumable(
                 snapshot.id,
                 "可写团队成员在应用中断后停止自动续跑；请由主代理先核验文件和任务状态，再重新分配。",

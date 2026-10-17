@@ -52,6 +52,30 @@ class PluginManager(
 
     suspend fun uninstall(id: String): Boolean = disable(id)
 
+    /**
+     * User-approved recovery of a failed, reloadable plugin only. Any incomplete cleanup is
+     * retried by PluginRegistry; on failure its state remains FAILED and no stale tools are
+     * re-admitted. Never replay an Agent tool call or silently recover a healthy plugin.
+     */
+    suspend fun recoverFailed(id: String): List<String> = mutationMutex.withLock {
+        require(registry.lifecycleSnapshot(id)?.state == PluginLifecycleState.FAILED) {
+            "插件未处于失败态：$id"
+        }
+        require(activeDependents(id).isEmpty()) {
+            "插件仍被其他已启用插件依赖，禁止直接恢复：$id"
+        }
+        // A failed replacement can still own old resources; explicitly remove them first.
+        // A failed installation has no installed instance and can proceed to a new install.
+        if (registry.isInstalled(id)) registry.uninstall(id)
+        // Failed installation may leave externally-owned resources after an unsuccessful
+        // compensating uninstall. Retrying that cleanup is mandatory before fresh admission.
+        else registry.cleanupFailed(id)
+        val plan = catalog.resolveInstallOrder(listOf(id), installedVersions(), apiVersion)
+        val plugins = plan.map(PluginDefinition::create)
+        registry.installAll(plugins)
+        plugins.map(HarnessPlugin::id)
+    }
+
     suspend fun replace(definition: PluginDefinition) = mutationMutex.withLock {
         val replacement = definition.descriptor
         require(replacement.apiVersion == apiVersion) {
@@ -93,12 +117,24 @@ class PluginManager(
         catalog.register(definition, replace = true)
     }
 
-    /** UI management calls resolve the current instance and cannot overlap lifecycle mutation. */
+    /** UI management commands hold the mutation lock until their remote work finishes. */
     suspend fun <T> withActivePlugin(id: String, block: suspend (HarnessPlugin, HarnessContext) -> T): T =
         mutationMutex.withLock {
             val plugin = registry.activePlugin(id) ?: error("插件未启用或运行态异常：$id")
             block(plugin, registry.context)
         }
+
+    /**
+     * Read-only observation of an active plugin's snapshot without queueing behind remote commands.
+     * This is not a lease or authorization: callers must not execute plugin commands through it.
+     * A concurrent disable/replacement invalidates the result rather than displaying a stale instance.
+     */
+    suspend fun <T> observeActivePlugin(id: String, read: suspend (HarnessPlugin) -> T): T {
+        val plugin = registry.activePlugin(id) ?: error("插件未启用或运行态异常：$id")
+        val snapshot = read(plugin)
+        check(registry.activePlugin(id) === plugin) { "插件状态已变化，请重新读取：$id" }
+        return snapshot
+    }
 
     fun installedPluginIds(): List<String> = registry.ids()
 

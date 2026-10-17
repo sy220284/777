@@ -144,6 +144,10 @@ internal class LocalSubagentRunnerFactory(
                 maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(model, baseUrl),
                 model = model,
                 baseUrl = baseUrl,
+                planSharing = runnerState.value.modelState.modelSelection.activeProfile?.let {
+                    it.authKind == com.labteto.dshmobile.local.model.LocalModelAuthKind.CHATGPT_PLAN &&
+                        it.model == model && it.baseUrl.trimEnd('/') == baseUrl.trimEnd('/')
+                } == true,
             )
         },
         resolveImageMode = { mode, baseUrl, model -> resolveLocalImageInputMode(mode, imageCapabilities, baseUrl, model) },

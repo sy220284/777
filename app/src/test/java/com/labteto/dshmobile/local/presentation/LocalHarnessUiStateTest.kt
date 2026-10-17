@@ -137,9 +137,20 @@ class LocalHarnessUiStateTest {
         val workOnlyUpdate = base.copy(
             work = LocalWorkState(planMode = true),
             safeAutoApprovalEnabled = true,
-            kernel = base.kernel.copy(contextChars = 48_000, queuedInputCount = 4),
+            kernel = base.kernel.copy(contextChars = 48_000),
         )
         assertEquals(base.toChatSurfaceUiState(), workOnlyUpdate.toChatSurfaceUiState())
+    }
+
+    @Test
+    fun chatAndGroupSurfacesTrackSharedQueueAndClearItOnSessionTransition() {
+        val base = LocalHarnessState(usageMode = LocalUsageMode.CHAT)
+        val queued = base.copy(kernel = base.kernel.copy(running = true, queuedInputCount = 2))
+        assertEquals(2, queued.toChatSurfaceUiState().queuedInputCount)
+        val group = queued.copy(chat = queued.chat.copy(groupChat = queued.chat.groupChat.copy(mode = com.labteto.dshmobile.local.chat.LocalChatMode.GROUP)))
+        assertEquals(2, group.toChatSurfaceUiState().queuedInputCount)
+        assertEquals(0, base.toChatSurfaceUiState().queuedInputCount)
+        assertEquals(2, queued.toWorkSurfaceUiState().queuedInputCount)
     }
 
     @Test

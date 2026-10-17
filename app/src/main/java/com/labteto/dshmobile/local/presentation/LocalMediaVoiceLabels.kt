@@ -3,6 +3,9 @@ package com.labteto.dshmobile.local.presentation
 import com.labteto.dshmobile.local.model.LocalMediaOffer
 import com.labteto.dshmobile.local.model.LocalMediaProvider
 
+/** Main's UI label helper consumes the neutral media value now owned by ui-contract. */
+typealias LocalMediaVoice = com.labteto.dshmobile.local.model.LocalMediaVoice
+
 /** Technical voice IDs remain unchanged for provider calls; all public labels are Chinese. */
 internal object LocalMediaVoiceLabels {
     private val miniMax = mapOf(

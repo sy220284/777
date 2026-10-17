@@ -14,6 +14,7 @@ import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.local.presentation.ChatGptSettingsController
 import com.labteto.dshmobile.notify.DshNotifications
 import com.labteto.dshmobile.ui.AppRoot
+import com.labteto.dshmobile.ui.host.LocalApplicationSceneDeepLinks
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -26,6 +27,7 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var notifications: DshNotifications
 
     private val requestedLocalSession = mutableStateOf<String?>(null)
+    private val requestedExternalScene = mutableStateOf<String?>(null)
     private var appliedApplicationNightMode: Int? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -36,6 +38,9 @@ class MainActivity : AppCompatActivity() {
             DshApplication.applicationNightModeFor(storedTheme, uiModeManager.nightMode)
         requestedLocalSession.value = savedInstanceState?.getString("pending_local_session")
             ?: notificationLocalSession(intent)
+        // A saved null means the previous VIEW request was consumed; do not replay it.
+        requestedExternalScene.value = if (savedInstanceState?.containsKey("pending_ui_scene") == true)
+            savedInstanceState.getString("pending_ui_scene") else externalSceneFromIntent(intent)
         applyWindowBackground(storedTheme)
         enableEdgeToEdge()
         notifications.ensureChannels()
@@ -51,6 +56,11 @@ class MainActivity : AppCompatActivity() {
         setContent {
             AppRoot(
                 requestedLocalSessionId = requestedLocalSession.value,
+                requestedExternalSceneKey = requestedExternalScene.value,
+                onExternalSceneRequestConsumed = {
+                    requestedExternalScene.value = null
+                    intent.data = null
+                },
                 onLocalSessionRequestConsumed = {
                     requestedLocalSession.value = null
                     intent.removeExtra(DshNotifications.EXTRA_LOCAL_SESSION_ID)
@@ -70,14 +80,21 @@ class MainActivity : AppCompatActivity() {
         intent.getStringExtra(DshNotifications.EXTRA_LOCAL_SESSION_ID)
             ?.takeIf { it.isNotBlank() && it.length <= 256 && it.none(Char::isISOControl) }
 
+    private fun externalSceneFromIntent(intent: Intent): String? =
+        if (intent.action == Intent.ACTION_VIEW)
+            LocalApplicationSceneDeepLinks.fromExternalUri(intent.dataString)
+        else null
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         requestedLocalSession.value = notificationLocalSession(intent)
+        requestedExternalScene.value = externalSceneFromIntent(intent)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("pending_local_session", requestedLocalSession.value)
+        outState.putString("pending_ui_scene", requestedExternalScene.value)
         super.onSaveInstanceState(outState)
     }
 

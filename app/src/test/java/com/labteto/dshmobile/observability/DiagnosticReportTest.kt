@@ -7,6 +7,24 @@ import org.junit.Test
 
 class DiagnosticReportTest {
     @Test
+    fun persistedStackFramesSurviveNewFormatAndOlderEventsRemainReadable() {
+        val frame = "androidx.compose.ui.node.NodeCoordinator#findCommonAncestor(NodeCoordinator.kt:123)"
+        val diagnostic = AppLogEntry(
+            timestampMillis = 1234L,
+            level = "E",
+            tag = "UncaughtException",
+            message = "operation=uncaught_exception",
+            throwableType = "IllegalArgumentException",
+            throwableFrames = frame,
+        )
+        val encoded = AppLog.encodeEntry(diagnostic)
+        assertEquals(frame, AppLog.decodeEntry(encoded)?.throwableFrames)
+        assertEquals(null, AppLog.decodeEntry(encoded.substringBeforeLast("\t"))?.throwableFrames)
+        val report = DiagnosticReport.build(listOf(diagnostic), environment = "test", androidApi = 37)
+        assertTrue(report.contains("frames=" + frame))
+    }
+
+    @Test
     fun exportedReportIncludesRedactedLogsAndOmitsPrivateEnvironmentPaths() {
         val report = DiagnosticReport.build(
             entries = listOf(
@@ -99,7 +117,11 @@ class DiagnosticReportTest {
             eventId = "process-123:9")
         val persisted = AppLog.encodeEntry(event)
         assertEquals("process-123:9", AppLog.decodeEntry(persisted)?.eventId)
-        val legacyElevenColumns = persisted.substringBeforeLast('\t')
+        // Version 13 appended sanitized stack frames after the event identity.
+        // Remove both new columns to exercise the historical 11-column format.
+        val legacyTwelveColumns = persisted.substringBeforeLast('\t')
+        assertEquals(event.eventId, AppLog.decodeEntry(legacyTwelveColumns)?.eventId)
+        val legacyElevenColumns = legacyTwelveColumns.substringBeforeLast('\t')
         assertEquals(null, AppLog.decodeEntry(legacyElevenColumns)?.eventId)
         assertEquals(event.message, AppLog.decodeEntry(legacyElevenColumns)?.message)
     }

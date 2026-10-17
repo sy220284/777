@@ -359,15 +359,17 @@ internal class LocalSessionLifecycleCoordinator(
         return true
     }
 
-    suspend fun deleteSessions(requestedIds: Set<String>): Int {
-        if (requestedIds.isEmpty() || !beginTransition()) return 0
+    suspend fun deleteSessions(requestedIds: Set<String>): Int = deleteSessionIds(requestedIds).size
+
+    suspend fun deleteSessionIds(requestedIds: Set<String>): Set<String> {
+        if (requestedIds.isEmpty() || !beginTransition()) return emptySet()
         state.update { it.copy(loading = true) }
         return try {
             transitionMutex.withLock {
                 persist()
                 val available = sessionCoordinator.summaries()
                 val ids = available.map { it.id }.filterTo(linkedSetOf()) { it in requestedIds }
-                if (ids.isEmpty()) return@withLock 0
+                if (ids.isEmpty()) return@withLock emptySet<String>()
                 if (currentSessionId() in ids) {
                     cancelActiveRunAndJoin()
                 }
@@ -451,7 +453,7 @@ internal class LocalSessionLifecycleCoordinator(
                     sessionCoordinator.releaseDeletionBarrier(ids)
                     state.update { it.copy(sessions = sessionSummaries()) }
                     persist()
-                    ids.size
+                    ids.toSet()
                 } finally {
                     deletionLeases.asReversed().forEach(LocalSessionRuntimeLease::close)
                 }

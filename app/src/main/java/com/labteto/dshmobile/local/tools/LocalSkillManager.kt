@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.files.parseLocalSkillMetadata
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import java.io.File
 import java.nio.file.Files
+import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -27,6 +28,7 @@ internal object LocalPresetSkillCatalog {
         "document-summary" to "文档总结、会议纪要和待办提取",
         "research-check" to "资料查询、来源核实和事实查证",
         "code-review" to "代码审查、PR 和回归风险",
+        "imagegen" to "图像生成、图片编辑、参考图及 UI 素材创作",
         "bug-investigation" to "故障排查、日志分析和崩溃定位",
         "data-insights" to "数据统计、报表和趋势分析",
         "translation-localization" to "翻译、术语统一和本地化",
@@ -50,17 +52,37 @@ internal object LocalPresetSkillCatalog {
             执行：读取相关内容并标明读取范围；区分事实、观点与推断；提取日期、数字、结论、决策与责任信息。
             交付：核心结论、重要依据及待办事项；原文未提供的字段标为未指定。
             """.trimIndent()),
-        LocalPresetSkill("research-check", "资料研究与核实", "检索资料、核实主张、对比证据与时效。", """
-            用途：研究问题并检验关键结论是否由可靠证据支持。
-            适用：资料查询、官方文档、产品/技术调查与事实核验。
-            执行：确定问题与时效；优先获取一手材料；对比不同来源的证据与适用条件；标明尚存争议。
-            交付：结论、证据来源及日期、冲突观点和待核查事项。
+        LocalPresetSkill("research-check", "资料研究与核实", "优先核对权威资料，分辨事实、版本与推断。", """
+            用途：核实技术文档、模型和 API 能力、外部事件、规则和可争议事实。
+            执行：
+            1. 明确问题、主体、时间范围与版本；若用户指定模型/账户/平台，不擅自替换。
+            2. 通过 web_search 找到一手权威来源，实际以 web_fetch 阅读正文，不能以摘要代替原文；资料就在工作区时先读本地文件。
+            3. 官方 OpenAI 问题优先开发者文档和帮助中心；其他服务商优先自身官方接口文档，并核对更新日期和适用地域。
+            4. 检查参数名称、接口版本、权限/额度、客户端能力、示例是否仍适用；技术结论须区分“官方支持”和“当前 777 已实现”。
+            5. 交叉复查冲突信息，引用具体页面或文件位置；无法联网、来源不足或未实际验证时明确说明。
+            交付：结论 → 权威证据/日期 → 与当前实现的差异 → 仍需核实的事项；禁止编造来源或把代码静态检查说成实测。
             """.trimIndent()),
-        LocalPresetSkill("code-review", "代码审查", "检查代码正确性、回归风险及实现质量。", """
-            用途：沿业务调用链审查实现并发现有证据支持的问题。
-            适用：代码审查、PR 评审、重构评估、架构和测试覆盖。
-            执行：确定版本基线；沿输入、状态、副作用和异常路径检查；定位缺陷与触发条件；按实际可用条件执行验证。
-            交付：按严重度排序的问题、代码位置、修复建议及验证状态。
+        LocalPresetSkill("code-review", "代码审查", "以真实缺陷和证据为中心审查 PR 与全量代码。", """
+            用途：只读审查 PR、提交、代码模块、架构与回归风险；用户要求修复时再单独执行修改。
+            执行：
+            1. 先核对仓库规范、审查范围和合并目标；PR 使用 merge-base 的真实差异，必要时阅读相关主线行为与调用链。
+            2. 逐项追踪入口、权限、数据流、并发、失败恢复、状态持久化及下游副作用，而非只看改动文本。
+            3. 有可用测试时运行针对性回归；区分复现失败、静态推断、历史主线失败及未执行测试。
+            4. 只报告改动引入且有可验证触发路径的问题；全量审计则明确问题是否先前已存在，不制造无依据的提醒。
+            5. 用 P0（阻断发布）、P1（重要缺陷）、P2（一般缺陷）、P3（低影响问题）分级，给出文件行号、触发条件、影响及具体修复方向。
+            6. 默认只读，不自行修改/提交/合并；若用户要求处理，则在授权能力内修改并再跑相关验证。
+            交付：问题按严重度排序并附证据；无可信缺陷写“未发现确定性问题”，但不能冒充已覆盖全部运行场景。
+            """.trimIndent()),
+        LocalPresetSkill("imagegen", "图片创作", "使用 777 原生多模态能力创建和编辑真实图片。", """
+            用途：生成图片、UI 素材、插画、图标或在已保存原图基础上进行编辑；不是文本提示词生成器。
+            执行：
+            1. 判断新图/原图编辑；明确主体、构图、风格、比例、参考素材及必须不变的细节。
+            2. Work 模式先调用 media_image_options 获取已配置且有 API Key 的图像服务；用户指定服务或账户时严格遵守，不得自动换其他付费路由。
+            3. 只有用户明确要求真实创作且经过原有工具审批，才使用 media_image_create 并传入实际 offer_id；原图编辑必须有当前会话已保存图片 ID，且由该服务商实际支持，不能冒充编辑。
+            4. 工具只返回异步提交回执；通过 media_image_status 核对真实任务状态，再到当前会话媒体成果区确认文件。未成功时绝不能声称图片已生成。
+            5. 长任务不重复提交以免重复扣费；需要批量时按用户授权逐个申请并跟进，避免静默并发收费。
+            6. Chat 模式的 OpenAI 内建图像工具与独立媒体创作界面属于不同路径，按实际可用功能调用，不把一个模式的能力虚报为另一个模式已具备。
+            交付：真实生成图片和可查看位置、实际服务商/模型、任务状态；无法执行时说明缺少哪项能力或权限。
             """.trimIndent()),
         LocalPresetSkill("bug-investigation", "故障定位", "追踪异常根因、提出修复并验证结果。", """
             用途：定位用户可见的错误、崩溃、超时与异常行为。
@@ -153,23 +175,69 @@ internal class LocalSkillStore(
                         '\\' !in relative && relative != "SKILL.md") { "技能资源路径无效" }
                     val path = ".dsh/skills/${preset.id}/$relative"
                     val target = File(workspace.path, path)
-                    if (!target.exists() || target.readText() != text) workspace.write(path, text)
+                    val marker = File(skillsDir, "${preset.id}/.bundled-resource-${rawFingerprint(relative)}")
+                    val existing = runCatching { target.readText() }.getOrNull()
+                    val clean = existing == text || (
+                        marker.isFile && rawFingerprint(existing.orEmpty()) == marker.readText().trim()
+                    )
+                    // Never overwrite an untracked user-edited MOBILE.md, CLI.md or other asset.
+                    if (existing == null || clean) {
+                        if (existing != text) workspace.write(path, text)
+                        marker.writeText(rawFingerprint(text) + "\n")
+                    }
                 }
             }
-            // App-owned instructions are versioned; preserve only the user's invocation toggle.
-            val disabled = runCatching { !workspace.skillMetadata(preset.id).modelInvocable }.getOrDefault(false)
             val baseDocument = buildLocalSkillDocument(
                 preset.id, preset.description, preset.instructions, preset.whenToUse, preset.title,
             )
-            val next = if (disabled) baseDocument.replaceFirst(
-                "\n---\n", "\ndisable-model-invocation: true\n---\n",
-            ) else baseDocument
             val path = ".dsh/skills/${preset.id}/SKILL.md"
-            // A malformed/oversized shipped file should recover to the current official version.
-            if (runCatching { workspace.readSkill(preset.id) }.getOrNull() != next) {
-                workspace.write(path, next)
+            val current = runCatching { workspace.readSkill(preset.id) }.getOrNull()
+            val disabled = runCatching { !workspace.skillMetadata(preset.id).modelInvocable }.getOrDefault(false)
+            val desired = withModelInvocationDisabled(baseDocument, disabled)
+            val baseline = File(skillsDir, "${preset.id}/.bundled-baseline-sha256")
+            val previousBaseline = runCatching { baseline.readText().trim() }.getOrNull()
+            val clean = current != null && (
+                // Known upstream version: upgrade only if the user never edited its content.
+                (previousBaseline != null && skillFingerprint(current) == previousBaseline) ||
+                    // Legacy installation without a baseline: don't erase an unknown user edit.
+                    (previousBaseline == null && current == desired)
+                )
+            val validCustomDocument = current != null &&
+                current.toByteArray(Charsets.UTF_8).size <= 24_000 &&
+                current.lineSequence().firstOrNull()?.trim() == "---" &&
+                parseLocalSkillMetadata(preset.id, current).description.isNotBlank()
+            if (validCustomDocument && !clean && current != desired) {
+                // A valid local override wins over bundled updates, including legacy
+                // installations created before the fingerprint marker existed.
+                continue
             }
+            if (current != null && !clean && current != desired) {
+                val raw = runCatching { File(skillsDir, "${preset.id}/SKILL.md").readText() }.getOrNull()
+                if (raw != null && raw != desired) {
+                    val backup = File(skillsDir, "${preset.id}/SKILL.pre-repair.md")
+                    if (!backup.exists()) backup.writeText(raw)
+                }
+            }
+            if (current != desired) workspace.write(path, desired)
+            baseline.writeText(skillFingerprint(baseDocument) + "\n")
         }
+    }
+
+    private fun withModelInvocationDisabled(document: String, disabled: Boolean): String =
+        if (disabled) document.replaceFirst("\n---\n", "\ndisable-model-invocation: true\n---\n")
+        else document
+
+    private fun rawFingerprint(text: String): String =
+        MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+
+    private fun skillFingerprint(document: String): String {
+        // Invocation is a separate user preference, not a modification of the rule body.
+        val canonical = document.replace(
+            Regex("(?m)^disable-model-invocation: (?:true|false)\\r?\\n"), "",
+        )
+        return MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
     }
 
     /** First launch only: users removing a bundled skill must not see it reappear on restart. */
@@ -179,6 +247,11 @@ internal class LocalSkillStore(
                 if (!workspace.skills().contains(preset.id)) install(preset.id)
             }
             workspace.write(".dsh/skills/.preset-seed-v1", "seeded\n")
+        }
+        // Newly bundled image workflow is added once without restoring later user deletions.
+        if (!File(skillsDir, ".imagegen-seed-v1").exists()) {
+            if (!workspace.skills().contains("imagegen")) install("imagegen")
+            workspace.write(".dsh/skills/.imagegen-seed-v1", "seeded\n")
         }
         // A separate one-time migration preserves deletions of the original presets.
         if (bundleFiles != null && !File(skillsDir, ".minimax-seed-v1").exists()) {
@@ -254,10 +327,17 @@ internal class LocalSkillStore(
                 require(relative.split('/').none { it.isBlank() || it == "." || it == ".." } &&
                     '\\' !in relative && relative != "SKILL.md") { "技能资源路径无效" }
                 val path = ".dsh/skills/$id/$relative"
-                if (!File(workspace.path, path).exists()) workspace.write(path, text)
+                val target = File(workspace.path, path)
+                if (!target.exists()) workspace.write(path, text)
+                if (target.readText() == text) {
+                    File(skillsDir, "$id/.bundled-resource-${rawFingerprint(relative)}")
+                        .writeText(rawFingerprint(text) + "\n")
+                }
             }
         }
-        addDocument(id, buildLocalSkillDocument(id, preset.description, preset.instructions, preset.whenToUse, preset.title))
+        val bundledDocument = buildLocalSkillDocument(id, preset.description, preset.instructions, preset.whenToUse, preset.title)
+        addDocument(id, bundledDocument)
+        File(skillsDir, "$id/.bundled-baseline-sha256").writeText(skillFingerprint(bundledDocument) + "\n")
     }
 
     fun create(id: String, displayName: String, description: String, instructions: String) {

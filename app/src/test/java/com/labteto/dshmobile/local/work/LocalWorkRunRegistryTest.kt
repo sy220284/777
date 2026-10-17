@@ -381,6 +381,91 @@ class LocalWorkRunRegistryTest {
     }
 
     @Test
+    fun staleDurableGoalContinuationIsDiscardedBeforeAnyModelWorkAndUserMessageSurvives() {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(sessionId = "session-a", usageMode = LocalUsageMode.WORK))
+        val registry = LocalWorkRunRegistry(runtime)
+        val binding = binding("session-a")
+        val original = LocalGoal("原目标", id = "goal-123", startedAtSequence = 2L)
+        binding.state.value = binding.state.value.copy(
+            work = LocalWorkState(goal = original.copy(note = "用户已经修改目标")),
+        )
+        val previous = LocalWorkResumeCommand(
+            sourceRunId = "source-run",
+            checkpointSequence = 4L,
+            failureCode = WORK_GOAL_PROGRESS_CONTINUATION,
+            index = 1,
+            sourceMessageId = "source-message",
+            goalId = original.id,
+            goalFingerprint = localWorkGoalFingerprint(original),
+        ).toQueueInput()
+        binding.runHandle.pendingInputs.offer(previous)
+        binding.runHandle.pendingInputs.offer(QueuedAgentInput("新要求", id = "new-user"))
+        val completed = Job()
+        val successor = Job()
+        binding.runHandle.job = completed
+        registry.attach(binding)
+        var consumed: QueuedAgentInput? = null
+        try {
+            assertSame(successor, registry.finishTurn(binding, completed) { input, _ ->
+                consumed = input
+                successor
+            })
+            assertEquals("new-user", consumed?.id)
+            assertEquals(0, binding.runHandle.pendingInputs.size())
+            val actions = binding.eventLog.snapshot()
+                .filter { it.type == LOCAL_AGENT_INBOX_EVENT_TYPE }
+                .mapNotNull { it.data["action"]?.toString() }
+            assertTrue(actions.any { it.contains("goal-continuation-discarded-stale") })
+            assertTrue(actions.any { it.contains("resumed") })
+            val history = binding.runHandle.modelHistory.snapshot().toString()
+            assertTrue(history.contains("新要求"))
+            assertFalse(history.contains(INTERNAL_WORK_GOAL_PROGRESS_PROMPT))
+        } finally {
+            completed.cancel()
+            successor.cancel()
+            binding.eventLog.close()
+        }
+    }
+
+    @Test
+    fun onlyStaleGoalContinuationReleasesOwnerWithoutLaunchingNextRun() {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(sessionId = "session-a", usageMode = LocalUsageMode.WORK))
+        val registry = LocalWorkRunRegistry(runtime)
+        val binding = binding("session-a")
+        val original = LocalGoal("原目标", id = "goal-123", startedAtSequence = 2L)
+        binding.state.value = binding.state.value.copy(
+            work = LocalWorkState(goal = original.copy(status = "paused")),
+        )
+        binding.runHandle.pendingInputs.offer(LocalWorkResumeCommand(
+            sourceRunId = "previous-run",
+            checkpointSequence = 4L,
+            failureCode = WORK_GOAL_PROGRESS_CONTINUATION,
+            index = 1,
+            sourceMessageId = null,
+            goalId = original.id,
+            goalFingerprint = localWorkGoalFingerprint(original),
+        ).toQueueInput())
+        val completed = Job()
+        binding.runHandle.job = completed
+        registry.attach(binding)
+        try {
+            assertNull(registry.finishTurn(binding, completed) { _, _ ->
+                error("过期任务不能启动模型")
+            })
+            assertNull(registry["session-a"])
+            assertTrue(binding.eventLog.snapshot().any {
+                it.type == LOCAL_AGENT_INBOX_EVENT_TYPE &&
+                    it.data["action"]?.toString()?.contains("goal-continuation-discarded-stale") == true
+            })
+        } finally {
+            completed.cancel()
+            binding.eventLog.close()
+        }
+    }
+
+    @Test
     fun attachingSameSessionReplacesPreviousBindingAtomically() {
         val registry = LocalWorkRunRegistry(LocalRuntimeStateStore())
         val first = binding("shared")
@@ -456,6 +541,37 @@ class LocalWorkRunRegistryTest {
             assertNull(registry["session-a"])
             assertNull(active.runHandle.projectionJob)
         } finally { completed.cancel(); active.eventLog.close() }
+    }
+
+    @Test
+    fun turnHandoffUsesRegisteredOwnerAcrossExecutionContextJobs() = runTest {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(sessionId = "context-owner", usageMode = LocalUsageMode.WORK))
+        val registry = LocalWorkRunRegistry(runtime)
+        val active = binding("context-owner")
+        val owner = Job()
+        val successor = Job()
+        val leases = com.labteto.dshmobile.harness.session.SessionExecutionRegistry()
+        val lease = leases.acquire("context-owner",
+            com.labteto.dshmobile.harness.session.SessionExecutionOwner("work", true))
+        active.runHandle.job = owner
+        registry.attach(active)
+        try {
+            kotlinx.coroutines.withContext(com.labteto.dshmobile.harness.session.SessionExecutionContext(lease)) {
+                org.junit.Assert.assertNotSame(owner, kotlinx.coroutines.currentCoroutineContext()[Job])
+                val next = registry.finishTurn(active, owner, onIdle = {
+                    active.runHandle.pendingInputs.offer(QueuedAgentInput("next", id = "next"))
+                }) { input, _ ->
+                    assertEquals("next", input.id)
+                    successor
+                }
+                assertSame(successor, next)
+                assertSame(successor, active.runHandle.job)
+            }
+        } finally {
+            lease.close(); owner.cancel(); successor.cancel()
+            registry.detach(active); active.eventLog.close()
+        }
     }
 
     private fun binding(sessionId: String): LocalWorkRunBinding =

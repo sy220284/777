@@ -187,4 +187,67 @@ class SessionEventLogMultiInstanceTest {
         }
     }
 
+    @Test
+    fun foreignAppendInvalidatesWarmSequenceEvenWithLiveAdapter() {
+        val root = kotlin.io.path.createTempDirectory("session-log-foreign-writer-").toFile()
+        val file = File(root, "session.events.jsonl")
+        val log = SessionEventLog(file, json)
+        try {
+            assertEquals(0L, log.append("work/start", buildJsonObject { put("owner", "one") }).sequence)
+            // Simulate a second OS process that committed a valid event while this
+            // adapter was idle. The next writer must rebase from disk, never reuse 1.
+            file.appendText(json.encodeToString(
+                SessionEvent.serializer(),
+                SessionEvent(1L, "work/foreign", 1L, buildJsonObject { put("owner", "two") }),
+            ) + "\n")
+            assertEquals(1L, log.latestSequence())
+            assertEquals(2L, log.append("work/next", buildJsonObject { put("owner", "one") }).sequence)
+            assertEquals(listOf(0L, 1L, 2L), log.snapshot().map { it.sequence })
+            assertTrue(File(file.path + ".writer.lock").isFile)
+        } finally { log.close(); root.deleteRecursively() }
+    }
+
+    @Test
+    fun crossProcessRebaseDoesNotTrustUnchangedFileSizeAndMtime() {
+        val root = kotlin.io.path.createTempDirectory("session-log-foreign-same-stamp-").toFile()
+        val file = File(root, "session.events.jsonl")
+        val log = SessionEventLog(file, json)
+        try {
+            val first = log.append("test/original", buildJsonObject { put("slot", "a") })
+            val fileBytes = file.length()
+            val before = java.nio.file.Files.getLastModifiedTime(file.toPath())
+            // Preserve the actual writer's envelope version as well as its timestamp.
+            // Otherwise a schema upgrade changes the byte count before rebase is tested.
+            val replacement = first.copy(sequence = 1L, type = "test/foreign!",
+                data = buildJsonObject { put("slot", "b") })
+            // Both byte count and timestamp are deliberately unchanged: metadata
+            // equality cannot certify that a foreign writer kept the same sequence.
+            file.writeText(json.encodeToString(SessionEvent.serializer(), replacement) + "\n")
+            assertEquals(fileBytes, file.length())
+            java.nio.file.Files.setLastModifiedTime(file.toPath(), before)
+            assertEquals(1L, log.latestSequence())
+            assertEquals(2L, log.append("test/next", buildJsonObject { put("slot", "c") }).sequence)
+        } finally { log.close(); root.deleteRecursively() }
+    }
+
+    @Test
+    fun nestedCompareAndAppendHoldsOneDurableLeaseAcrossSeveralEvents() {
+        val root = kotlin.io.path.createTempDirectory("session-log-nested-lease-").toFile()
+        val file = File(root, "session.events.jsonl")
+        val log = SessionEventLog(file, json)
+        try {
+            val first = log.withWriterLease {
+                val initial = log.append("work/cas", buildJsonObject { put("stage", "one") })
+                val next = log.withWriterLease {
+                    log.append("work/cas", buildJsonObject { put("stage", "two") })
+                }
+                assertEquals(initial.sequence + 1L, next.sequence)
+                initial
+            }
+            assertEquals(0L, first.sequence)
+            assertEquals(2L, log.append("work/cas", buildJsonObject { put("stage", "three") }).sequence)
+            assertEquals(3, log.snapshot().size)
+        } finally { log.close(); root.deleteRecursively() }
+    }
+
 }

@@ -16,9 +16,22 @@ import java.net.URI
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -80,12 +93,34 @@ internal fun mcpExtensionFailure(serverId: String, error: Exception, connecting:
 
 internal const val MAX_MCP_TOOL_RESULT_CHARS = 256 * 1024
 
+enum class McpServerLifecycle { CONNECTING, REGISTERED, RECONNECTING, DISCONNECTING, FAILED }
 data class McpServerSnapshot(
     val id: String,
     val transport: String,
     val target: String,
     val tools: List<String>,
+    val lifecycle: McpServerLifecycle = McpServerLifecycle.REGISTERED,
 )
+
+/** A single ordered Owner transition; null means a server was removed, not success. */
+data class McpLifecycleEvent(
+    val sequence: Long,
+    val serverId: String,
+    val snapshot: McpServerSnapshot?,
+)
+
+/** Replay is bounded. A consumer detecting a gap/epoch change must request a fresh Owner snapshot. */
+data class McpLifecycleHistory(
+    val incarnation: String,
+    val latestSequence: Long,
+    val events: List<McpLifecycleEvent>,
+    val requiresSnapshot: Boolean,
+    /** Captured under the same Owner mutex and sequence as the gap marker. */
+    val snapshot: List<McpServerSnapshot>? = null,
+)
+
+/** Exact on-demand ping result; never a tool permission or continuous-health claim. */
+enum class McpServerHealth { RESPONDED, BUSY, NOT_CONNECTED, UNCONFIRMED }
 
 /**
  * Bridges HTTP and stdio MCP servers into the native Harness Tool Registry.
@@ -132,6 +167,13 @@ class McpToolBridgePlugin(
         private var activeCalls = 0
         private var drained: CompletableDeferred<Unit>? = null
         private var clientClosed = false
+        var watchJob: Job? = null
+        private var failedTransport = false
+        fun isTransportFailed(): Boolean = synchronized(this) { failedTransport }
+        fun markTransportFailed(): DisconnectTicket = synchronized(this) {
+            failedTransport = true
+            beginDisconnect()
+        }
 
         fun beginCall(): Boolean = synchronized(this) {
             if (!acceptingCalls) {
@@ -150,6 +192,8 @@ class McpToolBridgePlugin(
             }
             completion?.complete(Unit)
         }
+
+        fun isAcceptingCalls(): Boolean = synchronized(this) { acceptingCalls }
 
         fun beginDisconnect(): DisconnectTicket = synchronized(this) {
             if (!acceptingCalls) {
@@ -173,11 +217,93 @@ class McpToolBridgePlugin(
                     true
                 }
             }
-            if (shouldClose) client.close()
+            if (shouldClose) {
+                watchJob?.cancel()
+                client.close()
+            }
         }
     }
 
     private val mutex = Mutex()
+    private val lifecycleScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // The MCP owner publishes lifecycle invalidations at each committed state transition.
+    // Readers subsequently obtain the actual registry snapshot under the same mutex.
+    private val lifecycleRevision = MutableStateFlow(0L)
+    val lifecycleRevisions: StateFlow<Long> = lifecycleRevision.asStateFlow()
+    private val incarnation = java.util.UUID.randomUUID().toString()
+    private var nextLifecycleSequence = 0L
+    private var previousLifecycle = emptyMap<String, McpServerSnapshot>()
+    private val lifecycleHistory = ArrayDeque<McpLifecycleEvent>()
+
+    /**
+     * Called under the MCP Owner mutex after every state mutation. Diff the actual
+     * authoritative registry/reservations, not a shadow UI state machine.
+     * All subscribers get the same monotonic sequence, including disconnect/crash.
+     */
+    private fun signalLifecycleChangedLocked() {
+        val current = currentLifecycleLocked().associateBy(McpServerSnapshot::id)
+        (previousLifecycle.keys + current.keys).toSortedSet().forEach { id ->
+            if (previousLifecycle[id] != current[id]) {
+                lifecycleHistory.addLast(McpLifecycleEvent(++nextLifecycleSequence, id, current[id]))
+                if (lifecycleHistory.size > 512) lifecycleHistory.removeFirst()
+            }
+        }
+        previousLifecycle = current
+        lifecycleRevision.value += 1L
+    }
+
+    /** Server snapshots are only authenticated MCP Owner facts, never permissions. */
+    private fun currentLifecycleLocked(): List<McpServerSnapshot> {
+        val registered = servers.values.map { binding ->
+            val phase = when {
+                binding.id in reconnectingIds -> McpServerLifecycle.RECONNECTING
+                binding.isTransportFailed() -> McpServerLifecycle.FAILED
+                !binding.isAcceptingCalls() -> McpServerLifecycle.DISCONNECTING
+                else -> McpServerLifecycle.REGISTERED
+            }
+            McpServerSnapshot(binding.id, binding.transport, binding.displayTarget,
+                if (binding.isTransportFailed()) emptyList() else binding.toolNames.toList(), phase)
+        }
+        val pending = (connectingIds + reconnectingIds)
+            .filterNot(servers::containsKey)
+            .map { id -> McpServerSnapshot(id, "", "", emptyList(),
+                if (id in reconnectingIds) McpServerLifecycle.RECONNECTING
+                else McpServerLifecycle.CONNECTING) }
+        return registered + pending
+    }
+
+    /** Return ordered transitions or explicitly require a full re-snapshot on loss. */
+    suspend fun lifecycleEventsSince(
+        expectedIncarnation: String?, afterSequence: Long, limit: Int = 80,
+    ): McpLifecycleHistory = mutex.withLock {
+        require(afterSequence >= -1L && limit in 1..200)
+        val oldest = lifecycleHistory.firstOrNull()?.sequence ?: nextLifecycleSequence + 1L
+        val needsSnapshot = (expectedIncarnation != null && expectedIncarnation != incarnation) ||
+            (oldest > 1L && afterSequence < oldest - 1L) ||
+            afterSequence > nextLifecycleSequence
+        McpLifecycleHistory(incarnation, nextLifecycleSequence,
+            if (needsSnapshot) emptyList() else lifecycleHistory.asSequence()
+                .filter { it.sequence > afterSequence }.take(limit).toList(),
+            requiresSnapshot = needsSnapshot,
+            snapshot = if (needsSnapshot) currentLifecycleLocked() else null,
+        )
+    }
+
+    /** Agent/plugin subscribers consume the same ordered Owner history as V6, without polling. */
+    fun observeLifecycle(): kotlinx.coroutines.flow.Flow<McpLifecycleHistory> = flow {
+        var cursor = -1L
+        var expected: String? = null
+        lifecycleRevisions.collect {
+            do {
+                val page = lifecycleEventsSince(expected, cursor)
+                emit(page)
+                expected = page.incarnation
+                cursor = if (page.requiresSnapshot) page.latestSequence
+                    else page.events.lastOrNull()?.sequence ?: page.latestSequence
+            } while (!page.requiresSnapshot && cursor < page.latestSequence)
+        }
+    }
+
     private val servers = linkedMapOf<String, ServerBinding>()
     private val connectingIds = linkedSetOf<String>()
     private val reconnectingIds = linkedSetOf<String>()
@@ -190,6 +316,7 @@ class McpToolBridgePlugin(
                 "MCP 插件存在未清理的连接状态"
             }
             acceptingConnections = true
+            signalLifecycleChangedLocked()
         }
         context.tools.register(
             HarnessTool(
@@ -287,6 +414,59 @@ class McpToolBridgePlugin(
         )
         context.tools.register(
             HarnessTool(
+                name = "mcp_lifecycle_events",
+                schema = functionToolSchema(
+                    name = "mcp_lifecycle_events",
+                    description = "读取有序 MCP 连接生命周期；支持等待真实变更。游标失效时返回当前快照，不授予调用权限。",
+                    properties = buildJsonObject {
+                        put("incarnation", buildJsonObject { put("type", "string") })
+                        put("after_sequence", buildJsonObject { put("type", "integer"); put("minimum", -1) })
+                        put("wait_for_change", buildJsonObject { put("type", "boolean") })
+                    },
+                ),
+                access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
+                timeoutMillis = CONNECT_TIMEOUT_MILLIS,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(family = "MCP", discoveryKeywords = MCP_DISCOVERY_KEYWORDS),
+                executor = HarnessToolExecutor { _, input, _ ->
+                    val expected = input.optional("incarnation")
+                    val after = input["after_sequence"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: -1L
+                    var page = lifecycleEventsSince(expected, after)
+                    if (input["wait_for_change"]?.jsonPrimitive?.booleanOrNull == true &&
+                        !page.requiresSnapshot && page.events.isEmpty()) {
+                        // Subscribe to the existing Owner revision; no heartbeat network request.
+                        withTimeoutOrNull(CONNECT_TIMEOUT_MILLIS - 5_000L) {
+                            lifecycleRevisions.first {
+                                val current = lifecycleEventsSince(expected, after)
+                                current.requiresSnapshot || current.latestSequence > after
+                            }
+                        }
+                        page = lifecycleEventsSince(expected, after)
+                    }
+                    ToolResult(buildJsonObject {
+                        put("incarnation", page.incarnation)
+                        put("latest_sequence", page.latestSequence)
+                        put("requires_snapshot", page.requiresSnapshot)
+                        put("events", buildJsonArray {
+                            page.events.forEach { event -> add(buildJsonObject {
+                                put("sequence", event.sequence); put("server_id", event.serverId)
+                                put("state", event.snapshot?.lifecycle?.name ?: "REMOVED")
+                            }) }
+                        })
+                        if (page.requiresSnapshot) put("servers", buildJsonArray {
+                            page.snapshot.orEmpty().forEach { server -> add(buildJsonObject {
+                                put("server_id", server.id); put("transport", server.transport)
+                                put("state", server.lifecycle.name)
+                                put("tools", buildJsonArray { server.tools.forEach { add(JsonPrimitive(it)) } })
+                            }) }
+                        })
+                    }.toString())
+                },
+            ),
+        )
+        context.tools.register(
+            HarnessTool(
                 name = "mcp_reconnect",
                 schema = functionToolSchema(
                     name = "mcp_reconnect",
@@ -360,6 +540,7 @@ class McpToolBridgePlugin(
             val callDrains = servers.values.toList().map { binding ->
                 binding to binding.beginDisconnect()
             }
+            signalLifecycleChangedLocked()
             connectionDrain to callDrains
         }
 
@@ -373,6 +554,7 @@ class McpToolBridgePlugin(
                         binding.toolNames.forEach(context.tools::unregister)
                     }
                     servers.clear()
+                    signalLifecycleChangedLocked()
                 }
             }
             owned.forEach(ServerBinding::closeClientOnce)
@@ -393,15 +575,43 @@ class McpToolBridgePlugin(
     suspend fun disconnectFromUi(context: HarnessContext, serverId: String): String =
         disconnect(context, serverId)
 
+    /**
+     * Check a registered server on user request only. The active-call lease prevents
+     * uninstall closing its transport mid-ping. A timeout/remote protocol error is
+     * unconfirmed, not proof of disconnection or permission denial.
+     */
+    suspend fun checkServerHealthFromUi(serverId: String): McpServerHealth {
+        val binding = mutex.withLock { servers[serverId] } ?: return McpServerHealth.NOT_CONNECTED
+        if (binding.isTransportFailed()) return McpServerHealth.NOT_CONNECTED
+        if (!binding.beginCall()) return McpServerHealth.BUSY
+        return try {
+            val received = withTimeoutOrNull(8_000L) { binding.client.ping(); true } == true
+            if (!binding.isAcceptingCalls()) McpServerHealth.BUSY
+            else if (received) McpServerHealth.RESPONDED
+            else McpServerHealth.UNCONFIRMED
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { McpServerHealth.UNCONFIRMED }
+        finally { binding.endCall() }
+    }
+
     suspend fun serverSnapshots(): List<McpServerSnapshot> = mutex.withLock {
         servers.values.map { binding ->
             McpServerSnapshot(
                 id = binding.id,
                 transport = binding.transport,
                 target = binding.displayTarget,
-                tools = binding.toolNames.toList(),
+                tools = if (binding.isTransportFailed()) emptyList() else binding.toolNames.toList(),
             )
         }
+    }
+
+    /**
+     * Actual in-process MCP lifecycle state, including reservations not yet registered.
+     * This is not a health probe, transport authorization, nor evidence of a tool call.
+     * The existing serverSnapshots() contract intentionally remains registry-only.
+     */
+    suspend fun lifecycleSnapshots(): List<McpServerSnapshot> = mutex.withLock {
+        currentLifecycleLocked()
     }
 
     private suspend fun connectHttp(context: HarnessContext, rawId: String, rawEndpoint: String): String {
@@ -451,6 +661,7 @@ class McpToolBridgePlugin(
                 "MCP 服务已连接或正在连接：$serverId"
             }
             connectingIds += serverId
+            signalLifecycleChangedLocked()
         }
 
         val client = try {
@@ -541,6 +752,7 @@ class McpToolBridgePlugin(
                                         isError = true,
                                     )
                                 } else {
+                                    var failedCleanup: ServerBinding.DisconnectTicket? = null
                                     try {
                                         val result = client.callTool(definition.name, input)
                                         val remoteError = result["isError"]?.jsonPrimitive?.booleanOrNull == true
@@ -555,9 +767,33 @@ class McpToolBridgePlugin(
                                     } catch (cancelled: CancellationException) {
                                         throw cancelled
                                     } catch (error: Exception) {
+                                        // A transport termination invalidates all tool registrations on the
+                                        // same server. Semantic tool errors/rate limits do not imply disconnection.
+                                        if (error is IOException ||
+                                            (error is McpHttpException &&
+                                                error.statusCode in setOf(401, 403, 404, 410))) {
+                                            failedCleanup = withContext(NonCancellable) {
+                                                mutex.withLock {
+                                                    if (servers[serverId] === binding) {
+                                                        binding.markTransportFailed().also { ticket ->
+                                                            if (ticket.started) {
+                                                                binding.toolNames.forEach(context.tools::unregister)
+                                                                signalLifecycleChangedLocked()
+                                                            }
+                                                        }
+                                                    } else null
+                                                }
+                                            }
+                                        }
                                         mcpExtensionFailure(serverId, error, connecting = false)
                                     } finally {
                                         binding.endCall()
+                                        failedCleanup?.let { ticket ->
+                                            withContext(NonCancellable) {
+                                                ticket.drained?.await()
+                                                binding.closeClientOnce()
+                                            }
+                                        }
                                     }
                                 }
                             },
@@ -567,12 +803,39 @@ class McpToolBridgePlugin(
                 }
                 servers[serverId] = binding
                 releaseConnectionReservationLocked(serverId)
+                binding.watchJob = client.terminalEvents?.let { failures ->
+                    lifecycleScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                        failures.collect {
+                            // The transport may have died without any active tool invocation.
+                            // Keep FAILED visible for explicit user reconnect. Never replay calls.
+                            withContext(NonCancellable) {
+                                val ticket = mutex.withLock {
+                                    if (servers[serverId] !== binding || binding.isTransportFailed())
+                                        return@withLock null
+                                    binding.markTransportFailed().also { result ->
+                                        if (result.started) {
+                                            binding.toolNames.forEach(context.tools::unregister)
+                                            signalLifecycleChangedLocked()
+                                        }
+                                    }
+                                }
+                                ticket?.drained?.await()
+                                if (ticket != null) binding.closeClientOnce()
+                            }
+                        }
+                    }
+                }
             }
             return connectedMessage
         } catch (error: Exception) {
             withContext(NonCancellable) {
-                registered.forEach(context.tools::unregister)
-                client.close()
+                // Even if remote transport close fails, release the reservation so one bad
+                // server cannot poison subsequent connects or unrelated MCP servers.
+                registered.asReversed().forEach { name ->
+                    runCatching { context.tools.unregister(name) }
+                        .exceptionOrNull()?.let(error::addSuppressed)
+                }
+                runCatching { client.close() }.exceptionOrNull()?.let(error::addSuppressed)
                 mutex.withLock { releaseConnectionReservationLocked(serverId) }
             }
             throw error
@@ -583,6 +846,7 @@ class McpToolBridgePlugin(
         val serverId = validateServerId(rawId)
         val existing = mutex.withLock {
             require(reconnectingIds.add(serverId)) { "MCP 服务正在重连：$serverId" }
+            signalLifecycleChangedLocked()
             servers[serverId]
         }
         try {
@@ -594,7 +858,7 @@ class McpToolBridgePlugin(
             return connect(context, serverId, existing.transport, existing.displayTarget,
                 existing.clientFactory, fromReconnect = true)
         } finally {
-            withContext(NonCancellable) { mutex.withLock { reconnectingIds.remove(serverId) } }
+            withContext(NonCancellable) { mutex.withLock { if (reconnectingIds.remove(serverId)) signalLifecycleChangedLocked() } }
         }
     }
 
@@ -609,11 +873,13 @@ class McpToolBridgePlugin(
                 "MCP 服务正在重连：$serverId"
             }
             val binding = servers[serverId] ?: return@withLock null
-            binding to binding.beginDisconnect()
+            (binding to binding.beginDisconnect()).also { (_, ticket) ->
+                if (ticket.started) signalLifecycleChangedLocked()
+            }
         } ?: return "MCP 服务未连接：$serverId"
 
         val (binding, ticket) = prepared
-        if (!ticket.started) {
+        if (!ticket.started && !binding.isTransportFailed()) {
             ticket.drained?.await()
             return "MCP 服务正在断开：$serverId"
         }
@@ -624,6 +890,7 @@ class McpToolBridgePlugin(
                 if (servers[serverId] === binding) {
                     binding.toolNames.forEach(context.tools::unregister)
                     servers.remove(serverId)
+                    signalLifecycleChangedLocked()
                 }
             }
             binding.closeClientOnce()
@@ -632,7 +899,7 @@ class McpToolBridgePlugin(
     }
 
     private fun releaseConnectionReservationLocked(serverId: String) {
-        connectingIds.remove(serverId)
+        if (connectingIds.remove(serverId)) signalLifecycleChangedLocked()
         if (connectingIds.isEmpty()) {
             connectingDrained?.complete(Unit)
             connectingDrained = null
@@ -780,6 +1047,7 @@ class McpToolBridgePlugin(
             "mcp_http_connect",
             "mcp_stdio_connect",
             "mcp_server_list",
+            "mcp_lifecycle_events",
             "mcp_reconnect",
             "mcp_disconnect",
         )

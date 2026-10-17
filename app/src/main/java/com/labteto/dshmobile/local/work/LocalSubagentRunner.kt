@@ -2,7 +2,7 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.AgentEventSink
-import com.labteto.dshmobile.harness.agent.AgentLoop
+import com.labteto.dshmobile.harness.agent.AgentTurnEngine
 import com.labteto.dshmobile.harness.agent.AgentModel
 import com.labteto.dshmobile.harness.agent.AgentModelReply
 import com.labteto.dshmobile.harness.agent.AgentStepLimitExtender
@@ -12,6 +12,7 @@ import com.labteto.dshmobile.harness.agent.AgentToolExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.modelVisibleContent
 import com.labteto.dshmobile.harness.jobs.JobContinuationPersistenceException
+import com.labteto.dshmobile.harness.jobs.JobExecutionSliceBoundaryException
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.local.LocalHarnessState
@@ -459,7 +460,7 @@ internal class LocalSubagentRunner(
                 )
             }
             val remainingSteps = totalBudgetLimit - recoveredBaseStep
-            val loop = AgentLoop(
+            val loop = AgentTurnEngine(
                 model = AgentModel {
                     currentCoroutineContext().ensureActive()
                     backgroundJobId?.let { jobId ->
@@ -598,6 +599,9 @@ internal class LocalSubagentRunner(
                     }
                 },
                 eventSink = AgentEventSink { event ->
+                    if (runContext != null && runCoordinator?.isCurrentOwner(runContext) == false) {
+                        return@AgentEventSink
+                    }
                     when (event) {
                         is AgentEvent.AssistantObserved -> {
                             val absoluteStep = recoveredBaseStep + event.step
@@ -773,7 +777,10 @@ internal class LocalSubagentRunner(
                 idFactory = { runContext?.runId ?: UUID.randomUUID().toString() },
             )
 
-            val result = loop.run(task)
+            val executionContext = runContext?.let { runCoordinator?.executionContext(it) }
+            val result = if (executionContext != null) {
+                withContext(executionContext) { loop.run(task) }
+            } else loop.run(task)
             if (result.stopReason == com.labteto.dshmobile.harness.agent.AgentStopReason.COMPLETED) {
                 val answer = result.answer.ifBlank { "子代理已结束，但没有返回文字。" }
                 val outputSchema = capabilities.outputSchema
@@ -860,6 +867,23 @@ internal class LocalSubagentRunner(
             primaryFailure = error
             throw error
         } catch (error: LocalModelException) {
+            if (error.code == "WORK_BUDGET_EXHAUSTED" &&
+                backgroundJobId != null && capabilities.continuable
+            ) {
+                // This request was rejected by the local admission budget before provider
+                // execution. Resume only from a committed, already-settled step.
+                val safeStep = (modelStep - 1).coerceAtLeast(recoveredBaseStep)
+                persistContinuationCheckpoint(step = safeStep)
+                eventLog().append("subagent/slice-suspended", buildJsonObject {
+                    put("agent_id", subagentId)
+                    put("background_job_id", backgroundJobId)
+                    put("step", safeStep)
+                    put("reason", error.code)
+                })
+                val pause = JobExecutionSliceBoundaryException(error)
+                primaryFailure = pause
+                throw pause
+            }
             AppLog.warn(
                 "LocalSubagentRunner",
                 "子智能体模型失败 agent=$subagentId model=$routeModel code=${error.code} detail=${error.message.orEmpty().take(800)}",

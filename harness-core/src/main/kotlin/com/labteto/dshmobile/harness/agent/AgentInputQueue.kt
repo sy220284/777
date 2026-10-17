@@ -2,11 +2,34 @@ package com.labteto.dshmobile.harness.agent
 
 import kotlinx.serialization.json.JsonObject
 
+/** Execution origin is part of the durable queue contract, not encoded in ID prefixes. */
+enum class QueuedAgentInputKind { USER, WORK_CONTINUATION }
+
+/** Stable resume coordinates are persisted with the queue, not inferred from display IDs. */
+data class AgentContinuationRef(
+    val sourceRunId: String,
+    val checkpointSequence: Long,
+    val failureCode: String,
+    val index: Int,
+    val sourceMessageId: String?,
+    /** Present only for Goal progress continuation: binds a resume to one immutable goal contract. */
+    val goalId: String? = null,
+    val goalFingerprint: String? = null,
+    /** Current Goal rounds use a durable revision; fingerprint is retained for old queue records. */
+    val goalRevision: Long? = null,
+) {
+    init {
+        require(sourceRunId.isNotBlank() && checkpointSequence >= 0 && index > 0)
+    }
+}
+
 data class QueuedAgentInput(
     val content: String,
     val memoryInput: String = content,
     val modelMessage: JsonObject? = null,
     val id: String = "",
+    val kind: QueuedAgentInputKind = QueuedAgentInputKind.USER,
+    val continuation: AgentContinuationRef? = null,
 )
 
 class AgentInputQueue(
@@ -34,6 +57,16 @@ class AgentInputQueue(
             throw error
         }
     }
+
+    /**
+     * Internal autonomous follow-ups are opportunistic. A user input or any other
+     * already-admitted command always wins: never append a background continuation
+     * behind a newer request. Admission and durability share the same queue lock.
+     */
+    fun offerIfEmpty(input: QueuedAgentInput, commit: () -> Unit = {}): Boolean =
+        synchronized(lock) {
+            if (items.isNotEmpty()) false else offer(input, commit)
+        }
 
     fun drain(): List<QueuedAgentInput> = synchronized(lock) {
         if (items.isEmpty()) return@synchronized emptyList()

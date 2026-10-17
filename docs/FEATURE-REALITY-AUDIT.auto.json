@@ -1,36 +1,33 @@
 {
   "version": 1,
   "type": "independent_code_first_static_audit",
-  "source_snapshot": "abc2104f86b9",
+  "source_snapshot": "74352b1e714f",
   "tree": {
-    "nodes_excluding_root": 544,
-    "leaf_descriptions": 447,
+    "nodes_excluding_root": 533,
+    "leaf_descriptions": 440,
     "leaves_by_layer": {
-      "第一层｜产品功能与界面": 307,
+      "第一层｜产品功能与界面": 300,
       "第三层｜平台与工程保障": 38,
       "第二层｜共享运行能力": 102
     }
   },
   "code": {
-    "production_files": 827,
-    "module_count": 7,
+    "production_files": 999,
+    "module_count": 6,
     "module_names": [
       "SHELL",
       "CHAT",
       "WORK",
-      "PROJECT",
       "AUTOMATION",
       "TOOLS",
       "SETTINGS"
     ],
-    "route_count": 9,
+    "route_count": 7,
     "route_names": [
       "HOME",
       "PERSONA_GALLERY",
       "DIARY",
       "WORKSPACE",
-      "RUN_CENTER",
-      "PROJECT",
       "TASKS",
       "TOOLS",
       "SETTINGS"
@@ -49,16 +46,6 @@
       {
         "symbol": "LocalHarnessScreen",
         "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-        "is_named_screen": true
-      },
-      {
-        "symbol": "LocalProjectScreen",
-        "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiContribution.kt",
-        "is_named_screen": true
-      },
-      {
-        "symbol": "LocalRunCenterScreen",
-        "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalRunCenterScreen.kt",
         "is_named_screen": true
       },
       {
@@ -92,7 +79,7 @@
         "is_named_screen": true
       }
     ],
-    "compose_named_screens": 10,
+    "compose_named_screens": 8,
     "compose_support_components": 1,
     "registered_builtin_tools": [
       {
@@ -393,6 +380,21 @@
       {
         "provider": "local_builtin_catalog",
         "name": "list_subagent_models",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "media_image_create",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "media_image_options",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "media_image_status",
         "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
       },
       {
@@ -761,12 +763,12 @@
         "source": "app/src/main/java/com/labteto/dshmobile/automation/HarnessWebhook.kt"
       }
     ],
-    "builtin_tool_count": 133,
+    "builtin_tool_count": 136,
     "plugin_counts": {
       "automation": 4,
       "device": 31,
       "github": 3,
-      "local_builtin_catalog": 64,
+      "local_builtin_catalog": 67,
       "lsp": 10,
       "mcp_management": 5,
       "runtime": 7,
@@ -817,28 +819,46 @@
     "third_party_dynamic_mcp_tools_not_included": true
   },
   "tests": {
-    "mapped_tree_leaves": 128,
-    "unique_test_method_refs": 138,
-    "android_test_methods_in_matrix": 31,
-    "unit_test_methods_in_matrix": 107,
+    "mapped_tree_leaves": 125,
+    "unique_test_method_refs": 133,
+    "android_test_methods_in_matrix": 25,
+    "unit_test_methods_in_matrix": 108,
     "source_present_does_not_mean_executed": true
   },
   "comparison": {
     "categories": {
       "candidate_file_only": 3,
       "ci_workflow_configuration": 14,
-      "historical_file_only": 73,
-      "named_code_declaration": 209,
-      "no_code_entry": 14,
-      "test_method_mapping": 128,
+      "historical_file_only": 75,
+      "named_code_declaration": 199,
+      "no_code_entry": 17,
+      "stale_production_source": 1,
+      "test_and_named_code_declaration": 3,
+      "test_method_mapping": 122,
       "unexecuted_instrumentation": 6
     },
-    "concrete_static_source_or_test_or_job_evidence": 357,
-    "weak_file_only_evidence": 76,
-    "no_confirmed_entry": 14,
+    "concrete_static_source_or_test_or_job_evidence": 344,
+    "weak_file_only_evidence": 78,
+    "no_confirmed_entry": 17,
+    "pending_source_migration": 1,
     "stable_static_identities": 117,
+    "stale_legacy_identity_count": 9,
+    "stale_legacy_identity_ids": [
+      "existing.0034",
+      "existing.0086",
+      "existing.0089",
+      "existing.0090",
+      "existing.0091",
+      "existing.0092",
+      "existing.0093",
+      "existing.0094",
+      "existing.0095"
+    ],
     "unproven_paths": [
-      "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 16类人物资料按完整事实取用",
+      "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / UI 场景覆盖清单与兼容性检查（迁移中）",
+      "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送、分支与交互端口（迁移中）",
+      "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）",
+      "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 原回复内交互卡片（迁移中）",
       "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 模型温度独立采样",
       "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 历史调参兼容读取，退出反应控制",
       "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 共同经历与采样设置分离",
@@ -853,7 +873,7 @@
       "第三层｜平台与工程保障 / 测试与语义验证 / 人物日记纠正与能力状态界面回归",
       "第三层｜平台与工程保障 / 测试与语义验证 / 交付要求、成果版本和记忆来源证据回归"
     ],
-    "all_444_paths_crosschecked": true,
+    "all_paths_crosschecked": true,
     "runtime_verified_independent_feature_count": null,
     "runtime_count_limitation": "未逐功能证明调用可达、真实设备行为和模型效果；其中有工程及共享服务条目"
   },
@@ -922,6 +942,16 @@
       "source_files": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
       ],
+      "test_references": 0,
+      "workflow_job_count": 0,
+      "unrun_instrumentation_tests": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / UI 场景覆盖清单与兼容性检查（迁移中）",
+      "layer": "第一层｜产品功能与界面",
+      "evidence_level": "no_code_entry",
+      "static_identity": null,
+      "source_files": [],
       "test_references": 0,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
@@ -1021,6 +1051,36 @@
       "unrun_instrumentation_tests": 0
     },
     {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送、分支与交互端口（迁移中）",
+      "layer": "第一层｜产品功能与界面",
+      "evidence_level": "no_code_entry",
+      "static_identity": null,
+      "source_files": [],
+      "test_references": 0,
+      "workflow_job_count": 0,
+      "unrun_instrumentation_tests": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）",
+      "layer": "第一层｜产品功能与界面",
+      "evidence_level": "no_code_entry",
+      "static_identity": null,
+      "source_files": [],
+      "test_references": 0,
+      "workflow_job_count": 0,
+      "unrun_instrumentation_tests": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 原回复内交互卡片（迁移中）",
+      "layer": "第一层｜产品功能与界面",
+      "evidence_level": "no_code_entry",
+      "static_identity": null,
+      "source_files": [],
+      "test_references": 0,
+      "workflow_job_count": 0,
+      "unrun_instrumentation_tests": 0
+    },
+    {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 主题颜色、圆角、字体与间距",
       "layer": "第一层｜产品功能与界面",
       "evidence_level": "named_code_declaration",
@@ -1059,11 +1119,9 @@
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 统一按钮、输入框与列表组件",
       "layer": "第一层｜产品功能与界面",
-      "evidence_level": "named_code_declaration",
+      "evidence_level": "stale_production_source",
       "static_identity": "existing.0100",
-      "source_files": [
-        "app/src/main/java/com/shenyan/designsystem/components/ShenyanBasics.kt"
-      ],
+      "source_files": [],
       "test_references": 0,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
@@ -1151,7 +1209,7 @@
       "unrun_instrumentation_tests": 0
     },
     {
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4人物内核与16类可扩展人物事实",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4人物内核与13项人物资料",
       "layer": "第一层｜产品功能与界面",
       "evidence_level": "named_code_declaration",
       "static_identity": "existing.0072",
@@ -1516,11 +1574,14 @@
       "unrun_instrumentation_tests": 0
     },
     {
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 16类人物资料按完整事实取用",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 13项人物资料按完整事实取用",
       "layer": "第一层｜产品功能与界面",
-      "evidence_level": "no_code_entry",
+      "evidence_level": "named_code_declaration",
       "static_identity": null,
-      "source_files": [],
+      "source_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterRuntimeProjector.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaStore.kt"
+      ],
       "test_references": 0,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
@@ -2598,55 +2659,33 @@
       "unrun_instrumentation_tests": 0
     },
     {
-      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 任务列表与运行状态",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 当前目标、阶段与执行步骤",
       "layer": "第一层｜产品功能与界面",
       "evidence_level": "named_code_declaration",
       "static_identity": null,
       "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalRunCenterScreen.kt"
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheet.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalWorkUiState.kt"
       ],
       "test_references": 0,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
     {
-      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 主任务／子任务关联",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
       "layer": "第一层｜产品功能与界面",
-      "evidence_level": "named_code_declaration",
+      "evidence_level": "test_and_named_code_declaration",
       "static_identity": null,
       "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryCheckpoint.kt"
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheet.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjection.kt"
       ],
-      "test_references": 0,
+      "test_references": 1,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
     {
-      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 执行阶段和步骤轨迹",
-      "layer": "第一层｜产品功能与界面",
-      "evidence_level": "named_code_declaration",
-      "static_identity": null,
-      "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalRunCenterScreen.kt"
-      ],
-      "test_references": 0,
-      "workflow_job_count": 0,
-      "unrun_instrumentation_tests": 0
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 工具调用活动时间线",
-      "layer": "第一层｜产品功能与界面",
-      "evidence_level": "named_code_declaration",
-      "static_identity": null,
-      "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalRunCenterScreen.kt"
-      ],
-      "test_references": 0,
-      "workflow_job_count": 0,
-      "unrun_instrumentation_tests": 0
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 中断、失败和恢复提示",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 中断、失败和恢复提示",
       "layer": "第一层｜产品功能与界面",
       "evidence_level": "test_method_mapping",
       "static_identity": null,
@@ -2656,43 +2695,32 @@
       "unrun_instrumentation_tests": 0
     },
     {
-      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 后台任务与运行结果",
-      "layer": "第一层｜产品功能与界面",
-      "evidence_level": "named_code_declaration",
-      "static_identity": "existing.0034",
-      "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryCheckpoint.kt"
-      ],
-      "test_references": 0,
-      "workflow_job_count": 0,
-      "unrun_instrumentation_tests": 0
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 工作成果清单、逐项操作及历史范围",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工作成果清单与逐项操作",
       "layer": "第一层｜产品功能与界面",
       "evidence_level": "test_method_mapping",
       "static_identity": null,
       "source_files": [],
-      "test_references": 6,
+      "test_references": 3,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
     {
-      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 交付要求与真实成果事件来源绑定",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 交付要求与真实成果事件来源绑定",
       "layer": "第一层｜产品功能与界面",
-      "evidence_level": "historical_file_only",
+      "evidence_level": "test_and_named_code_declaration",
       "static_identity": null,
       "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/work/LocalRequirementEvidence.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalRequirementEvidence.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt"
       ],
-      "test_references": 0,
+      "test_references": 2,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
     {
-      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 交付成果当前版本及证据变化提示",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 交付成果当前版本及证据变化提示",
       "layer": "第一层｜产品功能与界面",
-      "evidence_level": "historical_file_only",
+      "evidence_level": "named_code_declaration",
       "static_identity": null,
       "source_files": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkArtifactVersion.kt"
@@ -2830,104 +2858,6 @@
       "unrun_instrumentation_tests": 0
     },
     {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目新建、列表与切换",
-      "layer": "第一层｜产品功能与界面",
-      "evidence_level": "test_method_mapping",
-      "static_identity": null,
-      "source_files": [],
-      "test_references": 1,
-      "workflow_job_count": 0,
-      "unrun_instrumentation_tests": 0
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目名称与项目身份管理",
-      "layer": "第一层｜产品功能与界面",
-      "evidence_level": "named_code_declaration",
-      "static_identity": "existing.0092",
-      "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/project/LocalProjectFeatureRuntime.kt"
-      ],
-      "test_references": 0,
-      "workflow_job_count": 0,
-      "unrun_instrumentation_tests": 0
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目删除及关联引用保护（存在引用时阻止删除）",
-      "layer": "第一层｜产品功能与界面",
-      "evidence_level": "test_method_mapping",
-      "static_identity": null,
-      "source_files": [],
-      "test_references": 5,
-      "workflow_job_count": 0,
-      "unrun_instrumentation_tests": 0
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目指令 / 项目长期规则和上下文",
-      "layer": "第一层｜产品功能与界面",
-      "evidence_level": "test_method_mapping",
-      "static_identity": null,
-      "source_files": [],
-      "test_references": 1,
-      "workflow_job_count": 0,
-      "unrun_instrumentation_tests": 0
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目指令 / 项目规则应用到工作／子代理／聊天",
-      "layer": "第一层｜产品功能与界面",
-      "evidence_level": "named_code_declaration",
-      "static_identity": "existing.0095",
-      "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/project/LocalProjectFeatureRuntime.kt"
-      ],
-      "test_references": 0,
-      "workflow_job_count": 0,
-      "unrun_instrumentation_tests": 0
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目指令 / 规则文件不可读时拒绝执行",
-      "layer": "第一层｜产品功能与界面",
-      "evidence_level": "test_method_mapping",
-      "static_identity": null,
-      "source_files": [],
-      "test_references": 1,
-      "workflow_job_count": 0,
-      "unrun_instrumentation_tests": 0
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 会话与项目绑定",
-      "layer": "第一层｜产品功能与界面",
-      "evidence_level": "test_method_mapping",
-      "static_identity": null,
-      "source_files": [],
-      "test_references": 1,
-      "workflow_job_count": 0,
-      "unrun_instrumentation_tests": 0
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 项目范围的记忆与资料关联",
-      "layer": "第一层｜产品功能与界面",
-      "evidence_level": "named_code_declaration",
-      "static_identity": "existing.0093",
-      "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/project/LocalProjectFeatureRuntime.kt"
-      ],
-      "test_references": 0,
-      "workflow_job_count": 0,
-      "unrun_instrumentation_tests": 0
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 项目身份与工作目录分离",
-      "layer": "第一层｜产品功能与界面",
-      "evidence_level": "named_code_declaration",
-      "static_identity": "existing.0094",
-      "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/project/LocalProjectFeatureRuntime.kt"
-      ],
-      "test_references": 0,
-      "workflow_job_count": 0,
-      "unrun_instrumentation_tests": 0
-    },
-    {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 新建、查看、编辑和删除",
       "layer": "第一层｜产品功能与界面",
       "evidence_level": "named_code_declaration",
@@ -2960,6 +2890,18 @@
         "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt"
       ],
       "test_references": 0,
+      "workflow_job_count": 0,
+      "unrun_instrumentation_tests": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务操作异常与受理回执",
+      "layer": "第一层｜产品功能与界面",
+      "evidence_level": "test_and_named_code_declaration",
+      "static_identity": null,
+      "source_files": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementOperation.kt"
+      ],
+      "test_references": 2,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
@@ -4082,7 +4024,7 @@
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 聊天与工作用量切换",
       "layer": "第一层｜产品功能与界面",
-      "evidence_level": "named_code_declaration",
+      "evidence_level": "historical_file_only",
       "static_identity": "existing.0089",
       "source_files": [
         "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt"
@@ -4094,7 +4036,7 @@
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 7／30／90 天消耗趋势",
       "layer": "第一层｜产品功能与界面",
-      "evidence_level": "named_code_declaration",
+      "evidence_level": "historical_file_only",
       "static_identity": "existing.0086",
       "source_files": [
         "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt"
@@ -4118,7 +4060,7 @@
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 主代理／子代理消耗区分",
       "layer": "第一层｜产品功能与界面",
-      "evidence_level": "named_code_declaration",
+      "evidence_level": "historical_file_only",
       "static_identity": "existing.0091",
       "source_files": [
         "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt"
@@ -4142,7 +4084,7 @@
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 模型价格和未知价格提示",
       "layer": "第一层｜产品功能与界面",
-      "evidence_level": "named_code_declaration",
+      "evidence_level": "historical_file_only",
       "static_identity": "existing.0090",
       "source_files": [
         "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt"
@@ -4192,7 +4134,7 @@
       "evidence_level": "test_method_mapping",
       "static_identity": null,
       "source_files": [],
-      "test_references": 1,
+      "test_references": 3,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
@@ -4421,10 +4363,12 @@
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 会话创建、读写、删除和归档",
       "layer": "第二层｜共享运行能力",
-      "evidence_level": "test_method_mapping",
+      "evidence_level": "named_code_declaration",
       "static_identity": null,
-      "source_files": [],
-      "test_references": 1,
+      "source_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt"
+      ],
+      "test_references": 0,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
@@ -5364,7 +5308,7 @@
       "evidence_level": "test_method_mapping",
       "static_identity": null,
       "source_files": [],
-      "test_references": 7,
+      "test_references": 6,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
@@ -5929,5 +5873,5 @@
       "unrun_instrumentation_tests": 0
     }
   ],
-  "interpretation": "444是功能树末级描述，不是已验收的独立产品功能总数。路由、工具和页面数量口径不同不能相加。"
+  "interpretation": "440项是功能树末级描述，不是已验收的独立产品功能总数。路由、工具和页面数量口径不同不能相加。"
 }

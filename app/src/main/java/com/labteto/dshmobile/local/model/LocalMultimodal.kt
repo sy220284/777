@@ -197,6 +197,7 @@ internal suspend fun prepareLocalMultimodalMessages(
     maxImageBytes: Long = MAX_NATIVE_IMAGE_BYTES,
     model: String? = null,
     baseUrl: String? = null,
+    planSharing: Boolean = false,
 ): List<JsonObject> = withContext(Dispatchers.IO) {
     val activeImageMessageIndices = activeImageMessageIndices(messages, mode)
     val activeFileMessageIndices = activeFileMessageIndices(messages)
@@ -206,6 +207,7 @@ internal suspend fun prepareLocalMultimodalMessages(
     var activeDocumentChars = 0
     var activeVideoBytes = 0L
     var activeVideos = 0
+    var activeFileBytes = 0L
     val reservedDirectImages = messages.mapIndexed { index, message ->
         if (index in activeImageMessageIndices) {
             (message["content"] as? JsonArray).orEmpty().count { part ->
@@ -239,6 +241,26 @@ internal suspend fun prepareLocalMultimodalMessages(
                     }
                     val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: file.name
                     val mediaType = obj["mediaType"]?.jsonPrimitive?.contentOrNull ?: "application/octet-stream"
+                    // Send the active document as a request-scoped input_file when this is an
+                    // official OpenAI Responses route. No Files upload API or durable Base64.
+                    val nativeMime = openAiNativeFileMime(name)
+                    val nativeFileAllowed = planSharing && baseUrl != null &&
+                        usesOfficialOpenAiResponsesContract(baseUrl, false) &&
+                        model != null &&
+                        mode != LocalImageInputMode.TOOL &&
+                        nativeMime != null &&
+                        activeFileBytes + file.length() <= MAX_NATIVE_FILES_TOTAL_BYTES
+                    if (nativeFileAllowed) {
+                        activeFileBytes += file.length()
+                        val bytes = readLocalImageBytesBounded(file, MAX_LOCAL_DOCUMENT_BYTES)
+                        add(buildJsonObject {
+                            put("type", "input_file")
+                            put("filename", name.substringAfterLast('/').substringAfterLast('\\'))
+                            put("file_data", "data:" + nativeMime + ";base64," +
+                                Base64.getEncoder().encodeToString(bytes))
+                        })
+                        return@forEach
+                    }
                     val videoMime = LocalKimiPolicy.videoMediaType(name, mediaType)
                     if (videoMime != null && baseUrl != null && LocalKimiPolicy.isOfficial(baseUrl)) {
                         if (model == null || !LocalKimiPolicy.videoInputSupported(model, baseUrl)) {
@@ -426,6 +448,22 @@ private fun historicalFileReference(file: JsonObject): JsonObject {
     }
 }
 
+/** Only MIME types documented for inline Responses input_file; local extraction handles others. */
+private fun openAiNativeFileMime(name: String): String? = when (name.substringAfterLast('.', "").lowercase()) {
+    "pdf" -> "application/pdf"
+    "txt" -> "text/plain"
+    "md" -> "text/markdown"
+    "csv" -> "text/csv"
+    "tsv" -> "text/tsv"
+    "json" -> "application/json"
+    "xml" -> "application/xml"
+    "html", "htm" -> "text/html"
+    "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    "pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    else -> null
+}
+
 private fun modelImageUrl(mediaType: String, bytes: ByteArray): JsonObject {
     val data = Base64.getEncoder().encodeToString(bytes)
     return buildJsonObject {
@@ -503,7 +541,13 @@ internal fun redactModelImages(messages: List<JsonObject>): List<JsonObject> =
             content.forEach { part ->
                 val obj = part as? JsonObject
                 val type = obj?.get("type")?.jsonPrimitive?.contentOrNull
-                if (type == "image_url" || type == "video_url") {
+                if (type == "input_file") {
+                    add(buildJsonObject {
+                        put("type", "input_file")
+                        obj?.get("filename")?.let { put("filename", it) }
+                        put("file_data", "[inline file bytes omitted]")
+                    })
+                } else if (type == "image_url" || type == "video_url") {
                     val key = if (type == "video_url") "video_url" else "image_url"
                     add(buildJsonObject {
                         put("type", type)
@@ -539,6 +583,7 @@ internal const val MAX_LOCAL_IMAGE_EDGE = 8192
 internal const val MAX_LOCAL_IMAGE_PIXELS = 64_000_000L
 private const val MAX_NATIVE_IMAGE_BYTES = 20L * 1024L * 1024L
 private const val MAX_LOCAL_DOCUMENT_BYTES = 20L * 1024L * 1024L
+private const val MAX_NATIVE_FILES_TOTAL_BYTES = 32L * 1024L * 1024L
 private const val MAX_KIMI_VIDEO_BYTES = 20L * 1024L * 1024L
 private const val MAX_KIMI_VIDEOS_PER_REQUEST = 1
 private const val MAX_LOCAL_DOCUMENT_CHARS_PER_FILE = 40_000

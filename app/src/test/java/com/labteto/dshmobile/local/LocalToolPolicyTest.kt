@@ -45,6 +45,17 @@ class LocalToolPolicyTest {
         }
     }
 
+    @Test fun mediaToolsHaveExplicitBillingAndReadOnlyBoundaries() {
+        assertEquals(ToolAccess.PRIVILEGED, LocalToolPolicy.access("media_image_create"))
+        assertEquals(ToolApprovalPolicy.ALWAYS, LocalToolPolicy.approval("media_image_create"))
+        assertEquals(LocalAutoApprovalScope.NONE, LocalToolPolicy.autoApprovalScope("media_image_create"))
+        assertEquals(ToolExposure.OPTIONAL, LocalToolPolicy.exposure("media_image_create"))
+        assertFalse(LocalToolPolicy.allowedInPlan("media_image_create", LocalToolPolicy.access("media_image_create")))
+        assertEquals(ToolAccess.READ_ONLY, LocalToolPolicy.access("media_image_options"))
+        assertEquals(ToolAccess.READ_ONLY, LocalToolPolicy.access("media_image_status"))
+        assertTrue("生成图片" in LocalToolPolicy.metadata("media_image_create").discoveryKeywords)
+    }
+
     @Test fun tokenAnalysisDiscoversStructuredEnvironmentInfoInsteadOfRawLogScanning() {
         val keywords = LocalToolPolicy.metadata("environment_info").discoveryKeywords
         assertTrue("token" in keywords)

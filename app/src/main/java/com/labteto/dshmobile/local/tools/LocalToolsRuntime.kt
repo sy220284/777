@@ -11,11 +11,20 @@ class LocalToolsRuntime @Inject internal constructor(
     private val githubCredentials: LocalGitHubCredentialManager,
 ) {
     internal suspend fun servers(): List<McpServerSnapshot> = management.servers()
+    internal fun serverChanges(): kotlinx.coroutines.flow.Flow<Unit> = management.serverChanges()
+    internal suspend fun lifecycleHistory(incarnation: String?, afterSequence: Long) =
+        management.lifecycleHistory(incarnation, afterSequence)
+    internal suspend fun checkMcpHealth(serverId: String) = management.checkMcpHealth(serverId)
+    internal fun selectedConnectorIds(): Set<String> = management.selectedConnectorIds()
     internal suspend fun githubConfigured(): Boolean = githubCredentials.configured()
     internal suspend fun configureGitHub(token: String) = githubCredentials.configure(token)
     internal suspend fun clearGitHub() = githubCredentials.clear()
     internal fun capabilityCatalogue() = management.capabilityCatalogue()
+    internal fun validateCapabilityDraft(name: String, schema: kotlinx.serialization.json.JsonObject, input: String) =
+        management.validateCapabilityDraft(name, schema, input)
     internal fun installedPluginIds(): List<String> = management.installedPluginIds()
+    internal fun pluginLifecycleSnapshots() = management.pluginLifecycleSnapshots()
+    internal suspend fun recoverFailedPlugin(id: String) = management.recoverFailedPlugin(id)
     internal suspend fun installedSkills(): List<LocalInstalledSkill> =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.installedSkills() }
     internal suspend fun presetSkills(): List<LocalPresetSkill> =

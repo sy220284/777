@@ -1,0 +1,291 @@
+package com.labteto.dshmobile.uicontract
+
+/** Authored layout and local form values are presentation data, never task completion facts. */
+data class UiDocumentSource(
+    val sessionId: String,
+    val messageId: String,
+    val contextGeneration: Long,
+    val profileId: String?,
+    val projectId: String?,
+    val workMode: Boolean = false,
+)
+
+data class UiDocument(
+    val schemaVersion: Int,
+    val documentId: String,
+    val source: UiDocumentSource,
+    val revision: Long,
+    val title: String,
+    val nodes: List<UiDocumentNode>,
+    val actions: List<UiDocumentAction>,
+    val fallbackText: String,
+)
+
+enum class UiDocumentBinding { EXECUTION_PHASE, QUEUED_INPUT_COUNT, PENDING_APPROVAL_TOOL, CURRENT_ERROR }
+sealed interface UiDocumentBoundValue {
+    data class Text(val value: String) : UiDocumentBoundValue
+    data class Count(val value: Int) : UiDocumentBoundValue
+    data class Phase(val value: UiExecutionPhase) : UiDocumentBoundValue
+    data object Unavailable : UiDocumentBoundValue
+}
+enum class UiDocumentMediaKind { IMAGE, AUDIO, VIDEO }
+/** Read-only typed numbers, never authority or a verified progress claim. */
+data class UiChartPoint(val label: String, val value: Double)
+
+/** A field's storage policy comes from the authored document contract, not its guessed name. */
+enum class UiFieldRetention { SAVED_STATE, MEMORY_ONLY }
+
+sealed interface UiDocumentNode {
+    val id: String
+    data class Text(override val id: String, val text: String) : UiDocumentNode
+    /** References an existing Media Owner asset; never a raw URL or local filesystem path. */
+    data class Media(override val id: String, val assetId: String, val kind: UiDocumentMediaKind,
+        val label: String) : UiDocumentNode
+    /** Read-only presentation data. A table never authorizes tools, payment or progress claims. */
+    data class Table(override val id: String, val headers: List<String>, val rows: List<List<String>>) : UiDocumentNode
+    data class BarChart(override val id: String, val title: String, val unit: String,
+        val points: List<UiChartPoint>) : UiDocumentNode
+    /** Bounded read-only sequence, order is the supplied point order; no tool authority. */
+    data class LineChart(override val id: String, val title: String, val unit: String,
+        val points: List<UiChartPoint>) : UiDocumentNode
+    data class BoundText(override val id: String, val label: String, val binding: UiDocumentBinding) : UiDocumentNode
+    data class Column(override val id: String, val children: List<UiDocumentNode>) : UiDocumentNode
+    data class Row(override val id: String, val children: List<UiDocumentNode>) : UiDocumentNode
+    data class Field(override val id: String, val label: String, val initial: String, val required: Boolean,
+        val multiline: Boolean, val retention: UiFieldRetention = UiFieldRetention.SAVED_STATE) : UiDocumentNode
+    data class Select(override val id: String, val label: String, val options: List<String>, val initial: String) : UiDocumentNode
+    data class Switch(override val id: String, val label: String, val initial: Boolean) : UiDocumentNode
+    data class Button(override val id: String, val label: String, val actionId: String) : UiDocumentNode
+    data class Disclosure(override val id: String, val title: String, val children: List<UiDocumentNode>) : UiDocumentNode
+}
+
+sealed interface UiDocumentAction {
+    val id: String
+    /** User intent only: it cannot introduce a system message, tool call or privileged input. */
+    data class SendUserInput(override val id: String, val text: String, val fieldIds: List<String>,
+        val submit: Boolean = false) : UiDocumentAction
+    data class OpenKnownScene(override val id: String, val sceneId: UiSceneId) : UiDocumentAction
+    /** The pending identity must be obtained from the current Work owner at dispatch time. */
+    data class AnswerApproval(override val id: String, val pendingId: String, val approved: Boolean) : UiDocumentAction
+}
+
+data class UiDocumentActionRequest(
+    val documentId: String,
+    val revision: Long,
+    val source: UiDocumentSource,
+    val actionId: String,
+    val fields: Map<String, String>,
+    val confirmed: Boolean = false,
+)
+
+/** Explicit caller budget; renderers do not silently truncate a document. */
+data class UiDocumentBudget(val maxNodes: Int, val maxDepth: Int, val maxTextChars: Int) {
+    init { require(maxNodes > 0 && maxDepth > 0 && maxTextChars > 0) }
+}
+
+data class UiDocumentValidation(
+    val problems: List<String>,
+) { val valid: Boolean get() = problems.isEmpty() }
+
+fun UiDocument.validate(
+    budget: UiDocumentBudget,
+    knownScenes: Set<UiSceneId>,
+    pendingApprovalId: String?,
+): UiDocumentValidation {
+    val problems = mutableListOf<String>()
+    if (schemaVersion != 1) problems += "schema_version"
+    if (documentId.isBlank() || source.sessionId.isBlank() || source.messageId.isBlank() || revision < 0) problems += "identity"
+    if (actions.map { it.id }.distinct().size != actions.size || actions.any { it.id.isBlank() }) problems += "action_identity"
+    val actionById = actions.associateBy { it.id }
+    val nodesById = mutableMapOf<String, UiDocumentNode>()
+    var count = actions.size
+    var textChars = title.length.toLong() + fallbackText.length
+    fun walk(node: UiDocumentNode, depth: Int) {
+        if (++count > budget.maxNodes) { problems += "node_budget"; return }
+        if (depth > budget.maxDepth) { problems += "depth_budget"; return }
+        if (node.id.isBlank() || nodesById.put(node.id, node) != null) problems += "node_identity"
+        when (node) {
+            is UiDocumentNode.Text -> textChars += node.text.length
+            is UiDocumentNode.Media -> {
+                textChars += node.label.length.toLong() + node.assetId.length
+                if (node.assetId.isBlank() || node.assetId.length > 200 ||
+                    node.assetId.any(Char::isISOControl) || node.label.isBlank() ||
+                    node.label.length > 500) problems += "media_reference"
+            }
+            is UiDocumentNode.Table -> {
+                val cells = node.headers.size.toLong() + node.rows.sumOf { it.size.toLong() }
+                val nextCount = count.toLong() + cells
+                if (nextCount > budget.maxNodes) problems += "table_budget"
+                count = nextCount.coerceAtMost(budget.maxNodes.toLong() + 1).toInt()
+                if (node.headers.isEmpty() || node.headers.size > 8 || node.headers.any { it.isBlank() } ||
+                    node.headers.distinct().size != node.headers.size ||
+                    node.rows.any { it.size != node.headers.size }) problems += "table_shape"
+                textChars += node.headers.sumOf { it.length.toLong() } +
+                    node.rows.sumOf { row -> row.sumOf { it.length.toLong() } }
+            }
+            is UiDocumentNode.BarChart, is UiDocumentNode.LineChart -> {
+                val chart = when (node) {
+                    is UiDocumentNode.BarChart -> Triple(node.title, node.unit, node.points)
+                    is UiDocumentNode.LineChart -> Triple(node.title, node.unit, node.points)
+                    else -> error("unreachable")
+                }
+                val (title, unit, points) = chart
+                val nextCount = count.toLong() + points.size
+                if (nextCount > budget.maxNodes) problems += "chart_budget"
+                count = nextCount.coerceAtMost(budget.maxNodes.toLong() + 1).toInt()
+                textChars += title.length.toLong() + unit.length +
+                    points.sumOf { it.label.length.toLong() }
+                if (title.isBlank() || title.length > 120 || unit.length > 24 ||
+                    points.isEmpty() || points.size > 12 ||
+                    points.any { it.label.isBlank() || it.label.length > 120 ||
+                        !it.value.isFinite() || it.value < 0.0 || it.value > 1.0e12 } ||
+                    points.map { it.label }.distinct().size != points.size)
+                    problems += "chart_values"
+            }
+            is UiDocumentNode.BoundText -> textChars += node.label.length
+            is UiDocumentNode.Column -> node.children.forEach { walk(it, depth + 1) }
+            is UiDocumentNode.Row -> node.children.forEach { walk(it, depth + 1) }
+            is UiDocumentNode.Disclosure -> { textChars += node.title.length; node.children.forEach { walk(it, depth + 1) } }
+            is UiDocumentNode.Field -> {
+                textChars += node.label.length.toLong() + node.initial.length
+                if (node.retention == UiFieldRetention.MEMORY_ONLY && node.initial.isNotEmpty()) {
+                    problems += "sensitive_field_default"
+                }
+            }
+            is UiDocumentNode.Select -> {
+                textChars += node.label.length.toLong() + node.options.sumOf { it.length.toLong() }
+                if (node.options.isEmpty() || node.options.distinct().size != node.options.size || node.initial !in node.options) problems += "select_options"
+            }
+            is UiDocumentNode.Switch -> textChars += node.label.length
+            is UiDocumentNode.Button -> {
+                textChars += node.label.length
+                if (node.actionId !in actionById) problems += "button_action"
+            }
+        }
+    }
+    nodes.forEach { walk(it, 1) }
+    actions.forEach { action ->
+        when (action) {
+            is UiDocumentAction.SendUserInput -> {
+                textChars += action.text.length
+                if (action.fieldIds.distinct().size != action.fieldIds.size || action.fieldIds.any {
+                    nodesById[it] !is UiDocumentNode.Field && nodesById[it] !is UiDocumentNode.Select && nodesById[it] !is UiDocumentNode.Switch
+                }) problems += "input_reference"
+            }
+            is UiDocumentAction.OpenKnownScene -> if (action.sceneId !in knownScenes) problems += "unknown_scene"
+            is UiDocumentAction.AnswerApproval -> if (pendingApprovalId == null || action.pendingId != pendingApprovalId) problems += "approval_identity"
+        }
+    }
+    if (textChars > budget.maxTextChars) problems += "text_budget"
+    return UiDocumentValidation(problems.distinct())
+}
+
+/** Patches are complete validated replacements; there is no executable or arbitrary JSON patch. */
+data class UiDocumentPatch(val documentId: String, val baseRevision: Long, val replacement: UiDocument)
+fun UiDocumentPatch.matches(current: UiDocument): Boolean = documentId == current.documentId &&
+    replacement.documentId == current.documentId && replacement.source == current.source &&
+    baseRevision == current.revision && current.revision < Long.MAX_VALUE && replacement.revision == current.revision + 1
+
+
+/**
+ * A user can correct one existing chart point. Both chart types share the same immutable
+ * point contract; the Session Owner still validates source, permissions, budget and revision CAS.
+ * This changes only presentation data, never the Work evidence or tool result behind it.
+ */
+fun UiDocument.withUserEditedChartPoint(
+    chartId: String, index: Int, value: Double,
+): UiDocument? {
+    if (chartId.isBlank() || index < 0 || !value.isFinite() ||
+        value !in 0.0..1.0e12 || revision == Long.MAX_VALUE ||
+        documentId.startsWith("work-live:")) return null
+    var changed = 0
+    fun rewrite(node: UiDocumentNode): UiDocumentNode = when (node) {
+        is UiDocumentNode.BarChart -> if (node.id == chartId && index in node.points.indices) {
+            changed++
+            node.copy(points = node.points.mapIndexed { at, point ->
+                if (at == index) point.copy(value = value) else point
+            })
+        } else node
+        is UiDocumentNode.LineChart -> if (node.id == chartId && index in node.points.indices) {
+            changed++
+            node.copy(points = node.points.mapIndexed { at, point ->
+                if (at == index) point.copy(value = value) else point
+            })
+        } else node
+        is UiDocumentNode.Column -> node.copy(children = node.children.map(::rewrite))
+        is UiDocumentNode.Row -> node.copy(children = node.children.map(::rewrite))
+        is UiDocumentNode.Disclosure -> node.copy(children = node.children.map(::rewrite))
+        else -> node
+    }
+    val rewritten = nodes.map(::rewrite)
+    return if (changed == 1) copy(
+        revision = revision + 1,
+        nodes = rewritten,
+        fallbackText = "此文档包含用户修正的图表数据，内容尚未经业务核验",
+    ) else null
+}
+
+/**
+ * A user may correct one table display cell without changing its shape, controls or action
+ * definitions. The replacement remains user-edited presentation data, not verified evidence.
+ * The Session Owner must independently enforce revision CAS and UI budget on publication.
+ */
+fun UiDocument.withUserEditedTableCell(
+    tableId: String, row: Int, column: Int, value: String,
+): UiDocument? {
+    if (tableId.isBlank() || row < 0 || column < 0 || value.length > 4096 ||
+        revision == Long.MAX_VALUE || documentId.startsWith("work-live:")) return null
+    var changed = 0
+    fun rewrite(node: UiDocumentNode): UiDocumentNode = when (node) {
+        is UiDocumentNode.Table -> {
+            if (node.id != tableId || row !in node.rows.indices ||
+                column !in node.headers.indices ||
+                node.rows[row].size != node.headers.size) node
+            else {
+                changed++
+                node.copy(rows = node.rows.mapIndexed { index, cells ->
+                    if (index != row) cells else cells.mapIndexed { position, cell ->
+                        if (position == column) value else cell
+                    }
+                })
+            }
+        }
+        is UiDocumentNode.Column -> node.copy(children = node.children.map(::rewrite))
+        is UiDocumentNode.Row -> node.copy(children = node.children.map(::rewrite))
+        is UiDocumentNode.Disclosure -> node.copy(children = node.children.map(::rewrite))
+        else -> node
+    }
+    val rewritten = nodes.map(::rewrite)
+    return if (changed == 1) copy(
+        revision = revision + 1,
+        nodes = rewritten,
+        fallbackText = "此文档包含用户修改的表格数据，内容尚未经业务核验",
+    ) else null
+}
+
+/**
+ * Editing a text node changes only presentation content and increments one document revision.
+ * It cannot modify tool approvals, actions, media identities, or owner-verified Work facts.
+ * The Session store still performs the authoritative compare-and-swap before publication.
+ */
+fun UiDocument.withUserEditedText(nodeId: String, newText: String): UiDocument? {
+    if (nodeId.isBlank() || newText.length > 16_384 || revision == Long.MAX_VALUE ||
+        documentId.startsWith("work-live:")) return null
+    var replacements = 0
+    fun rewrite(node: UiDocumentNode): UiDocumentNode = when (node) {
+        is UiDocumentNode.Text -> if (node.id == nodeId) {
+            replacements++
+            node.copy(text = newText)
+        } else node
+        is UiDocumentNode.Column -> node.copy(children = node.children.map(::rewrite))
+        is UiDocumentNode.Row -> node.copy(children = node.children.map(::rewrite))
+        is UiDocumentNode.Disclosure -> node.copy(children = node.children.map(::rewrite))
+        else -> node
+    }
+    val rewritten = nodes.map(::rewrite)
+    return if (replacements == 1) copy(
+        revision = revision + 1, nodes = rewritten,
+        fallbackText = if (rewritten.size == 1 && rewritten[0] is UiDocumentNode.Text)
+            newText else "此文档包含用户修改的文本，请查看结构化内容",
+    ) else null
+}

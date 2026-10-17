@@ -41,6 +41,15 @@ class OpenAiResponsesClientTest {
         Json { ignoreUnknownKeys = true },
     )
 
+    private fun planToolNamespaces(payload: JsonObject): JsonArray {
+        assertFalse("Responses Lite must not emit top-level tools", "tools" in payload)
+        val item = payload["input"]!!.jsonArray.first().jsonObject
+        assertEquals("additional_tools", item["type"]!!.jsonPrimitive.content)
+        assertEquals("developer", item["role"]!!.jsonPrimitive.content)
+        assertTrue(item["id"]!!.jsonPrimitive.content.startsWith("at_"))
+        return item["tools"]!!.jsonArray
+    }
+
     @Test
     fun apiAndPlanReasoningSelectionPreserveDefaultAndUseNativeFields() {
         listOf(false, true).forEach { plan ->
@@ -352,9 +361,8 @@ class OpenAiResponsesClientTest {
         ]""").jsonArray
         listOf(false, true).forEach { plan ->
             val payload = client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = plan)
-            val emitted = payload["tools"]!!.jsonArray.let {
-                if (plan) it.single().jsonObject["tools"]!!.jsonArray else it
-            }
+            val emitted = if (plan) planToolNamespaces(payload).single().jsonObject["tools"]!!.jsonArray
+                else payload["tools"]!!.jsonArray
             assertEquals("false", emitted[0].jsonObject["strict"]!!.jsonPrimitive.content)
             assertEquals("true", emitted[1].jsonObject["strict"]!!.jsonPrimitive.content)
             assertEquals(tools[0].jsonObject["function"]!!.jsonObject["parameters"], emitted[0].jsonObject["parameters"])
@@ -478,7 +486,7 @@ class OpenAiResponsesClientTest {
             temperature = 0.9,
         )
 
-        assertEquals("保持人物连续性", payload["instructions"]?.jsonPrimitive?.content)
+        assertFalse("Responses Lite instructions must be developer input", "instructions" in payload)
         assertEquals(false, payload["store"]?.jsonPrimitive?.content?.toBoolean())
         assertEquals(true, payload["stream"]?.jsonPrimitive?.content?.toBoolean())
         assertFalse("temperature" in payload)
@@ -505,8 +513,11 @@ class OpenAiResponsesClientTest {
         }
 
         val input = payload["input"]!!.jsonArray
-        assertEquals(1, input.size)
-        assertEquals("user", input.single().jsonObject["role"]?.jsonPrimitive?.content)
+        assertEquals(2, input.size)
+        assertEquals("developer", input[0].jsonObject["role"]?.jsonPrimitive?.content)
+        assertEquals("保持人物连续性",
+            input[0].jsonObject["content"]!!.jsonArray.single().jsonObject["text"]?.jsonPrimitive?.content)
+        assertEquals("user", input[1].jsonObject["role"]?.jsonPrimitive?.content)
     }
 
     @Test
@@ -521,11 +532,12 @@ class OpenAiResponsesClientTest {
             )
             client.validateRequestPayload(payload)
 
-            assertTrue(payload["instructions"]?.jsonPrimitive?.content.orEmpty().isNotBlank())
+            assertFalse("instructions" in payload)
             val input = payload["input"]!!.jsonArray
-            assertEquals(1, input.size)
-            assertEquals("user", input.single().jsonObject["role"]?.jsonPrimitive?.content)
-            assertEquals(prompt, input.single().jsonObject["content"]?.jsonPrimitive?.content)
+            assertEquals(2, input.size)
+            assertEquals("developer", input[0].jsonObject["role"]?.jsonPrimitive?.content)
+            assertEquals("user", input[1].jsonObject["role"]?.jsonPrimitive?.content)
+            assertEquals(prompt, input[1].jsonObject["content"]?.jsonPrimitive?.content)
         }
     }
 
@@ -740,7 +752,112 @@ class OpenAiResponsesClientTest {
             temperature = null,
         )
 
-        assertEquals("规则一\n\n规则二", payload["instructions"]?.jsonPrimitive?.content)
+        assertFalse("instructions" in payload)
+        assertEquals("规则一\n\n规则二",
+            payload["input"]!!.jsonArray.first().jsonObject["content"]!!.jsonArray.single()
+                .jsonObject["text"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun inlineFileInputPassesResponsesAdapterWithoutConversionToImages() {
+        val payload = client.buildPayload(
+            model = "gpt-6-astra",
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", buildJsonArray {
+                    add(buildJsonObject {
+                        put("type", "input_file")
+                        put("filename", "manual.pdf")
+                        put("file_data", "data:application/pdf;base64,AAAA")
+                    })
+                })
+            }),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            planSharing = true,
+        )
+        val input = payload["input"]!!.jsonArray
+        val content = input.single().jsonObject["content"]!!.jsonArray
+        assertEquals("input_file", content.single().jsonObject["type"]?.jsonPrimitive?.content)
+        assertFalse("tools" in payload)
+    }
+
+    @Test
+    fun explicitSearchGetsNativeWebSearchOnlyWithoutLocalToolsAndOnlyWithPlan() {
+        val prompt = listOf(buildJsonObject { put("role", "user"); put("content", "联网搜索今天的新闻") })
+        val rejection = runCatching {
+            client.buildPayload("gpt-6-astra", prompt, JsonArray(emptyList()),
+                temperature = null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("CHATGPT_PLAN_UNSUPPORTED_CAPABILITY", rejection?.code)
+        val api = client.buildPayload("gpt-6-astra", prompt, JsonArray(emptyList()),
+            temperature = null, planSharing = false)
+        assertFalse("tools" in api)
+        val noSearch = client.buildPayload("gpt-6-astra",
+            listOf(buildJsonObject { put("role", "user"); put("content", "介绍一下联网搜索功能") }),
+            JsonArray(emptyList()), temperature = null, planSharing = true)
+        assertFalse("tools" in noSearch)
+    }
+
+    @Test
+    fun officialWebSearchResponsePreservesSourcesInVisibleMessage() {
+        val reply = client.parseCompleted(
+            Json.parseToJsonElement("""{"id":"resp-web","output":[{"type":"message","role":"assistant",
+                "content":[{"type":"output_text","text":"结果参考资料。",
+                    "annotations":[{"type":"url_citation","url":"https://example.org/article","title":"例子"}]}]}]}""").jsonObject,
+            promptBreakdown = TokenPromptBreakdown(),
+        )
+        assertTrue(reply.content.orEmpty().contains("https://example.org/article"))
+        assertTrue(reply.content.orEmpty().contains("结果参考资料"))
+    }
+
+    @Test
+    fun planPayloadRejectsUnsupportedHostedToolsAndUploadedFileId() {
+        val blocked = buildJsonObject {
+            put("model", "gpt-6-astra")
+            put("input", buildJsonArray {
+                add(buildJsonObject { put("role", "user"); put("content", "测试") })
+            })
+            put("tools", buildJsonArray {
+                add(buildJsonObject { put("type", "image_generation") })
+            })
+        }
+        val rejected = runCatching {
+            client.validateRequestPayload(blocked, planSharing = true)
+        }.exceptionOrNull()
+        assertTrue(rejected is LocalModelException)
+        assertEquals("CHATGPT_PLAN_UNSUPPORTED_CAPABILITY", (rejected as LocalModelException).code)
+        val invalidFile = buildJsonObject {
+            put("input", buildJsonArray {
+                add(buildJsonObject {
+                    put("role", "user")
+                    put("content", buildJsonArray {
+                        add(buildJsonObject { put("type", "input_file"); put("file_id", "file-test") })
+                    })
+                })
+            })
+        }
+        assertTrue(runCatching {
+            client.validateRequestPayload(invalidFile, planSharing = true)
+        }.exceptionOrNull() is LocalModelException)
+        client.validateRequestPayload(blocked, planSharing = false)
+    }
+
+    @Test
+    fun planSharingUsesCodexResponsesLiteAdditionalToolsInsteadOfTopLevelTools() {
+        val catalog = Json.parseToJsonElement("""[
+            {"type":"function","function":{"name":"read_file","description":"read",
+            "parameters":{"type":"object","properties":{}}}}
+        ]""").jsonArray
+        val messages = listOf(buildJsonObject { put("role", "user"); put("content", "读取文件") })
+        val first = client.buildPayload("gpt-test", messages, catalog, null, planSharing = true)
+        val second = client.buildPayload("gpt-test", messages, catalog, null, planSharing = true)
+        assertEquals(planToolNamespaces(first), planToolNamespaces(second))
+        assertEquals("user", first["input"]!!.jsonArray[1].jsonObject["role"]?.jsonPrimitive?.content)
+        val apiKey = client.buildPayload("gpt-test", messages, catalog, null, planSharing = false)
+        assertTrue("tools" in apiKey)
+        assertEquals("user", apiKey["input"]!!.jsonArray.first().jsonObject["role"]?.jsonPrimitive?.content)
+        client.validateRequestPayload(first, planSharing = true)
     }
 
     @Test
@@ -772,7 +889,7 @@ class OpenAiResponsesClientTest {
             planSharing = true,
         )
 
-        val namespace = payload["tools"]!!.jsonArray.single().jsonObject
+        val namespace = planToolNamespaces(payload).single().jsonObject
         assertEquals("namespace", namespace["type"]?.jsonPrimitive?.content)
         assertEquals("local", namespace["name"]?.jsonPrimitive?.content)
         val function = namespace["tools"]!!.jsonArray.single().jsonObject
@@ -806,7 +923,7 @@ class OpenAiResponsesClientTest {
             temperature = null,
             planSharing = true,
         )
-        val namespace = payload["tools"]!!.jsonArray.single().jsonObject
+        val namespace = planToolNamespaces(payload).single().jsonObject
 
         assertEquals("namespace", namespace["type"]?.jsonPrimitive?.content)
         assertEquals("local", namespace["name"]?.jsonPrimitive?.content)
@@ -835,9 +952,8 @@ class OpenAiResponsesClientTest {
                 temperature = null,
                 planSharing = plan,
             )
-            val emitted = payload["tools"]!!.jsonArray.let { outer ->
-                if (plan) outer.single().jsonObject["tools"]!!.jsonArray else outer
-            }.single().jsonObject
+            val emitted = (if (plan) planToolNamespaces(payload).single().jsonObject["tools"]!!.jsonArray
+                else payload["tools"]!!.jsonArray).single().jsonObject
 
             assertEquals("function", emitted["type"]?.jsonPrimitive?.content)
             assertEquals("minimal_tool", emitted["name"]?.jsonPrimitive?.content)
@@ -857,7 +973,7 @@ class OpenAiResponsesClientTest {
             temperature = null,
             planSharing = true,
         )
-        val namespace = payload["tools"]!!.jsonArray.single().jsonObject
+        val namespace = planToolNamespaces(payload).single().jsonObject
         assertTrue(namespace["description"]?.jsonPrimitive?.content.orEmpty().isNotBlank())
 
         namespace["tools"]!!.jsonArray.forEach { element ->
@@ -952,7 +1068,7 @@ class OpenAiResponsesClientTest {
             temperature = null,
             planSharing = true,
         )
-        val function = payload["tools"]!!.jsonArray.single().jsonObject["tools"]!!
+        val function = planToolNamespaces(payload).single().jsonObject["tools"]!!
             .jsonArray.single().jsonObject
 
         assertEquals("true", function["strict"]!!.jsonPrimitive.content)
@@ -1411,10 +1527,24 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
-    fun knownModernGptPlanModelsExposeNativeImageToolButProxyDoesNot() {
+    fun planPayloadCannotEnableImageGenerationEvenWhenForcedByCaller() {
+        val payload = client.buildPayload(
+            model = "gpt-6-astra",
+            messages = listOf(buildJsonObject { put("role", "user"); put("content", "画一只猫") }),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            planSharing = true,
+            enableImageGenerationTool = true,
+        )
+        assertFalse("tool_choice" in payload)
+        assertFalse("tools" in payload)
+    }
+
+    @Test
+    fun knownModernGptPlanModelsCannotUsePlanImageTool() {
         listOf("gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna",
             "gpt-5.6", "gpt-5.6-sol", "gpt-5.5").forEach { model ->
-            assertTrue(resolveOpenAiImageGenerationToolEnabled(
+            assertFalse(resolveOpenAiImageGenerationToolEnabled(
                 baseUrl = "https://api.openai.com/v1", model = model,
                 planSharing = true, requested = true,
             ))
@@ -1442,7 +1572,7 @@ class OpenAiResponsesClientTest {
                 }),
                 tools = JsonArray(emptyList()),
                 temperature = null,
-                planSharing = true,
+                planSharing = false,
                 enableImageGenerationTool = true,
             )
             assertEquals("image_generation",
@@ -1463,7 +1593,7 @@ class OpenAiResponsesClientTest {
                 }),
                 tools = JsonArray(emptyList()),
                 temperature = null,
-                planSharing = true,
+                planSharing = false,
                 enableImageGenerationTool = true,
             )
             assertFalse("tool_choice" in payload)
@@ -1476,7 +1606,7 @@ class OpenAiResponsesClientTest {
             }),
             tools = JsonArray(emptyList()),
             temperature = null,
-            planSharing = true,
+            planSharing = false,
             enableImageGenerationTool = false,
         )
         assertFalse("tool_choice" in disabled)
@@ -1500,6 +1630,7 @@ class OpenAiResponsesClientTest {
             tools = JsonArray(emptyList()),
             temperature = null,
             enableImageGenerationTool = true,
+            planSharing = false,
         )
         assertEquals("image_generation",
             payload["tool_choice"]?.jsonObject?.get("type")?.jsonPrimitive?.content)
@@ -1521,7 +1652,7 @@ class OpenAiResponsesClientTest {
             }),
             tools = JsonArray(emptyList()),
             temperature = null,
-            planSharing = true,
+            planSharing = false,
             enableImageGenerationTool = true,
         )
         listOf("请根据附图重新生成一张图片，修改要求：把背景改成蓝色",

@@ -50,8 +50,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
-import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
-import com.labteto.dshmobile.local.presentation.LocalToolsUiFacade
+import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot
+import com.labteto.dshmobile.uicontract.ToolsUiPort
 import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
@@ -84,6 +84,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.sync.withLock
 
 enum class ToolsNotice {
@@ -97,14 +99,15 @@ enum class ToolsNotice {
 
 data class ToolsUiState(
     val loading: Boolean = false,
-    val capabilities: List<com.labteto.dshmobile.local.presentation.LocalCapabilityUiEntry> = emptyList(),
-    val servers: List<McpServerSnapshot> = emptyList(),
+    val capabilities: List<com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot> = emptyList(),
+    val servers: List<UiMcpServerSnapshot> = emptyList(),
     val githubConfigured: Boolean = false,
     val localPlugins: List<String> = emptyList(),
-    val skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
-    val presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
+    val skills: List<com.labteto.dshmobile.uicontract.UiSkillSnapshot> = emptyList(),
+    val curatedSkills: List<String> = emptyList(),
+    val presets: List<com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot> = emptyList(),
     val createdSkillId: String? = null,
-    val skillEditor: com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry? = null,
+    val skillEditor: com.labteto.dshmobile.uicontract.UiSkillEditorSnapshot? = null,
     val savedSkillId: String? = null,
     val notice: ToolsNotice? = null,
     val feedback: String? = null,
@@ -113,18 +116,13 @@ data class ToolsUiState(
 
 /** Safe user-facing classification; never surface raw URLs, tokens or command-line contents. */
 internal fun localToolConnectionErrorMessageRes(error: Throwable): Int {
-    var cause: Throwable = error
-    repeat(4) {
-        val nested = cause.cause ?: return@repeat
-        cause = nested
-    }
-    return when (cause) {
-        is java.net.UnknownHostException -> R.string.tools_error_dns
-        is java.net.SocketTimeoutException -> R.string.tools_error_timeout
-        is java.net.ConnectException -> R.string.tools_error_unreachable
-        is SecurityException -> R.string.tools_error_permission
-        is IllegalArgumentException -> R.string.tools_error_config
-        else -> R.string.tools_error_generic
+    return when (com.labteto.dshmobile.uicontract.classifyUiToolError(error)) {
+        com.labteto.dshmobile.uicontract.UiToolError.DNS -> R.string.tools_error_dns
+        com.labteto.dshmobile.uicontract.UiToolError.TIMEOUT -> R.string.tools_error_timeout
+        com.labteto.dshmobile.uicontract.UiToolError.UNREACHABLE -> R.string.tools_error_unreachable
+        com.labteto.dshmobile.uicontract.UiToolError.PERMISSION -> R.string.tools_error_permission
+        com.labteto.dshmobile.uicontract.UiToolError.CONFIGURATION -> R.string.tools_error_config
+        com.labteto.dshmobile.uicontract.UiToolError.UNKNOWN -> R.string.tools_error_generic
     }
 }
 
@@ -136,7 +134,7 @@ internal class ToolsOperationGate {
 
 @HiltViewModel
 class ToolsViewModel @Inject constructor(
-    private val localTools: LocalToolsUiFacade,
+    private val localTools: ToolsUiPort,
     @ApplicationContext private val appContext: Context,
     private val networkSearchSettings: LocalNetworkSearchSettings,
 ) : ViewModel() {
@@ -150,6 +148,32 @@ class ToolsViewModel @Inject constructor(
     private fun launchOperation(block: suspend () -> Unit) {
         viewModelScope.launch {
             operationGate.run(block)
+        }
+    }
+
+    /**
+     * Read the MCP registry lifecycle only while the user is connecting/disconnecting.
+     * Uses a separate coroutine so a slow handshake cannot block status refresh behind
+     * the command gate. Never treats reservation/registration as a health check.
+     */
+    private suspend fun <T> trackMcpOperation(block: suspend () -> T): T = kotlinx.coroutines.coroutineScope {
+        val watcher = launch {
+            while (kotlinx.coroutines.currentCoroutineContext().isActive) {
+                try {
+                    _state.value = _state.value.copy(servers = localTools.servers())
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { /* Observation failure does not replay a mutation. */ }
+                kotlinx.coroutines.delay(300)
+            }
+        }
+        try {
+            block()
+        } finally {
+            watcher.cancelAndJoin()
+            try {
+                _state.value = _state.value.copy(servers = localTools.servers())
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { /* Preserve actual command error when status read fails. */ }
         }
     }
 
@@ -222,6 +246,36 @@ class ToolsViewModel @Inject constructor(
     fun installPreset(id: String) = changeSkills { localTools.installPreset(id) }
     fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         changeSkills(createdId = id) { localTools.createSkill(id, displayName, description, instructions) }
+    fun browseCuratedSkills() {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null)
+            try {
+                val results = localTools.curatedGitHubSkills()
+                _state.value = _state.value.copy(loading = false, curatedSkills = results,
+                    feedbackRes = if (results.isEmpty()) R.string.skills_github_official_empty else null)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false, feedback = error.message)
+            }
+        }
+    }
+
+    fun importGitHubSkill(link: String) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                val id = localTools.installGitHubSkill(link)
+                _state.value = _state.value.copy(loading = false,
+                    skills = localTools.installedSkills(), presets = localTools.presetSkills(),
+                    createdSkillId = id, feedback = appContext.getString(R.string.skills_import_success, id))
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false,
+                    feedback = error.message ?: appContext.getString(R.string.skills_import_failed))
+            }
+        }
+    }
+
     fun importSkill(uri: Uri) {
         launchOperation {
             _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
@@ -271,7 +325,7 @@ class ToolsViewModel @Inject constructor(
             try {
                 _state.value = _state.value.copy(
                     loading = false,
-                    skillEditor = com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry(
+                    skillEditor = com.labteto.dshmobile.uicontract.UiSkillEditorSnapshot(
                         id, localTools.readSkillDocument(id),
                     ),
                 )
@@ -313,7 +367,7 @@ class ToolsViewModel @Inject constructor(
         launchOperation {
             _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
             try {
-                localTools.connectHttp(serverId, endpoint)
+                trackMcpOperation { localTools.connectHttp(serverId, endpoint) }
                 _state.value = _state.value.copy(
                     loading = false,
                     servers = localTools.servers(),
@@ -337,7 +391,7 @@ class ToolsViewModel @Inject constructor(
         launchOperation {
             _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
             try {
-                localTools.connectStdio(serverId, command, workingDirectory)
+                trackMcpOperation { localTools.connectStdio(serverId, command, workingDirectory) }
                 _state.value = _state.value.copy(
                     loading = false,
                     servers = localTools.servers(),
@@ -407,7 +461,7 @@ class ToolsViewModel @Inject constructor(
         launchOperation {
             _state.value = _state.value.copy(loading = true, notice = null)
             try {
-                localTools.disconnect(serverId)
+                trackMcpOperation { localTools.disconnect(serverId) }
                 _state.value = _state.value.copy(
                     loading = false,
                     servers = localTools.servers(),
@@ -569,6 +623,9 @@ fun ToolsScreen(
             onInstallPreset = viewModel::installPreset,
             onCreateSkill = viewModel::createSkill,
             onImportSkill = { skillFilePicker.launch(arrayOf("*/*")) },
+            onInstallFromGitHub = viewModel::importGitHubSkill,
+            curatedSkills = state.curatedSkills,
+            onBrowseCuratedSkills = viewModel::browseCuratedSkills,
             onRemoveSkill = viewModel::removeSkill,
             onOpenSkillEditor = viewModel::openSkillEditor,
             onCloseSkillEditor = viewModel::closeSkillEditor,
@@ -578,7 +635,7 @@ fun ToolsScreen(
     } else if (capabilityCatalogueVisible) {
         FluidCapabilityCatalogue(
             entries = state.capabilities, loading = state.loading, failed = catalogueFailure,
-            connections = state.servers.size, onRefresh = viewModel::refresh, onBack = onClose,
+            connections = state.servers.count { it.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED }, onRefresh = viewModel::refresh, onBack = onClose,
             onManage = { capabilityCatalogueVisible = false },
             onPlugins = { skillsOnly = false; showPluginBrowser = true },
             onSkills = { skillsOnly = true; showPluginBrowser = true },
@@ -680,7 +737,7 @@ fun ToolsScreen(
                         color = colors.textTertiary,
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                        val builtinAvailable = "local-builtin" in state.localPlugins
+                        val builtinAvailable = "android-local-builtins" in state.localPlugins
                         ToolCapabilityRow(
                             iconPainter = painterResource(R.drawable.ic_ui_plugin),
                             title = stringResource(R.string.skills_title),
@@ -701,8 +758,8 @@ fun ToolsScreen(
                         ToolCapabilityRow(
                             iconPainter = painterResource(R.drawable.ic_ui_plugin),
                             title = stringResource(R.string.tools_external_services),
-                            status = state.servers.size.toString(),
-                            state = if (state.servers.isNotEmpty()) StateDotState.Done else StateDotState.Idle,
+                            status = stringResource(R.string.tools_external_registration_summary, state.servers.count { it.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED }),
+                            state = StateDotState.Idle,
                             onClick = { showExternalConfig = true },
                         )
                     }
@@ -786,7 +843,22 @@ fun ToolsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                     ) {
-                        StateDot(StateDotState.Done)
+                        // The registry snapshot carries discovered tools, not a current health probe.
+                        com.shenyan.designsystem.components.SyStateDot(
+                            phase = com.shenyan.designsystem.foundation.SyPhase.IDLE,
+                            label = stringResource(when (server.connection) {
+                                com.labteto.dshmobile.uicontract.UiToolConnection.HEALTH_UNCHECKED ->
+                                    R.string.tools_server_health_unchecked
+                                com.labteto.dshmobile.uicontract.UiToolConnection.FAILED ->
+                                    R.string.tools_server_failed
+                                com.labteto.dshmobile.uicontract.UiToolConnection.CONNECTING ->
+                                    R.string.tools_server_connecting
+                                com.labteto.dshmobile.uicontract.UiToolConnection.RECONNECTING ->
+                                    R.string.tools_server_reconnecting
+                                com.labteto.dshmobile.uicontract.UiToolConnection.DISCONNECTING ->
+                                    R.string.tools_server_disconnecting
+                            }),
+                        )
                         Column(Modifier.weight(1f)) {
                             Text(
                                 server.id,
@@ -806,14 +878,14 @@ fun ToolsScreen(
                         SyButton(
                             text = stringResource(R.string.cap_center_view_tools),
                             onClick = { expandedMcpServer = if (expandedMcpServer == server.id) null else server.id },
-                            enabled = server.tools.isNotEmpty(),
+                            enabled = server.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED && server.tools.isNotEmpty(),
                             size = SyButtonSize.Small,
                             variant = SyButtonVariant.Ghost,
                         )
                         SyButton(
                             text = stringResource(R.string.tools_disconnect),
                             onClick = { viewModel.disconnect(server.id) },
-                            enabled = !state.loading,
+                            enabled = !state.loading && server.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED,
                             size = SyButtonSize.Small,
                             variant = SyButtonVariant.Ghost,
                         )

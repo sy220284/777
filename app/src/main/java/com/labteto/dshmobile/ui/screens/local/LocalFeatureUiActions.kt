@@ -43,10 +43,10 @@ internal data class LocalShellFeatureUiActions(
     val toggleSessionPinned: (String) -> Unit,
     val renameSession: (String, String) -> Boolean,
     val deleteSessions: suspend (Set<String>) -> Int,
-    val configureChatPersona: suspend (PersonaProfile) -> Result<Unit>,
+    val configureChatPersona: suspend (PersonaProfile, com.labteto.dshmobile.uicontract.UiSessionIdentity?) -> Result<Unit>,
     val configureGroupMembers: (List<String>) -> Boolean,
     val selectGalleryPersona: (String) -> Boolean,
-    val autoFillChatPersona: suspend (PersonaProfile, String) -> Result<PersonaProfile>,
+    val autoFillChatPersona: suspend (PersonaProfile, String, com.labteto.dshmobile.uicontract.UiSessionIdentity?) -> Result<PersonaProfile>,
     val saveGroupAnnouncement: suspend (String) -> Result<Unit>,
     val undoPersonaCorrection: (Long, String, String) -> Unit,
     val setPlanMode: (Boolean) -> Unit,
@@ -97,6 +97,7 @@ internal data class LocalWorkUiActionResult(
 )
 
 internal data class LocalWorkFeatureUiActions(
+    val evidence: com.labteto.dshmobile.uicontract.WorkEvidenceUiPort,
     val workState: StateFlow<LocalWorkUiState>,
     val workspaceFiles: suspend () -> List<LocalWorkspaceFile>,
     val conversationFiles: suspend (String) -> LocalConversationFiles,
@@ -110,7 +111,7 @@ internal data class LocalWorkFeatureUiActions(
     val toolActivities: (String) -> List<LocalToolActivityUiItem>,
     val toolEvidence: (String, String, Long) -> String?,
     val requirementEvidence: (String) -> List<com.labteto.dshmobile.local.work.LocalRequirementEvidenceLink>,
-    val linkRequirementEvidence: (String, com.labteto.dshmobile.local.presentation.LocalRequirementUiTarget, LocalArtifactUiItem) -> Boolean,
+    val linkRequirementEvidence: suspend (String, com.labteto.dshmobile.local.presentation.LocalRequirementUiTarget, LocalArtifactUiItem) -> Boolean,
 )
 
 internal data class LocalAutomationFeatureUiActions(

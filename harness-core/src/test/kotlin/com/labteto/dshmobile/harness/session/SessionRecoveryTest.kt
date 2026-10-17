@@ -4,6 +4,8 @@ import java.nio.file.Files
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -12,6 +14,73 @@ import org.junit.Test
 
 class SessionRecoveryTest {
     private val json = Json { ignoreUnknownKeys = true }
+
+    @Test
+    fun admittedReadOnlyOperationRetainsRetryableRecoveryAcrossColdLogReplay() {
+        val directory = Files.createTempDirectory("session-recovery-read-only").toFile()
+        try {
+            val file = directory.resolve("events.jsonl")
+            val log = SessionEventLog(file, json, maxBytes = 4_096)
+            log.append("turn/start", buildJsonObject { })
+            log.append("step/start", buildJsonObject { put("step", 1) })
+            log.append("tool/call", buildJsonObject {
+                put("id", "read"); put("goal_id", "goal"); put("execution_started", false)
+            })
+            log.append("tool/execution-started", buildJsonObject {
+                put("id", "read"); put("execution_id", "exec-read"); put("read_only", true)
+            })
+            val recovered = SessionRecovery.repairInterruptedTail(log).toolResults.single()
+            assertEquals(SessionRecovery.TOOL_READ_RESULT_UNKNOWN, recovered.code)
+            assertTrue(recovered.modelContent.contains("\"retryable\":true"))
+            val ledger = ToolAttemptLedger()
+            SessionEventLog(file, json, maxBytes = 4_096).forEachAfter(-1L) { ledger.observe(it) }
+            assertFalse(ledger.hasUnresolvedExternalEffects("goal"))
+            assertEquals("exec-read", ledger.snapshot().single().executionId)
+            assertEquals(ToolAttemptState.SETTLED, ledger.snapshot().single().state)
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test
+    fun concurrentRecoveryReadersCommitOnlyOneRepairForSharedSession() {
+        val directory = Files.createTempDirectory("session-recovery-exclusive").toFile()
+        try {
+            val path = directory.resolve("events.jsonl")
+            val first = SessionEventLog(path, json, maxBytes = 4_096)
+            val second = SessionEventLog(path, json, maxBytes = 4_096)
+            try {
+                first.append("turn/start", buildJsonObject {})
+                first.append("step/start", buildJsonObject { put("step", 1) })
+                first.append("tool/call", buildJsonObject {
+                    put("id", "mutation")
+                    put("execution_started", true)
+                })
+                val gate = java.util.concurrent.CountDownLatch(1)
+                val threads = java.util.concurrent.Executors.newFixedThreadPool(2)
+                try {
+                    val futures = listOf(first, second).map { log ->
+                        threads.submit<SessionRepairResult> {
+                            gate.await()
+                            SessionRecovery.repairInterruptedTail(log)
+                        }
+                    }
+                    gate.countDown()
+                    val results = futures.map { it.get(10, java.util.concurrent.TimeUnit.SECONDS) }
+                    assertEquals(1, results.count { it.repaired })
+                    assertEquals(1, first.snapshot().count { it.type == "tool/result" })
+                    assertEquals(1, first.snapshot().count { it.type == "turn/end" })
+                    assertEquals(SessionRecovery.TOOL_OUTCOME_UNKNOWN,
+                        results.flatMap { it.toolResults }.single().code)
+                } finally {
+                    threads.shutdownNow()
+                }
+            } finally {
+                second.close()
+                first.close()
+            }
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
 
     @Test
     fun startedToolWithoutResultBecomesOutcomeUnknownAndTailCloses() {
@@ -157,6 +226,48 @@ class SessionRecoveryTest {
 
 
     @Test
+    fun staleEndForEarlierStepCannotHideUnsettledCurrentWrite() {
+        val directory = Files.createTempDirectory("session-recovery-late-step-end").toFile()
+        try {
+            val log = SessionEventLog(directory.resolve("events.jsonl"), json, maxBytes = 4_096)
+            log.append("turn/start", buildJsonObject {})
+            log.append("step/start", buildJsonObject { put("step", 1) })
+            log.append("step/end", buildJsonObject { put("step", 1) })
+            log.append("step/start", buildJsonObject { put("step", 2) })
+            log.append("tool/call", buildJsonObject {
+                put("id", "write-current")
+                put("goal_id", "goal")
+            })
+            log.append("step/end", buildJsonObject { put("step", 1) }) // delayed prior step
+            val repaired = SessionRecovery.repairInterruptedTail(log)
+            assertEquals(SessionRecovery.TOOL_OUTCOME_UNKNOWN,
+                repaired.toolResults.single().code)
+            assertEquals(listOf("tool/result", "step/end", "turn/end"),
+                repaired.appended.map { it.type })
+            assertEquals(2, repaired.appended[1].data["step"]?.jsonPrimitive?.intOrNull)
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test
+    fun existingStepEndDoesNotHideToolResultLostBeforeCrash() {
+        val directory = Files.createTempDirectory("session-recovery-lost-tool-result").toFile()
+        try {
+            val log = SessionEventLog(directory.resolve("events.jsonl"), json, maxBytes = 4_096)
+            log.append("turn/start", buildJsonObject {})
+            log.append("step/start", buildJsonObject { put("step", 7) })
+            log.append("tool/call", buildJsonObject {
+                put("id", "mutation")
+                put("goal_id", "goal")
+            })
+            log.append("step/end", buildJsonObject { put("step", 7) })
+            val repaired = SessionRecovery.repairInterruptedTail(log)
+            assertEquals(SessionRecovery.TOOL_OUTCOME_UNKNOWN,
+                repaired.toolResults.single().code)
+            assertEquals(listOf("tool/result", "turn/end"), repaired.appended.map { it.type })
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test
     fun completedStepInsideOpenTurnDoesNotResurrectOldPendingCalls() {
         val directory = Files.createTempDirectory("session-recovery-step-boundary").toFile()
         try {
@@ -210,6 +321,37 @@ class SessionRecoveryTest {
         } finally {
             directory.deleteRecursively()
         }
+    }
+
+    @Test
+    fun coldRecoveryPreservesUnresolvedLegacyWritesWhenProviderCallIdsAreReused() {
+        val directory = Files.createTempDirectory("session-recovery-reused-legacy").toFile()
+        try {
+            val file = directory.resolve("events.jsonl")
+            val log = SessionEventLog(file, json, maxBytes = 4_096)
+            log.append("turn/start", buildJsonObject {})
+            log.append("step/start", buildJsonObject { put("step", 1) })
+            repeat(2) {
+                log.append("tool/call", buildJsonObject {
+                    put("id", "reused")
+                    put("name", "write")
+                    put("goal_id", "goal")
+                })
+            }
+            // Recovery must still emit model-visible results but cannot ascribe
+            // either receipt to one of the two legacy executions by call ID alone.
+            val repaired = SessionRecovery.repairInterruptedTail(log)
+            assertEquals(2, repaired.toolResults.size)
+            assertTrue(repaired.toolResults.all {
+                it.code == SessionRecovery.TOOL_OUTCOME_UNKNOWN
+            })
+            val ledger = ToolAttemptLedger()
+            SessionEventLog(file, json, maxBytes = 4_096).use { recoveredLog ->
+                recoveredLog.forEachAfter(-1L) { ledger.observe(it) }
+            }
+            assertEquals(2, ledger.pending().size)
+            assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
+        } finally { directory.deleteRecursively() }
     }
 
     private fun assistantWithTool(id: String, name: String) = buildJsonObject {

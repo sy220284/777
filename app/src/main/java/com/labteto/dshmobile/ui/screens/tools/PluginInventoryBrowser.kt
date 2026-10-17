@@ -41,7 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
+import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -83,11 +83,11 @@ private data class InventoryRow(
 @Composable
 internal fun PluginInventoryBrowser(
     localIds: List<String>,
-    connectedServices: List<McpServerSnapshot> = emptyList(),
-    skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
-    presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
+    connectedServices: List<UiMcpServerSnapshot> = emptyList(),
+    skills: List<com.labteto.dshmobile.uicontract.UiSkillSnapshot> = emptyList(),
+    presets: List<com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot> = emptyList(),
     createdSkillId: String? = null,
-    skillEditor: com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry? = null,
+    skillEditor: com.labteto.dshmobile.uicontract.UiSkillEditorSnapshot? = null,
     savedSkillId: String? = null,
     skillsOnly: Boolean = false,
     loading: Boolean = false,
@@ -100,6 +100,9 @@ internal fun PluginInventoryBrowser(
     onInstallPreset: ((String) -> Unit)? = null,
     onCreateSkill: ((String, String, String, String) -> Unit)? = null,
     onImportSkill: (() -> Unit)? = null,
+    onInstallFromGitHub: ((String) -> Unit)? = null,
+    curatedSkills: List<String> = emptyList(),
+    onBrowseCuratedSkills: (() -> Unit)? = null,
     onRemoveSkill: ((String) -> Unit)? = null,
     onOpenSkillEditor: ((String) -> Unit)? = null,
     onCloseSkillEditor: (() -> Unit)? = null,
@@ -109,6 +112,7 @@ internal fun PluginInventoryBrowser(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val skillCreationPrompt = stringResource(R.string.skills_create_in_chat_prompt)
     var query by rememberSaveable { mutableStateOf("") }
+    var gitHubSkillUrl by rememberSaveable { mutableStateOf("") }
     var selectedCategory by rememberSaveable { mutableIntStateOf(0) }
     var transportFilter by rememberSaveable { mutableStateOf(PluginTransportFilter.ALL) }
     var selectedRow by remember { mutableStateOf<InventoryRow?>(null) }
@@ -139,7 +143,7 @@ internal fun PluginInventoryBrowser(
     val connectionStatus = stringResource(R.string.tools_catalog_connections)
     val local = localIds.sorted().map { id ->
         val label = when (id) {
-            "local-builtin" -> stringResource(R.string.skills_title)
+            "android-local-builtins" -> stringResource(R.string.skills_title)
             "android-runtime" -> stringResource(R.string.tools_capability_terminal)
             "local-language-server" -> stringResource(R.string.tools_capability_code)
             "android-device" -> stringResource(R.string.tools_capability_device)
@@ -148,7 +152,7 @@ internal fun PluginInventoryBrowser(
             else -> id
         }
         val (hint, icon) = when (id) {
-            "local-builtin" -> R.string.plugin_skills_hint to FeatherIcons.BookOpen
+            "android-local-builtins" -> R.string.plugin_skills_hint to FeatherIcons.BookOpen
             "android-runtime" -> R.string.plugin_terminal_hint to FeatherIcons.Terminal
             "local-language-server" -> R.string.plugin_code_hint to FeatherIcons.Code
             "android-device" -> R.string.plugin_device_hint to FeatherIcons.Device
@@ -162,8 +166,16 @@ internal fun PluginInventoryBrowser(
         InventoryRow(
             id = "service:${server.id}",
             name = server.id,
-            detail = stringResource(R.string.tools_server_summary, server.transport, server.tools.size),
-            connectedService = true,
+            detail = if (server.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED)
+                stringResource(R.string.tools_server_summary, server.transport, server.tools.size)
+                else stringResource(when (server.connection) {
+                    com.labteto.dshmobile.uicontract.UiToolConnection.CONNECTING -> R.string.tools_server_connecting
+                    com.labteto.dshmobile.uicontract.UiToolConnection.RECONNECTING -> R.string.tools_server_reconnecting
+                    com.labteto.dshmobile.uicontract.UiToolConnection.DISCONNECTING -> R.string.tools_server_disconnecting
+                    com.labteto.dshmobile.uicontract.UiToolConnection.HEALTH_UNCHECKED -> R.string.tools_server_health_unchecked
+                    com.labteto.dshmobile.uicontract.UiToolConnection.FAILED -> R.string.tools_server_failed
+                }),
+            connectedService = server.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED,
             available = false,
             icon = FeatherIcons.Globe,
         )
@@ -185,7 +197,7 @@ internal fun PluginInventoryBrowser(
     }
     val list = (if (skillsOnly) installedSkills + availablePresets else when (selectedCategory) {
         1 -> filteredConnections
-        2 -> local.filter { it.id in setOf("local:android-runtime", "local:local-language-server", "local:local-builtin") }
+        2 -> local.filter { it.id in setOf("local:android-runtime", "local:local-language-server", "local:android-local-builtins") }
         3 -> local.filter { it.id in setOf("local:android-device", "local:android-automation", "local:android-webhook") }
         4 -> local.filter { it.id == "local:local-vision" }
         else -> local
@@ -236,6 +248,51 @@ internal fun PluginInventoryBrowser(
                             )
                         }
                     }
+                    if (onInstallFromGitHub != null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                        ) {
+                            com.shenyan.designsystem.components.SyTextField(
+                                value = gitHubSkillUrl,
+                                onValueChange = { gitHubSkillUrl = it },
+                                placeholder = { Text(stringResource(R.string.skills_github_url_hint)) },
+                                modifier = Modifier.weight(1f).testTag("skill-github-url"),
+                            )
+                            SyButton(
+                                text = stringResource(R.string.skills_github_install),
+                                onClick = { onInstallFromGitHub(gitHubSkillUrl.trim()) },
+                                enabled = !loading && gitHubSkillUrl.trim().startsWith("https://github.com/"),
+                                size = SyButtonSize.Small,
+                                modifier = Modifier.testTag("skill-github-install"),
+                            )
+                        }
+                    }
+                    if (onBrowseCuratedSkills != null) {
+                        SyButton(
+                            text = stringResource(R.string.skills_github_browse_official),
+                            onClick = onBrowseCuratedSkills,
+                            enabled = !loading,
+                            variant = SyButtonVariant.Ghost,
+                            modifier = Modifier.testTag("skill-github-browse-official"),
+                        )
+                        if (curatedSkills.isNotEmpty()) {
+                            Text(stringResource(R.string.skills_github_official_heading),
+                                style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
+                                items(curatedSkills, key = { it }) { skillName ->
+                                    SyFilterChip(
+                                        text = skillName,
+                                        selected = false,
+                                        onClick = {
+                                            gitHubSkillUrl = "https://github.com/openai/skills/tree/main/skills/.curated/$skillName"
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
                     if (onCreateSkill != null) {
                         SyButton(
                             text = stringResource(R.string.skills_create_manual),
@@ -260,7 +317,7 @@ internal fun PluginInventoryBrowser(
                 items(5) { category ->
                     SyFilterChip(
                         text = when (category) {
-                            1 -> "${connectionStatus} · ${connectedServices.size}"
+                            1 -> "${connectionStatus} · ${connectedServices.count { it.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED }}"
                             2 -> stringResource(R.string.plugin_category_work)
                             3 -> stringResource(R.string.plugin_category_device)
                             4 -> stringResource(R.string.plugin_category_design)
@@ -447,6 +504,7 @@ internal fun PluginInventoryBrowser(
             )
             Text(
                 item.detail,
+                modifier = Modifier.testTag("plugin-detail-description"),
                 style = DsType.small13.withReadingWeight(),
                 color = colors.textSecondary,
             )
