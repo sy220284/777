@@ -628,6 +628,7 @@ class LocalToolExecutionCoordinatorTest {
             LocalToolExecutionIdentity(
                 executionId = "exec-fixed",
                 rootCallId = "call-root",
+                verifiedReadOnly = true,
             ),
             startedIdentity,
         )
@@ -658,6 +659,32 @@ class LocalToolExecutionCoordinatorTest {
         assertFalse(started)
         assertEquals(AgentToolSideEffect.NONE, result.sideEffect)
         assertEquals(null, result.executionId)
+    }
+
+    @Test
+    fun runHandoffDuringApprovalCannotExecuteOldTool() = runBlocking {
+        val owners = com.labteto.dshmobile.harness.agent.AgentRunOwnership()
+        val first = com.labteto.dshmobile.harness.agent.AgentRunIdentity("s1", "main", "old")
+        val next = first.copy(runId = "new")
+        owners.claim(first) { }
+        var executed = false
+        val registry = ToolRegistry().apply {
+            register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) {
+                executed = true
+                ToolResult("ok")
+            })
+        }
+        val result = withContext(owners.executionContext(first)) {
+            coordinator(registry).executeScoped(
+                LocalToolCall("call", "write", JsonObject(emptyMap()), "{}"),
+                sessionId = "s1", allowMutation = true, planModeEnabled = false,
+                approval = { _, _, _ -> owners.claim(next) { }; true },
+            )
+        }
+        assertFalse(executed)
+        assertEquals("TASK_CANCELLED", result.errorCode)
+        assertEquals(AgentToolSideEffect.NONE, result.sideEffect)
+        assertTrue(owners.isCurrent(next))
     }
 
     @Test

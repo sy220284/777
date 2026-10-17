@@ -2,6 +2,7 @@ package com.labteto.dshmobile.harness.agent
 
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
@@ -36,12 +37,16 @@ class AgentTurnEngine(
         val turn = AgentTurnState(idFactory(), command, history)
         val budget = AgentTurnStepBudget(maxSteps, stepLimitExtender)
 
+        val execution = currentCoroutineContext()[AgentRunExecutionContext]
+        execution?.requireCurrent()
         eventSink.append(AgentEvent.TurnStarted(turn.turnId, command))
         try {
             while (budget.admits(turn.steps + 1)) {
+                execution?.requireCurrent()
                 val step = turn.startStep()
                 eventSink.append(AgentEvent.StepStarted(turn.turnId, step))
                 val reply = model.complete(turn.snapshot())
+                execution?.requireCurrent()
                 turn.acceptModelReply(reply)
                 eventSink.append(AgentEvent.AssistantObserved(
                     turnId = turn.turnId,

@@ -173,6 +173,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
                         put("id", call.id)
                         put("name", call.name)
                         put("execution_id", identity.executionId)
+                        put("read_only", identity.verifiedReadOnly)
                         put("attributes", kotlinx.serialization.json.JsonObject(identity.attributes.mapValues { kotlinx.serialization.json.JsonPrimitive(it.value) }))
                         put("root_call_id", identity.rootCallId)
                         identity.parentExecutionId?.let { put("parent_execution_id", it) }

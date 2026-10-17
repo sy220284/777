@@ -154,4 +154,40 @@ class ToolAttemptLedgerTest {
     }
 
 
+    @Test
+    fun onlyActualAdmissionCanCertifyReadOnlyAndBindRunIdentity() {
+        val ledger = ToolAttemptLedger()
+        ledger.observe("tool/call", buildJsonObject {
+            put("id", "call"); put("goal_id", "goal"); put("execution_started", false)
+            put("read_only", true)
+        })
+        ledger.observe("tool/execution-started", buildJsonObject {
+            put("id", "call"); put("execution_id", "exec")
+            put("attributes", buildJsonObject { put("run_id", "run"); put("parent_run_id", "parent") })
+        })
+        val attempt = ledger.snapshot().single()
+        assertEquals(ToolAttemptState.EXTERNAL_PENDING, attempt.state)
+        assertEquals("run", attempt.runId)
+        assertEquals("parent", attempt.parentRunId)
+        assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
+    }
+
+    @Test
+    fun anUnknownResultCannotBeClearedByAReadOnlyHint() {
+        val ledger = ToolAttemptLedger()
+        ledger.observe("tool/call", buildJsonObject {
+            put("id", "call"); put("goal_id", "goal"); put("execution_started", false)
+        })
+        ledger.observe("tool/execution-started", buildJsonObject {
+            put("id", "call"); put("read_only", true)
+        })
+        assertEquals(ToolAttemptState.READING, ledger.snapshot().single().state)
+        assertFalse(ledger.hasUnresolvedExternalEffects("goal"))
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "call"); put("is_error", true); put("error_code", "TOOL_OUTCOME_UNKNOWN")
+        })
+        assertEquals(ToolAttemptState.UNKNOWN_EXTERNAL_EFFECT, ledger.snapshot().single().state)
+        assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
+    }
+
 }

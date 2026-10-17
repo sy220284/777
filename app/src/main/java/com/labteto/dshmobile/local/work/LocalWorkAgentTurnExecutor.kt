@@ -763,7 +763,9 @@ internal class LocalWorkAgentTurnExecutor(
                     profileId = runSnapshot.modelState.modelSelection.activeProfileId,
                     model = runSnapshot.modelState.model,
                     baseUrl = runSnapshot.modelState.baseUrl,
-                ) { loop.run(input) }
+                ) {
+                    withContext(agentRunCoordinator.executionContext(runContext)) { loop.run(input) }
+                }
             } catch (timeout: TimeoutCancellationException) {
                 // Only an actual nested operation may now time out; foreground work has no wall-clock stop.
                 foregroundOutcome = LocalExecutionService.OUTCOME_FAILED

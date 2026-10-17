@@ -526,7 +526,8 @@ if not frozen_model_route_contract(model_request_coordinator, model_request_conf
 # uses the previously bound, locally frozen run surface.
 
 for required_agent_owner_fact in (
-    "foregroundOwners",
+    "runOwners = AgentRunOwnership()",
+    "runOwners.commit(context.ownership(), terminal = terminal)",
     "fun isCurrentOwner(context: LocalAgentRunContext)",
     "fun ensureCurrentOwner(context: LocalAgentRunContext)",
 ):

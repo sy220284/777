@@ -623,6 +623,78 @@ class LocalAgentRunCoordinatorTest {
         }
     }
 
+    @Test
+    fun recoveryQueueKeepsOriginalRouteAndInputAfterAnotherProcessRestart() {
+        withCoordinator { coordinator, log ->
+            val context = coordinator.start(
+                "s1", LocalUsageMode.WORK, "deepseek-flash", "https://api.deepseek.com",
+                planMode = false, policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false, maxSteps = 8, input = "task", memoryInput = "original",
+            )
+            val checkpoint = requireNotNull(log.latest(LOCAL_AGENT_RUN_CHECKPOINT_EVENT))
+            log.append(LOCAL_AGENT_RUN_CHECKPOINT_EVENT, buildJsonObject {
+                checkpoint.data.forEach { (key, value) -> put(key, value) }
+                put("profile_id", "account-a"); put("credential_ref", "credential-a")
+                put("protocol", "CHAT_COMPLETIONS"); put("auth_kind", "API_KEY")
+                put("route_fingerprint", "original-route")
+            })
+            coordinator.markRecoveryQueued("s1", context.runId)
+            val cold = LocalAgentRunCoordinator(eventLogFor = { log })
+            val decision = requireNotNull(cold.recoveryDecision("s1", SessionRepairResult()))
+            assertEquals("account-a", decision.route?.profileId)
+            assertEquals("credential-a", decision.route?.credentialRef)
+            assertEquals("original-route", decision.route?.fingerprint)
+            assertEquals("original", log.latest(LOCAL_AGENT_RUN_CHECKPOINT_EVENT)?.data?.get("memory_input")
+                ?.toString()?.trim('"'))
+        }
+    }
+
+    @Test
+    fun unknownWriteRemainsBlockedWhenPreviousRepairAlreadyClosedTheTurn() {
+        withCoordinator { coordinator, log ->
+            coordinator.start(
+                "s1", LocalUsageMode.WORK, "deepseek-flash", "https://api.deepseek.com",
+                planMode = false, policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false, maxSteps = 8, input = "write task", memoryInput = "task",
+            )
+            log.append("turn/start", buildJsonObject { })
+            log.append("step/start", buildJsonObject { put("step", 1) })
+            log.append("tool/call", buildJsonObject { put("id", "write"); put("execution_started", false) })
+            log.append("tool/execution-started", buildJsonObject {
+                put("id", "write"); put("execution_id", "write-instance")
+            })
+            val firstRepair = log.repairInterruptedTail(force = true)
+            assertEquals("RECOVERY_TOOL_EFFECT_UNKNOWN",
+                coordinator.recoveryDecision("s1", firstRepair)?.blockedCode)
+            val cold = LocalAgentRunCoordinator(eventLogFor = { log })
+            val secondRepair = log.repairInterruptedTail(force = true)
+            assertFalse(secondRepair.repaired)
+            val decision = requireNotNull(cold.recoveryDecision("s1", secondRepair))
+            assertEquals("RECOVERY_TOOL_EFFECT_UNKNOWN", decision.blockedCode)
+            assertNull(decision.queuedInput)
+        }
+    }
+
+    @Test
+    fun queuedBackgroundRecoveryStillChecksAlreadyRecordedMutationReceipts() {
+        withCoordinator { coordinator, _ ->
+            val context = coordinator.start(
+                "s1", LocalUsageMode.WORK, "deepseek-flash", "https://api.deepseek.com",
+                planMode = false, policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false, maxSteps = 8, input = "write task", memoryInput = "task",
+                kind = LocalAgentRunKind.AUTOMATION,
+            )
+            coordinator.recordEvent(context, AgentEvent.ToolFinished(context.runId, 1,
+                AgentToolCall("write", "write", buildJsonObject { }), "ok",
+                sideEffect = AgentToolSideEffect.POSSIBLE))
+            coordinator.markRecoveryQueued("s1", context.runId, LocalAgentRunKind.AUTOMATION)
+            val decision = requireNotNull(coordinator.recoveryDecision("s1", SessionRepairResult(),
+                LocalAgentRunKind.AUTOMATION))
+            assertEquals("RECOVERY_MUTATION_REPLAY_UNSAFE", decision.blockedCode)
+            assertNull(decision.queuedInput)
+        }
+    }
+
     private fun withCoordinator(
         block: (LocalAgentRunCoordinator, LocalSessionEventLog) -> Unit,
     ) {

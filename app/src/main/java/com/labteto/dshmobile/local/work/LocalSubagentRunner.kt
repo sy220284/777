@@ -599,6 +599,9 @@ internal class LocalSubagentRunner(
                     }
                 },
                 eventSink = AgentEventSink { event ->
+                    if (runContext != null && runCoordinator?.isCurrentOwner(runContext) == false) {
+                        return@AgentEventSink
+                    }
                     when (event) {
                         is AgentEvent.AssistantObserved -> {
                             val absoluteStep = recoveredBaseStep + event.step
@@ -774,7 +777,10 @@ internal class LocalSubagentRunner(
                 idFactory = { runContext?.runId ?: UUID.randomUUID().toString() },
             )
 
-            val result = loop.run(task)
+            val executionContext = runContext?.let { runCoordinator?.executionContext(it) }
+            val result = if (executionContext != null) {
+                withContext(executionContext) { loop.run(task) }
+            } else loop.run(task)
             if (result.stopReason == com.labteto.dshmobile.harness.agent.AgentStopReason.COMPLETED) {
                 val answer = result.answer.ifBlank { "子代理已结束，但没有返回文字。" }
                 val outputSchema = capabilities.outputSchema

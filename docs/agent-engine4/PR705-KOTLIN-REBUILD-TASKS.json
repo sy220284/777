@@ -76,10 +76,12 @@
         "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentToolDispatch.kt",
         "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentTurnEngine.kt",
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunner.kt",
-        "reference-validation/src/main/kotlin/com/labteto/dshmobile/reference/NativeConformanceRunner.kt"
+        "reference-validation/src/main/kotlin/com/labteto/dshmobile/reference/NativeConformanceRunner.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentRunOwnership.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt"
       ],
       "tests_verified": [],
-      "notes": "已对 Work 实际 turn/end 事件增加 Kotlin 强类型 GoalDisposition（NO_GOAL/PAUSED/BLOCKED/WAITING_* /NEEDS_EXECUTION/READY_FOR_SETTLEMENT/COMPLETED），与真实 Work 验收证据共享同一快照；仅首个可交付切片，完整 Run/Turn/Tool typed contract 尚未完成。 本批直接替换平台中立 Agent 执行核心及 Work/Subagent/参考验证消费者，旧 AgentLoop 源码移除；待新 SHA CI 验证，不能标 completed。"
+      "notes": "已对 Work 实际 turn/end 事件增加 Kotlin 强类型 GoalDisposition（NO_GOAL/PAUSED/BLOCKED/WAITING_* /NEEDS_EXECUTION/READY_FOR_SETTLEMENT/COMPLETED），与真实 Work 验收证据共享同一快照；仅首个可交付切片，完整 Run/Turn/Tool typed contract 尚未完成。 本批直接替换平台中立 Agent 执行核心及 Work/Subagent/参考验证消费者，旧 AgentLoop 源码移除；待新 SHA CI 验证，不能标 completed。；新增共享强类型 AgentRunIdentity/AgentRunExecutionContext 与 ToolAttemptState；保持原事件兼容读取，不另建持久事实源。 此批按用户要求只做代码实现与静态复查，Kotlin 编译/测试未执行，不提高整项完成状态。"
     },
     {
       "id": "AE4V3-05",
@@ -96,10 +98,11 @@
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt",
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphRecovery.kt",
         "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/workflow/TaskGraphExecutor.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSubagentRuntime.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSubagentRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalAgentRunCoordinator.kt"
       ],
       "tests_verified": [],
-      "notes": "将 Work Goal 的工具副作用核验与 SessionRecovery 的异常工具补写统一到 harness-core/session/ToolAttemptLedger；读取原有 EventLog 不另立账本，原有历史兼容测试和新投影单测待最新 SHA CI。；ToolAttemptLedger 的 Work 投影改为 Session EventLog 流式 forEachAfter，不再将长会话事件档案整体 materialize 到 Android 堆内存。；新增任务图冷重建 projector：未结算的 taskgraph/start 在 GoalDriver 自动续轮前明确阻断；跨目标终态不可错误核销。当前提交 CI 待验证；不等于完整自主恢复。；TaskGraph 进度协议扩展稳定 nodeId，Work 事件携带 nodeId，冷重建 projector 可还原节点最新阶段且不冒充任务完成；JVM 回归待最新 CI。"
+      "notes": "将 Work Goal 的工具副作用核验与 SessionRecovery 的异常工具补写统一到 harness-core/session/ToolAttemptLedger；读取原有 EventLog 不另立账本，原有历史兼容测试和新投影单测待最新 SHA CI。；ToolAttemptLedger 的 Work 投影改为 Session EventLog 流式 forEachAfter，不再将长会话事件档案整体 materialize 到 Android 堆内存。；新增任务图冷重建 projector：未结算的 taskgraph/start 在 GoalDriver 自动续轮前明确阻断；跨目标终态不可错误核销。当前提交 CI 待验证；不等于完整自主恢复。；TaskGraph 进度协议扩展稳定 nodeId，Work 事件携带 nodeId，冷重建 projector 可还原节点最新阶段且不冒充任务完成；JVM 回归待最新 CI。；恢复排队/阻塞状态保留原检查点模型身份、原始任务和配置；重新启动从持久工具事实重判未知副作用，不能依赖上次 repair 的临时返回。核实只读调用在冷恢复时保持安全重读语义。 此批按用户要求只做代码实现与静态复查，Kotlin 编译/测试未执行，不提高整项完成状态。"
     },
     {
       "id": "AE4V3-06",
@@ -113,10 +116,12 @@
       "code_evidence": [
         "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionExecutionRegistry.kt",
         "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionRuntimeRegistry.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAutomationExecutionCoordinator.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAutomationExecutionCoordinator.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentRunOwnership.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalAgentRunCoordinator.kt"
       ],
       "tests_verified": [],
-      "notes": "Session 唯一互斥、等待队列与所有权迁入 Shared Session；Android 原 API 保持兼容。租约绑定 session/incarnation/epoch/owner，跨会话、跨类型或外来注册表租约不能进入执行；withOwner 传播协程执行身份，前台 Work 与后台 Work 自动任务接入。只完成进程内所有权合同，不冒称跨进程恢复或完整 Run Owner 完成。当前 SHA Kotlin 编译及单测仍待 CI。"
+      "notes": "Session 唯一互斥、等待队列与所有权迁入 Shared Session；Android 原 API 保持兼容。租约绑定 session/incarnation/epoch/owner，跨会话、跨类型或外来注册表租约不能进入执行；withOwner 传播协程执行身份，前台 Work 与后台 Work 自动任务接入。只完成进程内所有权合同，不冒称跨进程恢复或完整 Run Owner 完成。当前 SHA Kotlin 编译及单测仍待 CI。；Shared AgentRunOwnership 接管前台/自动任务/子代理运行提交权；同槽检查与持久提交/交接原子化，不跨会话持有 IO 锁；落盘失败不转移旧 Owner，终态只结算一次。持久恢复完整事务与外部核销仍未完成。 此批按用户要求只做代码实现与静态复查，Kotlin 编译/测试未执行，不提高整项完成状态。"
     },
     {
       "id": "AE4V3-07",
@@ -151,7 +156,7 @@
         "reference-validation/src/main/kotlin/com/labteto/dshmobile/reference/NativeConformanceRunner.kt"
       ],
       "tests_verified": [],
-      "notes": " 本批直接替换平台中立 Agent 执行核心及 Work/Subagent/参考验证消费者，旧 AgentLoop 源码移除；待新 SHA CI 验证，不能标 completed。"
+      "notes": " 本批直接替换平台中立 Agent 执行核心及 Work/Subagent/参考验证消费者，旧 AgentLoop 源码移除；待新 SHA CI 验证，不能标 completed。；Work 与子代理实际 AgentTurnEngine 接入精确 Run 协程上下文；模型返回后核对原 Run，旧结果不得成为正文或触发工具；审批和资源等待后共用相同身份。 此批按用户要求只做代码实现与静态复查，Kotlin 编译/测试未执行，不提高整项完成状态。"
     },
     {
       "id": "AE4V3-09",
@@ -168,10 +173,11 @@
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
         "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt",
         "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedgerTest.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt"
       ],
       "tests_verified": [],
-      "notes": "共享 Kotlin ToolAttemptLedger 强类型状态机在 Work 和 SessionRecovery 真实生产路径接管工具执行事实；尚未重构平台 Tool Executor 权限/租约/未知副作用权威核销。；共享工具历史按单次声明保存独立 Attempt，并用 execution_id 精确对应异步回执；重复 provider callId 不能抹去先前未知副作用。SessionRecovery 保留执行实例字段，新增重复编号和乱序回执 JVM 测试。需当前 CI 验证。；工具审批和资源等待后的准入校验精确 Session 租约，执行上下文与 tool/execution-started 共享身份属性；抛出异常的已启动执行保留 executionId，避免重复 callId 乱序结算失配。待当前 SHA 单测和构建。"
+      "notes": "共享 Kotlin ToolAttemptLedger 强类型状态机在 Work 和 SessionRecovery 真实生产路径接管工具执行事实；尚未重构平台 Tool Executor 权限/租约/未知副作用权威核销。；共享工具历史按单次声明保存独立 Attempt，并用 execution_id 精确对应异步回执；重复 provider callId 不能抹去先前未知副作用。SessionRecovery 保留执行实例字段，新增重复编号和乱序回执 JVM 测试。需当前 CI 验证。；工具审批和资源等待后的准入校验精确 Session 租约，执行上下文与 tool/execution-started 共享身份属性；抛出异常的已启动执行保留 executionId，避免重复 callId 乱序结算失配。待当前 SHA 单测和构建。；实际执行准入记录 read_only 与 Run/parentRun 身份，Shared ledger 区分声明/读取/外部待结算/已结算/外部未知；未知结果不被只读提示改写。后台重放检查复用 ledger 单次流式折叠，移除旧 callId 集合和全档 materialize。 此批按用户要求只做代码实现与静态复查，Kotlin 编译/测试未执行，不提高整项完成状态。"
     },
     {
       "id": "AE4V3-10",
@@ -415,16 +421,21 @@
   "status": "first incremental implementation, not entire refactor",
   "current_slice": {
     "date": "2026-10-17",
-    "component": "Shared Session 执行所有权与 Tool 执行身份接入",
-    "previous_head": "9124e056a2571de54b87c3b6b38e23b71d1ffc80",
-    "status": "local_static_verified_compile_pending",
+    "component": "共享 Run 提交权、恢复检查点与 Tool 冷恢复事实统一",
+    "previous_head": "1974a886f4d868c38ed6248377a724a7a2bc63e0",
+    "status": "code_implemented_static_verified",
     "code_evidence": [
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionExecutionRegistry.kt",
-      "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/SessionExecutionRegistryTest.kt"
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentRunOwnership.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalAgentRunCoordinator.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentTurnEngine.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunner.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt"
     ],
     "tests_verified": [
-      "architecture-3 ownership/performance guards and self-tests",
-      "test-quality static gate"
+      "architecture/performance gates and self-tests",
+      "test-quality/static checks only; Kotlin tests not executed"
     ]
   }
 }

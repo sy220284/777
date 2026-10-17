@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.local.runtime
 
+import com.labteto.dshmobile.harness.agent.AgentRunIdentity
+import com.labteto.dshmobile.harness.agent.AgentRunOwnership
+import com.labteto.dshmobile.harness.session.ToolAttemptLedger
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
@@ -15,12 +18,10 @@ import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.observability.AppLog
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
@@ -135,7 +136,7 @@ internal class LocalAgentRunCoordinator(
     private val now: () -> Long = System::currentTimeMillis,
     private val idFactory: () -> String = { UUID.randomUUID().toString() },
 ) {
-    private val foregroundOwners = ConcurrentHashMap<String, String>()
+    private val runOwners = AgentRunOwnership()
     fun start(
         sessionId: String,
         usageMode: LocalUsageMode,
@@ -184,98 +185,97 @@ internal class LocalAgentRunCoordinator(
             parentRunId = parentRunId,
             agentId = agentId,
         )
-        if (context.kind == LocalAgentRunKind.FOREGROUND) {
-            foregroundOwners[context.sessionId] = context.runId
+        runOwners.claim(context.ownership()) {
+            append(
+                context = context,
+                status = LocalAgentRunCheckpointStatus.RUNNING,
+                phase = LocalAgentRunPhase.TURN_STARTED,
+            )
         }
-        append(
-            context = context,
-            status = LocalAgentRunCheckpointStatus.RUNNING,
-            phase = LocalAgentRunPhase.TURN_STARTED,
-        )
         return context
     }
 
     fun isCurrentOwner(context: LocalAgentRunContext): Boolean =
-        context.kind != LocalAgentRunKind.FOREGROUND ||
-            foregroundOwners[context.sessionId] == context.runId
+        runOwners.isCurrent(context.ownership())
+
+    fun executionContext(context: LocalAgentRunContext) =
+        runOwners.executionContext(context.ownership(), context.parentRunId)
 
     fun ensureCurrentOwner(context: LocalAgentRunContext) {
         if (!isCurrentOwner(context)) {
-            throw CancellationException("前台任务运行时所有权已转移，丢弃旧任务迟到结果")
+            throw CancellationException("任务运行时所有权已转移，丢弃旧任务迟到结果")
         }
     }
 
     fun recordEvent(context: LocalAgentRunContext, event: AgentEvent) {
-        if (!isCurrentOwner(context)) return
-        when (event) {
-            is AgentEvent.TurnStarted -> append(
-                context,
-                LocalAgentRunCheckpointStatus.RUNNING,
-                LocalAgentRunPhase.TURN_STARTED,
-            )
-            is AgentEvent.StepStarted -> append(
-                context,
-                LocalAgentRunCheckpointStatus.RUNNING,
-                LocalAgentRunPhase.STEP_STARTED,
-                step = event.step,
-            )
-            is AgentEvent.AssistantObserved -> append(
-                context,
-                LocalAgentRunCheckpointStatus.RUNNING,
-                LocalAgentRunPhase.ASSISTANT_OBSERVED,
-                step = event.step,
-                toolCallCount = event.toolCalls.size,
-            )
-            // AgentLoop reports the model-declared call here. Actual executor admission is
-            // persisted as tool/execution-started by the execution coordinator.
-            is AgentEvent.ToolStarted -> Unit
-            is AgentEvent.ToolFinished -> append(
-                context,
-                LocalAgentRunCheckpointStatus.RUNNING,
-                LocalAgentRunPhase.TOOL_FINISHED,
-                step = event.step,
-                callId = event.call.id,
-                toolName = event.call.name,
-                sideEffect = event.sideEffect.name.lowercase(),
-            )
-            // ToolFinished already captures the durable continuation point for tool-using steps.
-            // Keeping a generic StepFinished checkpoint would erase whether an AssistantObserved
-            // event was a final no-tool answer and could cause duplicate replies after restart.
-            is AgentEvent.StepFinished -> Unit
-            is AgentEvent.TurnCompleted -> append(
-                context,
-                LocalAgentRunCheckpointStatus.COMPLETED,
-                LocalAgentRunPhase.TURN_FINISHED,
-                step = event.steps,
-                answer = event.answer,
-            )
-            is AgentEvent.TurnStepLimit -> append(
-                context,
-                LocalAgentRunCheckpointStatus.STEP_LIMIT,
-                LocalAgentRunPhase.TURN_FINISHED,
-                step = event.steps,
-                reason = "step_limit",
-            )
-            is AgentEvent.TurnFailed -> append(
-                context,
-                LocalAgentRunCheckpointStatus.FAILED,
-                LocalAgentRunPhase.TURN_FINISHED,
-                reason = event.reason,
-            )
-            is AgentEvent.TurnCancelled -> append(
-                context,
-                LocalAgentRunCheckpointStatus.CANCELLED,
-                LocalAgentRunPhase.TURN_FINISHED,
-                reason = "cancelled",
-            )
-        }
         val terminal =
             event is AgentEvent.TurnCompleted ||
                 event is AgentEvent.TurnStepLimit ||
                 event is AgentEvent.TurnFailed ||
                 event is AgentEvent.TurnCancelled
-        if (context.kind == LocalAgentRunKind.FOREGROUND && terminal) {
-            foregroundOwners.remove(context.sessionId, context.runId)
+        runOwners.commit(context.ownership(), terminal = terminal) {
+            when (event) {
+                is AgentEvent.TurnStarted -> append(
+                    context,
+                    LocalAgentRunCheckpointStatus.RUNNING,
+                    LocalAgentRunPhase.TURN_STARTED,
+                )
+                is AgentEvent.StepStarted -> append(
+                    context,
+                    LocalAgentRunCheckpointStatus.RUNNING,
+                    LocalAgentRunPhase.STEP_STARTED,
+                    step = event.step,
+                )
+                is AgentEvent.AssistantObserved -> append(
+                    context,
+                    LocalAgentRunCheckpointStatus.RUNNING,
+                    LocalAgentRunPhase.ASSISTANT_OBSERVED,
+                    step = event.step,
+                    toolCallCount = event.toolCalls.size,
+                )
+                // AgentTurnEngine reports the model-declared call here. Actual executor admission is
+                // persisted as tool/execution-started by the execution coordinator.
+                is AgentEvent.ToolStarted -> Unit
+                is AgentEvent.ToolFinished -> append(
+                    context,
+                    LocalAgentRunCheckpointStatus.RUNNING,
+                    LocalAgentRunPhase.TOOL_FINISHED,
+                    step = event.step,
+                    callId = event.call.id,
+                    toolName = event.call.name,
+                    sideEffect = event.sideEffect.name.lowercase(),
+                )
+                // ToolFinished already captures the durable continuation point for tool-using steps.
+                // Keeping a generic StepFinished checkpoint would erase whether an AssistantObserved
+                // event was a final no-tool answer and could cause duplicate replies after restart.
+                is AgentEvent.StepFinished -> Unit
+                is AgentEvent.TurnCompleted -> append(
+                    context,
+                    LocalAgentRunCheckpointStatus.COMPLETED,
+                    LocalAgentRunPhase.TURN_FINISHED,
+                    step = event.steps,
+                    answer = event.answer,
+                )
+                is AgentEvent.TurnStepLimit -> append(
+                    context,
+                    LocalAgentRunCheckpointStatus.STEP_LIMIT,
+                    LocalAgentRunPhase.TURN_FINISHED,
+                    step = event.steps,
+                    reason = "step_limit",
+                )
+                is AgentEvent.TurnFailed -> append(
+                    context,
+                    LocalAgentRunCheckpointStatus.FAILED,
+                    LocalAgentRunPhase.TURN_FINISHED,
+                    reason = event.reason,
+                )
+                is AgentEvent.TurnCancelled -> append(
+                    context,
+                    LocalAgentRunCheckpointStatus.CANCELLED,
+                    LocalAgentRunPhase.TURN_FINISHED,
+                    reason = "cancelled",
+                )
+            }
         }
     }
 
@@ -336,6 +336,32 @@ internal class LocalAgentRunCoordinator(
                 route = route,
             )
         }
+        val toolRecovery = if (requiresExecutableRecovery) {
+            runToolRecoveryFacts(log, checkpointType, runId, kind)
+        } else null
+        if (requiresExecutableRecovery && (
+                repair.toolResults.any { it.code == SessionRecovery.TOOL_OUTCOME_UNKNOWN } ||
+                    toolRecovery?.unresolvedEffects == true
+            )) {
+            return LocalAgentRunRecoveryDecision(
+                runId = runId,
+                blockedReason = "上次执行的工具副作用仍未结算，已停止自动续跑；请先核实实际结果。",
+                blockedCode = "RECOVERY_TOOL_EFFECT_UNKNOWN",
+                route = route,
+            )
+        }
+        if (requiresExecutableRecovery && kind != LocalAgentRunKind.FOREGROUND) {
+            val allowMutation = data["allow_mutation"]?.jsonPrimitive?.contentOrNull
+                ?.toBooleanStrictOrNull() ?: true
+            if (allowMutation && toolRecovery?.mutationReceipt == true) {
+                return LocalAgentRunRecoveryDecision(
+                    runId = runId,
+                    blockedReason = "上次后台执行已经进入可能产生副作用的工具阶段。为避免系统重跑造成重复操作，已停止自动续跑，请先检查外部状态。",
+                    blockedCode = "RECOVERY_MUTATION_REPLAY_UNSAFE",
+                    route = route,
+                )
+            }
+        }
         if (status == LocalAgentRunCheckpointStatus.RECOVERY_QUEUED.name.lowercase()) {
             val continuation = recoveryContinuationPrompt(log, recoveryUsageMode, contextPolicy)
             return LocalAgentRunRecoveryDecision(
@@ -349,29 +375,8 @@ internal class LocalAgentRunCoordinator(
             )
         }
         if (status != LocalAgentRunCheckpointStatus.RUNNING.name.lowercase()) return null
-        val unsafe = repair.toolResults.any { recovered ->
-            recovered.code == SessionRecovery.TOOL_OUTCOME_UNKNOWN
-        }
-        if (unsafe) {
-            return LocalAgentRunRecoveryDecision(
-                runId = runId,
-                blockedReason = "上次执行在工具调用期间被系统中断，工具副作用状态未知。已停止自动续跑，请先检查外部状态后再继续。",
-                blockedCode = "RECOVERY_TOOL_EFFECT_UNKNOWN",
-                route = route,
-            )
-        }
 
         if (kind != LocalAgentRunKind.FOREGROUND) {
-            val allowMutation = data["allow_mutation"]?.jsonPrimitive?.contentOrNull
-                ?.toBooleanStrictOrNull() ?: true
-            if (allowMutation && hasPossibleReplaySideEffect(log, checkpointType, runId)) {
-                return LocalAgentRunRecoveryDecision(
-                    runId = runId,
-                    blockedReason = "上次后台执行已经进入可能产生副作用的工具阶段。为避免系统重跑造成重复操作，已停止自动续跑，请先检查外部状态。",
-                    blockedCode = "RECOVERY_MUTATION_REPLAY_UNSAFE",
-                    route = route,
-                )
-            }
             val continuation = recoveryContinuationPrompt(log, recoveryUsageMode, contextPolicy)
             return LocalAgentRunRecoveryDecision(
                 runId = runId,
@@ -449,9 +454,6 @@ internal class LocalAgentRunCoordinator(
         runId: String,
         kind: LocalAgentRunKind = LocalAgentRunKind.FOREGROUND,
     ) {
-        if (kind == LocalAgentRunKind.FOREGROUND) {
-            foregroundOwners.remove(sessionId, runId)
-        }
         appendRecoveryState(
             sessionId = sessionId,
             runId = runId,
@@ -468,9 +470,6 @@ internal class LocalAgentRunCoordinator(
         kind: LocalAgentRunKind = LocalAgentRunKind.FOREGROUND,
         reasonCode: String? = null,
     ) {
-        if (kind == LocalAgentRunKind.FOREGROUND) {
-            foregroundOwners.remove(sessionId, runId)
-        }
         appendRecoveryState(
             sessionId = sessionId,
             runId = runId,
@@ -542,44 +541,40 @@ internal class LocalAgentRunCoordinator(
         )
     }
 
-    private fun hasPossibleReplaySideEffect(
+    private data class RunToolRecoveryFacts(
+        val unresolvedEffects: Boolean = false,
+        val mutationReceipt: Boolean = false,
+    )
+
+    /** Fold only this run's interval once; prior repair results are never the durable authority. */
+    private fun runToolRecoveryFacts(
         log: LocalSessionEventLog,
         checkpointType: String,
         runId: String,
-    ): Boolean = log.withEvents { events ->
-        var insideRun = false
-        val startedCalls = linkedSetOf<String>()
-        for (event in events) {
-            if (event.type == checkpointType) {
-                val data = event.data
-                if (data["run_id"]?.jsonPrimitive?.contentOrNull == runId) {
-                    insideRun = true
-                    if (
-                        data["phase"]?.jsonPrimitive?.contentOrNull == LocalAgentRunPhase.TOOL_FINISHED.name.lowercase() &&
-                        data["side_effect"]?.jsonPrimitive?.contentOrNull != "none"
-                    ) {
-                        return@withEvents true
-                    }
-                } else if (insideRun) {
-                    break
-                }
-                continue
-            }
-            if (!insideRun) continue
-            when (event.type) {
-                "tool/call" -> {
-                    // Legacy tool/call rows meant "started"; new rows explicitly say false.
-                    if (event.data["execution_started"]?.jsonPrimitive?.booleanOrNull != false) {
-                        event.data["id"]?.jsonPrimitive?.contentOrNull?.let(startedCalls::add)
-                    }
-                }
-                "tool/execution-started" ->
-                    event.data["id"]?.jsonPrimitive?.contentOrNull?.let(startedCalls::add)
-                "tool/result" ->
-                    event.data["id"]?.jsonPrimitive?.contentOrNull?.let(startedCalls::remove)
+        kind: LocalAgentRunKind,
+    ): RunToolRecoveryFacts {
+        val start = log.latestMatching(setOf(checkpointType)) { data ->
+            data["run_id"]?.jsonPrimitive?.contentOrNull == runId &&
+                data["phase"]?.jsonPrimitive?.contentOrNull == LocalAgentRunPhase.TURN_STARTED.name.lowercase()
+        } ?: return RunToolRecoveryFacts()
+        val ledger = ToolAttemptLedger()
+        var mutationReceipt = false
+        log.forEachAfter(start.sequence) { event ->
+            ledger.observe(event.type, event.data)
+            if (event.type == checkpointType &&
+                event.data["run_id"]?.jsonPrimitive?.contentOrNull == runId &&
+                event.data["phase"]?.jsonPrimitive?.contentOrNull == LocalAgentRunPhase.TOOL_FINISHED.name.lowercase() &&
+                event.data["side_effect"]?.jsonPrimitive?.contentOrNull != "none") {
+                mutationReceipt = true
             }
         }
-        startedCalls.isNotEmpty()
+        val unresolved = ledger.snapshot().any {
+            it.unresolvedExternalEffect && (kind != LocalAgentRunKind.SUBAGENT ||
+                it.runId == null || it.runId == runId || it.parentRunId == runId)
+        }
+        // Legacy background recovery restarts a task instead of replaying its exact history;
+        // already recorded mutations must still be reconciled before that path can run again.
+        return RunToolRecoveryFacts(unresolved, mutationReceipt)
     }
 
     private fun hasDurableFinalAssistant(log: LocalSessionEventLog): Boolean {
@@ -607,15 +602,15 @@ internal class LocalAgentRunCoordinator(
         reasonCode: String? = null,
     ) {
         val log = eventLogFor(sessionId)
-        val latestRunId = log.latest(eventType(kind))
-            ?.data
-            ?.get("run_id")
-            ?.jsonPrimitive
-            ?.contentOrNull
-        if (latestRunId != runId) return
-        log.append(
-            eventType(kind),
-            buildJsonObject {
+        val previous = log.latest(eventType(kind)) ?: return
+        val identity = AgentRunIdentity(
+            sessionId, runSlot(kind, previous.data["agent_id"]?.jsonPrimitive?.contentOrNull, runId), runId,
+        )
+        runOwners.retire(identity) {
+            val latest = log.latest(eventType(kind)) ?: return@retire false
+            if (latest.data["run_id"]?.jsonPrimitive?.contentOrNull != runId) return@retire false
+            log.append(eventType(kind), buildJsonObject {
+                latest.data.forEach { (key, value) -> put(key, value) }
                 put("version", LOCAL_AGENT_RUN_CHECKPOINT_VERSION)
                 put("run_id", runId)
                 put("session_id", sessionId)
@@ -624,9 +619,16 @@ internal class LocalAgentRunCoordinator(
                 put("updated_at", now())
                 put("reason", reason.take(2_000))
                 reasonCode?.takeIf(String::isNotBlank)?.let { put("reason_code", it) }
-            },
-        )
+            })
+            true
+        }
     }
+
+    private fun LocalAgentRunContext.ownership() =
+        AgentRunIdentity(sessionId, runSlot(kind, agentId, runId), runId)
+
+    private fun runSlot(kind: LocalAgentRunKind, agentId: String?, runId: String): String =
+        if (kind == LocalAgentRunKind.SUBAGENT) "child:${agentId ?: runId}" else kind.name.lowercase()
 
     private companion object {
         const val MAX_RECOVERY_OUTPUT_CHARS = 20_000

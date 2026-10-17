@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.harness.agent.AgentRunExecutionContext
 import com.labteto.dshmobile.harness.session.SessionExecutionContext
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
@@ -358,6 +359,7 @@ internal class LocalToolExecutionCoordinator(
         }
 
         val executionOwner = currentCoroutineContext()[SessionExecutionContext]?.lease
+        val runOwner = currentCoroutineContext()[AgentRunExecutionContext]
         var approvalDenied = false
         var executionStarted = false
         val executionIdentity = LocalToolExecutionIdentity(
@@ -365,15 +367,21 @@ internal class LocalToolExecutionCoordinator(
             rootCallId = call.id,
             attributes = buildMap {
                 putAll(executionAttributes)
+                runOwner?.let {
+                    put("run_id", it.identity.runId)
+                    it.parentRunId?.let { parent -> put("parent_run_id", parent) }
+                }
                 executionOwner?.identity?.let {
                     put("session_owner_incarnation", it.incarnation)
                     put("session_owner_epoch", it.epoch.toString())
                 }
             },
+            verifiedReadOnly = readLike,
         )
         var executionLease: LocalWorkspaceReadWriteGate.Lease? = null
         val invocation = try {
             executionOwner?.requireCurrent(sessionId)
+            runOwner?.requireCurrent(sessionId)
             registry.executeTracked(
                 name = call.name,
                 input = call.arguments,
@@ -400,6 +408,7 @@ internal class LocalToolExecutionCoordinator(
                         // A new correction can arrive while awaiting approval or resource admission.
                         // Reject the stale call before entering its executor, with no side effect.
                         executionOwner?.requireCurrent(sessionId)
+                        runOwner?.requireCurrent(sessionId)
                         if (!beforeExecution()) throw LocalToolSampleSuperseded()
                         // The registry calls this only after schema checks and user approval.
                         // Waiting for approval must never hold a filesystem read/write lease.
@@ -407,6 +416,7 @@ internal class LocalToolExecutionCoordinator(
                         // Admission can suspend behind another read/write operation. A correction
                         // committed during that wait must invalidate this still-unstarted call.
                         executionOwner?.requireCurrent(sessionId)
+                        runOwner?.requireCurrent(sessionId)
                         if (!beforeExecution()) throw LocalToolSampleSuperseded()
                         // Approval may outlive the exact plugin registration. Re-check after waiting
                         // for the shared read/write gate and before writing the started fact.
@@ -596,6 +606,7 @@ internal data class LocalToolExecutionIdentity(
     val rootCallId: String,
     val parentExecutionId: String? = null,
     val attributes: Map<String, String> = emptyMap(),
+    val verifiedReadOnly: Boolean = false,
 )
 
 private fun JsonObject.optionalStringForCoordinator(key: String): String? =

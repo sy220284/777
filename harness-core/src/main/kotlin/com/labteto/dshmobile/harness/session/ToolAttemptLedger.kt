@@ -15,6 +15,10 @@ import kotlinx.serialization.json.intOrNull
  * A declared tool is not necessarily admitted. Missing results after actual
  * executor admission and an unknown result remain unsafe to replay.
  */
+enum class ToolAttemptState {
+    DECLARED, READING, EXTERNAL_PENDING, SETTLED, UNKNOWN_EXTERNAL_EFFECT,
+}
+
 class ToolAttemptLedger {
     data class Attempt(
         val id: String,
@@ -25,9 +29,20 @@ class ToolAttemptLedger {
         val settled: Boolean,
         val outcomeUncertain: Boolean,
         val executionId: String? = null,
+        val verifiedReadOnly: Boolean = false,
+        val runId: String? = null,
+        val parentRunId: String? = null,
     ) {
+        val state: ToolAttemptState get() = when {
+            outcomeUncertain -> ToolAttemptState.UNKNOWN_EXTERNAL_EFFECT
+            settled -> ToolAttemptState.SETTLED
+            started && verifiedReadOnly -> ToolAttemptState.READING
+            started -> ToolAttemptState.EXTERNAL_PENDING
+            else -> ToolAttemptState.DECLARED
+        }
         val unresolvedExternalEffect: Boolean
-            get() = outcomeUncertain || (started && !settled)
+            get() = state == ToolAttemptState.UNKNOWN_EXTERNAL_EFFECT ||
+                state == ToolAttemptState.EXTERNAL_PENDING
     }
 
     private data class MutableAttempt(
@@ -40,8 +55,12 @@ class ToolAttemptLedger {
         var uncertain: Boolean = false,
         var toolCallObserved: Boolean = false,
         var executionId: String? = null,
+        var verifiedReadOnly: Boolean = false,
+        var runId: String? = null,
+        var parentRunId: String? = null,
     ) {
-        fun snapshot() = Attempt(id, name, step, goalId, started, settled, uncertain, executionId)
+        fun snapshot() = Attempt(id, name, step, goalId, started, settled, uncertain, executionId,
+            verifiedReadOnly, runId, parentRunId)
     }
 
     // Tool call IDs are only guaranteed by providers within an individual request.
@@ -133,6 +152,9 @@ class ToolAttemptLedger {
                     }
                     val attributes = data["attributes"] as? JsonObject
                     goalId = attributes?.let { readString(it, "goal_id") } ?: goalId
+                    runId = attributes?.let { readString(it, "run_id") } ?: runId
+                    parentRunId = attributes?.let { readString(it, "parent_run_id") } ?: parentRunId
+                    verifiedReadOnly = (data["read_only"] as? JsonPrimitive)?.booleanOrNull == true
                     started = true
                 }
             }
@@ -165,7 +187,7 @@ class ToolAttemptLedger {
     fun hasUnresolvedExternalEffects(goalId: String): Boolean =
         goalId.isNotBlank() && attempts.any { attempt ->
             attempt.goalId == goalId &&
-                (attempt.uncertain || (attempt.started && !attempt.settled))
+                attempt.snapshot().unresolvedExternalEffect
         }
 
     fun snapshot(): List<Attempt> = attempts.map { it.snapshot() }

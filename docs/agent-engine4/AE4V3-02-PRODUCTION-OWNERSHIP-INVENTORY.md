@@ -11,7 +11,7 @@
 | Tool Attempt | `harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/ToolAttemptLedger.kt`、`app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt` | 统一声明、真实准入、结果不确定及身份核销 |
 | Model Request | `app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt` | 需要逐项审计 Provider、Request Admission、冻结路由、Chat/Work 共用边界 |
 | Work Goal/Verifier | `app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt`、`LocalWorkCompletionEvidence.kt` | Work 唯一目标与验收 Owner，TurnCompleted 不能代替 GoalCompleted |
-| Work Run Owner | `app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistry.kt` | 待继续检查取消、交接、恢复栅栏，不得建立重复执行入口 |
+| Work Run Owner | `app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistry.kt` | Work 只持有绑定及领域投影；Shared `AgentRunOwnership` 接管运行提交权，SessionExecutionRegistry 接管会话租约。恢复从 EventLog 的检查点和工具事实读取；仍待完整冷恢复与外部核销 |
 | TaskGraph | `harness-core/src/main/kotlin/com/labteto/dshmobile/harness/workflow/TaskGraphExecutor.kt` | Work `LocalWorkflowCoordinator.kt`、`LocalWorkSubagentRuntime.kt` 已调用；旧 WorkflowRunner 退出 |
 | Agent Team | `app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt`、`LocalAgentTeamReducer.kt` | 与 Shared DAG 共用拓扑，持久团队任务及结果 Owner 后续整合 |
 | Automation | `app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomation.kt` | 逐条核对 Shared Run/Tool Lease 的唯一消费者，避免平行账本 |

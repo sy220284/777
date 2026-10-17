@@ -30,8 +30,8 @@ data class SessionRepairResult(
 
 /**
  * Closes a persisted tail turn after process loss without guessing whether a side-effecting tool
- * completed. A recorded tool/call becomes TOOL_OUTCOME_UNKNOWN; an assistant-declared call that
- * never reached tool/call becomes TOOL_NOT_STARTED.
+ * completed. An admitted mutation (or legacy admission without a read-only contract) becomes
+ * TOOL_OUTCOME_UNKNOWN. A verified read remains safely retryable; unadmitted calls are NOT_STARTED.
  */
 object SessionRecovery {
     const val TOOL_NOT_STARTED = "TOOL_NOT_STARTED"
@@ -116,6 +116,7 @@ object SessionRecovery {
                 name = call.name,
                 step = call.step,
                 started = call.started,
+                verifiedReadOnly = call.verifiedReadOnly,
             )
             recovered += result
             appended += log.append("tool/result", buildJsonObject {
@@ -126,6 +127,8 @@ object SessionRecovery {
                 put("content", result.content)
                 put("model_content", result.modelContent)
                 put("is_error", true)
+                put("retryable", result.code != TOOL_OUTCOME_UNKNOWN)
+                put("side_effect", if (result.code == TOOL_OUTCOME_UNKNOWN) "possible" else "none")
                 put("error_code", result.code)
                 put("recovered", true)
             })

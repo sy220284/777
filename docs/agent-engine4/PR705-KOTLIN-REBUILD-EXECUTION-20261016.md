@@ -141,3 +141,14 @@ Session 的互斥、等待者、释放、输入准入和身份事实改由 `harn
 参考依据：Codex ZIP `codex-rs/core/src/agent/control.rs` 的会话绑定 Runtime；DeepSeek ZIP `packages/goal/goal-round-driver/src/index.ts` 的精确 Agent 生命周期及 queued/claimed/admitted 竞争语义；Claude 官方 ZIP `mods/README.md` 的扩展与权限分层。第三方历史还原包仅保留作研究材料，本轮没有移植其实现。
 
 验证新增：Shared Session ABA/错误会话/错误 Owner/外来 Registry/取消等待者/删除交接，Android 兼容入口及子协程身份传播，工具批准等待后旧租约失效，异常回执 executionId。静态架构、性能不变量及各自自测、测试质量检查已通过。Kotlin 编译/单测以本提交 CI 为准；AE4V3-06 保持 in_progress，持久恢复、Run/Goal epoch 提交合同及未知副作用核销仍未完成。无需新增功能树节点：既有 Session/Tool 能力的内部所有权迁移；源码索引随本次刷新。
+
+## 2026-10-17：Run 提交权与冷恢复事实统一
+
+本次在 `1974a886f` 上接续重构，同时保留同期 R4 工具表单、Host 文件导入/媒体选择/工作区导出及证据文件版本读取改动。
+
+- Shared `AgentRunOwnership` 替换 Runtime 私有前台 Map；前台、后台 Automation 和子代理使用明确的 Session/slot/Run 身份。检查与持久提交、终态释放和交接在同一槽内完成；持久化失败不夺走旧 Owner，另一会话的 IO 不被全局锁阻塞。
+- Work/Subagent 真实执行入口传入 Run 协程上下文；AgentTurnEngine 在采样返回后核对原 Run，失效回复不能进入正文或派发工具。工具在审批与资源等待后再次核对同一 Run，并把 Run/parentRun 身份随现有 execution-started 交给平台与事实日志。
+- 真实执行准入才可记录 `read_only`，Shared ToolAttemptLedger 以强类型阶段区分声明、读取、外部执行待结算、已结算及外部结果未知。SessionRecovery 对核实的只读调用保留安全重读语义；缺乏旧合同的历史调用仍保留原保守语义。结果明确未知时，只读标识不能抹去未知事实。
+- 恢复排队/阻塞沿用原检查点内容，仅变更恢复状态，保留精确模型档案、凭据引用、原始任务和配置。再次启动按 Run 起点之后的持久工具事实单次流式折叠，移除原先按 provider callId 的另一套集合与全会话 materialize。上次 repair 已经结束时，未知副作用也不能因临时 repair 为空而失去阻塞。后台旧恢复路径会重新执行任务而非恢复完整执行历史，因此已知写入仍需核销，不能直接重放。
+
+新增回归源码覆盖：持久认领失败、同槽交接与跨会话并发、终态一次提交、模型迟到、工具审批中 Run 交接、只读冷恢复、来源身份、未知结果不能清除、恢复模型身份保留、连续两次恢复未知写入、排队后的后台副作用重判。按用户要求不安装工具、不运行本地编译/单测；当前检查仅为源码、架构、性能不变量、测试质量、安全及功能树静态复查。整项完成计数不提升，完整 GoalDriver、执行历史恢复与外部副作用核销仍需后续实现。

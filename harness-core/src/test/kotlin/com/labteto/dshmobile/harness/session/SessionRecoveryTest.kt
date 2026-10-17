@@ -14,6 +14,31 @@ class SessionRecoveryTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun admittedReadOnlyOperationRetainsRetryableRecoveryAcrossColdLogReplay() {
+        val directory = Files.createTempDirectory("session-recovery-read-only").toFile()
+        try {
+            val file = directory.resolve("events.jsonl")
+            val log = SessionEventLog(file, json, maxBytes = 4_096)
+            log.append("turn/start", buildJsonObject { })
+            log.append("step/start", buildJsonObject { put("step", 1) })
+            log.append("tool/call", buildJsonObject {
+                put("id", "read"); put("goal_id", "goal"); put("execution_started", false)
+            })
+            log.append("tool/execution-started", buildJsonObject {
+                put("id", "read"); put("execution_id", "exec-read"); put("read_only", true)
+            })
+            val recovered = SessionRecovery.repairInterruptedTail(log).toolResults.single()
+            assertEquals(SessionRecovery.TOOL_READ_RESULT_UNKNOWN, recovered.code)
+            assertTrue(recovered.modelContent.contains("\"retryable\":true"))
+            val ledger = ToolAttemptLedger()
+            SessionEventLog(file, json, maxBytes = 4_096).forEachAfter(-1L) { ledger.observe(it) }
+            assertFalse(ledger.hasUnresolvedExternalEffects("goal"))
+            assertEquals("exec-read", ledger.snapshot().single().executionId)
+            assertEquals(ToolAttemptState.SETTLED, ledger.snapshot().single().state)
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test
     fun startedToolWithoutResultBecomesOutcomeUnknownAndTailCloses() {
         val directory = Files.createTempDirectory("session-recovery-started").toFile()
         try {
