@@ -32,6 +32,14 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.RequestBody.Companion.toRequestBody
 
+/**
+ * A 404 with a retained session ID can signal session expiry. Only explicitly
+ * side-effect-free discovery calls may be sent again after reinitialization.
+ * A tools/call may have committed on the server before the 404; NEVER replay it.
+ */
+internal fun canReplayMcpAfterSessionExpiry(method: String): Boolean =
+    method == "tools/list" || method == "ping" || method == "server/discover"
+
 /** MCP 2025-06-18 Streamable HTTP lifecycle and optional session-id support. */
 class McpLegacyStreamableHttpTransport(
     private val endpoint: String,
@@ -52,8 +60,12 @@ class McpLegacyStreamableHttpTransport(
             sendRequest(method, params)
         } catch (error: McpHttpException) {
             if (error.statusCode == 404 && sessionId != null) {
+                // Session expiry invalidates our transport even when recovery of
+                // this specific call is unsafe. Never replay a mutation: the
+                // result remains unknown and the MCP Owner revokes tool admission.
                 initialized = false
                 sessionId = null
+                if (!canReplayMcpAfterSessionExpiry(method)) throw error
                 initializeIfNeeded()
                 sendRequest(method, params)
             } else {
