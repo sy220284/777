@@ -178,6 +178,46 @@ class V6ToolParameterFormTest {
         }
     }
 
+    @Test fun rawNestedJsonObjectAndArrayMustHonorRegisteredItemSchemas() {
+        val s = buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject {
+                put("entries", buildJsonObject {
+                    put("type", "array")
+                    put("minItems", 1)
+                    put("items", buildJsonObject {
+                        put("type", "object")
+                        put("required", buildJsonArray { add(JsonPrimitive("id")) })
+                        put("additionalProperties", false)
+                        put("properties", buildJsonObject {
+                            put("id", buildJsonObject { put("type", "integer") })
+                        })
+                    })
+                })
+                put("details", buildJsonObject {
+                    put("type", "object")
+                    put("additionalProperties", false)
+                    put("properties", buildJsonObject {
+                        put("active", buildJsonObject { put("type", "boolean") })
+                    })
+                })
+            })
+        }
+        assertEquals("""{"entries":[{"id":1}],"details":{"active":false}}""",
+            v6ToolArgumentsJson(s, mapOf(
+                "entries" to """[{"id":1}]""",
+                "details.active" to "false",
+            )))
+        for (invalid in listOf("""[{"id":"1"}]""", """[{"other":1}]""", "[]")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                v6ToolArgumentsJson(s, mapOf("entries" to invalid))
+            }
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            v6ToolArgumentsJson(s, mapOf("details.active" to "1"))
+        }
+    }
+
     @Test fun trustedEnumerationsAlsoRejectFreeformInput() {
         assertThrows(IllegalArgumentException::class.java) {
             v6ToolArgumentsJson(schema, mapOf("query" to "delete-all"))

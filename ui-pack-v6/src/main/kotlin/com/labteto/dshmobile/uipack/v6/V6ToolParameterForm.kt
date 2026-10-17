@@ -120,25 +120,63 @@ internal fun v6ToolArgumentsJson(schema: JsonObject, values: Map<String, String>
         putPath(tree, field.path, value)
     }
     val arguments = JsonObject(tree)
-    // A missing optional parent is valid. Once that parent is provided, its own
-    // required descendants become mandatory; the flattened field labels alone
-    // cannot express this conditional requirement.
-    fun checkRequired(spec: JsonObject, actual: JsonObject, path: String) {
-        val required = (spec["required"] as? JsonArray).orEmpty().map {
-            (it as JsonPrimitive).content
+    // The form may accept a raw object/array field. Validate that whole JSON
+    // tree against the *registered* schema, not just its top-level "object" token.
+    // Optional parents remain absent until supplied; when present, their required
+    // descendants and array item contracts are enforced before reaching the Owner.
+    fun validate(spec: JsonObject, value: kotlinx.serialization.json.JsonElement,
+        path: String, depth: Int) {
+        require(depth <= 10) { "工具输入嵌套深度超出 Schema 预算：$path" }
+        val type = (spec["type"] as? JsonPrimitive)?.content
+        val number = Regex("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?")
+        val matches = when (type) {
+            null -> true
+            "string" -> value is JsonPrimitive && value.isString
+            "boolean" -> value is JsonPrimitive && !value.isString &&
+                value.content in setOf("true", "false")
+            "integer" -> value is JsonPrimitive && !value.isString &&
+                value.content.matches(Regex("-?(0|[1-9][0-9]*)"))
+            "number" -> value is JsonPrimitive && !value.isString && value.content.matches(number)
+            "object" -> value is JsonObject
+            "array" -> value is JsonArray
+            else -> false
         }
-        for (name in required) {
-            require(name in actual) { "缺少必填字段：" + (path + name) }
-        }
-        val properties = spec["properties"] as? JsonObject ?: return
-        for ((name, value) in actual) {
-            val childSpec = properties[name] as? JsonObject ?: continue
-            if (value is JsonObject && childSpec["type"] == JsonPrimitive("object")) {
-                checkRequired(childSpec, value, path + name + ".")
+        require(matches) { "字段类型不匹配：$path（需要 $type）" }
+        val choices = spec["enum"] as? JsonArray
+        require(choices == null || value in choices) { "字段不在许可选项中：$path" }
+        if (value is JsonObject) {
+            val required = (spec["required"] as? JsonArray).orEmpty()
+                .map { (it as JsonPrimitive).content }
+            for (key in required) {
+                require(key in value) { "缺少必填字段：$path.$key" }
             }
+            val props = spec["properties"] as? JsonObject
+            for ((key, child) in value) {
+                val nested = props?.get(key) as? JsonObject
+                if (nested != null) {
+                    validate(nested, child, "$path.$key", depth + 1)
+                } else {
+                    val extras = spec["additionalProperties"]
+                    require(extras != JsonPrimitive(false)) {
+                        "未注册的对象字段：$path.$key"
+                    }
+                    if (extras is JsonObject) {
+                        validate(extras, child, "$path.$key", depth + 1)
+                    }
+                }
+            }
+        } else if (value is JsonArray) {
+            val items = spec["items"] as? JsonObject
+            if (items != null) {
+                value.forEachIndexed { i, child -> validate(items, child, "$path[$i]", depth + 1) }
+            }
+            val min = (spec["minItems"] as? JsonPrimitive)?.content?.toIntOrNull()
+            val max = (spec["maxItems"] as? JsonPrimitive)?.content?.toIntOrNull()
+            require((min == null || value.size >= min) &&
+                (max == null || value.size <= max)) { "数组条目数量不符合 Schema：$path" }
         }
     }
-    checkRequired(schema, arguments, "")
+    validate(schema, arguments, "parameters", 0)
     return arguments.toString().also {
         require(it.toByteArray(Charsets.UTF_8).size <= 16_384) { "工具参数超过大小预算" }
     }
