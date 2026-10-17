@@ -84,6 +84,10 @@ fun V6ToolsManagementScene(
     var editSkillId by remember(key) { mutableStateOf<String?>(null) }
     var selectedCapability by remember(key) { mutableStateOf<String?>(null) }
     var capabilityFieldValues by remember(key) { mutableStateOf<Map<String, String>>(emptyMap()) }
+    // Edits to a nested JSON array item are staged locally until the user
+    // confirms that row. An incomplete integer/object must not be committed
+    // to the Work draft after every keystroke.
+    var arrayRowEdits by remember(key) { mutableStateOf<Map<String, String>>(emptyMap()) }
     var manageConnections by remember(key) { mutableStateOf(false) }
     var capabilityInstructions by remember(key) { mutableStateOf("") }
     var editSkillDocument by remember(key) { mutableStateOf("") }
@@ -266,6 +270,7 @@ fun V6ToolsManagementScene(
                             SyButton("在 Work 中使用此能力", {
                                 selectedCapability = ability.name
                                 capabilityFieldValues = emptyMap()
+                                arrayRowEdits = emptyMap()
                             }, style = SyButtonStyle.SECONDARY)
                         }
                     }
@@ -323,8 +328,70 @@ fun V6ToolsManagementScene(
                                             }, style = SyButtonStyle.GHOST)
                                         }
                                     }
-                                    if (field.type in setOf("array", "object"))
-                                        SyNote("填写对应的 JSON 数组/对象；保存时由原工具注册表核验")
+                                    if (field.type == "array") {
+                                        val editor = remember(schema, field, capabilityFieldValues[field.name]) {
+                                            runCatching {
+                                                v6ToolArrayEditor(schema, field, capabilityFieldValues[field.name])
+                                            }.getOrNull()
+                                        }
+                                        if (editor == null) {
+                                            SyNote("该数组暂不支持逐项编辑，请填写可信 Schema 对应的完整 JSON")
+                                        } else {
+                                            SyNote("逐项编辑数组 · " + editor.itemType +
+                                                " · 已有 " + editor.items.size + " 项（限制 " +
+                                                editor.minItems + "—" + editor.maxItems + "）")
+                                            editor.items.forEachIndexed { index, value ->
+                                                val rowKey = field.name + "#" + index
+                                                val text = arrayRowEdits[rowKey] ?: (
+                                                    if (editor.itemType == "string")
+                                                        runCatching {
+                                                            (kotlinx.serialization.json.Json.parseToJsonElement(value)
+                                                                as kotlinx.serialization.json.JsonPrimitive).content
+                                                        }.getOrDefault(value)
+                                                    else value)
+                                                SyInput(text, {
+                                                    arrayRowEdits = arrayRowEdits + (rowKey to it.take(4_096))
+                                                }, label = field.label + " · 第 " + (index + 1) + " 项",
+                                                    singleLine = editor.itemType !in setOf("object", "array"))
+                                                SyButton("应用第 " + (index + 1) + " 项", {
+                                                    try {
+                                                        val updated = v6ToolArrayDraftChange(editor, index, text)
+                                                        capabilityFieldValues =
+                                                            capabilityFieldValues + (field.name to updated)
+                                                        arrayRowEdits = arrayRowEdits - rowKey
+                                                    } catch (failure: IllegalArgumentException) {
+                                                        feedback = failure.message ?: "数组元素输入无效"
+                                                    } catch (failure: kotlinx.serialization.SerializationException) {
+                                                        feedback = failure.message ?: "数组元素不是合法 JSON"
+                                                    }
+                                                }, style = SyButtonStyle.SECONDARY)
+                                                SyButton("移除第 " + (index + 1) + " 项", {
+                                                    capabilityFieldValues = capabilityFieldValues +
+                                                        (field.name to v6ToolArrayDraftChange(editor, index, null))
+                                                    arrayRowEdits = emptyMap()
+                                                }, style = SyButtonStyle.GHOST,
+                                                    enabled = editor.items.size > editor.minItems)
+                                            }
+                                            SyButton("添加数组项", {
+                                                val initial = when (editor.itemType) {
+                                                    "string" -> ""
+                                                    "integer", "number" -> "0"
+                                                    "boolean" -> "false"
+                                                    "object" -> "{}"
+                                                    "array" -> "[]"
+                                                    else -> error("类型未经 Schema 确认")
+                                                }
+                                                capabilityFieldValues = capabilityFieldValues +
+                                                    (field.name to v6ToolArrayDraftChange(
+                                                        editor, editor.items.size, initial))
+                                                arrayRowEdits = emptyMap()
+                                            }, enabled = editor.items.size < editor.maxItems,
+                                                style = SyButtonStyle.SECONDARY)
+                                            SyNote("完整数组仍由原工具 Owner 再次校验，编辑不等于授权执行")
+                                        }
+                                    } else if (field.type == "object") {
+                                        SyNote("可编辑嵌套对象子字段；完整 JSON 在提交时经原注册 Schema 检验")
+                                    }
                                 }
                             }
                         }
