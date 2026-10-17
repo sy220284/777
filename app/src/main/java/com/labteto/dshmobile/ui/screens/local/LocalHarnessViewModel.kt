@@ -282,7 +282,15 @@ class LocalHarnessViewModel @Inject constructor(
         return workConversationUiPort.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.SendWithTeam(expected, text, attachments)).toLegacySendResult()
     }
 
-    suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
+    /** Chat Feature is authoritative for suggestions in both V6 and the retired Shell. */
+    suspend fun generateReplySuggestions(): Boolean {
+        val identity = uiPorts.identitySnapshot() ?: return false
+        return when (replySuggestionsUiPort.generate(identity)) {
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted,
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued -> true
+            else -> false
+        }
+    }
     internal suspend fun diaryEntries(subjectKey: String): List<ChatDiaryEntry> =
         withContext(Dispatchers.IO) { runtime.chat.diaryEntries(subjectKey) }
     internal suspend fun correctDiaryEntry(
