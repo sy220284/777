@@ -3,6 +3,7 @@ package com.labteto.dshmobile.uipack.v6
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
@@ -89,8 +90,12 @@ internal fun v6StructuredToolResultNodes(
 ): List<V6ToolResultNode> {
     require(maxNodes in 1..128 && maxDepth in 1..8)
     val nodes = ArrayList<V6ToolResultNode>(minOf(64, maxNodes))
+    var truncated = false
     fun add(path: List<String>, kind: V6ToolResultKind, depth: Int, preview: String) {
-        if (nodes.size >= maxNodes) return
+        if (nodes.size >= maxNodes) {
+            truncated = true
+            return
+        }
         nodes += V6ToolResultNode(path,
             path.lastOrNull()?.take(80) ?: "工具结果", kind, depth,
             preview.take(320))
@@ -107,11 +112,18 @@ internal fun v6StructuredToolResultNodes(
         return nodes
     }
     fun walk(path: List<String>, element: JsonElement, depth: Int) {
-        if (nodes.size >= maxNodes) return
+        if (nodes.size >= maxNodes) {
+            truncated = true
+            return
+        }
         when (element) {
             is JsonObject -> {
                 add(path, V6ToolResultKind.OBJECT, depth, "对象 · ${element.size} 个字段")
-                if (depth >= maxDepth) return
+                if (depth >= maxDepth) {
+                    if (element.isNotEmpty()) add(path + "…",
+                        V6ToolResultKind.TRUNCATED, depth, "达到可展示的最大嵌套深度")
+                    return
+                }
                 element.entries.take(32).forEach { (key, value) ->
                     walk(path + key, value, depth + 1)
                 }
@@ -120,7 +132,11 @@ internal fun v6StructuredToolResultNodes(
             }
             is JsonArray -> {
                 add(path, V6ToolResultKind.ARRAY, depth, "数组 · ${element.size} 项")
-                if (depth >= maxDepth) return
+                if (depth >= maxDepth) {
+                    if (element.isNotEmpty()) add(path + "…",
+                        V6ToolResultKind.TRUNCATED, depth, "达到可展示的最大嵌套深度")
+                    return
+                }
                 element.take(32).forEachIndexed { index, child ->
                     walk(path + "[$index]", child, depth + 1)
                 }
@@ -141,7 +157,7 @@ internal fun v6StructuredToolResultNodes(
     walk(emptyList(), parsed, 0)
     // Budget truncation must be explicit. A long event cannot appear complete
     // merely because the projection stopped after 64 rendered rows.
-    if (nodes.size >= maxNodes)
+    if (truncated)
         nodes[maxNodes - 1] = V6ToolResultNode(
             nodes.last().path, "…", V6ToolResultKind.TRUNCATED,
             nodes.last().depth, "展示节点预算已满，请按来源事件核查")
