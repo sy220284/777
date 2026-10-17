@@ -145,9 +145,11 @@ internal class LocalV6StandaloneViewModel @Inject constructor(
     fun pack(
         updateStatus: kotlinx.coroutines.flow.StateFlow<String?>?,
         checkForUpdate: (() -> Unit)?,
+        visualFrame: @androidx.compose.runtime.Composable (@androidx.compose.runtime.Composable () -> Unit) -> Unit = { it() },
     ) = V6ApplicationScenePack(
         hostPreferencesUiPort, settingsUiPort, conversation,
         usageOwner = usageUiPort, updateStatus = updateStatus,
         checkForUpdate = checkForUpdate, secondary = secondary,
+        visualFrame = visualFrame,
     )
 }
