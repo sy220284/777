@@ -8,6 +8,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.Message
 import android.os.Messenger
+import android.os.ParcelFileDescriptor
 import com.labteto.dshmobile.interop.mcp.McpNegotiatingHttpTransport
 import com.labteto.dshmobile.interop.mcp.McpNegotiatingStdioTransport
 import com.labteto.dshmobile.interop.mcp.McpTerminationSource
@@ -150,17 +151,46 @@ class McpPluginWorkerService : Service() {
     private fun send(to: Messenger, kind: Int, requestId: Int, token: String,
         result: String? = null, error: String? = null, transportError: Boolean = false,
         httpStatus: Int = 0) {
+        val bytes = result?.toByteArray(Charsets.UTF_8)
+        val pipe = if (bytes != null && bytes.size > McpWorkerWire.MAX_INLINE_RESPONSE_BYTES) {
+            try { ParcelFileDescriptor.createPipe() }
+            catch (_: java.io.IOException) {
+                invalidate(token)
+                return
+            }
+        } else null
         val msg = Message.obtain(null, kind, requestId, McpWorkerWire.VERSION).apply {
             data = Bundle().apply {
                 putString("token", token)
-                result?.let { putString("result", it) }
+                if (pipe == null) result?.let { putString("result", it) }
+                else putParcelable("result_pipe", pipe[0])
                 error?.let { putString("error", it.take(120)) }
                 putBoolean("transport_error", transportError)
                 if (httpStatus > 0) putInt("http_status", httpStatus)
             }
         }
-        try { to.send(msg) }
-        catch (_: android.os.RemoteException) { invalidate(token) }
+        try {
+            // Deliver read FD first; writer runs asynchronously to avoid blocking the
+            // Binder thread on a full pipe before the consumer has received it.
+            to.send(msg)
+            if (pipe != null) {
+                val writer = pipe[1]
+                scope.launch {
+                    try {
+                        ParcelFileDescriptor.AutoCloseOutputStream(writer).use { output ->
+                            output.write(bytes!!)
+                        }
+                    } catch (_: java.io.IOException) {
+                        invalidate(token)
+                    }
+                }
+            }
+        } catch (_: android.os.RemoteException) {
+            pipe?.get(1)?.close()
+            invalidate(token)
+        } finally {
+            pipe?.get(0)?.close()
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder = incoming.binder

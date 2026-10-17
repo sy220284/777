@@ -12,7 +12,8 @@ internal object McpWorkerWire {
     // Binder calls share an OS transaction budget with framework metadata. A too-large
     // response must fail explicitly, never silently truncate a command or claim success.
     const val MAX_REQUEST_BYTES = 48 * 1024
-    const val MAX_RESPONSE_BYTES = 48 * 1024
+    const val MAX_INLINE_RESPONSE_BYTES = 48 * 1024
+    const val MAX_RESPONSE_BYTES = 8 * 1024 * 1024
     const val MAX_PENDING_CALLS = 16
     const val CONNECT_TIMEOUT_MS = 15_000L
     const val REQUEST_TIMEOUT_MS = 120_000L

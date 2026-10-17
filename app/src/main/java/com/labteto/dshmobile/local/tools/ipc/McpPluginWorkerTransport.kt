@@ -10,6 +10,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.Message
 import android.os.Messenger
+import android.os.ParcelFileDescriptor
 import com.labteto.dshmobile.interop.mcp.McpHttpException
 import com.labteto.dshmobile.interop.mcp.McpTerminationSource
 import com.labteto.dshmobile.interop.mcp.McpTransport
@@ -191,11 +192,28 @@ internal class McpPluginWorkerTransport(
         val encoded = Json.encodeToString(JsonObject.serializer(), params)
         require(McpWorkerWire.validRequestSize(encoded)) { "MCP request exceeds Binder budget" }
         ensureOpened()
-        val result = rpc(McpWorkerWire.REQUEST, Bundle().apply {
+        val replyBundle = rpc(McpWorkerWire.REQUEST, Bundle().apply {
             putString("method", method)
             putString("params", encoded)
-        }).getString("result") ?: throw IOException("MCP worker returned no result")
-        require(McpWorkerWire.validResponseSize(result)) { "MCP reply exceeds Binder budget" }
+        })
+        val result = replyBundle.getString("result") ?: replyBundle
+            .getParcelable("result_pipe", ParcelFileDescriptor::class.java)?.let { pipe ->
+                withContext(Dispatchers.IO) {
+                    ParcelFileDescriptor.AutoCloseInputStream(pipe).use { input ->
+                        val limit = McpWorkerWire.MAX_RESPONSE_BYTES
+                        val out = java.io.ByteArrayOutputStream()
+                        val buffer = ByteArray(32 * 1024)
+                        while (true) {
+                            val n = input.read(buffer)
+                            if (n < 0) break
+                            require(out.size() + n <= limit) { "MCP pipe response exceeded budget" }
+                            out.write(buffer, 0, n)
+                        }
+                        out.toString(Charsets.UTF_8.name())
+                    }
+                }
+            } ?: throw IOException("MCP worker returned no result")
+        require(McpWorkerWire.validResponseSize(result)) { "MCP reply exceeds verified budget" }
         return Json.parseToJsonElement(result) as? JsonObject
             ?: throw IOException("MCP worker returned invalid reply")
     }

@@ -18,7 +18,8 @@ class McpWorkerWireTest {
         assertTrue(McpWorkerWire.validRequestSize("a".repeat(48 * 1024)))
         assertFalse(McpWorkerWire.validRequestSize("中".repeat(20_000)))
         assertTrue(McpWorkerWire.validResponseSize("{}"))
-        assertFalse(McpWorkerWire.validResponseSize("x".repeat(48 * 1024 + 1)))
+        assertTrue(McpWorkerWire.validResponseSize("x".repeat(48 * 1024 + 1)))
+        assertFalse(McpWorkerWire.validResponseSize("x".repeat(8 * 1024 * 1024 + 1)))
     }
 
     @Test fun transportHasNoAutomaticCallReplayAndUsesOnlyPrivateWorkerProcess() {
