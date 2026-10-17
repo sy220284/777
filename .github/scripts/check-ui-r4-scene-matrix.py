@@ -18,6 +18,17 @@ CATALOG_LINE = re.compile(
 def errors(matrix, catalog):
     issues = []
     scenes = matrix.get("scenes", [])
+    # The 2026-10-16 scope decision is authoritative: never silently resurrect
+    # a retired Next pack, legacy migration stage or mandatory device signoff.
+    if "CODE_ONLY" not in str(matrix.get("scope", "")):
+        issues.append("R4 acceptance scope drift: CODE_ONLY must remain explicit")
+    for scene in scenes:
+        sid = scene.get("id", "<unknown>")
+        if "待设备验收" in str(scene.get("acceptance", "")):
+            issues.append(f"retired mandatory-device acceptance: {sid}")
+        implementation = str(scene.get("implementation", ""))
+        if "Next" in implementation or "独立 Pack 待迁移" in implementation:
+            issues.append(f"retired UI migration implementation claim: {sid}")
     actual = {}
     for match in CATALOG_LINE.finditer(catalog):
         identity, kind, owner, host = match.groups()
@@ -138,6 +149,15 @@ def main():
         tampered = copy.deepcopy(data)
         tampered["scenes"][0]["actionProof"][first]["ownerPort"] = "Old [Next]"
         assert any("retired Next owner" in x for x in errors(tampered, catalog))
+        tampered = copy.deepcopy(data)
+        tampered["scope"] = "historical device-only"
+        assert any("CODE_ONLY" in x for x in errors(tampered, catalog))
+        tampered = copy.deepcopy(data)
+        tampered["scenes"][0]["acceptance"] = "待设备验收"
+        assert any("mandatory-device" in x for x in errors(tampered, catalog))
+        tampered = copy.deepcopy(data)
+        tampered["scenes"][0]["implementation"] = "V6 现行入口；独立 Pack 待迁移"
+        assert any("retired UI migration" in x for x in errors(tampered, catalog))
         tampered = copy.deepcopy(data)
         tampered["scenes"].pop()
         assert any("scene count drift" in x for x in errors(tampered, catalog))

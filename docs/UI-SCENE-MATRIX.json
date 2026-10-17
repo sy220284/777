@@ -1,7 +1,7 @@
 {
   "contractVersion": 1,
   "baseline": "8d4855ff",
-  "scope": "R4 单独 V6 UI Pack + 中立 Host/Feature Port；当前仅以源码、Kotlin/Compose/JVM 契约与架构门禁签收，不要求设备/视觉验收。场景登记和Owner映射不等于173项动作行为签收。",
+  "scope": "R4 单独 V6 UI Pack + 中立 Host/Feature Port；CODE_ONLY 当前仅以源码、Kotlin/Compose/JVM 契约与架构门禁签收，不要求设备/视觉验收。场景登记和Owner映射不等于173项动作行为签收。",
   "scenes": [
     {
       "id": "conversation.chat",
