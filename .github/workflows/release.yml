@@ -49,6 +49,14 @@ jobs:
           BATCH_SHA="$(git rev-parse HEAD)"
           RELEASE_SHA="$BATCH_SHA"
 
+          # A backend-only baseline is intentionally non-user-facing: never create
+          # a release, even when all infrastructure and device tests are green.
+          if [ -f docs/UI-BACKEND-RESET.zh-CN.md ]; then
+            echo "当前分支为无界面后端基线；禁止自动发布空白客户端 APK。"
+            skip_release
+            exit 0
+          fi
+
           release_equivalent_to_batch() {
             release_sha="$1"
             batch_sha="$2"

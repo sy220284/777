@@ -13,6 +13,12 @@ CI = (WORKFLOWS / "ci.yml").read_text(encoding="utf-8")
 RELEASE = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
 CLEANUP = (WORKFLOWS / "cleanup-old-releases.yml").read_text(encoding="utf-8")
 CAPTURE_PATH = WORKFLOWS / "capture-readme-ui.yml"
+# Do not distribute a deliberately empty host as a user-facing release.
+if (ROOT / "docs/UI-BACKEND-RESET.zh-CN.md").exists() and (
+    "if [ -f docs/UI-BACKEND-RESET.zh-CN.md ]; then" not in RELEASE or
+    "skip_release" not in RELEASE
+):
+    raise SystemExit("Backend-only app must block automatic Release APK publishing")
 if CAPTURE_PATH.exists():
     raise SystemExit("Backend-only repository cannot reintroduce the retired UI screenshot workflow")
 SETTINGS = (ROOT / "settings.gradle.kts").read_text(encoding="utf-8")

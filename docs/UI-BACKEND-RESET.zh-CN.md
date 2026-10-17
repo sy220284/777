@@ -29,3 +29,7 @@
 ## 历史审计快照口径
 
 `docs/FEATURE-SOURCE-INDEX.auto.json`、`FEATURE-REVIEW.auto.json`、`FEATURE-REALITY-AUDIT.auto.json` 等报告产生于旧 UI 代码仍存在时，文件中的 `ui-pack-v6` / `ui/screens` 路径仅是**历史证据**，不是现行源码或当前功能验收结果。当前 UI 实现以本分支实际 Git 树和新的负面边界门禁为准；重建新 UI 后需要重新生成全量功能审计基线，不能复用这些旧截图、页面或证据声明。现行功能来源登记已改指向真实业务端口或 Provider 解析代码。
+
+## 禁止空白 APK 发版
+
+本阶段属于无界面后端基线，即使 CI 构建、Android 设备测试全部通过，也不能对终端用户发布空白客户端。`.github/workflows/release.yml` 在发布检测阶段识别本权威文档作为无界面标志并直接跳过发版；`.github/scripts/check-ci-repository-integrity.py` 强制验证拦截存在。**未来完整接入并验收新 UI 后**，在移除无界面标志和发布拦截时必须重新完成全量主线 CI 与发布证据检查。
