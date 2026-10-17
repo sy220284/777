@@ -1052,6 +1052,11 @@ for required in ("LocalHarnessViewModel = hiltViewModel()", "LocalHarnessScreen(
         die("R4 former Shell construction must stay quarantined in compatibility entry: " + required)
 if v6_boot.index("LocalV6StandaloneViewModel = hiltViewModel()") >= v6_boot.index("LocalLegacyApplicationEntry("):
     die("R4 standalone V6 must branch before quarantined Legacy composition")
+legacy_entry_pack = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/ui/legacy/LocalLegacyApplicationEntry.kt")
+)
+if "installedPacks = emptyList()" not in legacy_entry_pack or "LocalApplicationPackInstallations" in legacy_entry_pack:
+    die("R4 Legacy compatibility must not install a second V6 pack from aggregate old ViewModel")
 worker_process_guard = strip_comments(read(APPLICATION_PATH))
 if "if (isMcpWorkerProcess(Application.getProcessName(), packageName)) return" not in worker_process_guard:
     die("R4 isolated worker must not bootstrap the full Agent runtime")

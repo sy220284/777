@@ -2,7 +2,6 @@ package com.labteto.dshmobile.ui.legacy
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.BuildConfig
@@ -60,15 +59,9 @@ internal fun LocalLegacyApplicationEntry(
     )
 
     com.labteto.dshmobile.ui.host.LocalApplicationUiHost(
-        installedPacks = remember(features, viewModel) {
-            com.labteto.dshmobile.ui.host.LocalApplicationPackInstallations.fromOwners(
-                features,
-                updateStatus = viewModel.updateInstallStatus,
-                checkForUpdate = {
-                    viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
-                },
-            )
-        },
+        // V6 always boots through LocalV6StandaloneViewModel. The retired
+        // aggregate business ViewModel must never compose a second V6 pack.
+        installedPacks = emptyList(),
         availableCapabilities = hostCapabilities,
         requestedSceneKey = requestedExternalSceneKey ?: requestedHostScene,
         notificationSessionId = requestedLocalSessionId,
