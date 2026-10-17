@@ -50,16 +50,19 @@ fun rememberUiWorkspaceExporter(
     val scope = rememberCoroutineScope()
     val callback by rememberUpdatedState(onResult)
     val writer by rememberUpdatedState(writeFile)
-    var pending by remember { mutableStateOf<UiWorkspaceExportRequest?>(null) }
+    val gate = remember { UiHostDocumentOperationGate<UiWorkspaceExportRequest>() }
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
-        val request = pending
-        pending = null
-        when {
-            uri == null -> callback(UiWorkspaceExportReceipt.Cancelled)
-            request == null -> callback(UiWorkspaceExportReceipt.Failed("原导出请求已失效，请重新选择"))
-            else -> scope.launch {
+        if (uri == null) {
+            if (gate.cancelSelection() != null) callback(UiWorkspaceExportReceipt.Cancelled)
+            else callback(UiWorkspaceExportReceipt.Failed("导出请求已失效，请重新发起"))
+        } else {
+            val ticket = gate.selectionReturned()
+            if (ticket == null) callback(UiWorkspaceExportReceipt.Failed("原导出请求已失效，请重新选择"))
+            else scope.launch {
+                val request = ticket.request
+                val outcome = try {
                 try {
                     val bytes = withContext(Dispatchers.IO) {
                         requireNotNull(context.contentResolver.openOutputStream(uri, "wt")) {
@@ -93,21 +96,29 @@ fun rememberUiWorkspaceExporter(
                             UiWorkspaceExportReceipt.ExternalAppUnavailable(bytes, failure.message)
                         }
                     }
-                    callback(result)
+                    result
                 } catch (cancelled: CancellationException) { throw cancelled }
                 catch (failure: Exception) {
-                    callback(UiWorkspaceExportReceipt.Failed(failure.message))
+                    UiWorkspaceExportReceipt.Failed(failure.message)
+                } finally {
+                    gate.finish(ticket)
                 }
+                callback(outcome)
             }
         }
     }
     return { request ->
-        if (pending == null) {
-            pending = request
+        val ticket = gate.begin(request)
+        if (ticket == null) {
+            callback(UiWorkspaceExportReceipt.Failed("上一个导出尚未完成，请完成或取消后重试"))
+        } else {
             try { launcher.launch(request.displayName) }
-            catch (cancelled: CancellationException) { pending = null; throw cancelled }
+            catch (cancelled: CancellationException) {
+                gate.failToLaunch(ticket)
+                throw cancelled
+            }
             catch (failure: Exception) {
-                pending = null
+                gate.failToLaunch(ticket)
                 callback(UiWorkspaceExportReceipt.Failed(failure.message))
             }
         }

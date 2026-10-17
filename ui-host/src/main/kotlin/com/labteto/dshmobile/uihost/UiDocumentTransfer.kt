@@ -79,15 +79,17 @@ fun rememberUiDocumentSaver(mimeType: String, onResult: (UiDocumentWriteReceipt)
     val resolver = LocalContext.current.contentResolver
     val scope = rememberCoroutineScope()
     val callback by rememberUpdatedState(onResult)
-    var pending by remember(mimeType) { mutableStateOf<UiExportFile?>(null) }
+    val gate = remember(mimeType) { UiHostDocumentOperationGate<UiExportFile>() }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mimeType)) { uri ->
-        val payload = pending
-        pending = null
-        when {
-            uri == null -> callback(UiDocumentWriteReceipt.Cancelled)
-            payload == null -> callback(UiDocumentWriteReceipt.Failed("导出内容已失效，请重新选择导出"))
-            else -> scope.launch {
-                val result = withContext(Dispatchers.IO) {
+        if (uri == null) {
+            if (gate.cancelSelection() != null) callback(UiDocumentWriteReceipt.Cancelled)
+            else callback(UiDocumentWriteReceipt.Failed("导出请求已失效，请重新发起"))
+        } else {
+            val ticket = gate.selectionReturned()
+            if (ticket == null) callback(UiDocumentWriteReceipt.Failed("导出内容已失效，请重新选择导出"))
+            else scope.launch {
+                val payload = ticket.request
+                val result = try { withContext(Dispatchers.IO) {
                     try {
                         requireNotNull(resolver.openOutputStream(uri, "wt")) { "无法写入所选文档" }.use { output ->
                             var offset = 0
@@ -101,17 +103,22 @@ fun rememberUiDocumentSaver(mimeType: String, onResult: (UiDocumentWriteReceipt)
                         UiDocumentWriteReceipt.Saved
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (failure: Exception) { UiDocumentWriteReceipt.Failed(failure.message) }
-                }
+                } } finally { gate.finish(ticket) }
                 callback(result)
             }
         }
     }
     return { file ->
-        if (pending == null) {
-            pending = file
+        val ticket = gate.begin(file)
+        if (ticket == null) {
+            callback(UiDocumentWriteReceipt.Failed("上一个文件保存尚未结束，请完成或取消后重试"))
+        } else {
             try { launcher.launch(file.name) }
-            catch (cancelled: CancellationException) { pending = null; throw cancelled }
-            catch (failure: Exception) { pending = null; callback(UiDocumentWriteReceipt.Failed(failure.message)) }
+            catch (cancelled: CancellationException) { gate.failToLaunch(ticket); throw cancelled }
+            catch (failure: Exception) {
+                gate.failToLaunch(ticket)
+                callback(UiDocumentWriteReceipt.Failed(failure.message))
+            }
         }
     }
 }
