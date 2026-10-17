@@ -9,7 +9,7 @@ import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.dp
 
 /** V6.2 unified optical glyphs: 24dp, stroke 1.75, round caps and theme tint applied by caller. */
-internal object SyEntryIcons {
+object SyEntryIcons {
     val Persona: ImageVector by lazy { entryGlyph("Persona",
         "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8",
         "M5 20v-1.2A5.8 5.8 0 0 1 10.8 13h2.4A5.8 5.8 0 0 1 19 18.8V20") }
