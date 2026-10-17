@@ -51,6 +51,10 @@ class SessionExecutionRegistry {
     private class Entry {
         val mutex = Mutex()
         var reservations = 0
+        // Include suspended maintenance/deletion acquirers, not just the current
+        // owner. Otherwise a foreground owner can keep accepting new input after
+        // a destructive owner is already waiting to take the session.
+        var nonInputReservations = 0
         var lease: SessionExecutionLease? = null
     }
 
@@ -74,7 +78,10 @@ class SessionExecutionRegistry {
         // A reserved successor may not have resumed after the predecessor releases
         // its mutex. That interval is NOT idle: repair/send must not race its claim.
         val active = (entry?.reservations ?: 0) > 0
-        return SessionExecutionAdmission(active, active && entry?.lease?.owner?.acceptsInput != true)
+        return SessionExecutionAdmission(
+            active,
+            active && (entry?.lease?.owner?.acceptsInput != true || entry.nonInputReservations > 0),
+        )
     }
 
     fun tryAcquire(sessionId: String, owner: SessionExecutionOwner): SessionExecutionLease? {
@@ -83,6 +90,7 @@ class SessionExecutionRegistry {
             val entry = entries.getOrPut(sessionId, ::Entry)
             if (entry.reservations > 0 || !entry.mutex.tryLock()) return null
             entry.reservations = 1
+            if (!owner.acceptsInput) entry.nonInputReservations++
             return claim(sessionId, owner, entry)
         }
     }
@@ -90,12 +98,15 @@ class SessionExecutionRegistry {
     suspend fun acquire(sessionId: String, owner: SessionExecutionOwner): SessionExecutionLease {
         require(sessionId.isNotBlank()) { "会话编号不能为空" }
         val entry = synchronized(this) {
-            entries.getOrPut(sessionId, ::Entry).also { it.reservations++ }
+            entries.getOrPut(sessionId, ::Entry).also {
+                it.reservations++
+                if (!owner.acceptsInput) it.nonInputReservations++
+            }
         }
         try {
             entry.mutex.lock()
         } catch (error: Throwable) {
-            releaseReservation(sessionId, entry)
+            releaseReservation(sessionId, entry, owner)
             throw error
         }
         return synchronized(this) { claim(sessionId, owner, entry) }
@@ -149,12 +160,19 @@ class SessionExecutionRegistry {
             current
         }
         entry.mutex.unlock()
-        releaseReservation(sessionId, entry)
+        releaseReservation(sessionId, entry, lease.owner)
     }
 
     @Synchronized
-    private fun releaseReservation(sessionId: String, entry: Entry) {
+    private fun releaseReservation(sessionId: String, entry: Entry, owner: SessionExecutionOwner) {
         entry.reservations--
-        if (entry.reservations == 0) entries.remove(sessionId)
+        if (!owner.acceptsInput) entry.nonInputReservations--
+        check(entry.reservations >= 0 && entry.nonInputReservations >= 0) {
+            "会话执行租约预留计数不一致"
+        }
+        if (entry.reservations == 0) {
+            check(entry.nonInputReservations == 0) { "会话排他准入未释放" }
+            entries.remove(sessionId)
+        }
     }
 }
