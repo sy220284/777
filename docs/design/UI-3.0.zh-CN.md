@@ -209,4 +209,4 @@ V6 独立包必须完成 75 个必需场景与 173 项动作的真实等价验�
 
 ## 12. 当前执行状态
 
-**规范已定义；R4 独立 V6 迁移仍未完成。** 中立契约、Host SDK、Owner 端口与独立 V6 场景登记已落地，但 Legacy Shell 仍是生产稳定入口，`v6.migration.accepted` 未开放。Next 模块及调试入口已移除；R4 不要求第二套界面。V6 必需场景的真实业务、草稿/阅读和进程恢复、Android16/17/无障碍仍待正式验收。阶段、源码和实际验证结果见 [实施台账](../UI-3.0-IMPLEMENTATION.zh-CN.md)。本规范仍是新 UI 改造的第一查阅入口，旧方案仅供追溯。
+**规范已定义；R4 独立 V6 的代码装配已投入生产，行为验收仍未闭环。** 当前 `AppRoot` 仅装配 `LocalApplicationUiHost` 和单一 `V6ApplicationScenePack`；旧 Legacy Shell 入口已退役，不能再作为回退路径或独立包尚未安装的依据。`75/75` 必需场景已注册，但 `173/173` 动作仍缺正式行为签收；主线 Android 16/17 模拟器用例曾失败，#734 的 PR 作业未执行设备测试，不能以该 PR 的绿色 merge-gate 宣称设备验证完成。视觉主题仍从 `AppRoot/DshTheme` 注入，尚待按 UI Pack 所有权目标迁移与回归。Next/双 UI 切换不在 R4 范围，阶段、源码和当前证据见 [实施台账](../UI-3.0-IMPLEMENTATION.zh-CN.md) 和 [#734 审计记录](ui3/R4-POSTMERGE-RECHECK-20261017.zh-CN.md)。

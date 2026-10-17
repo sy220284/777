@@ -1,9 +1,9 @@
 # UI 3.0-R4 实施台账
 
-> **2026-10-17 当前主线事实（优先于以下历史 PR 开发记录）**：#705 已合并至 `main@e17804391ecfd185baf71a282e66d179c266d0df`，生产 `AppRoot` 使用单一独立 V6 Pack + Host/Feature Port；旧 Shell 不再是生产兜底，Next/双 UI Pack 不属于现行交付范围。R4 任务表登记 29 项代码实现，173 项动作正式验收仍为 0，不能把场景映射与阶段性 CI 视作业务最终签收。合并后 [main CI #39016721514](https://github.com/sy220284/777/actions/runs/39016721514) 的 AndroidTest 编译失败已定位为测试替身/导入契约失步，设备测试未运行；本轮在 #733 修复并以新 Head 重新验证。下文包含曾经的 Draft、旧 Shell、Next 双包描述，均只作为当时历史，不得覆盖现行生产装配和已核实的缺口。
+> **2026-10-17 当前主线/PR 核实事实（覆盖下列历史开发快照）**：`main@ef8ce1df8beee4d41824beb27954cd271b141be5`，#705/#733 已合并，生产 `AppRoot` 仅装配 `LocalApplicationUiHost` 与单一独立 V6 Pack；旧 Legacy Shell/Next 包已退出生产入口。现行 R4 为 75/75 必需 Scene 渲染器注册、173/173 Action 源码映射、**0/173 真实行为正式签收**；`Agent Engine V3` 24 项仍进行中。主线 CI [#39020211827](https://github.com/sy220284/777/actions/runs/39020211827) 的 Android16/17 仪表测试失败；修复 PR [#734](https://github.com/sy220284/777/pull/734) 的最新已执行静态、架构、JVM、ARM64 及 merge-gate 检查通过，但 PR 规则**跳过** Android16/17，尚无修复后设备放行证据。#734 还包含真实超时回执、冷启动输入框标签、入场动效语义和自动任务滚动状态修正。以下旧 Shell/Next/待合并描述皆为历史，不得作为现行状态。
 
 
-> **2026-10-16 本轮代码-only 交付口径（覆盖本文件所有历史验收要求）：** 按用户要求取消所有设备验证，不再要求实机/模拟器、Android16/17 仪器测试、人工视觉、TalkBack 或弱网设备验收。保留实际业务功能、会话/权限/副作用一致性、冷恢复代码与 JVM/Compose 单测，交付必须经过 Kotlin 编译、静态与架构检查。历史段落仅保留开发溯源，不作为新的设备门禁。13 项未完成代码任务与 5 项代码检查保留真实状态，以 [正式任务台账](design/ui3/R4-CODE-TASKS.json) 为准。
+> **历史执行口径，仅适用于当时的 2026-10-16 代码批次，不能覆盖当前 UI 3.0 §9.3 与发布验证：** 当轮按请求暂不执行设备验证，不再要求实机/模拟器、Android16/17 仪器测试、人工视觉、TalkBack 或弱网设备验收。保留实际业务功能、会话/权限/副作用一致性、冷恢复代码与 JVM/Compose 单测，交付必须经过 Kotlin 编译、静态与架构检查。历史段落仅保留开发溯源，不作为新的设备门禁。13 项未完成代码任务与 5 项代码检查保留真实状态，以 [正式任务台账](design/ui3/R4-CODE-TASKS.json) 为准。
 
 > **S4-07 动态文档图表编辑代码增量（需最终编译验证）：** 在当前 V6 动态文档直接选择柱状图/折线图的数值点，明确标注用户更正且未经业务核验；新 `EditUiDocumentChartPointCommand` 不接受任意节点/工具动作，复用原 Session EventLog 的同一来源、审批、会话、文档修订 CAS 流程。重构文本/表格/图表三条修改入口共用 `replaceDisplayNode`，消除三份 Owner 权限和持久化逻辑；新增图表边界、内容不越权、版本竞争、冷恢复和墓碑回归源码。老版本完整迁移与批量整理仍缺，`S4-07` 保持部分实现。
 
@@ -72,14 +72,14 @@
 | 阶段 | 当前实现 | 尚未完成 |
 |---|---|---|
 | S-1 | MCP 未检测健康使用中立标识；Chat/群聊显示真实共享队列；Work 审批使用 Owner 签发的实际等待身份 | 实时 MCP 选中/连接/授权观测与插件故障隔离完整旅程；可读性和辅助技术复现 |
-| S0 | 原 77 Scene 清单及新增证据 Overlay，共 78 Scene；7 路由/21 设置页与旧问题索引；**本轮新增 173 动作 actionProof 台账与 CI 防伪门禁，44 个真实 Port/Command 静态映射** | 其余 129 动作尚未填 Owner，所有动作仍缺完整业务/恢复签收；隐性入口需核对 |
+| S0 | 78 Scene（Host 3 + 独立 V6 75）、7 顶层路由；173 条动作均已具名映射到 Owner/回执，正式证明与代码覆盖分离，具名测试与 CI 证据门禁已增强 | 173 项均待真实业务操作和恢复签收（0/173）；隐性入口与状态恢复需设备复核 |
 | S1 | 中立 Chat/Work/Session/Tools/Media/Automation 等 Port；群聊、Work 团队/证据、Shell 偏好与图库 Owner 持续解耦，V6 逐项接入 | 完整人物/图库/会话能力等价、系统端口、旧回调退场、设备行为验收尚未完成 |
 | S2 | 中立 Port/Host 身份绑定、准入与失败处理具备源码测试基础 | V6 实际发送/编辑/审批/恢复端到端和设备验收待完成；不要求第二套界面 |
-| S3 | 独立 `:ui-pack-v6` 已登记全部 75 必需 Scene Renderer，Host 保留严格准入与导航恢复 | 旧 App Shell 退场、V6 真实功能/视觉/无障碍对等和 Android 16/17 仍未验收 |
+| S3 | 独立 `:ui-pack-v6` 已登记全部 75 必需 Scene Renderer，Host 保留严格准入与导航恢复 | 旧 App Shell 已退役；视觉主题仍在 AppRoot 注入，功能、无障碍及 Android16/17 真正行为验收仍缺 |
 | S4 | V6 动态文档、表单/图表、Owner 媒体与真实工具证据渐进绑定 | 复杂功能真实回执、长聊/弱网/重启恢复及设备验证待完成 |
-| S5 | 架构/静态/构建门禁保留 | 单 V6 禁用旧 Shell 后 75 Scene/173 Action 真机验收、三主题、TalkBack/200% 字体/IME/弱网/收费未知 |
+| S5 | 架构/静态/构建门禁保留 | 单 V6 的 75 Scene/173 Action 真实验收、三主题、TalkBack/200% 字体/IME/弱网/收费未知结果及 Android16/17 回归均尚未签收 |
 
-**全方案尚未实现完毕。** V6 独立包已登记 75/75 必需场景的源码 Renderer，不能由此认定与旧 App Shell 业务等价。旧 Shell 仍是生产稳定路径；`v6.migration.accepted` 未授权，Android16/17、173 项动作、恢复与无障碍仍待验收。Next 独立模块和调试入口已从本 PR 移除。主线已退役 Project、独立更新页、Run Center 等功能，不得恢复。
+**R4 代码装配落地，真实行为验收未完成。** 生产入口已使用独立 V6 Pack + Host，旧 Shell/Next 不再提供稳定回退；75/75 Renderer 注册不等于 173 项行为等价。当前 0/173 签收，Android16/17、恢复、主题所有权、无障碍仍须按本规范逐项验证。主线已退役 Project、独立更新页、Run Center 等功能，不得恢复。
 
 ## 所有权与动作边界
 
@@ -99,9 +99,13 @@ AI 辅助生成入口需要用户明确确认额外模型请求，冻结实际�
 
 文档及表单重开/恢复的完整旅程、无法识别消息锚点的损坏记录治理、Work Owner 运行内自动发布、绑定真实进度/证据和资源预算仍需完成，不计入已交付结果。
 
-## 独立包入口
+## 历史独立 Next 调试入口（已退役；不得按此说明启动）
 
-Next 编译依赖只有 `:ui-contract`、`:ui-host` 和 Android/Compose 标准库，不引用 App、V6、业务 Store 或 ModelGateway。仅 Debug 可显式打开：
+> 本节仅供追溯 2026-10-14/15 的试验过程。当前 `:ui-pack-next` 和 `next-conversation-slice` 已移除，不构成有效命令或产品功能。现行 AppRoot 的 UI 宿主只安装 V6 独立包。
+
+当时的 Next 编译依赖只有 `:ui-contract`、`:ui-host` 和 Android/Compose 标准库，不引用 App、V6、业务 Store 或 ModelGateway。仅 Debug 可显式打开：
+
+**注意：以下命令是已失效的历史示例，不得执行。**
 
 ```sh
 adb shell am start -n com.sy220284.dshmobile.debug/com.labteto.dshmobile.MainActivity \
