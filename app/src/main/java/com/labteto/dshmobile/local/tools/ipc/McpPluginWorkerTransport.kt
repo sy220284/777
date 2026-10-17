@@ -197,7 +197,7 @@ internal class McpPluginWorkerTransport(
         }
     }
 
-    override suspend fun request(method: String, params: JsonObject): JsonObject {
+    override suspend fun request(method: String, params: JsonObject): JsonObject = try {
         require(McpWorkerWire.isAllowedMethod(method))
         val encoded = Json.encodeToString(JsonObject.serializer(), params)
         require(McpWorkerWire.validRequestSize(encoded)) { "MCP request exceeds Binder budget" }
@@ -224,8 +224,13 @@ internal class McpPluginWorkerTransport(
                 }
             } ?: throw IOException("MCP worker returned no result")
         require(McpWorkerWire.validResponseSize(result)) { "MCP reply exceeds verified budget" }
-        return Json.parseToJsonElement(result) as? JsonObject
+        Json.parseToJsonElement(result) as? JsonObject
             ?: throw IOException("MCP worker returned invalid reply")
+    } catch (failure: IOException) {
+        // The error result can overtake the asynchronous TERMINATED notice.
+        // Abort every sibling IPC call now; there is no automatic retry.
+        terminate(failure)
+        throw failure
     }
 
     override fun close() {
