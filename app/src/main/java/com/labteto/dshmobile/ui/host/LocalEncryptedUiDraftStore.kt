@@ -53,9 +53,10 @@ internal class LocalEncryptedUiDraftStore(context: Context) {
         if (preferences.getBoolean("migrated.$domain", false)) return
         if (old != null) {
             write(domain, old)
-        } else {
-            preferences.edit().putBoolean("migrated.$domain", true).apply()
         }
+        // No old state was ever restored: leave the migration marker unset.
+        // A still-dormant Legacy VM may own an older SavedState bundle and
+        // must not have its one-time import blocked by a V6 cold launch.
     }
 
     private fun checkDomain(domain: String) {

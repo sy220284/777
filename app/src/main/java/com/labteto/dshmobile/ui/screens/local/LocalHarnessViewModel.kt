@@ -163,12 +163,21 @@ class LocalHarnessViewModel @Inject constructor(
         scope = viewModelScope,
     )
     internal val transcriptHistory = transcriptHistoryController.history
+    private val secureDrafts = com.labteto.dshmobile.ui.host.LocalEncryptedUiDraftStore(appContext)
+    init {
+        // Clear previously bundled plaintext from retained Android SavedState
+        // before either UI pack can project it; one-time legacy migration.
+        secureDrafts.migrateOldSavedStateOnce("conversation_drafts",
+            savedStateHandle.remove<List<String>>("conversation_drafts"))
+        secureDrafts.migrateOldSavedStateOnce("attachment_drafts",
+            savedStateHandle.remove<List<String>>("conversation_attachment_drafts"))
+    }
     val conversationDraftUiPort: com.labteto.dshmobile.uicontract.ConversationDraftUiPort =
-        LocalSessionDraftCache.restore(savedStateHandle.get<List<String>>("conversation_drafts").orEmpty()) {
-            savedStateHandle["conversation_drafts"] = ArrayList(it)
+        LocalSessionDraftCache.restore(secureDrafts.read("conversation_drafts")) {
+            secureDrafts.write("conversation_drafts", it)
         }.apply {
-            restoreAttachments(savedStateHandle.get<List<String>>("conversation_attachment_drafts").orEmpty()) {
-                savedStateHandle["conversation_attachment_drafts"] = ArrayList(it)
+            restoreAttachments(secureDrafts.read("attachment_drafts")) {
+                secureDrafts.write("attachment_drafts", it)
             }
         }
 

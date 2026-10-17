@@ -53,13 +53,20 @@ internal class LocalV6StandaloneViewModel @Inject constructor(
     val usageUiPort: com.labteto.dshmobile.uicontract.UsageUiPort,
     val workPolicyUiPort: com.labteto.dshmobile.uicontract.WorkPolicyUiPort,
 ) : ViewModel() {
+    private val secureDrafts = LocalEncryptedUiDraftStore(context)
+    init {
+        secureDrafts.migrateOldSavedStateOnce("conversation_drafts",
+            savedStateHandle.remove<List<String>>("v6_conversation_drafts"))
+        secureDrafts.migrateOldSavedStateOnce("attachment_drafts",
+            savedStateHandle.remove<List<String>>("v6_attachment_drafts"))
+    }
     val drafts: ConversationDraftUiPort =
-        LocalSessionDraftCache.restore(savedStateHandle.get<List<String>>("v6_conversation_drafts").orEmpty()) {
-            savedStateHandle["v6_conversation_drafts"] = ArrayList(it)
+        LocalSessionDraftCache.restore(secureDrafts.read("conversation_drafts")) {
+            secureDrafts.write("conversation_drafts", it)
         }.apply {
-            restoreAttachments(
-                savedStateHandle.get<List<String>>("v6_attachment_drafts").orEmpty()
-            ) { savedStateHandle["v6_attachment_drafts"] = ArrayList(it) }
+            restoreAttachments(secureDrafts.read("attachment_drafts")) {
+                secureDrafts.write("attachment_drafts", it)
+            }
         }
     private val readingState = LocalConversationReadingState(
         savedStateHandle.get<List<String>>("v6_reading").orEmpty()
