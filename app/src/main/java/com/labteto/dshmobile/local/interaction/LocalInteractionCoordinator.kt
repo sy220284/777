@@ -77,8 +77,19 @@ internal class LocalInteractionCoordinator(
                     "已有用户交互正在等待处理"
                 }
                 approvalWaiter = ApprovalWaiter(activeApproval, response)
+                // Publish under the same cancellation fence. Failure to publish must
+                // not strand a waiter that blocks all later interactions.
+                try {
+                    state.setPendingApproval(activeApproval)
+                    if (generation != cancellationGeneration) {
+                        throw CancellationException("用户交互所属回合已取消")
+                    }
+                } catch (error: Throwable) {
+                    approvalWaiter = null
+                    runCatching { state.clearPendingApproval(approval.callId) }
+                    throw error
+                }
             }
-            state.setPendingApproval(activeApproval)
             return try {
                 response.await()
             } finally {
@@ -106,8 +117,17 @@ internal class LocalInteractionCoordinator(
                     "已有用户交互正在等待处理"
                 }
                 questionWaiter = QuestionWaiter(activeQuestion, response)
+                try {
+                    state.setPendingQuestion(activeQuestion)
+                    if (generation != cancellationGeneration) {
+                        throw CancellationException("用户交互所属回合已取消")
+                    }
+                } catch (error: Throwable) {
+                    questionWaiter = null
+                    runCatching { state.clearPendingQuestion(question.callId) }
+                    throw error
+                }
             }
-            state.setPendingQuestion(activeQuestion)
             return try {
                 response.await().trim().ifBlank { LOCAL_QUESTION_EMPTY_RESPONSE }
             } finally {
