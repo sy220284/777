@@ -15,8 +15,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -550,71 +548,37 @@ fun V6WorkspaceScene(owner: FilesUiPort, previewFirst: Boolean, onBack: () -> Un
     var refresh by remember { mutableIntStateOf(0) }
     var feedback by remember { mutableStateOf<String?>(null) }
     var exporting by remember { mutableStateOf(false) }
-    var exportPath by remember { mutableStateOf<String?>(null) }
-    var exportAction by remember { mutableStateOf("save") }
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/octet-stream")
-    ) { uri: Uri? ->
-        val path = exportPath
-        val action = exportAction
-        if (uri == null) {
-            feedback = "已取消文件导出"
-        } else if (path != null && !exporting) {
-            exporting = true
-            scope.launch {
-                try {
-                    val bytes = withContext(Dispatchers.IO) {
-                        context.contentResolver.openOutputStream(uri, "wt")?.use { stream ->
-                            owner.exportWorkspaceFile(path, stream)
-                        } ?: error("无法打开用户选择的文件保存位置")
-                    }
-                    feedback = "已保存原文件（${bytes} 字节），内容来自工作区 Files Owner"
-                    val mime = context.contentResolver.getType(uri)
-                        ?: java.net.URLConnection.guessContentTypeFromName(path)
-                        ?: "application/octet-stream"
-                    val intent = when (action) {
-                        "share" -> Intent(Intent.ACTION_SEND).apply {
-                            type = mime
-                            putExtra(Intent.EXTRA_STREAM, uri)
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        "open" -> Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(uri, mime)
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        else -> null
-                    }
-                    if (intent != null) {
-                        try {
-                            context.startActivity(if (action == "share")
-                                Intent.createChooser(intent, "分享工作区文件") else intent)
-                        } catch (failure: Exception) {
-                            feedback = "文件已保存，但无法打开外部应用：" +
-                                (failure.message ?: "没有支持该文件类型的应用")
-                        }
-                    }
-                } catch (cancelled: CancellationException) { throw cancelled }
-                catch (failure: Exception) {
-                    feedback = failure.message ?: "文件保存失败；请检查目标位置"
-                } finally {
-                    exporting = false
-                    exportPath = null
-                }
+    val export = com.labteto.dshmobile.uihost.rememberUiWorkspaceExporter(
+        writeFile = { path, output -> owner.exportWorkspaceFile(path, output) },
+        onResult = { result ->
+            exporting = false
+            feedback = when (result) {
+                is com.labteto.dshmobile.uihost.UiWorkspaceExportReceipt.Saved ->
+                    "已保存原文件（${result.bytes} 字节），内容来自工作区 Files Owner"
+                is com.labteto.dshmobile.uihost.UiWorkspaceExportReceipt.ExternalAppUnavailable ->
+                    "文件已保存（${result.bytes} 字节），但无法打开外部应用：" +
+                        (result.message ?: "没有支持该文件类型的应用")
+                com.labteto.dshmobile.uihost.UiWorkspaceExportReceipt.Cancelled ->
+                    "已取消文件导出"
+                is com.labteto.dshmobile.uihost.UiWorkspaceExportReceipt.Failed ->
+                    result.message ?: "文件保存失败；请检查目标位置"
             }
-        }
-    }
+        },
+    )
     fun exportFile(path: String, action: String) {
         if (exporting) return
-        exportPath = path
-        exportAction = action
-        val name = path.substringAfterLast('/').ifBlank { "workspace-file" }
-        try { exportLauncher.launch(name) }
-        catch (failure: Exception) {
-            feedback = failure.message ?: "无法打开 Android 文件选择器"
-            exportPath = null
+        val operation = when (action) {
+            "save" -> com.labteto.dshmobile.uihost.UiWorkspaceExportAction.SAVE
+            "share" -> com.labteto.dshmobile.uihost.UiWorkspaceExportAction.SHARE
+            "open" -> com.labteto.dshmobile.uihost.UiWorkspaceExportAction.OPEN
+            else -> error("未知文件操作")
         }
+        exporting = true
+        export(com.labteto.dshmobile.uihost.UiWorkspaceExportRequest(
+            path = path,
+            displayName = path.substringAfterLast('/').ifBlank { "workspace-file" },
+            action = operation,
+        ))
     }
     LaunchedEffect(owner, refresh) {
         loading = true
