@@ -2,6 +2,9 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -68,6 +71,63 @@ class LocalWorkProgressCoordinatorTest {
         assertEquals("blocked", run.value.work.goal?.status)
         assertEquals(2, writes)
         assertEquals("blocked", log.snapshot().last().data["status"]?.toString()?.trim('"'))
+    }
+
+    @Test
+    fun simultaneousWorkPortsCannotOvertakeAnUnfinishedPlanCommit() {
+        val state = MutableStateFlow(LocalWorkRunState(sessionId = "parallel-progress"))
+        val file = File(temporary.root, "parallel-progress.jsonl")
+        // Two independent adapters represent concurrent Feature entrypoints sharing one Session.
+        val firstLog = eventLog(file)
+        val secondLog = eventLog(file)
+        val firstInPersist = CountDownLatch(1)
+        val releaseFirst = CountDownLatch(1)
+        val secondStarted = CountDownLatch(1)
+        val secondFinished = CountDownLatch(1)
+        val failure = AtomicReference<Throwable?>()
+        val first = LocalWorkProgressCoordinator(localWorkRunStatePort(state), firstLog) {
+            firstInPersist.countDown()
+            check(releaseFirst.await(5, TimeUnit.SECONDS)) { "first Work commit timed out" }
+        }
+        val second = LocalWorkProgressCoordinator(localWorkRunStatePort(state), secondLog) {}
+        val planThread = Thread {
+            runCatching { first.updatePlan(buildJsonObject {
+                put("items", JsonArray(listOf(JsonPrimitive("prepare"))))
+            }) }.onFailure(failure::set)
+        }
+        val todoThread = Thread {
+            secondStarted.countDown()
+            try {
+                second.updateTodos(buildJsonObject {
+                    put("items", JsonArray(listOf(buildJsonObject {
+                        put("content", "verify")
+                        put("status", "pending")
+                    })))
+                })
+            } catch (error: Throwable) {
+                failure.set(error)
+            } finally {
+                secondFinished.countDown()
+            }
+        }
+        try {
+            planThread.start()
+            assertTrue("first mutation must reach durable commit", firstInPersist.await(5, TimeUnit.SECONDS))
+            todoThread.start()
+            assertTrue(secondStarted.await(5, TimeUnit.SECONDS))
+            assertTrue("second port must wait until the first Work mutation has persisted",
+                !secondFinished.await(200, TimeUnit.MILLISECONDS))
+        } finally {
+            releaseFirst.countDown()
+            planThread.join(5_000)
+            todoThread.join(5_000)
+        }
+        assertTrue("Work worker threads must have completed", !planThread.isAlive && !todoThread.isAlive)
+        failure.get()?.let { throw AssertionError("concurrent Work mutation failed", it) }
+        assertEquals(listOf("plan/state", "todo/state"), firstLog.snapshot().map { it.type })
+        val projected = projectWorkSessionControls(LocalWorkState(), firstLog.snapshot())
+        assertEquals(state.value.work.plan, projected.plan)
+        assertEquals(state.value.work.todos, projected.todos)
     }
 
     @Test
