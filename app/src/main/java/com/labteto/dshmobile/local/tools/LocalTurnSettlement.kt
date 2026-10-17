@@ -19,7 +19,7 @@ internal fun pendingToolSettlements(
 ): List<LocalPendingToolSettlement> {
     val stepStart = eventLog.latest("step/start") ?: return emptyList()
     val ledger = ToolAttemptLedger()
-    eventLog.forEachAfter(stepStart.sequence) { ledger.observe(it) }
+    eventLog.forEachAfter(stepStart.sequence) { ledger.observe(it.type, it.data) }
     val attempts = ledger.snapshot().associateBy { it.id }
     return calls.filterNot { it.id in completedCallIds }.mapNotNull { call ->
         val attempt = attempts[call.id]
