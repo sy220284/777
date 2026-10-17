@@ -284,8 +284,8 @@ class SessionEventLog(
                     }
                 }
             } catch (future: UnsupportedSessionEventSchemaVersion) {
-            throw future
-        } catch (error: Exception) {
+                throw future
+            } catch (error: Exception) {
                 reportSegmentReadFailure(source, error)
             }
             if (result.size >= wanted) break
