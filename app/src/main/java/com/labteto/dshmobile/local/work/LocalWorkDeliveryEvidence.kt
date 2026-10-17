@@ -42,8 +42,12 @@ internal fun localWorkGraphDeliveryMissing(log: LocalSessionEventLog, goal: Loca
         ?: return emptyList()
     val graphId = graphStart.data.value("graph_id")?.takeIf(String::isNotBlank)
         ?: return listOf("工作流启动记录缺少可信任务图身份")
+    val graphExecutionId = graphStart.data.value("graph_execution_id")
+    val graphFingerprint = graphStart.data.value("goal_fingerprint")
     val end = log.latestMatching(setOf("taskgraph/end")) { data ->
-        data.value("graph_id") == graphId && data.value("goal_id") == goal.id
+        data.value("graph_id") == graphId && data.value("goal_id") == goal.id &&
+            data.value("graph_execution_id") == graphExecutionId &&
+            (graphFingerprint == null || data.value("goal_fingerprint") == graphFingerprint)
     }?.takeIf { it.sequence > graphStart.sequence }
         ?: return listOf("当前目标的工作流已启动但尚未形成可核验的终态")
     val outcome = end.data.value("outcome")
@@ -53,7 +57,9 @@ internal fun localWorkGraphDeliveryMissing(log: LocalSessionEventLog, goal: Loca
         // Their durable node-progress events still reveal blocked descendants.
         "settled" -> {
             val blocked = log.latestMatching(setOf("taskgraph/progress")) { data ->
-                data.value("graph_id") == graphId && data.value("stage") == "受阻"
+                data.value("graph_id") == graphId &&
+                    data.value("graph_execution_id") == graphExecutionId &&
+                    data.value("stage") == "受阻"
             }?.takeIf { it.sequence > graphStart.sequence }
             if (blocked != null) listOf("工作流包含受阻节点，历史结算缺少明确验收结论")
             else emptyList()

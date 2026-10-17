@@ -61,6 +61,8 @@ internal class LocalWorkSubagentRuntime(
         // Preflight is pure and rejects cycles, missing nodes and capacity overflow
         // before the canonical EventLog may declare a graph started.
         val graphId = java.util.UUID.randomUUID().toString()
+        // Persist a unique activation identity even if a graph ID is reused.
+        val graphExecutionId = java.util.UUID.randomUUID().toString()
         val workflow = LocalWorkflowCoordinator(
             execute = { prompt ->
                 // Fence the real subagent launch, not merely its completion projection.
@@ -87,6 +89,7 @@ internal class LocalWorkSubagentRuntime(
                 // An emitted EventLog progress fact precedes every Work UI projection.
                 binding.eventLog.append("taskgraph/progress", kotlinx.serialization.json.buildJsonObject {
                     put("graph_id", graphId)
+                    put("graph_execution_id", graphExecutionId)
                     put("goal_id", goalIdAtStart)
                     put("task_index", progress.index)
                     put("node_id", progress.nodeId)
@@ -117,6 +120,7 @@ internal class LocalWorkSubagentRuntime(
         checkGoalOwner()
         binding.eventLog.append("taskgraph/start", kotlinx.serialization.json.buildJsonObject {
             put("graph_id", graphId)
+            put("graph_execution_id", graphExecutionId)
             put("session_id", binding.sessionId)
             put("goal_id", goalIdAtStart)
             put("mode", mode)
@@ -142,6 +146,7 @@ internal class LocalWorkSubagentRuntime(
         ) {
             binding.eventLog.append("taskgraph/end", kotlinx.serialization.json.buildJsonObject {
                 put("graph_id", graphId)
+                put("graph_execution_id", graphExecutionId)
                 put("goal_id", goalIdAtStart)
                 put("outcome", outcome)
                 goalFingerprintAtStart?.let { put("goal_fingerprint", it) }

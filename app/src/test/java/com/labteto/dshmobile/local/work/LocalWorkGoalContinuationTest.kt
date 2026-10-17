@@ -268,6 +268,33 @@ class LocalWorkGoalContinuationTest {
     }
 
     @Test
+    fun graphExecutionIdentityFencesDelayedTerminalAndProgressWithSameGoalRevision() {
+        val ledger = LocalWorkTaskGraphRecoveryLedger()
+        fun event(executionId: String? = null, node: Boolean = false) = buildJsonObject {
+            put("graph_id", "reused")
+            put("goal_id", goal.id)
+            put("goal_fingerprint", "same-revision")
+            executionId?.let { put("graph_execution_id", it) }
+            if (node) { put("node_id", "node"); put("stage", "已完成") }
+        }
+        ledger.observe("taskgraph/start", event("old"))
+        ledger.observe("taskgraph/start", event("new"))
+        ledger.observe("taskgraph/progress", event("old", node = true))
+        ledger.observe("taskgraph/progress", event(node = true))
+        assertEquals("已完成", ledger.unresolvedForGoal(goal.id).first().lastNodeStages["node"])
+        assertTrue(ledger.unresolvedForGoal(goal.id).last().lastNodeStages.isEmpty())
+        ledger.observe("taskgraph/end", event()) // ambiguous legacy terminal
+        ledger.observe("taskgraph/end", event("foreign"))
+        assertEquals(2, ledger.unresolvedForGoal(goal.id).size)
+        ledger.observe("taskgraph/end", event("old"))
+        assertEquals(listOf("new"), ledger.unresolvedForGoal(goal.id).map { it.graphExecutionId })
+        ledger.observe("taskgraph/end", event("old")) // delayed duplicate
+        assertEquals(1, ledger.unresolvedForGoal(goal.id).size)
+        ledger.observe("taskgraph/end", event("new"))
+        assertTrue(ledger.unresolvedForGoal(goal.id).isEmpty())
+    }
+
+    @Test
     fun recoveredGraphTerminalStatusesAllSettleExecutionWithoutClaimingGoalSuccess() {
         for (terminal in listOf("nodes_completed", "partial", "failed", "cancelled")) {
             val ledger = LocalWorkTaskGraphRecoveryLedger()

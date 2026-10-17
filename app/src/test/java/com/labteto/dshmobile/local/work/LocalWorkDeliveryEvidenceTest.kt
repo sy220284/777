@@ -88,6 +88,26 @@ class LocalWorkDeliveryEvidenceTest {
         }
 
     @Test
+    fun delayedGraphTerminalCannotValidateNewExecutionWithReusedGraphId() =
+        scenario(artifacts = emptyList(), commands = emptyList()) { log, goal, root ->
+            fun event(execution: String, outcome: String? = null) = buildJsonObject {
+                put("graph_id", "reused-graph")
+                put("goal_id", goal.id)
+                put("goal_fingerprint", "unchanged")
+                put("graph_execution_id", execution)
+                outcome?.let { put("outcome", it) }
+            }
+            log.append("taskgraph/start", event("first"))
+            log.append("taskgraph/start", event("second"))
+            log.append("taskgraph/end", event("first", "nodes_completed"))
+            assertTrue(localWorkGraphDeliveryMissing(log, goal).any { it.contains("尚未形成") })
+            assertTrue(hasUnsettledWorkGoalTaskGraphs(log, goal))
+            log.append("taskgraph/end", event("second", "nodes_completed"))
+            assertFalse(hasUnsettledWorkGoalTaskGraphs(log, goal))
+            assertTrue(localWorkGraphDeliveryMissing(log, goal).isEmpty())
+        }
+
+    @Test
     fun unrelatedGraphAndLegacyBlockedGraphCannotLaunderDelivery() =
         scenario(artifacts = emptyList(), commands = emptyList()) { log, goal, root ->
             log.append("taskgraph/start", buildJsonObject {
