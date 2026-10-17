@@ -1,6 +1,3 @@
-<p align="center">
-  <img src="docs/images/banner.jpg" alt="神言神语 — 装进口袋的 Agent 平台" width="100%">
-</p>
 
 <h1 align="center">神言神语</h1>
 
@@ -37,7 +34,7 @@
 ## 系统组成
 
 ```text
-界面层    聊天会话 · 工作面板 · 人物调节 · 用量与设置（流体玻璃设计语言）
+界面层    （旧 UI 已移除，等待全新 UI 接入）
 记忆层    人物主档案 · 故事线 · 关系记忆 · 世界书 · 日记与披露边界
 内核层    Agent 循环 · 主 / 子代理 · 任务与技能 · 审批闸门 · 事件账本与恢复
 能力层    文件 / Git · 持久终端 · Node / Python / LSP · MCP · Web · Vision · 设备能力
