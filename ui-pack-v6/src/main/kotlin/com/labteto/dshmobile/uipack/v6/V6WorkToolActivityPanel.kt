@@ -65,6 +65,89 @@ internal fun v6StructuredToolResult(raw: String, maxLines: Int = 64): List<Strin
     return rendered
 }
 
+/**
+ * Exact paths are kept as tokens, not dot-joined strings. This prevents two
+ * different nested properties ({"a.b":1} vs {"a":{"b":1}}) from looking like
+ * the same source location. This projection is render-only, never a tool draft.
+ */
+internal enum class V6ToolResultKind {
+    OBJECT, ARRAY, STRING, NUMBER, BOOLEAN, NULL, TEXT, TRUNCATED,
+}
+
+internal data class V6ToolResultNode(
+    val path: List<String>,
+    val label: String,
+    val kind: V6ToolResultKind,
+    val depth: Int,
+    val preview: String,
+)
+
+internal fun v6StructuredToolResultNodes(
+    raw: String,
+    maxNodes: Int = 64,
+    maxDepth: Int = 6,
+): List<V6ToolResultNode> {
+    require(maxNodes in 1..128 && maxDepth in 1..8)
+    val nodes = ArrayList<V6ToolResultNode>(minOf(64, maxNodes))
+    fun add(path: List<String>, kind: V6ToolResultKind, depth: Int, preview: String) {
+        if (nodes.size >= maxNodes) return
+        nodes += V6ToolResultNode(path,
+            path.lastOrNull()?.take(80) ?: "工具结果", kind, depth,
+            preview.take(320))
+    }
+    if (raw.toByteArray(Charsets.UTF_8).size > 16_384) {
+        add(emptyList(), V6ToolResultKind.TRUNCATED, 0, "来源结果超过安全展示预算")
+        return nodes
+    }
+    val parsed = runCatching { Json.parseToJsonElement(raw) }.getOrNull()
+    if (parsed == null) {
+        raw.lineSequence().take(maxNodes).forEachIndexed { index, line ->
+            add(listOf(index.toString()), V6ToolResultKind.TEXT, 0, line.take(320))
+        }
+        return nodes
+    }
+    fun walk(path: List<String>, element: JsonElement, depth: Int) {
+        if (nodes.size >= maxNodes) return
+        when (element) {
+            is JsonObject -> {
+                add(path, V6ToolResultKind.OBJECT, depth, "对象 · ${element.size} 个字段")
+                if (depth >= maxDepth) return
+                element.entries.take(32).forEach { (key, value) ->
+                    walk(path + key, value, depth + 1)
+                }
+                if (element.size > 32) add(path + "…", V6ToolResultKind.TRUNCATED,
+                    depth + 1, "其余字段未展示")
+            }
+            is JsonArray -> {
+                add(path, V6ToolResultKind.ARRAY, depth, "数组 · ${element.size} 项")
+                if (depth >= maxDepth) return
+                element.take(32).forEachIndexed { index, child ->
+                    walk(path + "[$index]", child, depth + 1)
+                }
+                if (element.size > 32) add(path + "…", V6ToolResultKind.TRUNCATED,
+                    depth + 1, "其余数组项未展示")
+            }
+            JsonNull -> add(path, V6ToolResultKind.NULL, depth, "null")
+            is JsonPrimitive -> {
+                val kind = when {
+                    element.isString -> V6ToolResultKind.STRING
+                    element.content in setOf("true", "false") -> V6ToolResultKind.BOOLEAN
+                    else -> V6ToolResultKind.NUMBER
+                }
+                add(path, kind, depth, element.content)
+            }
+        }
+    }
+    walk(emptyList(), parsed, 0)
+    // Budget truncation must be explicit. A long event cannot appear complete
+    // merely because the projection stopped after 64 rendered rows.
+    if (nodes.size >= maxNodes)
+        nodes[maxNodes - 1] = V6ToolResultNode(
+            nodes.last().path, "…", V6ToolResultKind.TRUNCATED,
+            nodes.last().depth, "展示节点预算已满，请按来源事件核查")
+    return nodes
+}
+
 /** Show exact Work Owner execution facts, never derive success from an arbitrary JSON payload. */
 @Composable
 internal fun V6WorkToolActivityPanel(
@@ -74,7 +157,7 @@ internal fun V6WorkToolActivityPanel(
 ) {
     var activities by remember(identity) { mutableStateOf<List<LocalToolActivityUiItem>>(emptyList()) }
     var selected by remember(identity) { mutableStateOf<LocalToolActivityUiItem?>(null) }
-    var detail by remember(identity) { mutableStateOf<List<String>>(emptyList()) }
+    var detail by remember(identity) { mutableStateOf<List<V6ToolResultNode>>(emptyList()) }
     var failure by remember(identity) { mutableStateOf<String?>(null) }
     var loading by remember(identity) { mutableStateOf(false) }
     var activityEpoch by remember(identity) { mutableLongStateOf(0L) }
@@ -130,8 +213,9 @@ internal fun V6WorkToolActivityPanel(
                             reads.toolEvidenceForUi(identity.sessionId, item.callId, source)
                         }
                         if (request == detailEpoch) {
-                            detail = if (raw == null) listOf("来源事件已失效或不可用")
-                                else v6StructuredToolResult(raw)
+                            detail = if (raw == null) listOf(V6ToolResultNode(
+                                emptyList(), "来源", V6ToolResultKind.TEXT, 0, "事件已失效或不可用"))
+                                else v6StructuredToolResultNodes(raw)
                             failure = null
                         }
                     } catch (cancelled: CancellationException) { throw cancelled }
@@ -148,7 +232,10 @@ internal fun V6WorkToolActivityPanel(
         selected?.let { item ->
             Text("执行：${item.executionId ?: "未开始"} · 调用：${item.callId}")
             item.errorCode?.let { Text("错误码：$it") }
-            detail.take(64).forEach { Text(it) }
+            detail.take(64).forEach { node ->
+                Text(node.label + " · " + node.kind.name + "：" + node.preview,
+                    modifier = Modifier.padding(start = (node.depth.coerceAtMost(6) * 12).dp))
+            }
         }
         failure?.let { Text(it) }
     }
