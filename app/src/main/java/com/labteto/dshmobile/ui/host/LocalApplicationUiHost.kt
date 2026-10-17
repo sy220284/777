@@ -42,6 +42,7 @@ import com.labteto.dshmobile.uicontract.UiSceneId
 import com.labteto.dshmobile.uicontract.UiWindowClass
 import com.labteto.dshmobile.uihost.UiApplicationPackAdmission
 import com.labteto.dshmobile.uihost.UiApplicationPackRegistry
+import com.labteto.dshmobile.uihost.UiApplicationPackInstallation
 import com.labteto.dshmobile.uihost.UiApplicationScenePack
 import com.labteto.dshmobile.uihost.UiHostSceneNavigation
 import com.labteto.dshmobile.uihost.UiPackAdmissionRequirements
@@ -83,8 +84,9 @@ internal fun decideApplicationUi(
     selectedId: String?,
     installed: Collection<UiApplicationScenePack>,
     requirements: UiPackAdmissionRequirements,
+    installation: UiApplicationPackInstallation? = null,
 ): LocalApplicationUiDecision {
-    val currentId = currentApplicationPack(selectedId)
+    val currentId = installation?.resolveSelectedId(selectedId) ?: currentApplicationPack(selectedId)
     val admission = UiApplicationPackRegistry(installed).select(currentId, requirements)
     return when (admission) {
         is UiApplicationPackAdmission.Admitted -> LocalApplicationUiDecision.Hosted(admission)
@@ -101,6 +103,8 @@ internal fun decideApplicationUi(
 @Composable
 internal fun LocalApplicationUiHost(
     installedPacks: Collection<UiApplicationScenePack>,
+    defaultPackId: String? = null,
+    legacyPackIds: Map<String, String> = emptyMap(),
     availableCapabilities: Set<UiCapabilityId>,
     // Explicitly scoped for a debug-only independent V6 runtime. Production
     // always uses the default; the V6-only entry never mutates user selection.
@@ -111,20 +115,29 @@ internal fun LocalApplicationUiHost(
     onNotificationSessionProcessed: () -> Unit = {},
     onSceneRequestProcessed: (String, com.labteto.dshmobile.uihost.UiSceneNavigationResult) -> Unit = { _, _ -> },
 ) {
+    val installation = remember(installedPacks, defaultPackId, legacyPackIds) {
+        UiApplicationPackInstallation(
+            packs = installedPacks.toList(),
+            defaultPackId = defaultPackId ?: requireNotNull(installedPacks.singleOrNull()) {
+                "Multiple UI packs require an explicit defaultPackId"
+            }.manifest.id,
+            legacyAliases = legacyPackIds,
+        )
+    }
     val context = LocalContext.current
     val activity = remember(context) { context.findHostActivity() }
     val preference = remember(context, selectionPreferenceName) {
         context.getSharedPreferences(selectionPreferenceName, Context.MODE_PRIVATE)
     }
-    var selectedId by remember(preference) {
-        mutableStateOf(currentApplicationPack(preference.getString("selected_pack", null)))
+    var selectedId by remember(preference, installation) {
+        mutableStateOf(installation.resolveSelectedId(preference.getString("selected_pack", null)))
     }
     // An admitted pack selection persisted by Settings must swap the live Host too.
     // This listener watches a local preference only: no cloud/network UI-state coupling.
-    DisposableEffect(preference) {
+    DisposableEffect(preference, installation) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
             if (key == "selected_pack")
-                selectedId = currentApplicationPack(prefs.getString(key, null))
+                selectedId = installation.resolveSelectedId(prefs.getString(key, null))
         }
         preference.registerOnSharedPreferenceChangeListener(listener)
         onDispose { preference.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -145,8 +158,8 @@ internal fun LocalApplicationUiHost(
         requiredAccessibility = UiAccessibility.entries.toSet(),
         dark = isSystemInDarkTheme(),
     )
-    val decision = remember(installedPacks, selectedId, window, requirements.dark, availableCapabilities) {
-        decideApplicationUi(selectedId, installedPacks, requirements)
+    val decision = remember(installation, selectedId, window, requirements.dark, availableCapabilities) {
+        decideApplicationUi(selectedId, installation.packs, requirements, installation)
     }
     when (decision) {
         is LocalApplicationUiDecision.Hosted -> {
@@ -250,8 +263,8 @@ internal fun LocalApplicationUiHost(
                     // An invalid choice needs a new validated pack selection, not
                     // Activity recreation: rebuilding the Activity discards the
                     // existing Compose hierarchy and unrelated saved UI state.
-                    if (preference.edit().putString("selected_pack", V6_APPLICATION_UI).commit()) {
-                        selectedId = V6_APPLICATION_UI
+                    if (preference.edit().putString("selected_pack", installation.defaultPackId).commit()) {
+                        selectedId = installation.defaultPackId
                     }
                 },
                 onExit = { activity?.finish() },
