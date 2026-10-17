@@ -25,3 +25,12 @@
 - 人工或自动声称 `VERIFIED` 时，至少必须提供 Owner Port/Receipt、明确 `#方法名` 的恢复测试、40 位提交 SHA 和对应 CI Run ID；存在测试方法本身不证明断言充足，还须复核其真实内容与运行结果。
 - 在 `main` 未完成全量设备测试前不得引用旧 SHA 的绿色 CI 作为新 PR 结果。
 - 禁止为通过检查降低架构和依赖验证门槛，不恢复退役入口，不新增第二业务事实源。
+
+## 2026-10-17 最新主线设备失败复核与本 PR 修复
+
+主线 CI [#39020211827](https://github.com/sy220284/777/actions/runs/39020211827) 已结束：Android 16/17 均失败，因此 merge-gate 为失败；静态、架构、JVM、ARM64/x86 构建通过。不得把发行工作流单独成功认作设备门禁放行。
+
+- **ManagedProcessAndroidTest：** 真实超时运行结果为 `超时：true`、`TOOL_TIMEOUT`，旧测试误从人类输出里查 `[TOOL_TIMEOUT]`。改为直接断言 `ToolResult.isError/errorCode`，仍验证子进程未在超时后写入。
+- **LocalColdStartupRegressionTest：** 真正 V6 输入框已渲染，但测试仍定位旧 Shell 的 `SY_COMPOSER_FIELD_TAG`，始终等到超时。新 V6 输入框提供稳定标签，设备测试改定位新标签，保留真 Activity 冷启动验证。
+- **ShenyanMotionInteractionTest：** 原 `graphicsLayer.translationY` 对某些 Compose 语义树的位置不可见，入场和减少动效的断言失败。入场改用偏移定位配合透明度层，保留原上移/淡入及减少动效直达终态；设备测试仍验证实际位置变化。
+- **仍待进一步核实：** `V6AutomationContextInteractionTest.restartingEditorAfterSwitchBindsOnlyTheNewOwnerIdentity` 两台设备均等待新任务按钮超时；Android 17 `LocalChatTurnUsageTest` 另有一项超时。本 PR 不能因上述前三项代码调整就假报总门禁通过，需要针对新 Head 完整测试后继续修复。

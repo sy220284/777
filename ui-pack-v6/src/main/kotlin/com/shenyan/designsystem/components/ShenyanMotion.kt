@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -17,6 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import com.shenyan.designsystem.foundation.*
 
 /** Finite entrance, keyed by real content identity, never by streaming text/revision. */
@@ -44,9 +47,13 @@ fun SyEntrance(
         appeared = true
     }
     val distance = with(LocalDensity.current) { 12.dp.toPx() }
-    Box(modifier.graphicsLayer {
+    // Position-only offset preserves the visual rise, and makes the actual motion
+    // observable to Android accessibility/Compose semantics (graphicsLayer
+    // translation alone can keep stale boundsInRoot on some Compose versions).
+    Box(modifier.offset {
+        IntOffset(0, if (reduced) 0 else (distance * (1f - progress.value)).roundToInt())
+    }.graphicsLayer {
         alpha = if (reduced) 1f else progress.value
-        translationY = if (reduced) 0f else distance * (1f - progress.value)
     }) { content() }
 }
 

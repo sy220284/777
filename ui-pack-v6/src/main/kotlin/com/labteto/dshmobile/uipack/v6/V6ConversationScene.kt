@@ -37,6 +37,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -123,6 +124,9 @@ data class V6ConversationPorts(
 
 /** The four slots are distinct executable scenes, not aliases for the whole page. */
 enum class V6ConversationPart { FULL, HEADER, TIMELINE, COMPOSER, REPLY_STATUS, WORK_APPROVAL, WORK_QUESTION }
+
+/** Stable production input semantics for V6 launch/recovery tests. */
+const val V6_COMPOSER_FIELD_TAG = "v6-conversation-composer-field"
 
 internal fun describeV6ConversationReceipt(receipt: UiCommandReceipt): String = when (receipt) {
     UiCommandReceipt.Accepted -> "请求已受理，尚不代表执行完成"
@@ -786,7 +790,8 @@ fun V6ConversationScene(
         }
         SyInput(draft, { value ->
             identity?.let { ports.drafts.updateDraft(it.sessionId, value) }
-        }, label = "输入消息", enabled = identity != null, singleLine = false, maxLines = composerLines)
+        }, modifier = Modifier.testTag(V6_COMPOSER_FIELD_TAG),
+            label = "输入消息", enabled = identity != null, singleLine = false, maxLines = composerLines)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.weight(1f).horizontalScroll(rememberScrollState())) {
                 if (!workMode && ports.replySuggestions != null && onNavigate != null &&
