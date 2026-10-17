@@ -12,7 +12,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.labteto.dshmobile.R
+import com.labteto.dshmobile.uipack.v6.R
 
 /** Android migration facades; there is one real renderer in com.shenyan.designsystem. */
 enum class SyButtonStyle { PRIMARY, GHOST, OUTLINE, DANGER }
@@ -23,7 +23,7 @@ enum class SyButtonSize { Normal, Small, Large }
  * Keep the migration façade free of rendering decisions. The canonical button owns
  * ink, selection emphasis, disabled/loading states and the minimum touch target.
  */
-internal fun resolveSyButtonStyle(
+fun resolveSyButtonStyle(
     style: SyButtonStyle,
     variant: SyButtonVariant?,
 ): com.shenyan.designsystem.components.SyButtonStyle = when (variant) {
@@ -40,7 +40,7 @@ internal fun resolveSyButtonStyle(
     }
 }
 
-internal fun resolveSyButtonHeight(size: SyButtonSize, requested: Dp): Dp = when (size) {
+fun resolveSyButtonHeight(size: SyButtonSize, requested: Dp): Dp = when (size) {
     SyButtonSize.Large -> maxOf(requested, 52.dp)
     SyButtonSize.Normal, SyButtonSize.Small -> maxOf(requested, SyDimensions.minimumTouch)
 }

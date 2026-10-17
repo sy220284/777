@@ -44,7 +44,7 @@ def check_svg_glyph(path, size=24, stroke="1.75"):
     return pts
 
 # Kotlin -> SVG: check path-by-path equivalence, not only catalog cardinality.
-kotlin = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/components/FeatherIcons.kt").read_text()
+kotlin = (ROOT / "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/ui/components/FeatherIcons.kt").read_text()
 matches = list(re.finditer(
     r'val\s+(\w+)\s*:\s*ImageVector\s+by\s+lazy\s*\{\s*actionGlyph\("(\w+)",(.*?)\)\s*\}',
     kotlin, re.S,

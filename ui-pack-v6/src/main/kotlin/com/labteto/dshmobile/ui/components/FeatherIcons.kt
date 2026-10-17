@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
  * not a copy of the old mixed optical weights. Editable SVG counterparts:
  * docs/design/v6/assets/icons-actions/ (individual editable SVG files).
  */
-internal object FeatherIcons {
+object FeatherIcons {
     val Gauge: ImageVector by lazy { actionGlyph("Gauge",
         "M4 17 A9 9 0 0 1 20 17",
         "M12 16 L17 10",

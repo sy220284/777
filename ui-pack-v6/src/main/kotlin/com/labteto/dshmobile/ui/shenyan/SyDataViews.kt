@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import com.labteto.dshmobile.R
+import com.labteto.dshmobile.uipack.v6.R
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.shenyan.designsystem.foundation.LocalSyReduceMotion
 import com.shenyan.designsystem.foundation.SyMotion

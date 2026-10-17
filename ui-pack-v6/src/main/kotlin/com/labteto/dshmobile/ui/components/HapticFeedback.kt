@@ -12,7 +12,7 @@ import com.shenyan.designsystem.foundation.SyMotion
 import kotlin.math.roundToInt
 
 /** Map a finite slider value to a semantic detent. Zero segments disables feedback. */
-internal fun hapticTickIndex(value: Float, start: Float, end: Float, segments: Int): Int {
+fun hapticTickIndex(value: Float, start: Float, end: Float, segments: Int): Int {
     if (segments <= 0 || !value.isFinite() || !start.isFinite() || !end.isFinite() || end <= start) return 0
     return (((value - start) / (end - start)).coerceIn(0f, 1f) * segments).roundToInt()
 }

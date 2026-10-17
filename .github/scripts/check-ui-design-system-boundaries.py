@@ -142,7 +142,7 @@ CANONICAL_MOTION_FILES = (
 )
 INLINE_MOTION_DURATION = re.compile(r"\btween\s*(?:<[^>]+>)?\s*\(\s*[1-9][0-9]{1,3}\b")
 for relative in CANONICAL_MOTION_FILES:
-    file = (V6_VISUAL if relative.startswith("theme/") else UI) / relative
+    file = (V6_VISUAL if relative.startswith(("theme/", "shenyan/SyResponsiveSheet.kt")) else UI) / relative
     source = mask_non_code(file.read_text(encoding="utf-8"))
     for match in INLINE_MOTION_DURATION.finditer(source):
         line = source.count("\n", 0, match.start()) + 1
