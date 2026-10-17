@@ -411,10 +411,18 @@
         "AE4V3-09",
         "AE4V3-15"
       ],
-      "status": "not_started",
-      "code_evidence": [],
-      "tests_verified": [],
-      "notes": ""
+      "status": "in_progress",
+      "code_evidence": [
+        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/ProcessRuntime.kt",
+        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/ProcessRuntimeTest.kt"
+      ],
+      "tests_verified": [
+        "local harness-runtime-android compileKotlin + ProcessRuntimeTest",
+        "local App compileDebugKotlin",
+        "local 7-module JVM: 3168 passed, 0 failed",
+        "local 5 static gates"
+      ],
+      "notes": "2026-10-17：启动 Files/Git/Shell/Process 重构；ProcessRuntime 可用性与命令解析只接受普通可执行文件，跳过前置同名目录，避免假可用状态或 ProcessBuilder 启动失败。新增目录/真可执行文件/绝对路径正反测试。App Kotlin 编译、七模块 3168 JVM 测试(0失败)和五项静态门禁通过；整个 Files/Git/Shell/Process 沙箱与跨进程执行合同、提交 SHA CI 仍待验收，整项 in_progress。"
     },
     {
       "id": "AE4V3-20",

@@ -20,8 +20,8 @@ class AndroidProcessRuntime(
 
     override fun isCommandAvailable(command: String): Boolean {
         if (command.isBlank()) return false
-        if (command.contains(File.separatorChar)) return File(command).canExecute()
-        return searchPaths().any { directory -> File(directory, command).canExecute() }
+        if (command.contains(File.separatorChar)) return File(command).isExecutableCommand()
+        return searchPaths().any { directory -> File(directory, command).isExecutableCommand() }
     }
 
     override suspend fun execute(request: ProcessRequest): ProcessResult = withContext(Dispatchers.IO) {
@@ -54,10 +54,12 @@ class AndroidProcessRuntime(
         val resolved = searchPaths()
             .asSequence()
             .map { directory -> File(directory, executable) }
-            .firstOrNull(File::canExecute)
+            .firstOrNull { it.isExecutableCommand() }
             ?: return command
         return listOf(resolved.absolutePath) + command.drop(1)
     }
+
+    private fun File.isExecutableCommand(): Boolean = isFile && canExecute()
 
     private fun searchPaths(): List<File> {
         val envPaths = System.getenv("PATH").orEmpty()
