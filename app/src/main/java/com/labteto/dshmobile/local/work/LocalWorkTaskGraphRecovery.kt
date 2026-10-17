@@ -15,6 +15,7 @@ internal class LocalWorkTaskGraphRecoveryLedger {
         val graphId: String,
         val goalId: String,
         val goalFingerprint: String?,
+        val lastNodeStages: Map<String, String> = emptyMap(),
     )
 
     private val open = linkedMapOf<String, OpenGraph>()
@@ -31,6 +32,17 @@ internal class LocalWorkTaskGraphRecoveryLedger {
                     open[graphId] = OpenGraph(
                         graphId, goalId,
                         (data["goal_fingerprint"] as? JsonPrimitive)?.contentOrNull,
+                    )
+                }
+            }
+            "taskgraph/progress" -> {
+                val running = open[graphId] ?: return
+                if (running.goalId != goalId) return
+                val nodeId = (data["node_id"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+                val stage = (data["stage"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+                if (nodeId.isNotBlank() && stage.isNotBlank()) {
+                    open[graphId] = running.copy(
+                        lastNodeStages = running.lastNodeStages + (nodeId to stage),
                     )
                 }
             }

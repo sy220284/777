@@ -185,6 +185,18 @@ class TaskGraphExecutorTest {
     }
 
     @Test
+    fun everyGraphProgressFactUsesStableNodeIdentity() = runTest {
+        val progress = mutableListOf<TaskGraphProgress>()
+        val r = graph.run(listOf(
+            TaskGraphNode("stable-a", "任务一"),
+            TaskGraphNode("stable-b", "任务二", dependsOn = listOf("stable-a")),
+        ), onProgress = { synchronized(progress) { progress += it } }) { _, _ -> "已核实" }
+        assertTrue(r.all { it.succeeded })
+        assertEquals(setOf("stable-a", "stable-b"), progress.map { it.nodeId }.toSet())
+        assertTrue(progress.all { it.nodeId.isNotBlank() })
+    }
+
+    @Test
     fun parallelBranchesStayIndependentAndProgressTracksAllSettlements() = runTest {
         val steps = mutableListOf<TaskGraphProgress>()
         val r = graph.run(listOf(TaskGraphNode("one", "一"),

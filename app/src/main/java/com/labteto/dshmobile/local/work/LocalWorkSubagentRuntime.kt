@@ -89,6 +89,7 @@ internal class LocalWorkSubagentRuntime(
                     put("graph_id", graphId)
                     put("goal_id", goalIdAtStart)
                     put("task_index", progress.index)
+                    put("node_id", progress.nodeId)
                     put("task", progress.task.take(500))
                     put("stage", progress.stage)
                     put("completed", progress.completed)

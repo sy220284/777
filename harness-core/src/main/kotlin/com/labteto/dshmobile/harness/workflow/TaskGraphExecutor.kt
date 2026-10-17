@@ -40,6 +40,7 @@ data class TaskGraphProgress(
     val completed: Int,
     val total: Int,
     val detail: String = "",
+    val nodeId: String = "",
 )
 
 data class TaskGraphTaskContext(
@@ -111,6 +112,7 @@ class TaskGraphExecutor(
                     )
                     onProgress(TaskGraphProgress(
                         index, node.task, "受阻", completed.incrementAndGet(), total, reason,
+                        nodeId = node.id,
                     ))
                 }
             }
@@ -167,7 +169,7 @@ class TaskGraphExecutor(
             onProgress(TaskGraphProgress(
                 ctx.index, ctx.node.task,
                 if (attempt == 1) "执行中" else "重新指派",
-                completed.get(), total, feedback,
+                completed.get(), total, feedback, nodeId = ctx.node.id,
             ))
             val prompt = if (attempt == 1) ctx.node.task
                 else "${ctx.node.task}\n\n上次失败或验收未通过：$feedback。请核查并补足证据。"
@@ -183,7 +185,8 @@ class TaskGraphExecutor(
             // Progress is written to Work's authoritative EventLog. A failed
             // durable append is a terminal persistence error, never a reason
             // to re-execute a tool that may have already succeeded.
-            onProgress(TaskGraphProgress(ctx.index, ctx.node.task, "验收中", completed.get(), total))
+            onProgress(TaskGraphProgress(ctx.index, ctx.node.task, "验收中", completed.get(), total,
+                nodeId = ctx.node.id))
             val verdict = try {
                 accept(ctx, output)
             } catch (cancelled: CancellationException) {
@@ -195,14 +198,16 @@ class TaskGraphExecutor(
             }
             if (verdict.accepted) {
                 val count = completed.incrementAndGet()
-                onProgress(TaskGraphProgress(ctx.index, ctx.node.task, "已完成", count, total))
+                onProgress(TaskGraphProgress(ctx.index, ctx.node.task, "已完成", count, total,
+                    nodeId = ctx.node.id))
                 return TaskGraphNodeResult(ctx.node, ctx.index, TaskGraphOutcome.COMPLETED,
                     output = output, attempts = attempt)
             }
             feedback = verdict.feedback.ifBlank { "验收未通过" }.take(500)
         }
         val count = completed.incrementAndGet()
-        onProgress(TaskGraphProgress(ctx.index, ctx.node.task, "受阻", count, total, feedback))
+        onProgress(TaskGraphProgress(ctx.index, ctx.node.task, "受阻", count, total, feedback,
+            nodeId = ctx.node.id))
         return TaskGraphNodeResult(ctx.node, ctx.index, TaskGraphOutcome.FAILED,
             error = feedback, attempts = maxAttempts)
     }

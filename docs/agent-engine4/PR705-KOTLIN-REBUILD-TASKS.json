@@ -89,10 +89,12 @@
         "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt",
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphRecovery.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphRecovery.kt",
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/workflow/TaskGraphExecutor.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSubagentRuntime.kt"
       ],
       "tests_verified": [],
-      "notes": "将 Work Goal 的工具副作用核验与 SessionRecovery 的异常工具补写统一到 harness-core/session/ToolAttemptLedger；读取原有 EventLog 不另立账本，原有历史兼容测试和新投影单测待最新 SHA CI。；ToolAttemptLedger 的 Work 投影改为 Session EventLog 流式 forEachAfter，不再将长会话事件档案整体 materialize 到 Android 堆内存。；新增任务图冷重建 projector：未结算的 taskgraph/start 在 GoalDriver 自动续轮前明确阻断；跨目标终态不可错误核销。当前提交 CI 待验证；不等于完整自主恢复。"
+      "notes": "将 Work Goal 的工具副作用核验与 SessionRecovery 的异常工具补写统一到 harness-core/session/ToolAttemptLedger；读取原有 EventLog 不另立账本，原有历史兼容测试和新投影单测待最新 SHA CI。；ToolAttemptLedger 的 Work 投影改为 Session EventLog 流式 forEachAfter，不再将长会话事件档案整体 materialize 到 Android 堆内存。；新增任务图冷重建 projector：未结算的 taskgraph/start 在 GoalDriver 自动续轮前明确阻断；跨目标终态不可错误核销。当前提交 CI 待验证；不等于完整自主恢复。；TaskGraph 进度协议扩展稳定 nodeId，Work 事件携带 nodeId，冷重建 projector 可还原节点最新阶段且不冒充任务完成；JVM 回归待最新 CI。"
     },
     {
       "id": "AE4V3-06",
@@ -244,10 +246,11 @@
         "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/workflow/TaskGraphTopology.kt",
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamReducer.kt",
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionEvidence.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidence.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidence.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphRecovery.kt"
       ],
       "tests_verified": [],
-      "notes": "本轮重构并接入 DAG 图调度器（不可变拓扑、依赖条件、环与容量原子拒绝、执行并发上限、独立分支隔离、阻塞传播、Work 只读委托验收）。删除旧 HarnessWorkflowRunner 及旧测试；Agent Team 的持久 TaskGraph/恢复仍待统一，不能标记完成。 本批为 Work 模型工具 workflow 增加 graph 模式及零基有向依赖数组，接到 LocalWorkSubagentRuntime 和 TaskGraphExecutor 正式执行路径；循环/重复/自依赖/缺失/越界在执行前拒绝，并为汇总任务提供已验收的前置结果。当前 SHA CI 未验收。；Work Graph 与 Agent Team 统一使用 TaskGraphTopology 环检测。Work Graph 委托的每个节点状态变化写入 Session EventLog，UI 从事件之后读取；完整持久恢复与单元回归仍待最终 CI。；Work 图在写入 taskgraph/start 前完成统一拓扑预检；每条合法工作图均写入 start/progress/end(settled/failed/cancelled) EventLog 完整生命周期，取消不转为成功。仍待最新 HEAD CI。；TaskGraph 将 executor/acceptor 的可重试失败与 Session EventLog 的 onProgress 持久提交故障分离；事件落盘失败即停止整张图、禁止重复触发已成功工具。新增两项 JVM 回归待 CI。；TaskGraph 在 Work 消费端新增结构化 LocalWorkflowRunResult，failed/blocked 节点形成 node counts 与 durable taskgraph/end 的 nodes_completed/partial/blocked 终态，Goal 验收仍独立；新增部分失败及全成功 JVM 回归。；Work 结构化工作流阻塞已正式参与 Goal 完成门禁，历史 Session EventLog 最新图终态可在 UI 临时状态清理后继续阻断假完成，含兼容旧 settled 事件。；本轮修复 graphPartialResult 错误测试桩（重试提示改变输入），真实生产图执行加入 Goal 验收合同指纹栅栏，阻断目标暂停/修改后继续派发子代理，持久 taskgraph/start 记录 DAG 节点依赖与目标指纹以利恢复审计；待最新 CI 验证。"
+      "notes": "本轮重构并接入 DAG 图调度器（不可变拓扑、依赖条件、环与容量原子拒绝、执行并发上限、独立分支隔离、阻塞传播、Work 只读委托验收）。删除旧 HarnessWorkflowRunner 及旧测试；Agent Team 的持久 TaskGraph/恢复仍待统一，不能标记完成。 本批为 Work 模型工具 workflow 增加 graph 模式及零基有向依赖数组，接到 LocalWorkSubagentRuntime 和 TaskGraphExecutor 正式执行路径；循环/重复/自依赖/缺失/越界在执行前拒绝，并为汇总任务提供已验收的前置结果。当前 SHA CI 未验收。；Work Graph 与 Agent Team 统一使用 TaskGraphTopology 环检测。Work Graph 委托的每个节点状态变化写入 Session EventLog，UI 从事件之后读取；完整持久恢复与单元回归仍待最终 CI。；Work 图在写入 taskgraph/start 前完成统一拓扑预检；每条合法工作图均写入 start/progress/end(settled/failed/cancelled) EventLog 完整生命周期，取消不转为成功。仍待最新 HEAD CI。；TaskGraph 将 executor/acceptor 的可重试失败与 Session EventLog 的 onProgress 持久提交故障分离；事件落盘失败即停止整张图、禁止重复触发已成功工具。新增两项 JVM 回归待 CI。；TaskGraph 在 Work 消费端新增结构化 LocalWorkflowRunResult，failed/blocked 节点形成 node counts 与 durable taskgraph/end 的 nodes_completed/partial/blocked 终态，Goal 验收仍独立；新增部分失败及全成功 JVM 回归。；Work 结构化工作流阻塞已正式参与 Goal 完成门禁，历史 Session EventLog 最新图终态可在 UI 临时状态清理后继续阻断假完成，含兼容旧 settled 事件。；本轮修复 graphPartialResult 错误测试桩（重试提示改变输入），真实生产图执行加入 Goal 验收合同指纹栅栏，阻断目标暂停/修改后继续派发子代理，持久 taskgraph/start 记录 DAG 节点依赖与目标指纹以利恢复审计；待最新 CI 验证。；TaskGraph 进度协议扩展稳定 nodeId，Work 事件携带 nodeId，冷重建 projector 可还原节点最新阶段且不冒充任务完成；JVM 回归待最新 CI。"
     },
     {
       "id": "AE4V3-15",
@@ -400,13 +403,8 @@
   "status": "first incremental implementation, not entire refactor",
   "current_slice": {
     "date": "2026-10-17",
-    "component": "Work TaskGraph EventLog recovery fence in GoalDriver",
+    "component": "TaskGraph durable node identity and per-node cold recovery projection",
     "status": "code_submitted_ci_pending",
-    "head_before": "6660ec8b6de22cc6acbbec718a6a9fbdeb70f5d0",
-    "code_evidence": [
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphRecovery.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuation.kt",
-      "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuationTest.kt"
-    ]
+    "head_before": "cccf20be90e6398db07447c8ec2989602d5860ea"
   }
 }

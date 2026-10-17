@@ -193,6 +193,30 @@ class LocalWorkGoalContinuationTest {
     }
 
     @Test
+    fun coldGraphProjectionReconstructsPerNodeProgressWithoutInventingCompletion() {
+        val ledger = LocalWorkTaskGraphRecoveryLedger()
+        fun event(node: String, stage: String) = buildJsonObject {
+            put("graph_id", "g")
+            put("goal_id", goal.id)
+            put("node_id", node)
+            put("stage", stage)
+        }
+        ledger.observe("taskgraph/start", buildJsonObject {
+            put("graph_id", "g")
+            put("goal_id", goal.id)
+        })
+        ledger.observe("taskgraph/progress", event("task-1", "已完成"))
+        ledger.observe("taskgraph/progress", event("task-2", "执行中"))
+        ledger.observe("taskgraph/progress", event("task-2", "验收中"))
+        val graph = ledger.unresolvedForGoal(goal.id).single()
+        assertEquals("已完成", graph.lastNodeStages["task-1"])
+        assertEquals("验收中", graph.lastNodeStages["task-2"])
+        assertEquals(2, graph.lastNodeStages.size)
+        // Progress alone does not close an orphan; only the matching end fact does.
+        assertEquals("g", graph.graphId)
+    }
+
+    @Test
     fun recoveredGraphTerminalStatusesAllSettleExecutionWithoutClaimingGoalSuccess() {
         for (terminal in listOf("nodes_completed", "partial", "failed", "cancelled")) {
             val ledger = LocalWorkTaskGraphRecoveryLedger()
