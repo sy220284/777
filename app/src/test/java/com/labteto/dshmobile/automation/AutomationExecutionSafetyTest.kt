@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.automation
 
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -63,6 +66,99 @@ class AutomationExecutionSafetyTest {
         } finally {
             directory.deleteRecursively()
         }
+    }
+
+    @Test
+    fun overlappingManualRequestsSubmitInTheirDurableClaimOrder() {
+        val dir = Files.createTempDirectory("automation-submit-order").toFile()
+        val executor = Executors.newFixedThreadPool(2)
+        val firstSubmitted = CountDownLatch(1)
+        val secondStarted = CountDownLatch(1)
+        val allowFirstReturn = CountDownLatch(1)
+        try {
+            val store = AutomationStore(dir.resolve("automations.json"), json)
+            val admitted = store.upsert(AutomationTask(
+                id = "task", prompt = "run", createdAt = 1L, nextRunAt = 2L,
+            )).admitted
+            val submitted = java.util.Collections.synchronizedList(mutableListOf<String>())
+            val first = executor.submit<String?> {
+                store.claimAndSubmitManualRun("task", admitted.scheduleGeneration, "request-a") {
+                    submitted.add("request-a")
+                    firstSubmitted.countDown()
+                    check(allowFirstReturn.await(5, TimeUnit.SECONDS))
+                    "submitted-a"
+                }
+            }
+            assertTrue(firstSubmitted.await(5, TimeUnit.SECONDS))
+            val second = executor.submit<String?> {
+                secondStarted.countDown()
+                store.claimAndSubmitManualRun("task", admitted.scheduleGeneration, "request-b") {
+                    submitted.add("request-b")
+                    "submitted-b"
+                }
+            }
+            // While A's enqueue call is held, B cannot publish a newer claim
+            // and submit a second request that A might later REPLACE.
+            // The second enqueue must not finish while the first is still inside
+            // the store's critical section. Avoid read() here: it shares the lock.
+            assertTrue(secondStarted.await(5, TimeUnit.SECONDS))
+            assertFalse(second.isDone)
+            assertEquals(listOf("request-a"), submitted.toList())
+            allowFirstReturn.countDown()
+            assertEquals("submitted-a", first.get(5, TimeUnit.SECONDS))
+            assertEquals("submitted-b", second.get(5, TimeUnit.SECONDS))
+            assertEquals(listOf("request-a", "request-b"), submitted.toList())
+            assertEquals("request-b", store.get("task")!!.activeManualRunId)
+        } finally {
+            allowFirstReturn.countDown()
+            executor.shutdownNow()
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun failedManualAdmissionCompensatesOnlyItsExactClaim() {
+        val dir = Files.createTempDirectory("automation-submit-failure").toFile()
+        try {
+            val store = AutomationStore(dir.resolve("automations.json"), json)
+            val task = store.upsert(AutomationTask(
+                id = "task", prompt = "run", createdAt = 1L, nextRunAt = 2L,
+            )).admitted
+            assertTrue(runCatching {
+                store.claimAndSubmitManualRun("task", task.scheduleGeneration, "failed") {
+                    error("simulate synchronous WorkManager rejection")
+                }
+            }.isFailure)
+            assertNull(store.get("task")!!.activeManualRunId)
+            assertEquals("queued", store.claimAndSubmitManualRun(
+                "task", task.scheduleGeneration, "current",
+            ) { "queued" })
+            // An asynchronously rejected old request may clear only its own claim.
+            assertFalse(store.compensateManualEnqueueFailure(
+                "task", task.scheduleGeneration, "failed", "old async failure",
+            ))
+            assertEquals("current", store.get("task")!!.activeManualRunId)
+            assertTrue(store.compensateManualEnqueueFailure(
+                "task", task.scheduleGeneration, "current", "current async failure",
+            ))
+            assertNull(store.get("task")!!.activeManualRunId)
+            assertEquals("current async failure", store.get("task")!!.lastError)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun manualSettlementNeverReplacesAlreadyScheduledNextRun() {
+        val task = AutomationTask(
+            id = "scheduled", prompt = "work", createdAt = 1L, nextRunAt = 99L,
+            status = AutomationStatus.SCHEDULED,
+        )
+        assertFalse(mayEnqueueNextAfterAutomationSettlement(true, task, 99L))
+        assertTrue(mayEnqueueNextAfterAutomationSettlement(false, task, 99L))
+        assertFalse(mayEnqueueNextAfterAutomationSettlement(false,
+            task.copy(status = AutomationStatus.PAUSED), 99L))
+        assertFalse(mayEnqueueNextAfterAutomationSettlement(false, task, null))
     }
 
     @Test

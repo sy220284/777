@@ -114,11 +114,7 @@ internal class AutomationWorkerSettlementCoordinator(
                 resultText = run.output,
             )
         }
-        if (
-            updated?.status == AutomationStatus.SCHEDULED &&
-            committedNext != null &&
-            (usesChainedAutomationScheduling(updated) || updated.recurringMinutes == null)
-        ) {
+        if (mayEnqueueNextAfterAutomationSettlement(manualRun, updated, committedNext)) {
             scheduler.enqueueNextChained(id, requireNotNull(committedNext), requestedGeneration)
         }
         if (updated != null && committedWaiting) {

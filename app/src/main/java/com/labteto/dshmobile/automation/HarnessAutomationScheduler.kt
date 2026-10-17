@@ -36,6 +36,10 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.Calendar
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executor
+import kotlin.coroutines.EmptyCoroutineContext
+import kotlinx.coroutines.Dispatchers
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.random.Random
@@ -402,26 +406,44 @@ class HarnessAutomationScheduler @Inject constructor(
             )
             .addTag(WORK_TAG)
             .build()
-        // Claim the exact durable WorkManager request before it can execute. REPLACE
-        // cancels older work asynchronously, so generation alone is not an authority.
+        // Submit and persist under the SAME AutomationStore monitor. Two callers can
+        // no longer reorder claim(A)/enqueue(A) with claim(B)/enqueue(B).
         val claimId = request.id.toString()
-        store.updateIf(id, predicate = { it.scheduleGeneration == task.scheduleGeneration }) {
-            it.copy(activeManualRunId = claimId)
-        } ?: return false
-        return try {
+        val operation = store.claimAndSubmitManualRun(id, task.scheduleGeneration, claimId) {
             workManager.enqueueUniqueWork(
                 manualWorkName(id, task.scheduleGeneration),
                 ExistingWorkPolicy.REPLACE,
                 request,
             )
-            true
-        } catch (error: Throwable) {
-            // A failed admission must not leave a ghost manual execution claim.
-            store.updateIf(id, predicate = {
-                it.scheduleGeneration == task.scheduleGeneration && it.activeManualRunId == claimId
-            }) { it.copy(activeManualRunId = null) }
-            throw error
-        }
+        } ?: return false
+        // enqueueUniqueWork returns immediately, before the WorkManager database
+        // transaction finishes. A synchronous try/catch cannot observe an async
+        // rejection. Compensate the exact failed claim without erasing a successor.
+        operation.result.addListener({
+            val failure = try {
+                operation.result.get()
+                null
+            } catch (error: ExecutionException) {
+                error.cause ?: error
+            } catch (error: InterruptedException) {
+                Thread.currentThread().interrupt()
+                error
+            } catch (error: Exception) {
+                error
+            }
+            if (failure != null) {
+                store.compensateManualEnqueueFailure(
+                    id, task.scheduleGeneration, claimId,
+                    "手动任务提交失败：${failure.javaClass.simpleName}",
+                )
+                com.labteto.dshmobile.observability.AppLog.failure(
+                    "AutomationScheduler", "enqueue_manual", failure,
+                )
+            }
+        }, Executor { runnable -> Dispatchers.IO.dispatch(EmptyCoroutineContext, runnable) })
+        // This means the enqueue request was accepted locally, not that an async
+        // WorkManager transaction or user task execution has already succeeded.
+        return true
     }
 
     fun updateTask(

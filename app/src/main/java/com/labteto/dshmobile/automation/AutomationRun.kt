@@ -40,3 +40,12 @@ internal fun ownsAutomationSettlement(
     } else {
         task.status == AutomationStatus.RUNNING && task.lastRunAt == startedAt
     })
+
+/** A one-off manual receipt must never replace an already armed scheduled chain. */
+internal fun mayEnqueueNextAfterAutomationSettlement(
+    manualRun: Boolean,
+    updated: AutomationTask?,
+    nextRunAt: Long?,
+): Boolean = !manualRun && updated?.status == AutomationStatus.SCHEDULED &&
+    nextRunAt != null &&
+    (usesChainedAutomationScheduling(updated) || updated.recurringMinutes == null)

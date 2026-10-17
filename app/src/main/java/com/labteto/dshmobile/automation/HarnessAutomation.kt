@@ -263,6 +263,50 @@ class AutomationStore internal constructor(
         return AutomationTaskAdmission(admitted, replaced)
     }
 
+    /**
+     * Serializes the durable manual WorkManager claim AND the enqueue request against
+     * subsequent manual claims and schedule edits. A generation alone cannot order two
+     * manual submissions: claim(A), claim(B), enqueue(B), enqueue(A) used to lose B.
+     *
+     * WorkManager's asynchronous Operation completion is observed separately by the
+     * scheduler and may compensate only if this exact request still owns the claim.
+     */
+    @Synchronized
+    internal fun <T : Any> claimAndSubmitManualRun(
+        id: String,
+        generation: Long,
+        requestId: String,
+        submit: () -> T,
+    ): T? {
+        require(requestId.isNotBlank()) { "手动执行请求身份不能为空" }
+        val current = read().tasks.firstOrNull { it.id == id } ?: return null
+        if (current.scheduleGeneration != generation) return null
+        updateIf(id, predicate = { it.scheduleGeneration == generation }) {
+            it.copy(activeManualRunId = requestId)
+        } ?: return null
+        return try {
+            submit()
+        } catch (error: Throwable) {
+            updateIf(id, predicate = {
+                it.scheduleGeneration == generation && it.activeManualRunId == requestId
+            }) { it.copy(activeManualRunId = null) }
+            throw error
+        }
+    }
+
+    /** Commit the failure of an async WorkManager admission only for its exact owner. */
+    @Synchronized
+    internal fun compensateManualEnqueueFailure(
+        id: String,
+        generation: Long,
+        requestId: String,
+        reason: String,
+    ): Boolean = updateIf(id, predicate = {
+        it.scheduleGeneration == generation && it.activeManualRunId == requestId
+    }) { task ->
+        task.copy(activeManualRunId = null, lastError = reason.take(4000))
+    } != null
+
     @Synchronized
     fun remove(id: String): Boolean {
         val document = read()
