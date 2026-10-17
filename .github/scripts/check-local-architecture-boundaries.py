@@ -1027,10 +1027,10 @@ for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT):
 # ---- R4 genuine isolated MCP process + standalone V6 boot --------------------
 # These are production wiring invariants, not claims that device tests passed.
 worker_manifest = read("app/src/main/AndroidManifest.xml")
-if not re.search(
-    r'<service\\s+android:name="\\.local\\.tools\\.ipc\\.McpPluginWorkerService"'
-    r'\\s+android:process=":mcp_worker"\\s+android:exported="false"',
-    worker_manifest,
+if not (
+    'android:name=".local.tools.ipc.McpPluginWorkerService"' in worker_manifest
+    and 'android:process=":mcp_worker"' in worker_manifest
+    and 'android:exported="false"' in worker_manifest
 ):
     die("R4 MCP worker must be non-exported in an independent Android process")
 if "transportFactory = { endpoint ->" not in plugin_composition or (
