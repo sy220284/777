@@ -1013,9 +1013,12 @@ if "transportFactory = { endpoint ->" not in plugin_composition or (
     "stdioTransportFactory = { command, workingDirectory ->" not in plugin_composition
 ) or plugin_composition.count("McpPluginWorkerTransport(") < 2:
     die("R4 production MCP HTTP and stdio must both use Binder worker without local fallback")
-v6_boot = strip_comments(read("app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt"))
+app_root = strip_comments(read("app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt"))
+v6_boot = strip_comments(read("app/src/main/java/com/labteto/dshmobile/ui/host/LocalProductionUiEntry.kt"))
+if "LocalProductionUiEntry(" not in app_root:
+    die("R4 AppRoot must install the neutral application UI entry")
 if "LocalV6StandaloneViewModel = hiltViewModel()" not in v6_boot:
-    die("R4 AppRoot must compose the real Feature Port application owner")
+    die("R4 production entry must compose the real Feature Port application owner")
 for retired in ("LocalHarnessViewModel", "LocalHarnessScreen", "LocalLegacyApplicationEntry"):
     for path, source in kotlin_sources_under(ROOT / "app/src/main/java"):
         if references_type(source, retired) or re.search(r"\b(?:class|fun)\s+" + retired + r"\b", source):
