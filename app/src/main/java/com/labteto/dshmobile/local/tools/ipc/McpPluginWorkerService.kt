@@ -169,9 +169,11 @@ class McpPluginWorkerService : Service() {
         }
         // Closing a network/process transport can block; never hold the same
         // monitor needed to reject late result delivery during this I/O.
-        runCatching { instance.transport.close() }
+        // Notify the owner before potentially slow network/stdio close; revocation
+        // is a control-plane action, never blocked on plugin cleanup I/O.
         if (reason != null)
             send(instance.owner, McpWorkerWire.TERMINATED, 0, token, error = reason)
+        runCatching { instance.transport.close() }
     }
 
     private fun send(to: Messenger, kind: Int, requestId: Int, token: String,
