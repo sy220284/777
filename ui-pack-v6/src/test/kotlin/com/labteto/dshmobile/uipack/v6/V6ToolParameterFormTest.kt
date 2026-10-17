@@ -226,4 +226,116 @@ class V6ToolParameterFormTest {
             v6ToolArgumentsJson(schema, mapOf("query" to "inspect")))
     }
 
+
+    @Test fun registeredNestedArrayCanBeEditedPerItemWithoutChangingSiblingObjects() {
+        val arraySchema = buildJsonObject {
+            put("type", "object")
+            put("additionalProperties", false)
+            put("properties", buildJsonObject {
+                put("metadata", buildJsonObject {
+                    put("type", "object")
+                    put("additionalProperties", false)
+                    put("properties", buildJsonObject {
+                        put("ids", buildJsonObject {
+                            put("type", "array")
+                            put("minItems", 1)
+                            put("maxItems", 3)
+                            put("items", buildJsonObject { put("type", "integer") })
+                        })
+                        put("note", buildJsonObject { put("type", "string") })
+                    })
+                })
+            })
+        }
+        val field = v6ToolFormFields(arraySchema).single { it.name == "metadata.ids" }
+        val first = requireNotNull(v6ToolArrayEditor(arraySchema, field, null))
+        val one = v6ToolArrayDraftChange(first, 0, "12")
+        assertEquals("[12]", one)
+        val restored = requireNotNull(v6ToolArrayEditor(arraySchema, field, one))
+        val appended = v6ToolArrayDraftChange(restored, 1, "15")
+        assertEquals("[12,15]", appended)
+        val revised = v6ToolArrayDraftChange(
+            requireNotNull(v6ToolArrayEditor(arraySchema, field, appended)), 0, "-2",
+        )
+        assertEquals("[\u002d2,15]", revised)
+        val accepted = v6ToolArgumentsJson(arraySchema, mapOf(
+            "metadata.ids" to revised,
+            "metadata.note" to "not a tool call",
+        ))
+        assertEquals("""{"metadata":{"ids":[-2,15],"note":"not a tool call"}}""", accepted)
+        assertEquals("[15]", v6ToolArrayDraftChange(
+            requireNotNull(v6ToolArrayEditor(arraySchema, field, revised)), 0, null,
+        ))
+    }
+
+    @Test fun arrayEditorRejectsBadTypesUnauthorizedPathsAndExcessItems() {
+        val registered = buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject {
+                put("ids", buildJsonObject {
+                    put("type", "array")
+                    put("minItems", 1)
+                    put("maxItems", 2)
+                    put("items", buildJsonObject { put("type", "integer") })
+                })
+            })
+        }
+        val field = v6ToolFormFields(registered).single()
+        val first = requireNotNull(v6ToolArrayEditor(registered, field, null))
+        for (invalid in listOf("1.5", "true", "\"\"",
+                """{"tool":"allow"}""", "[1]")) {
+            assertThrows(Exception::class.java) {
+                v6ToolArrayDraftChange(first, 0, invalid)
+            }
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            v6ToolArrayEditor(registered, field.copy(path = listOf("other")), null)
+        }
+        val two = requireNotNull(v6ToolArrayEditor(registered, field, "[1,2]"))
+        assertThrows(IllegalArgumentException::class.java) {
+            v6ToolArrayDraftChange(two, 2, "3")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            v6ToolArrayEditor(registered, field, "[1,2,3]")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            v6ToolArgumentsJson(registered, mapOf("ids" to "[]"))
+        }
+    }
+
+    @Test fun arrayOfObjectsPreservesExactNestedJsonAndStillEnforcesItemSchema() {
+        val registered = buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject {
+                put("steps", buildJsonObject {
+                    put("type", "array")
+                    put("items", buildJsonObject {
+                        put("type", "object")
+                        put("required", buildJsonArray { add(JsonPrimitive("action")) })
+                        put("additionalProperties", false)
+                        put("properties", buildJsonObject {
+                            put("action", buildJsonObject {
+                                put("type", "string")
+                                put("enum", buildJsonArray { add(JsonPrimitive("review")) })
+                            })
+                        })
+                    })
+                })
+            })
+        }
+        val field = v6ToolFormFields(registered).single()
+        val editor = requireNotNull(v6ToolArrayEditor(registered, field, null))
+        assertEquals("object", editor.itemType)
+        val invalid = v6ToolArrayDraftChange(editor, 0, """{"action":"execute"}""")
+        assertThrows(IllegalArgumentException::class.java) {
+            v6ToolArgumentsJson(registered, mapOf("steps" to invalid))
+        }
+        val corrected = v6ToolArrayDraftChange(
+            requireNotNull(v6ToolArrayEditor(registered, field, invalid)),
+            0, """{"action":"review"}""")
+        assertEquals("""{"steps":[{"action":"review"}]}""",
+            v6ToolArgumentsJson(registered, mapOf("steps" to corrected)))
+    }
+
+
 }
