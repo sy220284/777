@@ -1,14 +1,15 @@
 package com.labteto.dshmobile.local.presentation
 
-import com.labteto.dshmobile.local.session.LocalHarnessMessage
-import com.labteto.dshmobile.uicontract.TranscriptUiPort
-import com.labteto.dshmobile.uicontract.UiTranscriptPage
+import com.labteto.dshmobile.uicontract.UiMessageSnapshot
+import com.labteto.dshmobile.uicontract.UiMessageRole
+import com.labteto.dshmobile.uicontract.UiMessageHistoryPort
+import com.labteto.dshmobile.uicontract.UiMessagePage
 import com.labteto.dshmobile.uicontract.UiTranscriptCursor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal data class LocalTranscriptHistoryLoadResult(
-    val olderMessages: List<LocalHarnessMessage>,
+    val olderMessages: List<UiMessageSnapshot>,
     val nextCursor: UiTranscriptCursor?,
     val loadedRawMessages: Int = 0,
 )
@@ -20,12 +21,12 @@ internal data class LocalTranscriptHistoryLoadResult(
  * loader only decides how many bounded pages are needed to satisfy the separate foreground quota.
  */
 internal class LocalTranscriptHistoryLoader(
-    private val session: TranscriptUiPort,
+    private val session: UiMessageHistoryPort,
     private val currentSessionId: () -> String,
-    private val liveMessages: () -> List<LocalHarnessMessage>,
+    private val liveMessages: () -> List<UiMessageSnapshot>,
 ) {
     suspend fun bootstrap(sessionId: String): LocalTranscriptHistoryLoadResult? {
-        var olderMessages = emptyList<LocalHarnessMessage>()
+        var olderMessages = emptyList<UiMessageSnapshot>()
         var pageCursor: UiTranscriptCursor? = null
         var nextCursor: UiTranscriptCursor? = null
         var needsMoreVisibleDialogue = true
@@ -65,7 +66,7 @@ internal class LocalTranscriptHistoryLoader(
 
     suspend fun olderBatch(
         sessionId: String,
-        olderMessages: List<LocalHarnessMessage>,
+        olderMessages: List<UiMessageSnapshot>,
         startCursor: UiTranscriptCursor,
     ): LocalTranscriptHistoryLoadResult? {
         var accumulated = olderMessages
@@ -115,8 +116,8 @@ internal class LocalTranscriptHistoryLoader(
     private suspend fun readPage(
         sessionId: String,
         cursor: UiTranscriptCursor?,
-    ): UiTranscriptPage = withContext(Dispatchers.IO) {
-        session.transcriptPage(
+    ): UiMessagePage = withContext(Dispatchers.IO) {
+        session.messagePage(
             sessionId = sessionId,
             cursor = cursor,
             limit = LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES,
@@ -124,14 +125,14 @@ internal class LocalTranscriptHistoryLoader(
     }
 
     private fun prependUniqueOlderMessages(
-        pageMessages: List<LocalHarnessMessage>,
-        olderMessages: List<LocalHarnessMessage>,
-        liveMessages: List<LocalHarnessMessage>,
-    ): List<LocalHarnessMessage> {
+        pageMessages: List<UiMessageSnapshot>,
+        olderMessages: List<UiMessageSnapshot>,
+        liveMessages: List<UiMessageSnapshot>,
+    ): List<UiMessageSnapshot> {
         if (pageMessages.isEmpty()) return olderMessages
         val existingIds = HashSet<String>(olderMessages.size + liveMessages.size)
-        olderMessages.mapTo(existingIds, LocalHarnessMessage::id)
-        liveMessages.mapTo(existingIds, LocalHarnessMessage::id)
+        olderMessages.mapTo(existingIds, UiMessageSnapshot::id)
+        liveMessages.mapTo(existingIds, UiMessageSnapshot::id)
         val newlyLoaded = pageMessages.filter { message -> existingIds.add(message.id) }
         return if (newlyLoaded.isEmpty()) olderMessages else newlyLoaded + olderMessages
     }
@@ -144,19 +145,19 @@ internal const val LOCAL_TRANSCRIPT_HISTORY_VISIBLE_DIALOGUE_BATCH_MESSAGES = 40
 internal const val LOCAL_TRANSCRIPT_HISTORY_MAX_PAGES_PER_LOAD = 20
 internal const val LOCAL_TRANSCRIPT_HISTORY_MAX_RAW_MESSAGES_PER_LOAD = 4_000
 
-internal fun userVisibleDialogueMessageCount(messages: List<LocalHarnessMessage>): Int =
-    messages.count { it.role == "user" || it.role == "assistant" }
+internal fun userVisibleDialogueMessageCount(messages: List<UiMessageSnapshot>): Int =
+    messages.count { it.role == UiMessageRole.USER || it.role == UiMessageRole.ASSISTANT }
 
-internal fun needsMoreUserVisibleDialogue(messages: List<LocalHarnessMessage>, target: Int): Boolean =
+internal fun needsMoreUserVisibleDialogue(messages: List<UiMessageSnapshot>, target: Int): Boolean =
     userVisibleDialogueMessageCount(messages) < target.coerceAtLeast(0)
 
 internal fun mergeLocalTranscriptHistory(
-    olderMessages: List<LocalHarnessMessage>,
-    liveMessages: List<LocalHarnessMessage>,
-): List<LocalHarnessMessage> {
+    olderMessages: List<UiMessageSnapshot>,
+    liveMessages: List<UiMessageSnapshot>,
+): List<UiMessageSnapshot> {
     if (olderMessages.isEmpty()) return liveMessages
     if (liveMessages.isEmpty()) return olderMessages
-    val liveIds = liveMessages.mapTo(hashSetOf(), LocalHarnessMessage::id)
+    val liveIds = liveMessages.mapTo(hashSetOf(), UiMessageSnapshot::id)
     val seen = hashSetOf<String>()
     return buildList(olderMessages.size + liveMessages.size) {
         olderMessages.forEach { message ->

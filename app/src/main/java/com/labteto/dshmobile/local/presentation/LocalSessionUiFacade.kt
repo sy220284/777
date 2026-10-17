@@ -3,9 +3,7 @@ package com.labteto.dshmobile.local.presentation
 import com.labteto.dshmobile.local.session.LocalSessionReadRuntime
 import com.labteto.dshmobile.local.session.LocalTranscriptPageCursor
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
-import com.labteto.dshmobile.uicontract.TranscriptUiPort
 import com.labteto.dshmobile.uicontract.UiTranscriptCursor
-import com.labteto.dshmobile.uicontract.UiTranscriptPage
 import com.labteto.dshmobile.uicontract.UiMessagePage
 import com.labteto.dshmobile.uicontract.UiMessageSnapshot
 import com.labteto.dshmobile.uicontract.UiMessageRole
@@ -25,7 +23,7 @@ import kotlinx.coroutines.withContext
 @Singleton
 class LocalSessionUiFacade @Inject constructor(
     private val session: LocalSessionReadRuntime,
-) : TranscriptUiPort, UiMessageHistoryPort {
+) : UiMessageHistoryPort {
     private data class Cursor(val sessionId: String, val instance: String, val reset: Long,
         val ownerCursor: LocalTranscriptPageCursor) : UiTranscriptCursor
 
@@ -62,7 +60,7 @@ class LocalSessionUiFacade @Inject constructor(
         }
     }
 
-    override suspend fun transcriptPage(sessionId: String, cursor: UiTranscriptCursor?, limit: Int): UiTranscriptPage = withContext(Dispatchers.IO) {
+    private suspend fun rawTranscriptPage(sessionId: String, cursor: UiTranscriptCursor?, limit: Int): Pair<List<LocalHarnessMessage>, UiTranscriptCursor?> = withContext(Dispatchers.IO) {
         val continuation = cursor?.let { it as? Cursor ?: error("不支持的历史分页标识") }
         require(continuation == null || continuation.sessionId == sessionId) { "历史分页不属于当前会话" }
         // The Session read owner repeats scope authorization before any result is exposed.
@@ -71,15 +69,15 @@ class LocalSessionUiFacade @Inject constructor(
         require(continuation == null || (continuation.instance == frame.instance && continuation.reset == frame.reset)) {
             "历史已更新，请重新加载"
         }
-        UiTranscriptPage(page.messages, page.nextCursor?.let { Cursor(sessionId, frame.instance, frame.reset, it) })
+        page.messages to page.nextCursor?.let { Cursor(sessionId, frame.instance, frame.reset, it) }
     }
     override suspend fun messagePage(sessionId: String, cursor: UiTranscriptCursor?, limit: Int): UiMessagePage {
-        val page = transcriptPage(sessionId, cursor, limit)
-        return UiMessagePage(page.messages.map(::projectTranscriptHistoryMessage), page.nextCursor)
+        val (messages, nextCursor) = rawTranscriptPage(sessionId, cursor, limit)
+        return UiMessagePage(messages.map(::projectTranscriptHistoryMessage), nextCursor)
     }
 }
 
-/** Only semantic presentation fields cross into Next; Session metadata stays in the Owner. */
+/** Only semantic presentation fields cross into any UI pack; Session metadata stays in the Owner. */
 internal fun projectTranscriptHistoryMessage(message: LocalHarnessMessage): UiMessageSnapshot =
     UiMessageSnapshot(message.id, when (message.role) {
         "user" -> UiMessageRole.USER
@@ -91,9 +89,7 @@ internal fun projectTranscriptHistoryMessage(message: LocalHarnessMessage): UiMe
 
 @dagger.Module
 @dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
-internal abstract class LocalTranscriptUiPortBindings {
-    @dagger.Binds @Singleton
-    abstract fun transcript(implementation: LocalSessionUiFacade): TranscriptUiPort
+internal abstract class LocalMessageHistoryPortBindings {
     @dagger.Binds @Singleton
     abstract fun messageHistory(implementation: LocalSessionUiFacade): UiMessageHistoryPort
 }
