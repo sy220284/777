@@ -39,6 +39,55 @@ class LocalHarnessSettingsCoordinatorTest {
         assertEquals(baseline, UserProfileStore(File(file.parentFile, "user.json.bak"), Json).read())
     }
 
+    @Test
+    fun agentAndModelRuntimeSettingsPublishInOneSharedPreferenceTransaction() = runTest {
+        val saved = linkedMapOf<String, Any?>()
+        var editCalls = 0
+        var applyCalls = 0
+        val recordedPreferences = Proxy.newProxyInstance(
+            SharedPreferences::class.java.classLoader,
+            arrayOf(SharedPreferences::class.java),
+        ) { _, method, _ ->
+            when (method.name) {
+                "edit" -> {
+                    editCalls++
+                    val staged = linkedMapOf<String, Any?>()
+                    Proxy.newProxyInstance(
+                        SharedPreferences.Editor::class.java.classLoader,
+                        arrayOf(SharedPreferences.Editor::class.java),
+                    ) { editor, operation, args ->
+                        when (operation.name) {
+                            "putInt", "putString" -> {
+                                staged[args!![0] as String] = args[1]
+                                editor
+                            }
+                            "remove" -> {
+                                staged[args!![0] as String] = null
+                                editor
+                            }
+                            "apply" -> { saved.putAll(staged); applyCalls++; null }
+                            else -> error("Unexpected editor method: ${operation.name}")
+                        }
+                    } as SharedPreferences.Editor
+                }
+                else -> error("Unexpected preferences method: ${method.name}")
+            }
+        } as SharedPreferences
+        val file = File(temporary.root, "profile/config.json")
+        val store = UserProfileStore(file, Json)
+        val runtime = LocalRuntimeStateStore().apply { initialize(LocalHarnessState(sessionId = "settings")) }
+        val settings = LocalHarnessSettingsCoordinator(recordedPreferences, store, runtime, backgroundScope)
+        settings.configureRuntimeLimits(mainMaxSteps = 40, subagentMaxSteps = 75, modelAttempts = 99)
+        assertEquals(1, editCalls)
+        assertEquals(1, applyCalls)
+        assertEquals(40, saved["main_max_steps"])
+        assertEquals(75, saved["subagent_max_steps"])
+        assertEquals(5, saved["model_attempts"])
+        assertEquals(40, runtime.state.value.mainMaxSteps)
+        assertEquals(75, runtime.state.value.subagentMaxSteps)
+        assertEquals(5, runtime.state.value.modelState.modelAttempts)
+    }
+
     @Test fun writeFailureIsVisibleAndDoesNotKillTheNextSave() = runTest {
         val parent = File(temporary.root, "blocked").apply { writeText("file") }
         val store = UserProfileStore(File(parent, "user.json"), Json)

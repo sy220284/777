@@ -365,10 +365,20 @@
         "AE4V3-10",
         "AE4V3-15"
       ],
-      "status": "not_started",
-      "code_evidence": [],
-      "tests_verified": [],
-      "notes": ""
+      "status": "in_progress",
+      "code_evidence": [
+        "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentRuntimeSettings.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelConfigContract.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/settings/LocalHarnessSettingsCoordinator.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/settings/LocalHarnessSettingsCoordinatorTest.kt"
+      ],
+      "tests_verified": [
+        "local :app:compileDebugKotlin",
+        "local LocalHarnessSettingsCoordinatorTest including shared editor atomicity",
+        "local 7-module JVM suite (pending current run)",
+        "local architecture/performance/test-quality/Kotlin-risk/CI-integrity static gates"
+      ],
+      "notes": "2026-10-17：启动 Settings 配置与身份治理。Agent 与 Model 的执行配置各自暴露 prepare（先验证与归一化）和 stage（写入本领域键）合同；Settings 的 runtime limits + model attempts 在单一 SharedPreferences 编辑事务中应用，并在验证成功后更新运行投影，避免 Model workerProfile 身份失效时仅 Agent 设置写入一半。保留既有独立 Settings API 和非阻塞 apply 语义。新增 Mock SharedPreferences 断言单一 edit/apply、三个字段一起提交和 UI 投影归一化。App Kotlin 编译与定向测试和静态门禁通过；完整配置身份迁移、跨进程持久一致性和提交 SHA CI 尚未验收，整项 in_progress。"
     },
     {
       "id": "AE4V3-18",

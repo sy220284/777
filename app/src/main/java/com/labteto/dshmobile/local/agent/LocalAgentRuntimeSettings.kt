@@ -24,19 +24,25 @@ internal object LocalAgentRuntimeSettings {
             ),
         )
 
+    /** Validate before any cross-domain Settings transaction touches durable storage. */
+    fun prepare(mainMaxSteps: Int, subagentMaxSteps: Int) = LocalAgentRuntimeSettingsSnapshot(
+        mainMaxSteps = LocalAgentRuntimeLimits.normalizeMainSteps(mainMaxSteps),
+        subagentMaxSteps = LocalAgentRuntimeLimits.normalizeSubagentSteps(subagentMaxSteps),
+    )
+
+    /** Stage only Agent-owned keys in an editor supplied by the Settings coordinator. */
+    fun stage(editor: SharedPreferences.Editor, snapshot: LocalAgentRuntimeSettingsSnapshot) {
+        editor.putInt(KEY_MAIN_MAX_STEPS, snapshot.mainMaxSteps)
+        editor.putInt(KEY_SUBAGENT_MAX_STEPS, snapshot.subagentMaxSteps)
+    }
+
     fun write(
         preferences: SharedPreferences,
         mainMaxSteps: Int,
         subagentMaxSteps: Int,
     ): LocalAgentRuntimeSettingsSnapshot {
-        val snapshot = LocalAgentRuntimeSettingsSnapshot(
-            mainMaxSteps = LocalAgentRuntimeLimits.normalizeMainSteps(mainMaxSteps),
-            subagentMaxSteps = LocalAgentRuntimeLimits.normalizeSubagentSteps(subagentMaxSteps),
-        )
-        preferences.edit()
-            .putInt(KEY_MAIN_MAX_STEPS, snapshot.mainMaxSteps)
-            .putInt(KEY_SUBAGENT_MAX_STEPS, snapshot.subagentMaxSteps)
-            .apply()
+        val snapshot = prepare(mainMaxSteps, subagentMaxSteps)
+        preferences.edit().also { stage(it, snapshot) }.apply()
         return snapshot
     }
 }
