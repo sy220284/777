@@ -274,8 +274,9 @@ class LocalHarnessViewModel @Inject constructor(
     internal suspend fun loadOlderTranscript(sessionId: String): Result<Int> =
         transcriptHistoryController.loadOlder(sessionId)
 
-    fun configure(apiKey: String, model: String, baseUrl: String) = runtime.model.configure(apiKey, model, baseUrl)
-    fun selectModel(model: String) = runtime.model.selectModel(model)
+    fun configure(apiKey: String, model: String, baseUrl: String) =
+        settingsUiPort.configureModel(apiKey, model, baseUrl)
+    fun selectModel(model: String) = settingsUiPort.selectModel(model)
     internal fun captureUiSendIdentity(): com.labteto.dshmobile.uicontract.UiSessionIdentity? = uiPorts.identitySnapshot()
 
     internal fun send(
@@ -319,7 +320,10 @@ class LocalHarnessViewModel @Inject constructor(
         return chatGroupUiPort.submit(com.labteto.dshmobile.uicontract.ChatGroupUiCommand.CreateGroupSession(identity, ids)) ==
             com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
     }
-    fun createSingleChatSession() = runtime.chat.createSingleChatSession()
+    fun createSingleChatSession(): Boolean =
+        sessionUiPort.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.Create(
+            uiPorts.identitySnapshot(), LocalConversationMode.INDEPENDENT, LocalUsageMode.CHAT,
+        )) == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted
     fun configureGroupChatMembers(ids: List<String>, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Boolean {
         // V6 now submits the same closed intent to the original Chat Owner.
         val identity = expected ?: return false
@@ -484,7 +488,7 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun autoFillChatPersona(current: PersonaProfile, description: String, expected: com.labteto.dshmobile.uicontract.UiSessionIdentity?): Result<PersonaProfile> =
         chatModelAssistController.autoFillCurrentPersona(current, description, expected)
     fun switchSession(sessionId: String): Boolean = sessionUiPort.submit(com.labteto.dshmobile.uicontract.SessionUiCommand.Open(sessionId)) == com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued
-    fun clearCredential() = runtime.model.clearCredential()
+    fun clearCredential() = settingsUiPort.clearCredential()
 }
 
 /**
