@@ -313,12 +313,12 @@ class ZhaoxiAcceptanceAndroidTest {
     @Test fun longTableAtTwoHundredPercentCanReachTailWithoutClipping() {
         ready()
         val table = buildString {
-            append("# 长内容验收\\n\\n| 序号 | 工作结果 | 状态说明 | 路径 |\\n")
-            append("| --- | --- | --- | --- |\\n")
+            append("# 长内容验收\n\n| 序号 | 工作结果 | 状态说明 | 路径 |\n")
+            append("| --- | --- | --- | --- |\n")
             (1..35).forEach { index ->
-                append("| $index | 第 ${index} 项任务 | 等待审批与执行结果均以真实状态为准 | work/artifacts/long-file-$index.md |\\n")
+                append("| $index | 第 ${index} 项任务 | 等待审批与执行结果均以真实状态为准 | work/artifacts/long-file-$index.md |\n")
             }
-            append("\\n最后一条记录，滚动需要能够到达这里。")
+            append("\n最后一条记录，滚动需要能够到达这里。")
         }
         compose.activityRule.scenario.onActivity { activity ->
             activity.setContent {
