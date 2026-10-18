@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.uipack.zhaoxi
 
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDrawerEntry
+import com.labteto.dshmobile.uipack.zhaoxi.components.zxFilterDrawerEntries
 import com.labteto.dshmobile.uicontract.ToolsUiReceipt
 import com.labteto.dshmobile.uicontract.SettingsUiReceipt
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxModelSubmitFeedback
@@ -26,6 +28,25 @@ import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 class ZhaoxiInteractionAuditTest {
+    @Test fun drawerSearchFiltersRealEntriesAndKeepsDestinationIds() {
+        val rows = listOf(
+            "聊天" to listOf(
+                ZxDrawerEntry("chat.1", "朝夕日常", "最新"),
+                ZxDrawerEntry("chat.2", "工作协作"),
+            ),
+            "工具" to listOf(ZxDrawerEntry("tools.mcp", "MCP 服务器", "已连接")),
+            "空组" to emptyList(),
+        )
+        assertEquals(2, zxFilterDrawerEntries("", rows).size)
+        assertEquals(listOf("chat.1"), zxFilterDrawerEntries(" 朝夕 ", rows)[0].second.map { it.id })
+        assertEquals(listOf("tools.mcp"), zxFilterDrawerEntries("连接", rows)[0].second.map { it.id })
+        assertEquals(listOf("tools.mcp"), zxFilterDrawerEntries("工具", rows)[0].second.map { it.id })
+        assertEquals(emptyList<Pair<String, List<ZxDrawerEntry>>>(),
+            zxFilterDrawerEntries("不存在的会话", rows))
+        assertEquals(listOf("chat.1"),
+            zxFilterDrawerEntries("最新", rows).flatMap { it.second }.map { it.id })
+    }
+
     @Test fun modelPickerWaitsForActualOwnerSelectionInsteadOfTreatingSubmissionAsSuccess() {
         for (receipt in listOf(SettingsUiReceipt.Submitted, SettingsUiReceipt.Applied)) {
             val result = zxModelSubmitFeedback(receipt)
