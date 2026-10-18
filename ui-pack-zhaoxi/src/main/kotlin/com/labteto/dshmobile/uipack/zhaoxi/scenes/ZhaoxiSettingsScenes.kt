@@ -176,12 +176,8 @@ fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneR
             ))) "已保存" else "未能保存通知设置"
         }
     }
-    fun minutes(text: String): Int? {
-        val match = Regex("^(\\d{1,2}):(\\d{2})$").matchEntire(text.trim()) ?: return null
-        val h = match.groupValues[1].toInt()
-        val m = match.groupValues[2].toInt()
-        return if (h in 0..23 && m in 0..59) h * 60 + m else null
-    }
+    var triedQuietSave by remember { mutableStateOf(false) }
+    val quietError = if (triedQuietSave) zxQuietHoursError(startTime, endTime) else null
     ZxPage("通知", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("提醒类型")
@@ -195,15 +191,20 @@ fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneR
         if (snap.quietEnabled) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
-                    startTime, { startTime = it }, Modifier.weight(1f), placeholder = "开始 HH:mm")
+                    startTime, { startTime = it }, Modifier.weight(1f), placeholder = "开始 HH:mm",
+                    error = quietError != null, errorMessage = quietError)
                 com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
-                    endTime, { endTime = it }, Modifier.weight(1f), placeholder = "结束 HH:mm")
+                    endTime, { endTime = it }, Modifier.weight(1f), placeholder = "结束 HH:mm",
+                    error = quietError != null, errorMessage = quietError)
             }
+            quietError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
             ZxButton("保存免打扰时间", {
-                val start = minutes(startTime)
-                val end = minutes(endTime)
-                if (start == null || end == null) status = "请输入正确时间（00:00–23:59）"
-                else update(start = start, end = end)
+                triedQuietSave = true
+                val problem = zxQuietHoursError(startTime, endTime)
+                if (problem != null) status = problem
+                else update(
+                    start = requireNotNull(zxTimeOfDayMinutes(startTime)),
+                    end = requireNotNull(zxTimeOfDayMinutes(endTime)))
             })
         }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
