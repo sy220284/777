@@ -5,9 +5,9 @@
 
 ## 1. 全程同一阅读流
 
-- 模型开始：在当前回复末尾显示状态提示与临时预览，保留原输入和此前已完成消息。
+- 模型开始：在用户轮次后创建稳定 `reply:<sourceUserId>:0` 容器，原位显示状态和过滤后的临时预览；正式回复更新该容器，保留此前已完成消息。
 - 连续输出：文字增量使用 `ZxRichReply`，对旧纯文本、标题、列表、引用、代码、表格统一解析；不向用户显示模型原始工具指令。
-- 执行工具：依据持久事实在原消息旁原位更新 `work-live:<sourceMessageId>` 成果卡；工具调用的结果未知、失败、待审批不得画成成功。
+- 执行工具：依据持久事实在同一轮回复下展示 `work-live:<sourceMessageId>` 对应的轻量「执行状态」，默认折叠详细工具记录；结果未知、失败、待审批不得画成成功。不得再显示第二套独立任务卡。
 - 阶段成果：实物证据、表格、图表、文本原位呈现；工具回执默认折叠，但可展开阅读。
 - 最终结果：正式 assistant 消息进入持久 transcript 后，临时预览停止展示；不制造第二份完成内容，也不丢失已提交的成果卡。
 - 已有聊天历史：原先纯文本回复继续采用同一富文本视图，加载历史分页后关联旧成果卡。
@@ -27,14 +27,14 @@
 - `Session EventLog` 仍是工具执行及提交内容唯一事实源；`UiDocumentSessionStore` 承担成果版本更新及历史读取，不建立第二事实库。
 - 文档动作必须经原 Feature Owner 受理；历史冷分页默认只读，不复活过期审批或权限。
 - 新界面从中立 `ui-contract` 接入，Android UI Pack 不依赖 App 私有 Runtime。
-- 当前流预览限制为最近 4096 字符，应向用户标注为「最新内容预览」；超长任务的完整历史以已持久提交的结果为准。
+- 当前流预览上限为最近 65536 字符，每 100ms 至多尝试一次普通预览更新；超长生成仍可能裁掉更早的临时文本，完整内容依赖持久提交的阶段/最终消息。后续应单独验收超长回答的前缀连续性。
 
 ## 4. 现有实现映射
 
 | UI 能力 | 文件 |
 |---|---|
 | 流式预览与实体状态 | `LocalConversationUiPortComposition.kt`, `ConversationUiPort.kt` |
-| 聊天时间线 / 阅读位置 / 实时尾随 | `ZhaoxiConversationScenes.kt` |
+| 单一回复容器 / 阅读位置 / 实时尾随 | `ZhaoxiReplyTimeline.kt`, `ZhaoxiConversationScenes.kt`, `ZhaoxiSlotScenes.kt` |
 | 统一富文本排版 | `ZxRichReply.kt` |
 | 工具进度卡与版本去重 | `LocalWorkUiDocumentPublisher.kt` |
 | 卡片及图表内容 | `ZhaoxiUiDocumentScenes.kt` |
