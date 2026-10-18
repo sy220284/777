@@ -44,15 +44,30 @@ class ZhaoxiHomeSmokeAndroidTest {
             compose.onAllNodesWithTag("zhaoxi.composer.input", useUnmergedTree = true)
                 .fetchSemanticsNodes().isNotEmpty()
         }
+        val createdSessionId = owner.sessions.snapshot().identity?.sessionId
+            ?: throw AssertionError("New conversation has no active session identity")
         compose.onNodeWithTag("zhaoxi.composer.input", useUnmergedTree = true)
             .performTextInput("待发送的草稿")
         compose.activityRule.scenario.recreate()
         compose.onNodeWithTag("zhaoxi.composer.input", useUnmergedTree = true)
             .assertTextEquals("待发送的草稿")
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
-        compose.onNodeWithText("聊天").performClick()
+        // Reopen the exact same session through the home recent-session entry.
+        // Clicking the generic “聊天” tab only selects a mode; it does not open a session.
+        val reopenTag = "zhaoxi.home.reopen_session.$createdSessionId"
+        compose.waitUntil(30_000) {
+            compose.onAllNodesWithTag(reopenTag).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag(reopenTag).performClick()
+        compose.waitUntil(30_000) {
+            compose.onAllNodesWithTag("zhaoxi.composer.input", useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithTag("zhaoxi.composer.input", useUnmergedTree = true)
             .assertTextEquals("待发送的草稿")
+        compose.runOnIdle {
+            org.junit.Assert.assertEquals(createdSessionId, owner.sessions.snapshot().identity?.sessionId)
+        }
     }
     @Test fun allE817IconsLoadAsNativeVectors() {
         val names = com.labteto.dshmobile.uipack.zhaoxi.components.ZhaoxiIconResources.all
