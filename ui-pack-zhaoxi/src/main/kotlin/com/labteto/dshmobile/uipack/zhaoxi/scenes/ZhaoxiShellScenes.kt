@@ -297,9 +297,10 @@ private fun ZxHomeDrawerEntry(
     ) {
         ZxIcon(icon)
         Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 13.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                color = c.ink, maxLines = 1)
-            if (detail.isNotBlank()) Text(detail, fontSize = 11.sp, color = c.ink2, maxLines = 1)
+            Text(title, fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = c.ink, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            if (detail.isNotBlank()) Text(detail, fontSize = 12.sp, color = c.ink2, maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }
         if (selected) ZxIcon("check")
     }
