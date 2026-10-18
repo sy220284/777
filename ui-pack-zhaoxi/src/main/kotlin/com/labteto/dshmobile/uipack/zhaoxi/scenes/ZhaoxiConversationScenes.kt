@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.compose.foundation.text.selection.SelectionContainer
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
@@ -220,8 +222,9 @@ fun ZhaoxiReplyStatusScene(phase: UiExecutionPhase, queuedInputCount: Int) {
 fun ZhaoxiReaderScene(title: String, text: String, scope: UiSceneRenderScope) {
     ZxPage(title, onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxRichReply(text)
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxFooterNote("长按可选中复制")
+        SelectionContainer {
+            com.labteto.dshmobile.uipack.zhaoxi.components.ZxRichReply(text)
+        }
     }
 }
 
