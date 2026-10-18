@@ -2,6 +2,7 @@ package com.labteto.dshmobile.uipack.zhaoxi.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
@@ -34,12 +35,14 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.SolidColor
@@ -172,8 +175,11 @@ fun ZxField(
     modifier: Modifier = Modifier,
     placeholder: String = "",
     error: Boolean = false,
+    errorMessage: String? = null,
     textStyle: TextStyle = TextStyle(fontSize = 14.sp),
     visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    inputTestTag: String? = null,
 ) {
     val c = ZhaoxiTheme.colors
     val source = remember { MutableInteractionSource() }
@@ -193,10 +199,14 @@ fun ZxField(
             onValueChange = onValueChange,
             textStyle = textStyle.copy(color = c.ink),
             visualTransformation = visualTransformation,
+            keyboardOptions = keyboardOptions,
             interactionSource = source,
             cursorBrush = SolidColor(c.accentInk),
-            modifier = Modifier.fillMaxWidth().semantics {
+            modifier = Modifier.fillMaxWidth()
+                .then(if (inputTestTag != null) Modifier.testTag(inputTestTag) else Modifier)
+                .semantics {
                 if (placeholder.isNotEmpty()) contentDescription = placeholder
+                if (error) this.error(errorMessage ?: "输入值不正确")
             },
         ) { inner ->
             Box {

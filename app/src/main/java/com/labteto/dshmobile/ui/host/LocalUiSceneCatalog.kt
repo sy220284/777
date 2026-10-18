@@ -76,6 +76,7 @@ internal object LocalUiSceneCatalog {
         UiSceneRequirement(UiSceneId("settings.memory_settings"), UiSceneKind.PAGE, "SETTINGS", hostProvided = false),
         UiSceneRequirement(UiSceneId("settings.memory_management"), UiSceneKind.PAGE, "SETTINGS", hostProvided = false),
         UiSceneRequirement(UiSceneId("settings.permissions"), UiSceneKind.PAGE, "SETTINGS", hostProvided = false),
+        UiSceneRequirement(UiSceneId("settings.approval_mode"), UiSceneKind.PAGE, "SETTINGS", hostProvided = false),
         UiSceneRequirement(UiSceneId("settings.notifications"), UiSceneKind.PAGE, "SETTINGS", hostProvided = false),
         UiSceneRequirement(UiSceneId("settings.advanced"), UiSceneKind.PAGE, "SETTINGS", hostProvided = false),
         UiSceneRequirement(UiSceneId("settings.session_storage"), UiSceneKind.PAGE, "SETTINGS", hostProvided = false),

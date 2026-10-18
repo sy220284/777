@@ -29,25 +29,6 @@ class ZhaoxiE818TokensTest {
         assertEquals(Color(0xFFA896A7), accentFor(ZhaoxiHue.MAUVE, dark = true).accentInk)
         assertEquals(Color(0xFFB29C86), accentFor(ZhaoxiHue.DUSK, dark = true).accentInk)
     }
-    /** 点缀填色不变，只检查面向小字的 accentInk，并覆盖次级底色。 */
-    @Test
-    fun allFiveLightAccentTextColorsMeetAAOnNeutralSurfaces() {
-        fun ratio(foreground: Color, background: Color): Float {
-            val a = foreground.luminance()
-            val b = background.luminance()
-            return (maxOf(a, b) + .05f) / (minOf(a, b) + .05f)
-        }
-        for (hue in ZhaoxiHue.entries) {
-            val ink = accentFor(hue, dark = false).accentInk
-            for (surface in listOf(Color.White, Color(0xFFF7F7F7))) {
-                assertTrue(
-                    "${hue.key} accentInk on $surface must be readable as normal text",
-                    ratio(ink, surface) >= 4.5f,
-                )
-            }
-        }
-    }
-
     @Test
     fun wallpaperVeilAdaptsToRealImageBrightness() {
         assertEquals(.36f, wallpaperVeilAlpha(.1f, lightMode = true, adaptive = false), .0001f)
@@ -74,4 +55,26 @@ class ZhaoxiE818TokensTest {
         assertEquals("w7.webp", resolveZhaoxiWallpaper(true, "w7.webp", ZhaoxiHue.STONE, false))
         assertEquals(null, resolveZhaoxiWallpaper(false, "w7.webp", ZhaoxiHue.STONE, false))
     }
+
+    /** Original accents remain unchanged; readable ink must pass AA on both surfaces. */
+    @Test
+    fun lightAccentInkPassesAAOnWhiteAndSubtleCards() {
+        val expected = mapOf(
+            ZhaoxiHue.STONE to Color(0xFF706963),
+            ZhaoxiHue.SAGE to Color(0xFF526D5A),
+            ZhaoxiHue.STEEL to Color(0xFF4F687D),
+            ZhaoxiHue.MAUVE to Color(0xFF715B70),
+            ZhaoxiHue.DUSK to Color(0xFF786048),
+        )
+        expected.forEach { (hue, ink) ->
+            assertEquals(hue.key, ink, accentFor(hue, dark = false).accentInk)
+            listOf(Color.White, Color(0xFFF7F7F7)).forEach { surface ->
+                val a = ink.luminance()
+                val b = surface.luminance()
+                val ratio = (maxOf(a, b) + .05f) / (minOf(a, b) + .05f)
+                assertTrue("Accent text ${hue.key} on $surface: $ratio", ratio >= 4.5f)
+            }
+        }
+    }
+
 }

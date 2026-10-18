@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.compose.foundation.text.selection.SelectionContainer
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
@@ -220,29 +222,63 @@ fun ZhaoxiReplyStatusScene(phase: UiExecutionPhase, queuedInputCount: Int) {
 fun ZhaoxiReaderScene(title: String, text: String, scope: UiSceneRenderScope) {
     ZxPage(title, onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxRichReply(text)
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxFooterNote("长按可选中复制")
+        SelectionContainer {
+            com.labteto.dshmobile.uipack.zhaoxi.components.ZxRichReply(text)
+        }
     }
 }
 
-/** conversation.model_picker — 模型选择层。 */
+/** conversation.model_picker — 使用 Owner 的真实选择状态，不以“已提交”冒充“已切换”。 */
 @Composable
 fun ZhaoxiModelPickerScene(
     models: List<Triple<String, String, Boolean>>,
-    onSelect: (String) -> Unit,
+    onSelect: (String) -> SettingsUiReceipt,
     onOpenModelSettings: () -> Unit,
     scope: UiSceneRenderScope,
 ) {
+    var pendingModelId by remember { mutableStateOf<String?>(null) }
+    var feedback by remember { mutableStateOf<String?>(null) }
+    var failed by remember { mutableStateOf(false) }
+
+    // SettingsUiReceipt.Submitted only means the request was queued by the Model Owner.
+    // Leave this screen only when the reactive model snapshot confirms the new selection.
+    LaunchedEffect(models, pendingModelId) {
+        if (pendingModelId != null && models.any { it.first == pendingModelId && it.third }) {
+            pendingModelId = null
+            scope.onBack()
+        }
+    }
     ZxPage("选择模型", onBack = { scope.onBack() }) {
-        if (models.isEmpty())
+        if (models.isEmpty()) {
             com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty(
-                "模型清单未注入", "到「设置 · 模型」配置供应商与密钥")
-        models.forEach { (id, sub, current) ->
-            ZxRow(id, sub, mono = true, onClick = { onSelect(id) }) {
-                if (current) Text("✓", color = ZhaoxiTheme.colors.accent)
+                "还没有配置可用模型", "先在模型设置添加或启用模型",
+                actionLabel = "前往模型设置", onAction = onOpenModelSettings)
+        }
+        feedback?.let { ZxBanner(it, if (failed) ZxTone.Err else ZxTone.Warn) }
+        models.forEach { (id, displayName, current) ->
+            ZxRow(
+                displayName.ifBlank { "未命名模型" },
+                when {
+                    current -> "当前使用"
+                    pendingModelId == id -> "等待模型状态更新"
+                    else -> "点击以切换"
+                },
+                onClick = {
+                    if (current) {
+                        scope.onBack()
+                    } else if (pendingModelId == null) {
+                        val result = zxModelSubmitFeedback(onSelect(id))
+                        pendingModelId = if (result.waitForSelection) id else null
+                        failed = result.error
+                        feedback = result.message
+                    }
+                },
+            ) {
+                if (current) Text("✓", color = ZhaoxiTheme.colors.accentInk)
+                else if (pendingModelId == id) Text("处理中", color = ZhaoxiTheme.colors.ink2)
             }
         }
-        ZxNavRow("模型设置与 API Key…", onClick = onOpenModelSettings)
+        ZxNavRow("模型设置与 API Key", onClick = onOpenModelSettings)
     }
 }
 

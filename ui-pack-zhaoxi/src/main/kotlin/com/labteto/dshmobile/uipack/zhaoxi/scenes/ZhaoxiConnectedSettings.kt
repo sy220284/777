@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -16,6 +18,13 @@ import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 import com.labteto.dshmobile.uihost.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
+
+/** Whole-app Model Performance Owner accepts only 1.0–2.0, no silent UI clamping. */
+internal fun ModelPerformanceUiReceipt.zxPerformanceMessage(): String = when (this) {
+    ModelPerformanceUiReceipt.Applied -> "设置已保存"
+    ModelPerformanceUiReceipt.InvalidValue -> "数值超出支持范围"
+    is ModelPerformanceUiReceipt.Failed -> message ?: "保存失败"
+}
 
 /** Render typed Settings receipts without exposing Kotlin data-class names. */
 internal fun SettingsUiReceipt.zxUserMessage(action: String = "操作"): String = when (this) {
@@ -227,6 +236,10 @@ fun ZhaoxiRuntimeSettingsScene(
     var attempts by rememberSaveable(snap.modelAttempts) { mutableStateOf(snap.modelAttempts.toString()) }
     var rules by rememberUiPrivateText("zhaoxi.rules", snap.userRules) { snap.userRules }
     var status by remember { mutableStateOf<String?>(null) }
+    var showValidation by remember { mutableStateOf(false) }
+    val mainError = if (showValidation) zxRuntimeLimitError(ZxRuntimeLimitField.MAIN_STEPS, main) else null
+    val subError = if (showValidation) zxRuntimeLimitError(ZxRuntimeLimitField.SUBAGENT_STEPS, sub) else null
+    val attemptError = if (showValidation) zxRuntimeLimitError(ZxRuntimeLimitField.MODEL_ATTEMPTS, attempts) else null
     ZxPage(if (sessionOnly) "个人规则" else "高级设置", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         if (sessionOnly) {
@@ -239,16 +252,28 @@ fun ZhaoxiRuntimeSettingsScene(
             }, Modifier.fillMaxWidth())
         } else {
             ZxSection("执行限制")
-            ZxField(main, { main = it }, Modifier.fillMaxWidth(), placeholder = "主任务步数")
-            ZxField(sub, { sub = it }, Modifier.fillMaxWidth(), placeholder = "子任务步数")
-            ZxField(attempts, { attempts = it }, Modifier.fillMaxWidth(), placeholder = "模型尝试次数")
+            ZxField(main, { main = it }, Modifier.fillMaxWidth(), placeholder = "主任务步数",
+                error = mainError != null, errorMessage = mainError,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            mainError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
+            ZxField(sub, { sub = it }, Modifier.fillMaxWidth(), placeholder = "子任务步数",
+                error = subError != null, errorMessage = subError,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            subError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
+            ZxField(attempts, { attempts = it }, Modifier.fillMaxWidth(), placeholder = "模型尝试次数",
+                error = attemptError != null, errorMessage = attemptError,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            attemptError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
             ZxButton("保存运行设置", {
-                val m = main.toIntOrNull()
-                val n = sub.toIntOrNull()
-                val a = attempts.toIntOrNull()
-                status = if (m == null || n == null || a == null) "请输入有效整数"
-                else settings.submit(SettingsUiCommand.RuntimeLimits(
-                    m, n, a, snap.modelSelection.workerProfileId)).zxUserMessage("保存运行设置")
+                showValidation = true
+                val fault = zxRuntimeLimitError(ZxRuntimeLimitField.MAIN_STEPS, main)
+                    ?: zxRuntimeLimitError(ZxRuntimeLimitField.SUBAGENT_STEPS, sub)
+                    ?: zxRuntimeLimitError(ZxRuntimeLimitField.MODEL_ATTEMPTS, attempts)
+                status = fault ?: settings.submit(SettingsUiCommand.RuntimeLimits(
+                    requireNotNull(main.toIntOrNull()),
+                    requireNotNull(sub.toIntOrNull()),
+                    requireNotNull(attempts.toIntOrNull()),
+                    snap.modelSelection.workerProfileId)).zxUserMessage("保存运行设置")
             }, Modifier.fillMaxWidth())
         }
         status?.let { ZxFooterNote(it) }
@@ -260,12 +285,27 @@ fun ZhaoxiPerformanceScene(port: ModelPerformanceUiPort, scope: UiSceneRenderSco
     val snap by port.snapshots.collectAsState(initial = port.snapshot())
     var temperature by rememberSaveable(snap.temperatureCeiling) { mutableStateOf(snap.temperatureCeiling.toString()) }
     var status by remember { mutableStateOf<String?>(null) }
+    var showTemperatureError by remember { mutableStateOf(false) }
+    val temperatureError = if (showTemperatureError) zxTemperatureCeilingError(temperature) else null
     ZxPage("模型性能", onBack = { scope.onBack() }) {
+        ZxSection("推理强度")
         UiModelReasoningCeiling.entries.forEach { ceiling ->
-            ZxChip(ceiling.name, ceiling == snap.reasoning) { status = port.submit(ModelPerformanceUiCommand.SetReasoning(ceiling)).toString() }
+            ZxChip(ceiling.name, ceiling == snap.reasoning) {
+                status = port.submit(ModelPerformanceUiCommand.SetReasoning(ceiling)).zxPerformanceMessage()
+            }
         }
-        ZxField(temperature, { temperature = it }, placeholder = "温度上限")
-        ZxButton("保存温度", { status = temperature.toDoubleOrNull()?.let { port.submit(ModelPerformanceUiCommand.SetTemperature(it)).toString() } ?: "请输入数值" })
+        ZxSection("温度上限")
+        ZxField(temperature, { temperature = it }, Modifier.fillMaxWidth(),
+            placeholder = "1.0–2.0", error = temperatureError != null,
+            errorMessage = temperatureError,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+        temperatureError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
+        ZxButton("保存温度", {
+            showTemperatureError = true
+            status = zxTemperatureCeilingError(temperature)
+                ?: port.submit(ModelPerformanceUiCommand.SetTemperature(
+                    requireNotNull(temperature.toDoubleOrNull()))).zxPerformanceMessage()
+        })
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
     }
 }
@@ -283,7 +323,12 @@ fun ZhaoxiPricingScene(port: PricingUiPort, scope: UiSceneRenderScope) {
             ZxValueRow("低峰", value = "缓存 ${model.offPeak.cacheHitCnyPerMillion} / 输入 ${model.offPeak.cacheMissCnyPerMillion} / 输出 ${model.offPeak.outputCnyPerMillion}")
         }
         (result ?: snap.error)?.let { ZxBanner(it, ZxTone.Info) }
-        ZxButton("刷新官方价格", { jobs.launch { result = port.refreshOfficial().toString() } }, enabled = !snap.refreshing)
+        ZxButton("刷新官方价格", { jobs.launch {
+            result = when (val receipt = port.refreshOfficial()) {
+                PricingUiReceipt.Completed -> "价格已更新"
+                is PricingUiReceipt.Failed -> receipt.message ?: "刷新失败"
+            }
+        } }, enabled = !snap.refreshing)
     }
 }
 

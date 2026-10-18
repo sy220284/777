@@ -33,7 +33,7 @@ enum class ZhaoxiHue(val key: String) { STONE("stone"), SAGE("sage"), STEEL("ste
 
 data class ZhaoxiAccent(val accent: Color, val tint: Color, val accentInk: Color = accent)
 
-/** E8.18 保留原点缀色；浅色 accentInk 单独加深，确保白色及次级表面上小字至少 4.5:1。 */
+/** light 取值与 tokens.css [data-hue] 一致；dark 严格以 E8.18 tokens.css 的强调色与安全文字色为准。 */
 fun accentFor(hue: ZhaoxiHue, dark: Boolean): ZhaoxiAccent = when (hue) {
     ZhaoxiHue.STONE -> if (dark) ZhaoxiAccent(Color(0xFF938D89), Color(0x1F938D89)) else ZhaoxiAccent(Color(0xFF78716C), Color(0x1F78716C), Color(0xFF706963))
     ZhaoxiHue.SAGE  -> if (dark) ZhaoxiAccent(Color(0xFF7C9483), Color(0x247C9483)) else ZhaoxiAccent(Color(0xFF7C9483), Color(0x247C9483), Color(0xFF526D5A))
@@ -216,11 +216,11 @@ enum class ZhaoxiMaterial { M0, M1, M2, M3 }
 
 /**
  * M0 纯色分层 / M1 云母（静态渐变，零模糊） / M2 轻玻璃 blur20 / M3 强玻璃 blur24+噪点。
- * 降级链：低内存/省电 → blur 半径减半；RenderEffect 不可用 → M2/M3 退化为 97% 不透明纯色。
+ * 未收到 Host 可信背景采样能力时默认 NONE；M2/M3 退化为 97% 不透明材质，确保文字可读。
  * 判定由 Host 注入 LocalZhaoxiBlurCapability，组件与 Pack 不自行探测。
  */
 enum class ZhaoxiBlurCapability { FULL, REDUCED, NONE }
-val LocalZhaoxiBlurCapability = staticCompositionLocalOf { ZhaoxiBlurCapability.FULL }
+val LocalZhaoxiBlurCapability = staticCompositionLocalOf { ZhaoxiBlurCapability.NONE }
 
 /**
  * 材质唯一入口（E8.16 实装）。

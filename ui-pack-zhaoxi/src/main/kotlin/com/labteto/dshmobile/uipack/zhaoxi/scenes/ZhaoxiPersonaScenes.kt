@@ -36,6 +36,7 @@ import com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt
 import com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt
 import com.labteto.dshmobile.uicontract.UiPersonaGalleryEntry
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadge
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadgeTone
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog
@@ -62,6 +63,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
  * 数据全部来自 S1 端口系投影；归档变更（删除/迁移）走显式 Owner 命令，结果以 receipt 呈现。
  */
 
+/** Import success and failure are separate: an IO failure may have partially committed. */
+internal fun UiPersonaImportReceipt.zxImportFeedback(): String = when (this) {
+    is UiPersonaImportReceipt.Imported -> "人物已导入"
+    is UiPersonaImportReceipt.Failed -> message?.takeIf(String::isNotBlank) ?: "导入状态不确定，请先刷新人物图集"
+}
+
 /** chat.gallery / route.persona_gallery / chat.persona_picker — 图集。 */
 @Composable
 fun ZhaoxiPersonaGalleryScene(
@@ -74,6 +81,7 @@ fun ZhaoxiPersonaGalleryScene(
 ) {
     var revision by remember { mutableStateOf(0) }
     var feedback by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
     var search by rememberSaveable { mutableStateOf("") }
     var showPresets by rememberSaveable { mutableStateOf(false) }
     val jobs = androidx.compose.runtime.rememberCoroutineScope()
@@ -81,9 +89,19 @@ fun ZhaoxiPersonaGalleryScene(
     val state by produceState<UiPersonaGalleryReadReceipt?>(null, revision) { value = gallery.read() }
     val importer = transfer?.let { owner ->
         com.labteto.dshmobile.uihost.rememberUiDocumentImporter(owner.maxImportBytes) { result ->
-            if (result is com.labteto.dshmobile.uihost.UiDocumentPickReceipt.Picked) jobs.launch {
-                feedback = owner.import(ImportPersonaDocumentCommand(result.document.bytes, result.document.name, result.document.mimeType)).toString()
-                revision++
+            if (result is com.labteto.dshmobile.uihost.UiDocumentPickReceipt.Picked && !busy) jobs.launch {
+                busy = true
+                try {
+                    val receipt = owner.import(ImportPersonaDocumentCommand(
+                        result.document.bytes, result.document.name, result.document.mimeType))
+                    feedback = receipt.zxImportFeedback()
+                    revision++ // A failed import may have committed; refresh before retry.
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    feedback = failure.message ?: "导入失败，请先刷新图集再重试"
+                    revision++
+                } finally { busy = false }
             }
         }
     }
@@ -97,16 +115,24 @@ fun ZhaoxiPersonaGalleryScene(
                 ZxChip("新建人物", false) { onOpenPersona("new") }
                 ZxChip("预设", showPresets) { showPresets = !showPresets }
             }
-            if (importer != null) ZxChip("导入", false) { importer() }
+            if (importer != null) ZxChip("导入", false) { if (!busy) importer() }
         }
         if (showPresets && authoring != null) {
             ZxSection("人物预设")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 authoring.presets().forEach { preset ->
-                    ZxChip(preset.name, false) { jobs.launch {
-                        feedback = authoring.installPreset(preset.id).toString()
-                        revision++
+                    ZxChip(preset.name, false) { if (!busy) jobs.launch {
+                        busy = true
+                        try {
+                            val receipt = authoring.installPreset(preset.id)
+                            feedback = receipt.zxAuthoringFeedback()
+                            if (receipt is UiPersonaAuthoringReceipt.Saved) revision++
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                            throw cancelled
+                        } catch (failure: Exception) {
+                            feedback = failure.message ?: "预设安装失败"
+                        } finally { busy = false }
                     } }
                 }
             }
@@ -185,7 +211,14 @@ fun ZhaoxiPersonaEditorScene(
     }
 }
 
-/** chat.gallery_delete — 删除人物（确认弹窗，Danger）。 */
+/** Convert archive errors to readable product copy, never Kotlin data-class output. */
+internal fun zxGalleryDeletionFailure(receipt: UiPersonaGalleryDeletionReceipt): String = when (receipt) {
+    UiPersonaGalleryDeletionReceipt.Missing -> "人物已经不存在"
+    is UiPersonaGalleryDeletionReceipt.Failed -> receipt.message?.takeIf(String::isNotBlank) ?: "删除失败"
+    is UiPersonaGalleryDeletionReceipt.Deleted -> "人物已删除"
+}
+
+/** chat.gallery_delete — 人物归档删除，危险操作有明确确认、取消与失败恢复。 */
 @Composable
 fun ZxGalleryDeleteScene(
     deletion: PersonaGalleryDeletionUiPort,
@@ -197,64 +230,128 @@ fun ZxGalleryDeleteScene(
 ) {
     val jobs = androidx.compose.runtime.rememberCoroutineScope()
     val entry by produceState<UiPersonaGalleryEntry?>(null, galleryId) {
-        value = (gallery?.read() as? UiPersonaGalleryReadReceipt.Available)?.entries?.firstOrNull { it.id == galleryId }
+        value = (gallery?.read() as? UiPersonaGalleryReadReceipt.Available)
+            ?.entries?.firstOrNull { it.id == galleryId }
     }
-    var result by remember { mutableStateOf<UiPersonaGalleryDeletionReceipt?>(null) }
-    var busy by remember { mutableStateOf(false) }
+    var result by remember(galleryId) { mutableStateOf<UiPersonaGalleryDeletionReceipt?>(null) }
+    var busy by remember(galleryId) { mutableStateOf(false) }
+    var confirmDelete by remember(galleryId) { mutableStateOf(true) }
     ZxPage("删除人物", onBack = { scope.onBack() }) {
         when (val receipt = result) {
             is UiPersonaGalleryDeletionReceipt.Deleted -> {
-                Text("人物归档已删除", color = ZhaoxiTheme.colors.ink)
-                receipt.portraitCleanupWarning?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-                if (receipt.sessionSync == UiStorySessionSync.DEFERRED) Text("当前会话将在业务状态允许时同步清理", color = ZhaoxiTheme.colors.ink2)
-                ZxChip("返回图集", false) { scope.onNavigate(UiSceneId("route.persona_gallery")) }
+                Text("人物已删除", color = ZhaoxiTheme.colors.ink)
+                receipt.portraitCleanupWarning?.let {
+                    com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
+                        it, com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Warn)
+                }
+                if (receipt.sessionSync == UiStorySessionSync.DEFERRED) {
+                    ZxFooterNote("当前会话稍后同步")
+                }
+                ZxChip("返回图集", false) {
+                    scope.onNavigate(UiSceneId("route.persona_gallery"))
+                }
+            }
+            UiPersonaGalleryDeletionReceipt.Missing -> {
+                ZxEmpty("人物已不存在", "可返回图集查看",
+                    actionLabel = "返回图集",
+                    onAction = { scope.onNavigate(UiSceneId("route.persona_gallery")) })
             }
             else -> {
-                if (busy) Text("正在删除…", color = ZhaoxiTheme.colors.ink2)
-                else ZxDialog("删除 ${entry?.name ?: personaName}？", "将删除该人物归档、故事与公开日记，无法恢复", "删除", {
-                    jobs.launch {
-                        busy = true
-                        try { result = deletion.delete(DeletePersonaGalleryCommand(identity, galleryId)) }
-                        finally { busy = false }
+                if (busy) {
+                    Text("正在删除…", color = ZhaoxiTheme.colors.ink2)
+                } else {
+                    if (receipt is UiPersonaGalleryDeletionReceipt.Failed) {
+                        com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
+                            zxGalleryDeletionFailure(receipt),
+                            com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err)
+                        ZxButton("重新尝试", { confirmDelete = true })
                     }
-                }, { scope.onBack() })
-                if (receipt != null) Text(receipt.toString(), color = ZhaoxiTheme.colors.ink2)
+                    if (!confirmDelete) ZxButton("返回", { scope.onBack() })
+                }
+                if (confirmDelete && !busy) ZxDialog(
+                    "删除 ${entry?.name ?: personaName}？",
+                    "将删除人物归档、故事及公开日记，无法恢复。",
+                    "确认删除",
+                    {
+                        confirmDelete = false
+                        if (!busy) jobs.launch {
+                            busy = true
+                            try {
+                                result = deletion.delete(DeletePersonaGalleryCommand(identity, galleryId))
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                throw cancelled
+                            } catch (failure: Exception) {
+                                result = UiPersonaGalleryDeletionReceipt.Failed(failure.message)
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    },
+                    { confirmDelete = false; scope.onBack() },
+                )
             }
         }
     }
 }
 
-/** chat.group_members — 群成员。 */
+/** Owner-aligned bounds; surface errors before sending an invalid group mutation. */
+internal fun zxGroupMemberCountError(count: Int, min: Int, max: Int): String? = when {
+    count < min -> "至少选择 ${min} 位成员"
+    count > max -> "最多选择 ${max} 位成员"
+    else -> null
+}
+
+internal fun zxAnnouncementLengthError(length: Int, limit: Int): String? =
+    if (length > limit) "公告不能超过 ${limit} 字" else null
+
+/** chat.group_members — show member bounds and real save receipt. */
 @Composable
 fun ZxGroupMembersScene(groups: ChatGroupUiPort, scope: UiSceneRenderScope) {
     val snap by groups.snapshots.collectAsState(initial = groups.snapshot())
     var selected by remember(snap.identity, snap.memberIds) { mutableStateOf(snap.memberIds) }
-    var receipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
+    var receipt by remember(snap.identity) { mutableStateOf<UiCommandReceipt?>(null) }
+    val selectionError = zxGroupMemberCountError(selected.size, snap.minimumMembers, snap.maximumMembers)
     ZxPage("群成员", onBack = { scope.onBack() }) {
         CommandFeedback(receipt)
+        if (snap.available.isEmpty()) ZxEmpty("没有可选人物", "先创建人物再设置群聊")
         snap.available.forEach { choice ->
-            ZxRow(choice.displayName, if (choice.galleryId in selected) "已选" else "未选",
-                onClick = { selected = if (choice.galleryId in selected) selected - choice.galleryId else selected + choice.galleryId })
+            val picked = choice.galleryId in selected
+            ZxRow(choice.displayName, if (picked) "已选" else "未选",
+                onClick = {
+                    selected = if (picked) selected - choice.galleryId
+                        else if (selected.size < snap.maximumMembers) selected + choice.galleryId else selected
+                }, trailing = {
+                    ZxBadge(if (picked) "已选" else "未选", ZxBadgeTone.Neutral)
+                })
         }
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton("保存成员", {
+        Text("${selected.size} / ${snap.maximumMembers} 位成员", color = ZhaoxiTheme.colors.ink2)
+        selectionError?.let { Text(it, color = ZhaoxiTheme.colors.err) }
+        ZxButton("保存成员", {
             snap.identity?.let { receipt = groups.submit(ChatGroupUiCommand.ConfigureMembers(it, selected.toList())) }
-        }, enabled = !snap.busy && snap.identity != null)
+        }, enabled = !snap.busy && snap.identity != null &&
+            selectionError == null && selected != snap.memberIds)
     }
 }
 
+/** chat.group_announcement — display validation and preserve the draft after rejection. */
 @Composable
 fun ZxGroupAnnouncementScene(groups: ChatGroupUiPort, scope: UiSceneRenderScope) {
     val snap by groups.snapshots.collectAsState(initial = groups.snapshot())
-    var text by com.labteto.dshmobile.uihost.rememberUiPrivateText("zhaoxi.announcement.${snap.identity?.sessionId}", snap.announcement) { snap.announcement }
-    var receipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
+    var text by com.labteto.dshmobile.uihost.rememberUiPrivateText(
+        "zhaoxi.announcement.${snap.identity?.sessionId}", snap.announcement) { snap.announcement }
+    var receipt by remember(snap.identity) { mutableStateOf<UiCommandReceipt?>(null) }
+    val error = zxAnnouncementLengthError(text.length, snap.maximumAnnouncementChars)
     ZxPage("群公告", onBack = { scope.onBack() }) {
         CommandFeedback(receipt)
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(text, { text = it },
-            Modifier.fillMaxWidth().height(120.dp), placeholder = "公告")
-        Text("${text.length} / ${snap.maximumAnnouncementChars} 字", color = ZhaoxiTheme.colors.ink3)
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton("保存公告", {
+        ZxField(text, { text = it }, Modifier.fillMaxWidth().height(120.dp),
+            placeholder = "公告", error = error != null, errorMessage = error)
+        Text("${text.length} / ${snap.maximumAnnouncementChars} 字",
+            color = if (error != null) ZhaoxiTheme.colors.err else ZhaoxiTheme.colors.ink3)
+        error?.let { Text(it, color = ZhaoxiTheme.colors.err) }
+        ZxButton("保存公告", {
             snap.identity?.let { receipt = groups.submit(ChatGroupUiCommand.SaveAnnouncement(it, text)) }
-        }, enabled = !snap.busy && snap.identity != null)
+        }, enabled = !snap.busy && snap.identity != null &&
+            error == null && text != snap.announcement)
     }
 }
 

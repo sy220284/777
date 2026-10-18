@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.window.Dialog
@@ -32,6 +33,8 @@ import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiDuration
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiMotion
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
+import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiMaterial
+import com.labteto.dshmobile.uipack.zhaoxi.theme.zxMaterial
 
 /**
  * Zx 反馈与状态组件（E8.14 实装）。规格：实施规格 §1.2。
@@ -63,8 +66,16 @@ fun ZxToastHost(toast: ZxToast?, onAction: () -> Unit = {}, modifier: Modifier =
             ) {
                 Text(t.message, color = c.onInk, fontSize = 13.sp)
                 t.action?.let { a ->
-                    Text(a, color = c.onInk, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.clickable(onClick = onAction))
+                    Box(
+                        Modifier.heightIn(min = 48.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(role = Role.Button, onClick = onAction)
+                            .padding(horizontal = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(a, color = c.onInk, fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
@@ -86,7 +97,7 @@ fun ZxDialog(
         Column(
             modifier.fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
-                .background(c.card)
+                .zxMaterial(ZhaoxiMaterial.M3)
                 .padding(20.dp),
         ) {
             Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
@@ -114,7 +125,7 @@ fun ZxSheet(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(topStart = ZhaoxiTheme.shapes.sheet, topEnd = ZhaoxiTheme.shapes.sheet))
-            .background(c.glass2)
+            .zxMaterial(ZhaoxiMaterial.M3)
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         Box(
@@ -198,8 +209,16 @@ fun ZxBanner(
         Box(Modifier.size(width = 3.dp, height = 28.dp).background(toneColor))
         Text(text, Modifier.weight(1f).padding(horizontal = 12.dp), fontSize = 12.5.sp, color = c.ink2)
         action?.let { (label, run) ->
-            Text(label, Modifier.padding(end = 12.dp).clickable(onClick = run),
-                fontSize = 12.sp, color = toneColor, fontWeight = FontWeight.SemiBold)
+            Box(
+                Modifier.heightIn(min = 48.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(role = Role.Button, onClick = run)
+                    .padding(horizontal = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(label, fontSize = 12.sp, color = toneColor,
+                    fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }

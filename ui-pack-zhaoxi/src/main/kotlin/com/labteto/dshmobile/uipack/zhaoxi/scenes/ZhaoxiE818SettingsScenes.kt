@@ -245,7 +245,16 @@ fun ZhaoxiMemorySettingsScene(settings: SettingsUiPort, scope: UiSceneRenderScop
     }
 }
 
-/** Inline in the existing registered settings.permissions scene; a new scene ID is not invented. */
+/** Agent approval policy is a standalone settings destination, separate from Android grants. */
+@Composable
+fun ZhaoxiApprovalModeScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
+    ZxPage("操作审批模式", onBack = { scope.onBack() }) {
+        Spacer(Modifier.height(8.dp))
+        ZhaoxiApprovalModeSelector(settings)
+    }
+}
+
+/** Shared Owner-backed policy selector: no fake permission flags. */
 @Composable
 fun ZhaoxiApprovalModeSelector(settings: SettingsUiPort) {
     val mode by settings.approvalMode.collectAsState()

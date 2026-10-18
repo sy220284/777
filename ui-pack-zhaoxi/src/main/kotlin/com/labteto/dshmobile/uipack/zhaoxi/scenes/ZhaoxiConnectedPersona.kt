@@ -20,6 +20,40 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
+/** Preserve actual archive/foreground state; never expose a Kotlin receipt dump. */
+internal fun UiPersonaAuthoringReceipt.zxAuthoringFeedback(): String = when (this) {
+    is UiPersonaAuthoringReceipt.Saved -> "人物档案已保存"
+    is UiPersonaAuthoringReceipt.Rejected -> "无法保存，请刷新人物档案后重试"
+    is UiPersonaAuthoringReceipt.Failed -> message ?: "人物保存失败"
+    is UiPersonaAuthoringReceipt.Loaded -> "人物档案已读取"
+    is UiPersonaAuthoringReceipt.Suggested -> "建议已生成"
+}
+
+internal fun UiPersonaPortraitReceipt.zxPortraitFeedback(): String = when (this) {
+    is UiPersonaPortraitReceipt.Updated ->
+        cleanupWarning?.let { "画像已更新，清理旧图片时出现问题：$it" } ?: "画像已更新"
+    UiPersonaPortraitReceipt.Missing -> "人物或画像已不存在"
+    is UiPersonaPortraitReceipt.Failed -> message ?: "画像操作失败"
+}
+
+internal fun UiPersonaStoryReceipt.zxStoryFeedback(): String = when (this) {
+    is UiPersonaStoryReceipt.Saved -> when (sessionSync) {
+        UiStorySessionSync.APPLIED -> "故事已保存并同步到当前会话"
+        UiStorySessionSync.NOT_BOUND -> "故事已保存"
+        UiStorySessionSync.DEFERRED -> "故事已保存，当前会话稍后同步"
+    }
+    UiPersonaStoryReceipt.Missing -> "故事已不存在，请刷新"
+    is UiPersonaStoryReceipt.Failed -> message ?: "保存失败"
+}
+
+internal fun UiCurrentPersonaReceipt.zxTuningFeedback(): String = when (this) {
+    UiCurrentPersonaReceipt.Saved -> "人物设置已应用"
+    UiCurrentPersonaReceipt.Rejected -> "人物状态已变化，请刷新后重试"
+    is UiCurrentPersonaReceipt.Failed -> message ?: "保存失败"
+    is UiCurrentPersonaReceipt.Loaded -> "已读取人物设置"
+    is UiCurrentPersonaReceipt.Suggested -> "建议已生成"
+}
+
 /** 设计包 E8.18：字段标签始终可见，存储键保持原契约不变。 */
 private fun personaFieldTitle(key: String): String = when (key) {
     "opening" -> "开场对白"
@@ -115,7 +149,7 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
             val result = if (id != null && rev != null) authoring.save(id, rev, draft) else authoring.create(draft)
             when (result) {
                 is UiPersonaAuthoringReceipt.Saved -> { galleryId = result.galleryId; revision = result.revision; status = "归档已保存；应用到会话请从人物档案选择"; scope.onBack() }
-                else -> status = result.toString()
+                else -> status = result.zxAuthoringFeedback()
             }
         } }, enabled = draft.name.isNotBlank())
     }
@@ -129,7 +163,7 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
     val entry = (receipt as? UiPersonaGalleryReadReceipt.Available)?.entries?.firstOrNull { it.id == galleryId }
     val jobs = rememberCoroutineScope()
     var status by remember { mutableStateOf<String?>(null) }
-    val save = rememberUiDocumentSaver("application/octet-stream") { status = it.toString() }
+    val save = rememberUiDocumentSaver("application/octet-stream") { status = if (it == UiDocumentWriteReceipt.Saved) "导出完成" else "导出失败" }
     ZxPage(entry?.name ?: "人物档案", onBack = { scope.onBack() }) {
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
         if (receipt is UiPersonaGalleryReadReceipt.Failed) Text((receipt as UiPersonaGalleryReadReceipt.Failed).message ?: "读取失败")
@@ -146,7 +180,7 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
                 ZxButton("继续故事", { snap.identity?.let { status = owner.submit(PersonaSelectionUiCommand.StartStory(it, galleryId, story.id, false)).userHint() } }, enabled = snap.canStartStory)
                 ZxField(notes, { notes = it }, placeholder = "故事备注")
                 if (stories != null) ZxButton("保存备注", { jobs.launch {
-                    status = stories.submit(PersonaStoryUiCommand.SaveDetails(snap.identity, galleryId, story.id, notes, story.storyStage)).toString(); revision++
+                    status = stories.submit(PersonaStoryUiCommand.SaveDetails(snap.identity, galleryId, story.id, notes, story.storyStage)).zxStoryFeedback(); revision++
                 } })
             }
         }
@@ -170,7 +204,7 @@ fun ZhaoxiPortraitEditor(port: PersonaPortraitUiPort, galleryId: String, scope: 
     var confirmRemove by remember { mutableStateOf(false) }
     val preview by produceState<UiPersonaPortraitPreviewReceipt?>(null, galleryId, revision) { value = port.preview(galleryId) }
     val pick = rememberUiAttachmentPickerFor<String>(arrayOf("image/*"), { status = it }) { target, uri ->
-        if (uri != null) jobs.launch { status = port.submit(PersonaPortraitUiCommand.Import(target, uri)).toString(); revision++ }
+        if (uri != null) jobs.launch { status = port.submit(PersonaPortraitUiCommand.Import(target, uri)).zxPortraitFeedback(); revision++ }
     }
     ZxPage("人物画像", onBack = { scope.onBack() }) {
         val bytes = (preview as? UiPersonaPortraitPreviewReceipt.Ready)?.bytes
@@ -196,7 +230,7 @@ fun ZhaoxiPortraitEditor(port: PersonaPortraitUiPort, galleryId: String, scope: 
             {
                 confirmRemove = false
                 jobs.launch {
-                    status = port.submit(PersonaPortraitUiCommand.Remove(galleryId)).toString()
+                    status = port.submit(PersonaPortraitUiCommand.Remove(galleryId)).zxPortraitFeedback()
                     revision++
                 }
             },
@@ -219,10 +253,10 @@ fun ZhaoxiCurrentPersonaTuning(port: CurrentPersonaUiPort, scope: UiSceneRenderS
             ZxButton("应用到当前人物", { jobs.launch {
                 val position = value.toIntOrNull()
                 status = if (position == null || position !in 0..100) "请输入 0–100 的整数"
-                else port.save(snapshot.target, snapshot.draft.copy(samplingTemperaturePosition = position)).toString()
+                else port.save(snapshot.target, snapshot.draft.copy(samplingTemperaturePosition = position)).zxTuningFeedback()
             } })
             ZxButton("恢复全局采样", { jobs.launch {
-                status = port.save(snapshot.target, snapshot.draft.copy(samplingTemperaturePosition = null, legacySamplingPosition = null)).toString()
+                status = port.save(snapshot.target, snapshot.draft.copy(samplingTemperaturePosition = null, legacySamplingPosition = null)).zxTuningFeedback()
             } })
         }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
