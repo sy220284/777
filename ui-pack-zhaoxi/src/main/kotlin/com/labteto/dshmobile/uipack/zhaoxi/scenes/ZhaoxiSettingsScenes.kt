@@ -141,7 +141,7 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
         ZxSwitchRow("界面动效", "关闭后停用场景与组件过渡动画",
             checked = snap.motionScale > 0f,
             onChange = { writeAppearance(motionScale = if (it) 1f else 0f) })
-        ZxFooterNote("五套主题可切换明暗 · 环境光与透明度保存到本地偏好")
+        
     }
 }
 
@@ -205,7 +205,7 @@ fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneR
             })
         }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        ZxNavRow("系统通知权限", sub = "查看系统授权") { preferences.openSystemNotifications() }
+        ZxNavRow("系统通知权限") { preferences.openSystemNotifications() }
     }
 }
 
@@ -223,7 +223,7 @@ fun ZhaoxiPermissionsScene(preferences: HostPreferencesUiPort, scope: UiSceneRen
             false -> "未授权"
             null -> "系统未提供状态"
         })
-        ZxNavRow("管理通知权限", sub = "前往 Android 系统设置") { preferences.openSystemNotifications() }
+        ZxNavRow("管理通知权限") { preferences.openSystemNotifications() }
         ZxSection("媒体权限")
         if (media != null) {
             ZxValueRow("图片", value = if (media.images) "已授权" else "未授权")
@@ -231,85 +231,28 @@ fun ZhaoxiPermissionsScene(preferences: HostPreferencesUiPort, scope: UiSceneRen
             ZxValueRow("音频", value = if (media.audio) "已授权" else "未授权")
             if (media.selectedVisualOnly) ZxFooterNote("目前仅授予所选图片/视频的访问范围")
         } else ZxFooterNote("设备权限状态由 Android 系统提供")
-        ZxNavRow("管理设备权限", sub = "前往 Android 系统设置") { preferences.openSystemPermissions() }
-        ZxFooterNote("这里只显示实际授权状态，不直接绕过 Android 权限对话框")
+        ZxNavRow("管理设备权限") { preferences.openSystemPermissions() }
+        
     }
 }
 
-/** settings.usage — 用量（UsageUiPort 只读）。 */
-@Composable
-fun ZhaoxiUsageScene(usage: com.labteto.dshmobile.uicontract.UsageUiPort, scope: UiSceneRenderScope) {
-    val revision by usage.revision.collectAsState()
-    val snapshot = remember(revision) { usage.snapshot() }
-    var model by remember { mutableStateOf<String?>(null) }
-    var selectedGroup by remember { mutableStateOf<String?>(null) }
-    val current = model?.let { snapshot.byModel[it] } ?: snapshot
-    ZxPage("模型用量", onBack = { scope.onBack() }) {
-        ZxChip("全部模型", model == null) { model = null }
-        snapshot.byModel.keys.forEach { id -> ZxChip(id, model == id) { model = id } }
-        ZxValueRow("Token 总量", value = "${current.tracked.totalTokens}", sub = "${current.tracked.requestCount} 次请求")
-        ZxValueRow("输入 / 输出", value = "${current.tracked.inputTokens} / ${current.tracked.outputTokens}")
-        ZxValueRow("估算费用（元）", value = "${current.tracked.estimatedCostCny}")
-        current.sessions.forEach { session -> ZxRow(session.title, "${session.aggregate.totalTokens} Token", onClick = { selectedGroup = session.key }) }
-        selectedGroup?.let { id ->
-            usage.groupDetail(com.labteto.dshmobile.local.TokenUsageGroupKind.SESSION, id, model)?.let { detail ->
-                ZxSection(detail.title)
-                detail.records.forEach { record -> Text(record.toString(), color = ZhaoxiTheme.colors.ink2) }
-            }
-        }
-    }
-}
-
-/** settings.memory / route.diary — 记忆与日记（只读为主）。 */
-@Composable
-fun ZhaoxiMemoryScene(
-    memory: com.labteto.dshmobile.uicontract.MemoryUiPort?,
-    scope: UiSceneRenderScope,
-) {
-    ZxPage("记忆", onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(8.dp))
-        if (memory == null) {
-            com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("记忆未启用", "在模型配置后可用")
-        } else {
-            ZxValueRow("长期记忆", value = "", sub = "快照由 MemoryUiPort 提供")
-            ZxNavRow("公开日记回顾", sub = "route.diary") { scope.onNavigate(UiSceneId("route.diary")) }
-        }
-    }
-}
-
-/** settings.diagnostics — 诊断与更新。 */
+/** 运行更新入口；只显示 Host 真实提供的状态和可用操作。 */
 @Composable
 fun ZhaoxiDiagnosticsScene(
     updateStatus: kotlinx.coroutines.flow.StateFlow<String?>?,
     checkForUpdate: (() -> Unit)?,
     scope: UiSceneRenderScope,
 ) {
-    var demo by remember { mutableStateOf<String?>(null) }
-    val status by (updateStatus ?: kotlinx.coroutines.flow.MutableStateFlow<String?>(null)).collectAsState()
-    ZxPage("诊断与更新", onBack = { scope.onBack() }) {
+    val status by (updateStatus ?: kotlinx.coroutines.flow.MutableStateFlow<String?>(null))
+        .collectAsState()
+    ZxPage("更新", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        ZxValueRow("版本", value = "朝夕 E8.17", sub = "独立 UI Pack / Host 契约版本 1")
-        ZxValueRow("更新状态", value = status ?: "未检查")
-        Spacer(Modifier.height(8.dp))
-        ZxButton("检查更新", { checkForUpdate?.invoke() }, Modifier.fillMaxWidth())
-        if (demo == "empty") com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("这里什么都没有", "可以返回继续使用")
-        if (demo == "error") com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner("错误状态示例", com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err)
-        ZxSection("界面状态演示")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ZxChip("空态", false) { demo = "empty" }
-            ZxChip("错误态", false) { demo = "error" }
-            ZxChip("引导", false) { scope.onNavigate(UiSceneId("shell.onboarding")) }
+        ZxSection("应用更新")
+        ZxValueRow("检查状态", value = status ?: "尚未检查")
+        if (checkForUpdate != null) {
+            ZxButton("检查更新", checkForUpdate, Modifier.fillMaxWidth())
+        } else {
+            ZxEmpty("暂不可检查更新", "请稍后重试")
         }
-    }
-}
-
-/** settings.backup — 备份与迁移入口页。 */
-@Composable
-fun ZhaoxiBackupScene(scope: UiSceneRenderScope) {
-    ZxPage("备份与迁移", onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(8.dp))
-        ZxNavRow("导出人物", sub = "经人物图集 · 迁移入口在图集内") { scope.onNavigate(UiSceneId("route.persona_gallery")) }
-        ZxNavRow("工作区文件", sub = "route.workspace") { scope.onNavigate(UiSceneId("route.workspace")) }
-        ZxFooterNote("破坏性迁移只经 ZxDialog 确认")
     }
 }
