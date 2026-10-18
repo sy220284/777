@@ -62,6 +62,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
  * 数据全部来自 S1 端口系投影；归档变更（删除/迁移）走显式 Owner 命令，结果以 receipt 呈现。
  */
 
+/** Import success and failure are separate: an IO failure may have partially committed. */
+internal fun UiPersonaImportReceipt.zxImportFeedback(): String = when (this) {
+    is UiPersonaImportReceipt.Imported -> "人物已导入"
+    is UiPersonaImportReceipt.Failed -> message?.takeIf(String::isNotBlank) ?: "导入状态不确定，请先刷新人物图集"
+}
+
 /** chat.gallery / route.persona_gallery / chat.persona_picker — 图集。 */
 @Composable
 fun ZhaoxiPersonaGalleryScene(
@@ -74,6 +80,7 @@ fun ZhaoxiPersonaGalleryScene(
 ) {
     var revision by remember { mutableStateOf(0) }
     var feedback by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
     var search by rememberSaveable { mutableStateOf("") }
     var showPresets by rememberSaveable { mutableStateOf(false) }
     val jobs = androidx.compose.runtime.rememberCoroutineScope()
@@ -81,9 +88,19 @@ fun ZhaoxiPersonaGalleryScene(
     val state by produceState<UiPersonaGalleryReadReceipt?>(null, revision) { value = gallery.read() }
     val importer = transfer?.let { owner ->
         com.labteto.dshmobile.uihost.rememberUiDocumentImporter(owner.maxImportBytes) { result ->
-            if (result is com.labteto.dshmobile.uihost.UiDocumentPickReceipt.Picked) jobs.launch {
-                feedback = owner.import(ImportPersonaDocumentCommand(result.document.bytes, result.document.name, result.document.mimeType)).toString()
-                revision++
+            if (result is com.labteto.dshmobile.uihost.UiDocumentPickReceipt.Picked && !busy) jobs.launch {
+                busy = true
+                try {
+                    val receipt = owner.import(ImportPersonaDocumentCommand(
+                        result.document.bytes, result.document.name, result.document.mimeType))
+                    feedback = receipt.zxImportFeedback()
+                    revision++ // A failed import may have committed; refresh before retry.
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    feedback = failure.message ?: "导入失败，请先刷新图集再重试"
+                    revision++
+                } finally { busy = false }
             }
         }
     }
@@ -97,16 +114,24 @@ fun ZhaoxiPersonaGalleryScene(
                 ZxChip("新建人物", false) { onOpenPersona("new") }
                 ZxChip("预设", showPresets) { showPresets = !showPresets }
             }
-            if (importer != null) ZxChip("导入", false) { importer() }
+            if (importer != null) ZxChip("导入", false) { if (!busy) importer() }
         }
         if (showPresets && authoring != null) {
             ZxSection("人物预设")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 authoring.presets().forEach { preset ->
-                    ZxChip(preset.name, false) { jobs.launch {
-                        feedback = authoring.installPreset(preset.id).toString()
-                        revision++
+                    ZxChip(preset.name, false) { if (!busy) jobs.launch {
+                        busy = true
+                        try {
+                            val receipt = authoring.installPreset(preset.id)
+                            feedback = receipt.zxAuthoringFeedback()
+                            if (receipt is UiPersonaAuthoringReceipt.Saved) revision++
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                            throw cancelled
+                        } catch (failure: Exception) {
+                            feedback = failure.message ?: "预设安装失败"
+                        } finally { busy = false }
                     } }
                 }
             }
