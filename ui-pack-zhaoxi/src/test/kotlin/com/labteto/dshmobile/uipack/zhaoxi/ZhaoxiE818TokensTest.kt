@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.uipack.zhaoxi
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiHue
 import com.labteto.dshmobile.uipack.zhaoxi.theme.accentFor
 import com.labteto.dshmobile.uipack.zhaoxi.theme.wallpaperVeilAlpha
@@ -54,4 +55,26 @@ class ZhaoxiE818TokensTest {
         assertEquals("w7.webp", resolveZhaoxiWallpaper(true, "w7.webp", ZhaoxiHue.STONE, false))
         assertEquals(null, resolveZhaoxiWallpaper(false, "w7.webp", ZhaoxiHue.STONE, false))
     }
+
+    /** Original accents remain unchanged; readable ink must pass AA on both surfaces. */
+    @Test
+    fun lightAccentInkPassesAAOnWhiteAndSubtleCards() {
+        val expected = mapOf(
+            ZhaoxiHue.STONE to Color(0xFF706963),
+            ZhaoxiHue.SAGE to Color(0xFF526D5A),
+            ZhaoxiHue.STEEL to Color(0xFF4F687D),
+            ZhaoxiHue.MAUVE to Color(0xFF715B70),
+            ZhaoxiHue.DUSK to Color(0xFF786048),
+        )
+        expected.forEach { (hue, ink) ->
+            assertEquals(hue.key, ink, accentFor(hue, dark = false).accentInk)
+            listOf(Color.White, Color(0xFFF7F7F7)).forEach { surface ->
+                val a = ink.luminance()
+                val b = surface.luminance()
+                val ratio = (maxOf(a, b) + .05f) / (minOf(a, b) + .05f)
+                assertTrue("Accent text ${hue.key} on $surface: $ratio", ratio >= 4.5f)
+            }
+        }
+    }
+
 }
