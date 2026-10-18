@@ -448,7 +448,8 @@ class ZhaoxiApplicationScenePack(
             "settings.notifications" -> ZhaoxiNotificationsScene(preferences, scope)
             "settings.permissions" -> ZhaoxiPermissionsScene(preferences, scope, settings ?: sec?.settings)
             "settings.models" -> settings?.let { ZhaoxiModelsScene(it, scope) }
-            "settings.session", "settings.advanced" -> settings?.let { ZhaoxiRuntimeSettingsScene(it, scope) }
+            "settings.session" -> settings?.let { ZhaoxiRuntimeSettingsScene(it, scope, sessionOnly = true) }
+            "settings.advanced" -> settings?.let { ZhaoxiRuntimeSettingsScene(it, scope) }
             "settings.chat" -> settings?.let { ZhaoxiChatGuardScene(it, scope) }
             "settings.memory_settings" -> settings?.let { ZhaoxiMemorySettingsScene(it, scope) }
             "settings.account" -> settings?.let { ZhaoxiAccountScene(it, scope) }
