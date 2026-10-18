@@ -169,7 +169,7 @@ fun ZhaoxiMemoryOverviewScene(memory: MemoryUiPort, settings: SettingsUiPort?, s
         ZxNavRow("记忆管理", sub = "搜索 · 修改 · 遗忘") {
             scope.onNavigate(UiSceneId("settings.memory_management"))
         }
-        
+
     }
 }
 
@@ -230,7 +230,7 @@ fun ZhaoxiMemorySettingsScene(settings: SettingsUiPort, scope: UiSceneRenderScop
             status = settings.submit(SettingsUiCommand.Personalization(snap.userRules, snap.autoRecall, it)).toString()
         }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        
+
     }
 }
 
