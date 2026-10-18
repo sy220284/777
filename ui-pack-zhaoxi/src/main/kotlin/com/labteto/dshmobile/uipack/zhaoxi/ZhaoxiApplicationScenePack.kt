@@ -277,7 +277,25 @@ class ZhaoxiApplicationScenePack(
         when (scene.value) {
             // ---- 壳层 ----
             "route.home", "shell.new_session" -> ZhaoxiHomeScene(sec?.sessions, scope)
-            "shell.search" -> ZhaoxiSearchScene(sec?.sessions, scope)
+            "shell.search" -> ZhaoxiSearchScene(
+                sec?.sessions,
+                sec?.gallery ?: conv?.gallery,
+                sec?.automation,
+                sec?.files ?: conv?.files,
+                scope,
+                onGalleryOpen = { id ->
+                    targets.galleryId = id
+                    scope.onNavigate(UiSceneId("chat.gallery_profile"))
+                },
+                onTaskOpen = { id ->
+                    targets.automationTaskId = id
+                    scope.onNavigate(UiSceneId("automation.editor"))
+                },
+                onFileOpen = { path ->
+                    targets.workspacePath = path
+                    scope.onNavigate(UiSceneId("workspace.preview"))
+                },
+            )
             "shell.onboarding" -> ZhaoxiOnboardingScene(scope)
             "shell.empty" -> ZhaoxiEmptyDemoScene(scope)
             "shell.error" -> ZhaoxiErrorDemoScene(scope)
