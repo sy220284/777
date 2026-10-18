@@ -11,7 +11,19 @@ internal fun UiCommandReceipt.userHint(): String = when (this) {
     is UiCommandReceipt.Rejected -> rejectionHint(reason)
     is UiCommandReceipt.Failed -> message
     UiCommandReceipt.OutcomeUnknown -> "结果尚未确认，请先查看当前状态，避免重复提交"
-    is UiCommandReceipt.MessageEdited -> "编辑结果：$result"
+    is UiCommandReceipt.MessageEdited -> when (result) {
+        UiMessageEditOutcome.SENT -> "已提交修改并开始回复"
+        UiMessageEditOutcome.COMMITTED_NOT_STARTED -> "修改已保存，暂未开始回复"
+        UiMessageEditOutcome.BUSY -> "当前会话正在执行，请稍后重试"
+        UiMessageEditOutcome.UNAVAILABLE -> "此时无法修改消息"
+        UiMessageEditOutcome.WRONG_MODE -> "当前会话模式不支持该操作"
+        UiMessageEditOutcome.UNCONFIGURED -> "请先完成模型配置"
+        UiMessageEditOutcome.HISTORY_UNAVAILABLE -> "历史消息暂不可用，请刷新"
+        UiMessageEditOutcome.MESSAGE_MISSING -> "消息已不存在，请返回刷新"
+        UiMessageEditOutcome.EMPTY -> "请输入修改后的消息"
+        UiMessageEditOutcome.UNCHANGED -> "内容未改变"
+        UiMessageEditOutcome.FAILED -> "修改失败，请重试"
+    }
     UiCommandReceipt.NotAdmitted -> "操作未被受理"
 }
 @Composable
