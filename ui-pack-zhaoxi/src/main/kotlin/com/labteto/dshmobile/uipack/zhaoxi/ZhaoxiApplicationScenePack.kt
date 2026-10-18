@@ -428,7 +428,10 @@ class ZhaoxiApplicationScenePack(
             "route.tools", "tools.mcp", "tools.github", "tools.plugins" ->
                 sec?.tools?.let { ZhaoxiToolsScene(it, scope, scene.value) }
             "media.creation", "media.result" -> (sec?.media ?: conv?.media)?.let { media ->
-                settings?.let { ZhaoxiConnectedMediaScene(media, it, sessionId, scope, sec?.gallery ?: conv?.gallery, sec?.portraits) }
+                settings?.let { ZhaoxiConnectedMediaScene(
+                    media, it, sessionId, scope, sec?.gallery ?: conv?.gallery,
+                    sec?.portraits, resultsOnly = scene.value == "media.result")
+                }
             }
 
             // ---- 工作区 ----
