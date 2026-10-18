@@ -58,6 +58,7 @@ data class ZhaoxiColors(
     val glass: Color,       // M2 轻玻璃底
     val glass2: Color,      // M3 强玻璃底
     val accent: Color,      // 点缀色（当前 hue）
+    val accentInk: Color,   // 文字安全强调色（E8.18 --accent-ink）
     val tint: Color,        // 点缀底色
     val ok: Color, val okBg: Color,
     val warn: Color, val warnBg: Color,
@@ -76,7 +77,7 @@ fun zhaoxiColors(hue: ZhaoxiHue, dark: Boolean): ZhaoxiColors {
         ink = Color(0xFFECECEC), ink2 = Color(0xFF9B9B9B), ink3 = Color(0xFF9B9BA4),
         line = Color(0x17FFFFFF),
         glass = Color(0xD9171717), glass2 = Color(0xF0171717),
-        accent = a.accent, tint = a.tint,
+        accent = a.accent, accentInk = a.accentInk, tint = a.tint,
         ok = Color(0xFF7FA88F), okBg = Color(0x294E8A5A),
         warn = Color(0xFFB08030), warnBg = Color(0x29B08030),
         err = Color(0xFFB34A42), errBg = Color(0x29B34A42),
@@ -88,7 +89,7 @@ fun zhaoxiColors(hue: ZhaoxiHue, dark: Boolean): ZhaoxiColors {
         ink = Color(0xFF0D0D0D), ink2 = Color(0xFF6B7280), ink3 = Color(0xFF686872),
         line = Color(0x140D0D0D),
         glass = Color(0xD9FFFFFF), glass2 = Color(0xEBFFFFFF),
-        accent = a.accent, tint = a.tint,
+        accent = a.accent, accentInk = a.accentInk, tint = a.tint,
         ok = Color(0xFF4E8A5A), okBg = Color(0x1F4E8A5A),
         warn = Color(0xFF8A661C), warnBg = Color(0xFFF7F1E3),
         err = Color(0xFFB34A42), errBg = Color(0x1FB34A42),
