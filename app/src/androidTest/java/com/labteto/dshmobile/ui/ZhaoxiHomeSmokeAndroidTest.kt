@@ -19,6 +19,10 @@ class ZhaoxiHomeSmokeAndroidTest {
         compose.onNodeWithText("朝夕").assertExists()
         compose.onNodeWithText("新会话").assertExists()
         compose.onNodeWithText("人物").assertExists()
+        compose.onNodeWithContentDescription("打开侧栏").performClick()
+        compose.onNodeWithText("搜索全部人物、任务、文件").assertExists()
+        compose.onNodeWithText("新工作").assertExists()
+        compose.onNodeWithContentDescription("关闭侧栏").performClick()
         compose.onNodeWithText("设置").performClick()
         compose.onNodeWithText("模型与服务").assertExists()
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
