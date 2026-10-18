@@ -1,5 +1,10 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.remember
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import com.labteto.dshmobile.uipack.zhaoxi.components.zxPressSurface
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -52,7 +57,7 @@ fun ZxPage(
     Column(modifier.fillMaxSize().imePadding()) {
         // Keep the scene surface transparent so E8.17 ambient light remains visible.
         ZxTopBar(title, onNav = { onBack?.invoke() }, canBack = !menu, showNav = onBack != null) { topRight() }
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 24.dp)) {
             content()
         }
     }
@@ -89,7 +94,7 @@ fun ZxSettingsGroup(modifier: Modifier = Modifier, content: @Composable ColumnSc
         modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(ZhaoxiTheme.shapes.card))
             .background(ZhaoxiTheme.colors.bg2)
             .padding(horizontal = 14.dp, vertical = 4.dp),
         content = content,
@@ -99,11 +104,18 @@ fun ZxSettingsGroup(modifier: Modifier = Modifier, content: @Composable ColumnSc
 @Composable
 fun ZxNavRow(label: String, sub: String = "", value: String = "", onClick: () -> Unit) {
     val c = ZhaoxiTheme.colors
+    val interaction = remember { MutableInteractionSource() }
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-            .clickable(role = Role.Button, onClick = onClick)
-            .heightIn(min = 48.dp).padding(vertical = 11.dp),
+        Modifier.fillMaxWidth()
+            .zxPressSurface(interaction)
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(
+                role = Role.Button, onClick = onClick, interactionSource = interaction,
+                indication = androidx.compose.foundation.LocalIndication.current)
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 8.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         val designIcon = when {
             label.contains("模型") -> "sparkle"
@@ -118,18 +130,14 @@ fun ZxNavRow(label: String, sub: String = "", value: String = "", onClick: () ->
             label.contains("人物") -> "user"
             else -> null
         }
-        if (designIcon != null) {
-            com.labteto.dshmobile.uipack.zhaoxi.components.ZxIcon(designIcon)
-            androidx.compose.foundation.layout.Spacer(Modifier.width(10.dp))
-        }
+        if (designIcon != null) ZxIcon(designIcon)
         Column(Modifier.weight(1f)) {
-            Text(label, fontSize = 13.5.sp, color = c.ink)
-            if (sub.isNotEmpty()) Text(sub, fontSize = 11.sp, color = c.ink3, lineHeight = 16.sp)
+            Text(label, fontSize = 14.sp, color = c.ink, lineHeight = 20.sp)
+            if (sub.isNotEmpty()) Text(sub, fontSize = 12.sp, color = c.ink2, lineHeight = 18.sp)
         }
         if (value.isNotEmpty()) {
-            Text(value, fontSize = 12.sp, color = c.ink2,
-                fontFamily = FontFamily.Monospace)
-            androidx.compose.foundation.layout.Spacer(Modifier.width(6.dp))
+            Text(value, fontSize = 12.sp, color = c.ink2, fontFamily = FontFamily.Monospace,
+                textAlign = TextAlign.End, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         ZxIcon("chevron-right", modifier = Modifier.width(18.dp), description = null)
     }
@@ -139,26 +147,34 @@ fun ZxNavRow(label: String, sub: String = "", value: String = "", onClick: () ->
 fun ZxSwitchRow(label: String, sub: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val c = ZhaoxiTheme.colors
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 11.dp),
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text(label, fontSize = 13.5.sp, color = c.ink)
-            if (sub.isNotEmpty()) Text(sub, fontSize = 11.sp, color = c.ink3, lineHeight = 16.sp)
+            Text(label, fontSize = 14.sp, color = c.ink, lineHeight = 20.sp)
+            if (sub.isNotEmpty()) Text(sub, fontSize = 12.sp, color = c.ink2, lineHeight = 18.sp)
         }
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxSwitch(checked, onChange, contentDescription = label)
+        com.labteto.dshmobile.uipack.zhaoxi.components.ZxSwitch(
+            checked, onChange, contentDescription = label)
     }
 }
 
+/** Responsive value row; long model names and amounts wrap instead of being clipped. */
 @Composable
 fun ZxValueRow(label: String, sub: String = "", value: String, mono: Boolean = false) {
     val c = ZhaoxiTheme.colors
-    Row(Modifier.fillMaxWidth().padding(vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
         Column(Modifier.weight(1f)) {
-            Text(label, fontSize = 13.5.sp, color = c.ink)
-            if (sub.isNotEmpty()) Text(sub, fontSize = 11.sp, color = c.ink3, lineHeight = 16.sp)
+            Text(label, fontSize = 14.sp, color = c.ink, lineHeight = 20.sp)
+            if (sub.isNotEmpty()) Text(sub, fontSize = 12.sp, color = c.ink2, lineHeight = 18.sp)
         }
-        Text(value, fontSize = 12.sp, color = c.ink3,
+        Text(value, modifier = Modifier.weight(1f), fontSize = 12.sp, color = c.ink2,
+            textAlign = TextAlign.End, maxLines = 3, overflow = TextOverflow.Ellipsis,
             fontFamily = if (mono) FontFamily.Monospace else null)
     }
 }
@@ -166,15 +182,21 @@ fun ZxValueRow(label: String, sub: String = "", value: String, mono: Boolean = f
 @Composable
 fun ZxDangerRow(label: String, sub: String, onClick: () -> Unit) {
     val c = ZhaoxiTheme.colors
+    val interaction = remember { MutableInteractionSource() }
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-            .clickable(role = Role.Button, onClick = onClick)
-            .heightIn(min = 48.dp).padding(vertical = 11.dp),
+        Modifier.fillMaxWidth()
+            .zxPressSurface(interaction)
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(
+                role = Role.Button, onClick = onClick, interactionSource = interaction,
+                indication = androidx.compose.foundation.LocalIndication.current)
+            .heightIn(min = 56.dp).padding(horizontal = 8.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text(label, fontSize = 13.5.sp, color = c.err)
-            if (sub.isNotEmpty()) Text(sub, fontSize = 11.sp, color = c.ink3, lineHeight = 16.sp)
+            Text(label, fontSize = 14.sp, color = c.err)
+            if (sub.isNotEmpty()) Text(sub, fontSize = 12.sp, color = c.ink2, lineHeight = 18.sp)
         }
         ZxIcon("chevron-right", modifier = Modifier.width(18.dp), description = null)
     }
@@ -188,23 +210,33 @@ fun ZxRow(
     modifier: Modifier = Modifier,
     mono: Boolean = false,
     onClick: (() -> Unit)? = null,
-    trailing: @Composable () -> Unit = { Text("›", fontSize = 12.sp, color = ZhaoxiTheme.colors.ink3) },
+    trailing: @Composable () -> Unit = {
+        ZxIcon("chevron-right", modifier = Modifier.width(18.dp), description = null)
+    },
 ) {
     val c = ZhaoxiTheme.colors
+    val interaction = remember { MutableInteractionSource() }
     Row(
         modifier
             .fillMaxWidth()
+            .then(if (onClick != null) Modifier.zxPressSurface(interaction) else Modifier)
             .clip(RoundedCornerShape(12.dp))
-            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
-            .heightIn(min = 48.dp).padding(horizontal = 12.dp, vertical = 10.dp),
+            .then(if (onClick != null) Modifier.clickable(
+                role = Role.Button, onClick = onClick, interactionSource = interaction,
+                indication = androidx.compose.foundation.LocalIndication.current) else Modifier)
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 13.sp, color = c.ink,
-                fontFamily = if (mono) FontFamily.Monospace else null)
-            if (sub.isNotEmpty()) Text(sub, fontSize = 11.sp, color = c.ink3, lineHeight = 16.sp)
+            Text(title, fontSize = 14.sp, color = c.ink, lineHeight = 20.sp,
+                fontFamily = if (mono) FontFamily.Monospace else null,
+                maxLines = 3, overflow = TextOverflow.Ellipsis)
+            if (sub.isNotEmpty()) Text(sub, fontSize = 12.sp, color = c.ink2, lineHeight = 18.sp,
+                maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
         trailing()
     }
 }
+
