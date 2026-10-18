@@ -591,17 +591,28 @@ fun ZhaoxiWorkspaceScene(
                     onClick = { onPreview(file.path) })
             }
         } else {
+            val visibleArtifacts = conversation.artifacts.filter {
+                it.path.contains(fileQuery.trim(), ignoreCase = true)
+            }
+            val visibleInvolved = conversation.involved.filter {
+                it.path.contains(fileQuery.trim(), ignoreCase = true)
+            }
             ZxSection("当前会话产物")
             if (sessionId.isBlank()) ZxEmpty("尚未打开会话", "进入一个聊天或工作会话后可以查看产物")
             else if (conversation.isEmpty) ZxEmpty("暂无会话产物", "当前会话尚未产生可查看的文件")
-            if (conversation.artifacts.isNotEmpty()) ZxSection("产物")
-            conversation.artifacts.forEach { file ->
-                ZxRow(file.path.substringAfterLast('/'), "${zxHumanFileSize(file.bytes.toLong())} · ${file.path}",
+            else if (visibleArtifacts.isEmpty() && visibleInvolved.isEmpty()) {
+                ZxEmpty("没有匹配的会话文件", "调整搜索条件或清空搜索内容")
+            }
+            if (visibleArtifacts.isNotEmpty()) ZxSection("产物")
+            visibleArtifacts.forEach { file ->
+                ZxRow(file.path.substringAfterLast('/'),
+                    "${zxHumanFileSize(file.bytes.toLong())} · ${file.path}",
                     onClick = { onPreview(file.path) })
             }
-            if (conversation.involved.isNotEmpty()) ZxSection("关联文件")
-            conversation.involved.forEach { file ->
-                ZxRow(file.path.substringAfterLast('/'), "${zxHumanFileSize(file.bytes.toLong())} · ${file.path}",
+            if (visibleInvolved.isNotEmpty()) ZxSection("关联文件")
+            visibleInvolved.forEach { file ->
+                ZxRow(file.path.substringAfterLast('/'),
+                    "${zxHumanFileSize(file.bytes.toLong())} · ${file.path}",
                     onClick = { onPreview(file.path) })
             }
         }
@@ -627,7 +638,7 @@ fun ZhaoxiWorkspacePreviewScene(files: FilesUiPort?, path: String, scope: UiScen
                 val item = requireNotNull(previewState.second)
                 ZxSection("文件信息")
                 ZxValueRow("文件名", value = item.file.path.substringAfterLast('/'))
-                ZxValueRow("大小", value = "${item.file.bytes} 字节")
+                ZxValueRow("大小", value = zxHumanFileSize(item.file.bytes.toLong()))
                 ZxSection("内容预览")
                 val content = item.text
                 if (content == null) {
