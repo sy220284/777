@@ -15,6 +15,7 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -78,10 +79,15 @@ fun ZhaoxiHomeScene(
         ?: kotlinx.coroutines.flow.flowOf(UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null)))
         .collectAsState(initial = UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null))
     var commandReceipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
+    var drawerQuery by rememberSaveable { mutableStateOf("") }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val drawerScope = rememberCoroutineScope()
     val c = ZhaoxiTheme.colors
     val workMode = snap.usageMode == LocalUsageMode.WORK
+    val visibleSessions = if (drawerQuery.isBlank()) snap.sessions else snap.sessions.filter { session ->
+        session.title.contains(drawerQuery.trim(), ignoreCase = true) ||
+            session.summaryPreview.orEmpty().contains(drawerQuery.trim(), ignoreCase = true)
+    }
     fun create(mode: LocalUsageMode) {
         commandReceipt = sessions?.submit(SessionUiCommand.Create(snap.identity, LocalConversationMode.INDEPENDENT, mode))
         drawerScope.launch { drawerState.close() }
@@ -115,7 +121,15 @@ fun ZhaoxiHomeScene(
                     }
                     ZxHomeDrawerEntry("plus", "新会话", onClick = { create(LocalUsageMode.CHAT) })
                     ZxHomeDrawerEntry("tasks", "新工作", onClick = { create(LocalUsageMode.WORK) })
-                    ZxHomeDrawerEntry("search", "搜索人物、会话、任务、文件", onClick = { navigate("shell.search") })
+                    Spacer(Modifier.height(8.dp))
+                    ZxField(
+                        value = drawerQuery,
+                        onValueChange = { drawerQuery = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = "筛选会话标题或内容",
+                    )
+                    ZxHomeDrawerEntry("search", "搜索全部人物、任务、文件",
+                        onClick = { navigate("shell.search") })
                     Spacer(Modifier.height(12.dp))
                     ZxModeSwitch(workMode, onChange = { selectedWork ->
                         commandReceipt = sessions?.submit(SessionUiCommand.SelectMode(if (selectedWork) LocalUsageMode.WORK else LocalUsageMode.CHAT))
@@ -141,13 +155,16 @@ fun ZhaoxiHomeScene(
                             Text("最近会话", fontSize = 11.sp, color = c.ink2, fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
                         }
-                        if (snap.sessions.isEmpty()) {
+                        if (visibleSessions.isEmpty()) {
                             item {
-                                Text("尚无会话，点击上方「新会话」开始",
-                                    fontSize = 12.sp, color = c.ink2, modifier = Modifier.padding(12.dp))
+                                Text(
+                                    if (drawerQuery.isBlank()) "尚无会话，点击上方「新会话」开始"
+                                    else "没有找到匹配的会话",
+                                    fontSize = 12.sp, color = c.ink2, modifier = Modifier.padding(12.dp),
+                                )
                             }
                         }
-                        items(snap.sessions, key = { it.id }) { session ->
+                        items(visibleSessions, key = { it.id }) { session ->
                             ZxHomeDrawerEntry(
                                 "diary", session.title.take(40),
                                 selected = snap.identity?.sessionId == session.id,
