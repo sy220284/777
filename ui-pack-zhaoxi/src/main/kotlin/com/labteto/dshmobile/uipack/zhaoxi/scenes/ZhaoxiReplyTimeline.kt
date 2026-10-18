@@ -66,3 +66,28 @@ internal fun projectZxReplyTimeline(
     }
     return result
 }
+
+
+/**
+ * Only append the part of a request-scoped streaming snapshot that is not already durable.
+ * Preview providers may return cumulative text or just the latest delta; only strip
+ * verified leading committed text. Never search-and-remove arbitrary repeated prose.
+ */
+internal fun uncommittedReplyPreview(
+    preview: String?,
+    persistedStages: List<UiMessageSnapshot>,
+): String? {
+    if (preview.isNullOrBlank()) return null
+    val committed = persistedStages.map { it.text }.filter(String::isNotBlank)
+    if (committed.isEmpty()) return preview
+    // A delayed preview can arrive after its matching durable message.
+    if (committed.any { it == preview || it.startsWith(preview) }) return null
+    val prefixes = listOf("\n\n", "\n", "").map { committed.joinToString(it) }
+        .filter(String::isNotBlank).sortedByDescending(String::length)
+    val prefix = prefixes.firstOrNull(preview::startsWith)
+        ?: committed.lastOrNull(preview::startsWith)
+    if (prefix != null) return preview.removePrefix(prefix).trimStart('\n', '\r')
+        .takeIf(String::isNotBlank)
+    // Some providers emit a fresh-only delta. Preserve it verbatim if no prefix matches.
+    return preview
+}
