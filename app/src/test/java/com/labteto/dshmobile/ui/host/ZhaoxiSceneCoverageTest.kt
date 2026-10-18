@@ -13,7 +13,7 @@ class ZhaoxiSceneCoverageTest {
             .map { it.id }.toSet()
         assertEquals("Zhaoxi pack scene inventory and the live Host catalog diverged",
             hostScenes, ZhaoxiUiPackManifest.fullSceneIds)
-        assertEquals(75, hostScenes.size)
+        assertEquals(76, hostScenes.size)
     }
 
     @Test fun oldV6AndHostSystemServicesNeverBecomePackScenes() {
