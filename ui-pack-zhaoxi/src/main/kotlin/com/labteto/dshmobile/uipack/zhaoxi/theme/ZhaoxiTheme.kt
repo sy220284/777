@@ -287,8 +287,9 @@ fun ZhaoxiBackground(
     val c = ZhaoxiTheme.colors
     val context = androidx.compose.ui.platform.LocalContext.current
     val wallpaper by produceState<Pair<androidx.compose.ui.graphics.ImageBitmap, Float>?>(null, wallpaperPreset) {
-        value = if (wallpaperPreset == null) null else
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        value = try {
+            if (wallpaperPreset == null) null else
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 context.assets.open("e818_wallpapers.zip").use { stream ->
                     java.util.zip.ZipInputStream(stream).use { zip ->
                         var candidate: java.util.zip.ZipEntry?
@@ -311,7 +312,7 @@ fun ZhaoxiBackground(
                                             count++
                                         }
                                     }
-                                    bitmap.asImageBitmap() to luminance / count
+                                    bitmap.asImageBitmap() to (if (count > 0) luminance / count else 0.5f)
                                 }
                                 break
                             }
@@ -320,6 +321,12 @@ fun ZhaoxiBackground(
                     }
                 }
             }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // An unavailable/corrupted optional wallpaper must not crash the UI host.
+            null
+        }
     }
     val currentWallpaper = wallpaper
     val glow = intensity.coerceIn(0f, 1f) * (if (currentWallpaper != null) 0.16f else 1f)
