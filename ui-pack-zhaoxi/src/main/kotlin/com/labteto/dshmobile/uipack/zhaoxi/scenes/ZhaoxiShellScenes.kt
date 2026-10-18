@@ -329,34 +329,116 @@ private fun androidx.compose.foundation.layout.RowScope.ZxHomeShortcut(
     }
 }
 
-/** shell.search — 搜索。 */
+/** shell.search — 按 Owner 的只读投影跨会话、人物、任务与工作区搜索。 */
 @Composable
-fun ZhaoxiSearchScene(sessions: SessionUiPort?, scope: UiSceneRenderScope) {
-    var query by remember { mutableStateOf("") }
+fun ZhaoxiSearchScene(
+    sessions: SessionUiPort?,
+    gallery: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort?,
+    automation: com.labteto.dshmobile.uicontract.AutomationUiPort?,
+    files: FilesUiPort?,
+    scope: UiSceneRenderScope,
+    onGalleryOpen: (String) -> Unit,
+    onTaskOpen: (String) -> Unit,
+    onFileOpen: (String) -> Unit,
+) {
+    var query by rememberSaveable { mutableStateOf("") }
+    var commandReceipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
     val snapshot by (sessions?.snapshots
         ?: kotlinx.coroutines.flow.flowOf(UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null)))
         .collectAsState(initial = sessions?.snapshot() ?: UiSessionsSnapshot(
             null, LocalUsageMode.CHAT, false, emptyList(), null))
-    val results = remember(query, snapshot.sessions) {
-        val needle = query.trim()
-        if (needle.isEmpty()) emptyList() else snapshot.sessions.filter { session ->
-            session.title.contains(needle, ignoreCase = true) ||
-                session.summaryPreview.orEmpty().contains(needle, ignoreCase = true) ||
-                session.id.contains(needle, ignoreCase = true)
-        }.take(60)
+    val galleryRead by produceState<com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt?>(null, gallery) {
+        value = gallery?.read()
     }
+    val taskSnapshot by produceState(automation?.snapshot(), automation) {
+        automation?.snapshots?.collect { value = it }
+    }
+    val fileRead by produceState<Result<List<com.labteto.dshmobile.local.tools.LocalWorkspaceFile>>?>(null, files) {
+        value = files?.let { runCatching { it.workspaceFiles() } }
+    }
+    val needle = query.trim()
+    val sessionResults = if (needle.isEmpty()) emptyList() else snapshot.sessions.filter {
+        it.title.contains(needle, ignoreCase = true) ||
+            it.summaryPreview.orEmpty().contains(needle, ignoreCase = true)
+    }.take(30)
+    val personaResults = if (needle.isEmpty()) emptyList() else
+        (galleryRead as? com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt.Available)
+            ?.entries.orEmpty().filter { entry ->
+                entry.name.contains(needle, ignoreCase = true) ||
+                    entry.stories.any { story ->
+                        story.title.contains(needle, ignoreCase = true) ||
+                            story.notes.contains(needle, ignoreCase = true)
+                    }
+            }.take(30)
+    val taskResults = if (needle.isEmpty()) emptyList() else
+        taskSnapshot?.tasks.orEmpty().filter { task ->
+            task.prompt.contains(needle, ignoreCase = true) ||
+                task.actorName.orEmpty().contains(needle, ignoreCase = true)
+        }.take(30)
+    val fileResults = if (needle.isEmpty()) emptyList() else
+        fileRead?.getOrNull().orEmpty().filter { it.path.contains(needle, ignoreCase = true) }.take(30)
+    val loading = gallery != null && galleryRead == null ||
+        files != null && fileRead == null
+
     ZxPage("搜索", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxField(query, { query = it }, Modifier.fillMaxWidth(),
-            placeholder = "搜索会话标题及预览…")
+            placeholder = "搜索会话、人物、任务和工作区文件")
+        CommandFeedback(commandReceipt)
         Spacer(Modifier.height(8.dp))
-        if (query.isBlank()) ZxEmpty("输入关键词", "可搜索本地会话标题与最近消息摘要")
-        else if (results.isEmpty()) ZxEmpty("没有匹配的会话", "试试其他关键词")
-        results.forEach { item ->
-            ZxRow(item.title.take(60), item.summaryPreview.orEmpty().take(80),
-                onClick = {
-                    sessions?.submit(SessionUiCommand.Open(item.id))
-                })
+        if (needle.isEmpty()) {
+            ZxEmpty("搜索内容", "输入名称或关键词，在本机数据中查找")
+        } else {
+            if (sessionResults.isNotEmpty()) {
+                ZxSection("会话")
+                sessionResults.forEach { item ->
+                    ZxRow(item.title.take(80), item.summaryPreview.orEmpty().take(120),
+                        onClick = {
+                            val receipt = sessions?.submit(SessionUiCommand.Open(item.id))
+                                ?: UiCommandReceipt.NotAdmitted
+                            commandReceipt = receipt
+                            if (receipt == UiCommandReceipt.Accepted || receipt == UiCommandReceipt.Queued) {
+                                scope.onBack()
+                            }
+                        })
+                }
+            }
+            if (personaResults.isNotEmpty()) {
+                ZxSection("人物")
+                personaResults.forEach { item ->
+                    ZxRow(item.name, item.stories.take(2).joinToString(" · ") { it.title },
+                        onClick = { onGalleryOpen(item.id) })
+                }
+            }
+            if (taskResults.isNotEmpty()) {
+                ZxSection("定时任务")
+                taskResults.forEach { item ->
+                    ZxRow(item.prompt.take(80), item.actorName.orEmpty(),
+                        onClick = { onTaskOpen(item.id) })
+                }
+            }
+            if (fileResults.isNotEmpty()) {
+                ZxSection("工作区文件")
+                fileResults.forEach { item ->
+                    ZxRow(item.path.substringAfterLast('/'), item.path,
+                        onClick = { onFileOpen(item.path) })
+                }
+            }
+            if (loading) {
+                ZxSection("正在查找")
+                Text("正在读取人物与文件…", fontSize = 12.sp,
+                    color = ZhaoxiTheme.colors.ink2)
+            }
+            (galleryRead as? com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt.Failed)?.let {
+                ZxBanner("人物数据读取失败：${it.message ?: "请稍后重试"}", ZxTone.Warn)
+            }
+            fileRead?.exceptionOrNull()?.let {
+                ZxBanner("工作区文件读取失败，请返回工作区检查文件状态", ZxTone.Warn)
+            }
+            if (!loading && sessionResults.isEmpty() && personaResults.isEmpty() &&
+                taskResults.isEmpty() && fileResults.isEmpty()) {
+                ZxEmpty("没有找到匹配的内容", "可以换一个关键词重试")
+            }
         }
     }
 }
