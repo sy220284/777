@@ -131,7 +131,7 @@ fun ZxDrawer(
 ) {
     val c = ZhaoxiTheme.colors
     Column(modifier.background(c.side).padding(12.dp)) {
-        ZxField(query, onQuery, Modifier.fillMaxWidth(), placeholder = "搜索人物、会话、任务、文件")
+        ZxField(query, onQuery, Modifier.fillMaxWidth(), placeholder = "筛选当前列表")
         Spacer(Modifier.height(8.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             groups.forEach { (group, entries) ->
