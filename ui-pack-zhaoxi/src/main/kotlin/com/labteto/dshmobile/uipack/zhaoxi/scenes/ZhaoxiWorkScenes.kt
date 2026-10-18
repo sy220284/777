@@ -81,7 +81,7 @@ fun ZhaoxiRequirementEvidenceScene(
             null -> repeat(3) { com.labteto.dshmobile.uipack.zhaoxi.components.ZxSkeleton(com.labteto.dshmobile.uipack.zhaoxi.components.ZxSkeletonVariant.Row, Modifier.padding(vertical = 6.dp)) }
             is UiWorkEvidenceReadReceipt.Available -> {
                 ZxSection("需求清单 · ${r.snapshot.requirements.size}")
-                com.labteto.dshmobile.uipack.zhaoxi.components.ZxValueRow(
+                ZxValueRow(
                     "已关联证据", value = "${r.snapshot.references.size} 条")
                 r.snapshot.requirements.forEach { req ->
                     ZxRow("「${req.text}」", "需求 #${req.index} · ${req.reportedStatus}") {
