@@ -306,4 +306,39 @@ class ZhaoxiAcceptanceAndroidTest {
         }
     }
 
+    /**
+     * Offline typography and scroll fixture: tests long tables/200% text without pretending
+     * to prove network streaming or live approval end-to-end.
+     */
+    @Test fun longTableAtTwoHundredPercentCanReachTailWithoutClipping() {
+        ready()
+        val table = buildString {
+            append("# 长内容验收\\n\\n| 序号 | 工作结果 | 状态说明 | 路径 |\\n")
+            append("| --- | --- | --- | --- |\\n")
+            (1..35).forEach { index ->
+                append("| $index | 第 ${index} 项任务 | 等待审批与执行结果均以真实状态为准 | work/artifacts/long-file-$index.md |\\n")
+            }
+            append("\\n最后一条记录，滚动需要能够到达这里。")
+        }
+        compose.activityRule.scenario.onActivity { activity ->
+            activity.setContent {
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density, density.fontScale * 2f)) {
+                    ZhaoxiTheme(hue = ZhaoxiHue.STONE, dark = false, reducedMotion = true) {
+                        Column(
+                            Modifier.fillMaxSize().testTag("zx-acceptance-longtable")
+                                .verticalScroll(rememberScrollState()).padding(16.dp),
+                        ) {
+                            ZxRichReply(table)
+                            Spacer(Modifier.height(24.dp))
+                            androidx.compose.material3.Text("滚动终点锚点")
+                        }
+                    }
+                }
+            }
+        }
+        compose.onNodeWithText("滚动终点锚点").performScrollTo().assertIsDisplayed()
+        capture("fixture-table-200-percent-scrolled", "longtable")
+    }
+
 }
