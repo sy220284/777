@@ -353,7 +353,7 @@ class ZhaoxiApplicationScenePack(
             "conversation.ui_document_generate" -> conv?.documents?.let { ZhaoxiUiDocumentGenerateScene(it, scope, ::currentDocumentContext) }
             "work.approval" -> conv?.let { ZhaoxiApprovalScene(it.work, scope) }
             "work.question" -> conv?.let { ZhaoxiQuestionScene(it.work, scope) }
-            "work.plan_review" -> conv?.workReads?.let { ZhaoxiPlanReviewScene(it, conv.work, sessionId, scope) }
+            "work.plan_review" -> conv?.workReads?.let { ZhaoxiPlanReviewScene(it, conv.work, sessionId, scope, canOpenEvidence = conv.evidence != null) }
             "work.requirement_evidence" -> if (conv?.evidence != null && identity != null)
                 ZhaoxiRequirementEvidenceScene(conv.evidence, identity, scope)
             else ZxEmpty("证据不可用", "缺少会话身份")
