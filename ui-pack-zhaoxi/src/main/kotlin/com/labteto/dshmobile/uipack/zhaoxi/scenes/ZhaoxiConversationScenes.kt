@@ -323,7 +323,10 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
         if (!restored && all.isNotEmpty()) {
             val anchor = reading.anchor(sessionId)
             followTail = anchor?.followingTail ?: true
-            val index = timeline.indexOfFirst { anchor?.messageId != null && it.containsMessage(anchor.messageId) }
+            val restoredMessageId = anchor?.messageId
+            val index = timeline.indexOfFirst {
+                restoredMessageId != null && it.containsMessage(restoredMessageId)
+            }
             state.scrollToItem(if (index >= 0) index + 1 else timeline.size, if (index >= 0) anchor?.offsetPx ?: 0 else 0)
             restored = true
         }
