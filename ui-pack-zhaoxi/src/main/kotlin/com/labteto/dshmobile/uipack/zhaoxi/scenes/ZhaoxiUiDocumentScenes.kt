@@ -163,21 +163,22 @@ fun ZxDocumentCard(
     val validation = remember(document, knownScenes, pendingApprovalId) {
         document.validate(UiDocumentBudget(512, 16, 262_144), knownScenes, pendingApprovalId)
     }
+    val isWorkProgress = document.documentId == "work-live:${document.source.messageId}" &&
+        document.source.workMode
     Column(Modifier.fillMaxWidth().padding(12.dp)) {
-        Text(document.title.ifBlank { "文档" }, fontSize = 15.sp, color = ZhaoxiTheme.colors.ink)
+        Text(if (isWorkProgress) "执行状态" else document.title.ifBlank { "文档" },
+            fontSize = 14.sp, color = ZhaoxiTheme.colors.ink)
         if (!validation.valid) {
             ZxBanner("文档超出安全显示限制 · 已降级", ZxTone.Warn)
             Text(document.fallbackText.take(400), fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2)
         } else {
-            val isWorkProgress = document.documentId.startsWith("work-live:") &&
-                document.source.workMode
             if (isWorkProgress) {
                 val status = document.nodes.filterIsInstance<UiDocumentNode.Text>()
                     .firstOrNull { it.id == "work_turn_status" }?.text
                 if (!status.isNullOrBlank()) Text(status, fontSize = 13.sp, color = ZhaoxiTheme.colors.ink2)
                 val rows = document.nodes.filterIsInstance<UiDocumentNode.Table>()
                     .firstOrNull { it.id == "work_events" }?.rows.orEmpty()
-                Text("执行记录 ${rows.size} 项 · 持续更新", fontSize = 11.sp, color = ZhaoxiTheme.colors.ink2)
+                Text("工具记录 ${rows.size} 项 · 已保存", fontSize = 11.sp, color = ZhaoxiTheme.colors.ink2)
                 var detailsExpanded by remember(document.source.sessionId, document.documentId) {
                     mutableStateOf(false)
                 }
