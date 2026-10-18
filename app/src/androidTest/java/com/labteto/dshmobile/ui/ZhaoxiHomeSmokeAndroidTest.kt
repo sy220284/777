@@ -24,6 +24,9 @@ class ZhaoxiHomeSmokeAndroidTest {
         compose.onNodeWithText("搜索全部人物、任务、文件").assertExists()
         compose.onNodeWithText("人物图集").assertExists()
         compose.onNodeWithContentDescription("关闭侧栏").performClick()
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithText("人物图集").fetchSemanticsNodes().isEmpty()
+        }
         compose.onNodeWithText("设置").performClick()
         compose.onNodeWithText("模型与服务").assertExists()
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
