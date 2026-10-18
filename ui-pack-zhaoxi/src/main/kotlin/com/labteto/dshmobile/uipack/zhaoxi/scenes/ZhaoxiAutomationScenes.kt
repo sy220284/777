@@ -106,7 +106,7 @@ fun ZhaoxiAutomationTasksScene(
                 }
                 task.runReceipts.lastOrNull()?.let { last ->
                     ZxValueRow("最近执行", value = last.status.wireValue,
-                        sub = last.errorPreview?.take(100) ?: last.resultPreview?.take(100))
+                        sub = last.errorPreview?.take(100) ?: last.resultPreview?.take(100) ?: "无摘要")
                 }
                 if (task.status == com.labteto.dshmobile.automation.AutomationStatus.BLOCKED) {
                     ZxFooterNote("任务已阻断；请先检查所属会话、授权或编辑任务配置")
