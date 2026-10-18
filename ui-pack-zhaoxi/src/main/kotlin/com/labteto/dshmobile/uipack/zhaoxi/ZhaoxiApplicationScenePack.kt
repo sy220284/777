@@ -480,7 +480,12 @@ class ZhaoxiApplicationScenePack(
         ) {
         ZhaoxiTheme(hue = hue, dark = dark, reducedMotion = reduced || appearance.motionScale == 0f) {
             Box(Modifier.fillMaxSize()) {
-                ZhaoxiBackground(Modifier.fillMaxSize())
+                ZhaoxiBackground(
+                    Modifier.fillMaxSize(),
+                    intensity = appearance.ambientGlow *
+                        (if (state.stack.lastOrNull()?.value in setOf("route.home", "conversation.chat", "conversation.work")) 1f else .45f),
+                    workMode = state.stack.lastOrNull()?.value == "conversation.work",
+                )
                 // Only the incoming content is live; do not retain an outgoing command tree.
                 val progress = remember { Animatable(0f) }
                 val motion = ZhaoxiMotion.spec<Float>(ZhaoxiDuration.NORMAL)
