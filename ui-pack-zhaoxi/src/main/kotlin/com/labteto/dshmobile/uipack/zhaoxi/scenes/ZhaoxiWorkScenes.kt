@@ -356,7 +356,7 @@ fun ZhaoxiWorkTeamScene(team: WorkTeamUiPort, scope: UiSceneRenderScope) {
         if (snap.members.isEmpty())
             ZxEmpty("当前没有运行团队", "可从 Work 中发送带团队的任务后查看进展")
         snap.members.forEach { member ->
-            val selected = current?.id == member.id && current.jobId == member.jobId
+            val selected = current?.let { it.id == member.id && it.jobId == member.jobId } == true
             ZxRow(member.name, buildString {
                 append(member.phase)
                 if (member.activity.isNotBlank()) append(" · ").append(member.activity.take(90))
