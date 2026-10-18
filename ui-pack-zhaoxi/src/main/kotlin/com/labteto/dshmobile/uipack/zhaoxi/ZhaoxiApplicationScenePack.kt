@@ -355,12 +355,19 @@ class ZhaoxiApplicationScenePack(
             "conversation.ui_document_generate" -> conv?.documents?.let { ZhaoxiUiDocumentGenerateScene(it, scope, ::currentDocumentContext) }
             "work.approval" -> conv?.let { ZhaoxiApprovalScene(it.work, scope) }
             "work.question" -> conv?.let { ZhaoxiQuestionScene(it.work, scope) }
-            "work.plan_review" -> conv?.workReads?.let { ZhaoxiPlanReviewScene(it, conv.work, sessionId, scope, canOpenEvidence = conv.evidence != null) }
+            "work.plan_review" -> conv?.workReads?.let {
+                ZhaoxiPlanReviewScene(it, conv.work, sessionId, scope, canOpenEvidence = conv.evidence != null)
+            } ?: ZxEmpty("工作计划不可用", "当前会话尚未接入计划读取能力",
+                actionLabel = "返回", onAction = { scope.onBack() })
             "work.requirement_evidence" -> if (conv?.evidence != null && identity != null)
                 ZhaoxiRequirementEvidenceScene(conv.evidence, identity, scope)
             else ZxEmpty("证据不可用", "缺少会话身份")
             "work.team" -> conv?.workTeam?.let { ZhaoxiWorkTeamScene(it, scope) }
+                ?: ZxEmpty("团队信息不可用", "当前会话没有团队运行信息",
+                    actionLabel = "返回", onAction = { scope.onBack() })
             "work.capabilities" -> sec?.tools?.let { ZhaoxiToolsScene(it, scope, "work.capabilities") }
+                ?: ZxEmpty("能力目录不可用", "工具管理尚未连接",
+                    actionLabel = "返回", onAction = { scope.onBack() })
             "work.steering_choice" -> ZhaoxiSteeringScene(scope)
             "chat.reply_suggestions" -> (conv?.replySuggestions ?: sec?.replySuggestions)?.let {
                 ZxReplySuggestionsScene(it, onPick = { text ->
@@ -392,17 +399,21 @@ class ZhaoxiApplicationScenePack(
                         conv?.selection ?: sec?.selection, conv?.stories, sec?.transfer, scope)
                     "chat.persona_editor", "chat.world_book" ->
                         if (sec?.authoring != null) ZhaoxiPersonaEditorScene(sec.authoring, gid, scope, initialTab = if (scene.value == "chat.world_book") 2 else 0)
-                        else ZxEmpty("端口未注入", "chat.persona_authoring 能力未连接")
+                        else ZxEmpty("人物编辑暂不可用", "请返回人物图集",
+                            actionLabel = "返回", onAction = { scope.onBack() })
                     "chat.gallery_portrait" ->
                         if (sec?.portraits != null) ZhaoxiPortraitEditor(sec.portraits, gid, scope)
-                        else ZxEmpty("端口未注入", "chat.gallery_portrait 能力未连接")
+                        else ZxEmpty("人物画像暂不可用", "请返回人物图集",
+                            actionLabel = "返回", onAction = { scope.onBack() })
                     "chat.gallery_delete" ->
                         if (conv?.galleryDeletion != null)
                             ZxGalleryDeleteScene(conv.galleryDeletion, gid, "所选人物", identity, scope, sec?.gallery ?: conv.gallery)
-                        else ZxEmpty("端口未注入", "图集删除能力未连接")
+                        else ZxEmpty("当前无法删除人物", "请返回人物图集",
+                            actionLabel = "返回", onAction = { scope.onBack() })
                     else ->
                         if (sec?.diary != null) ZhaoxiDiaryScene(sec.diary, gid, scope)
-                        else ZxEmpty("端口未注入", "chat.diary_manage 能力未连接")
+                        else ZxEmpty("日记暂不可用", "请返回人物图集",
+                            actionLabel = "返回", onAction = { scope.onBack() })
                 }
             }
             "chat.character_tuning" -> sec?.currentPersona?.let { ZhaoxiCurrentPersonaTuning(it, scope) }
@@ -425,7 +436,8 @@ class ZhaoxiApplicationScenePack(
             }
             "automation.editor" -> sec?.automation?.let {
                 ZhaoxiAutomationEditorScene(it, scope, targets.automationTaskId)
-            }
+            } ?: ZxEmpty("自动化编辑暂不可用", "请返回任务列表",
+                actionLabel = "返回", onAction = { scope.onBack() })
             "automation.persona_interaction" -> sec?.automation?.let { automation ->
                 ZhaoxiPersonaInteractionScene(automation, scope,
                     onCreate = {
@@ -440,11 +452,16 @@ class ZhaoxiApplicationScenePack(
             }
             "route.tools", "tools.mcp", "tools.github", "tools.plugins" ->
                 sec?.tools?.let { ZhaoxiToolsScene(it, scope, scene.value) }
-            "media.creation", "media.result" -> (sec?.media ?: conv?.media)?.let { media ->
-                settings?.let { ZhaoxiConnectedMediaScene(
-                    media, it, sessionId, scope, sec?.gallery ?: conv?.gallery,
-                    sec?.portraits, resultsOnly = scene.value == "media.result")
-                }
+                    ?: ZxEmpty("工具管理暂不可用", "请检查服务连接",
+                        actionLabel = "返回", onAction = { scope.onBack() })
+            "media.creation", "media.result" -> {
+                val mediaOwner = sec?.media ?: conv?.media
+                if (mediaOwner != null && settings != null) {
+                    ZhaoxiConnectedMediaScene(
+                        mediaOwner, settings, sessionId, scope, sec?.gallery ?: conv?.gallery,
+                        sec?.portraits, resultsOnly = scene.value == "media.result")
+                } else ZxEmpty("媒体功能不可用", "请先配置媒体模型",
+                    actionLabel = "返回", onAction = { scope.onBack() })
             }
 
             // ---- 工作区 ----
