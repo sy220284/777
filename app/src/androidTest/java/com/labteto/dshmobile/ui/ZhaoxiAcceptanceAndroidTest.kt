@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.*
@@ -21,7 +22,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxButtonVariant
-import com.labteto.dshmobile.uipack.zhaoxi.components.ZxField
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxMessageRow
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxRichReply
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTypingIndicator
@@ -136,7 +136,7 @@ class ZhaoxiAcceptanceAndroidTest {
                 ZhaoxiTheme(hue = ZhaoxiHue.STONE, dark = false, reducedMotion = true) {
                     Column(Modifier.fillMaxSize().padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        ZxButton("主要操作", { clicks++ }, Modifier.fillMaxSize(0.4f))
+                        ZxButton("主要操作", { clicks++ }, Modifier.fillMaxWidth())
                         ZxButton("处理中", { clicks++ }, loading = true)
                         ZxButton("不可使用", { clicks++ }, enabled = false)
                         ZxButton("描边操作", { clicks++ }, variant = ZxButtonVariant.Outline)
