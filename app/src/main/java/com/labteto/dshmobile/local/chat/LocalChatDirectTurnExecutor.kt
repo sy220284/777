@@ -257,7 +257,11 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     options = com.labteto.dshmobile.local.LocalModelRequestOptions(
                         toolsOverride = JsonArray(emptyList()),
                         allowImageGeneration = true,
-                        publishPreviewEnabled = false,
+                        publishPreviewEnabled = true,
+                        previewDeltaTransformFactory = {
+                            val filter = com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPreview()
+                            filter::append
+                        },
                     persistOverflowHistory = true,
                     requestLog = eventLog,
                     temperature = snapshot.chat.chatState.behaviorTuning.roleplayTemperature(
