@@ -16,6 +16,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -38,6 +39,10 @@ import com.labteto.dshmobile.uicontract.WorkTeamUiCommand
 import com.labteto.dshmobile.uicontract.WorkTeamUiPort
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadge
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadgeTone
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxButtonVariant
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxField
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxFooterNote
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty
@@ -317,31 +322,137 @@ fun ZhaoxiRequirementEvidenceScene(
 fun ZhaoxiWorkTeamScene(team: WorkTeamUiPort, scope: UiSceneRenderScope) {
     val snap by team.snapshots.collectAsState(initial = team.snapshot())
     val co = rememberCoroutineScope()
-    ZxPage("集群工坊", onBack = { scope.onBack() }) {
+    var selectedMember by remember(snap.identity?.sessionId) { mutableStateOf<Pair<String, String>?>(null) }
+    var textDraft by remember(selectedMember) { mutableStateOf("") }
+    var output by remember(selectedMember) { mutableStateOf<String?>(null) }
+    var feedback by remember(snap.identity?.sessionId) { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var confirmMember by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var confirmTeam by remember { mutableStateOf(false) }
+    val current = snap.members.firstOrNull { it.id == selectedMember?.first && it.jobId == selectedMember?.second }
+    fun send(command: WorkTeamUiCommand, successfulAction: String) {
+        if (busy) return
+        busy = true
+        co.launch {
+            try {
+                val result = team.submit(command)
+                feedback = zxWorkTeamResultLabel(result, successfulAction)
+                if (result.receipt.admitted() && command is WorkTeamUiCommand.SendMessage) textDraft = ""
+                // Owner acceptance is not a verified task or final outcome.
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (failure: Exception) { feedback = failure.message ?: "团队操作没有确认成功" }
+            finally { busy = false }
+        }
+    }
+    ZxPage("Agent 团队", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
+        if (snap.rebuilding) ZxFooterNote("团队正在恢复状态，以下成员信息以运行时投影为准")
         snap.failure?.let {
-            com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(it, com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err)
+            com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
+                it, com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err)
         }
-        if (snap.members.isEmpty()) {
-            com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("集群空闲", "发送带团队的任务后，子 Agent 会出现在这里")
-        }
-        snap.members.forEach { m ->
-            ZxRow(m.name, "${m.phase} · ${m.activity}" + (m.error?.let { " · $it" } ?: ""),
+        feedback?.let { ZxFooterNote(it) }
+        ZxSection("团队成员 · ${snap.members.size}")
+        if (snap.members.isEmpty())
+            ZxEmpty("当前没有运行团队", "可从 Work 中发送带团队的任务后查看进展")
+        snap.members.forEach { member ->
+            val selected = current?.id == member.id && current.jobId == member.jobId
+            ZxRow(member.name, buildString {
+                append(member.phase)
+                if (member.activity.isNotBlank()) append(" · ").append(member.activity.take(90))
+                if (member.pendingMessages > 0) append(" · 待处理消息 ${member.pendingMessages}")
+                member.error?.let { append(" · 错误：").append(it.take(80)) }
+            }, onClick = { selectedMember = if (selected) null else member.id to member.jobId },
                 trailing = {
-                    Row {
-                        if (m.pendingMessages > 0) ZxBadge("${m.pendingMessages}", ZxBadgeTone.Accent)
-                        ZxChip("停止", false) {
-                            snap.identity?.let { id ->
-                                co.launch {
-                                    team.submit(WorkTeamUiCommand.StopMember(id, m.id, m.jobId))
-                                }
-                            }
-                        }
+                    ZxChip(if (selected) "收起" else "详情", selected) {
+                        selectedMember = if (selected) null else member.id to member.jobId
                     }
                 })
         }
-
+        if (current != null) {
+            ZxSection("成员详情 · ${current.name}")
+            ZxValueRow("当前阶段", value = current.phase.ifBlank { "未上报" })
+            ZxValueRow("正在做什么", value = current.activity.ifBlank { "暂无运行描述" })
+            current.task?.let { ZxRow("任务目标", it.take(600), showChevron = false) }
+            if (current.pendingMessages > 0) {
+                com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
+                    "还有 ${current.pendingMessages} 条成员消息待处理",
+                    com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Info)
+            }
+            current.error?.let { com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
+                "成员错误：$it", com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Warn) }
+            ZxSection("成员产出")
+            ZxButton("查看真实产出", {
+                val identity = snap.identity
+                if (identity == null) feedback = "工作会话身份已失效，请重新进入"
+                else {
+                    val result = team.readOutput(identity, current.id, current.jobId)
+                    if (result.receipt.admitted()) {
+                        output = result.message
+                        feedback = if (result.message.isBlank()) "成员尚未生成可展示的输出" else "已读取成员产出"
+                    } else {
+                        output = null
+                        feedback = zxWorkTeamResultLabel(result, "读取成员产出")
+                    }
+                }
+            }, enabled = snap.identity != null && !busy,
+                variant = ZxButtonVariant.Outline)
+            output?.takeIf(String::isNotBlank)?.let { value ->
+                androidx.compose.foundation.text.selection.SelectionContainer {
+                    Text(value, color = ZhaoxiTheme.colors.ink, fontSize = 13.sp)
+                }
+            }
+            ZxSection("发送消息给成员")
+            ZxField(textDraft, { textDraft = it }, Modifier.fillMaxWidth().heightIn(min = 96.dp),
+                placeholder = "给此成员补充指令或问题")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ZxButton("发送给成员", {
+                    val id = snap.identity
+                    if (id != null) send(WorkTeamUiCommand.SendMessage(
+                        id, current.id, current.jobId, textDraft.trim()), "成员消息")
+                }, Modifier.weight(1f), enabled = !busy && snap.identity != null && textDraft.isNotBlank())
+                ZxButton("停止成员", { confirmMember = current.id to current.jobId },
+                    Modifier.weight(1f), variant = ZxButtonVariant.Danger,
+                    enabled = !busy && snap.identity != null)
+            }
+        }
+        if (snap.members.isNotEmpty()) {
+            ZxSection("团队控制")
+            ZxFooterNote("执行步骤数只表示成员运行步骤；任务是否完成需以 Work 的真实待办和 Lead 验收为准。")
+            ZxButton("停止整个团队", { confirmTeam = true },
+                Modifier.fillMaxWidth(), variant = ZxButtonVariant.Danger,
+                enabled = !busy && snap.identity != null)
+        }
     }
+    confirmMember?.let { target ->
+        ZxDialog("停止这个 Agent？",
+            "将向当前成员发送中断请求，已产生的结果仍须核验。",
+            "确认停止", {
+                confirmMember = null
+                val id = snap.identity
+                if (id != null && snap.members.any { it.id == target.first && it.jobId == target.second })
+                    send(WorkTeamUiCommand.StopMember(id, target.first, target.second), "停止成员")
+                else feedback = "成员任务已变化，取消过时的停止指令"
+            }, { confirmMember = null })
+    }
+    if (confirmTeam) ZxDialog("停止整个 Agent 团队？",
+        "将尝试中断当前会话的所有成员。仅发送指令不代表全部成员已经停止。",
+        "确认停止", {
+            confirmTeam = false
+            val id = snap.identity
+            val jobs = snap.members.map { it.jobId }.filter(String::isNotBlank).toSet()
+            if (id != null && jobs.isNotEmpty())
+                send(WorkTeamUiCommand.StopTeam(id, jobs), "停止团队")
+            else feedback = "团队状态已变化，无法提交旧任务的停止指令"
+        }, { confirmTeam = false })
+}
+
+/** Only the Owner's result is displayed; Accepted means admitted, never verified execution. */
+internal fun zxWorkTeamResultLabel(result: com.labteto.dshmobile.uicontract.UiWorkTeamResult,
+    action: String): String = when (val receipt = result.receipt) {
+    com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted -> "$action：已受理 · ${result.message}"
+    com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued -> "$action：已排队 · ${result.message}"
+    else -> "$action：${receipt.userHint()} · ${result.message}"
 }
 
 /** work.capabilities — 能力就绪（交接 Sheet 内容页面化）。 */
