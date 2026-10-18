@@ -18,6 +18,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,8 +81,10 @@ fun ZxModeSwitch(workMode: Boolean, onChange: (Boolean) -> Unit, modifier: Modif
                 Modifier
                     .clip(RoundedCornerShape(999.dp))
                     .background(if (on) c.ink else c.bg2)
-                    .clickable { onChange(w) }
-                    .padding(horizontal = 13.dp, vertical = 5.dp),
+                    .clickable(role = Role.Tab) { onChange(w) }
+                    .semantics { selected = on }
+                    .heightIn(min = 42.dp)
+                    .padding(horizontal = 14.dp, vertical = 5.dp),
             ) { Text(label, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = if (on) c.onInk else c.ink2) }
         }
     }
