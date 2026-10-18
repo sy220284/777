@@ -3,9 +3,27 @@ package com.labteto.dshmobile.ui
 import android.graphics.Bitmap
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxMessageRow
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxRichReply
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTypingIndicator
+import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
+import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiHue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -42,10 +60,19 @@ class ZhaoxiAcceptanceAndroidTest {
             theme, "stone", scale, 0, .5f, .5f, .5f, 1f, true)))
     }
 
-    private fun capture(name: String) {
+    private fun capture(name: String, sceneId: String? = null) {
         compose.waitForIdle()
-        val screenshot = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
-        File(directory, "$name.png").outputStream().use { screenshot.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        // Capture the rendered scene subtree, not whichever Activity window is currently foreground.
+        // This prevents mislabeled setting/tool screenshots from passing for conversation scenes.
+        val screenshot = if (sceneId == null) {
+            requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+        } else {
+            compose.onNodeWithTag("zx-acceptance-$sceneId")
+                .assertIsDisplayed().captureToImage().asAndroidBitmap()
+        }
+        File(directory, "$name.png").outputStream().use {
+            check(screenshot.compress(Bitmap.CompressFormat.PNG, 100, it)) { "Screenshot failed: $name" }
+        }
         screenshot.recycle()
     }
 
@@ -64,7 +91,7 @@ class ZhaoxiAcceptanceAndroidTest {
         compose.activityRule.scenario.onActivity { activity -> activity.setContent {
             CompositionLocalProvider(LocalUiPrivateTextCipher provides ports.privateTextCipher,
                 LocalUiHostSystemOperationOwner provides systemOperations) {
-                Box(Modifier.fillMaxSize().systemBarsPadding()) {
+                Box(Modifier.fillMaxSize().systemBarsPadding().testTag("zx-acceptance-${current.id.value}")) {
                     // SLOT renderers are embedded here; never proposed as navigation targets.
                     key(current.id) {
                         pack.SceneFrame(UiSceneNavigationState(pack.manifest.id, listOf(root, current.id))) {
@@ -88,12 +115,68 @@ class ZhaoxiAcceptanceAndroidTest {
                     compose.runOnIdle { current = requirement }
                     compose.waitForIdle()
                     compose.onAllNodesWithText("该场景暂无 Zx* 实装映射", substring = true).assertCountEquals(0)
-                    capture("$label-${requirement.id.value}")
+                    capture("$label-${requirement.id.value}", requirement.id.value)
                     index.appendText("$label\t${requirement.id.value}\t${requirement.kind}\tlocal-session-and-persona; no-external-model; empty-message-and-media-states\n")
                 }
             }
         } finally { appearance(ports, "system", 1f) }
         assertEquals(106, index.readLines().size) // 75 light + 15 dark + 15 at 130%.
+    }
+
+
+    /**
+     * Offline presentation fixture. Unlike owner-backed 75-scene smoke screenshots, this
+     * deliberately includes rich answer content so a reviewer can actually inspect typography.
+     * Never label these screenshots as evidence of network streaming or Work tool execution.
+     */
+    @Test fun offlineReplyFixturesCoverContentAndLargeText() {
+        ready()
+        val examples = listOf(
+            Triple("light", false, 1f),
+            Triple("dark", true, 1f),
+            Triple("large", false, 1.3f),
+        )
+        examples.forEach { (label, dark, fontScale) ->
+            compose.activityRule.scenario.onActivity { activity ->
+                activity.setContent {
+                    val deviceDensity = LocalDensity.current
+                    CompositionLocalProvider(
+                        LocalDensity provides Density(deviceDensity.density, deviceDensity.fontScale * fontScale)
+                    ) {
+                        ZhaoxiTheme(hue = ZhaoxiHue.STONE, dark = dark, reducedMotion = true) {
+                            Column(
+                                Modifier.fillMaxSize()
+                                    .background(com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme.colors.bg)
+                                    .testTag("zx-acceptance-reply-fixture")
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(horizontal = 16.dp, vertical = 20.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp),
+                            ) {
+                                ZxMessageRow(
+                                    UiMessageSnapshot("fixture-user", UiMessageRole.USER,
+                                        "帮我整理一份 UI 改造进度，有表格和代码。", 0L),
+                                    "我", onLongPress = {}, onBranchSelect = {},
+                                )
+                                ZxMessageRow(
+                                    UiMessageSnapshot("fixture-assistant", UiMessageRole.ASSISTANT,
+                                        "# 界面验收示例\n正文排版应保持清晰，**重点内容**醒目但克制。\n\n" +
+                                        "## 本轮内容\n- 顶栏层级\n- 回复布局\n- 空白状态\n\n" +
+                                        "| 项目 | 状态 | 备注 |\n| --- | --- | --- |\n" +
+                                        "| 视觉层级 | 已调整 | 中性色为主 |\n" +
+                                        "| 动效 | 已调整 | 尊重减弱动效 |\n\n" +
+                                        "```kotlin\nval reply = \"清晰、稳定的回复\"\n```", 0L),
+                                    "助手", onLongPress = {}, onBranchSelect = {},
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                ZxTypingIndicator()
+                            }
+                        }
+                    }
+                }
+            }
+            compose.onNodeWithText("界面验收示例", substring = true).assertExists()
+            capture("fixture-reply-$label", "reply-fixture")
+        }
     }
 
     @Test fun appearancePersistsExactStandardScaleAndExposesSelection() {

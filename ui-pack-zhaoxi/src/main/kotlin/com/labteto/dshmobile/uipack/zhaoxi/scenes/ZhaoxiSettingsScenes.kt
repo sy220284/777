@@ -8,10 +8,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -68,10 +71,19 @@ fun ZhaoxiSettingsHomeScene(scope: UiSceneRenderScope) {
 fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRenderScope) {
     val snap by preferences.snapshots.collectAsState(initial = UiHostPreferences("system", "stone", 1.0f))
     val jobs = rememberCoroutineScope()
-    fun writeAppearance(theme: String = snap.theme, accent: String = snap.accent, textScale: Float = snap.textScale) {
+    fun writeAppearance(
+        theme: String = snap.theme,
+        accent: String = snap.accent,
+        textScale: Float = snap.textScale,
+        ambientGlow: Float = snap.ambientGlow,
+        transparency: Float = snap.transparency,
+        motionScale: Float = snap.motionScale,
+    ) {
         jobs.launch { preferences.submit(UiHostPreferencesCommand.Appearance(theme, accent, textScale, snap.textWeight,
-            snap.transparency, snap.ambientGlow, snap.componentEmphasis, snap.motionScale, snap.adaptiveContrast)) }
+            transparency, ambientGlow, snap.componentEmphasis, motionScale, snap.adaptiveContrast)) }
     }
+    var glow by remember(snap.ambientGlow) { mutableFloatStateOf(snap.ambientGlow) }
+    var glass by remember(snap.transparency) { mutableFloatStateOf(snap.transparency) }
     ZxPage("外观", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("主题")
@@ -98,7 +110,30 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
             labels = listOf("小", "标准", "大"),
             onChange = { v -> writeAppearance(textScale = listOf(0.9f, 1f, 1.3f)[v]) },
         )
-        ZxFooterNote("外观偏好即时生效 · 写入宿主偏好存储")
+        ZxSection("背景与材质")
+        Text("环境光强度 · ${(glow * 100).toInt()}%", fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2)
+        Slider(
+            value = glow, onValueChange = { glow = it },
+            onValueChangeFinished = { writeAppearance(ambientGlow = glow) },
+            colors = SliderDefaults.colors(
+                thumbColor = ZhaoxiTheme.colors.accent,
+                activeTrackColor = ZhaoxiTheme.colors.accent,
+            ),
+        )
+        Text("玻璃透明度 · ${(glass * 100).toInt()}%", fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2)
+        Slider(
+            value = glass, onValueChange = { glass = it },
+            onValueChangeFinished = { writeAppearance(transparency = glass) },
+            colors = SliderDefaults.colors(
+                thumbColor = ZhaoxiTheme.colors.accent,
+                activeTrackColor = ZhaoxiTheme.colors.accent,
+            ),
+        )
+        ZxSection("动效")
+        ZxSwitchRow("界面动效", "关闭后停用场景与组件过渡动画",
+            checked = snap.motionScale > 0f,
+            onChange = { writeAppearance(motionScale = if (it) 1f else 0f) })
+        ZxFooterNote("五套主题可切换明暗 · 环境光与透明度保存到本地偏好")
     }
 }
 
