@@ -180,6 +180,7 @@ fun ZxField(
     visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     inputTestTag: String? = null,
+    fieldLabel: String? = null,
 ) {
     val c = ZhaoxiTheme.colors
     val source = remember { MutableInteractionSource() }
@@ -205,7 +206,7 @@ fun ZxField(
             modifier = Modifier.fillMaxWidth()
                 .then(if (inputTestTag != null) Modifier.testTag(inputTestTag) else Modifier)
                 .semantics {
-                if (placeholder.isNotEmpty()) contentDescription = placeholder
+                (fieldLabel ?: placeholder).takeIf { it.isNotEmpty() }?.let { contentDescription = it }
                 if (error) this.error(errorMessage ?: "输入值不正确")
             },
         ) { inner ->

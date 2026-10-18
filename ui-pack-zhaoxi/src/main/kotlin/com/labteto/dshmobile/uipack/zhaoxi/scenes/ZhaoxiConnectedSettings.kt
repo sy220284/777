@@ -101,8 +101,9 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             }, { pendingRemoveModel = null })
         }
         ZxSection(if (profileId == null) "添加模型" else "编辑模型")
-        ZxSection("模型标识")
-        ZxField(model, { model = it }, Modifier.fillMaxWidth(), placeholder = "模型名称（始终允许手动输入）")
+        ZxSection("模型名称")
+        ZxField(model, { model = it }, Modifier.fillMaxWidth(), placeholder = "模型名称（支持手动输入）",
+            fieldLabel = "模型名称")
         ZxFooterNote("可使用供应商目录选择模型，也可手动填写目录里没有的自定义模型。")
         ZxSection("接口地址")
         ZxField(baseUrl, { baseUrl = it }, Modifier.fillMaxWidth(), placeholder = "接口地址")
