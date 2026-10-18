@@ -218,27 +218,58 @@ fun ZhaoxiUsageDetailScene(usage: UsageUiPort, requestId: String?, scope: UiScen
 }
 
 /** Memory overview deliberately says global scope; other scopes require their own authorized context. */
+internal fun zxMemoryKindTitle(kind: MemoryKind): String = when (kind) {
+    MemoryKind.RULE -> "规则"
+    MemoryKind.PREFERENCE -> "偏好"
+    MemoryKind.FACT -> "人物与事实"
+    MemoryKind.DECISION -> "决定"
+    MemoryKind.CONSTRAINT -> "约束"
+    MemoryKind.STATE -> "状态"
+    MemoryKind.SUMMARY -> "摘要"
+    MemoryKind.RELATIONSHIP_FACT -> "关系事实"
+    MemoryKind.RELATIONSHIP_STATE -> "关系进展"
+    MemoryKind.RELATIONSHIP_PREFERENCE -> "关系偏好"
+}
+
 @Composable
 fun ZhaoxiMemoryOverviewScene(memory: MemoryUiPort, settings: SettingsUiPort?, scope: UiSceneRenderScope) {
-    val page = remember(memory) { memory.memoryPage(MemoryManagementQuery(setOf(MemoryScope.GLOBAL))) }
+    var refresh by remember { mutableIntStateOf(0) }
+    val snap = settings?.let { it.state.collectAsState(initial = it.initialState).value }
+    val current = settings?.memoryContext()
+    val page = remember(memory, refresh) {
+        memory.memoryPage(MemoryManagementQuery(setOf(MemoryScope.GLOBAL)))
+    }
+    val lineage = remember(memory, refresh, current?.lineageId) {
+        current?.lineageId?.takeIf(String::isNotBlank)?.let { lineageId ->
+            memory.memoryPage(MemoryManagementQuery(
+                scopes = setOf(MemoryScope.LINEAGE), lineageId = lineageId))
+        }
+    }
     ZxPage("记忆", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        ZxSection("全局记忆概览")
-        ZxValueRow("有效记忆", value = page.totalMatching.toString(), mono = true)
-        ZxValueRow("记忆分类", value = page.kindCounts.count { it.value > 0 }.toString())
+        ZxSection("当前记忆策略")
+        if (snap != null) {
+            ZxValueRow("自动召回", value = if (snap.autoRecall) "已开启" else "已关闭")
+            ZxValueRow("自动记忆", value = if (snap.autoMemory) "已开启" else "已关闭")
+        } else ZxFooterNote("当前设置服务未接入，无法确认自动记忆策略")
+        ZxSection("有效记忆概览")
+        ZxValueRow("全局有效记忆", value = page.totalMatching.toString(), mono = true)
+        lineage?.let { ZxValueRow("当前会话线有效记忆", value = it.totalMatching.toString(), mono = true) }
+        ZxValueRow("全局记忆分类", value = page.kindCounts.count { it.value > 0 }.toString())
         page.kindCounts.filterValues { it > 0 }.forEach { (kind, count) ->
-            ZxValueRow(kind.name, value = count.toString())
+            ZxValueRow(zxMemoryKindTitle(kind), value = count.toString())
         }
-        ZxSection("记忆管理")
+        ZxButton("刷新记忆统计", { refresh++ }, variant = ZxButtonVariant.Outline)
+        ZxSection("管理与策略")
         if (settings != null) {
-            ZxNavRow("记忆设置", sub = "自动召回 · 自动记忆") {
+            ZxNavRow("自动召回与自动记忆设置", sub = "当前设置直接读取现有 Owner") {
                 scope.onNavigate(UiSceneId("settings.memory_settings"))
             }
         }
-        ZxNavRow("记忆管理", sub = "搜索 · 修改 · 遗忘") {
+        ZxNavRow("打开记忆管理", sub = "按可见范围及类型搜索 · 查看 · 修改 · 置顶 · 遗忘") {
             scope.onNavigate(UiSceneId("settings.memory_management"))
         }
-
+        ZxFooterNote("本页显示有效记忆数量；遗忘的记忆不计入统计，不凭空推断可恢复数量。")
     }
 }
 
