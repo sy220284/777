@@ -181,20 +181,21 @@ fun ZhaoxiChatGuardScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     var confirmClear by remember { mutableStateOf(false) }
     ZxPage("聊天风格守卫", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        ZxSwitchRow("启用风格守卫", "在原有模型与人物规则边界内生效", snap.chatStyleGuardEnabled) {
-            result = settings.submit(SettingsUiCommand.StyleGuard(it)).toString()
+        ZxSwitchRow("启用风格守卫", "", snap.chatStyleGuardEnabled) {
+            result = settings.submit(SettingsUiCommand.StyleGuard(it)).zxUserMessage("更新")
         }
         ZxSection("自定义过滤词")
         ZxValueRow("已配置", value = "${snap.chatStyleGuardCustomPhrases.size} 项")
         ZxField(draft, { draft = it }, Modifier.fillMaxWidth(), placeholder = "输入过滤词")
         ZxButton("添加过滤词", {
-            result = settings.submit(SettingsUiCommand.AddStylePhrase(draft.trim())).toString()
-            if (result == SettingsUiReceipt.Applied.toString()) draft = ""
+            val receipt = settings.submit(SettingsUiCommand.AddStylePhrase(draft.trim()))
+            result = receipt.zxUserMessage("添加")
+            if (receipt == SettingsUiReceipt.Applied) draft = ""
         }, enabled = draft.isNotBlank())
         snap.chatStyleGuardCustomPhrases.forEach { phrase ->
             ZxRow(phrase, "自定义", trailing = {
                 ZxChip("移除", false) {
-                    result = settings.submit(SettingsUiCommand.RemoveStylePhrase(phrase)).toString()
+                    result = settings.submit(SettingsUiCommand.RemoveStylePhrase(phrase)).zxUserMessage("移除")
                 }
             })
         }
@@ -207,7 +208,7 @@ fun ZhaoxiChatGuardScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         if (snap.styleGuardHits.isNotEmpty()) {
             ZxButton(if (confirmClear) "确认清空记录" else "清空命中记录", {
                 if (confirmClear) {
-                    result = settings.submit(SettingsUiCommand.ClearStyleHits).toString()
+                    result = settings.submit(SettingsUiCommand.ClearStyleHits).zxUserMessage("清空")
                     confirmClear = false
                 } else confirmClear = true
             })
@@ -224,10 +225,10 @@ fun ZhaoxiMemorySettingsScene(settings: SettingsUiPort, scope: UiSceneRenderScop
         Spacer(Modifier.height(8.dp))
         ZxSection("记忆行为")
         ZxSwitchRow("自动召回", "按模型与会话权限检索记忆", snap.autoRecall) {
-            status = settings.submit(SettingsUiCommand.Personalization(snap.userRules, it, snap.autoMemory)).toString()
+            status = settings.submit(SettingsUiCommand.Personalization(snap.userRules, it, snap.autoMemory)).zxUserMessage("更新")
         }
-        ZxSwitchRow("自动记忆", "记忆写入由原 Memory Owner 管理", snap.autoMemory) {
-            status = settings.submit(SettingsUiCommand.Personalization(snap.userRules, snap.autoRecall, it)).toString()
+        ZxSwitchRow("自动记忆", "", snap.autoMemory) {
+            status = settings.submit(SettingsUiCommand.Personalization(snap.userRules, snap.autoRecall, it)).zxUserMessage("更新")
         }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
 
@@ -246,7 +247,7 @@ fun ZhaoxiApprovalModeSelector(settings: SettingsUiPort) {
             LocalApprovalMode.MANUAL -> "手动审批"
             LocalApprovalMode.AUTO -> "自动审批"
         }, mode == candidate) {
-            status = settings.submit(SettingsUiCommand.ApprovalMode(candidate)).toString()
+            status = settings.submit(SettingsUiCommand.ApprovalMode(candidate)).zxUserMessage("更新审批模式")
         }
     }
     ZxFooterNote("审批模式不会修改系统权限")
