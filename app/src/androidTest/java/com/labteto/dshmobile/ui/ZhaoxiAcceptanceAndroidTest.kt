@@ -224,6 +224,10 @@ class ZhaoxiAcceptanceAndroidTest {
             androidx.compose.ui.semantics.Role.RadioButton,
         )
         compose.onNode(standardTextScale).performScrollTo().performClick()
+        // 设置写入和观察者更新异步进行；等待 Owner 确认后仍检验 UI 选中态。
+        compose.waitUntil(10_000) {
+            runBlocking { ports.hostPreferencesUiPort.snapshots.first().textScale == 1f }
+        }
         compose.onNode(standardTextScale).assertIsSelected()
         val snapshot = runBlocking { ports.hostPreferencesUiPort.snapshots.first() }
         assertEquals(1f, snapshot.textScale, .001f)
