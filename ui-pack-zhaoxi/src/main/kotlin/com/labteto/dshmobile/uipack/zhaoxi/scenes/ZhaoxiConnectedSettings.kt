@@ -282,7 +282,8 @@ fun ZhaoxiPerformanceScene(port: ModelPerformanceUiPort, scope: UiSceneRenderSco
         ZxSection("温度上限")
         ZxField(temperature, { temperature = it }, Modifier.fillMaxWidth(),
             placeholder = "1.0–2.0", error = temperatureError != null,
-            errorMessage = temperatureError)
+            errorMessage = temperatureError,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
         temperatureError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
         ZxButton("保存温度", {
             showTemperatureError = true
