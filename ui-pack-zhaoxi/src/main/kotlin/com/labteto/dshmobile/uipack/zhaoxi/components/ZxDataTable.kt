@@ -43,7 +43,8 @@ fun ZxDataTable(
     val colors = ZhaoxiTheme.colors
     val clipboard = LocalClipboardManager.current
     val fontScale = LocalDensity.current.fontScale
-    var visibleRows by remember(headers, rows) { mutableStateOf(24) }
+    // A streaming reply appends rows repeatedly; preserve the reader's expanded position.
+    var visibleRows by remember(headers) { mutableStateOf(24) }
     var copied by remember(headers, rows) { mutableStateOf(false) }
     val widths = remember(headers, rows, fontScale) {
         headers.indices.map { column ->
