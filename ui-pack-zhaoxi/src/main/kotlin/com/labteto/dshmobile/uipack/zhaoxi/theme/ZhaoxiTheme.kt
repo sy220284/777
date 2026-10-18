@@ -216,17 +216,17 @@ enum class ZhaoxiMaterial { M0, M1, M2, M3 }
 
 /**
  * M0 纯色分层 / M1 云母（静态渐变，零模糊） / M2 轻玻璃 blur20 / M3 强玻璃 blur24+噪点。
- * 降级链：低内存/省电 → blur 半径减半；RenderEffect 不可用 → M2/M3 退化为 97% 不透明纯色。
+ * Host 未提供真正的背景取样时默认 NONE，避免将透明背景误当真实磨砂玻璃。
  * 判定由 Host 注入 LocalZhaoxiBlurCapability，组件与 Pack 不自行探测。
  */
 enum class ZhaoxiBlurCapability { FULL, REDUCED, NONE }
-val LocalZhaoxiBlurCapability = staticCompositionLocalOf { ZhaoxiBlurCapability.FULL }
+val LocalZhaoxiBlurCapability = staticCompositionLocalOf { ZhaoxiBlurCapability.NONE }
 
 /**
  * 材质唯一入口（E8.16 实装）。
  * M0 纯色分层 / M1 云母（静态径向渐变，零模糊） / M2 轻玻璃 / M3 强玻璃+噪点。
  * 降级链：blur 不可用（NONE 或 API<31）→ M2/M3 退化为 97% 不透明纯色；
- * REDUCED → 模糊半径减半。判定由 Host 注入 LocalZhaoxiBlurCapability。
+ * REDUCED 仅在 Host 实际支持后景采样时有效；默认 NONE 保证弹层可读性。
  * 内容不能使用 Modifier.blur（会把文字和控件一并模糊）；宿主未提供真正
  * 背景取样时使用可读的半透明材质，不虚构背景模糊成功。
  */
