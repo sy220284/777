@@ -1,6 +1,18 @@
 package com.labteto.dshmobile.uipack.zhaoxi.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.draw.graphicsLayer
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.border
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
@@ -50,6 +62,7 @@ import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 
 enum class ZxButtonVariant { Ink, Outline, Ghost, Danger }
 
+/** E8.18 六态按钮；边框、焦点、按压和加载均可见且保留 48dp 触控范围。 */
 @Composable
 fun ZxButton(
     text: String,
@@ -60,38 +73,57 @@ fun ZxButton(
     loading: Boolean = false,
 ) {
     val c = ZhaoxiTheme.colors
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val focused by interaction.collectIsFocusedAsState()
+    val scale by animateFloatAsState(if (pressed) .97f else 1f,
+        ZhaoxiMotion.spec(ZhaoxiDuration.INSTANT), label = "zxBtnPress")
     val spec = ZhaoxiMotion.spec<androidx.compose.ui.graphics.Color>(ZhaoxiDuration.FAST)
     val bg by animateColorAsState(
         when {
             !enabled -> c.bg2
             variant == ZxButtonVariant.Ink -> c.ink
             variant == ZxButtonVariant.Danger -> c.err
-            else -> c.card
+            variant == ZxButtonVariant.Outline -> c.card
+            else -> c.bg2
         }, spec, label = "zxBtnBg",
     )
     val fg = when {
         !enabled -> c.ink3
-        variant == ZxButtonVariant.Ink || variant == ZxButtonVariant.Danger -> c.onInk
-        variant == ZxButtonVariant.Danger -> c.err
+        variant == ZxButtonVariant.Danger -> if (c.bg.luminance() < .5f) c.ink else c.onInk
+        variant == ZxButtonVariant.Ink -> c.onInk
         else -> c.ink
     }
+    val shape = RoundedCornerShape(12.dp)
     Box(
         modifier
             .widthIn(min = 64.dp)
             .heightIn(min = 48.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(shape)
             .background(bg)
-            .then(
-                if (variant == ZxButtonVariant.Outline)
-                    Modifier.background(bg) // 描边以 line 色呈现（Outline 态）
-                else Modifier,
+            .border(if (focused) 2.dp else 1.dp,
+                if (focused) c.accentInk else if (variant == ZxButtonVariant.Outline) c.line else bg,
+                shape)
+            .clickable(
+                enabled = enabled && !loading,
+                role = Role.Button,
+                interactionSource = interaction,
+                indication = androidx.compose.material.ripple.rememberRipple(),
+                onClick = onClick,
             )
-            .clickable(enabled = enabled && !loading, role = Role.Button, onClick = onClick)
+            .semantics {
+                contentDescription = text
+                if (loading) stateDescription = "处理中"
+            }
             .padding(horizontal = 18.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        // loading 宽度锁定：标签与指示同槽位，不换布局
-        Text(if (loading) "…" else text, color = fg, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Text(text, modifier = Modifier.alpha(if (loading) 0f else 1f),
+            color = fg, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+            maxLines = 2, textAlign = TextAlign.Center)
+        if (loading) CircularProgressIndicator(
+            modifier = Modifier.size(18.dp), color = fg, strokeWidth = 2.dp)
     }
 }
 
@@ -104,18 +136,31 @@ fun ZxIconButton(
     content: @Composable () -> Unit,
 ) {
     val c = ZhaoxiTheme.colors
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val focused by interaction.collectIsFocusedAsState()
+    val scale by animateFloatAsState(if (pressed) .96f else 1f,
+        ZhaoxiMotion.spec(ZhaoxiDuration.INSTANT), label = "zxIconPress")
+    val shape = RoundedCornerShape(12.dp)
     Box(
         modifier
             .size(48.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(enabled = enabled, onClick = onClick, role = Role.Button)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(shape)
+            .border(if (focused) 2.dp else 0.dp, c.accentInk, shape)
+            .clickable(
+                enabled = enabled, onClick = onClick, role = Role.Button,
+                interactionSource = interaction,
+                indication = androidx.compose.material.ripple.rememberRipple())
             .semantics { this.contentDescription = contentDescription }
-            .alpha(if (enabled) 1f else 0.4f)
+            .alpha(if (enabled) 1f else .45f)
             .padding(8.dp),
         contentAlignment = Alignment.Center,
-    ) { androidx.compose.runtime.CompositionLocalProvider(
-        androidx.compose.material3.LocalContentColor provides c.ink,
-    ) { content() } }
+    ) {
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.material3.LocalContentColor provides c.ink,
+        ) { content() }
+    }
 }
 
 @Composable
@@ -129,11 +174,16 @@ fun ZxField(
     visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
 ) {
     val c = ZhaoxiTheme.colors
+    val source = remember { MutableInteractionSource() }
+    val focused by source.collectIsFocusedAsState()
+    val shape = RoundedCornerShape(ZhaoxiTheme.shapes.field)
     Box(
         modifier
             .heightIn(min = 48.dp)
-            .clip(RoundedCornerShape(ZhaoxiTheme.shapes.field))
+            .clip(shape)
             .background(c.bg2)
+            .border(if (focused) 2.dp else 1.dp,
+                if (error) c.err else if (focused) c.accentInk else c.line, shape)
             .padding(horizontal = 14.dp, vertical = 11.dp),
     ) {
         BasicTextField(
@@ -141,13 +191,17 @@ fun ZxField(
             onValueChange = onValueChange,
             textStyle = textStyle.copy(color = c.ink),
             visualTransformation = visualTransformation,
-            cursorBrush = SolidColor(c.accent),
-            modifier = Modifier.widthIn(min = 120.dp).semantics {
+            interactionSource = source,
+            cursorBrush = SolidColor(c.accentInk),
+            modifier = Modifier.fillMaxWidth().semantics {
                 if (placeholder.isNotEmpty()) contentDescription = placeholder
             },
         ) { inner ->
-            if (value.isEmpty()) Text(placeholder, color = c.ink3, fontSize = textStyle.fontSize)
-            inner()
+            Box {
+                if (value.isEmpty()) Text(placeholder, color = c.ink3,
+                    fontSize = textStyle.fontSize)
+                inner()
+            }
         }
     }
 }
@@ -174,6 +228,15 @@ fun ZxSwitch(
             Box(Modifier.size(20.dp).clip(CircleShape).background(c.card))
         }
     }
+}
+
+/** Reusable press feedback for clickable rows and chips. Animation duration respects reduced motion. */
+@Composable
+fun Modifier.zxPressSurface(source: MutableInteractionSource): Modifier {
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) .98f else 1f,
+        ZhaoxiMotion.spec(ZhaoxiDuration.INSTANT), label = "zxRowPress")
+    return this.graphicsLayer { scaleX = scale; scaleY = scale }
 }
 
 /** 档位滑杆（推理/温度共用，5 档）：过档触感 TICK 由调用方经 ZhaoxiHaptic 触发。 */
@@ -239,7 +302,7 @@ fun ZxTabRow(
     content: @Composable RowScope.() -> Unit = {},
     onSelect: (Int) -> Unit,
 ) {
-    Row(modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(modifier.horizontalScroll(rememberScrollState()).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         tabs.forEachIndexed { i, t -> ZxChip(t, i == selected, role = Role.Tab, onClick = { onSelect(i) }) }
         content()
     }
