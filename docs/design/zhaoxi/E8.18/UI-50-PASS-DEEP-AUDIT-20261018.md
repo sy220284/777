@@ -63,3 +63,25 @@
 | 38 | 模型采样温度非法值引导 | 问题 P2 | 温度输入只检查可解析为 Double，未见字段端的合法区间与即时提示，具体区间由 Owner 确认。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedSettings.kt:253 |
 | 39 | MCP 操作结果与连接健康回执 | 问题 P2 | 连接、健康检查、断开使用 `.toString()` 提示，成功/失败和认证问题未被翻成用户可读状态。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiAutomationScenes.kt:405 |
 | 40 | GitHub 未授权状态的下一步入口 | 问题 P1 | GitHub 页提示需要授权但没有可执行的授权操作入口，用户可能卡在空态。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiAutomationScenes.kt:446 |
+
+## 第 5 组：组件、视觉、无障碍与设备验收（41—50）
+
+| # | 检查项 | 结果 | 事实/缺陷 | 证据位置 |
+|---|---|---|---|---|
+| 41 | 核心按钮 48dp 与按下反馈 | 静态通过 | 按钮最小高度 48dp，按压缩放/加载态/禁用行为已经存在；设备触控验证仍需全页抽样。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxPrimitives.kt:69 |
+| 42 | 图标按钮可读标签与触控 | 静态通过 | 图标按钮 48dp 且要求语义描述；调用点的空标签或含糊名称需逐项 TalkBack 验证。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxPrimitives.kt:133 |
+| 43 | 输入框错误态读屏可感知 | 问题 P1 | ZxField 有错误红框，但没有同时暴露独立错误文案与 TalkBack 错误语义；仅靠颜色传达状态。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxPrimitives.kt:169 |
+| 44 | 标签/筛选控件选中态语义 | 静态通过 | Chip 提供 selectable 与 selected 状态、按压触感；过多胶囊的焦点顺序/窄屏位置仍需测。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxPrimitives.kt:279 |
+| 45 | 通用空态是否具备下一步动作 | 问题 P2 | ZxEmpty 组件只有标题+正文+图标，无通用行动按钮参数；部分空态只给提示而没有重试/创建入口。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxEmpty.kt:24 |
+| 46 | 危险弹框是系统模态并支持返回 | 静态通过 | 真实 Dialog 已使用系统 onDismiss；旋转、背景点击、TalkBack 焦点困锁需设备验收。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxFeedback.kt:76 |
+| 47 | 动画减弱策略集中生效 | 待验证 | 设计层有 reduced-motion 标志与统一时长 spec；需检查系统 animator scale=0、所有页面/组件回路确实使用。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/theme/ZhaoxiTheme.kt:157 |
+| 48 | 正文/背景 WCAG 4.5:1 对比度 | 待测量 | 令牌有多套颜色，但本次无直接像素对比度测试结果；不能由视觉感觉认定全主题 AA 通过。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/theme/ZhaoxiTheme.kt:49 |
+| 49 | 放大字体与 TalkBack 全场景覆盖 | 问题 P1 | 已有 130% 截图路径，但没有 200% 全场景布局证明；设备读屏焦点与键盘遮挡测试不完整。 | app/src/androidTest/java/com/labteto/dshmobile/ui/ZhaoxiAcceptanceAndroidTest.kt:82 |
+| 50 | 整合 HEAD 的完整 CI/设备闭环 | 未通过验收 | PR 当前 HEAD `fe72d6284d44`，运行 #39115459918 pending/未完成；不得用旧 SHA 成功代替。 | https://github.com/sy220284/777/actions |
+
+## 结论与证据边界
+
+- 已执行 **50 个不同的静态/流程/视觉验收专项检查**，每项有仓库文件或 CI 证据位置。统计：静态通过 24项；问题 P1 12项；待交互验收 1项；部分验证 1项；问题 P2 7项；待核对 1项；待实机 1项；待验证 1项；待测量 1项；未通过验收 1项。这些结果不是 50 次完整 Android 端到端运行；视觉截图、真实支付/授权、长任务时序和权限回跳都必须另行实测。
+- 优先修复：P1（运行/安全/无障碍与用户路径）优先于 P2（文案/输入/空态）。待实测不当作“已通过”，静态通过仅证明源码具备相应结构。
+- 最新 HEAD fe72d6284d442b769a0f715c11ada751dd9a4e3e；本报告会随其他贡献者继续提交而变旧，处理时应先对比 PR 的最新 SHA、CI 与本报告锚点。
+- E8.18 原始设计 ZIP 在本次用户上传中没有重新提供；本轮已读取完整 `ui设计.skill`、审计 E8.18 仓库现有实现与历史对照文档。没有据此声称完成原型像素级一一对拍。
