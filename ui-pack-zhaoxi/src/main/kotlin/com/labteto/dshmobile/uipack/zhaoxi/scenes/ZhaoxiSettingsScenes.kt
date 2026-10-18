@@ -211,11 +211,12 @@ fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneR
 
 /** settings.permissions — 呈现真实系统权限事实，跳转系统授权页而不伪造开关。 */
 @Composable
-fun ZhaoxiPermissionsScene(preferences: HostPreferencesUiPort, scope: UiSceneRenderScope) {
+fun ZhaoxiPermissionsScene(preferences: HostPreferencesUiPort, scope: UiSceneRenderScope, settings: SettingsUiPort? = null) {
     val notification = preferences.notificationPermissionGranted()
     val media = preferences.mediaPermissionSnapshot()
     ZxPage("权限与设备", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
+        settings?.let { ZhaoxiApprovalModeSelector(it) }
         ZxSection("系统通知")
         ZxValueRow("通知权限", value = when (notification) {
             true -> "已授权"
