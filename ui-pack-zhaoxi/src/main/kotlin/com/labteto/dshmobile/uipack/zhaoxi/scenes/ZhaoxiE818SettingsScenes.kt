@@ -31,7 +31,7 @@ fun ZhaoxiUsageOverviewScene(usage: UsageUiPort, scope: UiSceneRenderScope, mode
     val revision by usage.revision.collectAsState()
     val source = remember(revision, usage) { usage.snapshot() }
     var selectedModel by rememberSaveable { mutableStateOf<String?>(null) }
-    val snapshot = source.byModel[selectedModel] ?: source
+    val snapshot = selectedModel?.let { source.byModel[it] } ?: source
     var selectedGroup by remember { mutableStateOf<String?>(null) }
     ZxPage(if (modelOnly) "模型用量" else "用量统计", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
@@ -87,7 +87,7 @@ fun ZhaoxiUsageLogScene(
     val revision by usage.revision.collectAsState()
     val source = remember(usage, revision) { usage.snapshot() }
     var selectedModel by rememberSaveable { mutableStateOf<String?>(null) }
-    val current = source.byModel[selectedModel] ?: source
+    val current = selectedModel?.let { source.byModel[it] } ?: source
     ZxPage("用量日志", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("模型筛选")
@@ -208,22 +208,38 @@ fun ZhaoxiChatGuardScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
 }
 
 @Composable
-fun ZhaoxiApprovalModeScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
+fun ZhaoxiMemorySettingsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
+    val snap by settings.state.collectAsState(initial = settings.initialState)
+    var status by remember { mutableStateOf<String?>(null) }
+    ZxPage("记忆设置", onBack = { scope.onBack() }) {
+        Spacer(Modifier.height(8.dp))
+        ZxSection("记忆行为")
+        ZxSwitchRow("自动召回", "按模型与会话权限检索记忆", snap.autoRecall) {
+            status = settings.submit(SettingsUiCommand.Personalization(snap.userRules, it, snap.autoMemory)).toString()
+        }
+        ZxSwitchRow("自动记忆", "记忆写入由原 Memory Owner 管理", snap.autoMemory) {
+            status = settings.submit(SettingsUiCommand.Personalization(snap.userRules, snap.autoRecall, it)).toString()
+        }
+        status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
+        ZxFooterNote("仅管理偏好，不重建人物/项目作用域的数据事实")
+    }
+}
+
+/** Inline in the existing registered settings.permissions scene; a new scene ID is not invented. */
+@Composable
+fun ZhaoxiApprovalModeSelector(settings: SettingsUiPort) {
     val mode by settings.approvalMode.collectAsState()
     var status by remember { mutableStateOf<String?>(null) }
-    ZxPage("审批模式", onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(8.dp))
-        ZxSection("工具与任务审批")
-        LocalApprovalMode.entries.forEach { candidate ->
-            ZxChip(when (candidate) {
-                LocalApprovalMode.DEFAULT -> "默认"
-                LocalApprovalMode.MANUAL -> "手动审批"
-                LocalApprovalMode.AUTO -> "自动审批"
-            }, mode == candidate) {
-                status = settings.submit(SettingsUiCommand.ApprovalMode(candidate)).toString()
-            }
+    ZxSection("操作审批模式")
+    LocalApprovalMode.entries.forEach { candidate ->
+        ZxChip(when (candidate) {
+            LocalApprovalMode.DEFAULT -> "默认"
+            LocalApprovalMode.MANUAL -> "手动审批"
+            LocalApprovalMode.AUTO -> "自动审批"
+        }, mode == candidate) {
+            status = settings.submit(SettingsUiCommand.ApprovalMode(candidate)).toString()
         }
-        ZxFooterNote("审批模式仍由原 Owner 解释和执行；切换不授予新的设备或服务权限")
-        status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
     }
+    ZxFooterNote("审批策略由原 Owner 执行；此开关不授予新设备权限")
+    status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
 }
