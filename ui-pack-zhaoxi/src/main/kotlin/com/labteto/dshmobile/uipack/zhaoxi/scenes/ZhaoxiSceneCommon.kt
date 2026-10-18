@@ -210,8 +210,8 @@ fun ZxRow(
     modifier: Modifier = Modifier,
     mono: Boolean = false,
     onClick: (() -> Unit)? = null,
-    trailing: @Composable () -> Unit = {},
     showChevron: Boolean = true,
+    trailing: @Composable () -> Unit = {},
 ) {
     val c = ZhaoxiTheme.colors
     val interaction = remember { MutableInteractionSource() }
