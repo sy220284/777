@@ -44,6 +44,7 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.ZxQuestionCard
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxSection
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 import com.labteto.dshmobile.uihost.UiSceneRenderScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
@@ -149,15 +150,17 @@ fun ZhaoxiBranchesScene(
     scope: UiSceneRenderScope,
 ) {
     val branch = message.branch
+    var receipt by remember(message.id) { mutableStateOf<UiCommandReceipt?>(null) }
     ZxPage("分支", onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
+        CommandFeedback(receipt)
         if (branch == null) ZxEmpty("没有分支", "修改重发或重新生成后产生分支")
         else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
             ZxBranchSwitcher(branch.index, branch.count) { i ->
-                // 身份缺失时不提交；回执由宿主快照回流呈现
-                chat.snapshot().identity?.let { id ->
-                    chat.submit(ChatUiCommand.SelectVariant(id, message.id, i))
-                }
+                val identity = chat.snapshot().identity
+                receipt = if (identity == null)
+                    UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                else chat.submit(ChatUiCommand.SelectVariant(identity, message.id, i))
             }
         }
     }
@@ -195,17 +198,21 @@ fun ZhaoxiApprovalScene(work: WorkConversationUiPort, scope: UiSceneRenderScope)
 fun ZhaoxiQuestionScene(work: WorkConversationUiPort, scope: UiSceneRenderScope) {
     val snap by work.snapshots.collectAsState(initial = work.snapshot())
     var answer by remember { mutableStateOf("") }
+    var receipt by remember(snap.question?.pendingId) { mutableStateOf<UiCommandReceipt?>(null) }
     ZxPage("提问", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
+        CommandFeedback(receipt)
         val question = snap.question
         if (question == null) ZxEmpty("没有待回答", "Agent 提问时会出现在这里")
         else ZxQuestionCard(question, answer, { answer = it }) { a ->
-            snap.identity?.let { id ->
-                when (work.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.AnswerQuestion(
-                    id, question.pendingId, a))) {
-                    UiCommandReceipt.Accepted, UiCommandReceipt.Queued -> scope.onBack()
-                    else -> {}  // 拒收：停留在本页，答案不丢
-                }
+            val identity = snap.identity
+            if (identity == null) {
+                receipt = UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+            } else {
+                val response = work.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.AnswerQuestion(
+                    identity, question.pendingId, a))
+                if (response.admitted()) scope.onBack()
+                else receipt = response  // 拒收后保留用户答案和页面
             }
         }
     }
@@ -240,7 +247,6 @@ fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRender
     ZxPage("日记", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("公开日记")
-        ZxFooterNote("这里只展示允许阅读的日记内容；人物的私密反思不会公开。")
         feedback?.let { com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
             it, com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Info) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -279,7 +285,7 @@ fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRender
                 ZxSection("未解的余韵")
                 Text(selected.unresolvedEcho, fontSize = 14.sp, color = ZhaoxiTheme.colors.ink2)
             }
-            ZxFooterNote("来源：${selected.sourceMode} · 经历 ${selected.experienceId.take(16)}（只读引用）")
+            ZxFooterNote("来源：${selected.sourceMode}")
             if (selected.active && !editing) {
                 ZxButton("勘误内容", {
                     eventDraft = selected.event
@@ -294,7 +300,6 @@ fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRender
             }
             if (selected.active && editing) {
                 ZxSection("内容勘误")
-                ZxFooterNote("修改保留原始经历身份，保存时会校验日记版本，防止覆盖较新内容。")
                 ZxField(eventDraft, { eventDraft = it }, Modifier.fillMaxWidth(), placeholder = "事件")
                 ZxField(feelingDraft, { feelingDraft = it }, Modifier.fillMaxWidth(), placeholder = "感受")
                 ZxField(thoughtDraft, { thoughtDraft = it }, Modifier.fillMaxWidth(), placeholder = "心绪")
@@ -313,6 +318,10 @@ fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRender
                                 revision++
                                 editing = false
                             }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (failure: Exception) {
+                            feedback = failure.message ?: "保存日记失败"
                         } finally { busy = false }
                     }
                 }, enabled = !busy && eventDraft.isNotBlank(), loading = busy)
@@ -322,7 +331,7 @@ fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRender
         pendingDisable?.let { target ->
             com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog(
                 "停用这篇日记？",
-                "停用后不再用于有效日记展示，已有来源与版本记录仍由原 Owner 管理。",
+                "停用后将不再显示在有效日记中。",
                 "确认停用",
                 {
                     pendingDisable = null
@@ -336,6 +345,10 @@ fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRender
                                 selectedId = null
                                 editing = false
                             }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (failure: Exception) {
+                            feedback = failure.message ?: "停用日记失败"
                         } finally { busy = false }
                     }
                 },
