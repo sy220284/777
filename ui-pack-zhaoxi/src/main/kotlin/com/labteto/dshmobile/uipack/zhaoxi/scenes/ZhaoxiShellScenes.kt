@@ -29,6 +29,7 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.ZxIcon
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxIconButton
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxModeSwitch
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
