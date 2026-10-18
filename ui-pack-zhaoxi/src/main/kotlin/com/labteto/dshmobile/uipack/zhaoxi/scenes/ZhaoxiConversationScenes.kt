@@ -191,11 +191,7 @@ fun ZhaoxiConversationHeaderScene(
 fun ZhaoxiReplyStatusScene(phase: UiExecutionPhase, queuedInputCount: Int) {
     when {
         queuedInputCount > 0 -> ZxBanner("⇄ 已排队 $queuedInputCount 条 · 队列满时将拒收", ZxTone.Warn)
-        phase == UiExecutionPhase.RUNNING ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ZxTypingIndicator()
-                Text("运行中 · 可 steer", fontSize = 11.sp, color = ZhaoxiTheme.colors.warn)
-            }
+        // RUNNING is shown only inside the one reply surface. No second typing row.
         phase == UiExecutionPhase.WAITING_FOR_USER -> ZxBanner("需要你处理 · 审批与提问待决定", ZxTone.Warn)
         else -> {}
     }
@@ -250,10 +246,7 @@ fun ZhaoxiComposerSlotScene(
             ZxBanner("未送达 · 草稿已保留", ZxTone.Err)
             Spacer(Modifier.height(4.dp))
         }
-        ZxCapBar(
-            listOf(ZxCap("reason", "推理", false), ZxCap("temp", "温度", false)),
-            onOpen = { /* capability controls are exposed from model settings */ },
-        )
+        // Capability tuning remains in model settings; no inactive duplicate chips.
         ZxComposer(draft, onDraftChange, send, {
             if (onSendText(draft)) { onDraftChange(""); rejected = false } else rejected = true
         }, placeholder, running = running, onStop = onStop)
@@ -307,7 +300,6 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
                 .groupBy { it.document.source.messageId }
         else emptyMap()
     }
-    val activeByMessage = currentDocuments.groupBy { it.document.source.messageId }
     val allCardsBySource = (historical.values.flatten() + currentDocuments)
         .associateBy { it.document.documentId }.values.groupBy { it.document.source.messageId }
     val workByTurn = allCardsBySource.mapValues { (_, items) ->
