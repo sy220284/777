@@ -13,11 +13,20 @@ import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 import com.labteto.dshmobile.uihost.*
 import kotlinx.coroutines.launch
 
+/** Attachment import receipts do not include permissioned user data in output. */
+internal fun UiAttachmentReceipt.zxAttachmentFeedback(): String = when (this) {
+    is UiAttachmentReceipt.Imported -> "附件已添加"
+    is UiAttachmentReceipt.Rejected -> "附件未被接受：${com.labteto.dshmobile.uipack.zhaoxi.components.rejectionHint(reason)}"
+    UiAttachmentReceipt.GrantRevoked -> "文件读取权限已失效，请重新选择"
+    is UiAttachmentReceipt.Failed -> message?.takeIf(String::isNotBlank) ?: "附件导入失败"
+}
+
 @Composable
 fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSecondaryPorts?, scope: UiSceneRenderScope, renderSlot: @Composable (UiSceneId) -> Unit = {}) {
     var selectedSlot by remember { mutableStateOf<UiSceneId?>(null) }
     var receipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
     var feedback by remember { mutableStateOf<String?>(null) }
+    var importing by remember { mutableStateOf(false) }
     val jobs = rememberCoroutineScope()
     CommandFeedback(receipt)
     feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
@@ -38,14 +47,25 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
         }
         ports.attachments?.let { attachmentOwner ->
             val pick = rememberUiAttachmentPickerFor<UiSessionIdentity>(onRejected = { feedback = it }) { target, uri ->
-                if (uri != null) jobs.launch {
-                    when (val result = attachmentOwner.import(ImportUiAttachmentCommand(target, uri))) {
-                        is UiAttachmentReceipt.Imported -> ports.drafts.addAttachment(target.sessionId, result.attachment)
-                        else -> feedback = result.toString()
-                    }
+                if (uri != null && !importing) jobs.launch {
+                    importing = true
+                    try {
+                        val result = attachmentOwner.import(ImportUiAttachmentCommand(target, uri))
+                        when (result) {
+                            is UiAttachmentReceipt.Imported -> {
+                                ports.drafts.addAttachment(target.sessionId, result.attachment)
+                                feedback = "附件已添加"
+                            }
+                            else -> feedback = result.zxAttachmentFeedback()
+                        }
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        feedback = failure.message ?: "附件导入失败"
+                    } finally { importing = false }
                 }
             }
-            ZxButton("添加附件", { identity?.let(pick) }, enabled = identity != null)
+            ZxButton("添加附件", { identity?.let(pick) }, enabled = identity != null && !importing, loading = importing)
         }
         if (ports.workMode()) {
             ports.workPolicy?.let { policy ->
