@@ -138,8 +138,9 @@ internal class LocalUiDocumentUiAdapter(
             !state.sessionTransitioning && state.uiBindingIdentity(current) == identity
         }
         if (!admitted) return@withContext emptyList()
-        val records = store.read(identity.sessionId, messageIds.take(120).toSet(),
-            generation.budget, knownScenes)
+        val records = messageIds.chunked(120).flatMap { batch ->
+            store.read(identity.sessionId, batch.toSet(), generation.budget, knownScenes)
+        }
         // Historical cards contain durable text/artifact snapshots. Only the active
         // Owner can issue actions; a cold-page read intentionally grants no permissions.
         records.map { record ->
