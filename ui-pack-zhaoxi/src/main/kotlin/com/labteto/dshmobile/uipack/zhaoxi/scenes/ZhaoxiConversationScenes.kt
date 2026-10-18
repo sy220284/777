@@ -366,7 +366,7 @@ private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<Ui
                         ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
                             onAction = { actionId, fields ->
                                 if (documents == null || identity == null ||
-                                    card.actions[actionId]?.enabled != true) {
+                                    card.actions[actionId]?.available != true) {
                                     UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
                                 } else documents.submit(identity, UiDocumentActionRequest(
                                     documentId = card.document.documentId,
