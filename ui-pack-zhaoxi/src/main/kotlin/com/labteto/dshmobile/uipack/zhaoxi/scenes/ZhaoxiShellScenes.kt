@@ -387,7 +387,7 @@ fun ZhaoxiOnboardingScene(scope: UiSceneRenderScope) {
 fun ZhaoxiEmptyDemoScene(scope: UiSceneRenderScope) {
     ZxPage("空态演示", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(24.dp))
-        ZxEmpty("这里什么都没有", "空态 = 一句结论 + 一句引导")
+        ZxEmpty("暂无内容", "请返回上一页")
     }
 }
 
@@ -434,7 +434,7 @@ fun ZhaoxiWorkspaceScene(
         }
         if (selectedDomain == 0) {
             ZxSection("工作区文件")
-            if (files == null) ZxEmpty("文件能力未连接", "无法读取工作区文件")
+            if (files == null) ZxEmpty("工作区不可用", "暂时无法读取文件")
             else if (workspace.isEmpty()) ZxEmpty("工作区是空的", "执行过程中产生的文件会出现在这里")
             workspace.forEach { file ->
                 ZxRow(file.path.substringAfterLast('/'), "${file.bytes} 字节 · ${file.path}",
@@ -470,7 +470,7 @@ fun ZhaoxiWorkspacePreviewScene(files: FilesUiPort?, path: String, scope: UiScen
         Spacer(Modifier.height(8.dp))
         when {
             path.isBlank() -> ZxEmpty("尚未选择文件", "请先从工作区选择文件")
-            files == null -> ZxEmpty("文件能力未连接", "当前无法读取文件")
+            files == null -> ZxEmpty("文件不可用", "暂时无法读取文件")
             !previewState.first -> ZxSection("正在读取文件…")
             previewState.second == null -> ZxEmpty("文件预览不可用", "请核实文件是否仍存在")
             else -> {
@@ -485,7 +485,7 @@ fun ZhaoxiWorkspacePreviewScene(files: FilesUiPort?, path: String, scope: UiScen
                 } else {
                     Text(content, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                         fontSize = 12.sp, color = ZhaoxiTheme.colors.ink)
-                    if (item.truncated) ZxFooterNote("内容较长，已按文件能力提供的预览范围显示")
+                    if (item.truncated) ZxFooterNote("预览已截断")
                 }
                 ZxFooterNote(item.file.path)
             }
