@@ -23,6 +23,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val snap by settings.state.collectAsState(initial = settings.initialState)
     val jobs = rememberCoroutineScope()
     var profileId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingRemoveModel by remember { mutableStateOf<String?>(null) }
     var model by rememberSaveable { mutableStateOf("") }
     var baseUrl by rememberSaveable { mutableStateOf("https://api.deepseek.com") }
     var protocol by rememberSaveable { mutableStateOf(LocalModelProtocol.CHAT_COMPLETIONS) }
@@ -43,11 +44,26 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
         snap.modelProfiles.forEach { p ->
             ZxRow(p.displayName ?: p.model, if (snap.modelSelection.isActive(p)) "当前模型" else p.baseUrl,
-                onClick = { status = settings.submit(SettingsUiCommand.SelectModel(p.id)).toString() })
+                onClick = { status = when (val receipt = settings.submit(SettingsUiCommand.SelectModel(p.id))) {
+                    SettingsUiReceipt.Applied -> "已切换模型"
+                    is SettingsUiReceipt.Failed -> receipt.message ?: "切换失败"
+                    else -> "切换未完成"
+                } })
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ZxChip("编辑", false) { profileId = p.id; model = p.model; baseUrl = p.baseUrl; protocol = p.protocol; apiKey = "" }
-                ZxChip("移除", false) { status = settings.submit(SettingsUiCommand.RemoveModel(p.id)).toString() }
+                ZxChip("移除", false) { pendingRemoveModel = p.id }
             }
+        }
+        pendingRemoveModel?.let { id ->
+            ZxDialog("移除模型？", "此操作会删除本地模型配置。", "移除", {
+                pendingRemoveModel = null
+                status = when (val receipt = settings.submit(SettingsUiCommand.RemoveModel(id))) {
+                    SettingsUiReceipt.Applied -> "模型已移除"
+                    is SettingsUiReceipt.Failed -> receipt.message ?: "移除失败"
+                    else -> "移除未完成"
+                }
+                if (profileId == id) profileId = null
+            }, { pendingRemoveModel = null })
         }
         ZxSection(if (profileId == null) "添加模型" else "编辑模型")
         ZxField(model, { model = it }, Modifier.fillMaxWidth(), placeholder = "模型名称")
@@ -76,6 +92,7 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val snap by settings.chatGptState.collectAsState()
     val jobs = rememberCoroutineScope()
     var status by remember { mutableStateOf<String?>(null) }
+    var pendingRemoveAccount by remember { mutableStateOf<String?>(null) }
     fun execute(action: suspend () -> Unit) { jobs.launch {
         try { action() } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) { status = failure.message ?: "账户操作失败" }
@@ -89,7 +106,13 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                 onClick = { execute { settings.selectChatGptAccount(account.id) } })
             ZxButton("测试连接", { execute { status = settings.testChatGptAccount(account.id) } })
             ZxButton("断开连接", { execute { status = settings.disconnectChatGptAccount(account.id) } })
-            ZxButton("移除账户", { execute { status = settings.removeChatGptAccount(account.id) } })
+            ZxButton("移除账户", { pendingRemoveAccount = account.id }, variant = ZxButtonVariant.Danger)
+        }
+        pendingRemoveAccount?.let { id ->
+            ZxDialog("移除账户？", "将解除此账户的本地连接。", "移除", {
+                pendingRemoveAccount = null
+                execute { status = settings.removeChatGptAccount(id) }
+            }, { pendingRemoveAccount = null })
         }
         ZxButton("连接 ChatGPT", { execute { settings.connectChatGpt() } })
         ZxButton("刷新账户与模型", { execute { settings.refreshChatGpt() } })
