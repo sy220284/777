@@ -266,6 +266,12 @@ fun Modifier.zxMaterial(m: ZhaoxiMaterial): Modifier = composed {
     }
 }
 
+/** Brightness-calibrated veil follows the E8.18 wallpaper rule, without blurring foreground text. */
+internal fun wallpaperVeilAlpha(luminance: Float, lightMode: Boolean, adaptive: Boolean): Float =
+    if (!adaptive) 0.36f else (
+        0.55f + ((if (lightMode) 0.5f - luminance else luminance - 0.5f) * 0.55f)
+    ).coerceIn(0.38f, 0.88f)
+
 /**
  * E8.18 可选内置壁纸：十张高保真原稿 WebP 归档到 assets；
  * 默认不开启，启用后按五主题×明暗确定唯一资产。
@@ -280,19 +286,32 @@ fun ZhaoxiBackground(
 ) {
     val c = ZhaoxiTheme.colors
     val context = androidx.compose.ui.platform.LocalContext.current
-    val wallpaper by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wallpaperPreset) {
+    val wallpaper by produceState<Pair<androidx.compose.ui.graphics.ImageBitmap, Float>?>(null, wallpaperPreset) {
         value = if (wallpaperPreset == null) null else
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 context.assets.open("e818_wallpapers.zip").use { stream ->
                     java.util.zip.ZipInputStream(stream).use { zip ->
                         var candidate: java.util.zip.ZipEntry?
-                        var decoded: androidx.compose.ui.graphics.ImageBitmap? = null
+                        var decoded: Pair<androidx.compose.ui.graphics.ImageBitmap, Float>? = null
                         while (zip.nextEntry.also { candidate = it } != null) {
                             if (candidate?.name == wallpaperPreset) {
                                 val bytes = zip.readBytes()
                                 decoded = android.graphics.BitmapFactory.decodeByteArray(
                                     bytes, 0, bytes.size)?.let { bitmap ->
-                                    bitmap.asImageBitmap()
+                                    val stepX = (bitmap.width / 9).coerceAtLeast(1)
+                                    val stepY = (bitmap.height / 9).coerceAtLeast(1)
+                                    var luminance = 0f
+                                    var count = 0
+                                    for (y in 0 until bitmap.height step stepY) {
+                                        for (x in 0 until bitmap.width step stepX) {
+                                            val pixel = bitmap.getPixel(x, y)
+                                            luminance += (0.2126f * android.graphics.Color.red(pixel) +
+                                                0.7152f * android.graphics.Color.green(pixel) +
+                                                0.0722f * android.graphics.Color.blue(pixel)) / 255f
+                                            count++
+                                        }
+                                    }
+                                    bitmap.asImageBitmap() to luminance / count
                                 }
                                 break
                             }
@@ -306,7 +325,7 @@ fun ZhaoxiBackground(
     androidx.compose.foundation.layout.Box(modifier) {
         wallpaper?.let {
             androidx.compose.foundation.Image(
-                bitmap = it,
+                bitmap = it.first,
                 contentDescription = null,
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
@@ -317,7 +336,8 @@ fun ZhaoxiBackground(
                 drawRect(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(c.bg, c.bg2)))
             } else {
                 // Only the surface is veiled; controls and text above this layer remain sharp.
-                drawRect(c.bg.copy(alpha = if (adaptiveContrast) 0.68f else 0.36f))
+                drawRect(c.bg.copy(alpha = wallpaperVeilAlpha(
+                    wallpaper.second, c.bg.red > 0.5f, adaptiveContrast)))
             }
             if (glow > 0f) {
                 drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
