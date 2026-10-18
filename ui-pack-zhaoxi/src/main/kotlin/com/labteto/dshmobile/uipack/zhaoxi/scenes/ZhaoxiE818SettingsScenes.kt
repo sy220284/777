@@ -43,9 +43,23 @@ fun ZhaoxiUsageOverviewScene(usage: UsageUiPort, scope: UiSceneRenderScope, mode
             ZxChip(id, selectedModel == id) { selectedModel = id; selectedGroup = null }
         }
         ZxSection("用量总览")
-        ZxValueRow("Token 总量", value = snapshot.tracked.totalTokens.toString(), mono = true)
-        ZxValueRow("请求次数", value = snapshot.tracked.requestCount.toString(), mono = true)
-        ZxValueRow("估算费用", value = "¥" + "%.4f".format(snapshot.tracked.estimatedCostCny), mono = true)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text("Token 总量", fontSize = 11.sp, color = ZhaoxiTheme.colors.ink2)
+                Text(snapshot.tracked.totalTokens.toString(), fontSize = 19.sp,
+                    fontWeight = FontWeight.SemiBold, color = ZhaoxiTheme.colors.ink)
+            }
+            Column(Modifier.weight(1f)) {
+                Text("请求", fontSize = 11.sp, color = ZhaoxiTheme.colors.ink2)
+                Text(snapshot.tracked.requestCount.toString(), fontSize = 19.sp,
+                    fontWeight = FontWeight.SemiBold, color = ZhaoxiTheme.colors.ink)
+            }
+            Column(Modifier.weight(1f)) {
+                Text("估算费用", fontSize = 11.sp, color = ZhaoxiTheme.colors.ink2)
+                Text("¥" + "%.4f".format(snapshot.tracked.estimatedCostCny), fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold, color = ZhaoxiTheme.colors.ink)
+            }
+        }
         ZxValueRow("输入 / 输出", value = "${snapshot.tracked.inputTokens} / ${snapshot.tracked.outputTokens}", mono = true)
         if (snapshot.tracked.unreportedRequestCount > 0) {
             ZxFooterNote("${snapshot.tracked.unreportedRequestCount} 次请求未上报精确用量，统计仅反映可追踪事实")
