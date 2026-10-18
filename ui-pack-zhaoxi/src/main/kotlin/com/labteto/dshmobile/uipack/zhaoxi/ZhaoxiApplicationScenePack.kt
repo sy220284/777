@@ -389,7 +389,7 @@ class ZhaoxiApplicationScenePack(
                     "chat.gallery_profile" -> ZhaoxiPersonaProfileScene(gid, sec?.gallery ?: conv?.gallery,
                         conv?.selection ?: sec?.selection, conv?.stories, sec?.transfer, scope)
                     "chat.persona_editor", "chat.world_book" ->
-                        if (sec?.authoring != null) ZhaoxiPersonaEditorScene(sec.authoring, gid, scope)
+                        if (sec?.authoring != null) ZhaoxiPersonaEditorScene(sec.authoring, gid, scope, initialTab = if (scene.value == "chat.world_book") 2 else 0)
                         else ZxEmpty("端口未注入", "chat.persona_authoring 能力未连接")
                     "chat.gallery_portrait" ->
                         if (sec?.portraits != null) ZhaoxiPortraitEditor(sec.portraits, gid, scope)
@@ -418,7 +418,7 @@ class ZhaoxiApplicationScenePack(
             }
 
             // ---- 工作区 ----
-            "route.workspace" -> ZhaoxiWorkspaceScene(sec?.files ?: conv?.files, scope) { filePath ->
+            "route.workspace" -> ZhaoxiWorkspaceScene(sec?.files ?: conv?.files, sessionId, scope) { filePath ->
                 targets.workspacePath = filePath
                 scope.onNavigate(UiSceneId("workspace.preview"))
             }
