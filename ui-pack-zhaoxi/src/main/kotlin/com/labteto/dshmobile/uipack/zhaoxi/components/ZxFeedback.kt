@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiDuration
@@ -47,8 +48,8 @@ fun ZxToastHost(toast: ZxToast?, onAction: () -> Unit = {}, modifier: Modifier =
     val c = ZhaoxiTheme.colors
     AnimatedVisibility(
         visible = toast != null,
-        enter = slideInVertically(ZhaoxiMotion.spec(ZhaoxiDuration.NORMAL, spring = true)) { it } + fadeIn(),
-        exit = slideOutVertically(ZhaoxiMotion.spec(ZhaoxiDuration.FAST)) { it } + fadeOut(),
+        enter = slideInVertically(ZhaoxiMotion.spec(ZhaoxiDuration.NORMAL, spring = true)) { it } + fadeIn(animationSpec = ZhaoxiMotion.spec(ZhaoxiDuration.FAST)),
+        exit = slideOutVertically(ZhaoxiMotion.spec(ZhaoxiDuration.FAST)) { it } + fadeOut(animationSpec = ZhaoxiMotion.spec(ZhaoxiDuration.FAST)),
         modifier = modifier,
     ) {
         toast?.let { t ->
@@ -70,7 +71,7 @@ fun ZxToastHost(toast: ZxToast?, onAction: () -> Unit = {}, modifier: Modifier =
     }
 }
 
-/** 仅用于破坏性操作；confirm 恒为 Danger。 */
+/** Destructive confirmation is a real modal with system back and focus confinement. */
 @Composable
 fun ZxDialog(
     title: String,
@@ -81,14 +82,13 @@ fun ZxDialog(
     modifier: Modifier = Modifier,
 ) {
     val c = ZhaoxiTheme.colors
-    Box(
-        modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(c.card)
-            .padding(20.dp),
-    ) {
-        Column {
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(c.card)
+                .padding(20.dp),
+        ) {
             Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
             Spacer(Modifier.height(8.dp))
             Text(body, fontSize = 13.sp, color = c.ink2, lineHeight = 20.sp)

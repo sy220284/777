@@ -13,14 +13,19 @@ import kotlinx.serialization.json.Json
 class ZhaoxiSceneTargets {
     var galleryId by mutableStateOf<String?>(null)
     var workspacePath by mutableStateOf("")
+    var usageRequestId by mutableStateOf<String?>(null)
+    var automationTaskId by mutableStateOf<String?>(null)
     var message by mutableStateOf<Pair<UiSessionIdentity, String>?>(null)
     companion object {
         val Saver = listSaver<ZhaoxiSceneTargets, String>(
             save = { listOf(it.galleryId.orEmpty(), it.workspacePath,
-                it.message?.first?.let { identity -> Json.encodeToString(identity) }.orEmpty(), it.message?.second.orEmpty()) },
+                it.message?.first?.let { identity -> Json.encodeToString(identity) }.orEmpty(), it.message?.second.orEmpty(),
+                it.usageRequestId.orEmpty(), it.automationTaskId.orEmpty()) },
             restore = { values -> ZhaoxiSceneTargets().apply {
                 galleryId = values[0].takeIf(String::isNotBlank)
                 workspacePath = values[1]
+                usageRequestId = values.getOrNull(4)?.takeIf(String::isNotBlank)
+                automationTaskId = values.getOrNull(5)?.takeIf(String::isNotBlank)
                 if (values[2].isNotBlank()) message = Json.decodeFromString<UiSessionIdentity>(values[2]) to values[3]
             } },
         )

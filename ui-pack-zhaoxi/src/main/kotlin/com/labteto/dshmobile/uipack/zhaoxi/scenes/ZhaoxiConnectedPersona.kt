@@ -9,6 +9,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.uicontract.*
 import com.labteto.dshmobile.uipack.zhaoxi.components.*
@@ -19,8 +20,32 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
+/** 设计包 E8.18：字段标签始终可见，存储键保持原契约不变。 */
+private fun personaFieldTitle(key: String): String = when (key) {
+    "opening" -> "开场对白"
+    "personality" -> "性格特征"
+    "valuesAndTradeoffs" -> "价值取向与取舍"
+    "selfNarrative" -> "自我认知"
+    "subjectiveBeliefs" -> "主观信念"
+    "identityGap" -> "身份认知差异"
+    "preferencesAndHabits" -> "喜好与习惯"
+    "voiceStyle" -> "说话风格"
+    "biography" -> "人物经历"
+    "relationships" -> "人物关系"
+    "customFacts" -> "补充事实"
+    else -> key
+}
+
 @Composable
-fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAuthoringSnapshot?, scope: UiSceneRenderScope) {
+private fun ZhaoxiPersonaField(title: String, value: String, onChange: (String) -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, color = ZhaoxiTheme.colors.ink2, fontSize = 13.sp)
+        ZxField(value, onChange, Modifier.fillMaxWidth(), placeholder = "填写$title")
+    }
+}
+
+@Composable
+fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAuthoringSnapshot?, scope: UiSceneRenderScope, initialTab: Int = 0) {
     var encodedDraft by rememberUiPrivateText("zhaoxi.persona.${snapshot?.galleryId ?: "new"}", snapshot?.revision) {
         Json.encodeToString(snapshot?.draft ?: UiPersonaDraft())
     }
@@ -36,35 +61,55 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
     var revision by remember(snapshot?.revision) { mutableStateOf(snapshot?.revision) }
     var galleryId by remember(snapshot?.galleryId) { mutableStateOf(snapshot?.galleryId) }
     val jobs = rememberCoroutineScope()
+    var selectedTab by rememberSaveable(snapshot?.galleryId, initialTab) { mutableIntStateOf(initialTab) }
     ZxPage("人物编辑", onBack = { scope.onBack() }) {
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        ZxField(draft.name, { draft = draft.copy(name = it) }, Modifier.fillMaxWidth(), placeholder = "姓名")
-        ZxField(draft.coreIdentity, { draft = draft.copy(coreIdentity = it) }, Modifier.fillMaxWidth(), placeholder = "核心身份")
-        ZxField(draft.franchise, { draft = draft.copy(franchise = it) }, Modifier.fillMaxWidth(), placeholder = "作品 / 世界")
-        (listOf("opening") + UI_PERSONA_FACT_FIELDS + draft.fields.keys).distinct().forEach { field ->
-            ZxField(draft.fields[field].orEmpty(), { draft = draft.copy(fields = draft.fields + (field to it)) },
-                Modifier.fillMaxWidth(), placeholder = field)
+        ZxSection("人物档案")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ZxAvatar(draft.name.ifBlank { "人" }, Modifier.size(48.dp), accent = true)
+            Column {
+                Text(draft.name.ifBlank { "未命名人物" }, color = ZhaoxiTheme.colors.ink)
+                Text(if (galleryId == null) "新建人物 · 尚未归档" else "已关联人物归档", color = ZhaoxiTheme.colors.ink2)
+            }
         }
-        ZxSection("事实")
-        draft.facts.forEach { fact ->
+        ZxTabRow(listOf("核心身份", "事实", "世界书", "行为调节"), selectedTab) { selectedTab = it }
+        when (selectedTab) {
+            0 -> {
+        ZhaoxiPersonaField("姓名", draft.name) { draft = draft.copy(name = it) }
+        ZhaoxiPersonaField("核心身份", draft.coreIdentity) { draft = draft.copy(coreIdentity = it) }
+        ZhaoxiPersonaField("作品 / 世界", draft.franchise) { draft = draft.copy(franchise = it) }
+        (listOf("opening") + UI_PERSONA_FACT_FIELDS + draft.fields.keys).distinct().forEach { field ->
+            ZhaoxiPersonaField(personaFieldTitle(field), draft.fields[field].orEmpty()) { value ->
+                draft = draft.copy(fields = draft.fields + (field to value))
+            }
+        }
+            }
+            1 -> {
+        draft.facts.forEachIndexed { index, fact ->
+            ZxSection("事实 ${index + 1}")
             ZxField(fact.category, { value -> draft = draft.copy(facts = draft.facts.map { if (it.id == fact.id) it.copy(category = value) else it }) }, placeholder = "类别")
             ZxField(fact.content, { value -> draft = draft.copy(facts = draft.facts.map { if (it.id == fact.id) it.copy(content = value) else it }) }, Modifier.fillMaxWidth(), placeholder = "事实内容")
             ZxChip("移除事实", false) { draft = draft.copy(facts = draft.facts.filterNot { it.id == fact.id }) }
         }
         ZxChip("添加事实", false) { draft = draft.copy(facts = draft.facts + UiPersonaFact(java.util.UUID.randomUUID().toString(), "customFacts", "")) }
-        ZxSection("世界书")
-        draft.lore.forEach { lore ->
+            }
+            2 -> {
+        draft.lore.forEachIndexed { index, lore ->
+            ZxSection("世界书条目 ${index + 1}")
             ZxField(lore.title, { value -> draft = draft.copy(lore = draft.lore.map { if (it.id == lore.id) it.copy(title = value) else it }) }, placeholder = "标题")
             ZxField(lore.content, { value -> draft = draft.copy(lore = draft.lore.map { if (it.id == lore.id) it.copy(content = value) else it }) }, Modifier.fillMaxWidth(), placeholder = "内容")
             ZxField(lore.keywords.joinToString("、"), { value -> draft = draft.copy(lore = draft.lore.map { if (it.id == lore.id) it.copy(keywords = value.split("、").filter(String::isNotBlank)) else it }) }, placeholder = "关键词（顿号分隔）")
             ZxChip("移除条目", false) { draft = draft.copy(lore = draft.lore.filterNot { it.id == lore.id }) }
         }
         ZxChip("添加世界书条目", false) { draft = draft.copy(lore = draft.lore + UiPersonaLore(java.util.UUID.randomUUID().toString(), "", "")) }
-        ZxSection("行为调节")
+            }
+            3 -> {
         ZxField(draft.samplingTemperaturePosition?.toString().orEmpty(), { value ->
             if (value.isEmpty() || value.toIntOrNull()?.let { it in 0..100 } == true) draft = draft.copy(samplingTemperaturePosition = value.toIntOrNull())
         }, placeholder = "采样位置 0–100，留空沿用全局")
         ZxChip("恢复全局采样", false) { draft = draft.copy(samplingTemperaturePosition = null, legacySamplingPosition = null) }
+            }
+        }
         ZxButton("保存归档", { jobs.launch {
             val id = galleryId; val rev = revision
             val result = if (id != null && rev != null) authoring.save(id, rev, draft) else authoring.create(draft)
@@ -122,6 +167,7 @@ fun ZhaoxiPortraitEditor(port: PersonaPortraitUiPort, galleryId: String, scope: 
     val jobs = rememberCoroutineScope()
     var revision by remember { mutableStateOf(0) }
     var status by remember { mutableStateOf<String?>(null) }
+    var confirmRemove by remember { mutableStateOf(false) }
     val preview by produceState<UiPersonaPortraitPreviewReceipt?>(null, galleryId, revision) { value = port.preview(galleryId) }
     val pick = rememberUiAttachmentPickerFor<String>(arrayOf("image/*"), { status = it }) { target, uri ->
         if (uri != null) jobs.launch { status = port.submit(PersonaPortraitUiCommand.Import(target, uri)).toString(); revision++ }
@@ -144,7 +190,18 @@ fun ZhaoxiPortraitEditor(port: PersonaPortraitUiPort, galleryId: String, scope: 
         image?.let { Image(it, "人物画像", Modifier.fillMaxWidth().height(280.dp)) }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
         ZxButton("导入画像", { pick(galleryId) })
-        ZxButton("移除画像", { jobs.launch { status = port.submit(PersonaPortraitUiCommand.Remove(galleryId)).toString(); revision++ } })
+        if (image != null) ZxButton("移除画像", { confirmRemove = true }, variant = ZxButtonVariant.Danger)
+        if (confirmRemove) ZxDialog(
+            "确定移除这张画像？", "移除后无法从当前人物档案恢复。", "确认移除",
+            {
+                confirmRemove = false
+                jobs.launch {
+                    status = port.submit(PersonaPortraitUiCommand.Remove(galleryId)).toString()
+                    revision++
+                }
+            },
+            { confirmRemove = false },
+        )
     }
 }
 

@@ -29,7 +29,7 @@ class ZhaoxiHomeSmokeAndroidTest {
             compose.onAllNodesWithText("人物图集").fetchSemanticsNodes().isEmpty()
         }
         compose.onNodeWithText("设置").performClick()
-        compose.onNodeWithText("模型与服务").assertExists()
+        compose.onNodeWithText("模型与账户").assertExists()
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithTag("zhaoxi.home.create_chat").assertExists()
     }

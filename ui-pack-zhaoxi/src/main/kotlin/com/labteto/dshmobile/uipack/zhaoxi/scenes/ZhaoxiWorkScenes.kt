@@ -28,6 +28,7 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadge
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadgeTone
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxFooterNote
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxPlanReviewCard
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxPlanStep
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxSection
@@ -44,17 +45,33 @@ import kotlinx.coroutines.launch
 /** work.plan_review — 计划审查（方案呈现 + 逐步确认 + 批准执行）。 */
 @Composable
 fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile.uicontract.WorkConversationUiPort,
-    sessionId: String, scope: UiSceneRenderScope) {
+    sessionId: String, scope: UiSceneRenderScope, canOpenEvidence: Boolean = false) {
     val snapshot by work.snapshots.collectAsState(initial = work.snapshot())
     val plan = snapshot.let { workReads.planForUi(sessionId) }
     ZxPage("计划审查", onBack = { scope.onBack() }) {
         if (plan == null) {
             com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("没有进行中的计划", "计划由工作运行时提供")
         } else {
-            plan.plan.forEachIndexed { index, step -> ZxRow(step, plan.todos.getOrNull(index)?.ownerStatus.orEmpty()) }
-            // Approval and questions carry the actual Owner-issued pending identifier.
-            snapshot.question?.let { ZxNavRow("回答计划问题") { scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.question")) } }
-            snapshot.approval?.let { ZxNavRow("处理审批") { scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.approval")) } }
+            ZxSection("执行步骤")
+            if (plan.plan.isEmpty()) ZxEmpty("暂无计划步骤", "运行时更新后会显示")
+            plan.plan.forEachIndexed { index, step ->
+                val state = plan.todos.getOrNull(index)?.ownerStatus.orEmpty()
+                ZxRow("${index + 1}. $step", state, trailing = {
+                    if (state.isNotBlank()) ZxBadge(state, ZxBadgeTone.Neutral)
+                })
+            }
+            if (snapshot.question != null || snapshot.approval != null) {
+                ZxSection("需要操作")
+                snapshot.question?.let { ZxNavRow("回答问题") {
+                    scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.question"))
+                } }
+                snapshot.approval?.let { ZxNavRow("处理审批") {
+                    scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.approval"))
+                } }
+            }
+            if (canOpenEvidence) ZxNavRow("需求与证据") {
+                scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.requirement_evidence"))
+            }
         }
     }
 }
@@ -75,7 +92,8 @@ fun ZhaoxiRequirementEvidenceScene(
         when (val r = snap) {
             null -> repeat(3) { com.labteto.dshmobile.uipack.zhaoxi.components.ZxSkeleton(com.labteto.dshmobile.uipack.zhaoxi.components.ZxSkeletonVariant.Row, Modifier.padding(vertical = 6.dp)) }
             is UiWorkEvidenceReadReceipt.Available -> {
-                ZxSection("需求清单")
+                ZxSection("需求清单 · ${r.snapshot.requirements.size}")
+                ZxValueRow("已关联证据", value = "${r.snapshot.references.size} 条")
                 r.snapshot.requirements.forEach { req ->
                     ZxRow("「${req.text}」", "需求 #${req.index} · ${req.reportedStatus}") {
                         ZxBadge(req.reportedStatus, ZxBadgeTone.Neutral)
@@ -83,14 +101,36 @@ fun ZhaoxiRequirementEvidenceScene(
                 }
                 ZxSection("证据引用")
                 if (r.snapshot.references.isEmpty()) {
-                    com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("还没有关联证据", "在运行详情里把产物关联到需求")
+                    com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("暂无关联证据", "关联文件后会显示在这里")
                 }
                 r.snapshot.references.forEach { link ->
-                    ZxRow(link.toString().take(64), "")
+                    ZxRow(link.artifactPath.substringAfterLast('/'),
+                        "需求 #${link.requirementIndex} · ${if (link.versionNow == null) "文件不可用" else if (link.versionNow == link.versionAtLink) "版本一致" else "文件已变化"}")
+                }
+                if (r.snapshot.artifacts.isNotEmpty()) {
+                    ZxSection("运行产物 · ${r.snapshot.artifacts.size}")
+                    r.snapshot.artifacts.forEach { item ->
+                        ZxRow(item.reference.substringAfterLast('/').ifBlank { item.reference },
+                            "${item.category} · " + when (item.currentlyAvailable) {
+                                true -> "可访问"
+                                false -> "已不可访问"
+                                null -> "未核对当前可用性"
+                            })
+                    }
                 }
                 r.snapshot.machine?.let { m ->
-                    ZxSection("机器核验")
-                    ZxRow("状态", "${m.status} · 缺失 ${m.missing.size} 项")
+                    ZxSection("机器条件核验")
+                    val status = when (m.status) {
+                        com.labteto.dshmobile.uicontract.UiWorkMachineVerificationStatus.NO_MACHINE_CONDITIONS -> "没有可自动核验的条件"
+                        com.labteto.dshmobile.uicontract.UiWorkMachineVerificationStatus.UNSATISFIED -> "仍有未满足的条件"
+                        com.labteto.dshmobile.uicontract.UiWorkMachineVerificationStatus.VERIFIED_CONDITIONS -> "可机检条件已满足"
+                    }
+                    ZxRow("状态", status)
+                    ZxRow("检查范围", "文件条件 ${m.artifactConditionCount} · 命令条件 ${m.commandConditionCount}")
+                    if (m.missing.isNotEmpty()) {
+                        ZxSection("缺失条件 · ${m.missing.size}")
+                        m.missing.forEach { item -> ZxRow(item, "") }
+                    }
                 }
             }
             is UiWorkEvidenceReadReceipt.Rejected ->
@@ -98,7 +138,7 @@ fun ZhaoxiRequirementEvidenceScene(
             is UiWorkEvidenceReadReceipt.Failed ->
                 com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner("读取失败 · ${r.message ?: "未知"}", com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err)
         }
-        ZxFooterNote("状态由 Work Owner 上报 · 选中引用 ≠ 核验通过")
+
     }
 }
 
@@ -130,7 +170,7 @@ fun ZhaoxiWorkTeamScene(team: WorkTeamUiPort, scope: UiSceneRenderScope) {
                     }
                 })
         }
-        ZxFooterNote("成员状态由 WorkTeamUiPort 投影 · 子任务完成 ≠ 需求核验通过")
+
     }
 }
 
@@ -150,7 +190,7 @@ fun ZhaoxiWorkCapabilitiesScene(items: List<Triple<String, String, Int>>, scope:
                 )
             }
         }
-        ZxFooterNote("条件配置按钮按状态出现 · 配置入口跳对应设置页")
+
     }
 }
 
@@ -162,6 +202,6 @@ fun ZhaoxiSteeringScene(scope: UiSceneRenderScope) {
         com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner("运行中直接发送即插队纠偏（steer）", com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Info)
         ZxRow("发送即纠偏", "不等当前步骤结束 · 指令进入当前执行上下文")
         ZxRow("排队语义", "队列满时拒收并提示 · 草稿保留")
-        ZxFooterNote("回执矩阵见 朝夕-R4接入设计 §4")
+
     }
 }

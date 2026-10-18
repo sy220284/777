@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,6 +37,7 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadge
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadgeTone
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxField
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxFooterNote
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxPersonaCard
@@ -69,6 +71,8 @@ fun ZhaoxiPersonaGalleryScene(
 ) {
     var revision by remember { mutableStateOf(0) }
     var feedback by remember { mutableStateOf<String?>(null) }
+    var search by rememberSaveable { mutableStateOf("") }
+    var showPresets by rememberSaveable { mutableStateOf(false) }
     val jobs = androidx.compose.runtime.rememberCoroutineScope()
     val state by produceState<UiPersonaGalleryReadReceipt?>(null, revision) { value = gallery.read() }
     val importer = transfer?.let { owner ->
@@ -81,27 +85,43 @@ fun ZhaoxiPersonaGalleryScene(
     }
     ZxPage("人物图集", onBack = { scope.onBack() }) {
         feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        if (authoring != null) {
-            ZxChip("新建人物", false) { onOpenPersona("new") }
-            authoring.presets().forEach { preset -> ZxChip("添加 ${preset.name}", false) { jobs.launch {
-                feedback = authoring.installPreset(preset.id).toString(); revision++
-            } } }
+        ZxSection("人物")
+        ZxField(search, { search = it }, Modifier.fillMaxWidth(), placeholder = "搜索人物")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (authoring != null) {
+                ZxChip("新建人物", false) { onOpenPersona("new") }
+                ZxChip("预设", showPresets) { showPresets = !showPresets }
+            }
+            if (importer != null) ZxChip("导入", false) { importer() }
         }
-        if (importer != null) ZxChip("导入人物", false) { importer() }
+        if (showPresets && authoring != null) {
+            ZxSection("人物预设")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                authoring.presets().forEach { preset ->
+                    ZxChip(preset.name, false) { jobs.launch {
+                        feedback = authoring.installPreset(preset.id).toString()
+                        revision++
+                    } }
+                }
+            }
+        }
         Spacer(Modifier.height(8.dp))
         when (val r = state) {
             null -> repeat(3) { ZxSkeleton(ZxSkeletonVariant.Card, Modifier.padding(vertical = 6.dp)) }
             is UiPersonaGalleryReadReceipt.Failed ->
                 com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner("读取失败 · ${r.message ?: "未知"}", com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err)
             is UiPersonaGalleryReadReceipt.Available -> {
-                if (r.entries.isEmpty()) ZxEmpty("图集还空着", "添加预设或新建一个人物开始")
+                val visible = r.entries.filter { search.isBlank() || it.name.contains(search, ignoreCase = true) }
+                if (visible.isEmpty()) ZxEmpty(if (search.isBlank()) "暂无人物" else "没有匹配的人物", "可以新建或导入人物")
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.heightIn(min = 148.dp, max = 600.dp),
                 ) {
-                    items(r.entries) { e ->
+                    items(visible) { e ->
                         ZxPersonaCard(e.name, "${e.stories.size} 段故事", onClick = { onOpenPersona(e.id) })
                     }
                 }
@@ -117,14 +137,15 @@ fun ZhaoxiPersonaEditorScene(
     authoring: PersonaAuthoringUiPort,
     galleryId: String,
     scope: UiSceneRenderScope,
+    initialTab: Int = 0,
 ) {
     val state by produceState<UiPersonaAuthoringReceipt?>(null, galleryId) {
         value = if (galleryId == "new") null else authoring.read(galleryId)
     }
     when (val result = state) {
-        is UiPersonaAuthoringReceipt.Loaded -> ZhaoxiAuthoringForm(authoring, result.snapshot, scope)
-        null -> if (galleryId == "new") ZhaoxiAuthoringForm(authoring, null, scope) else ZxEmpty("加载中", "正在读取人物")
-        else -> ZxEmpty("无法编辑人物", result.toString())
+        is UiPersonaAuthoringReceipt.Loaded -> ZhaoxiAuthoringForm(authoring, result.snapshot, scope, initialTab)
+        null -> if (galleryId == "new") ZhaoxiAuthoringForm(authoring, null, scope, initialTab) else ZxEmpty("加载中", "正在读取人物")
+        else -> ZxEmpty("人物暂不可编辑", "请返回图集重试")
     }
 }
 

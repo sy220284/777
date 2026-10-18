@@ -331,14 +331,16 @@ class ZhaoxiApplicationScenePack(
                 }
                 if (msg == null) ZxEmpty("没有消息", "会话为空") else when (scene.value) {
                     "conversation.edit" -> ZhaoxiEditScene(msg, conv!!.chat, scope, if (workMode) conv.work else null)
-                    "chat.branches" -> ZhaoxiBranchesScene(msg, conv!!.chat, scope)
+                    "chat.branches" -> if (workMode) ZxEmpty("暂不支持工作分支切换", "返回工作会话继续") else ZhaoxiBranchesScene(msg, conv!!.chat, scope)
                     "conversation.reader" -> ZhaoxiReaderScene("阅读", msg.text, scope)
                     else -> ZhaoxiMessageActionsScene(msg, scope,
                         onEdit = { scope.onNavigate(UiSceneId("conversation.edit")) },
                         onRegenerate = {
-                            if (workMode) activeIdentity?.let { conv!!.work.submit(WorkConversationUiCommand.RegenerateReply(it, msg.id)) }
-                            else activeIdentity?.let { conv!!.chat.submit(ChatUiCommand.RegenerateReply(it, msg.id)) }
-                            scope.onBack()
+                            when {
+                                activeIdentity == null -> UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                                workMode -> conv!!.work.submit(WorkConversationUiCommand.RegenerateReply(activeIdentity, msg.id))
+                                else -> conv!!.chat.submit(ChatUiCommand.RegenerateReply(activeIdentity, msg.id))
+                            }
                         })
                 }
             }
@@ -353,12 +355,12 @@ class ZhaoxiApplicationScenePack(
             "conversation.ui_document_generate" -> conv?.documents?.let { ZhaoxiUiDocumentGenerateScene(it, scope, ::currentDocumentContext) }
             "work.approval" -> conv?.let { ZhaoxiApprovalScene(it.work, scope) }
             "work.question" -> conv?.let { ZhaoxiQuestionScene(it.work, scope) }
-            "work.plan_review" -> conv?.workReads?.let { ZhaoxiPlanReviewScene(it, conv.work, sessionId, scope) }
+            "work.plan_review" -> conv?.workReads?.let { ZhaoxiPlanReviewScene(it, conv.work, sessionId, scope, canOpenEvidence = conv.evidence != null) }
             "work.requirement_evidence" -> if (conv?.evidence != null && identity != null)
                 ZhaoxiRequirementEvidenceScene(conv.evidence, identity, scope)
             else ZxEmpty("证据不可用", "缺少会话身份")
             "work.team" -> conv?.workTeam?.let { ZhaoxiWorkTeamScene(it, scope) }
-            "work.capabilities" -> sec?.tools?.let { ZhaoxiToolsScene(it, scope) }
+            "work.capabilities" -> sec?.tools?.let { ZhaoxiToolsScene(it, scope, "work.capabilities") }
             "work.steering_choice" -> ZhaoxiSteeringScene(scope)
             "chat.reply_suggestions" -> (conv?.replySuggestions ?: sec?.replySuggestions)?.let {
                 ZxReplySuggestionsScene(it, onPick = { text ->
@@ -389,7 +391,7 @@ class ZhaoxiApplicationScenePack(
                     "chat.gallery_profile" -> ZhaoxiPersonaProfileScene(gid, sec?.gallery ?: conv?.gallery,
                         conv?.selection ?: sec?.selection, conv?.stories, sec?.transfer, scope)
                     "chat.persona_editor", "chat.world_book" ->
-                        if (sec?.authoring != null) ZhaoxiPersonaEditorScene(sec.authoring, gid, scope)
+                        if (sec?.authoring != null) ZhaoxiPersonaEditorScene(sec.authoring, gid, scope, initialTab = if (scene.value == "chat.world_book") 2 else 0)
                         else ZxEmpty("端口未注入", "chat.persona_authoring 能力未连接")
                     "chat.gallery_portrait" ->
                         if (sec?.portraits != null) ZhaoxiPortraitEditor(sec.portraits, gid, scope)
@@ -408,17 +410,45 @@ class ZhaoxiApplicationScenePack(
             "chat.group_announcement" -> conv?.groups?.let { ZxGroupAnnouncementScene(it, scope) }
 
             // ---- 自动化 / 工具 / 媒体 ----
-            "route.tasks", "automation.tasks" -> sec?.automation?.let { ZhaoxiAutomationTasksScene(it, scope) }
-            "automation.editor" -> sec?.automation?.let { ZhaoxiAutomationEditorScene(it, scope) }
-            "automation.persona_interaction" -> sec?.automation?.let { ZhaoxiPersonaInteractionScene(it, scope) }
+            "route.tasks", "automation.tasks" -> sec?.automation?.let { automation ->
+                ZhaoxiAutomationTasksScene(
+                    automation, scope,
+                    onOpenEditor = { id ->
+                        targets.automationTaskId = id
+                        scope.onNavigate(UiSceneId("automation.editor"))
+                    },
+                    onCreate = {
+                        targets.automationTaskId = null
+                        scope.onNavigate(UiSceneId("automation.editor"))
+                    },
+                )
+            }
+            "automation.editor" -> sec?.automation?.let {
+                ZhaoxiAutomationEditorScene(it, scope, targets.automationTaskId)
+            }
+            "automation.persona_interaction" -> sec?.automation?.let { automation ->
+                ZhaoxiPersonaInteractionScene(automation, scope,
+                    onCreate = {
+                        targets.automationTaskId = null
+                        scope.onNavigate(UiSceneId("automation.editor"))
+                    },
+                    onEdit = { id ->
+                        targets.automationTaskId = id
+                        scope.onNavigate(UiSceneId("automation.editor"))
+                    },
+                )
+            }
             "route.tools", "tools.mcp", "tools.github", "tools.plugins" ->
-                sec?.tools?.let { ZhaoxiToolsScene(it, scope) }
+                sec?.tools?.let { ZhaoxiToolsScene(it, scope, scene.value) }
             "media.creation", "media.result" -> (sec?.media ?: conv?.media)?.let { media ->
-                settings?.let { ZhaoxiConnectedMediaScene(media, it, sessionId, scope, sec?.gallery ?: conv?.gallery, sec?.portraits) }
+                settings?.let { ZhaoxiConnectedMediaScene(
+                    media, it, sessionId, scope, sec?.gallery ?: conv?.gallery,
+                    sec?.portraits, resultsOnly = scene.value == "media.result")
+                }
             }
 
             // ---- 工作区 ----
-            "route.workspace" -> ZhaoxiWorkspaceScene(sec?.files ?: conv?.files, scope) { filePath ->
+            "route.workspace" -> ZhaoxiWorkspaceScene(sec?.files ?: conv?.files, sessionId, scope) { filePath ->
                 targets.workspacePath = filePath
                 scope.onNavigate(UiSceneId("workspace.preview"))
             }
@@ -428,22 +458,33 @@ class ZhaoxiApplicationScenePack(
             // ---- 设置 ----
             "settings.root", "route.settings" -> ZhaoxiSettingsHomeScene(scope)
             "settings.appearance" -> ZhaoxiAppearanceScene(preferences, scope)
-            "settings.notifications", "settings.permissions" -> ZhaoxiNotificationsScene(preferences, scope)
+            "settings.notifications" -> ZhaoxiNotificationsScene(preferences, scope)
+            "settings.permissions" -> ZhaoxiPermissionsScene(preferences, scope, settings ?: sec?.settings)
             "settings.models" -> settings?.let { ZhaoxiModelsScene(it, scope) }
-            "settings.session", "settings.chat", "settings.advanced", "settings.memory_settings" ->
-                settings?.let { ZhaoxiRuntimeSettingsScene(it, scope) }
+            "settings.session" -> settings?.let { ZhaoxiRuntimeSettingsScene(it, scope, sessionOnly = true) }
+            "settings.advanced" -> settings?.let { ZhaoxiRuntimeSettingsScene(it, scope) }
+            "settings.chat" -> settings?.let { ZhaoxiChatGuardScene(it, scope) }
+            "settings.memory_settings" -> settings?.let { ZhaoxiMemorySettingsScene(it, scope) }
             "settings.account" -> settings?.let { ZhaoxiAccountScene(it, scope) }
             "settings.minimax_quota" -> settings?.let { ZhaoxiQuotaScene(it, scope) }
-            "settings.usage", "settings.model_usage", "settings.usage_log", "settings.usage_detail" ->
-                usageOwner?.let { ZhaoxiUsageScene(it, scope) }
+            "settings.usage" -> usageOwner?.let { ZhaoxiUsageOverviewScene(it, scope) }
+            "settings.model_usage" -> usageOwner?.let { ZhaoxiUsageOverviewScene(it, scope, modelOnly = true) }
+            "settings.usage_log" -> usageOwner?.let { usage ->
+                ZhaoxiUsageLogScene(usage, scope) { requestId ->
+                    targets.usageRequestId = requestId
+                    scope.onNavigate(UiSceneId("settings.usage_detail"))
+                }
+            }
+            "settings.usage_detail" -> usageOwner?.let { ZhaoxiUsageDetailScene(it, targets.usageRequestId, scope) }
             "settings.model_performance" -> sec?.modelPerformance?.let { ZhaoxiPerformanceScene(it, scope) }
             "settings.pricing" -> sec?.pricing?.let { ZhaoxiPricingScene(it, scope) }
-            "settings.memory", "settings.memory_management" -> sec?.memory?.let { ZhaoxiMemoryManagementScene(it, scope) }
+            "settings.memory" -> sec?.memory?.let { ZhaoxiMemoryOverviewScene(it, settings ?: sec.settings, scope) }
+            "settings.memory_management" -> sec?.memory?.let { ZhaoxiMemoryManagementScene(it, scope) }
             "settings.session_storage" -> settings?.let { ZhaoxiStorageScene(it, scope) }
             "settings.diagnostics", "settings.update" ->
                 ZhaoxiDiagnosticsScene(updateStatus, checkForUpdate, scope)
 
-            else -> ZxEmpty("朝夕 · ${scene.value}", "该场景暂无 Zx* 实装映射")
+            else -> ZxEmpty("页面暂不可用", "请返回重试")
         }
     }
 
