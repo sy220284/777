@@ -341,6 +341,7 @@ fun ZhaoxiHomeScene(
                     title = (renamedTitles[session.id] ?: session.title).take(40),
                     detail = session.summaryPreview.orEmpty().take(56),
                     selected = snap.identity?.sessionId == session.id,
+                    testTag = "zhaoxi.home.reopen_session.${session.id}",
                     onClick = { openSession(session.id) },
                 )
             }
@@ -481,13 +482,16 @@ private fun ZxHomeDrawerEntry(
     title: String,
     detail: String = "",
     selected: Boolean = false,
+    testTag: String? = null,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
 ) {
     val c = ZhaoxiTheme.colors
     val interaction = remember { MutableInteractionSource() }
     Row(
-        Modifier.fillMaxWidth().zxPressSurface(interaction).clip(RoundedCornerShape(12.dp))
+        Modifier.fillMaxWidth()
+            .then(if (testTag == null) Modifier else Modifier.testTag(testTag))
+            .zxPressSurface(interaction).clip(RoundedCornerShape(12.dp))
             .background(if (selected) c.bg2 else Color.Transparent)
             .then(if (onLongClick != null) Modifier.combinedClickable(
                 role = Role.Button,
