@@ -532,7 +532,7 @@ class ZhaoxiApplicationScenePack(
             "settings.model_performance" -> sec?.modelPerformance?.let { ZhaoxiPerformanceScene(it, scope) }
             "settings.pricing" -> sec?.pricing?.let { ZhaoxiPricingScene(it, scope) }
             "settings.memory" -> sec?.memory?.let { ZhaoxiMemoryOverviewScene(it, settings ?: sec.settings, scope) }
-            "settings.memory_management" -> sec?.memory?.let { ZhaoxiMemoryManagementScene(it, scope) }
+            "settings.memory_management" -> sec?.memory?.let { ZhaoxiMemoryManagementScene(it, scope, settings ?: sec.settings) }
             "settings.session_storage" -> settings?.let { ZhaoxiStorageScene(it, scope) }
             "settings.diagnostics", "settings.update" ->
                 ZhaoxiDiagnosticsScene(updateStatus, checkForUpdate, scope)
