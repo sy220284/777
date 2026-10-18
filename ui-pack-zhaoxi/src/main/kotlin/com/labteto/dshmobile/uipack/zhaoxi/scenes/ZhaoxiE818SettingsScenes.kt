@@ -152,8 +152,6 @@ fun ZhaoxiUsageDetailScene(usage: UsageUiPort, requestId: String?, scope: UiScen
 @Composable
 fun ZhaoxiMemoryOverviewScene(memory: MemoryUiPort, settings: SettingsUiPort?, scope: UiSceneRenderScope) {
     val page = remember(memory) { memory.memoryPage(MemoryManagementQuery(setOf(MemoryScope.GLOBAL))) }
-    val snap by (settings?.state ?: kotlinx.coroutines.flow.flowOf(UiSettingsSnapshot()))
-        .collectAsState(initial = settings?.initialState ?: UiSettingsSnapshot())
     ZxPage("记忆", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("全局记忆概览")
@@ -162,16 +160,13 @@ fun ZhaoxiMemoryOverviewScene(memory: MemoryUiPort, settings: SettingsUiPort?, s
         page.kindCounts.filterValues { it > 0 }.forEach { (kind, count) ->
             ZxValueRow(kind.name, value = count.toString())
         }
-        ZxSection("记忆设置")
+        ZxSection("记忆管理")
         if (settings != null) {
-            ZxSwitchRow("自动召回", "在允许范围内检索既有记忆", snap.autoRecall) {
-                settings.submit(SettingsUiCommand.Personalization(snap.userRules, it, snap.autoMemory))
-            }
-            ZxSwitchRow("自动记忆", "按现有 Owner 规则保存可记住的事实", snap.autoMemory) {
-                settings.submit(SettingsUiCommand.Personalization(snap.userRules, snap.autoRecall, it))
+            ZxNavRow("记忆设置", sub = "自动召回 · 自动记忆") {
+                scope.onNavigate(UiSceneId("settings.memory_settings"))
             }
         }
-        ZxNavRow("管理全局记忆", sub = "搜索 · 修改 · 遗忘") {
+        ZxNavRow("记忆管理", sub = "搜索 · 修改 · 遗忘") {
             scope.onNavigate(UiSceneId("settings.memory_management"))
         }
         ZxFooterNote("这里只显示全局作用域统计；人物/项目记忆不会被混入全局数字")
