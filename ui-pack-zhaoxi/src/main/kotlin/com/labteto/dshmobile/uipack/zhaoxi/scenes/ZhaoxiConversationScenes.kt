@@ -282,8 +282,9 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val jobs = androidx.compose.runtime.rememberCoroutineScope()
-    val all = (older + messages).distinctBy { it.id }
-    val timeline = projectZxReplyTimeline(all, running)
+    val all = remember(older, messages) { (older + messages).distinctBy { it.id } }
+    // A 100ms model preview changes only the live text, not historic message grouping.
+    val timeline = remember(all, running) { projectZxReplyTimeline(all, running) }
     val latestReplyKey = timeline.lastOrNull { it is ZxTimelineEntry.Reply }?.key
     val documentsState = if (documents != null) documents.snapshots.collectAsState(initial = documents.snapshot())
         else null
@@ -300,8 +301,10 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
                 .groupBy { it.document.source.messageId }
         else emptyMap()
     }
-    val allCardsBySource = (historical.values.flatten() + currentDocuments)
-        .associateBy { it.document.documentId }.values.groupBy { it.document.source.messageId }
+    val allCardsBySource = remember(historical, currentDocuments) {
+        (historical.values.flatten() + currentDocuments)
+            .associateBy { it.document.documentId }.values.groupBy { it.document.source.messageId }
+    }
     val workByTurn = allCardsBySource.mapValues { (_, items) ->
         items.firstOrNull { it.document.isInlineWorkTaskCard() }
     }
