@@ -46,7 +46,6 @@ import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip
 import com.labteto.dshmobile.uipack.zhaoxi.theme.zhaoxiWallpaperPresets
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import java.util.zip.ZipInputStream
 
@@ -60,8 +59,7 @@ internal fun ZhaoxiWallpaperPicker(
     val context = LocalContext.current
     var previewRevision by remember { mutableIntStateOf(0) }
     val previewResult by produceState<Result<Map<String, ImageBitmap>>?>(null, context, previewRevision) {
-        value = try {
-            Result.success(withContext(Dispatchers.IO) {
+        value = runCatching { withContext(Dispatchers.IO) {
             buildMap {
                 context.assets.open("e818_wallpapers.zip").use { source ->
                     ZipInputStream(source).use { zip ->
@@ -87,12 +85,7 @@ internal fun ZhaoxiWallpaperPicker(
                     }
                 }
             }
-            })
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            Result.failure<Map<String, ImageBitmap>>(error)
-        }
+        } }
     }
     val previews = previewResult?.getOrNull().orEmpty()
     val previewError = previewResult?.isFailure == true

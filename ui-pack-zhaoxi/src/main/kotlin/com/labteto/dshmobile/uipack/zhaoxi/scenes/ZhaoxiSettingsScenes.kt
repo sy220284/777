@@ -130,8 +130,6 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
     var glass by remember(snap.transparency) { mutableFloatStateOf(snap.transparency) }
     var wallpaperSaving by remember { mutableStateOf(false) }
     var wallpaperError by remember { mutableStateOf<String?>(null) }
-    var wallpaperSaving by remember { mutableStateOf(false) }
-    var wallpaperError by remember { mutableStateOf<String?>(null) }
     ZxPage("外观", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("主题")

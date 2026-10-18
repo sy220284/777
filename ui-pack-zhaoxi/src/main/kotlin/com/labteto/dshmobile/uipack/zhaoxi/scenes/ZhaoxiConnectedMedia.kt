@@ -17,6 +17,40 @@ import com.labteto.dshmobile.uihost.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 
+/** Media Owner states are the single source of truth; OUTCOME_UNKNOWN is never failed/success. */
+internal fun LocalMediaCreationPhase.zxCreationPhaseLabel(): String = when (this) {
+    LocalMediaCreationPhase.PREPARING -> "准备中"
+    LocalMediaCreationPhase.SUBMITTING -> "正在提交"
+    LocalMediaCreationPhase.SAVING -> "保存结果中"
+    LocalMediaCreationPhase.OUTCOME_UNKNOWN -> "执行结果待确认"
+    LocalMediaCreationPhase.FAILED -> "执行失败"
+    LocalMediaCreationPhase.SAVE_FAILED -> "保存失败"
+    LocalMediaCreationPhase.SUCCEEDED -> "已完成"
+}
+
+internal fun LocalMediaVideoPhase.zxVideoPhaseLabel(): String = when (this) {
+    LocalMediaVideoPhase.SUBMITTING -> "正在提交"
+    LocalMediaVideoPhase.OUTCOME_UNKNOWN -> "执行结果待确认"
+    LocalMediaVideoPhase.QUEUED -> "等待处理"
+    LocalMediaVideoPhase.PROCESSING -> "生成中"
+    LocalMediaVideoPhase.SUCCEEDED -> "生成完成"
+    LocalMediaVideoPhase.FAILED -> "生成失败"
+}
+
+/** Owner result, not just a dispatched request: never show imported when storage failed. */
+internal data class ZxPortraitImportFeedback(val message: String, val failure: Boolean, val warning: Boolean = false)
+
+internal fun zxPortraitImportFeedback(receipt: UiPersonaPortraitReceipt): ZxPortraitImportFeedback = when (receipt) {
+    is UiPersonaPortraitReceipt.Updated -> receipt.cleanupWarning?.takeIf(String::isNotBlank)?.let {
+        ZxPortraitImportFeedback("画像已更新，但清理旧图片时出现问题：${it.take(160)}", failure = false, warning = true)
+    } ?: ZxPortraitImportFeedback("人物画像已更新", failure = false)
+    UiPersonaPortraitReceipt.Missing ->
+        ZxPortraitImportFeedback("人物已不存在，请返回人物图集刷新", failure = true)
+    is UiPersonaPortraitReceipt.Failed ->
+        ZxPortraitImportFeedback(receipt.message?.takeIf(String::isNotBlank)?.take(160)
+            ?: "画像导入失败，请检查文件或重试", failure = true)
+}
+
 @Composable
 fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sessionId: String,
     scope: UiSceneRenderScope, gallery: PersonaGalleryUiPort? = null, portraits: PersonaPortraitUiPort? = null,
@@ -31,6 +65,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
     val validImageRatio = remember(ratio) { Regex("^[1-9][0-9]?:[1-9][0-9]?$").matches(ratio.trim()) }
     var voice by rememberSaveable { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
+    var statusTone by remember { mutableStateOf(ZxTone.Info) }
     var busy by remember { mutableStateOf(false) }
     var selected by rememberSaveable(sessionId) { mutableStateOf<String?>(null) }
     var pendingDelete by remember { mutableStateOf<String?>(null) }
@@ -40,31 +75,48 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
     val jobs = rememberCoroutineScope()
     fun execute(action: suspend () -> String) {
         if (busy) return
+        // Claim the action before coroutine dispatch so two rapid taps cannot enqueue
+        // duplicate provider operations (including possibly billable requests).
+        busy = true
         jobs.launch {
-            busy = true
-            try { status = action() }
+            try {
+                statusTone = ZxTone.Info
+                status = action()
+            }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { status = failure.message ?: "操作失败" }
+            catch (failure: Exception) {
+                statusTone = ZxTone.Err
+                status = failure.message?.takeIf(String::isNotBlank) ?: "操作失败"
+            }
             finally { busy = false }
         }
     }
-    fun receiptText(receipt: MediaUiReceipt): String = when (receipt) {
-        is MediaUiReceipt.CreationAdmitted -> "已加入生成队列"
-        is MediaUiReceipt.VideoAdmitted -> "视频任务已提交"
-        MediaUiReceipt.Applied -> "操作成功"
-        is MediaUiReceipt.Failed -> receipt.message ?: "操作失败"
+    fun receiptText(receipt: MediaUiReceipt): String {
+        statusTone = if (receipt is MediaUiReceipt.Failed) ZxTone.Err else ZxTone.Info
+        return when (receipt) {
+            is MediaUiReceipt.CreationAdmitted -> "已加入生成队列，结果以任务状态为准"
+            is MediaUiReceipt.VideoAdmitted -> "视频任务已受理，等待后续状态"
+            MediaUiReceipt.Applied -> "操作已完成"
+            is MediaUiReceipt.Failed -> receipt.message?.takeIf(String::isNotBlank) ?: "操作失败，请确认实际状态"
+        }
     }
     val export = rememberUiStreamDocumentSaver<Pair<String, String>>("application/octet-stream", { "media-${it.first}" }, { target, output ->
         when (val r = media.exportToSessionAsset(target.first, target.second, output)) {
             MediaUiReceipt.Applied -> UiDocumentWriteReceipt.Saved
             else -> UiDocumentWriteReceipt.Failed("保存失败")
         }
-    }, { _, r -> status = if (r == UiDocumentWriteReceipt.Saved) "保存成功" else "保存失败" }, { status = it.message })
+    }, { _, r ->
+        statusTone = if (r == UiDocumentWriteReceipt.Saved) ZxTone.Info else ZxTone.Err
+        status = if (r == UiDocumentWriteReceipt.Saved) "文件已保存" else "保存失败"
+    }, {
+        statusTone = ZxTone.Err
+        status = it.message
+    })
     val transcribe = rememberUiAttachmentPickerFor<Pair<LocalMediaOffer, String>>(arrayOf("audio/*"), { status = it }) { target, uri ->
         if (uri != null) execute { receiptText(media.submit(MediaUiCommand.Transcribe(target.first, uri, target.second))) }
     }
     ZxPage(if (resultsOnly) "媒体结果" else "媒体生成", onBack = { scope.onBack() }) {
-        status?.let { ZxBanner(it, ZxTone.Info) }
+        status?.let { ZxBanner(it, statusTone) }
         if (sessionId.isBlank()) {
             ZxEmpty("请先打开会话", "选择会话后继续")
         } else if (!resultsOnly) {
@@ -102,6 +154,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
             val target = offer
             if (target != null) {
                 if (target.kind == LocalMediaKind.IMAGE && !validImageRatio) {
+                    statusTone = ZxTone.Err
                     status = "请输入有效的画面比例，例如 1:1、16:9"
                 } else if (target.kind == LocalMediaKind.TRANSCRIBE) transcribe(target to sessionId)
                 else execute {
@@ -116,11 +169,30 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
             }
         }, enabled = !busy && sessionId.isNotBlank() && offer != null && (prompt.isNotBlank() || offer?.kind == LocalMediaKind.TRANSCRIBE), loading = busy)
         if (page.jobs.isNotEmpty() || page.videos.isNotEmpty()) ZxSection("生成任务")
-        page.jobs.forEach { ZxRow(it.kind, "${it.phase} ${it.error.orEmpty()}") }
+        page.jobs.forEach { job ->
+            val kind = when (job.kind.uppercase()) {
+                "IMAGE" -> "图片"
+                "VIDEO" -> "视频"
+                "SPEECH" -> "语音"
+                "TRANSCRIBE" -> "音频转写"
+                else -> "媒体任务"
+            }
+            ZxRow(kind, listOf(job.phase.zxCreationPhaseLabel(),
+                job.error?.takeIf(String::isNotBlank)?.take(120)).filterNotNull().joinToString(" · "))
+            if (job.phase == LocalMediaCreationPhase.OUTCOME_UNKNOWN) {
+                ZxBanner("上次请求的远端执行结果尚不确定，请先核对记录，避免重复付费生成", ZxTone.Warn)
+            }
+        }
         page.videos.forEach { task ->
-            ZxRow(task.model, "${task.phase} ${task.lastError.orEmpty()}")
+            ZxRow(task.model, listOf(task.phase.zxVideoPhaseLabel(),
+                task.lastError?.takeIf(String::isNotBlank)?.take(120)).filterNotNull().joinToString(" · "))
+            if (task.phase == LocalMediaVideoPhase.OUTCOME_UNKNOWN) {
+                ZxBanner("视频请求结果待确认，请勿直接重复生成；先检查服务端任务状态", ZxTone.Warn)
+            }
             val original = offers.firstOrNull { it.id == task.offerId }
-            if (original != null && media.canRefresh(task, original)) ZxButton("查询视频状态", { execute { receiptText(media.submit(MediaUiCommand.PollVideo(original, task.id))) } })
+            if (original != null && media.canRefresh(task, original)) ZxButton("查询视频状态", {
+                execute { receiptText(media.submit(MediaUiCommand.PollVideo(original, task.id))) }
+            }, enabled = !busy)
         }
         } else {
         ZxNavRow("新建生成", sub = "图像 · 视频 · 语音与转写") {
@@ -169,23 +241,49 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
                 if (kind != null) UiOwnedMediaPlayback(path, kind, Modifier.fillMaxWidth().heightIn(max = 400.dp))
             }
             ZxSection("作品操作")
-            ZxButton("保存到文件", { export(result.id to sessionId) })
-            ZxButton("分享", { execute { shareUiMedia(context, media, result.id, sessionId); "已打开系统分享" } })
+            ZxButton("保存到文件", { export(result.id to sessionId) }, enabled = !busy)
+            ZxButton("分享", { execute { shareUiMedia(context, media, result.id, sessionId); "系统分享界面已打开，是否分享成功由目标应用决定" } }, enabled = !busy)
             ZxButton("再次生成", { pendingRegenerate = result.id }, enabled = !busy)
-            if (result.kind.uppercase() == "IMAGE" && gallery != null && portraits != null)
-                ZxButton("存为人物画像", { galleryPicker = !galleryPicker })
+            if (result.kind.uppercase() == "IMAGE" && gallery != null && portraits != null) {
+                if (asset.localPath != null) {
+                    ZxButton("存为人物画像", { galleryPicker = !galleryPicker }, enabled = !busy)
+                } else {
+                    ZxFooterNote("存为人物画像需要已下载到本机的原图")
+                }
+            }
             if (galleryPicker && gallery != null && portraits != null) {
-                val entries by produceState<UiPersonaGalleryReadReceipt?>(null) { value = gallery.read() }
-                (entries as? UiPersonaGalleryReadReceipt.Available)?.entries?.forEach { entry ->
-                    ZxButton("设为 ${entry.name} 的画像", { execute {
-                        val uri = ownedUiMediaUri(context, media, result.id, sessionId)
-                        portraits.submit(PersonaPortraitUiCommand.Import(entry.id, uri)).let { "画像操作已提交" }
-                    } })
+                val entries by produceState<UiPersonaGalleryReadReceipt?>(null) {
+                    value = try { gallery.read() }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (failure: Exception) { UiPersonaGalleryReadReceipt.Failed(failure.message) }
+                }
+                when (val galleryResult = entries) {
+                    is UiPersonaGalleryReadReceipt.Available -> {
+                        if (galleryResult.entries.isEmpty()) ZxFooterNote("暂无可选人物，请先创建人物")
+                        galleryResult.entries.forEach { entry ->
+                            ZxButton("设为 ${entry.name} 的画像", { execute {
+                                val uri = ownedUiMediaUri(context, media, result.id, sessionId)
+                                val imported = portraits.submit(PersonaPortraitUiCommand.Import(entry.id, uri))
+                                val feedback = zxPortraitImportFeedback(imported)
+                                statusTone = when {
+                                    feedback.failure -> ZxTone.Err
+                                    feedback.warning -> ZxTone.Warn
+                                    else -> ZxTone.Info
+                                }
+                                if (!feedback.failure) galleryPicker = false
+                                feedback.message
+                            } }, enabled = !busy)
+                        }
+                    }
+                    is UiPersonaGalleryReadReceipt.Failed -> {
+                        ZxBanner(galleryResult.message ?: "无法读取人物列表，请重新进入后重试", ZxTone.Err)
+                    }
+                    else -> ZxFooterNote("正在读取人物列表")
                 }
             }
             ZxSection("管理")
             ZxButton("删除结果", { pendingDelete = result.id },
-                variant = ZxButtonVariant.Danger)
+                variant = ZxButtonVariant.Danger, enabled = !busy)
         }
         }
         pendingRegenerate?.let { resultId ->
