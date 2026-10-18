@@ -5,6 +5,8 @@ import androidx.compose.ui.graphics.luminance
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiHue
 import com.labteto.dshmobile.uipack.zhaoxi.theme.accentFor
 import com.labteto.dshmobile.uipack.zhaoxi.theme.wallpaperVeilAlpha
+import com.labteto.dshmobile.uipack.zhaoxi.theme.resolveZhaoxiWallpaper
+import com.labteto.dshmobile.uipack.zhaoxi.theme.zhaoxiWallpaperPresets
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -58,4 +60,18 @@ class ZhaoxiE818TokensTest {
         }
     }
 
+    @Test
+    fun wallpaperSelectionKeepsAllTenOriginalChoices() {
+        assertEquals((0..9).map { "w$it.webp" }, zhaoxiWallpaperPresets.map { it.key })
+        val expected = mapOf(
+            ZhaoxiHue.DUSK to 0, ZhaoxiHue.STONE to 2,
+            ZhaoxiHue.SAGE to 4, ZhaoxiHue.MAUVE to 6, ZhaoxiHue.STEEL to 8,
+        )
+        for ((hue, i) in expected) {
+            assertEquals("w$i.webp", resolveZhaoxiWallpaper(true, "auto", hue, false))
+            assertEquals("w${i + 1}.webp", resolveZhaoxiWallpaper(true, "auto", hue, true))
+        }
+        assertEquals("w7.webp", resolveZhaoxiWallpaper(true, "w7.webp", ZhaoxiHue.STONE, false))
+        assertEquals(null, resolveZhaoxiWallpaper(false, "w7.webp", ZhaoxiHue.STONE, false))
+    }
 }

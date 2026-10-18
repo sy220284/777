@@ -14,6 +14,7 @@ data class UiHostPreferences(
     val motionScale: Float = 1f,
     val adaptiveContrast: Boolean = true,
     val presetWallpaperEnabled: Boolean = false,
+    val selectedWallpaperPreset: String = "auto",
     val notifyJobs: Boolean = true,
     val notifyResults: Boolean = true,
     val notifyFailures: Boolean = true,
@@ -25,6 +26,8 @@ data class UiHostPreferences(
 )
 
 sealed interface UiHostPreferencesCommand {
+    /** Choose an asset or the adaptive mode without resetting other appearance preferences. */
+    data class SelectWallpaperPreset(val preset: String) : UiHostPreferencesCommand
     data class Appearance(val theme: String, val accent: String, val textScale: Float,
         val textWeight: Int, val transparency: Float, val ambientGlow: Float,
         val componentEmphasis: Float, val motionScale: Float, val adaptiveContrast: Boolean,

@@ -288,6 +288,13 @@ class ZhaoxiAcceptanceAndroidTest {
                         it.presetWallpaperEnabled && it.motionScale == 0f
                     }
                 }
+                assertTrue(ports.hostPreferencesUiPort.submit(
+                    UiHostPreferencesCommand.SelectWallpaperPreset("w7.webp")))
+                withTimeout(15_000) {
+                    ports.hostPreferencesUiPort.snapshots.first {
+                        it.presetWallpaperEnabled && it.selectedWallpaperPreset == "w7.webp"
+                    }
+                }
             }
             compose.activityRule.scenario.onActivity { activity ->
                 activity.setContent {
@@ -305,6 +312,8 @@ class ZhaoxiAcceptanceAndroidTest {
             capture("fixture-wallpaper-stone-light", "wallpaper-fixture")
         } finally {
             runBlocking {
+                assertTrue(ports.hostPreferencesUiPort.submit(
+                    UiHostPreferencesCommand.SelectWallpaperPreset(previous.selectedWallpaperPreset)))
                 assertTrue(ports.hostPreferencesUiPort.submit(UiHostPreferencesCommand.Appearance(
                     previous.theme, previous.accent, previous.textScale, previous.textWeight,
                     previous.transparency, previous.ambientGlow, previous.componentEmphasis,

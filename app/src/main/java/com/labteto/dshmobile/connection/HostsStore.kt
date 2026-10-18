@@ -28,6 +28,7 @@ class HostsStore @Inject constructor(
         val SIDEBAR_AVATAR = stringPreferencesKey("sidebar_avatar_source")
         val BACKGROUND_ADAPTIVE_CONTRAST = booleanPreferencesKey("background_adaptive_contrast")
         val PRESET_WALLPAPER_ENABLED = booleanPreferencesKey("zhaoxi_e818_wallpaper_enabled")
+        val SELECTED_WALLPAPER_PRESET = stringPreferencesKey("zhaoxi_e818_wallpaper_preset")
         val TEXT_SCALE = floatPreferencesKey("text_scale")
         val TEXT_WEIGHT_ADJUSTMENT = intPreferencesKey("text_weight_adjustment")
         val WALLPAPER_SURFACE_TRANSPARENCY = floatPreferencesKey("wallpaper_surface_transparency")
@@ -100,6 +101,7 @@ class HostsStore @Inject constructor(
             sidebarAvatarSource = prefs[Keys.SIDEBAR_AVATAR],
             backgroundAdaptiveContrast = prefs[Keys.BACKGROUND_ADAPTIVE_CONTRAST] ?: true,
             presetWallpaperEnabled = prefs[Keys.PRESET_WALLPAPER_ENABLED] ?: false,
+            selectedWallpaperPreset = prefs[Keys.SELECTED_WALLPAPER_PRESET] ?: "auto",
             textScale = (prefs[Keys.TEXT_SCALE] ?: 1.0f).coerceIn(AppDisplayLimits.MIN_READING_SCALE, AppDisplayLimits.MAX_READING_SCALE),
             textWeightAdjustment = (prefs[Keys.TEXT_WEIGHT_ADJUSTMENT] ?: 0).coerceIn(0, 2),
             wallpaperSurfaceTransparency =
@@ -130,6 +132,7 @@ class HostsStore @Inject constructor(
             } ?: prefs.remove(Keys.SIDEBAR_AVATAR)
             prefs[Keys.BACKGROUND_ADAPTIVE_CONTRAST] = next.backgroundAdaptiveContrast
             prefs[Keys.PRESET_WALLPAPER_ENABLED] = next.presetWallpaperEnabled
+            prefs[Keys.SELECTED_WALLPAPER_PRESET] = next.selectedWallpaperPreset
             prefs[Keys.TEXT_SCALE] = next.textScale.coerceIn(AppDisplayLimits.MIN_READING_SCALE, AppDisplayLimits.MAX_READING_SCALE)
             prefs[Keys.TEXT_WEIGHT_ADJUSTMENT] = next.textWeightAdjustment.coerceIn(0, 2)
             prefs[Keys.WALLPAPER_SURFACE_TRANSPARENCY] =

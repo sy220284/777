@@ -329,6 +329,7 @@ fun ZhaoxiBackground(
                 bitmap = it.first,
                 contentDescription = null,
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
                 modifier = Modifier.fillMaxSize(),
             )
         }

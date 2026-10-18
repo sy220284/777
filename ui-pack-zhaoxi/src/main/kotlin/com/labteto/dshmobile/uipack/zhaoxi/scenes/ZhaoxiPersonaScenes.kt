@@ -20,6 +20,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -76,6 +77,7 @@ fun ZhaoxiPersonaGalleryScene(
     var search by rememberSaveable { mutableStateOf("") }
     var showPresets by rememberSaveable { mutableStateOf(false) }
     val jobs = androidx.compose.runtime.rememberCoroutineScope()
+    val portraitTargetPx = (180f * LocalDensity.current.density).toInt()
     val state by produceState<UiPersonaGalleryReadReceipt?>(null, revision) { value = gallery.read() }
     val importer = transfer?.let { owner ->
         com.labteto.dshmobile.uihost.rememberUiDocumentImporter(owner.maxImportBytes) { result ->
@@ -128,7 +130,7 @@ fun ZhaoxiPersonaGalleryScene(
                             value = portraits?.preview(e.id)
                         }
                         val bytes = (receipt as? UiPersonaPortraitPreviewReceipt.Ready)?.bytes
-                        val portrait by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, bytes) {
+                        val portrait by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, bytes, portraitTargetPx) {
                             if (bytes != null) {
                                 value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                                     val opts = android.graphics.BitmapFactory.Options().apply {
@@ -136,7 +138,7 @@ fun ZhaoxiPersonaGalleryScene(
                                     }
                                     android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
                                     var sample = 1
-                                    while (maxOf(opts.outWidth, opts.outHeight) / sample > 360) sample *= 2
+                                    while (opts.outWidth / (sample * 2) >= portraitTargetPx) sample *= 2
                                     val bitmap = android.graphics.BitmapFactory.decodeByteArray(
                                         bytes, 0, bytes.size,
                                         android.graphics.BitmapFactory.Options().apply { inSampleSize = sample },

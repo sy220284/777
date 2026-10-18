@@ -77,37 +77,49 @@ fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile
         if (plan == null) {
             com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("没有进行中的计划", "计划由工作运行时提供")
         } else {
-            val reported = plan.todos.count { it.ownerStatus.isNotBlank() }
-            val done = plan.todos.count {
-                it.ownerStatus.trim().lowercase() in setOf("completed", "done", "success", "finished", "已完成", "完成")
-            }
+            val visibleStatuses = plan.todos.take(plan.plan.size).map { it.ownerStatus }
+            val reported = visibleStatuses.count(String::isNotBlank)
+            val done = visibleStatuses.count(::zxWorkStepIsDone)
             ZxSection("实际步骤状态")
             Row(
-                Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                Modifier.fillMaxWidth()
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                    .background(ZhaoxiTheme.colors.card)
+                    .padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (plan.plan.isNotEmpty() && reported > 0) {
-                    CircularProgressIndicator(
-                        progress = { done.toFloat() / plan.plan.size },
-                        modifier = Modifier.height(54.dp),
-                        color = ZhaoxiTheme.colors.accent,
-                    )
+                    Box(Modifier.size(66.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(
+                            progress = { done.toFloat() / plan.plan.size },
+                            modifier = Modifier.size(66.dp),
+                            color = ZhaoxiTheme.colors.accent,
+                            trackColor = ZhaoxiTheme.colors.line,
+                            strokeWidth = 5.dp,
+                        )
+                        Text("${done * 100 / plan.plan.size}%",
+                            color = ZhaoxiTheme.colors.ink, fontSize = 14.sp)
+                    }
                 }
-                Column {
-                    Text("$done / ${plan.plan.size} 步已报告完成", color = ZhaoxiTheme.colors.ink,
-                        fontSize = 16.sp)
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text("$done / ${plan.plan.size} 步已完成",
+                        color = ZhaoxiTheme.colors.ink, fontSize = 16.sp)
                     Text(
-                        if (reported == 0) "工作尚未提供步骤完成状态" else "仅统计明确完成的步骤，不代表任务整体成功",
+                        if (reported == 0) "等待运行时报告步骤状态"
+                        else "已更新 $reported 步 · 以实际步骤回执为准",
                         color = ZhaoxiTheme.colors.ink2, fontSize = 12.sp,
                     )
+                    Text("步骤进度不代表任务整体成功",
+                        color = ZhaoxiTheme.colors.ink3, fontSize = 11.sp)
                 }
             }
             ZxSection("执行步骤")
             if (plan.plan.isEmpty()) ZxEmpty("暂无计划步骤", "运行时更新后会显示")
             plan.plan.forEachIndexed { index, step ->
                 val state = plan.todos.getOrNull(index)?.ownerStatus.orEmpty()
-                ZxRow("${index + 1}. $step", state, trailing = {
-                    if (state.isNotBlank()) ZxBadge(state, ZxBadgeTone.Neutral)
+                ZxRow("${index + 1}. $step", "", trailing = {
+                    ZxBadge(zxWorkStepLabel(state), zxWorkStepTone(state))
                 })
             }
             if (snapshot.question != null || snapshot.approval != null) {
@@ -357,4 +369,25 @@ fun ZhaoxiSteeringScene(scope: UiSceneRenderScope) {
         ZxRow("排队语义", "队列满时拒收并提示 · 草稿保留")
 
     }
+}
+
+/** The Work Owner status is authoritative; only explicit terminal-success states count as done. */
+internal fun zxWorkStepIsDone(status: String): Boolean =
+    status.trim().lowercase() in setOf("completed", "done", "success", "finished", "已完成", "完成")
+
+internal fun zxWorkStepLabel(status: String): String = when (status.trim().lowercase()) {
+    "completed", "done", "success", "finished", "已完成", "完成" -> "已完成"
+    "running", "in_progress", "in-progress", "processing", "进行中", "执行中" -> "进行中"
+    "failed", "error", "失败" -> "失败"
+    "blocked", "受阻" -> "受阻"
+    "pending", "todo", "queued", "not_started", "待执行" -> "待执行"
+    "" -> "待同步"
+    else -> status.take(20)
+}
+
+internal fun zxWorkStepTone(status: String): ZxBadgeTone = when (status.trim().lowercase()) {
+    "completed", "done", "success", "finished", "已完成", "完成" -> ZxBadgeTone.Accent
+    "running", "in_progress", "in-progress", "processing", "进行中", "执行中" -> ZxBadgeTone.Accent
+    "failed", "error", "失败", "blocked", "受阻" -> ZxBadgeTone.Err
+    else -> ZxBadgeTone.Neutral
 }
