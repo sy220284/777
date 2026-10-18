@@ -94,7 +94,7 @@ class ZhaoxiAcceptanceAndroidTest {
         compose.activityRule.scenario.onActivity { activity -> activity.setContent {
             CompositionLocalProvider(LocalUiPrivateTextCipher provides ports.privateTextCipher,
                 LocalUiHostSystemOperationOwner provides systemOperations) {
-                Box(Modifier.fillMaxSize().systemBarsPadding().testTag("zx-acceptance-${current.id.value}")) {
+                Box(Modifier.fillMaxSize().testTag("zx-acceptance-${current.id.value}")) {
                     // SLOT renderers are embedded here; never proposed as navigation targets.
                     key(current.id) {
                         pack.SceneFrame(UiSceneNavigationState(pack.manifest.id, listOf(root, current.id))) {

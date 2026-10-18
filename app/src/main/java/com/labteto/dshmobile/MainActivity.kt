@@ -2,6 +2,7 @@ package com.labteto.dshmobile
 
 import android.os.Bundle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import com.labteto.dshmobile.notify.DshNotifications
@@ -22,6 +23,8 @@ class MainActivity : AppCompatActivity() {
     private val app: AppViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Draw the E8.18 wallpaper behind both system bars; Compose content handles safe insets.
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         notifications.ensureChannels()
         setContent {

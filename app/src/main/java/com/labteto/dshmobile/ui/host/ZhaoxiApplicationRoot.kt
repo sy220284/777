@@ -94,7 +94,7 @@ internal fun ZhaoxiApplicationRoot(
         com.labteto.dshmobile.uihost.LocalUiHostSystemOperationOwner provides systemOperations,
         com.labteto.dshmobile.uihost.LocalUiPrivateTextCipher provides owner.privateTextCipher,
     ) {
-    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().systemBarsPadding()) {
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     when (val result = selected) {
         is UiApplicationPackSelectionResult.Selected -> {
             val admission = result.admission
@@ -140,7 +140,7 @@ internal fun ZhaoxiApplicationRoot(
 
 @Composable
 private fun IntegrationBlocked(message: String, retry: (() -> Unit)?) {
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
+    Column(Modifier.fillMaxSize().systemBarsPadding().padding(24.dp), verticalArrangement = Arrangement.Center) {
         Text("朝夕 UI 接入校验")
         Text(message, Modifier.padding(vertical = 12.dp))
         if (retry != null) Button(onClick = retry) { Text("重试接入") }

@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.uicontract.*
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -579,7 +580,8 @@ class ZhaoxiApplicationScenePack(
                     progress.snapTo(0f)
                     progress.animateTo(1f, motion)
                 }
-                Box(Modifier.fillMaxSize().graphicsLayer {
+                // Wallpaper covers the whole window; only interactive content avoids system bars.
+                Box(Modifier.fillMaxSize().systemBarsPadding().graphicsLayer {
                     alpha = progress.value
                     translationY = (1f - progress.value) * 16f * density
                 }) { content() }
