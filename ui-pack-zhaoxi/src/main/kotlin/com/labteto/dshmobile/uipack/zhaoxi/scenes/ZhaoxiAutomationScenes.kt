@@ -279,7 +279,8 @@ fun ZhaoxiAutomationEditorScene(
                         firstRunError = null
                     }, Modifier.fillMaxWidth(),
                         placeholder = "YYYY-MM-DD HH:mm",
-                        error = firstRunError != null, errorMessage = firstRunError)
+                        error = firstRunError != null)
+                    firstRunError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
                     ZxButton("选择日期和时间", {
                         // Android native pickers follow the device locale, 12/24h preference,
                         // accessibility, and IME conventions. Keep text input as a fallback.
