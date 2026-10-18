@@ -128,6 +128,25 @@ internal class LocalUiDocumentUiAdapter(
     }.flowOn(Dispatchers.IO).stateIn(scope, SharingStarted.WhileSubscribed(5_000), UiDocumentsSceneSnapshot(null, emptyList(), false, null))
 
     override fun snapshot() = snapshots.value
+
+    override suspend fun documentsForMessages(
+        identity: UiSessionIdentity, messageIds: Set<String>,
+    ): List<UiDocumentSnapshot> = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        if (messageIds.isEmpty()) return@withContext emptyList()
+        val admitted = synchronized(state.foregroundRunHandle.lock) {
+            val current = state.state.value
+            !state.sessionTransitioning && state.uiBindingIdentity(current) == identity
+        }
+        if (!admitted) return@withContext emptyList()
+        val records = store.read(identity.sessionId, messageIds.take(120).toSet(),
+            generation.budget, knownScenes)
+        // Historical cards contain durable text/artifact snapshots. Only the active
+        // Owner can issue actions; a cold-page read intentionally grants no permissions.
+        records.map { record ->
+            UiDocumentSnapshot(record.document, record.provenance, emptyMap(), emptyMap(),
+                record.recoveryNotice)
+        }
+    }
     override suspend fun generate(command: GenerateUiDocumentCommand) = generation.generate(command, knownScenes, navigationScenes)
 
     override suspend fun generateLocal(command: com.labteto.dshmobile.uicontract.GenerateLocalUiDocumentCommand): UiDocumentReceipt =
