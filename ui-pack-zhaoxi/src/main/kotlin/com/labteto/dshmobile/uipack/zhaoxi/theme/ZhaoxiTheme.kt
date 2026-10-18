@@ -17,7 +17,6 @@ import androidx.compose.foundation.background
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -226,28 +225,23 @@ val LocalZhaoxiBlurCapability = staticCompositionLocalOf { ZhaoxiBlurCapability.
  * M0 纯色分层 / M1 云母（静态径向渐变，零模糊） / M2 轻玻璃 / M3 强玻璃+噪点。
  * 降级链：blur 不可用（NONE 或 API<31）→ M2/M3 退化为 97% 不透明纯色；
  * REDUCED → 模糊半径减半。判定由 Host 注入 LocalZhaoxiBlurCapability。
- * 说明：Compose Modifier.blur 作用于节点自身内容；真正背景模糊需宿主层
- * RenderEffect，本实现按规格取「半透明层 + 半径模糊」的近似，如实降级。
+ * 内容不能使用 Modifier.blur（会把文字和控件一并模糊）；宿主未提供真正
+ * 背景取样时使用可读的半透明材质，不虚构背景模糊成功。
  */
 fun Modifier.zxMaterial(m: ZhaoxiMaterial): Modifier = composed {
     val c = ZhaoxiTheme.colors
     val capability = LocalZhaoxiBlurCapability.current
     val blurOk = capability != ZhaoxiBlurCapability.NONE &&
         android.os.Build.VERSION.SDK_INT >= 31
-    val radius = when (capability) {
-        ZhaoxiBlurCapability.FULL -> 20.dp
-        ZhaoxiBlurCapability.REDUCED -> 12.dp
-        ZhaoxiBlurCapability.NONE -> 0.dp
-    }
     when (m) {
         ZhaoxiMaterial.M0 -> this.background(c.bg2)
         ZhaoxiMaterial.M1 -> this.background(
             androidx.compose.ui.graphics.Brush.radialGradient(listOf(c.micaA, c.micaB)))
         ZhaoxiMaterial.M2 ->
-            if (blurOk) this.background(c.glass).blur(radius)
+            if (blurOk) this.background(c.glass)
             else this.background(c.glass2.copy(alpha = 0.97f))
         ZhaoxiMaterial.M3 -> {
-            val base = if (blurOk) this.background(c.glass).blur(radius * 1.2f)
+            val base = if (blurOk) this.background(c.glass2)
             else this.background(c.glass2.copy(alpha = 0.97f))
             base.drawBehind {
                 // 噪点：确定性伪随机点阵，alpha 0.022（免 Bitmap 资源）

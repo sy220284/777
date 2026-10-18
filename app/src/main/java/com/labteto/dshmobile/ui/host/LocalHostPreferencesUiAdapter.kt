@@ -73,7 +73,7 @@ internal class LocalHostPreferencesUiAdapter @Inject constructor(
                 require(command.textScale in .9f..1.5f)
                 require(command.textWeight in 0..2)
                 require(command.transparency in 0f..1f && command.ambientGlow in 0f..1f &&
-                    command.componentEmphasis in 0f..1f && command.motionScale in .7f..1.3f)
+                    command.componentEmphasis in 0f..1f && command.motionScale in 0f..1.3f)
                 current.copy(themePreference = command.theme, accentTheme = command.accent,
                     textScale = command.textScale, textWeightAdjustment = command.textWeight,
                     wallpaperSurfaceTransparency = command.transparency,

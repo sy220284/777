@@ -66,6 +66,8 @@ fun ZhaoxiAutomationTasksScene(
                 "已计划" -> task.status == com.labteto.dshmobile.automation.AutomationStatus.SCHEDULED
                 "运行中" -> task.status == com.labteto.dshmobile.automation.AutomationStatus.RUNNING
                 "已暂停" -> task.status == com.labteto.dshmobile.automation.AutomationStatus.PAUSED
+                "失败/受阻" -> task.status in setOf(com.labteto.dshmobile.automation.AutomationStatus.FAILED,
+                    com.labteto.dshmobile.automation.AutomationStatus.BLOCKED)
                 else -> true
             }
         }
@@ -74,7 +76,7 @@ fun ZhaoxiAutomationTasksScene(
         Spacer(Modifier.height(8.dp))
         ZxSection("任务状态")
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("全部", "已计划", "运行中", "已暂停").forEach { label ->
+            listOf("全部", "已计划", "运行中", "已暂停", "失败/受阻").forEach { label ->
                 ZxChip(label, filter == label) { filter = label }
             }
         }
@@ -97,22 +99,42 @@ fun ZhaoxiAutomationTasksScene(
                     "${if (task.mode == AutomationMode.CHAT) "聊天" else "工作"} · ${task.status.wireValue} · ${task.scheduleType.name}",
                     onClick = { onOpenEditor(task.id) },
                 )
-                if (actionAvailable) {
+                task.lastError?.takeIf(String::isNotBlank)?.let { error ->
+                    com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
+                        "上次执行失败：${error.take(160)}",
+                        com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Warn)
+                }
+                task.runReceipts.lastOrNull()?.let { last ->
+                    ZxValueRow("最近执行", value = last.status.wireValue,
+                        sub = last.errorPreview?.take(100) ?: last.resultPreview?.take(100))
+                }
+                if (task.status == com.labteto.dshmobile.automation.AutomationStatus.BLOCKED) {
+                    ZxFooterNote("任务已阻断；请先检查所属会话、授权或编辑任务配置")
+                }
+                if (actionAvailable || task.status == com.labteto.dshmobile.automation.AutomationStatus.FAILED) {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 10.dp),
                         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         ZxChip("立即运行", false) {
-                            feedback = automation.submit(AutomationUiCommand.RunNow(task.id)).toString()
+                            feedback = when (val result = automation.submit(AutomationUiCommand.RunNow(task.id))) {
+                                is AutomationUiReceipt.Applied -> "已提交执行；完成情况以运行记录为准"
+                                is AutomationUiReceipt.Rejected -> "执行未被接受：${result.reason}"
+                                is AutomationUiReceipt.Failed -> result.message ?: "执行失败"
+                            }
                         }
                         androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
                         Text(if (paused) "已暂停" else "已启用", color = ZhaoxiTheme.colors.ink2)
                         ZxSwitch(checked = !paused, onCheckedChange = { enabled ->
-                            feedback = automation.submit(
+                            feedback = when (val result = automation.submit(
                                 if (enabled) AutomationUiCommand.Resume(task.id)
                                 else AutomationUiCommand.Pause(task.id)
-                            ).toString()
+                            )) {
+                                is AutomationUiReceipt.Applied -> if (enabled) "任务已恢复" else "任务已暂停"
+                                is AutomationUiReceipt.Rejected -> "修改未被接受：${result.reason}"
+                                is AutomationUiReceipt.Failed -> result.message ?: "状态修改失败"
+                            }
                         }, contentDescription = "${task.prompt.take(20)} · 启用状态")
                     }
                 }
@@ -176,7 +198,13 @@ fun ZhaoxiAutomationEditorScene(
     fun showReceipt(receipt: AutomationUiReceipt) {
         feedback = when (receipt) {
             is AutomationUiReceipt.Applied -> "已保存"
-            is AutomationUiReceipt.Rejected -> "调度请求被拒绝：${receipt.reason}"
+            is AutomationUiReceipt.Rejected -> when (receipt.reason) {
+                com.labteto.dshmobile.uicontract.UiAutomationRejection.STALE_TASK -> "任务已在其他位置修改，请返回列表重新进入"
+                com.labteto.dshmobile.uicontract.UiAutomationRejection.STALE_CONTEXT -> "会话已变化，请切回任务所属会话"
+                com.labteto.dshmobile.uicontract.UiAutomationRejection.INVALID_INPUT -> "调度参数无效，请检查时间和间隔"
+                com.labteto.dshmobile.uicontract.UiAutomationRejection.MISSING -> "任务已不存在，请返回列表"
+                com.labteto.dshmobile.uicontract.UiAutomationRejection.OWNER_REJECTED -> "当前运行状态不允许该修改"
+            }
             is AutomationUiReceipt.Failed -> receipt.message ?: "调度请求失败"
         }
     }
@@ -242,8 +270,15 @@ fun ZhaoxiAutomationEditorScene(
                     }
                 }
             }
-            ZxSection("通知")
-            ZxSwitchRow("运行通知", "", notify) { notify = it }
+            ZxSection("通知与失败处理")
+            ZxSwitchRow("运行通知", "执行结束后根据系统通知权限提醒", notify) { notify = it }
+            if (editing != null) {
+                ZxValueRow("连续失败", value = "${editing.failureStreak} 次")
+                editing.lastError?.takeIf(String::isNotBlank)?.let {
+                    ZxFooterNote("最近失败：${it.take(160)}")
+                }
+                ZxFooterNote("失败后的重试与调度由任务引擎控制；当前版本不支持单独配置失败重试策略")
+            }
             feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
             Spacer(Modifier.height(12.dp))
             ZxButton(if (editingTaskId == null) "创建任务" else "保存修改", {
