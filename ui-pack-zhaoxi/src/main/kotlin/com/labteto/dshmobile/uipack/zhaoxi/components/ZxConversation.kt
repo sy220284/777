@@ -365,6 +365,7 @@ fun ZxPersonaCard(
                 modifier = Modifier.fillMaxWidth().height(90.dp)
                     .clip(RoundedCornerShape(12.dp)),
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
             )
         } else ZxAvatar(name, Modifier.size(52.dp))
         Spacer(Modifier.height(8.dp))

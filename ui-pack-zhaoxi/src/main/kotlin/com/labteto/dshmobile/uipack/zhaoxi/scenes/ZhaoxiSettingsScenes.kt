@@ -131,8 +131,12 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
             }
         }
         ZxSection("背景与材质")
-        ZxSwitchRow("启用主题壁纸", "可选十张低饱和壁纸，按五主题与明暗自动切换；关闭时保留动态环境光",
+        ZxSwitchRow("启用主题壁纸", "开启后显示选中的壁纸；自动模式随主题和明暗切换",
             snap.presetWallpaperEnabled) { writeAppearance(presetWallpaperEnabled = it) }
+        ZxSection("选择壁纸")
+        ZhaoxiWallpaperPicker(snap.selectedWallpaperPreset) { preset ->
+            jobs.launch { preferences.submit(UiHostPreferencesCommand.SelectWallpaperPreset(preset)) }
+        }
         ZxSwitchRow("智能对比度", "根据壁纸与明暗模式保持文字可读",
             snap.adaptiveContrast) { writeAppearance(adaptiveContrast = it) }
         Text("环境光强度 · ${(glow * 100).toInt()}%", fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2)
