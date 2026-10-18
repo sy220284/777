@@ -1,5 +1,13 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -52,6 +60,18 @@ fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile
     sessionId: String, scope: UiSceneRenderScope, canOpenEvidence: Boolean = false) {
     val snapshot by work.snapshots.collectAsState(initial = work.snapshot())
     val plan = snapshot.let { workReads.planForUi(sessionId) }
+    var historyRefresh by remember(sessionId) { mutableStateOf(0) }
+    val sequence = workReads.eventSequenceForUi(sessionId)
+    val history = remember(sessionId, snapshot, sequence, historyRefresh) {
+        workReads.historyPageForUi(sessionId, null)
+    }
+    var olderEvents by remember(sessionId, history.older, historyRefresh) {
+        mutableStateOf<List<com.labteto.dshmobile.local.presentation.LocalWorkHistoryRecord>>(emptyList())
+    }
+    var olderCursor by remember(sessionId, history.older, historyRefresh) {
+        mutableStateOf(history.older)
+    }
+    var historyExpired by remember(sessionId, historyRefresh) { mutableStateOf(false) }
     ZxPage("计划审查", onBack = { scope.onBack() }) {
         if (plan == null) {
             com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("没有进行中的计划", "计划由工作运行时提供")
@@ -98,22 +118,47 @@ fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile
                     scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.approval"))
                 } }
             }
-            val history = remember(sessionId, snapshot) { workReads.historyPageForUi(sessionId, null) }
-            ZxSection("运行事件 · 最近 ${history.records.size} 条")
-            if (history.invalidated) {
-                ZxFooterNote("运行记录已发生变化，请返回后重新进入以获取最新事件")
+            ZxSection("运行事件")
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                ZxBadge("已读取 ${history.records.size + olderEvents.size} 条", ZxBadgeTone.Neutral)
+                ZxChip("刷新日志", false) { historyRefresh++ }
             }
-            if (history.records.isEmpty()) ZxEmpty("尚无运行事件", "开始执行后会显示真实工作事件")
-            history.records.takeLast(24).asReversed().forEach { event ->
-                val label = event.name.ifBlank { event.type }
-                ZxRow(label, "#${event.sequence} · " + (event.phase?.name ?: event.type) +
-                    (event.content.takeIf(String::isNotBlank)?.let { " · ${it.take(100)}" } ?: ""))
+            if (history.invalidated || historyExpired) {
+                ZxFooterNote("工作日志已更换或重置，刷新后重新读取，旧游标不能继续使用")
+            } else {
+                val visibleEvents = (olderEvents + history.records).distinctBy { it.sequence }
+                if (visibleEvents.isEmpty()) ZxEmpty("尚无运行事件", "执行开始后显示真实工作事件")
+                visibleEvents.takeLast(32).asReversed().forEach { event ->
+                    ZhaoxiWorkEventTimelineItem(event)
+                }
+                if (olderCursor != null) ZxChip("加载较早事件", false) {
+                    val page = workReads.historyPageForUi(sessionId, olderCursor)
+                    if (page.invalidated) {
+                        historyExpired = true
+                        olderCursor = null
+                        olderEvents = emptyList()
+                    } else {
+                        olderEvents = (page.records + olderEvents).distinctBy { it.sequence }
+                        olderCursor = page.older
+                    }
+                }
             }
-            val tools = remember(sessionId, snapshot) { workReads.toolActivitiesForUi(sessionId) }
+            val tools = remember(sessionId, snapshot, sequence, historyRefresh) {
+                workReads.toolActivitiesForUi(sessionId)
+            }
             if (tools.isNotEmpty()) {
                 ZxSection("工具执行 · ${tools.size}")
                 tools.takeLast(16).asReversed().forEach { item ->
-                    ZxRow(item.name, item.phase.name +
+                    val label = when (item.phase) {
+                        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.DECLARED -> "等待执行"
+                        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING -> "执行中"
+                        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.COMPLETED -> "已完成"
+                        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.FAILED -> "执行失败"
+                        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.OUTCOME_UNKNOWN -> "结果未确认"
+                        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.CANCELLED -> "已取消"
+                    }
+                    ZxRow(item.name, label +
                         (item.errorCode?.let { " · 错误 ${it}" } ?: "") +
                         (item.resultPreview?.let { " · ${it.take(90)}" } ?: ""))
                 }
@@ -121,6 +166,50 @@ fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile
             if (canOpenEvidence) ZxNavRow("需求与证据") {
                 scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.requirement_evidence"))
             }
+        }
+    }
+}
+
+/** Work 事件只有 Owner 报告的状态；不推断最终成功或凭空填入时间。 */
+@Composable
+private fun ZhaoxiWorkEventTimelineItem(
+    event: com.labteto.dshmobile.local.presentation.LocalWorkHistoryRecord,
+) {
+    val c = ZhaoxiTheme.colors
+    val phase = event.phase
+    val phaseText = when (phase) {
+        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.DECLARED -> "待执行"
+        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING -> "执行中"
+        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.COMPLETED -> "已完成"
+        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.FAILED -> "失败"
+        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.OUTCOME_UNKNOWN -> "结果未知"
+        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.CANCELLED -> "已取消"
+        null -> event.type
+    }
+    val tone = when (phase) {
+        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.FAILED,
+        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.OUTCOME_UNKNOWN -> ZxBadgeTone.Err
+        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING -> ZxBadgeTone.Accent
+        else -> ZxBadgeTone.Neutral
+    }
+    Row(Modifier.fillMaxWidth().padding(vertical = 7.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(Modifier.size(11.dp).clip(CircleShape).background(
+                if (tone == ZxBadgeTone.Err) c.err else c.accent))
+            Box(Modifier.width(2.dp).height(40.dp).background(c.line))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(event.name.ifBlank { event.type }, Modifier.weight(1f),
+                    color = c.ink, fontSize = 14.sp, lineHeight = 20.sp)
+                ZxBadge(phaseText, tone)
+            }
+            event.content.takeIf(String::isNotBlank)?.let {
+                Text(it.take(180), color = c.ink2, fontSize = 12.sp, lineHeight = 18.sp)
+            }
+            Text("事件 #${event.sequence}", color = c.ink3, fontSize = 11.sp)
         }
     }
 }
