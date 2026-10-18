@@ -23,22 +23,18 @@ internal fun UiAttachmentReceipt.zxAttachmentFeedback(): String = when (this) {
 
 
 /** Explicit user-selected excerpts only; never export hidden Chat history into a new Work task. */
+internal fun zxShareableChatHistory(messages: List<UiMessageSnapshot>): List<UiMessageSnapshot> =
+    messages.filter { (it.role == UiMessageRole.USER || it.role == UiMessageRole.ASSISTANT) && it.text.isNotBlank() }
+
 internal fun zxHandoffSummary(
     goal: String,
     messages: List<UiMessageSnapshot>,
 ): String {
     val trimmedGoal = goal.trim()
     require(trimmedGoal.isNotBlank()) { "先填写工作目标" }
-    require(messages.isNotEmpty()) { "请先选择要交接的聊天内容" }
-    val lines = messages.take(80).mapNotNull { message ->
-        val text = message.text.trim().take(1200).takeIf(String::isNotBlank) ?: return@mapNotNull null
-        val who = when (message.role) {
-            UiMessageRole.USER -> "用户"
-            UiMessageRole.ASSISTANT -> "助手"
-            UiMessageRole.SYSTEM -> "系统"
-            UiMessageRole.TOOL -> "工具"
-        }
-        "[$who] $text"
+    val lines = zxShareableChatHistory(messages).take(80).map { message ->
+        val who = if (message.role == UiMessageRole.USER) "用户" else "助手"
+        "[$who] ${message.text.trim().take(1200)}"
     }
     require(lines.isNotEmpty()) { "选中的消息没有可交接的文字" }
     return buildString {
@@ -54,14 +50,17 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
     var receipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
     var feedback by remember { mutableStateOf<String?>(null) }
     var importing by remember { mutableStateOf(false) }
-    var showHandoff by remember { mutableStateOf(false) }
-    var handoffGoal by remember { mutableStateOf("") }
-    var selectedHandoffIds by remember { mutableStateOf(emptySet<String>()) }
-    var handoffMessages by remember { mutableStateOf(emptyList<UiMessageSnapshot>()) }
-    var handoffCursor by remember { mutableStateOf<UiTranscriptCursor?>(null) }
-    var handoffHasMore by remember { mutableStateOf(true) }
-    var handoffLoading by remember { mutableStateOf(false) }
-    var handoffProblem by remember { mutableStateOf<String?>(null) }
+    // A handoff is scoped to its source chat. Switching sessions or entering Work
+    // must never carry selected messages or a pending history cursor into another source.
+    val handoffSourceId = conv?.takeUnless { it.workMode() }?.chat?.snapshot()?.identity?.sessionId
+    var showHandoff by remember(handoffSourceId) { mutableStateOf(false) }
+    var handoffGoal by remember(handoffSourceId) { mutableStateOf("") }
+    var selectedHandoffIds by remember(handoffSourceId) { mutableStateOf(emptySet<String>()) }
+    var handoffMessages by remember(handoffSourceId) { mutableStateOf(emptyList<UiMessageSnapshot>()) }
+    var handoffCursor by remember(handoffSourceId) { mutableStateOf<UiTranscriptCursor?>(null) }
+    var handoffHasMore by remember(handoffSourceId) { mutableStateOf(true) }
+    var handoffLoading by remember(handoffSourceId) { mutableStateOf(false) }
+    var handoffProblem by remember(handoffSourceId) { mutableStateOf<String?>(null) }
     val jobs = rememberCoroutineScope()
     CommandFeedback(receipt)
     feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
@@ -140,11 +139,11 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
                 if (showHandoff && chatSnapshot.identity != null) {
                     val origin = chatSnapshot.identity!!
                     ZxSection("创建关联 Work · 来源：当前聊天")
-                    ZxFooterNote("仅交接你勾选的文字。未选消息、私人附件与未授权资料不会自动传到 Work；创建后需自行发送任务。")
+                    ZxFooterNote("仅交接你勾选的用户/助手可见文字，系统消息、工具日志与附件不会转移；创建后需自行发送任务。")
                     ZxField(handoffGoal, { handoffGoal = it }, Modifier.fillMaxWidth(),
                         placeholder = "工作目标：例如整理这次讨论并给出执行方案")
-                    val ordered = handoffMessages.distinctBy { it.id }.takeLast(240)
-                    if (ordered.isEmpty()) ZxEmpty("暂无可交接消息", "可在聊天中先进行一段对话")
+                    val ordered = zxShareableChatHistory(handoffMessages).distinctBy { it.id }.takeLast(240)
+                    if (ordered.isEmpty()) ZxEmpty("暂无可交接消息", "仅展示可以明确选择的聊天正文")
                     else ordered.takeLast(80).forEach { message ->
                         val picked = message.id in selectedHandoffIds
                         val label = if (message.role == UiMessageRole.USER) "我" else
