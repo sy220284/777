@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -236,13 +238,16 @@ fun ZhaoxiRuntimeSettingsScene(
         } else {
             ZxSection("执行限制")
             ZxField(main, { main = it }, Modifier.fillMaxWidth(), placeholder = "主任务步数",
-                error = mainError != null, errorMessage = mainError)
+                error = mainError != null, errorMessage = mainError,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             mainError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
             ZxField(sub, { sub = it }, Modifier.fillMaxWidth(), placeholder = "子任务步数",
-                error = subError != null, errorMessage = subError)
+                error = subError != null, errorMessage = subError,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             subError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
             ZxField(attempts, { attempts = it }, Modifier.fillMaxWidth(), placeholder = "模型尝试次数",
-                error = attemptError != null, errorMessage = attemptError)
+                error = attemptError != null, errorMessage = attemptError,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             attemptError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
             ZxButton("保存运行设置", {
                 showValidation = true
