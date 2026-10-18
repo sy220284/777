@@ -159,12 +159,12 @@ class ZhaoxiAcceptanceAndroidTest {
                                 )
                                 ZxMessageRow(
                                     UiMessageSnapshot("fixture-assistant", UiMessageRole.ASSISTANT,
-                                        "# 界面验收示例\\n正文排版应保持清晰，**重点内容**醒目但克制。\\n\\n" +
-                                        "## 本轮内容\\n- 顶栏层级\\n- 回复布局\\n- 空白状态\\n\\n" +
-                                        "| 项目 | 状态 | 备注 |\\n| --- | --- | --- |\\n" +
-                                        "| 视觉层级 | 已调整 | 中性色为主 |\\n" +
-                                        "| 动效 | 已调整 | 尊重减弱动效 |\\n\\n" +
-                                        "```kotlin\\nval reply = \"清晰、稳定的回复\"\\n```", 0L),
+                                        "# 界面验收示例\n正文排版应保持清晰，**重点内容**醒目但克制。\n\n" +
+                                        "## 本轮内容\n- 顶栏层级\n- 回复布局\n- 空白状态\n\n" +
+                                        "| 项目 | 状态 | 备注 |\n| --- | --- | --- |\n" +
+                                        "| 视觉层级 | 已调整 | 中性色为主 |\n" +
+                                        "| 动效 | 已调整 | 尊重减弱动效 |\n\n" +
+                                        "```kotlin\nval reply = \"清晰、稳定的回复\"\n```", 0L),
                                     "助手", onLongPress = {}, onBranchSelect = {},
                                 )
                                 Spacer(Modifier.height(4.dp))
