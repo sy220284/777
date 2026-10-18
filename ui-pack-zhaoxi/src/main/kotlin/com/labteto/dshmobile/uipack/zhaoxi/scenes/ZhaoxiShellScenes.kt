@@ -402,32 +402,90 @@ fun ZhaoxiErrorDemoScene(scope: UiSceneRenderScope) {
     }
 }
 
-/** route.workspace — 工作区文件。 */
+/** route.workspace — 分离工作区文件和当前会话产物，均读取真实 FilesUiPort。 */
 @Composable
-fun ZhaoxiWorkspaceScene(files: FilesUiPort?, scope: UiSceneRenderScope, onPreview: (String) -> Unit) {
+fun ZhaoxiWorkspaceScene(
+    files: FilesUiPort?,
+    sessionId: String,
+    scope: UiSceneRenderScope,
+    onPreview: (String) -> Unit,
+) {
+    var selectedDomain by rememberSaveable { mutableStateOf(0) }
+    val workspace by produceState(initialValue = emptyList<com.labteto.dshmobile.local.tools.LocalWorkspaceFile>(), files) {
+        value = runCatching { files?.workspaceFiles() }.getOrNull().orEmpty()
+    }
+    val conversation by produceState(
+        initialValue = com.labteto.dshmobile.local.session.LocalConversationFiles(),
+        files,
+        sessionId,
+    ) {
+        value = if (files == null || sessionId.isBlank()) {
+            com.labteto.dshmobile.local.session.LocalConversationFiles()
+        } else {
+            runCatching { files.conversationFiles(sessionId) }.getOrNull()
+                ?: com.labteto.dshmobile.local.session.LocalConversationFiles()
+        }
+    }
     ZxPage("工作区", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        val list by produceState(initialValue = emptyList<com.labteto.dshmobile.local.tools.LocalWorkspaceFile>(), files) {
-            value = runCatching { files?.workspaceFiles() }.getOrNull().orEmpty()
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ZxChip("工作区", selectedDomain == 0) { selectedDomain = 0 }
+            ZxChip("会话产物", selectedDomain == 1) { selectedDomain = 1 }
         }
-        if (list.isEmpty()) ZxEmpty("工作区是空的", "产物与附件会出现在这里")
-        list.forEach { f ->
-            ZxRow(f.path.substringAfterLast('/').take(48), "${f.bytes} 字节 · ${f.path}".take(92),
-                onClick = { onPreview(f.path) })
+        if (selectedDomain == 0) {
+            ZxSection("工作区文件")
+            if (files == null) ZxEmpty("文件能力未连接", "无法读取工作区文件")
+            else if (workspace.isEmpty()) ZxEmpty("工作区是空的", "执行过程中产生的文件会出现在这里")
+            workspace.forEach { file ->
+                ZxRow(file.path.substringAfterLast('/'), "${file.bytes} 字节 · ${file.path}",
+                    onClick = { onPreview(file.path) })
+            }
+        } else {
+            ZxSection("当前会话产物")
+            if (sessionId.isBlank()) ZxEmpty("尚未打开会话", "进入一个聊天或工作会话后可以查看产物")
+            else if (conversation.isEmpty) ZxEmpty("暂无会话产物", "当前会话尚未产生可查看的文件")
+            if (conversation.artifacts.isNotEmpty()) ZxSection("产物")
+            conversation.artifacts.forEach { file ->
+                ZxRow(file.path.substringAfterLast('/'), "${file.bytes} 字节 · ${file.path}",
+                    onClick = { onPreview(file.path) })
+            }
+            if (conversation.involved.isNotEmpty()) ZxSection("关联文件")
+            conversation.involved.forEach { file ->
+                ZxRow(file.path.substringAfterLast('/'), "${file.bytes} 字节 · ${file.path}",
+                    onClick = { onPreview(file.path) })
+            }
         }
     }
 }
 
-/** workspace.preview — 文件预览。 */
+/** workspace.preview — 使用 Owner 提供的实际预览与截断标记，不再截断调试字符串。 */
 @Composable
 fun ZhaoxiWorkspacePreviewScene(files: FilesUiPort?, path: String, scope: UiSceneRenderScope) {
-    ZxPage("预览", onBack = { scope.onBack() }) {
+    val preview by produceState<com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview?>(null, files, path) {
+        value = if (files == null || path.isBlank()) null
+            else runCatching { files.previewWorkspaceFile(path) }.getOrNull()
+    }
+    ZxPage("文件预览", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        val text by produceState(initialValue = "加载中…", files, path) {
-            value = if (path.isBlank()) "请先从工作区选择文件" else
-                runCatching { files?.previewWorkspaceFile(path)?.toString() }.getOrNull() ?: "预览不可用"
+        when {
+            path.isBlank() -> ZxEmpty("尚未选择文件", "请先从工作区选择文件")
+            files == null -> ZxEmpty("文件能力未连接", "当前无法读取文件")
+            preview == null -> ZxEmpty("文件预览不可用", "请核实文件是否仍存在")
+            else -> {
+                val item = preview!!
+                ZxSection("文件信息")
+                ZxValueRow("文件名", value = item.file.path.substringAfterLast('/'))
+                ZxValueRow("大小", value = "${item.file.bytes} 字节")
+                ZxSection("内容预览")
+                if (item.text == null) {
+                    ZxEmpty("无法预览文本", "二进制文件不会按文字强行解码")
+                } else {
+                    Text(item.text, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        fontSize = 12.sp, color = ZhaoxiTheme.colors.ink)
+                    if (item.truncated) ZxFooterNote("内容较长，已按文件能力提供的预览范围显示")
+                }
+                ZxFooterNote(item.file.path)
+            }
         }
-        Text(text.take(2000), fontSize = 12.sp, color = ZhaoxiTheme.colors.ink)
-        ZxFooterNote(path)
     }
 }
