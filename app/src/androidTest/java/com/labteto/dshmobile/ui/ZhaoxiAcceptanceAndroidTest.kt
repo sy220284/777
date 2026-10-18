@@ -39,7 +39,7 @@ class ZhaoxiAcceptanceAndroidTest {
 
     private fun appearance(ports: LocalApplicationFeaturePortsOwner, theme: String, scale: Float) = runBlocking {
         assertTrue(ports.hostPreferencesUiPort.submit(UiHostPreferencesCommand.Appearance(
-            theme, "stone", scale, 0, .5f, .5f, .5f, 0f, true)))
+            theme, "stone", scale, 0, .5f, .5f, .5f, 1f, true)))
     }
 
     private fun capture(name: String) {
