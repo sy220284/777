@@ -48,7 +48,11 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     var apiKey by remember { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var discoveredModels by remember { mutableStateOf<List<String>?>(null) }
+    var catalogFilter by remember { mutableStateOf("") }
+    var catalogFailure by remember { mutableStateOf<String?>(null) }
     fun execute(action: suspend () -> String) {
+        if (busy) return
         jobs.launch {
             busy = true
             try { status = action() }
@@ -97,7 +101,8 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         }
         ZxSection(if (profileId == null) "添加模型" else "编辑模型")
         ZxSection("模型标识")
-        ZxField(model, { model = it }, Modifier.fillMaxWidth(), placeholder = "模型名称")
+        ZxField(model, { model = it }, Modifier.fillMaxWidth(), placeholder = "模型名称（始终允许手动输入）")
+        ZxFooterNote("可使用供应商目录选择模型，也可手动填写目录里没有的自定义模型。")
         ZxSection("接口地址")
         ZxField(baseUrl, { baseUrl = it }, Modifier.fillMaxWidth(), placeholder = "接口地址")
         ZxSection("访问凭据")
@@ -105,7 +110,62 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             visualTransformation = PasswordVisualTransformation())
         ZxFooterNote(if (profileId == null) "凭据仅用于连接该模型" else
             "不填写密钥时保留原凭据；不会在界面中回显已有密钥")
-        LocalModelProtocol.entries.forEach { p -> ZxChip(p.name, p == protocol) { protocol = p } }
+        LocalModelProtocol.entries.forEach { p -> ZxChip(p.name, p == protocol) {
+            protocol = p
+            discoveredModels = null
+            catalogFailure = null
+        } }
+        ZxSection("从提供商读取可用模型")
+        ZxButton("读取 /models 目录", {
+            if (!busy) {
+                val oldAddress = baseUrl.trim()
+                val oldProtocol = protocol
+                val oldProfile = profileId
+                val oldKey = apiKey
+                busy = true
+                catalogFailure = null
+                discoveredModels = null
+                jobs.launch {
+                    try {
+                        val names = settings.discoverApiModels(oldKey, oldAddress, oldProtocol, oldProfile)
+                            .map(String::trim).filter(String::isNotBlank).distinct().sorted()
+                        if (oldAddress != baseUrl.trim() || oldProtocol != protocol ||
+                            oldProfile != profileId || oldKey != apiKey) {
+                            catalogFailure = "连接配置已变化，请重新查询模型列表"
+                        } else {
+                            discoveredModels = names
+                            status = if (names.isEmpty()) "目录没有返回模型，可以继续手动填写" else
+                                "已读取 ${names.size} 个可用模型，请选择后保存"
+                        }
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (failure: Exception) {
+                        catalogFailure = failure.message ?: "读取模型目录失败"
+                        status = "目录不可用，不影响手动填写模型"
+                    } finally { busy = false }
+                }
+            }
+        }, enabled = !busy && baseUrl.isNotBlank() && (apiKey.isNotBlank() || profileId != null),
+            variant = ZxButtonVariant.Outline, loading = busy)
+        catalogFailure?.let { ZxFooterNote("目录读取失败：$it。可手动填写模型名称并测试。") }
+        discoveredModels?.let { names ->
+            if (names.isEmpty()) ZxFooterNote("当前目录为空，手动配置仍然可用")
+            else {
+                ZxField(catalogFilter, { catalogFilter = it }, Modifier.fillMaxWidth(),
+                    placeholder = "筛选可用模型")
+                names.filter { it.contains(catalogFilter.trim(), ignoreCase = true) }
+                    .take(60).forEach { available ->
+                        ZxRow(available, "选用此模型标识", onClick = {
+                            model = available
+                            status = "已选择模型标识，还需要点击保存模型"
+                        }, trailing = {
+                            ZxChip(if (model == available) "已选择" else "选择", model == available) {
+                                model = available
+                            }
+                        })
+                    }
+                if (names.size > 60) ZxFooterNote("列表较长，使用上方搜索框快速定位模型")
+            }
+        }
         ZxButton("测试连接", { execute { settings.testModel(apiKey, model, baseUrl, protocol, profileId) } }, enabled = !busy && model.isNotBlank())
         ZxButton("保存模型", { execute {
             when (val result = settings.save(SettingsUiCommand.SaveModel(apiKey, model, baseUrl, protocol, profileId))) {
@@ -117,6 +177,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         } }, enabled = !busy && model.isNotBlank())
         ZxChip("新建配置", false) {
             profileId = null; model = ""; apiKey = ""; status = null
+            discoveredModels = null; catalogFailure = null; catalogFilter = ""
         }
         ZxNavRow("查看模型用量", sub = "按模型对照 Token 与估算费用") {
             scope.onNavigate(UiSceneId("settings.model_usage"))
