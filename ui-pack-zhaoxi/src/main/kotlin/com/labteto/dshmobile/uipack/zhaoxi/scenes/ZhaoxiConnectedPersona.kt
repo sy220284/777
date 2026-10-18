@@ -328,7 +328,8 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
 
 @Composable
 fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?, selection: PersonaSelectionUiPort?,
-    stories: PersonaStoryUiPort?, transfer: PersonaTransferUiPort?, scope: UiSceneRenderScope) {
+    stories: PersonaStoryUiPort?, transfer: PersonaTransferUiPort?, scope: UiSceneRenderScope,
+    authoring: PersonaAuthoringUiPort? = null) {
     var revision by remember { mutableStateOf(0) }
     val receipt by produceState<UiPersonaGalleryReadReceipt?>(null, galleryId, revision) { value = gallery?.read() }
     val entry = (receipt as? UiPersonaGalleryReadReceipt.Available)?.entries?.firstOrNull { it.id == galleryId }
@@ -337,6 +338,9 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
     var status by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var more by remember { mutableStateOf(false) }
+    var inspection by remember { mutableStateOf<UiPersonaInspection?>(null) }
+    var inspectionBusy by remember { mutableStateOf(false) }
+    var chosenSuggestionFields by remember { mutableStateOf(emptySet<Int>()) }
     var activeStoryId by remember(galleryId) { mutableStateOf<String?>(null) }
     var confirmDeleteStory by remember { mutableStateOf<String?>(null) }
     var pendingSwitch by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -450,6 +454,68 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
                 onClick = { protectThen { scope.onNavigate(UiSceneId("chat.persona_editor")) } })
             ZxChip(if (more) "收起更多" else "更多管理", more) { more = !more }
             if (more) {
+                if (authoring != null && snap?.identity != null) {
+                    ZxNavRow("人物设定检查", sub = "真实人物事实冲突 · 建议追加须本人确认") {
+                        if (!inspectionBusy) jobs.launch {
+                            inspectionBusy = true
+                            try {
+                                when (val result = authoring.inspect(snap.identity!!, galleryId, activeStoryId)) {
+                                    is UiPersonaInspectionReceipt.Inspected -> {
+                                        inspection = result.inspection
+                                        chosenSuggestionFields = emptySet()
+                                        status = "检查完成，请选择要采纳的建议"
+                                    }
+                                    UiPersonaInspectionReceipt.Rejected -> status = "人物状态已变化，请重试"
+                                    is UiPersonaInspectionReceipt.Failed -> status = result.message ?: "人物检查失败"
+                                }
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                            catch (failure: Exception) { status = "人物检查失败，请确认连接后重试" }
+                            finally { inspectionBusy = false }
+                        }
+                    }
+                    inspection?.let { result ->
+                        ZxSection("人物设定核查")
+                        if (result.conflicts.isEmpty()) ZxFooterNote("暂未检测到事实冲突")
+                        result.conflicts.forEach { conflict ->
+                            ZxRow(conflict.field, "既有：${conflict.fixedValue.take(80)} · 观察：${conflict.observedValue.take(80)} · ${conflict.reason.take(70)}")
+                        }
+                        ZxSection("可选择采纳的建议")
+                        if (result.suggestions.isEmpty()) ZxFooterNote("暂时没有待追加建议")
+                        result.suggestions.forEachIndexed { i, suggestion ->
+                            val checked = i in chosenSuggestionFields
+                            ZxRow(personaFieldTitle(suggestion.field),
+                                suggestion.value.take(110) + " · ${suggestion.evidence.take(60)}",
+                                onClick = {
+                                    chosenSuggestionFields = if (checked) chosenSuggestionFields - i
+                                        else chosenSuggestionFields + i
+                                }, trailing = {
+                                    ZxChip(if (checked) "已选" else "选择", checked) {
+                                        chosenSuggestionFields = if (checked) chosenSuggestionFields - i
+                                            else chosenSuggestionFields + i
+                                    }
+                                })
+                        }
+                        ZxButton("确认追加所选建议", {
+                            if (!inspectionBusy && chosenSuggestionFields.isNotEmpty()) jobs.launch {
+                                inspectionBusy = true
+                                try {
+                                    val refreshed = authoring.read(galleryId)
+                                    if (refreshed is UiPersonaAuthoringReceipt.Loaded) {
+                                        val resultSave = authoring.applySuggestions(galleryId, refreshed.snapshot.revision,
+                                            result.suggestions.filterIndexed { i, _ -> i in chosenSuggestionFields })
+                                        status = resultSave.zxAuthoringFeedback()
+                                        if (resultSave is UiPersonaAuthoringReceipt.Saved) {
+                                            inspection = null
+                                            revision++
+                                        }
+                                    } else status = "人物档案已变化，建议没有应用"
+                                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                                catch (failure: Exception) { status = "追加建议失败，请检查档案后重试" }
+                                finally { inspectionBusy = false }
+                            }
+                        }, enabled = chosenSuggestionFields.isNotEmpty() && !inspectionBusy, loading = inspectionBusy)
+                    }
+                }
                 ZxNavRow("人物画像") { protectThen { scope.onNavigate(UiSceneId("chat.gallery_portrait")) } }
                 ZxNavRow("日记") { protectThen { scope.onNavigate(UiSceneId("chat.diary")) } }
                 transfer?.let { owner ->
