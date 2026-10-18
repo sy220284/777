@@ -9,8 +9,8 @@ import org.junit.Test
 class ZxDataTableReadabilityTest {
     @Test
     fun columnWidthIncreasesWithFontScale() {
-        val normal = zxTableColumnWidthDp("执行状态", listOf("执行成功"), 1f)
-        val zoomed = zxTableColumnWidthDp("执行状态", listOf("执行成功"), 2f)
+        val normal = zxTableColumnWidthDp("执行状态", listOf("执行成功等待验证完成"), 1f)
+        val zoomed = zxTableColumnWidthDp("执行状态", listOf("执行成功等待验证完成"), 2f)
         assertEquals(140f, normal, 0.01f)
         assertEquals(normal * 2f, zoomed, 0.01f)
     }
