@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiDuration
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiMotion
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
+import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiMaterial
+import com.labteto.dshmobile.uipack.zhaoxi.theme.zxMaterial
 
 /**
  * Zx 反馈与状态组件（E8.14 实装）。规格：实施规格 §1.2。
@@ -95,7 +97,7 @@ fun ZxDialog(
         Column(
             modifier.fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
-                .background(c.card)
+                .zxMaterial(ZhaoxiMaterial.M3)
                 .padding(20.dp),
         ) {
             Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
@@ -123,7 +125,7 @@ fun ZxSheet(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(topStart = ZhaoxiTheme.shapes.sheet, topEnd = ZhaoxiTheme.shapes.sheet))
-            .background(c.glass2)
+            .zxMaterial(ZhaoxiMaterial.M3)
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         Box(
