@@ -1,5 +1,12 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.compose.foundation.layout.FlowRow
+import com.labteto.dshmobile.automation.AutomationMode
+import com.labteto.dshmobile.automation.AutomationScheduleType
+import com.labteto.dshmobile.uicontract.AutomationUiReceipt
+import com.labteto.dshmobile.uicontract.UiAutomationSchedule
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxField
+import kotlinx.coroutines.CancellationException
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -48,6 +55,7 @@ fun ZhaoxiAutomationTasksScene(
     automation: AutomationUiPort,
     scope: UiSceneRenderScope,
     onOpenEditor: (String) -> Unit = {},
+    onCreate: () -> Unit = { scope.onNavigate(UiSceneId("automation.editor")) },
 ) {
     val snap by automation.snapshots.collectAsState(initial = automation.snapshot())
     var filter by remember { mutableStateOf("全部") }
@@ -81,10 +89,11 @@ fun ZhaoxiAutomationTasksScene(
                 com.labteto.dshmobile.automation.AutomationStatus.BLOCKED,
             )
             ZxRow(task.prompt.take(80),
-                "${if (task.mode == com.labteto.dshmobile.automation.AutomationMode.CHAT) "聊天" else "工作"} · ${task.status.wireValue} · ${task.scheduleType.name}",
+                "${if (task.mode == AutomationMode.CHAT) "聊天" else "工作"} · ${task.status.wireValue} · ${task.scheduleType.name}",
+                onClick = { onOpenEditor(task.id) },
                 trailing = {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        ZxChip("立即运行", false) {
+                        if (actionAvailable) ZxChip("立即运行", false) {
                             feedback = automation.submit(AutomationUiCommand.RunNow(task.id)).toString()
                         }
                         if (actionAvailable) {
@@ -99,40 +108,203 @@ fun ZhaoxiAutomationTasksScene(
             )
         }
         Spacer(Modifier.height(8.dp))
-        ZxButton("新建自动化", { scope.onNavigate(UiSceneId("automation.editor")) }, Modifier.fillMaxWidth())
+        ZxButton("新建自动化", onCreate, Modifier.fillMaxWidth())
         ZxFooterNote("任务状态和开关来自 Automation Owner；立即运行仅代表提交请求，不代表执行成功")
     }
 }
 
-/** automation.editor — 自动化编辑器（按上下文区分提醒/任务/人物互动）。 */
+/** E8.18 form-based creation/editing, using the existing scheduler and immutable generation fence. */
 @Composable
 fun ZhaoxiAutomationEditorScene(
     automation: AutomationUiPort,
     scope: UiSceneRenderScope,
+    editingTaskId: String? = null,
 ) {
     val co = rememberCoroutineScope()
-    var draft by remember { mutableStateOf("") }
+    val snap by automation.snapshots.collectAsState(initial = automation.snapshot())
+    val editing = snap.tasks.firstOrNull { it.id == editingTaskId }
+    val chatMode = editing?.mode == AutomationMode.CHAT ||
+        (editingTaskId == null && snap.context.canPlanChat)
+    val mode = if (chatMode) AutomationMode.CHAT else AutomationMode.WORK
+    val formatter = remember {
+        java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).apply {
+            isLenient = false
+        }
+    }
+    var prompt by remember(editingTaskId, editing?.id) { mutableStateOf(editing?.prompt.orEmpty()) }
+    var selected by remember(editingTaskId, editing?.id) {
+        mutableStateOf(editing?.scheduleType?.takeUnless { it == AutomationScheduleType.LEGACY }
+            ?: AutomationScheduleType.ONCE)
+    }
+    var firstRun by remember(editingTaskId, editing?.id) {
+        mutableStateOf(formatter.format(java.util.Date(editing?.nextRunAt ?: (System.currentTimeMillis() + 3_600_000L))))
+    }
+    var interval by remember(editingTaskId, editing?.id) {
+        mutableStateOf((editing?.recurringMinutes ?: 60L).toString())
+    }
+    var silence by remember(editingTaskId, editing?.id) {
+        mutableStateOf((editing?.silenceMinutes ?: 60L).toString())
+    }
+    var windowStart by remember(editingTaskId, editing?.id) {
+        mutableStateOf(editing?.windowStartMinuteOfDay?.let { "%02d:%02d".format(it / 60, it % 60) } ?: "09:00")
+    }
+    var windowEnd by remember(editingTaskId, editing?.id) {
+        mutableStateOf(editing?.windowEndMinuteOfDay?.let { "%02d:%02d".format(it / 60, it % 60) } ?: "18:00")
+    }
+    var notify by remember(editingTaskId, editing?.id) { mutableStateOf(editing?.notify ?: true) }
+    var natural by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<String?>(null) }
-    ZxPage("自动化 · 编辑", onBack = { scope.onBack() }) {
+    fun minuteOfDay(value: String): Int? {
+        val pieces = value.trim().split(":")
+        if (pieces.size != 2) return null
+        val h = pieces[0].toIntOrNull() ?: return null
+        val m = pieces[1].toIntOrNull() ?: return null
+        return if (h in 0..23 && m in 0..59) h * 60 + m else null
+    }
+    fun showReceipt(receipt: AutomationUiReceipt) {
+        feedback = when (receipt) {
+            is AutomationUiReceipt.Applied -> "已提交给调度系统；执行结果请从任务列表核对"
+            is AutomationUiReceipt.Rejected -> "调度请求被拒绝：${receipt.reason}"
+            is AutomationUiReceipt.Failed -> receipt.message ?: "调度请求失败"
+        }
+    }
+    ZxPage(if (editingTaskId == null) "新建自动化" else "编辑自动化", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        ZxSection("触发")
-        ZxRow("执行时间", "在任务描述中写明时间或触发条件，保存时由自动化服务解析")
-        ZxSection("动作")
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
-            draft, { draft = it }, Modifier.fillMaxWidth().height(96.dp),
-            placeholder = "要自动做什么…")
-        Spacer(Modifier.height(10.dp))
-        ZxButton("保存", {
-            co.launch {
-                val context = automation.context()
-                val identity = context.identity
-                feedback = if (context.canPlanChat && identity != null && draft.isNotBlank())
-                    automation.planAndSave(PlanChatAutomationCommand(identity, draft)).toString()
-                else "当前会话暂不支持自动化编排，请切换至有效聊天会话并输入任务说明。"
+        if (editingTaskId != null && editing == null) {
+            ZxEmpty("任务已不可用", "原任务可能被删除或当前尚未加载；请返回任务列表")
+        } else if (editing?.mode == AutomationMode.CHAT &&
+            (snap.context.identity?.sessionId != editing.targetSessionId || !snap.context.canPlanChat)) {
+            ZxEmpty("切换到任务所属的聊天会话", "为防止跨会话修改，聊天自动化只能在绑定会话编辑")
+        } else {
+            ZxSection("目标")
+            ZxValueRow("执行模式", value = if (chatMode) "聊天 · 当前会话" else "工作")
+            if (chatMode && editingTaskId == null) {
+                ZxChip("智能理解时间", natural) { natural = !natural }
+                if (natural) ZxFooterNote("直接描述执行时间和任务，使用原有聊天规划服务解析；保存仍由 Owner 校验")
             }
-        }, Modifier.fillMaxWidth())
-        feedback?.let { Text(it.take(240)) }
-        ZxFooterNote("仅从真实会话通过 planAndSave 创建，Owner 校验身份和结果")
+            ZxSection("任务内容")
+            ZxField(prompt, { prompt = it }, Modifier.fillMaxWidth().height(104.dp),
+                placeholder = "描述要完成的任务…")
+            if (!natural) {
+                ZxSection("调度方式")
+                val options = buildList {
+                    add(AutomationScheduleType.ONCE to "单次")
+                    add(AutomationScheduleType.INTERVAL to "固定间隔")
+                    add(AutomationScheduleType.DAILY to "每天")
+                    add(AutomationScheduleType.WEEKLY to "每周")
+                    add(AutomationScheduleType.MONTHLY to "每月")
+                    if (chatMode) {
+                        add(AutomationScheduleType.SILENCE to "沉默后")
+                        add(AutomationScheduleType.WINDOW to "指定时段")
+                    }
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    options.forEach { (type, title) ->
+                        ZxChip(title, selected == type) { selected = type }
+                    }
+                }
+                if (selected !in setOf(AutomationScheduleType.SILENCE, AutomationScheduleType.WINDOW)) {
+                    ZxSection("首次运行时间")
+                    ZxField(firstRun, { firstRun = it }, Modifier.fillMaxWidth(),
+                        placeholder = "YYYY-MM-DD HH:mm")
+                    ZxFooterNote("按设备本地时区设置；必须晚于当前时间")
+                }
+                if (selected == AutomationScheduleType.INTERVAL) {
+                    ZxSection("重复间隔（分钟）")
+                    ZxField(interval, { interval = it }, Modifier.fillMaxWidth(),
+                        placeholder = if (chatMode) "最短 60 分钟" else "最短 15 分钟")
+                }
+                if (selected == AutomationScheduleType.SILENCE) {
+                    ZxSection("沉默触发（分钟）")
+                    ZxField(silence, { silence = it }, Modifier.fillMaxWidth(),
+                        placeholder = "至少 60 分钟")
+                }
+                if (selected == AutomationScheduleType.WINDOW) {
+                    ZxSection("活动时段")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ZxField(windowStart, { windowStart = it }, Modifier.weight(1f),
+                            placeholder = "开始 HH:mm")
+                        ZxField(windowEnd, { windowEnd = it }, Modifier.weight(1f),
+                            placeholder = "结束 HH:mm")
+                    }
+                }
+            }
+            ZxSection("通知")
+            ZxSwitchRow("运行通知", "通过现有自动化通知策略提示结果", notify) { notify = it }
+            feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
+            Spacer(Modifier.height(12.dp))
+            ZxButton(if (editingTaskId == null) "创建任务" else "保存修改", {
+                if (prompt.isBlank()) {
+                    feedback = "请填写任务内容"
+                } else if (natural) {
+                    val identity = snap.context.identity
+                    if (!snap.context.canPlanChat || identity == null) {
+                        feedback = "请切换到有效的单人聊天会话"
+                    } else {
+                        co.launch {
+                            busy = true
+                            try {
+                                showReceipt(automation.planAndSave(PlanChatAutomationCommand(
+                                    identity, prompt, editingTaskId)))
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (failure: Exception) {
+                                feedback = failure.message ?: "规划失败"
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    }
+                } else {
+                    val date = runCatching { formatter.parse(firstRun)?.time }.getOrNull()
+                    val duration = interval.toLongOrNull()
+                    val silenceDuration = silence.toLongOrNull()
+                    val start = minuteOfDay(windowStart)
+                    val end = minuteOfDay(windowEnd)
+                    val recurring = when (selected) {
+                        AutomationScheduleType.INTERVAL -> duration
+                        AutomationScheduleType.DAILY -> 1_440L
+                        AutomationScheduleType.WEEKLY -> 10_080L
+                        AutomationScheduleType.MONTHLY -> 43_200L
+                        else -> null
+                    }
+                    val timed = selected !in setOf(AutomationScheduleType.SILENCE, AutomationScheduleType.WINDOW)
+                    val minGap = if (chatMode) 60L else 15L
+                    feedback = when {
+                        timed && (date == null || date <= System.currentTimeMillis()) ->
+                            "请输入晚于当前时间的有效本地日期"
+                        selected == AutomationScheduleType.INTERVAL && (duration == null || duration < minGap) ->
+                            "间隔不得小于 ${minGap} 分钟"
+                        selected == AutomationScheduleType.SILENCE && (silenceDuration == null || silenceDuration < 60L) ->
+                            "沉默触发最短为 60 分钟"
+                        selected == AutomationScheduleType.WINDOW && (start == null || end == null || start == end) ->
+                            "请输入两个不同的 HH:mm 时间"
+                        else -> null
+                    }
+                    if (feedback == null) {
+                        val schedule = UiAutomationSchedule(
+                            prompt = prompt.trim(),
+                            firstRunAt = date ?: System.currentTimeMillis() + 60_000L,
+                            recurringMinutes = recurring,
+                            mode = mode,
+                            scheduleType = selected,
+                            silenceMinutes = if (selected == AutomationScheduleType.SILENCE) silenceDuration else null,
+                            windowStartMinuteOfDay = if (selected == AutomationScheduleType.WINDOW) start else null,
+                            windowEndMinuteOfDay = if (selected == AutomationScheduleType.WINDOW) end else null,
+                            notify = notify,
+                        )
+                        showReceipt(automation.submit(if (editing == null) {
+                            AutomationUiCommand.Create(snap.context.identity, schedule)
+                        } else {
+                            AutomationUiCommand.Update(editing.id, editing.scheduleGeneration, schedule)
+                        }))
+                    }
+                }
+            }, Modifier.fillMaxWidth(), enabled = !busy && prompt.isNotBlank(), loading = busy)
+            ZxFooterNote("单次、间隔、每天、每周、每月及聊天特殊触发均复用原有调度 Owner；请求被接收不代表任务已运行")
+        }
     }
 }
 
