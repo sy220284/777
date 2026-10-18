@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,23 +37,15 @@ fun ZxTopBar(
     onNav: () -> Unit,
     modifier: Modifier = Modifier,
     canBack: Boolean = true,
-    navGlyph: String = if (canBack) "‹" else "☰",
+    showNav: Boolean = true,
     actions: @Composable () -> Unit = {},
 ) {
     val c = ZhaoxiTheme.colors
-    Row(
-        modifier
-            .fillMaxWidth()
-            .background(c.glass)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        ZxIconButton(onClick = onNav, contentDescription = if (canBack) "返回" else "菜单") {
-            Text(navGlyph, fontSize = 19.sp, color = c.ink)
-        }
+    // E8.17: title stays at the geometric center, regardless of right actions.
+    Box(modifier.fillMaxWidth().heightIn(min = 66.dp).background(c.glass)) {
         Text(
             title,
-            Modifier.weight(1f),
+            Modifier.fillMaxWidth(0.60f).align(Alignment.Center),
             textAlign = TextAlign.Center,
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold,
@@ -60,7 +53,14 @@ fun ZxTopBar(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Row { actions() }
+        if (showNav) {
+            ZxIconButton(
+                onClick = onNav,
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = 12.dp),
+                contentDescription = if (canBack) "返回" else "打开侧栏",
+            ) { ZxIcon(if (canBack) "back" else "menu") }
+        }
+        Row(Modifier.align(Alignment.CenterEnd).padding(end = 12.dp)) { actions() }
     }
 }
 
