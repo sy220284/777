@@ -293,37 +293,65 @@ fun ZxGalleryDeleteScene(
     }
 }
 
-/** chat.group_members — 群成员。 */
+/** Owner-aligned bounds; surface errors before sending an invalid group mutation. */
+internal fun zxGroupMemberCountError(count: Int, min: Int, max: Int): String? = when {
+    count < min -> "至少选择 ${min} 位成员"
+    count > max -> "最多选择 ${max} 位成员"
+    else -> null
+}
+
+internal fun zxAnnouncementLengthError(length: Int, limit: Int): String? =
+    if (length > limit) "公告不能超过 ${limit} 字" else null
+
+/** chat.group_members — show member bounds and real save receipt. */
 @Composable
 fun ZxGroupMembersScene(groups: ChatGroupUiPort, scope: UiSceneRenderScope) {
     val snap by groups.snapshots.collectAsState(initial = groups.snapshot())
     var selected by remember(snap.identity, snap.memberIds) { mutableStateOf(snap.memberIds) }
-    var receipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
+    var receipt by remember(snap.identity) { mutableStateOf<UiCommandReceipt?>(null) }
+    val selectionError = zxGroupMemberCountError(selected.size, snap.minimumMembers, snap.maximumMembers)
     ZxPage("群成员", onBack = { scope.onBack() }) {
         CommandFeedback(receipt)
+        if (snap.available.isEmpty()) ZxEmpty("没有可选人物", "先创建人物再设置群聊")
         snap.available.forEach { choice ->
-            ZxRow(choice.displayName, if (choice.galleryId in selected) "已选" else "未选",
-                onClick = { selected = if (choice.galleryId in selected) selected - choice.galleryId else selected + choice.galleryId })
+            val picked = choice.galleryId in selected
+            ZxRow(choice.displayName, if (picked) "已选" else "未选",
+                onClick = {
+                    selected = if (picked) selected - choice.galleryId
+                        else if (selected.size < snap.maximumMembers) selected + choice.galleryId else selected
+                }, trailing = { ZxChip(if (picked) "已选" else "选择", picked) {
+                    selected = if (picked) selected - choice.galleryId
+                        else if (selected.size < snap.maximumMembers) selected + choice.galleryId else selected
+                } })
         }
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton("保存成员", {
+        Text("${selected.size} / ${snap.maximumMembers} 位成员", color = ZhaoxiTheme.colors.ink2)
+        selectionError?.let { Text(it, color = ZhaoxiTheme.colors.err) }
+        ZxButton("保存成员", {
             snap.identity?.let { receipt = groups.submit(ChatGroupUiCommand.ConfigureMembers(it, selected.toList())) }
-        }, enabled = !snap.busy && snap.identity != null)
+        }, enabled = !snap.busy && snap.identity != null &&
+            selectionError == null && selected != snap.memberIds)
     }
 }
 
+/** chat.group_announcement — display validation and preserve the draft after rejection. */
 @Composable
 fun ZxGroupAnnouncementScene(groups: ChatGroupUiPort, scope: UiSceneRenderScope) {
     val snap by groups.snapshots.collectAsState(initial = groups.snapshot())
-    var text by com.labteto.dshmobile.uihost.rememberUiPrivateText("zhaoxi.announcement.${snap.identity?.sessionId}", snap.announcement) { snap.announcement }
-    var receipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
+    var text by com.labteto.dshmobile.uihost.rememberUiPrivateText(
+        "zhaoxi.announcement.${snap.identity?.sessionId}", snap.announcement) { snap.announcement }
+    var receipt by remember(snap.identity) { mutableStateOf<UiCommandReceipt?>(null) }
+    val error = zxAnnouncementLengthError(text.length, snap.maximumAnnouncementChars)
     ZxPage("群公告", onBack = { scope.onBack() }) {
         CommandFeedback(receipt)
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(text, { text = it },
-            Modifier.fillMaxWidth().height(120.dp), placeholder = "公告")
-        Text("${text.length} / ${snap.maximumAnnouncementChars} 字", color = ZhaoxiTheme.colors.ink3)
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton("保存公告", {
+        ZxField(text, { text = it }, Modifier.fillMaxWidth().height(120.dp),
+            placeholder = "公告", error = error != null, errorMessage = error)
+        Text("${text.length} / ${snap.maximumAnnouncementChars} 字",
+            color = if (error != null) ZhaoxiTheme.colors.err else ZhaoxiTheme.colors.ink3)
+        error?.let { Text(it, color = ZhaoxiTheme.colors.err) }
+        ZxButton("保存公告", {
             snap.identity?.let { receipt = groups.submit(ChatGroupUiCommand.SaveAnnouncement(it, text)) }
-        }, enabled = !snap.busy && snap.identity != null)
+        }, enabled = !snap.busy && snap.identity != null &&
+            error == null && text != snap.announcement)
     }
 }
 
