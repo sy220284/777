@@ -290,23 +290,29 @@ private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<Ui
     var error by remember { mutableStateOf<String?>(null) }
     val jobs = androidx.compose.runtime.rememberCoroutineScope()
     val all = (older + messages).distinctBy { it.id }
+    val timeline = projectZxReplyTimeline(all, running)
+    val latestReplyKey = timeline.lastOrNull { it is ZxTimelineEntry.Reply }?.key
     val documentsState = if (documents != null) documents.snapshots.collectAsState(initial = documents.snapshot())
         else null
-    // Work execution events remain in the Owner ledger, but the reply timeline is prose-first.
-    // Its auto-published work-live projection must not appear as a persistent task card.
+    // Tool events stay durable in the Owner ledger. The timeline shows only a small,
+    // user-expandable status below the corresponding reply, never raw tool commands.
     val currentDocuments = documentsState?.value?.takeIf { it.sessionId == sessionId }
-        ?.documents.orEmpty().filterNot { it.document.isInlineWorkTaskCard() }
+        ?.documents.orEmpty()
     // Historical document reads have no privileges; newer active snapshots always win by ID.
     val olderIds = older.map { it.id }.toSet()
     val historical by produceState<Map<String, List<UiDocumentSnapshot>>>(emptyMap(), sessionId,
         olderIds, documents, identity) {
         value = if (documents != null && identity != null && olderIds.isNotEmpty())
             documents.documentsForMessages(identity, olderIds)
-                .filterNot { it.document.isInlineWorkTaskCard() }
                 .groupBy { it.document.source.messageId }
         else emptyMap()
     }
     val activeByMessage = currentDocuments.groupBy { it.document.source.messageId }
+    val allCardsBySource = (historical.values.flatten() + currentDocuments)
+        .associateBy { it.document.documentId }.values.groupBy { it.document.source.messageId }
+    val workByTurn = allCardsBySource.mapValues { (_, items) ->
+        items.firstOrNull { it.document.isInlineWorkTaskCard() }
+    }
     val streamText = preview?.text?.takeIf { it.isNotBlank() &&
         all.lastOrNull { message -> message.role == UiMessageRole.ASSISTANT }?.text != it }
     val state = rememberLazyListState()
@@ -316,8 +322,8 @@ private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<Ui
         if (!restored && all.isNotEmpty()) {
             val anchor = reading.anchor(sessionId)
             followTail = anchor?.followingTail ?: true
-            val index = all.indexOfFirst { it.id == anchor?.messageId }
-            state.scrollToItem(if (index >= 0) index + 1 else all.size, if (index >= 0) anchor?.offsetPx ?: 0 else 0)
+            val index = timeline.indexOfFirst { anchor?.messageId != null && it.containsMessage(anchor.messageId) }
+            state.scrollToItem(if (index >= 0) index + 1 else timeline.size, if (index >= 0) anchor?.offsetPx ?: 0 else 0)
             restored = true
         }
     }
@@ -325,7 +331,12 @@ private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<Ui
         snapshotFlow { state.firstVisibleItemIndex to state.firstVisibleItemScrollOffset }
             .distinctUntilChanged().collect { (index, offset) ->
                 if (restored && sessionId.isNotBlank()) reading.rememberAnchor(sessionId,
-                    UiReadingAnchor(all.getOrNull(index - 1)?.id, offset, !state.canScrollForward))
+                    UiReadingAnchor(timeline.getOrNull(index - 1)?.let { entry ->
+                        when (entry) {
+                            is ZxTimelineEntry.Message -> entry.message.id
+                            is ZxTimelineEntry.Reply -> entry.stages.firstOrNull()?.id ?: entry.anchorId
+                        }
+                    }, offset, !state.canScrollForward))
             }
     }
     // Follow new output only while the reader has chosen the live tail.
@@ -335,7 +346,7 @@ private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<Ui
                 if (scrolling) followTail = atTail
             }
     }
-    LaunchedEffect(all.size, streamText, running,
+    LaunchedEffect(timeline.size, streamText, running,
         currentDocuments.map { it.document.documentId to it.document.revision }) {
         if (restored && followTail) {
             androidx.compose.runtime.withFrameNanos { }
@@ -361,10 +372,16 @@ private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<Ui
                         loading = true
                         try {
                             val page = history.messagePage(sessionId, cursor, 60)
-                            val previousId = all.getOrNull(state.firstVisibleItemIndex - 1)?.id
+                            val previousId = timeline.getOrNull(state.firstVisibleItemIndex - 1)?.let { entry ->
+                                when (entry) {
+                                    is ZxTimelineEntry.Message -> entry.message.id
+                                    is ZxTimelineEntry.Reply -> entry.stages.firstOrNull()?.id ?: entry.anchorId
+                                }
+                            }
                             older = (page.messages + older).distinctBy { it.id }
                             cursor = page.nextCursor; loaded = true; error = null
-                            val index = (older + messages).distinctBy { it.id }.indexOfFirst { it.id == previousId }
+                            val index = projectZxReplyTimeline((older + messages).distinctBy { it.id }, running)
+                                .indexOfFirst { previousId != null && it.containsMessage(previousId) }
                             if (index >= 0) state.scrollToItem(index + 1)
                         } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
                         catch (failure: Exception) { error = failure.message ?: "历史加载失败" }
@@ -372,38 +389,67 @@ private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<Ui
                     }
                 }, enabled = !loading)
         }
-        items(all, key = { it.id }) { m ->
-            Column {
-                ZxMessageRow(m, if (m.role == UiMessageRole.USER) "我" else "助手",
-                    onLongPress = { onMessage(m) }, onBranchSelect = { onBranch(m, it) })
-                val byId = (historical[m.id].orEmpty() + activeByMessage[m.id].orEmpty())
-                    .associateBy { it.document.documentId }.values
-                byId.forEach { card ->
-                    androidx.compose.runtime.key(card.document.documentId) {
-                        ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
-                            onAction = { actionId, fields ->
-                                if (documents == null || identity == null ||
-                                    card.actions[actionId]?.available != true) {
-                                    UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
-                                } else documents.submit(identity, UiDocumentActionRequest(
-                                    documentId = card.document.documentId,
-                                    revision = card.document.revision, source = card.document.source,
-                                    actionId = actionId, fields = fields))
-                            }, media = media)
+        items(timeline, key = { it.key }) { entry ->
+            when (entry) {
+                is ZxTimelineEntry.Message -> {
+                    ZxMessageRow(entry.message,
+                        if (entry.message.role == UiMessageRole.USER) "我" else "助手",
+                        onLongPress = { onMessage(it) }, onBranchSelect = { onBranch(entry.message, it) })
+                }
+                is ZxTimelineEntry.Reply -> {
+                    val isCurrent = running && entry.key == latestReplyKey
+                    Column {
+                        // Stage and final messages stay in this one keyed reply container.
+                        entry.stages.forEachIndexed { index, stage ->
+                            ZxMessageRow(
+                                if (index == 0) stage else stage.copy(progressive = true),
+                                "助手", onLongPress = { onMessage(stage) },
+                                onBranchSelect = { onBranch(stage, it) })
+                            allCardsBySource[stage.id].orEmpty()
+                                .filterNot { it.document.isInlineWorkTaskCard() }
+                                .forEach { card ->
+                                    androidx.compose.runtime.key(card.document.documentId) {
+                                        ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
+                                            onAction = { actionId, fields ->
+                                                if (documents == null || identity == null ||
+                                                    card.actions[actionId]?.available != true)
+                                                    UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+                                                else documents.submit(identity, UiDocumentActionRequest(
+                                                    documentId = card.document.documentId,
+                                                    revision = card.document.revision, source = card.document.source,
+                                                    actionId = actionId, fields = fields))
+                                            }, media = media)
+                                    }
+                                }
+                        }
+                        if (isCurrent) {
+                            val currentText = streamText?.takeUnless {
+                                entry.stages.lastOrNull()?.text == it
+                            }
+                            if (currentText != null) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    ZxTypingIndicator()
+                                    Text("正在输出", fontSize = 11.sp, color = ZhaoxiTheme.colors.ink2)
+                                }
+                                com.labteto.dshmobile.uipack.zhaoxi.components.ZxRichReply(currentText)
+                            } else if (entry.stages.isEmpty()) ZxTypingIndicator()
+                        }
+                        // The single compact, collapsible Work status shares the reply slot.
+                        workByTurn[entry.anchorId]?.let { card ->
+                            ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
+                                onAction = { _, _ -> UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED) },
+                                media = media)
+                        }
+                        allCardsBySource[entry.anchorId].orEmpty()
+                            .filterNot { it.document.isInlineWorkTaskCard() }
+                            .forEach { card ->
+                                ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
+                                    onAction = { _, _ -> UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED) },
+                                    media = media)
+                            }
                     }
                 }
             }
-        }
-        if (running) item(key = "live-model-preview") {
-            if (streamText != null) {
-                Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ZxTypingIndicator()
-                        Text("正在输出 · 最新内容预览", fontSize = 11.sp, color = ZhaoxiTheme.colors.ink2)
-                    }
-                    com.labteto.dshmobile.uipack.zhaoxi.components.ZxRichReply(streamText)
-                }
-            } else ZxTypingIndicator()
         }
         }
         if (!followTail && all.isNotEmpty()) {
