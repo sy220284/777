@@ -40,3 +40,26 @@ internal fun zxQuietHoursError(start: String, end: String): String? {
         else -> null
     }
 }
+
+/**
+ * A model-change request is not a confirmed model switch. Both Applied and Submitted
+ * must wait for the actual Settings Owner selection snapshot before closing the UI.
+ */
+internal data class ZxModelSubmitFeedback(
+    val waitForSelection: Boolean,
+    val error: Boolean,
+    val message: String,
+)
+
+internal fun zxModelSubmitFeedback(receipt: com.labteto.dshmobile.uicontract.SettingsUiReceipt): ZxModelSubmitFeedback =
+    when (receipt) {
+        com.labteto.dshmobile.uicontract.SettingsUiReceipt.Applied,
+        com.labteto.dshmobile.uicontract.SettingsUiReceipt.Submitted ->
+            ZxModelSubmitFeedback(true, false, "已提交切换请求，等待模型状态确认")
+        com.labteto.dshmobile.uicontract.SettingsUiReceipt.Rejected ->
+            ZxModelSubmitFeedback(false, true, "模型切换未被受理，请检查配置后重试")
+        is com.labteto.dshmobile.uicontract.SettingsUiReceipt.Failed ->
+            ZxModelSubmitFeedback(false, true,
+                receipt.message?.takeIf(String::isNotBlank)?.let { "切换失败：$it" }
+                    ?: "模型切换失败，请重试")
+    }
