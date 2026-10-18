@@ -126,7 +126,7 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
         )
         ZxSection("字重")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(0 to "标准", 1 to "略粗", 2 to "加粗").forEach { (value, label) ->
+            listOf(0 to "常规字重", 1 to "略粗", 2 to "加粗").forEach { (value, label) ->
                 ZxChip(label, snap.textWeight == value) { writeAppearance(textWeight = value) }
             }
         }

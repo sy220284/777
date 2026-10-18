@@ -223,7 +223,7 @@ class ZhaoxiAcceptanceAndroidTest {
             androidx.compose.ui.semantics.SemanticsProperties.Role,
             androidx.compose.ui.semantics.Role.RadioButton,
         )
-        compose.onNode(standardTextScale).performClick()
+        compose.onNode(standardTextScale).performScrollTo().performClick()
         compose.onNode(standardTextScale).assertIsSelected()
         val snapshot = runBlocking { ports.hostPreferencesUiPort.snapshots.first() }
         assertEquals(1f, snapshot.textScale, .001f)
