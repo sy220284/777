@@ -176,6 +176,12 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
         options = com.labteto.dshmobile.local.LocalModelRequestOptions(
             toolsOverride = toolsOverride,
             publishPreviewEnabled = publishPreview,
+            previewDeltaTransformFactory = if (publishPreview) {
+                {
+                    val filter = com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPreview()
+                    filter::append
+                }
+            } else null,
             maxAttemptsOverride = maxAttemptsOverride,
             allowContextOverflowRecovery = allowContextOverflowRecovery,
             requestLog = eventLog,
@@ -246,7 +252,8 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 messages = requestMessages,
                 step = 100 + index,
                 toolsOverride = JsonArray(emptyList()),
-                publishPreview = false,
+                // Suppress speculative previews for characters permitted to remain silent.
+                publishPreview = !groupMemberMayStaySilent(input, member, index),
                 maxAttemptsOverride = interactiveAttempts,
                 temperature = persona.behaviorTuning.roleplayTemperature(
                     snapshot.modelState.model, snapshot.modelState.baseUrl,
