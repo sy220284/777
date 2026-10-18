@@ -3,10 +3,17 @@ package com.labteto.dshmobile.uipack.zhaoxi.scenes
 import androidx.compose.foundation.layout.FlowRow
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
+import com.labteto.dshmobile.uicontract.UiAutomationRejection
 import com.labteto.dshmobile.uicontract.AutomationUiReceipt
 import com.labteto.dshmobile.uicontract.UiAutomationSchedule
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxField
 import kotlinx.coroutines.CancellationException
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import com.labteto.dshmobile.uicontract.ToolsUiCommand
+import com.labteto.dshmobile.uicontract.ToolsUiReceipt
+import com.labteto.dshmobile.uicontract.UiToolError
+import com.labteto.dshmobile.uicontract.UiMcpHealth
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -43,6 +50,19 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.ZxSwitch
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 import com.labteto.dshmobile.uihost.UiSceneRenderScope
 import kotlinx.coroutines.launch
+
+/** Admission is not execution completion; never display Kotlin enum names as errors. */
+internal fun zxAutomationReceiptText(action: String, receipt: AutomationUiReceipt): String = when (receipt) {
+    is AutomationUiReceipt.Applied -> if (action == "立即运行") "运行请求已提交" else "${action}已提交"
+    is AutomationUiReceipt.Rejected -> when (receipt.reason) {
+        UiAutomationRejection.STALE_CONTEXT -> "会话已变化，请返回刷新"
+        UiAutomationRejection.STALE_TASK -> "任务已更新，请重新载入"
+        UiAutomationRejection.INVALID_INPUT -> "输入不符合调度条件"
+        UiAutomationRejection.MISSING -> "任务已不存在"
+        UiAutomationRejection.OWNER_REJECTED -> "调度操作未被接受"
+    }
+    is AutomationUiReceipt.Failed -> receipt.message ?: "${action}失败"
+}
 
 /**
  * 自动化与工具/媒体域场景（E8.14 实装）。
@@ -104,15 +124,15 @@ fun ZhaoxiAutomationTasksScene(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         ZxChip("立即运行", false) {
-                            feedback = automation.submit(AutomationUiCommand.RunNow(task.id)).toString()
+                            feedback = zxAutomationReceiptText("立即运行", automation.submit(AutomationUiCommand.RunNow(task.id)))
                         }
                         androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
                         Text(if (paused) "已暂停" else "已启用", color = ZhaoxiTheme.colors.ink2)
                         ZxSwitch(checked = !paused, onCheckedChange = { enabled ->
-                            feedback = automation.submit(
+                            feedback = zxAutomationReceiptText(if (enabled) "启用任务" else "暂停任务", automation.submit(
                                 if (enabled) AutomationUiCommand.Resume(task.id)
                                 else AutomationUiCommand.Pause(task.id)
-                            ).toString()
+                            ))
                         }, contentDescription = "${task.prompt.take(20)} · 启用状态")
                     }
                 }
@@ -174,11 +194,7 @@ fun ZhaoxiAutomationEditorScene(
         return if (h in 0..23 && m in 0..59) h * 60 + m else null
     }
     fun showReceipt(receipt: AutomationUiReceipt) {
-        feedback = when (receipt) {
-            is AutomationUiReceipt.Applied -> "已保存"
-            is AutomationUiReceipt.Rejected -> "调度请求被拒绝：${receipt.reason}"
-            is AutomationUiReceipt.Failed -> receipt.message ?: "调度请求失败"
-        }
+        feedback = zxAutomationReceiptText("任务", receipt)
     }
     ZxPage(if (editingTaskId == null) "新建自动化" else "编辑自动化", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
@@ -349,6 +365,28 @@ fun ZhaoxiPersonaInteractionScene(
     }
 }
 
+/** Map management facts to human-readable feedback; Applied never means tools were authorized or executed. */
+internal fun zxToolReceiptText(receipt: ToolsUiReceipt): String = when (receipt) {
+    is ToolsUiReceipt.Applied -> "设置已保存"
+    is ToolsUiReceipt.Failed -> when (receipt.reason) {
+        UiToolError.DNS -> "无法解析服务器地址"
+        UiToolError.TIMEOUT -> "连接超时，请重试"
+        UiToolError.UNREACHABLE -> "无法连接服务器"
+        UiToolError.PERMISSION -> "缺少连接权限，请检查授权"
+        UiToolError.CONFIGURATION -> "连接配置无效"
+        UiToolError.UNKNOWN -> "操作失败，请检查配置后重试"
+    }
+}
+
+/** A responded ping proves only this one health check, not access to a tool. */
+internal fun zxMcpHealthText(health: UiMcpHealth): String = when (health) {
+    UiMcpHealth.RESPONDED -> "连接已响应"
+    UiMcpHealth.BUSY -> "服务器忙，请稍后检查"
+    UiMcpHealth.NOT_CONNECTED -> "尚未建立连接"
+    UiMcpHealth.UNCONFIRMED -> "无法确认当前连接状态"
+    UiMcpHealth.UNSUPPORTED -> "不支持连接检查"
+}
+
 /** 按 E8.18 独立场景分派工具中心、MCP、插件和 GitHub；所有状态来自 ToolsUiPort。 */
 @Composable
 fun ZhaoxiToolsScene(
@@ -360,7 +398,26 @@ fun ZhaoxiToolsScene(
     var feedback by remember { mutableStateOf<String?>(null) }
     var endpoint by remember { mutableStateOf("") }
     var serverId by remember { mutableStateOf("") }
+    var githubToken by remember { mutableStateOf("") }
+    var pendingClearGitHub by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
     var refresh by remember { mutableStateOf(0) }
+    fun submitConfiguration(command: ToolsUiCommand, clearTokenOnSuccess: Boolean = false) {
+        if (busy) return
+        co.launch {
+            busy = true
+            try {
+                val receipt = tools.submit(command)
+                feedback = zxToolReceiptText(receipt)
+                if (clearTokenOnSuccess && receipt is ToolsUiReceipt.Applied) githubToken = ""
+                refresh++
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } finally {
+                busy = false
+            }
+        }
+    }
     val catalogue = remember(tools) { tools.capabilityCatalogue() }
     val plugins = remember(tools, refresh) { tools.pluginLifecycleSnapshots() }
     val installedIds = remember(tools, refresh) { tools.installedPluginIds() }
@@ -390,27 +447,24 @@ fun ZhaoxiToolsScene(
                     serverId, { serverId = it }, Modifier.fillMaxWidth(), placeholder = "服务器名称")
                 com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
                     endpoint, { endpoint = it }, Modifier.fillMaxWidth(), placeholder = "HTTP 地址")
-                ZxButton("连接服务器", { co.launch {
-                    feedback = tools.submit(
-                        com.labteto.dshmobile.uicontract.ToolsUiCommand.ConnectHttp(serverId, endpoint)
-                    ).toString()
-                    refresh++
-                } }, enabled = serverId.isNotBlank() && endpoint.isNotBlank())
+                ZxButton("连接服务器", {
+                    submitConfiguration(ToolsUiCommand.ConnectHttp(serverId.trim(), endpoint.trim()))
+                }, enabled = !busy && serverId.isNotBlank() &&
+                    (endpoint.trim().startsWith("https://") || endpoint.trim().startsWith("http://")),
+                    loading = busy)
                 ZxSection("已登记服务器")
                 if (servers.isEmpty()) ZxEmpty("尚未添加 MCP 服务器", "填写名称和地址后连接")
                 servers.forEach { server ->
                     ZxRow(server.id, "${server.transport} · ${server.connection} · ${server.tools.size} 个工具")
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ZxChip("检查连接", false) { co.launch {
-                            feedback = tools.checkServerHealth(server.id).toString()
-                            refresh++
+                        ZxChip("检查连接", false) { if (!busy) co.launch {
+                            busy = true
+                            try { feedback = zxMcpHealthText(tools.checkServerHealth(server.id)); refresh++ }
+                            catch (cancelled: CancellationException) { throw cancelled }
+                            catch (failure: Exception) { feedback = "检查失败，请稍后重试" }
+                            finally { busy = false }
                         } }
-                        ZxChip("断开", false) { co.launch {
-                            feedback = tools.submit(
-                                com.labteto.dshmobile.uicontract.ToolsUiCommand.Disconnect(server.id)
-                            ).toString()
-                            refresh++
-                        } }
+                        ZxChip("断开", false) { submitConfiguration(ToolsUiCommand.Disconnect(server.id)) }
                     }
                 }
 
@@ -428,12 +482,9 @@ fun ZhaoxiToolsScene(
                 }
                 plugins.filter { it.state == com.labteto.dshmobile.uicontract.UiPluginLifecycleState.FAILED }
                     .forEach { item ->
-                        ZxButton("恢复 ${item.id}", { co.launch {
-                            feedback = tools.submit(
-                                com.labteto.dshmobile.uicontract.ToolsUiCommand.RecoverFailedPlugin(item.id)
-                            ).toString()
-                            refresh++
-                        } })
+                        ZxButton("恢复 ${item.id}", {
+                            submitConfiguration(ToolsUiCommand.RecoverFailedPlugin(item.id))
+                        }, enabled = !busy, loading = busy)
                     }
 
             }
@@ -443,7 +494,30 @@ fun ZhaoxiToolsScene(
                 ZxSection("可用能力")
                 catalogue.filter { it.family.contains("github", ignoreCase = true) }
                     .forEach { cap -> ZxRow(cap.name, "${cap.access} · ${cap.approval}") }
-                if (!githubConfigured) ZxEmpty("未连接 GitHub", "请先完成授权")
+                if (!githubConfigured) {
+                    ZxSection("连接账户")
+                    com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
+                        githubToken, { githubToken = it }, Modifier.fillMaxWidth(),
+                        placeholder = "GitHub 访问令牌",
+                        visualTransformation = PasswordVisualTransformation(),
+                    )
+                    ZxButton("保存 GitHub 授权", {
+                        val submittedToken = githubToken.trim()
+                        if (submittedToken.isNotBlank()) submitConfiguration(
+                            ToolsUiCommand.ConfigureGitHub(submittedToken), clearTokenOnSuccess = true)
+                    }, enabled = !busy && githubToken.isNotBlank(), loading = busy)
+                } else {
+                    ZxButton("解除 GitHub 连接", { pendingClearGitHub = true },
+                        variant = ZxButtonVariant.Outline)
+                }
+                if (pendingClearGitHub) ZxDialog(
+                    "解除 GitHub 连接？", "连接设置将被清除，现有仓库内容不会删除。", "解除连接",
+                    {
+                        pendingClearGitHub = false
+                        submitConfiguration(ToolsUiCommand.ClearGitHub)
+                    },
+                    { pendingClearGitHub = false },
+                )
             }
             "work.capabilities" -> {
                 val grouped = catalogue.groupBy { it.family }
