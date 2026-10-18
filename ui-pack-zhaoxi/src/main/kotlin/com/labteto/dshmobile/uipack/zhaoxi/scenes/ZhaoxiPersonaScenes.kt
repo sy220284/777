@@ -117,13 +117,14 @@ fun ZhaoxiPersonaEditorScene(
     authoring: PersonaAuthoringUiPort,
     galleryId: String,
     scope: UiSceneRenderScope,
+    initialTab: Int = 0,
 ) {
     val state by produceState<UiPersonaAuthoringReceipt?>(null, galleryId) {
         value = if (galleryId == "new") null else authoring.read(galleryId)
     }
     when (val result = state) {
-        is UiPersonaAuthoringReceipt.Loaded -> ZhaoxiAuthoringForm(authoring, result.snapshot, scope)
-        null -> if (galleryId == "new") ZhaoxiAuthoringForm(authoring, null, scope) else ZxEmpty("加载中", "正在读取人物")
+        is UiPersonaAuthoringReceipt.Loaded -> ZhaoxiAuthoringForm(authoring, result.snapshot, scope, initialTab)
+        null -> if (galleryId == "new") ZhaoxiAuthoringForm(authoring, null, scope, initialTab) else ZxEmpty("加载中", "正在读取人物")
         else -> ZxEmpty("无法编辑人物", result.toString())
     }
 }
