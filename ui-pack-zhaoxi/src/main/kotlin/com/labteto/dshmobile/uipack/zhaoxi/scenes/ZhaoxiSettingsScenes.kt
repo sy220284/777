@@ -143,7 +143,7 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
         ZxSwitchRow("界面动效", "关闭后停用场景与组件过渡动画",
             checked = snap.motionScale > 0f,
             onChange = { writeAppearance(motionScale = if (it) 1f else 0f) })
-        
+
     }
 }
 
@@ -234,7 +234,7 @@ fun ZhaoxiPermissionsScene(preferences: HostPreferencesUiPort, scope: UiSceneRen
             if (media.selectedVisualOnly) ZxFooterNote("目前仅授予所选图片/视频的访问范围")
         } else ZxFooterNote("设备权限状态由 Android 系统提供")
         ZxNavRow("管理设备权限") { preferences.openSystemPermissions() }
-        
+
     }
 }
 
