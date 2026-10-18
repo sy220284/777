@@ -424,7 +424,18 @@ class ZhaoxiApplicationScenePack(
             "automation.editor" -> sec?.automation?.let {
                 ZhaoxiAutomationEditorScene(it, scope, targets.automationTaskId)
             }
-            "automation.persona_interaction" -> sec?.automation?.let { ZhaoxiPersonaInteractionScene(it, scope) }
+            "automation.persona_interaction" -> sec?.automation?.let { automation ->
+                ZhaoxiPersonaInteractionScene(automation, scope,
+                    onCreate = {
+                        targets.automationTaskId = null
+                        scope.onNavigate(UiSceneId("automation.editor"))
+                    },
+                    onEdit = { id ->
+                        targets.automationTaskId = id
+                        scope.onNavigate(UiSceneId("automation.editor"))
+                    },
+                )
+            }
             "route.tools", "tools.mcp", "tools.github", "tools.plugins" ->
                 sec?.tools?.let { ZhaoxiToolsScene(it, scope, scene.value) }
             "media.creation", "media.result" -> (sec?.media ?: conv?.media)?.let { media ->
@@ -471,7 +482,7 @@ class ZhaoxiApplicationScenePack(
             "settings.diagnostics", "settings.update" ->
                 ZhaoxiDiagnosticsScene(updateStatus, checkForUpdate, scope)
 
-            else -> ZxEmpty("朝夕 · ${scene.value}", "该场景暂无 Zx* 实装映射")
+            else -> ZxEmpty("页面暂不可用", "请返回重试")
         }
     }
 
