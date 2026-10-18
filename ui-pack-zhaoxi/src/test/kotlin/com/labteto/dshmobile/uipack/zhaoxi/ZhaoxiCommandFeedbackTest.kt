@@ -2,6 +2,7 @@ package com.labteto.dshmobile.uipack.zhaoxi
 
 import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.UiMessageEditOutcome
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.exitsMessageEditor
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.positiveFeedback
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.userHint
 import org.junit.Assert.assertEquals
@@ -49,4 +50,18 @@ class ZhaoxiCommandFeedbackTest {
         assertFalse(UiCommandReceipt.Failed("").positiveFeedback())
         assertEquals("网络异常", UiCommandReceipt.Failed("网络异常").userHint())
     }
+    @Test fun editScreenOnlyClosesAfterTheOwnerActuallyAcceptsTheEdit() {
+        assertTrue(UiCommandReceipt.Accepted.exitsMessageEditor())
+        assertTrue(UiCommandReceipt.Queued.exitsMessageEditor())
+        for (outcome in UiMessageEditOutcome.entries) {
+            val shouldClose = outcome == UiMessageEditOutcome.SENT ||
+                outcome == UiMessageEditOutcome.COMMITTED_NOT_STARTED
+            assertEquals(shouldClose,
+                UiCommandReceipt.MessageEdited(outcome).exitsMessageEditor())
+        }
+        assertFalse(UiCommandReceipt.Failed("失败").exitsMessageEditor())
+        assertFalse(UiCommandReceipt.NotAdmitted.exitsMessageEditor())
+        assertFalse(UiCommandReceipt.OutcomeUnknown.exitsMessageEditor())
+    }
+
 }
