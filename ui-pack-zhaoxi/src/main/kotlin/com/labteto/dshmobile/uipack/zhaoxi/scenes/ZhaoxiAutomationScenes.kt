@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.uicontract.UiSceneId
+import com.labteto.dshmobile.uicontract.submit
 import com.labteto.dshmobile.uicontract.PlanChatAutomationCommand
 import com.labteto.dshmobile.uicontract.AutomationUiCommand
 import com.labteto.dshmobile.uicontract.AutomationUiPort
