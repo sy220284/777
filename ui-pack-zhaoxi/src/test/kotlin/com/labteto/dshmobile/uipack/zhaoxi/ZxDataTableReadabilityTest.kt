@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.uipack.zhaoxi
 
 import com.labteto.dshmobile.uipack.zhaoxi.components.zxTableColumnWidthDp
+import com.labteto.dshmobile.uipack.zhaoxi.components.zxTableCellReadingLabel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -20,6 +21,12 @@ class ZxDataTableReadabilityTest {
         val latin = zxTableColumnWidthDp("State", listOf("Completed"), 1f)
         val han = zxTableColumnWidthDp("状态", listOf("已完成正在验证"), 1f)
         assertTrue(han > latin)
+    }
+
+    @Test
+    fun screenReaderReadsColumnNameAndEmptyCells() {
+        assertEquals("运行状态：已完成", zxTableCellReadingLabel("运行状态", "已完成"))
+        assertEquals("进度：空白", zxTableCellReadingLabel("进度", ""))
     }
 
     @Test
