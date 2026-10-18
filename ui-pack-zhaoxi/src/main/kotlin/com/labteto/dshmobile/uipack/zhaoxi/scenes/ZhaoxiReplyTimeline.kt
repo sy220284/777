@@ -78,16 +78,16 @@ internal fun uncommittedReplyPreview(
     persistedStages: List<UiMessageSnapshot>,
 ): String? {
     if (preview.isNullOrBlank()) return null
-    val committed = persistedStages.map { it.text }.filter(String::isNotBlank)
+    val committed = persistedStages.map { it.text }.filter { it.isNotBlank() }
     if (committed.isEmpty()) return preview
     // A delayed preview can arrive after its matching durable message.
     if (committed.any { it == preview || it.startsWith(preview) }) return null
     val prefixes = listOf("\n\n", "\n", "").map { committed.joinToString(it) }
-        .filter(String::isNotBlank).sortedByDescending(String::length)
-    val prefix = prefixes.firstOrNull(preview::startsWith)
-        ?: committed.lastOrNull(preview::startsWith)
+        .filter { it.isNotBlank() }.sortedByDescending { it.length }
+    val prefix = prefixes.firstOrNull { preview.startsWith(it) }
+        ?: committed.lastOrNull { preview.startsWith(it) }
     if (prefix != null) return preview.removePrefix(prefix).trimStart('\n', '\r')
-        .takeIf(String::isNotBlank)
+        .takeIf { it.isNotBlank() }
     // Some providers emit a fresh-only delta. Preserve it verbatim if no prefix matches.
     return preview
 }
