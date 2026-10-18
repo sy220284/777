@@ -351,13 +351,16 @@ fun ZxPersonaCard(
         modifier
             .clip(RoundedCornerShape(ZhaoxiTheme.shapes.card))
             .background(c.card)
-            .clickable(onClick = onClick)
+            .heightIn(min = 148.dp)
+            .fillMaxWidth()
+            .clickable(role = Role.Button, onClick = onClick)
             .padding(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         ZxAvatar(name, Modifier.size(52.dp))
         Spacer(Modifier.height(8.dp))
-        Text(name + if (pinned) " 📌" else "", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
-        Text(subtitle, fontSize = 10.sp, color = c.ink3)
+        Text(name + if (pinned) " · 置顶" else "", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+            color = c.ink, maxLines = 2)
+        Text(subtitle, fontSize = 12.sp, color = c.ink2, maxLines = 2)
     }
 }
