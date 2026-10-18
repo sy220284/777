@@ -119,6 +119,21 @@ fun ZxModeSwitch(workMode: Boolean, onChange: (Boolean) -> Unit, modifier: Modif
 
 data class ZxDrawerEntry(val id: String, val label: String, val badge: String? = null)
 
+/** Search only within the drawer data provided by the Host; never synthesize destinations. */
+internal fun zxFilterDrawerEntries(
+    query: String,
+    groups: List<Pair<String, List<ZxDrawerEntry>>>,
+): List<Pair<String, List<ZxDrawerEntry>>> {
+    val term = query.trim()
+    if (term.isEmpty()) return groups.filter { it.second.isNotEmpty() }
+    return groups.mapNotNull { (heading, entries) ->
+        val matching = if (heading.contains(term, ignoreCase = true)) entries else
+            entries.filter { it.label.contains(term, ignoreCase = true) ||
+                it.badge?.contains(term, ignoreCase = true) == true }
+        if (matching.isEmpty()) null else heading to matching
+    }
+}
+
 /** 抽屉：搜索框 + 分组列表 + 底部通用入口。 */
 @Composable
 fun ZxDrawer(
@@ -130,11 +145,17 @@ fun ZxDrawer(
     modifier: Modifier = Modifier,
 ) {
     val c = ZhaoxiTheme.colors
+    val visibleGroups = remember(query, groups) { zxFilterDrawerEntries(query, groups) }
     Column(modifier.background(c.side).padding(12.dp)) {
         ZxField(query, onQuery, Modifier.fillMaxWidth(), placeholder = "筛选当前列表")
         Spacer(Modifier.height(8.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            groups.forEach { (group, entries) ->
+            if (visibleGroups.isEmpty()) {
+                ZxEmpty("没有匹配的结果", "试试其他关键词")
+                ZxButton("清除筛选", { onQuery("") }, Modifier.fillMaxWidth(),
+                    variant = ZxButtonVariant.Outline)
+            }
+            visibleGroups.forEach { (group, entries) ->
                 ZxSection(group)
                 entries.forEach { e ->
                     val interaction = remember(e.id) { MutableInteractionSource() }
