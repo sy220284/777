@@ -44,22 +44,33 @@ import kotlinx.coroutines.launch
 /** work.plan_review — 计划审查（方案呈现 + 逐步确认 + 批准执行）。 */
 @Composable
 fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile.uicontract.WorkConversationUiPort,
-    sessionId: String, scope: UiSceneRenderScope) {
+    sessionId: String, scope: UiSceneRenderScope, canOpenEvidence: Boolean = false) {
     val snapshot by work.snapshots.collectAsState(initial = work.snapshot())
     val plan = snapshot.let { workReads.planForUi(sessionId) }
     ZxPage("计划审查", onBack = { scope.onBack() }) {
         if (plan == null) {
             com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("没有进行中的计划", "计划由工作运行时提供")
         } else {
-            ZxSection("计划步骤 · ${plan.plan.size}")
+            ZxSection("执行步骤")
+            if (plan.plan.isEmpty()) ZxEmpty("暂无计划步骤", "运行时更新后会显示")
             plan.plan.forEachIndexed { index, step ->
-                ZxRow("${index + 1}. $step",
-                    plan.todos.getOrNull(index)?.ownerStatus?.takeIf(String::isNotBlank)
-                        ?: "等待工作运行时更新")
+                val state = plan.todos.getOrNull(index)?.ownerStatus.orEmpty()
+                ZxRow("${index + 1}. $step", state, trailing = {
+                    if (state.isNotBlank()) ZxBadge(state, ZxBadgeTone.Neutral)
+                })
             }
-            // Approval and questions carry the actual Owner-issued pending identifier.
-            snapshot.question?.let { ZxNavRow("回答计划问题") { scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.question")) } }
-            snapshot.approval?.let { ZxNavRow("处理审批") { scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.approval")) } }
+            if (snapshot.question != null || snapshot.approval != null) {
+                ZxSection("需要操作")
+                snapshot.question?.let { ZxNavRow("回答问题") {
+                    scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.question"))
+                } }
+                snapshot.approval?.let { ZxNavRow("处理审批") {
+                    scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.approval"))
+                } }
+            }
+            if (canOpenEvidence) ZxNavRow("需求与证据") {
+                scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.requirement_evidence"))
+            }
         }
     }
 }
@@ -81,8 +92,7 @@ fun ZhaoxiRequirementEvidenceScene(
             null -> repeat(3) { com.labteto.dshmobile.uipack.zhaoxi.components.ZxSkeleton(com.labteto.dshmobile.uipack.zhaoxi.components.ZxSkeletonVariant.Row, Modifier.padding(vertical = 6.dp)) }
             is UiWorkEvidenceReadReceipt.Available -> {
                 ZxSection("需求清单 · ${r.snapshot.requirements.size}")
-                ZxValueRow(
-                    "已关联证据", value = "${r.snapshot.references.size} 条")
+                ZxValueRow("已关联证据", value = "${r.snapshot.references.size} 条")
                 r.snapshot.requirements.forEach { req ->
                     ZxRow("「${req.text}」", "需求 #${req.index} · ${req.reportedStatus}") {
                         ZxBadge(req.reportedStatus, ZxBadgeTone.Neutral)
