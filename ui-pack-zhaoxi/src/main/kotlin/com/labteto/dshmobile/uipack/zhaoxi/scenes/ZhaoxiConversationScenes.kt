@@ -206,7 +206,7 @@ fun ZhaoxiReplyStatusScene(phase: UiExecutionPhase, queuedInputCount: Int) {
 fun ZhaoxiReaderScene(title: String, text: String, scope: UiSceneRenderScope) {
     ZxPage(title, onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        Text(text, fontSize = 16.sp, lineHeight = 28.sp, color = ZhaoxiTheme.colors.ink)
+        com.labteto.dshmobile.uipack.zhaoxi.components.ZxRichReply(text)
         com.labteto.dshmobile.uipack.zhaoxi.components.ZxFooterNote("长按可选中复制")
     }
 }
@@ -276,7 +276,7 @@ internal fun UiDocument.isInlineWorkTaskCard(): Boolean =
     source.workMode && documentId == "work-live:${source.messageId}"
 
 @Composable
-private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<UiMessageSnapshot>,
+internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<UiMessageSnapshot>,
     reading: ConversationReadingUiPort, history: UiMessageHistoryPort?, modifier: Modifier,
     onMessage: (UiMessageSnapshot) -> Unit, onBranch: (UiMessageSnapshot, Int) -> Unit = { _, _ -> },
     preview: UiStreamingReplyPreview? = null, running: Boolean = false,
