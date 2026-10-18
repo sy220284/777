@@ -431,15 +431,24 @@ class ZhaoxiApplicationScenePack(
             "settings.notifications" -> ZhaoxiNotificationsScene(preferences, scope)
             "settings.permissions" -> ZhaoxiPermissionsScene(preferences, scope)
             "settings.models" -> settings?.let { ZhaoxiModelsScene(it, scope) }
-            "settings.session", "settings.chat", "settings.advanced", "settings.memory_settings" ->
-                settings?.let { ZhaoxiRuntimeSettingsScene(it, scope) }
+            "settings.session", "settings.advanced" -> settings?.let { ZhaoxiRuntimeSettingsScene(it, scope) }
+            "settings.chat" -> settings?.let { ZhaoxiChatGuardScene(it, scope) }
+            "settings.memory_settings" -> settings?.let { ZhaoxiMemorySettingsScene(it, scope) }
             "settings.account" -> settings?.let { ZhaoxiAccountScene(it, scope) }
             "settings.minimax_quota" -> settings?.let { ZhaoxiQuotaScene(it, scope) }
-            "settings.usage", "settings.model_usage", "settings.usage_log", "settings.usage_detail" ->
-                usageOwner?.let { ZhaoxiUsageScene(it, scope) }
+            "settings.usage" -> usageOwner?.let { ZhaoxiUsageOverviewScene(it, scope) }
+            "settings.model_usage" -> usageOwner?.let { ZhaoxiUsageOverviewScene(it, scope, modelOnly = true) }
+            "settings.usage_log" -> usageOwner?.let { usage ->
+                ZhaoxiUsageLogScene(usage, scope) { requestId ->
+                    targets.usageRequestId = requestId
+                    scope.onNavigate(UiSceneId("settings.usage_detail"))
+                }
+            }
+            "settings.usage_detail" -> usageOwner?.let { ZhaoxiUsageDetailScene(it, targets.usageRequestId, scope) }
             "settings.model_performance" -> sec?.modelPerformance?.let { ZhaoxiPerformanceScene(it, scope) }
             "settings.pricing" -> sec?.pricing?.let { ZhaoxiPricingScene(it, scope) }
-            "settings.memory", "settings.memory_management" -> sec?.memory?.let { ZhaoxiMemoryManagementScene(it, scope) }
+            "settings.memory" -> sec?.memory?.let { ZhaoxiMemoryOverviewScene(it, settings ?: sec.settings, scope) }
+            "settings.memory_management" -> sec?.memory?.let { ZhaoxiMemoryManagementScene(it, scope) }
             "settings.session_storage" -> settings?.let { ZhaoxiStorageScene(it, scope) }
             "settings.diagnostics", "settings.update" ->
                 ZhaoxiDiagnosticsScene(updateStatus, checkForUpdate, scope)
