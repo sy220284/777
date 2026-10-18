@@ -176,9 +176,8 @@ fun ZxDocumentCard(
                 var detailsExpanded by remember(document.source.sessionId, document.documentId) {
                     mutableStateOf(false)
                 }
-                ZxRow("执行详情", if (detailsExpanded) "收起" else "展开") {
-                    detailsExpanded = !detailsExpanded
-                }
+                ZxRow("执行详情", if (detailsExpanded) "收起" else "展开",
+                    onClick = { detailsExpanded = !detailsExpanded })
                 if (detailsExpanded) document.nodes.filterNot {
                     it.id == "work_turn_status" || it.id == "work_scope"
                 }.forEach { node ->
@@ -226,7 +225,8 @@ private fun ZxDocumentNodeView(
         is UiDocumentNode.Disclosure -> {
             var expanded by remember(node.id) { mutableStateOf(false) }
             Column {
-                ZxRow(node.title, if (expanded) "收起" else "展开") { expanded = !expanded }
+                ZxRow(node.title, if (expanded) "收起" else "展开",
+                    onClick = { expanded = !expanded })
                 if (expanded) node.children.forEach {
                     ZxDocumentNodeView(it, bindings, fields, onAction)
                 }
@@ -240,8 +240,8 @@ private fun ZxDocumentNodeView(
                     Text(row.joinToString("  │  "), fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2)
                 }
                 if (node.rows.size > 16) ZxRow(
-                    if (showAll) "收起表格" else "查看全部 ${node.rows.size} 行", ""
-                ) { showAll = !showAll }
+                    if (showAll) "收起表格" else "查看全部 ${node.rows.size} 行", "",
+                    onClick = { showAll = !showAll })
             }
         }
         is UiDocumentNode.BarChart -> {
