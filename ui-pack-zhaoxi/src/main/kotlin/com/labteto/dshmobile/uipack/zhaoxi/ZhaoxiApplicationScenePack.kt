@@ -17,6 +17,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.platform.LocalContext
 import com.labteto.dshmobile.uicontract.UiHostPreferences
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiHue
+import com.labteto.dshmobile.uipack.zhaoxi.theme.resolveZhaoxiWallpaper
 import androidx.compose.ui.Modifier
 import com.labteto.dshmobile.uicontract.ChatUiCommand
 import com.labteto.dshmobile.uicontract.HostPreferencesUiPort
@@ -524,13 +525,8 @@ class ZhaoxiApplicationScenePack(
             Box(Modifier.fillMaxSize()) {
                 ZhaoxiBackground(
                     Modifier.fillMaxSize(),
-                    wallpaperPreset = if (appearance.presetWallpaperEnabled) when (hue) {
-                        ZhaoxiHue.DUSK -> if (dark) "w1.webp" else "w0.webp"
-                        ZhaoxiHue.STONE -> if (dark) "w3.webp" else "w2.webp"
-                        ZhaoxiHue.SAGE -> if (dark) "w5.webp" else "w4.webp"
-                        ZhaoxiHue.MAUVE -> if (dark) "w7.webp" else "w6.webp"
-                        ZhaoxiHue.STEEL -> if (dark) "w9.webp" else "w8.webp"
-                    } else null,
+                    wallpaperPreset = resolveZhaoxiWallpaper(
+                        appearance.presetWallpaperEnabled, appearance.selectedWallpaperPreset, hue, dark),
                     adaptiveContrast = appearance.adaptiveContrast,
                     intensity = appearance.ambientGlow *
                         (if (state.stack.lastOrNull()?.value in setOf("route.home", "conversation.chat", "conversation.work")) 1f else .45f),
