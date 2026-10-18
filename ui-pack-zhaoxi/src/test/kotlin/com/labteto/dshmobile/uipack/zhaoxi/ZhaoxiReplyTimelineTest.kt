@@ -4,6 +4,7 @@ import com.labteto.dshmobile.uicontract.UiMessageRole
 import com.labteto.dshmobile.uicontract.UiMessageSnapshot
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.ZxTimelineEntry
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.projectZxReplyTimeline
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.uncommittedReplyPreview
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -54,4 +55,22 @@ class ZhaoxiReplyTimelineTest {
         assertEquals("已核查实际回执",
             (list.last() as ZxTimelineEntry.Reply).stages.single().text)
     }
+    @Test fun cumulativePreviewOnlyShowsUncommittedTail() {
+        val stages = listOf(
+            msg("step1", UiMessageRole.ASSISTANT, "已找到文件"),
+            msg("step2", UiMessageRole.ASSISTANT, "已完成分析"),
+        )
+        assertEquals("进一步核对", uncommittedReplyPreview(
+            "已找到文件\\n\\n已完成分析\\n\\n进一步核对".replace("\\\\n", "\\n"), stages))
+        assertEquals(null, uncommittedReplyPreview("已完成分析", stages))
+        assertEquals(null, uncommittedReplyPreview("已完成分析的前缀".take(5), stages))
+    }
+
+    @Test fun freshDeltaIsPreservedAndLatestStagePrefixIsStripped() {
+        val stages = listOf(msg("step", UiMessageRole.ASSISTANT, "已完成核查"))
+        assertEquals("下一步", uncommittedReplyPreview("下一步", stages))
+        assertEquals("；继续验证", uncommittedReplyPreview("已完成核查；继续验证", stages))
+        assertEquals(null, uncommittedReplyPreview("  ", stages))
+    }
+
 }
