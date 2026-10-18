@@ -60,11 +60,17 @@ internal fun ZhaoxiWallpaperPicker(selectedPreset: String, onSelect: (String) ->
                             val bytes = zip.readBytes()
                             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                            // Match the actual screen-density thumbnail width. The previous
+                            // fixed 260px long-edge limit reduced 828px artwork to ~104px wide.
+                            val requiredWidth = (102f * context.resources.displayMetrics.density).toInt()
                             var sample = 1
-                            while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 260) sample *= 2
+                            while (bounds.outWidth / (sample * 2) >= requiredWidth) sample *= 2
                             BitmapFactory.decodeByteArray(
                                 bytes, 0, bytes.size,
-                                BitmapFactory.Options().apply { inSampleSize = sample },
+                                BitmapFactory.Options().apply {
+                                    inSampleSize = sample
+                                    inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
+                                },
                             )?.let { put(entry.name, it.asImageBitmap()) }
                         }
                     }
@@ -104,6 +110,7 @@ internal fun ZhaoxiWallpaperPicker(selectedPreset: String, onSelect: (String) ->
                     if (preview != null) Image(
                         bitmap = preview, contentDescription = null,
                         contentScale = ContentScale.Crop,
+                        filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
                         modifier = Modifier.fillMaxWidth().height(122.dp),
                     )
                     else if (key == "auto") Text("自动", color = c.ink, fontSize = 17.sp)
