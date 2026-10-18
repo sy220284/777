@@ -51,6 +51,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.uicontract.FilesUiPort
+import com.labteto.dshmobile.uihost.UiWorkspaceExportAction
+import com.labteto.dshmobile.uihost.UiWorkspaceExportReceipt
+import com.labteto.dshmobile.uihost.UiWorkspaceExportRequest
+import com.labteto.dshmobile.uihost.UiWorkspaceBatchExportRequest
+import com.labteto.dshmobile.uihost.rememberUiWorkspaceExporter
+import com.labteto.dshmobile.uihost.rememberUiWorkspaceBatchExporter
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.uicontract.UiCommandReceipt
@@ -673,6 +679,14 @@ internal fun zxWorkspaceFileVisible(path: String, query: String, showInternal: B
         (query.isBlank() || path.contains(query.trim(), ignoreCase = true))
 }
 
+/** Only the real Host exporter may report that the user-selected destination was written. */
+internal fun zxWorkspaceExportFeedback(receipt: UiWorkspaceExportReceipt): String? = when (receipt) {
+    is UiWorkspaceExportReceipt.Saved -> "文件已保存（${zxHumanFileSize(receipt.bytes)}）"
+    is UiWorkspaceExportReceipt.ExternalAppUnavailable -> "文件已保存，但没有可打开或分享的应用"
+    UiWorkspaceExportReceipt.Cancelled -> null
+    is UiWorkspaceExportReceipt.Failed -> "文件操作失败：${receipt.message ?: "请检查文件是否仍可访问"}"
+}
+
 /** route.workspace — 分离工作区文件和当前会话产物，均读取真实 FilesUiPort。 */
 @Composable
 fun ZhaoxiWorkspaceScene(
@@ -685,6 +699,18 @@ fun ZhaoxiWorkspaceScene(
     var fileQuery by rememberSaveable { mutableStateOf("") }
     var showInternalFiles by rememberSaveable { mutableStateOf(false) }
     var refreshFiles by remember { mutableStateOf(0) }
+    var selectionMode by rememberSaveable { mutableStateOf(false) }
+    var selectedPaths by remember { mutableStateOf(emptySet<String>()) }
+    var fileFeedback by remember { mutableStateOf<String?>(null) }
+    fun clearSelection() { selectedPaths = emptySet(); selectionMode = false }
+    val batchExporter = rememberUiWorkspaceBatchExporter(
+        writeFile = { path, output -> requireNotNull(files).exportWorkspaceFile(path, output) },
+        onResult = { receipt ->
+            zxWorkspaceExportFeedback(receipt)?.let { fileFeedback = it }
+            if (receipt is UiWorkspaceExportReceipt.Saved ||
+                receipt is UiWorkspaceExportReceipt.ExternalAppUnavailable) clearSelection()
+        },
+    )
     val workspace by produceState(initialValue = emptyList<com.labteto.dshmobile.local.tools.LocalWorkspaceFile>(), files, refreshFiles) {
         value = runCatching { files?.workspaceFiles() }.getOrNull().orEmpty()
     }
@@ -704,28 +730,67 @@ fun ZhaoxiWorkspaceScene(
     ZxPage("工作区", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ZxChip("工作区", selectedDomain == 0) { selectedDomain = 0 }
-            ZxChip("会话产物", selectedDomain == 1) { selectedDomain = 1 }
+            ZxChip("工作区", selectedDomain == 0) { selectedDomain = 0; clearSelection() }
+            ZxChip("会话产物", selectedDomain == 1) { selectedDomain = 1; clearSelection() }
         }
-        ZxField(fileQuery, { fileQuery = it }, Modifier.fillMaxWidth(),
+        fileFeedback?.let { ZxFooterNote(it) }
+        ZxField(fileQuery, { fileQuery = it; selectedPaths = emptySet() }, Modifier.fillMaxWidth(),
             placeholder = "搜索文件名或路径")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (selectedDomain == 0) {
-                ZxChip("常用文件", !showInternalFiles) { showInternalFiles = false }
-                ZxChip("含内部文件", showInternalFiles) { showInternalFiles = true }
+                ZxChip("常用文件", !showInternalFiles) { showInternalFiles = false; selectedPaths = emptySet() }
+                ZxChip("含内部文件", showInternalFiles) { showInternalFiles = true; selectedPaths = emptySet() }
             }
-            ZxChip("刷新", false) { refreshFiles++ }
+            ZxChip("刷新", false) { refreshFiles++; selectedPaths = emptySet() }
+            if (selectedDomain == 0 && files != null)
+                ZxChip(if (selectionMode) "取消选择" else "多选分享", selectionMode) {
+                    if (selectionMode) clearSelection() else selectionMode = true
+                }
         }
         if (selectedDomain == 0) {
             val visible = workspace.filter { zxWorkspaceFileVisible(it.path, fileQuery, showInternalFiles) }
             ZxSection("工作区文件 · ${visible.size}")
+            if (selectionMode && files != null && visible.isNotEmpty()) {
+                val visiblePaths = visible.map { it.path }.toSet()
+                val selectedVisible = selectedPaths.intersect(visiblePaths)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ZxChip("全选本页", selectedVisible.size == visible.size) {
+                        selectedPaths = if (selectedVisible.size == visible.size)
+                            selectedPaths - visiblePaths else selectedPaths + visiblePaths
+                    }
+                    ZxChip("已选 ${selectedVisible.size} 项", false) {}
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ZxButton("打包保存", {
+                        batchExporter(UiWorkspaceBatchExportRequest(selectedVisible.toList().sorted(),
+                            UiWorkspaceExportAction.SAVE))
+                    }, enabled = selectedVisible.isNotEmpty() && selectedVisible.size <= 100)
+                    ZxButton("打包分享", {
+                        batchExporter(UiWorkspaceBatchExportRequest(selectedVisible.toList().sorted(),
+                            UiWorkspaceExportAction.SHARE))
+                    }, enabled = selectedVisible.isNotEmpty() && selectedVisible.size <= 100,
+                        variant = ZxButtonVariant.Outline)
+                }
+                ZxFooterNote("所选文件经系统文件选择器保存为 ZIP 后，才能分享给其他应用；最多 100 项。")
+            }
             if (files == null) ZxEmpty("工作区不可用", "暂时无法读取文件")
             else if (workspace.isEmpty()) ZxEmpty("工作区是空的", "执行过程中产生的文件会出现在这里")
             else if (visible.isEmpty()) ZxEmpty("没有匹配的文件", "可调整搜索条件，或选择包含内部文件")
             visible.forEach { file ->
+                val selected = file.path in selectedPaths
                 ZxRow(file.path.substringAfterLast('/'),
                     "${zxHumanFileSize(file.bytes.toLong())} · ${file.path}",
-                    onClick = { onPreview(file.path) })
+                    onClick = {
+                        if (selectionMode) selectedPaths = if (selected) selectedPaths - file.path
+                            else selectedPaths + file.path
+                        else onPreview(file.path)
+                    },
+                    trailing = {
+                        if (selectionMode) ZxChip(if (selected) "已选" else "选择", selected) {
+                            selectedPaths = if (selected) selectedPaths - file.path
+                                else selectedPaths + file.path
+                        }
+                    })
             }
         } else {
             val visibleArtifacts = conversation.artifacts.filter {
@@ -759,6 +824,11 @@ fun ZhaoxiWorkspaceScene(
 /** workspace.preview — 使用 Owner 提供的实际预览与截断标记，不再截断调试字符串。 */
 @Composable
 fun ZhaoxiWorkspacePreviewScene(files: FilesUiPort?, path: String, scope: UiSceneRenderScope) {
+    var exportFeedback by remember { mutableStateOf<String?>(null) }
+    val exporter = rememberUiWorkspaceExporter(
+        writeFile = { source, output -> requireNotNull(files).exportWorkspaceFile(source, output) },
+        onResult = { receipt -> zxWorkspaceExportFeedback(receipt)?.let { exportFeedback = it } },
+    )
     val previewState by produceState<Pair<Boolean, com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview?>>(false to null, files, path) {
         val result = if (files == null || path.isBlank()) null
             else runCatching { files.previewWorkspaceFile(path) }.getOrNull()
@@ -776,6 +846,21 @@ fun ZhaoxiWorkspacePreviewScene(files: FilesUiPort?, path: String, scope: UiScen
                 ZxSection("文件信息")
                 ZxValueRow("文件名", value = item.file.path.substringAfterLast('/'))
                 ZxValueRow("大小", value = zxHumanFileSize(item.file.bytes.toLong()))
+                exportFeedback?.let { ZxFooterNote(it) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ZxButton("保存", {
+                        exporter(UiWorkspaceExportRequest(path, item.file.path.substringAfterLast('/'),
+                            UiWorkspaceExportAction.SAVE))
+                    })
+                    ZxButton("分享", {
+                        exporter(UiWorkspaceExportRequest(path, item.file.path.substringAfterLast('/'),
+                            UiWorkspaceExportAction.SHARE))
+                    }, variant = ZxButtonVariant.Outline)
+                    ZxButton("外部打开", {
+                        exporter(UiWorkspaceExportRequest(path, item.file.path.substringAfterLast('/'),
+                            UiWorkspaceExportAction.OPEN))
+                    }, variant = ZxButtonVariant.Outline)
+                }
                 ZxSection("内容预览")
                 val content = item.text
                 if (content == null) {
