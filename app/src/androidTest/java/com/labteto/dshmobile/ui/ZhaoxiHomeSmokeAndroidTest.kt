@@ -41,7 +41,7 @@ class ZhaoxiHomeSmokeAndroidTest {
         compose.onNode(hasSetTextAction()).performTextInput("待发送的草稿")
         compose.activityRule.scenario.recreate()
         compose.onNode(hasSetTextAction()).assertTextEquals("待发送的草稿")
-        compose.onNodeWithContentDescription("返回").performClick()
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithText("聊天").performClick()
         compose.onNode(hasSetTextAction()).assertTextEquals("待发送的草稿")
     }
