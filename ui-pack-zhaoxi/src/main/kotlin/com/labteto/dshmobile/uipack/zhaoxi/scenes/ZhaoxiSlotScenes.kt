@@ -195,22 +195,136 @@ fun ZhaoxiQuestionScene(work: WorkConversationUiPort, scope: UiSceneRenderScope)
     }
 }
 
-/** chat.diary / route.diary — 日记（DiaryUiPort 只读 + 勘误）。 */
+/** chat.diary / route.diary — 公开日记阅读、按原版本勘误与停用。私密反思不渲染。 */
 @Composable
 fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRenderScope) {
-    val entries by produceState<List<com.labteto.dshmobile.uicontract.UiDiaryEntry>>(initialValue = emptyList(), galleryId, diary) {
-        value = runCatching { diary.entries(galleryId) }.getOrDefault(emptyList())
+    var revision by remember { mutableStateOf(0) }
+    val entries by produceState<List<com.labteto.dshmobile.uicontract.UiDiaryEntry>>(
+        initialValue = emptyList(), galleryId, diary, revision,
+    ) {
+        value = diary.entries(galleryId)
+    }
+    var filter by remember { mutableStateOf("有效") }
+    var selectedId by remember(galleryId) { mutableStateOf<String?>(null) }
+    var editing by remember(galleryId) { mutableStateOf(false) }
+    var eventDraft by remember { mutableStateOf("") }
+    var feelingDraft by remember { mutableStateOf("") }
+    var thoughtDraft by remember { mutableStateOf("") }
+    var meaningDraft by remember { mutableStateOf("") }
+    var echoDraft by remember { mutableStateOf("") }
+    var pendingDisable by remember { mutableStateOf<com.labteto.dshmobile.uicontract.UiDiaryEntry?>(null) }
+    var feedback by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    val jobs = androidx.compose.runtime.rememberCoroutineScope()
+    fun describe(result: com.labteto.dshmobile.uicontract.UiDiaryReceipt): String = when (result) {
+        com.labteto.dshmobile.uicontract.UiDiaryReceipt.Applied -> "操作已保存"
+        com.labteto.dshmobile.uicontract.UiDiaryReceipt.Stale -> "记录已经更新，请重新读取后再操作"
+        is com.labteto.dshmobile.uicontract.UiDiaryReceipt.Failed -> result.message ?: "操作失败"
     }
     ZxPage("日记", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        if (entries.isEmpty()) ZxEmpty("还没有日记", "日记由相处事件凝结 · 私密日记不可见")
-        entries.filter { it.active }.forEach { e ->
-            ZxRow(e.event.take(40), "${e.personaName} · ${e.feeling.take(24)}")
-            if (e.innerThought.isNotBlank())
-                Text(e.innerThought.take(120), fontSize = 11.sp,
-                    color = ZhaoxiTheme.colors.ink3, modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(6.dp))
+        ZxSection("公开日记")
+        ZxFooterNote("这里只展示允许阅读的日记内容；人物的私密反思不会公开。")
+        feedback?.let { com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
+            it, com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Info) }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ZxChip("有效", filter == "有效") { filter = "有效"; editing = false }
+            ZxChip("已停用", filter == "已停用") { filter = "已停用"; editing = false }
         }
-        ZxFooterNote("勘误经 DiaryUiPort.correct · 停用经 deactivate")
+        val visible = entries.filter { if (filter == "有效") it.active else !it.active }
+        if (visible.isEmpty()) {
+            ZxEmpty(if (filter == "有效") "还没有公开日记" else "暂无已停用日记",
+                "人物的相处经历会在符合条件时形成日记")
+        }
+        visible.forEach { entry ->
+            ZxRow(entry.event.take(58), "${entry.personaName} · ${entry.feeling.take(36)}",
+                onClick = {
+                    selectedId = entry.id
+                    editing = false
+                })
+        }
+        val selected = visible.firstOrNull { it.id == selectedId }
+            ?: visible.firstOrNull()
+        if (selected != null) {
+            ZxSection(if (selected.active) "日记内容" else "已停用记录")
+            Text(selected.event, fontSize = 15.sp, lineHeight = 24.sp,
+                color = ZhaoxiTheme.colors.ink, modifier = Modifier.fillMaxWidth())
+            if (selected.feeling.isNotBlank()) ZxValueRow("当时的感受", value = selected.feeling)
+            if (selected.innerThought.isNotBlank()) {
+                ZxSection("心绪")
+                Text(selected.innerThought, fontSize = 14.sp, lineHeight = 22.sp,
+                    color = ZhaoxiTheme.colors.ink2)
+            }
+            if (selected.relationshipMeaning.isNotBlank()) {
+                ZxSection("关系意义")
+                Text(selected.relationshipMeaning, fontSize = 14.sp, color = ZhaoxiTheme.colors.ink2)
+            }
+            if (selected.unresolvedEcho.isNotBlank()) {
+                ZxSection("未解的余韵")
+                Text(selected.unresolvedEcho, fontSize = 14.sp, color = ZhaoxiTheme.colors.ink2)
+            }
+            ZxFooterNote("来源：${selected.sourceMode} · 经历 ${selected.experienceId.take(16)}（只读引用）")
+            if (selected.active && !editing) {
+                ZxButton("勘误内容", {
+                    eventDraft = selected.event
+                    feelingDraft = selected.feeling
+                    thoughtDraft = selected.innerThought
+                    meaningDraft = selected.relationshipMeaning
+                    echoDraft = selected.unresolvedEcho
+                    editing = true
+                })
+                ZxButton("停用日记", { pendingDisable = selected },
+                    variant = ZxButtonVariant.Danger)
+            }
+            if (selected.active && editing) {
+                ZxSection("内容勘误")
+                ZxFooterNote("修改保留原始经历身份，保存时会校验日记版本，防止覆盖较新内容。")
+                ZxField(eventDraft, { eventDraft = it }, Modifier.fillMaxWidth(), placeholder = "事件")
+                ZxField(feelingDraft, { feelingDraft = it }, Modifier.fillMaxWidth(), placeholder = "感受")
+                ZxField(thoughtDraft, { thoughtDraft = it }, Modifier.fillMaxWidth(), placeholder = "心绪")
+                ZxField(meaningDraft, { meaningDraft = it }, Modifier.fillMaxWidth(), placeholder = "关系意义")
+                ZxField(echoDraft, { echoDraft = it }, Modifier.fillMaxWidth(), placeholder = "未解的余韵")
+                ZxButton("保存勘误", {
+                    if (!busy) jobs.launch {
+                        busy = true
+                        try {
+                            val result = diary.correct(com.labteto.dshmobile.uicontract.UiDiaryCorrection(
+                                galleryId, selected.id, selected.updatedAt,
+                                eventDraft, feelingDraft, thoughtDraft, meaningDraft, echoDraft,
+                                selected.privateReflection))
+                            feedback = describe(result)
+                            if (result == com.labteto.dshmobile.uicontract.UiDiaryReceipt.Applied) {
+                                revision++
+                                editing = false
+                            }
+                        } finally { busy = false }
+                    }
+                }, enabled = !busy && eventDraft.isNotBlank(), loading = busy)
+                ZxChip("取消编辑", false) { editing = false }
+            }
+        }
+        pendingDisable?.let { target ->
+            com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog(
+                "停用这篇日记？",
+                "停用后不再用于有效日记展示，已有来源与版本记录仍由原 Owner 管理。",
+                "确认停用",
+                {
+                    pendingDisable = null
+                    if (!busy) jobs.launch {
+                        busy = true
+                        try {
+                            val result = diary.deactivate(galleryId, target.id, target.updatedAt)
+                            feedback = describe(result)
+                            if (result == com.labteto.dshmobile.uicontract.UiDiaryReceipt.Applied) {
+                                revision++
+                                selectedId = null
+                                editing = false
+                            }
+                        } finally { busy = false }
+                    }
+                },
+                { pendingDisable = null },
+            )
+        }
     }
 }
