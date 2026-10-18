@@ -580,7 +580,7 @@ fun ZhaoxiToolsScene(
     }
     val heading = when (destination) {
         "tools.mcp" -> "MCP 连接"
-        "tools.plugins" -> "插件管理"
+        "tools.plugins" -> "插件与技能"
         "tools.github" -> "GitHub"
         "work.capabilities" -> "能力目录"
         else -> "工具中心"
@@ -650,7 +650,8 @@ fun ZhaoxiToolsScene(
                             submitConfiguration(ToolsUiCommand.RecoverFailedPlugin(item.id))
                         }, enabled = !busy, loading = busy)
                     }
-
+                Spacer(Modifier.height(12.dp))
+                ZhaoxiSkillManager(tools)
             }
             "tools.github" -> {
                 ZxSection("连接状态")
@@ -719,7 +720,7 @@ fun ZhaoxiToolsScene(
                 ZxSection("连接与扩展")
                 ZxRow("MCP 服务器", "${servers.size} 个已登记连接",
                     onClick = { scope.onNavigate(UiSceneId("tools.mcp")) })
-                ZxRow("插件", "${installedIds.size} 个已安装插件",
+                ZxRow("插件与技能管理", "${installedIds.size} 个插件 · ${skills.orEmpty().size} 项已安装技能",
                     onClick = { scope.onNavigate(UiSceneId("tools.plugins")) })
                 ZxRow("GitHub", if (githubConfigured) "已配置" else "未配置",
                     onClick = { scope.onNavigate(UiSceneId("tools.github")) })
