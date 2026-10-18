@@ -53,6 +53,7 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.ZxSection
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 import com.labteto.dshmobile.uicontract.UiSceneId
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import com.labteto.dshmobile.uihost.UiSceneRenderScope
 
 /**
@@ -129,6 +130,8 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
     var glass by remember(snap.transparency) { mutableFloatStateOf(snap.transparency) }
     var wallpaperSaving by remember { mutableStateOf(false) }
     var wallpaperError by remember { mutableStateOf<String?>(null) }
+    var wallpaperSaving by remember { mutableStateOf(false) }
+    var wallpaperError by remember { mutableStateOf<String?>(null) }
     ZxPage("外观", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("主题")
@@ -177,6 +180,8 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
                         if (!preferences.submit(UiHostPreferencesCommand.SelectWallpaperPreset(preset))) {
                             wallpaperError = "壁纸保存失败，请重试"
                         }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
                     } catch (error: Exception) {
                         wallpaperError = "壁纸保存失败，请重试"
                     } finally {
