@@ -90,7 +90,8 @@ fun ZhaoxiHomeScene(
     val drawerScope = rememberCoroutineScope()
     val c = ZhaoxiTheme.colors
     val workMode = snap.usageMode == LocalUsageMode.WORK
-    val visibleSessions = if (drawerQuery.isBlank()) snap.sessions else snap.sessions.filter { session ->
+    val modeSessions = snap.sessions.filter { it.usageMode == snap.usageMode }
+    val visibleSessions = if (drawerQuery.isBlank()) modeSessions else modeSessions.filter { session ->
         session.title.contains(drawerQuery.trim(), ignoreCase = true) ||
             session.summaryPreview.orEmpty().contains(drawerQuery.trim(), ignoreCase = true)
     }
@@ -129,21 +130,21 @@ fun ZhaoxiHomeScene(
                     ) {
                         Text("朝夕", Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
                         ZxIconButton(
-                            onClick = { drawerScope.launch { drawerState.close() } },
-                            contentDescription = "关闭侧栏",
-                        ) { ZxIcon("back") }
+                            onClick = { create(snap.usageMode) },
+                            contentDescription = if (workMode) "新建工作" else "新建会话",
+                        ) { ZxIcon("plus") }
+                        ZxIconButton(
+                            onClick = { navigate("shell.search") },
+                            contentDescription = "全局搜索",
+                        ) { ZxIcon("search") }
                     }
-                    ZxHomeDrawerEntry("plus", "新会话", onClick = { create(LocalUsageMode.CHAT) })
-                    ZxHomeDrawerEntry("tasks", "新工作", onClick = { create(LocalUsageMode.WORK) })
                     Spacer(Modifier.height(8.dp))
                     ZxField(
                         value = drawerQuery,
                         onValueChange = { drawerQuery = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = "筛选会话标题或内容",
+                        placeholder = if (workMode) "筛选工作会话" else "筛选聊天会话",
                     )
-                    ZxHomeDrawerEntry("search", "搜索会话、人物、任务、文件",
-                        onClick = { navigate("shell.search") })
                     CommandFeedback(commandReceipt)
                     Spacer(Modifier.height(12.dp))
                     ZxModeSwitch(workMode, onChange = { selectedWork ->
@@ -151,7 +152,6 @@ fun ZhaoxiHomeScene(
                             if (selectedWork) LocalUsageMode.WORK else LocalUsageMode.CHAT,
                         )) ?: UiCommandReceipt.NotAdmitted
                         commandReceipt = receipt
-                        if (receipt.admitted()) drawerScope.launch { drawerState.close() }
                     })
                     Spacer(Modifier.height(14.dp))
                     LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -170,13 +170,13 @@ fun ZhaoxiHomeScene(
                         }
                         item {
                             Spacer(Modifier.height(10.dp))
-                            Text("最近会话", fontSize = 11.sp, color = c.ink2, fontWeight = FontWeight.SemiBold,
+                            Text(if (workMode) "工作历史" else "聊天历史", fontSize = 11.sp, color = c.ink2, fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
                         }
                         if (visibleSessions.isEmpty()) {
                             item {
                                 Text(
-                                    if (drawerQuery.isBlank()) "暂无会话，可从上方新建"
+                                    if (drawerQuery.isBlank()) (if (workMode) "暂无工作会话，可点击顶部新建" else "暂无聊天会话，可点击顶部新建")
                                     else "没有匹配的会话",
                                     fontSize = 12.sp, color = c.ink2, modifier = Modifier.padding(12.dp),
                                 )
@@ -249,10 +249,10 @@ fun ZhaoxiHomeScene(
                 ) { ZxIcon("menu") }
             }
             Spacer(Modifier.height(8.dp))
-            if (snap.sessions.isEmpty() && !snap.loading) {
+            if (modeSessions.isEmpty() && !snap.loading) {
                 ZxEmpty("还没有会话", "点击「新会话」开始")
             }
-            snap.sessions.take(6).forEach { session ->
+            modeSessions.take(6).forEach { session ->
                 ZxHomeDrawerEntry(
                     icon = "diary",
                     title = session.title.take(40),

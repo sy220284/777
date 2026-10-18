@@ -80,6 +80,17 @@ internal fun zxAutomationReceiptText(action: String, receipt: AutomationUiReceip
  * 启停/删除/立即运行只经 AutomationUiPort.submit；任务详情展示快照投影。
  */
 
+/** 列表检索只过滤已有任务，不额外查询或改动调度事实。 */
+internal fun zxAutomationTaskMatches(
+    query: String, prompt: String, actorName: String?, scheduleName: String,
+): Boolean {
+    val needle = query.trim()
+    return needle.isEmpty() ||
+        prompt.contains(needle, ignoreCase = true) ||
+        actorName.orEmpty().contains(needle, ignoreCase = true) ||
+        scheduleName.contains(needle, ignoreCase = true)
+}
+
 /** automation.tasks / route.tasks — 自动化任务列表。 */
 @Composable
 fun ZhaoxiAutomationTasksScene(
@@ -89,11 +100,13 @@ fun ZhaoxiAutomationTasksScene(
     onCreate: () -> Unit = { scope.onNavigate(UiSceneId("automation.editor")) },
 ) {
     val snap by automation.snapshots.collectAsState(initial = automation.snapshot())
-    var filter by remember { mutableStateOf("全部") }
+    var filter by rememberSaveable { mutableStateOf("全部") }
+    var taskQuery by rememberSaveable { mutableStateOf("") }
+    var modeFilter by rememberSaveable { mutableStateOf("全部模式") }
     var feedback by remember { mutableStateOf<String?>(null) }
-    val filtered = remember(snap.tasks, filter) {
+    val filtered = remember(snap.tasks, filter, taskQuery, modeFilter) {
         snap.tasks.filter { task ->
-            when (filter) {
+            val matchingStatus = when (filter) {
                 "已计划" -> task.status == com.labteto.dshmobile.automation.AutomationStatus.SCHEDULED
                 "运行中" -> task.status == com.labteto.dshmobile.automation.AutomationStatus.RUNNING
                 "已暂停" -> task.status == com.labteto.dshmobile.automation.AutomationStatus.PAUSED
@@ -101,10 +114,24 @@ fun ZhaoxiAutomationTasksScene(
                     com.labteto.dshmobile.automation.AutomationStatus.BLOCKED)
                 else -> true
             }
+            matchingStatus &&
+                (modeFilter == "全部模式" ||
+                    (modeFilter == "聊天" && task.mode == AutomationMode.CHAT) ||
+                    (modeFilter == "工作" && task.mode == AutomationMode.WORK)) &&
+                zxAutomationTaskMatches(taskQuery, task.prompt, task.actorName,
+                    task.scheduleType.zxAutomationScheduleLabel())
         }
     }
     ZxPage("自动化", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
+        ZxField(taskQuery, { taskQuery = it }, Modifier.fillMaxWidth(),
+            placeholder = "搜索任务内容、人物或执行周期")
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("全部模式", "聊天", "工作").forEach { label ->
+                ZxChip(label, modeFilter == label) { modeFilter = label }
+            }
+        }
         ZxSection("任务状态")
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -114,7 +141,8 @@ fun ZhaoxiAutomationTasksScene(
         }
         ZxValueRow("当前列表", value = "${filtered.size} / ${snap.tasks.size}")
         feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        if (filtered.isEmpty()) ZxEmpty("没有符合条件的任务", "可切换状态筛选或创建新任务")
+        if (snap.tasks.isEmpty()) ZxEmpty("暂无自动化任务", "可以创建第一个真实任务")
+        else if (filtered.isEmpty()) ZxEmpty("没有符合条件的任务", "可调整搜索、模式或状态筛选")
         filtered.forEach { task ->
             val paused = task.status == com.labteto.dshmobile.automation.AutomationStatus.PAUSED
             val mayRetry = task.status in setOf(
