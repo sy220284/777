@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.uipack.zhaoxi
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiHue
 import com.labteto.dshmobile.uipack.zhaoxi.theme.accentFor
 import com.labteto.dshmobile.uipack.zhaoxi.theme.wallpaperVeilAlpha
