@@ -82,14 +82,22 @@ fun ZhaoxiMessageActionsScene(
     message: UiMessageSnapshot,
     scope: UiSceneRenderScope,
     onEdit: () -> Unit = {},
-    onRegenerate: () -> Unit = {},
+    onRegenerate: () -> UiCommandReceipt = { UiCommandReceipt.NotAdmitted },
 ) {
+    var regenerateReceipt by remember(message.id) { mutableStateOf<UiCommandReceipt?>(null) }
     ZxPage("消息操作", onBack = { scope.onBack() }) {
+        CommandFeedback(regenerateReceipt)
         Spacer(Modifier.height(8.dp))
         Text(message.text.take(200), fontSize = 13.sp, color = ZhaoxiTheme.colors.ink2)
         Spacer(Modifier.height(10.dp))
         if (message.editableText != null) ZxNavRow("修改并重发", sub = "编辑后作为新分支提交") { onEdit() }
-        ZxNavRow("重新生成", sub = "从这条重试回复") { onRegenerate() }
+        ZxNavRow("重新生成", sub = "从这条重试回复") {
+            val result = onRegenerate()
+            when (result) {
+                UiCommandReceipt.Accepted, UiCommandReceipt.Queued -> scope.onBack()
+                else -> regenerateReceipt = result
+            }
+        }
         ZxNavRow("阅读文本") { scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("conversation.reader")) }
         val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
         ZxNavRow("复制文本", sub = "") {
