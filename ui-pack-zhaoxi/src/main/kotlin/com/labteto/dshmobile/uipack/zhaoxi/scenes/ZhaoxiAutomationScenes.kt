@@ -88,29 +88,39 @@ fun ZhaoxiAutomationTasksScene(
                 com.labteto.dshmobile.automation.AutomationStatus.COMPLETED,
                 com.labteto.dshmobile.automation.AutomationStatus.BLOCKED,
             )
-            ZxRow(task.prompt.take(80),
-                "${if (task.mode == AutomationMode.CHAT) "聊天" else "工作"} · ${task.status.wireValue} · ${task.scheduleType.name}",
-                onClick = { onOpenEditor(task.id) },
-                showChevron = false,
-                trailing = {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (actionAvailable) ZxChip("立即运行", false) {
+            androidx.compose.foundation.layout.Column(
+                Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                ZxRow(
+                    task.prompt.take(100),
+                    "${if (task.mode == AutomationMode.CHAT) "聊天" else "工作"} · ${task.status.wireValue} · ${task.scheduleType.name}",
+                    onClick = { onOpenEditor(task.id) },
+                )
+                if (actionAvailable) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        ZxChip("立即运行", false) {
                             feedback = automation.submit(AutomationUiCommand.RunNow(task.id)).toString()
                         }
-                        if (actionAvailable) {
-                            ZxSwitch(checked = !paused, onCheckedChange = { on ->
-                                feedback = automation.submit(
-                                    if (on) AutomationUiCommand.Resume(task.id) else AutomationUiCommand.Pause(task.id)
-                                ).toString()
-                            }, contentDescription = "${task.prompt.take(20)} · 启用状态")
-                        }
+                        androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                        Text(if (paused) "已暂停" else "已启用", color = ZhaoxiTheme.colors.ink2)
+                        ZxSwitch(checked = !paused, onCheckedChange = { enabled ->
+                            feedback = automation.submit(
+                                if (enabled) AutomationUiCommand.Resume(task.id)
+                                else AutomationUiCommand.Pause(task.id)
+                            ).toString()
+                        }, contentDescription = "${task.prompt.take(20)} · 启用状态")
                     }
-                },
-            )
+                }
+            }
         }
         Spacer(Modifier.height(8.dp))
         ZxButton("新建自动化", onCreate, Modifier.fillMaxWidth())
-        ZxFooterNote("任务状态和开关来自 Automation Owner；立即运行仅代表提交请求，不代表执行成功")
+
     }
 }
 
@@ -165,7 +175,7 @@ fun ZhaoxiAutomationEditorScene(
     }
     fun showReceipt(receipt: AutomationUiReceipt) {
         feedback = when (receipt) {
-            is AutomationUiReceipt.Applied -> "已提交给调度系统；执行结果请从任务列表核对"
+            is AutomationUiReceipt.Applied -> "已保存"
             is AutomationUiReceipt.Rejected -> "调度请求被拒绝：${receipt.reason}"
             is AutomationUiReceipt.Failed -> receipt.message ?: "调度请求失败"
         }
@@ -182,7 +192,7 @@ fun ZhaoxiAutomationEditorScene(
             ZxValueRow("执行模式", value = if (chatMode) "聊天 · 当前会话" else "工作")
             if (chatMode && editingTaskId == null) {
                 ZxChip("智能理解时间", natural) { natural = !natural }
-                if (natural) ZxFooterNote("直接描述执行时间和任务，使用原有聊天规划服务解析；保存仍由 Owner 校验")
+
             }
             ZxSection("任务内容")
             ZxField(prompt, { prompt = it }, Modifier.fillMaxWidth().height(104.dp),
@@ -233,7 +243,7 @@ fun ZhaoxiAutomationEditorScene(
                 }
             }
             ZxSection("通知")
-            ZxSwitchRow("运行通知", "通过现有自动化通知策略提示结果", notify) { notify = it }
+            ZxSwitchRow("运行通知", "", notify) { notify = it }
             feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
             Spacer(Modifier.height(12.dp))
             ZxButton(if (editingTaskId == null) "创建任务" else "保存修改", {
@@ -304,29 +314,38 @@ fun ZhaoxiAutomationEditorScene(
                     }
                 }
             }, Modifier.fillMaxWidth(), enabled = !busy && prompt.isNotBlank(), loading = busy)
-            ZxFooterNote("单次、间隔、每天、每周、每月及聊天特殊触发均复用原有调度 Owner；请求被接收不代表任务已运行")
+    
         }
     }
 }
 
-/** automation.persona_interaction — 人物互动编排。 */
+/** Current-chat automation page backed by the real scheduler rather than sample event cards. */
 @Composable
 fun ZhaoxiPersonaInteractionScene(
     automation: AutomationUiPort,
     scope: UiSceneRenderScope,
+    onCreate: () -> Unit,
+    onEdit: (String) -> Unit,
 ) {
-    val co = rememberCoroutineScope()
-    ZxPage("人物互动编排", onBack = { scope.onBack() }) {
+    val snap by automation.snapshots.collectAsState(initial = automation.snapshot())
+    val currentId = snap.context.identity?.sessionId
+    val tasks = snap.tasks.filter {
+        it.mode == AutomationMode.CHAT && it.targetSessionId == currentId
+    }
+    ZxPage("聊天自动化", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        ZxSection("规则")
-        ZxRow("相遇事件 → 生成互动", "事件总线触发 · 双人物会话", trailing = {
-            ZxBadge("示例", ZxBadgeTone.Neutral)
-        })
-        ZxFooterNote("互动占用各自人物的对话额度")
-        Spacer(Modifier.height(10.dp))
-        ZxButton("编排新互动", {
-            scope.onNavigate(UiSceneId("automation.editor"))
-        }, Modifier.fillMaxWidth())
+        if (!snap.context.canPlanChat || currentId == null) {
+            ZxEmpty("请进入单人聊天", "选择会话后可设置互动")
+        } else {
+            ZxSection("互动任务")
+            if (tasks.isEmpty()) ZxEmpty("暂无互动任务", "可以为当前聊天创建提醒或互动")
+            tasks.forEach { task ->
+                ZxRow(task.prompt.take(100),
+                    "${task.status.wireValue} · ${task.scheduleType.name}",
+                    onClick = { onEdit(task.id) })
+            }
+            ZxButton("新建互动", onCreate, Modifier.fillMaxWidth())
+        }
     }
 }
 
@@ -394,7 +413,7 @@ fun ZhaoxiToolsScene(
                         } }
                     }
                 }
-                ZxFooterNote("连接状态不代表工具已经授权执行；每次执行仍由原 Owner 验证")
+        
             }
             "tools.plugins" -> {
                 ZxSection("已安装插件")
@@ -416,7 +435,7 @@ fun ZhaoxiToolsScene(
                             refresh++
                         } })
                     }
-                ZxFooterNote("未提供的启停、安装操作不伪造；插件状态以 Owner 快照为准")
+        
             }
             "tools.github" -> {
                 ZxSection("连接状态")
@@ -424,7 +443,7 @@ fun ZhaoxiToolsScene(
                 ZxSection("可用能力")
                 catalogue.filter { it.family.contains("github", ignoreCase = true) }
                     .forEach { cap -> ZxRow(cap.name, "${cap.access} · ${cap.approval}") }
-                if (!githubConfigured) ZxFooterNote("GitHub 尚未配置；请通过已有授权配置入口连接")
+                if (!githubConfigured) ZxEmpty("未连接 GitHub", "请先完成授权")
             }
             "work.capabilities" -> {
                 val grouped = catalogue.groupBy { it.family }
@@ -452,7 +471,7 @@ fun ZhaoxiToolsScene(
                     onClick = { scope.onNavigate(UiSceneId("tools.plugins")) })
                 ZxRow("GitHub", if (githubConfigured) "已配置" else "未配置",
                     onClick = { scope.onNavigate(UiSceneId("tools.github")) })
-                ZxFooterNote("能力登记不等于运行许可；受控操作由原工具 Owner 执行")
+        
             }
         }
     }

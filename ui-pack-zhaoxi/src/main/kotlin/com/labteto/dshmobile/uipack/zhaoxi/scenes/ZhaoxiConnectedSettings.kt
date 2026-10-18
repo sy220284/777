@@ -23,6 +23,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val snap by settings.state.collectAsState(initial = settings.initialState)
     val jobs = rememberCoroutineScope()
     var profileId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingRemoveModel by remember { mutableStateOf<String?>(null) }
     var model by rememberSaveable { mutableStateOf("") }
     var baseUrl by rememberSaveable { mutableStateOf("https://api.deepseek.com") }
     var protocol by rememberSaveable { mutableStateOf(LocalModelProtocol.CHAT_COMPLETIONS) }
@@ -43,11 +44,26 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
         snap.modelProfiles.forEach { p ->
             ZxRow(p.displayName ?: p.model, if (snap.modelSelection.isActive(p)) "当前模型" else p.baseUrl,
-                onClick = { status = settings.submit(SettingsUiCommand.SelectModel(p.id)).toString() })
+                onClick = { status = when (val receipt = settings.submit(SettingsUiCommand.SelectModel(p.id))) {
+                    SettingsUiReceipt.Applied -> "已切换模型"
+                    is SettingsUiReceipt.Failed -> receipt.message ?: "切换失败"
+                    else -> "切换未完成"
+                } })
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ZxChip("编辑", false) { profileId = p.id; model = p.model; baseUrl = p.baseUrl; protocol = p.protocol; apiKey = "" }
-                ZxChip("移除", false) { status = settings.submit(SettingsUiCommand.RemoveModel(p.id)).toString() }
+                ZxChip("移除", false) { pendingRemoveModel = p.id }
             }
+        }
+        pendingRemoveModel?.let { id ->
+            ZxDialog("移除模型？", "此操作会删除本地模型配置。", "移除", {
+                pendingRemoveModel = null
+                status = when (val receipt = settings.submit(SettingsUiCommand.RemoveModel(id))) {
+                    SettingsUiReceipt.Applied -> "模型已移除"
+                    is SettingsUiReceipt.Failed -> receipt.message ?: "移除失败"
+                    else -> "移除未完成"
+                }
+                if (profileId == id) profileId = null
+            }, { pendingRemoveModel = null })
         }
         ZxSection(if (profileId == null) "添加模型" else "编辑模型")
         ZxField(model, { model = it }, Modifier.fillMaxWidth(), placeholder = "模型名称")
@@ -76,6 +92,7 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val snap by settings.chatGptState.collectAsState()
     val jobs = rememberCoroutineScope()
     var status by remember { mutableStateOf<String?>(null) }
+    var pendingRemoveAccount by remember { mutableStateOf<String?>(null) }
     fun execute(action: suspend () -> Unit) { jobs.launch {
         try { action() } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) { status = failure.message ?: "账户操作失败" }
@@ -89,7 +106,13 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                 onClick = { execute { settings.selectChatGptAccount(account.id) } })
             ZxButton("测试连接", { execute { status = settings.testChatGptAccount(account.id) } })
             ZxButton("断开连接", { execute { status = settings.disconnectChatGptAccount(account.id) } })
-            ZxButton("移除账户", { execute { status = settings.removeChatGptAccount(account.id) } })
+            ZxButton("移除账户", { pendingRemoveAccount = account.id }, variant = ZxButtonVariant.Danger)
+        }
+        pendingRemoveAccount?.let { id ->
+            ZxDialog("移除账户？", "将解除此账户的本地连接。", "移除", {
+                pendingRemoveAccount = null
+                execute { status = settings.removeChatGptAccount(id) }
+            }, { pendingRemoveAccount = null })
         }
         ZxButton("连接 ChatGPT", { execute { settings.connectChatGpt() } })
         ZxButton("刷新账户与模型", { execute { settings.refreshChatGpt() } })
@@ -165,29 +188,44 @@ private fun quotaResetLabel(timestampMillis: Long): String =
     java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
         .format(java.util.Date(timestampMillis))
 
+/** Separate runtime limits from personal instructions; both use the current Settings Owner. */
 @Composable
-fun ZhaoxiRuntimeSettingsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
+fun ZhaoxiRuntimeSettingsScene(
+    settings: SettingsUiPort,
+    scope: UiSceneRenderScope,
+    sessionOnly: Boolean = false,
+) {
     val snap by settings.state.collectAsState(initial = settings.initialState)
     var main by rememberSaveable(snap.mainMaxSteps) { mutableStateOf(snap.mainMaxSteps.toString()) }
     var sub by rememberSaveable(snap.subagentMaxSteps) { mutableStateOf(snap.subagentMaxSteps.toString()) }
     var attempts by rememberSaveable(snap.modelAttempts) { mutableStateOf(snap.modelAttempts.toString()) }
     var rules by rememberUiPrivateText("zhaoxi.rules", snap.userRules) { snap.userRules }
     var status by remember { mutableStateOf<String?>(null) }
-    ZxPage("行为与运行", onBack = { scope.onBack() }) {
-        status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        ZxField(main, { main = it }, placeholder = "主任务步数")
-        ZxField(sub, { sub = it }, placeholder = "子任务步数")
-        ZxField(attempts, { attempts = it }, placeholder = "模型尝试次数")
-        ZxButton("保存运行设置", {
-            val m = main.toIntOrNull(); val s = sub.toIntOrNull(); val a = attempts.toIntOrNull()
-            status = if (m == null || s == null || a == null) "请输入整数" else
-                settings.submit(SettingsUiCommand.RuntimeLimits(m, s, a, snap.modelSelection.workerProfileId)).toString()
-        })
-        ZxField(rules, { rules = it }, Modifier.fillMaxWidth(), placeholder = "长期规则")
-        ZxButton("保存规则", { status = settings.submit(SettingsUiCommand.Personalization(rules, snap.autoRecall, snap.autoMemory)).toString() })
-        ZxSwitchRow("自动召回", "", snap.autoRecall) { status = settings.submit(SettingsUiCommand.Personalization(snap.userRules, it, snap.autoMemory)).toString() }
-        ZxSwitchRow("自动记忆", "", snap.autoMemory) { status = settings.submit(SettingsUiCommand.Personalization(snap.userRules, snap.autoRecall, it)).toString() }
-        ZxSwitchRow("对话风格约束", "", snap.chatStyleGuardEnabled) { status = settings.submit(SettingsUiCommand.StyleGuard(it)).toString() }
+    ZxPage(if (sessionOnly) "个人规则" else "高级设置", onBack = { scope.onBack() }) {
+        Spacer(Modifier.height(8.dp))
+        if (sessionOnly) {
+            ZxSection("对话规则")
+            ZxField(rules, { rules = it }, Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                placeholder = "输入希望助手遵循的规则")
+            ZxButton("保存规则", {
+                status = settings.submit(SettingsUiCommand.Personalization(
+                    rules, snap.autoRecall, snap.autoMemory)).toString()
+            }, Modifier.fillMaxWidth())
+        } else {
+            ZxSection("执行限制")
+            ZxField(main, { main = it }, Modifier.fillMaxWidth(), placeholder = "主任务步数")
+            ZxField(sub, { sub = it }, Modifier.fillMaxWidth(), placeholder = "子任务步数")
+            ZxField(attempts, { attempts = it }, Modifier.fillMaxWidth(), placeholder = "模型尝试次数")
+            ZxButton("保存运行设置", {
+                val m = main.toIntOrNull()
+                val n = sub.toIntOrNull()
+                val a = attempts.toIntOrNull()
+                status = if (m == null || n == null || a == null) "请输入有效整数"
+                else settings.submit(SettingsUiCommand.RuntimeLimits(
+                    m, n, a, snap.modelSelection.workerProfileId)).toString()
+            }, Modifier.fillMaxWidth())
+        }
+        status?.let { ZxFooterNote(it) }
     }
 }
 
