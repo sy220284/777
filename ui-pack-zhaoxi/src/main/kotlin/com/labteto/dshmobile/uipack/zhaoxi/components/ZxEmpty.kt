@@ -21,7 +21,13 @@ import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 
 /** Calm reusable empty state; never implies a capability or a successful operation. */
 @Composable
-fun ZxEmpty(title: String, body: String, modifier: Modifier = Modifier) {
+fun ZxEmpty(
+    title: String,
+    body: String,
+    modifier: Modifier = Modifier,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
     val c = ZhaoxiTheme.colors
     Column(
         modifier.padding(horizontal = 24.dp, vertical = 20.dp),
@@ -37,5 +43,9 @@ fun ZxEmpty(title: String, body: String, modifier: Modifier = Modifier) {
             color = c.ink, textAlign = TextAlign.Center)
         Text(body, fontSize = 13.sp, color = c.ink2,
             lineHeight = 21.sp, textAlign = TextAlign.Center)
+        if (!actionLabel.isNullOrBlank() && onAction != null) {
+            Spacer(Modifier.height(8.dp))
+            ZxButton(actionLabel, onAction, variant = ZxButtonVariant.Outline)
+        }
     }
 }

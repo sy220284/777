@@ -22,7 +22,7 @@ import com.labteto.dshmobile.uicontract.UiSceneId
  */
 object ZhaoxiUiPackManifest {
 
-    /** 朝夕完整形态需要覆盖的 75 个非 hostProvided 场景（与目录逐项 diff 为空）。 */
+    /** 朝夕完整形态需要覆盖的 76 个非 hostProvided 场景（与目录逐项 diff 为空）。 */
     val fullSceneIds: Set<UiSceneId> = setOf(
         // 会话域
         "conversation.chat", "conversation.work", "conversation.header",
@@ -45,13 +45,13 @@ object ZhaoxiUiPackManifest {
         "tools.mcp", "tools.github", "tools.plugins", "media.creation", "media.result",
         // 外壳
         "shell.new_session", "shell.search", "shell.onboarding", "shell.empty", "shell.error",
-        // 设置（22 目的地，含 settings.update SLOT）
+        // 设置（23 目的地，含 settings.update SLOT）
         "settings.root", "settings.session", "settings.appearance", "settings.chat",
         "settings.models", "settings.model_performance", "settings.account",
         "settings.model_usage", "settings.minimax_quota", "settings.pricing",
         "settings.usage", "settings.usage_log", "settings.usage_detail",
         "settings.memory", "settings.memory_settings", "settings.memory_management",
-        "settings.permissions", "settings.notifications", "settings.advanced",
+        "settings.permissions", "settings.approval_mode", "settings.notifications", "settings.advanced",
         "settings.session_storage", "settings.diagnostics", "settings.update",
         // 七顶级路由
         "route.home", "route.persona_gallery", "route.diary", "route.workspace",

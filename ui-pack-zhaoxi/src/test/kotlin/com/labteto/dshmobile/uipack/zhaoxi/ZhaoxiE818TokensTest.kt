@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.uipack.zhaoxi
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiHue
 import com.labteto.dshmobile.uipack.zhaoxi.theme.accentFor
 import com.labteto.dshmobile.uipack.zhaoxi.theme.wallpaperVeilAlpha
@@ -28,6 +29,19 @@ class ZhaoxiE818TokensTest {
         assertEquals(Color(0xFFA896A7), accentFor(ZhaoxiHue.MAUVE, dark = true).accentInk)
         assertEquals(Color(0xFFB29C86), accentFor(ZhaoxiHue.DUSK, dark = true).accentInk)
     }
+    @Test
+    fun lightAccentInkReadableOnWhiteAndSecondarySurface() {
+        for (hue in ZhaoxiHue.entries) {
+            val ink = accentFor(hue, false).accentInk
+            for (bg in listOf(Color.White, Color(0xFFF7F7F7))) {
+                val f = ink.luminance()
+                val b = bg.luminance()
+                val contrast = (maxOf(f, b) + .05f) / (minOf(f, b) + .05f)
+                assertTrue("${hue.key} on $bg: $contrast", contrast >= 4.5f)
+            }
+        }
+    }
+
     @Test
     fun wallpaperVeilAdaptsToRealImageBrightness() {
         assertEquals(.36f, wallpaperVeilAlpha(.1f, lightMode = true, adaptive = false), .0001f)

@@ -4,6 +4,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -71,7 +72,7 @@ fun ZxTopBar(
     }
 }
 
-/** CHAT⇄WORK 模式分段。 */
+/** CHAT⇄WORK 模式切换：280ms 选中态过渡、可打断按压及减弱动效降级。 */
 @Composable
 fun ZxModeSwitch(workMode: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     val c = ZhaoxiTheme.colors
@@ -81,20 +82,57 @@ fun ZxModeSwitch(workMode: Boolean, onChange: (Boolean) -> Unit, modifier: Modif
     ) {
         listOf(false to "聊天", true to "工作").forEach { (w, label) ->
             val on = w == workMode
+            val interaction = remember(w) { MutableInteractionSource() }
+            val bg by androidx.compose.animation.animateColorAsState(
+                targetValue = if (on) c.ink else c.bg2,
+                animationSpec = com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiMotion.spec(
+                    com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiDuration.NORMAL),
+                label = "zxModeBackground",
+            )
+            val fg by androidx.compose.animation.animateColorAsState(
+                targetValue = if (on) c.onInk else c.ink2,
+                animationSpec = com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiMotion.spec(
+                    com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiDuration.NORMAL),
+                label = "zxModeForeground",
+            )
             Box(
                 Modifier
+                    .zxPressSurface(interaction)
                     .clip(RoundedCornerShape(999.dp))
-                    .background(if (on) c.ink else c.bg2)
-                    .clickable(role = Role.Tab) { onChange(w) }
+                    .background(bg)
+                    .clickable(
+                        role = Role.Tab,
+                        interactionSource = interaction,
+                        indication = androidx.compose.foundation.LocalIndication.current,
+                        onClick = { if (!on) onChange(w) },
+                    )
                     .semantics { selected = on }
                     .heightIn(min = 48.dp)
                     .padding(horizontal = 14.dp, vertical = 5.dp),
-            ) { Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (on) c.onInk else c.ink2) }
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = fg)
+            }
         }
     }
 }
 
 data class ZxDrawerEntry(val id: String, val label: String, val badge: String? = null)
+
+/** Search only within the drawer data provided by the Host; never synthesize destinations. */
+internal fun zxFilterDrawerEntries(
+    query: String,
+    groups: List<Pair<String, List<ZxDrawerEntry>>>,
+): List<Pair<String, List<ZxDrawerEntry>>> {
+    val term = query.trim()
+    if (term.isEmpty()) return groups.filter { it.second.isNotEmpty() }
+    return groups.mapNotNull { (heading, entries) ->
+        val matching = if (heading.contains(term, ignoreCase = true)) entries else
+            entries.filter { it.label.contains(term, ignoreCase = true) ||
+                it.badge?.contains(term, ignoreCase = true) == true }
+        if (matching.isEmpty()) null else heading to matching
+    }
+}
 
 /** 抽屉：搜索框 + 分组列表 + 底部通用入口。 */
 @Composable
@@ -107,11 +145,17 @@ fun ZxDrawer(
     modifier: Modifier = Modifier,
 ) {
     val c = ZhaoxiTheme.colors
+    val visibleGroups = remember(query, groups) { zxFilterDrawerEntries(query, groups) }
     Column(modifier.background(c.side).padding(12.dp)) {
-        ZxField(query, onQuery, Modifier.fillMaxWidth(), placeholder = "搜索人物、会话、任务、文件")
+        ZxField(query, onQuery, Modifier.fillMaxWidth(), placeholder = "筛选当前列表")
         Spacer(Modifier.height(8.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            groups.forEach { (group, entries) ->
+            if (visibleGroups.isEmpty()) {
+                ZxEmpty("没有匹配的结果", "试试其他关键词")
+                ZxButton("清除筛选", { onQuery("") }, Modifier.fillMaxWidth(),
+                    variant = ZxButtonVariant.Outline)
+            }
+            visibleGroups.forEach { (group, entries) ->
                 ZxSection(group)
                 entries.forEach { e ->
                     val interaction = remember(e.id) { MutableInteractionSource() }

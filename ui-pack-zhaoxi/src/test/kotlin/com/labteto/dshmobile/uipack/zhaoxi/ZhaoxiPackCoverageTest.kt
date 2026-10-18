@@ -11,7 +11,7 @@ import org.junit.Assert.assertTrue
  *
  * 对齐主线 V6 的 V6FullSceneCoverageTest 职责：在包侧自证
  * manifest/renderers 双向一致、不越界声明 hostProvided 场景、
- * 场景全集不超出 75 个非 hostProvided 目标清单。
+ * 场景全集不超出 76 个非 hostProvided 目标清单。
  * E8.14 起 renderers 全部为 Zx* 实装分发（占位渲染已移除）。
  * Host 目录的逐项对照（SceneCatalog 级）属 app 模块测试，接入时补齐。
  */
@@ -23,7 +23,7 @@ class ZhaoxiPackCoverageTest {
 
     @Test
     fun fullInventoryMatchesMergedCatalog() {
-        assertEquals("朝夕 75 场景目标清单与 LocalUiSceneCatalog 非 hostProvided 全集不一致", 75, ZhaoxiUiPackManifest.fullSceneIds.size)
+        assertEquals("朝夕 76 场景目标清单与 LocalUiSceneCatalog 非 hostProvided 全集不一致", 76, ZhaoxiUiPackManifest.fullSceneIds.size)
         assertEquals("朝夕 37 能力目标清单与 LocalUiConnectedCapabilities 投影不一致", 37, ZhaoxiUiPackManifest.fullCapabilityIds.size)
     }
 

@@ -1,5 +1,10 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.compose.ui.platform.LocalContext
+import android.text.format.DateFormat
+import android.app.TimePickerDialog
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -10,6 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -18,6 +28,11 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,7 +64,14 @@ import com.labteto.dshmobile.uihost.UiSceneRenderScope
 
 /** route.settings — 按 E8.18 四大信息域组织设置入口。 */
 @Composable
-fun ZhaoxiSettingsHomeScene(scope: UiSceneRenderScope) {
+fun ZhaoxiSettingsHomeScene(
+    scope: UiSceneRenderScope,
+    updateStatus: kotlinx.coroutines.flow.StateFlow<String?>? = null,
+    checkForUpdate: (() -> Unit)? = null,
+    settingsOwner: SettingsUiPort? = null,
+) {
+    val updateFlow = updateStatus ?: remember { kotlinx.coroutines.flow.MutableStateFlow<String?>(null) }
+    val currentUpdateStatus by updateFlow.collectAsState()
     ZxPage("设置", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("对话与体验")
@@ -57,8 +79,6 @@ fun ZhaoxiSettingsHomeScene(scope: UiSceneRenderScope) {
         ZxNavRow("聊天风格", sub = "过滤词 · 命中记录") { scope.onNavigate(UiSceneId("settings.chat")) }
         ZxNavRow("个人规则") { scope.onNavigate(UiSceneId("settings.session")) }
         ZxNavRow("记忆", sub = "记忆概览 · 管理") { scope.onNavigate(UiSceneId("settings.memory")) }
-        ZxNavRow("通知", sub = "提醒种类 · 免打扰") { scope.onNavigate(UiSceneId("settings.notifications")) }
-
         ZxSection("模型与账户")
         ZxNavRow("模型", sub = "当前模型 · API Key · 协议") { scope.onNavigate(UiSceneId("settings.models")) }
         ZxNavRow("模型性能", sub = "推理强度 · 温度") { scope.onNavigate(UiSceneId("settings.model_performance")) }
@@ -66,13 +86,22 @@ fun ZhaoxiSettingsHomeScene(scope: UiSceneRenderScope) {
         ZxNavRow("套餐额度", sub = "MiniMax 模型额度") { scope.onNavigate(UiSceneId("settings.minimax_quota")) }
 
         ZxSection("Agent 与安全")
+        settingsOwner?.let {
+            ZxNavRow("操作审批模式") { scope.onNavigate(UiSceneId("settings.approval_mode")) }
+        }
         ZxNavRow("权限与设备", sub = "通知与媒体权限状态") { scope.onNavigate(UiSceneId("settings.permissions")) }
+        ZxNavRow("通知", sub = "提醒类型 · 免打扰") { scope.onNavigate(UiSceneId("settings.notifications")) }
 
         ZxSection("数据与系统")
         ZxNavRow("用量统计", sub = "模型消耗 · 请求记录") { scope.onNavigate(UiSceneId("settings.usage")) }
         ZxNavRow("会话存储", sub = "占用空间 · 压缩 · 导出") { scope.onNavigate(UiSceneId("settings.session_storage")) }
         ZxNavRow("高级设置", sub = "运行限制") { scope.onNavigate(UiSceneId("settings.advanced")) }
-        ZxNavRow("检查更新") { scope.onNavigate(UiSceneId("settings.diagnostics")) }
+        if (checkForUpdate != null) {
+            ZxNavRow("检查更新", sub = "直接向应用更新服务检查新版本") { checkForUpdate() }
+            currentUpdateStatus?.takeIf(String::isNotBlank)?.let { ZxFooterNote(it) }
+        } else {
+            ZxFooterNote("当前构建未提供应用内更新检查")
+        }
     }
 }
 
@@ -88,13 +117,9 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
         ambientGlow: Float = snap.ambientGlow,
         transparency: Float = snap.transparency,
         motionScale: Float = snap.motionScale,
-        textWeight: Int = snap.textWeight,
-        adaptiveContrast: Boolean = snap.adaptiveContrast,
-        presetWallpaperEnabled: Boolean = snap.presetWallpaperEnabled,
     ) {
-        jobs.launch { preferences.submit(UiHostPreferencesCommand.Appearance(theme, accent, textScale, textWeight,
-            transparency, ambientGlow, snap.componentEmphasis, motionScale, adaptiveContrast,
-            presetWallpaperEnabled)) }
+        jobs.launch { preferences.submit(UiHostPreferencesCommand.Appearance(theme, accent, textScale, snap.textWeight,
+            transparency, ambientGlow, snap.componentEmphasis, motionScale, snap.adaptiveContrast)) }
     }
     var glow by remember(snap.ambientGlow) { mutableFloatStateOf(snap.ambientGlow) }
     var glass by remember(snap.transparency) { mutableFloatStateOf(snap.transparency) }
@@ -124,12 +149,6 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
             labels = listOf("小", "标准", "大"),
             onChange = { v -> writeAppearance(textScale = listOf(0.9f, 1f, 1.3f)[v]) },
         )
-        ZxSection("字重")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(0 to "常规字重", 1 to "略粗", 2 to "加粗").forEach { (value, label) ->
-                ZxChip(label, snap.textWeight == value) { writeAppearance(textWeight = value) }
-            }
-        }
         ZxSection("背景与材质")
         ZxSwitchRow("启用主题壁纸", "开启后显示选中的壁纸；自动模式随主题和明暗切换",
             snap.presetWallpaperEnabled) { writeAppearance(presetWallpaperEnabled = it) }
@@ -194,12 +213,18 @@ fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneR
             ))) "已保存" else "未能保存通知设置"
         }
     }
-    fun minutes(text: String): Int? {
-        val match = Regex("^(\\d{1,2}):(\\d{2})$").matchEntire(text.trim()) ?: return null
-        val h = match.groupValues[1].toInt()
-        val m = match.groupValues[2].toInt()
-        return if (h in 0..23 && m in 0..59) h * 60 + m else null
+    val deviceContext = LocalContext.current
+    fun chooseQuietTime(start: Boolean) {
+        val current = zxTimeOfDayMinutes(if (start) startTime else endTime) ?: if (start) 22 * 60 else 7 * 60
+        TimePickerDialog(deviceContext, { _, hour, minute ->
+            val formatted = "%02d:%02d".format(hour, minute)
+            if (start) startTime = formatted else endTime = formatted
+            triedQuietSave = false
+            status = null
+        }, current / 60, current % 60, DateFormat.is24HourFormat(deviceContext)).show()
     }
+    var triedQuietSave by remember { mutableStateOf(false) }
+    val quietError = if (triedQuietSave) zxQuietHoursError(startTime, endTime) else null
     ZxPage("通知", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("提醒类型")
@@ -213,15 +238,26 @@ fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneR
         if (snap.quietEnabled) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
-                    startTime, { startTime = it }, Modifier.weight(1f), placeholder = "开始 HH:mm")
+                    startTime, { startTime = it }, Modifier.weight(1f), placeholder = "开始 HH:mm",
+                    error = quietError != null, errorMessage = quietError)
                 com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
-                    endTime, { endTime = it }, Modifier.weight(1f), placeholder = "结束 HH:mm")
+                    endTime, { endTime = it }, Modifier.weight(1f), placeholder = "结束 HH:mm",
+                    error = quietError != null, errorMessage = quietError)
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ZxButton("选择开始时间", { chooseQuietTime(true) },
+                    Modifier.weight(1f), variant = com.labteto.dshmobile.uipack.zhaoxi.components.ZxButtonVariant.Outline)
+                ZxButton("选择结束时间", { chooseQuietTime(false) },
+                    Modifier.weight(1f), variant = com.labteto.dshmobile.uipack.zhaoxi.components.ZxButtonVariant.Outline)
+            }
+            quietError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
             ZxButton("保存免打扰时间", {
-                val start = minutes(startTime)
-                val end = minutes(endTime)
-                if (start == null || end == null) status = "请输入正确时间（00:00–23:59）"
-                else update(start = start, end = end)
+                triedQuietSave = true
+                val problem = zxQuietHoursError(startTime, endTime)
+                if (problem != null) status = problem
+                else update(
+                    start = requireNotNull(zxTimeOfDayMinutes(startTime)),
+                    end = requireNotNull(zxTimeOfDayMinutes(endTime)))
             })
         }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
@@ -231,12 +267,26 @@ fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneR
 
 /** settings.permissions — 呈现真实系统权限事实，跳转系统授权页而不伪造开关。 */
 @Composable
-fun ZhaoxiPermissionsScene(preferences: HostPreferencesUiPort, scope: UiSceneRenderScope, settings: SettingsUiPort? = null) {
-    val notification = preferences.notificationPermissionGranted()
-    val media = preferences.mediaPermissionSnapshot()
+fun ZhaoxiPermissionsScene(preferences: HostPreferencesUiPort, scope: UiSceneRenderScope) {
+    // Android permissions may change outside this process in system Settings.
+    // Invalidate the read-only Host snapshot on every foreground resume.
+    val owner = LocalLifecycleOwner.current
+    var permissionRevision by remember { mutableIntStateOf(0) }
+    DisposableEffect(owner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) permissionRevision++
+        }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
+    }
+    val notification = remember(preferences, permissionRevision) {
+        preferences.notificationPermissionGranted()
+    }
+    val media = remember(preferences, permissionRevision) {
+        preferences.mediaPermissionSnapshot()
+    }
     ZxPage("权限与设备", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        settings?.let { ZhaoxiApprovalModeSelector(it) }
         ZxSection("系统通知")
         ZxValueRow("通知权限", value = when (notification) {
             true -> "已授权"
