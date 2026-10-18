@@ -192,7 +192,6 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     }
 }
 
-@Composable
 /** Dedicated account management, separate from API model configuration. */
 internal fun zxChatGptAccountAuthLabel(account: com.labteto.dshmobile.local.model.chatgpt.ChatGptAccountSummary): String = when {
     !account.signedIn -> "登录凭据已失效"
@@ -200,6 +199,7 @@ internal fun zxChatGptAccountAuthLabel(account: com.labteto.dshmobile.local.mode
     else -> "已登录 · 套餐授权已启用"
 }
 
+@Composable
 fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val snap by settings.chatGptState.collectAsState()
     val jobs = rememberCoroutineScope()
