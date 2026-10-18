@@ -336,9 +336,11 @@ class ZhaoxiApplicationScenePack(
                     else -> ZhaoxiMessageActionsScene(msg, scope,
                         onEdit = { scope.onNavigate(UiSceneId("conversation.edit")) },
                         onRegenerate = {
-                            if (workMode) activeIdentity?.let { conv!!.work.submit(WorkConversationUiCommand.RegenerateReply(it, msg.id)) }
-                            else activeIdentity?.let { conv!!.chat.submit(ChatUiCommand.RegenerateReply(it, msg.id)) }
-                            scope.onBack()
+                            when {
+                                activeIdentity == null -> UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                                workMode -> conv!!.work.submit(WorkConversationUiCommand.RegenerateReply(activeIdentity, msg.id))
+                                else -> conv!!.chat.submit(ChatUiCommand.RegenerateReply(activeIdentity, msg.id))
+                            }
                         })
                 }
             }
