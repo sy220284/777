@@ -215,6 +215,7 @@ class ZhaoxiAcceptanceAndroidTest {
         val ports = ready()
         compose.onNodeWithText("设置").performClick()
         compose.onNodeWithText("记忆").performClick()
+        compose.onNodeWithText("记忆设置").performClick()
         val old = runBlocking { ports.settingsUiPort.state.first { !it.loading }.autoMemory }
         val control = compose.onNodeWithContentDescription("自动记忆")
         control.performScrollTo()
