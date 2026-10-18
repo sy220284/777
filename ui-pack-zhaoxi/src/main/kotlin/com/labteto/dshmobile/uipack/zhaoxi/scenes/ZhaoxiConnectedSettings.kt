@@ -171,7 +171,7 @@ fun ZhaoxiQuotaScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                     model.weeklyResetMillis?.let { ZxValueRow("每周重置", value = quotaResetLabel(it)) }
                 }
             }
-            null -> if (profile != null && !busy && error == null) ZxFooterNote("点击刷新额度，查询结果将按金额或 Token 套餐结构展示")
+            null -> if (profile != null && !busy && error == null) ZxFooterNote("点击刷新额度")
         }
     }
 }

@@ -314,7 +314,7 @@ fun ZhaoxiAutomationEditorScene(
                     }
                 }
             }, Modifier.fillMaxWidth(), enabled = !busy && prompt.isNotBlank(), loading = busy)
-    
+
         }
     }
 }
@@ -413,7 +413,7 @@ fun ZhaoxiToolsScene(
                         } }
                     }
                 }
-        
+
             }
             "tools.plugins" -> {
                 ZxSection("已安装插件")
@@ -435,7 +435,7 @@ fun ZhaoxiToolsScene(
                             refresh++
                         } })
                     }
-        
+
             }
             "tools.github" -> {
                 ZxSection("连接状态")
@@ -471,7 +471,7 @@ fun ZhaoxiToolsScene(
                     onClick = { scope.onNavigate(UiSceneId("tools.plugins")) })
                 ZxRow("GitHub", if (githubConfigured) "已配置" else "未配置",
                     onClick = { scope.onNavigate(UiSceneId("tools.github")) })
-        
+
             }
         }
     }

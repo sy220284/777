@@ -33,6 +33,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
     var busy by remember { mutableStateOf(false) }
     var selected by rememberSaveable(sessionId) { mutableStateOf<String?>(null) }
     var pendingDelete by remember { mutableStateOf<String?>(null) }
+    var pendingRegenerate by remember { mutableStateOf<String?>(null) }
     var galleryPicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val jobs = rememberCoroutineScope()
@@ -64,7 +65,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
     ZxPage(if (resultsOnly) "媒体结果" else "媒体生成", onBack = { scope.onBack() }) {
         status?.let { ZxBanner(it, ZxTone.Info) }
         if (sessionId.isBlank()) {
-            ZxEmpty("请先打开会话", "选择会话后继续媒体生成和查看结果")
+            ZxEmpty("请先打开会话", "选择会话后继续")
         } else if (!resultsOnly) {
         ZxNavRow("历史结果", sub = "${page.results.size} 项") {
             scope.onNavigate(UiSceneId("media.result"))
@@ -161,22 +162,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
             ZxSection("作品操作")
             ZxButton("保存到文件", { export(result.id to sessionId) })
             ZxButton("分享", { execute { shareUiMedia(context, media, result.id, sessionId); "已打开系统分享" } })
-            ZxButton("重新生成", {
-                val original = offers.firstOrNull { it.profile.id == result.profileId && it.model == result.model }
-                if (original == null) status = "原模型配置已不可用"
-                else execute {
-                    if (!media.hasMatchingCredential(original, result.credentialSignature)) "原账户凭据已变更，请重新选择生成配置"
-                    else {
-                        val cmd = when (original.kind) {
-                            LocalMediaKind.IMAGE -> MediaUiCommand.Image(original, result.description.orEmpty(), result.imageRatio ?: "1:1", sessionId, revisionOf = result.id)
-                            LocalMediaKind.SPEECH -> MediaUiCommand.Speech(original, result.description.orEmpty(), result.voiceId.orEmpty(), sessionId, revisionOf = result.id)
-                            LocalMediaKind.VIDEO -> MediaUiCommand.Video(original, result.description.orEmpty(), sessionId, revisionOf = result.id)
-                            LocalMediaKind.TRANSCRIBE -> return@execute "转写需要重新选择源音频"
-                        }
-                        receiptText(media.submit(cmd))
-                    }
-                }
-            })
+            ZxButton("再次生成", { pendingRegenerate = result.id }, enabled = !busy)
             if (result.kind.uppercase() == "IMAGE" && gallery != null && portraits != null)
                 ZxButton("存为人物画像", { galleryPicker = !galleryPicker })
             if (galleryPicker && gallery != null && portraits != null) {
@@ -192,6 +178,32 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
             ZxButton("删除结果", { pendingDelete = result.id },
                 variant = ZxButtonVariant.Danger)
         }
+        }
+        pendingRegenerate?.let { resultId ->
+            val previous = page.results.firstOrNull { it.id == resultId }
+            if (previous != null) ZxDialog(
+                "再次调用模型？", "可能产生额外费用。", "继续生成",
+                {
+                    pendingRegenerate = null
+                    val result = previous
+                    val original = offers.firstOrNull { it.profile.id == result.profileId && it.model == result.model }
+                if (original == null) status = "原模型配置已不可用"
+                else execute {
+                    if (!media.hasMatchingCredential(original, result.credentialSignature)) "原账户凭据已变更，请重新选择生成配置"
+                    else {
+                        val cmd = when (original.kind) {
+                            LocalMediaKind.IMAGE -> MediaUiCommand.Image(original, result.description.orEmpty(), result.imageRatio ?: "1:1", sessionId, revisionOf = result.id)
+                            LocalMediaKind.SPEECH -> MediaUiCommand.Speech(original, result.description.orEmpty(), result.voiceId.orEmpty(), sessionId, revisionOf = result.id)
+                            LocalMediaKind.VIDEO -> MediaUiCommand.Video(original, result.description.orEmpty(), sessionId, revisionOf = result.id)
+                            LocalMediaKind.TRANSCRIBE -> return@execute "转写需要重新选择源音频"
+                        }
+                        receiptText(media.submit(cmd))
+                    }
+                }
+
+                },
+                { pendingRegenerate = null },
+            )
         }
         pendingDelete?.let { id -> ZxDialog("删除媒体结果？", "删除本地结果无法恢复", "删除", {
             pendingDelete = null; execute { receiptText(media.submit(MediaUiCommand.RemoveResult(id))) }

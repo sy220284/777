@@ -120,13 +120,13 @@ fun ZhaoxiUsageLogScene(
             }
         }
         ZxSection("最近请求")
-        if (current.recentRecords.isEmpty()) ZxEmpty("暂无请求记录", "只有 Owner 已记录的请求才会出现在这里")
+        if (current.recentRecords.isEmpty()) ZxEmpty("暂无请求记录", "完成模型请求后可查看明细")
         current.recentRecords.forEach { record ->
             ZxRow(record.model, "${record.context.action.name} · ${record.totalTokens} Token · ¥${"%.4f".format(record.estimatedCostCny)}",
                 onClick = { openRequest(record.requestId) })
         }
         if (current.tracked.unreportedRequestCount > 0) {
-            ZxFooterNote("未上报的请求不会被推测为已知用量")
+            ZxFooterNote("部分请求未上报准确用量")
         }
     }
 }
@@ -179,7 +179,7 @@ fun ZhaoxiMemoryOverviewScene(memory: MemoryUiPort, settings: SettingsUiPort?, s
         ZxNavRow("记忆管理", sub = "搜索 · 修改 · 遗忘") {
             scope.onNavigate(UiSceneId("settings.memory_management"))
         }
-        ZxFooterNote("这里只显示全局作用域统计；人物/项目记忆不会被混入全局数字")
+
     }
 }
 
@@ -240,7 +240,7 @@ fun ZhaoxiMemorySettingsScene(settings: SettingsUiPort, scope: UiSceneRenderScop
             status = settings.submit(SettingsUiCommand.Personalization(snap.userRules, snap.autoRecall, it)).toString()
         }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        ZxFooterNote("仅管理偏好，不重建人物/项目作用域的数据事实")
+
     }
 }
 
@@ -259,6 +259,6 @@ fun ZhaoxiApprovalModeSelector(settings: SettingsUiPort) {
             status = settings.submit(SettingsUiCommand.ApprovalMode(candidate)).toString()
         }
     }
-    ZxFooterNote("审批策略由原 Owner 执行；此开关不授予新设备权限")
+    ZxFooterNote("审批模式不会修改系统权限")
     status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
 }
