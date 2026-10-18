@@ -631,18 +631,18 @@ fun ZhaoxiMemoryManagementScene(memory: MemoryUiPort, scope: UiSceneRenderScope,
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ZxChip("全部", kindFilter == null) { changeFilter { kindFilter = null } }
             MemoryKind.entries.forEach { kind ->
-                ZxChip(kind.name, kindFilter == kind) { changeFilter { kindFilter = kind } }
+                ZxChip(zxMemoryKindTitle(kind), kindFilter == kind) { changeFilter { kindFilter = kind } }
             }
         }
         ZxValueRow("符合条件", value = "${page.totalMatching} 条")
         if (kindFilter == null) page.kindCounts.filterValues { it > 0 }.forEach { (kind, count) ->
-            ZxValueRow(kind.name, value = count.toString())
+            ZxValueRow(zxMemoryKindTitle(kind), value = count.toString())
         }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
         if (page.records.isEmpty()) ZxEmpty("没有匹配的记忆", "可以调整搜索条件")
         page.records.forEach { record ->
             val opened = selectedRecordId == record.id
-            ZxRow(record.kind.name, record.content.take(95) +
+            ZxRow(zxMemoryKindTitle(record.kind), record.content.take(95) +
                 if (record.pinned) " · 已置顶" else "", onClick = {
                     if (editingDirty && !opened) status = "请先保存当前编辑"
                     else { selectedRecordId = if (opened) null else record.id; editingDirty = false }
@@ -655,7 +655,7 @@ fun ZhaoxiMemoryManagementScene(memory: MemoryUiPort, scope: UiSceneRenderScope,
             if (opened) {
                 var text by rememberUiPrivateText("zhaoxi.memory.${record.id}", record.updatedAt) { record.content }
                 ZxSettingsGroup {
-                    ZxValueRow("记忆类型", value = record.kind.name)
+                    ZxValueRow("记忆类型", value = zxMemoryKindTitle(record.kind))
                     ZxValueRow("披露范围", value = record.disclosure.name)
                     ZxField(text, { text = it; editingDirty = it != record.content },
                         Modifier.fillMaxWidth().heightIn(min = 112.dp))
