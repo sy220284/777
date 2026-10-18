@@ -6,6 +6,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,10 +17,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +36,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.labteto.dshmobile.uipack.zhaoxi.components.zxPressSurface
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 import com.labteto.dshmobile.uipack.zhaoxi.theme.zhaoxiWallpaperPresets
 import kotlinx.coroutines.Dispatchers
@@ -71,12 +76,15 @@ internal fun ZhaoxiWallpaperPicker(selectedPreset: String, onSelect: (String) ->
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
         entries.forEach { (key, name) ->
             val active = selectedPreset == key
+            val interaction = remember(key) { MutableInteractionSource() }
             Column(
                 Modifier.width(102.dp)
+                    .zxPressSurface(interaction)
                     .clip(RoundedCornerShape(14.dp))
                     .border(BorderStroke(if (active) 2.dp else 1.dp, if (active) c.accent else c.line),
                         RoundedCornerShape(14.dp))
-                    .clickable(role = Role.RadioButton) { onSelect(key) }
+                    .clickable(interactionSource = interaction, indication = LocalIndication.current,
+                        role = Role.RadioButton) { onSelect(key) }
                     .semantics { selected = active }
                     .padding(5.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -95,6 +103,10 @@ internal fun ZhaoxiWallpaperPicker(selectedPreset: String, onSelect: (String) ->
                     )
                     else if (key == "auto") Text("自动", color = c.ink, fontSize = 17.sp)
                     else Text("加载中", color = c.ink2, fontSize = 11.sp)
+                    if (active) Text("✓",
+                        modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
+                            .clip(CircleShape).background(c.card).padding(horizontal = 5.dp, vertical = 1.dp),
+                        color = c.accentInk, fontSize = 12.sp)
                 }
                 Text(name, color = if (active) c.accentInk else c.ink2,
                     fontSize = 11.sp, maxLines = 1)
