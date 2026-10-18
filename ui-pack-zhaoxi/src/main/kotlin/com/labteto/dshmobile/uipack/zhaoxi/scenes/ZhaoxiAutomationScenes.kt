@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
 import androidx.compose.foundation.layout.FlowRow
+import com.labteto.dshmobile.automation.AutomationStatus
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.uicontract.AutomationUiReceipt
@@ -103,7 +104,7 @@ fun ZhaoxiAutomationTasksScene(
             ) {
                 ZxRow(
                     task.prompt.take(100),
-                    "${if (task.mode == AutomationMode.CHAT) "聊天" else "工作"} · ${task.status.wireValue} · ${task.scheduleType.name}",
+                    "${if (task.mode == AutomationMode.CHAT) "聊天" else "工作"} · ${task.status.zxAutomationStatusLabel()} · ${task.scheduleType.zxAutomationScheduleLabel()}",
                     onClick = { onOpenEditor(task.id) },
                 )
                 task.lastError?.takeIf(String::isNotBlank)?.let { error ->
@@ -115,7 +116,7 @@ fun ZhaoxiAutomationTasksScene(
                     val result = receipt.errorPreview?.take(120)
                         ?: receipt.resultPreview?.take(120) ?: "未提供运行摘要"
                     ZxValueRow(if (index == 0) "最近执行" else "较早执行 ${index + 1}",
-                        value = receipt.status.wireValue, sub = result)
+                        value = receipt.status.zxAutomationStatusLabel(), sub = result)
                 }
                 if (task.failureStreak > 0) {
                     val policy = when {
@@ -457,7 +458,7 @@ fun ZhaoxiPersonaInteractionScene(
             if (tasks.isEmpty()) ZxEmpty("暂无互动任务", "可以为当前聊天创建提醒或互动")
             tasks.forEach { task ->
                 ZxRow(task.prompt.take(100),
-                    "${task.status.wireValue} · ${task.scheduleType.name}",
+                    "${task.status.zxAutomationStatusLabel()} · ${task.scheduleType.zxAutomationScheduleLabel()}",
                     onClick = { onEdit(task.id) })
             }
             ZxButton("新建互动", onCreate, Modifier.fillMaxWidth())
@@ -591,4 +592,30 @@ fun ZhaoxiToolsScene(
             }
         }
     }
+}
+
+
+/** Display-only labels. Decisions and status transitions remain owned by AutomationUiPort. */
+internal fun AutomationStatus.zxAutomationStatusLabel(): String = when (this) {
+    AutomationStatus.SCHEDULED -> "已计划"
+    AutomationStatus.RUNNING -> "运行中"
+    AutomationStatus.WAITING_USER -> "等待处理"
+    AutomationStatus.PAUSED -> "已暂停"
+    AutomationStatus.BLOCKED -> "已受阻"
+    AutomationStatus.FAILED -> "执行失败"
+    AutomationStatus.COMPLETED -> "已完成"
+    AutomationStatus.CANCELLED -> "已取消"
+    AutomationStatus.SKIPPED -> "已跳过"
+    AutomationStatus.QUEUED -> "排队中"
+}
+
+internal fun AutomationScheduleType.zxAutomationScheduleLabel(): String = when (this) {
+    AutomationScheduleType.LEGACY -> "旧版周期"
+    AutomationScheduleType.ONCE -> "单次"
+    AutomationScheduleType.INTERVAL -> "固定间隔"
+    AutomationScheduleType.DAILY -> "每天"
+    AutomationScheduleType.WEEKLY -> "每周"
+    AutomationScheduleType.MONTHLY -> "每月"
+    AutomationScheduleType.SILENCE -> "沉默后"
+    AutomationScheduleType.WINDOW -> "指定时段"
 }
