@@ -56,7 +56,8 @@ data class UiMessageBranch(val index: Int, val count: Int)
 /** Transient owner-scoped model text. Durable transcript replaces it when committed. */
 data class UiStreamingReplyPreview(val requestId: String, val text: String)
 data class UiMessageSnapshot(val id: String, val role: UiMessageRole, val text: String, val createdAt: Long,
-    val editableText: String? = null, val branch: UiMessageBranch? = null, val proactive: Boolean = false)
+    val editableText: String? = null, val branch: UiMessageBranch? = null, val proactive: Boolean = false,
+    val progressive: Boolean = false)
 
 /** Chat-owned read-only group facts; there is no implicit group administration command. */
 data class UiChatGroupSummary(val memberNames: List<String>)
