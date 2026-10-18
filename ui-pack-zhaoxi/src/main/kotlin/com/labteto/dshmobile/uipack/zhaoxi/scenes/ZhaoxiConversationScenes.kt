@@ -435,12 +435,12 @@ private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<Ui
                             } else if (entry.stages.isEmpty()) ZxTypingIndicator()
                         }
                         // The single compact, collapsible Work status shares the reply slot.
-                        workByTurn[entry.anchorId]?.let { card ->
+                        entry.anchorId?.let { anchor -> workByTurn[anchor] }?.let { card ->
                             ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
                                 onAction = { _, _ -> UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED) },
                                 media = media)
                         }
-                        allCardsBySource[entry.anchorId].orEmpty()
+                        entry.anchorId?.let { allCardsBySource[it] }.orEmpty()
                             .filterNot { it.document.isInlineWorkTaskCard() }
                             .forEach { card ->
                                 ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
