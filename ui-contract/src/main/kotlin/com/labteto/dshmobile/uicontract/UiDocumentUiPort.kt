@@ -87,6 +87,8 @@ sealed interface UiDocumentReceipt {
 interface UiDocumentUiPort {
     val snapshots: Flow<UiDocumentsSceneSnapshot>
     fun snapshot(): UiDocumentsSceneSnapshot
+    /** Read-only cold-page projection for earlier visible transcript messages, identity fenced by Owner. */
+    suspend fun documentsForMessages(identity: UiSessionIdentity, messageIds: Set<String>): List<UiDocumentSnapshot> = emptyList()
     suspend fun generateLocal(command: GenerateLocalUiDocumentCommand): UiDocumentReceipt
     suspend fun generate(command: GenerateUiDocumentCommand): UiDocumentReceipt
     suspend fun delete(command: DeleteUiDocumentCommand): UiDocumentReceipt
