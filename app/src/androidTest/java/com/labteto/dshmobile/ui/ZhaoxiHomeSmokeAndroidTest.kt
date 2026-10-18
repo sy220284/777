@@ -5,6 +5,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import com.labteto.dshmobile.MainActivity
 import org.junit.Rule
@@ -31,7 +32,7 @@ class ZhaoxiHomeSmokeAndroidTest {
         compose.onNode(hasSetTextAction()).performTextInput("待发送的草稿")
         compose.activityRule.scenario.recreate()
         compose.onNode(hasSetTextAction()).assertTextEquals("待发送的草稿")
-        compose.onNodeWithText("返回").performClick()
+        compose.onNodeWithContentDescription("返回会话列表").performClick()
         compose.onNodeWithText("聊天").performClick()
         compose.onNode(hasSetTextAction()).assertTextEquals("待发送的草稿")
     }
