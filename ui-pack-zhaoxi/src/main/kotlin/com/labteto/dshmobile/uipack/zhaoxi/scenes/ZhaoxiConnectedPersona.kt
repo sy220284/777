@@ -56,7 +56,6 @@ internal fun UiCurrentPersonaReceipt.zxTuningFeedback(): String = when (this) {
 
 /** 设计包 E8.18：字段标签始终可见，存储键保持原契约不变。 */
 private fun personaFieldTitle(key: String): String = when (key) {
-    "opening" -> "开场对白"
     "personality" -> "性格特征"
     "valuesAndTradeoffs" -> "价值取向与取舍"
     "selfNarrative" -> "自我认知"
@@ -70,6 +69,13 @@ private fun personaFieldTitle(key: String): String = when (key) {
     else -> key
 }
 
+/** The E8.18 primary editor consists of 3 identity fields plus 10 canonical fact fields. */
+internal fun zxPersonaMainEditorKeys(): List<String> =
+    listOf("name", "coreIdentity", "franchise") + UI_PERSONA_FACT_FIELDS
+
+internal fun zxPersonaCanonicalDraft(draft: UiPersonaDraft): UiPersonaDraft =
+    draft.copy(fields = draft.fields.filterKeys { it in UI_PERSONA_FACT_FIELDS })
+
 @Composable
 private fun ZhaoxiPersonaField(title: String, value: String, onChange: (String) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -81,7 +87,7 @@ private fun ZhaoxiPersonaField(title: String, value: String, onChange: (String) 
 @Composable
 fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAuthoringSnapshot?, scope: UiSceneRenderScope, initialTab: Int = 0) {
     var encodedDraft by rememberUiPrivateText("zhaoxi.persona.${snapshot?.galleryId ?: "new"}", snapshot?.revision) {
-        Json.encodeToString(snapshot?.draft ?: UiPersonaDraft())
+        Json.encodeToString(zxPersonaCanonicalDraft(snapshot?.draft ?: UiPersonaDraft()))
     }
     val draftState = object : MutableState<UiPersonaDraft> {
         override var value: UiPersonaDraft
@@ -106,17 +112,41 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
                 Text(if (galleryId == null) "新建人物 · 尚未归档" else "已关联人物归档", color = ZhaoxiTheme.colors.ink2)
             }
         }
-        ZxTabRow(listOf("核心身份", "事实", "世界书", "行为调节"), selectedTab) { selectedTab = it }
+        ZxTabRow(listOf("核心档案", "独立事实", "世界书", "表达与边界"), selectedTab) { selectedTab = it }
         when (selectedTab) {
             0 -> {
         ZhaoxiPersonaField("姓名", draft.name) { draft = draft.copy(name = it) }
         ZhaoxiPersonaField("核心身份", draft.coreIdentity) { draft = draft.copy(coreIdentity = it) }
         ZhaoxiPersonaField("作品 / 世界", draft.franchise) { draft = draft.copy(franchise = it) }
-        (listOf("opening") + UI_PERSONA_FACT_FIELDS + draft.fields.keys).distinct().forEach { field ->
+        ZxSection("性格与价值")
+        listOf("personality", "valuesAndTradeoffs").forEach { field ->
             ZhaoxiPersonaField(personaFieldTitle(field), draft.fields[field].orEmpty()) { value ->
                 draft = draft.copy(fields = draft.fields + (field to value))
             }
         }
+        ZxSection("自我认知")
+        listOf("selfNarrative", "subjectiveBeliefs", "identityGap").forEach { field ->
+            ZhaoxiPersonaField(personaFieldTitle(field), draft.fields[field].orEmpty()) { value ->
+                draft = draft.copy(fields = draft.fields + (field to value))
+            }
+        }
+        ZxSection("日常与表达")
+        listOf("preferencesAndHabits", "voiceStyle").forEach { field ->
+            ZhaoxiPersonaField(personaFieldTitle(field), draft.fields[field].orEmpty()) { value ->
+                draft = draft.copy(fields = draft.fields + (field to value))
+            }
+        }
+        ZxSection("经历与关系")
+        listOf("biography", "relationships").forEach { field ->
+            ZhaoxiPersonaField(personaFieldTitle(field), draft.fields[field].orEmpty()) { value ->
+                draft = draft.copy(fields = draft.fields + (field to value))
+            }
+        }
+        ZxSection("补充设定")
+        ZhaoxiPersonaField("补充事实", draft.fields["customFacts"].orEmpty()) { value ->
+            draft = draft.copy(fields = draft.fields + ("customFacts" to value))
+        }
+        ZxFooterNote("人物主档案共 13 个正式字段；额外事实、世界书与采样偏好从上方页签管理。")
             }
             1 -> {
         draft.facts.forEachIndexed { index, fact ->
@@ -146,7 +176,7 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
         }
         ZxButton("保存归档", { jobs.launch {
             val id = galleryId; val rev = revision
-            val result = if (id != null && rev != null) authoring.save(id, rev, draft) else authoring.create(draft)
+            val result = if (id != null && rev != null) authoring.save(id, rev, zxPersonaCanonicalDraft(draft)) else authoring.create(zxPersonaCanonicalDraft(draft))
             when (result) {
                 is UiPersonaAuthoringReceipt.Saved -> { galleryId = result.galleryId; revision = result.revision; status = "归档已保存；应用到会话请从人物档案选择"; scope.onBack() }
                 else -> status = result.zxAuthoringFeedback()
