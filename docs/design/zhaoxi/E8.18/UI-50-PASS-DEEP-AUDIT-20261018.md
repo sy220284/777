@@ -48,3 +48,18 @@
 | 28 | 图片生成比例校验 | 问题 P1 | 比例允许任意字符串直接传入 Image 命令；未见提交前的比例合法性反馈。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedMedia.kt:88 |
 | 29 | 付费媒体再次生成确认 | 静态通过 | 已在模型再次调用前增加明确确认，仍须断言取消不会提交命令。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedMedia.kt:182 |
 | 30 | 媒体失败结果的非付费重试入口 | 问题 P1 | MediaUiPort 提供不再次计费的图片下载恢复方法，但当前媒体结果页未接入；失败文件仅显示不可用。 | ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/MediaUiPort.kt:53 |
+
+## 第 4 组：设置、模型、权限与工具（31—40）
+
+| # | 检查项 | 结果 | 事实/缺陷 | 证据位置 |
+|---|---|---|---|---|
+| 31 | 设置入口分组与一级信息架构 | 静态通过 | 设置按会话体验/模型账户/权限/数据区分；核心入口实际最少点击步数未验证。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSettingsScenes.kt:52 |
+| 32 | 通知权限/首选项保存反馈 | 静态通过 | 提醒开关提交给 HostPreferences 并区分保存结果；通知送达与 Android 后台策略仍待验证。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSettingsScenes.kt:173 |
+| 33 | 免打扰时间区间有效性 | 问题 P2 | 输入日期格式通过校验，但开始与结束相同仍会提交；明确全日/空窗口语义前不能用作有效配置。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSettingsScenes.kt:205 |
+| 34 | 系统权限返回后的 UI 观察更新 | 待实机 | 权限页直接同步读取系统授权状态，无明显生命周期恢复触发；系统设置返回后的 Compose 刷新需要验证。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSettingsScenes.kt:217 |
+| 35 | 模型 API Key 输入保密显示 | 静态通过 | 模型凭据输入遮蔽。应补凭据更新、日志泄漏和 Activity 重建时私密文本持久化验证。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedSettings.kt:8 |
+| 36 | 模型/账户删除安全确认 | 静态通过 | 两个删除路径均有二次确认，需测试取消操作无副作用及取消成功回执。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedSettings.kt:66 |
+| 37 | 工作运行限制数值边界 | 问题 P1 | 高级页只判断是否整数，0/负数/过大值可能先提交；具体合法区间需与 Settings Owner 对齐。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedSettings.kt:234 |
+| 38 | 模型采样温度非法值引导 | 问题 P2 | 温度输入只检查可解析为 Double，未见字段端的合法区间与即时提示，具体区间由 Owner 确认。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedSettings.kt:253 |
+| 39 | MCP 操作结果与连接健康回执 | 问题 P2 | 连接、健康检查、断开使用 `.toString()` 提示，成功/失败和认证问题未被翻成用户可读状态。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiAutomationScenes.kt:405 |
+| 40 | GitHub 未授权状态的下一步入口 | 问题 P1 | GitHub 页提示需要授权但没有可执行的授权操作入口，用户可能卡在空态。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiAutomationScenes.kt:446 |
