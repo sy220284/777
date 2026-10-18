@@ -478,7 +478,7 @@ class ZhaoxiApplicationScenePack(
         androidx.compose.runtime.CompositionLocalProvider(
             androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(windowDensity.density, windowDensity.fontScale * appearance.textScale),
         ) {
-        ZhaoxiTheme(hue = hue, dark = dark, reducedMotion = reduced || appearance.motionScale == 0f) {
+        ZhaoxiTheme(hue = hue, dark = dark, reducedMotion = reduced || appearance.motionScale == 0f, transparency = appearance.transparency) {
             Box(Modifier.fillMaxSize()) {
                 ZhaoxiBackground(
                     Modifier.fillMaxSize(),
