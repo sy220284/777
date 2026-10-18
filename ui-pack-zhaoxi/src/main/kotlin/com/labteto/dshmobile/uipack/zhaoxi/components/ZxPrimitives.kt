@@ -2,6 +2,7 @@ package com.labteto.dshmobile.uipack.zhaoxi.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
@@ -172,6 +173,7 @@ fun ZxField(
     modifier: Modifier = Modifier,
     placeholder: String = "",
     error: Boolean = false,
+    errorMessage: String? = null,
     textStyle: TextStyle = TextStyle(fontSize = 14.sp),
     visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
 ) {
@@ -197,6 +199,7 @@ fun ZxField(
             cursorBrush = SolidColor(c.accentInk),
             modifier = Modifier.fillMaxWidth().semantics {
                 if (placeholder.isNotEmpty()) contentDescription = placeholder
+                if (error) this.error(errorMessage ?: "输入值不正确")
             },
         ) { inner ->
             Box {
