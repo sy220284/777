@@ -127,10 +127,16 @@ fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile
             if (history.invalidated || historyExpired) {
                 ZxFooterNote("工作日志已更换或重置，刷新后重新读取，旧游标不能继续使用")
             } else {
-                val visibleEvents = (olderEvents + history.records).distinctBy { it.sequence }
-                if (visibleEvents.isEmpty()) ZxEmpty("尚无运行事件", "执行开始后显示真实工作事件")
-                visibleEvents.takeLast(32).asReversed().forEach { event ->
+                if (history.records.isEmpty() && olderEvents.isEmpty())
+                    ZxEmpty("尚无运行事件", "执行开始后显示真实工作事件")
+                history.records.takeLast(24).asReversed().forEach { event ->
                     ZhaoxiWorkEventTimelineItem(event)
+                }
+                if (olderEvents.isNotEmpty()) {
+                    ZxSection("较早记录 · ${olderEvents.size} 条")
+                    olderEvents.asReversed().forEach { event ->
+                        ZhaoxiWorkEventTimelineItem(event)
+                    }
                 }
                 if (olderCursor != null) ZxChip("加载较早事件", false) {
                     val page = workReads.historyPageForUi(sessionId, olderCursor)
