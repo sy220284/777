@@ -71,12 +71,15 @@ fun ZxMessageRow(
             .padding(vertical = 6.dp),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
     ) {
-        if (!isUser) {
+        if (!isUser && !msg.progressive) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 ZxAvatar(authorName)
                 Text(authorName, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
                 if (msg.proactive) ZxBadge("主动", ZxBadgeTone.Accent)
             }
+            Spacer(Modifier.height(4.dp))
+        } else if (msg.progressive) {
+            Text("阶段进展", fontSize = 11.sp, color = c.ink2)
             Spacer(Modifier.height(4.dp))
         }
         Box(
