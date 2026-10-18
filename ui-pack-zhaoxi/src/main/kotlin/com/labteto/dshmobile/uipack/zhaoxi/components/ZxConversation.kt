@@ -84,13 +84,16 @@ fun ZxMessageRow(
         }
         Box(
             Modifier
-                .widthIn(max = 300.dp)
+                .then(if (isUser) Modifier.widthIn(max = 300.dp) else Modifier.fillMaxWidth())
                 .then(
                     if (isUser) Modifier.clip(RoundedCornerShape(ZhaoxiTheme.shapes.msg)).background(c.bg2)
                     else Modifier,
                 )
                 .padding(horizontal = if (isUser) 12.dp else 0.dp, vertical = if (isUser) 9.dp else 0.dp),
-        ) { Text(msg.text, fontSize = 15.sp, lineHeight = 23.sp, color = c.ink) }
+        ) {
+            if (isUser) Text(msg.text, fontSize = 15.sp, lineHeight = 23.sp, color = c.ink)
+            else ZxRichReply(msg.text)
+        }
         msg.branch?.let { b ->
             if (b.count > 1) ZxBranchSwitcher(b.index, b.count, onSelect = onBranchSelect)
         }
