@@ -3429,7 +3429,7 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConversationScenes.kt",
-      "sha256": "7bf19222a70afd33"
+      "sha256": "68b9a70cd4b91ab2"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiPersonaScenes.kt",
@@ -3469,15 +3469,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "3a72e81ff00d",
+  "source_snapshot": "579b70f0bad1",
   "observed_delta": {
-    "baseline": "892dd21c5979",
-    "added_production_files": [
-      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZhaoxiIconResources.kt"
-    ],
+    "baseline": "3a72e81ff00d",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxIcon.kt"
+      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConversationScenes.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

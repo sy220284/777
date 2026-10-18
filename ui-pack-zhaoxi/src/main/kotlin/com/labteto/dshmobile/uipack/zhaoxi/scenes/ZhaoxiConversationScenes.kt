@@ -71,13 +71,12 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
     val sessionId = snap.identity?.sessionId.orEmpty()
     val draft = storedDrafts[sessionId].orEmpty()
     fun writeDraft(text: String) { if (sessionId.isNotBlank()) drafts.updateDraft(sessionId, text) }
-    var rejection by remember { mutableStateOf<UiCommandRejection?>(null) }
+    var receipt by remember(sessionId) { mutableStateOf<UiCommandReceipt?>(null) }
     Column(Modifier.fillMaxWidth().fillMaxSize().imePadding()) {
         ZxConversationRoutes(scope, menu)
-        rejection?.let { r ->
-            ZxBanner("未送达 · ${rejectionHint(r)} · 草稿已保留", ZxTone.Err)
-            Spacer(Modifier.height(4.dp))
-        }
+        CommandFeedback(receipt)
+        snap.error?.let { ZxBanner(it, ZxTone.Err) }
+        if (snap.status == UiSceneStatus.LOADING) com.labteto.dshmobile.uipack.zhaoxi.components.ZxProgressBar(null)
         Column(Modifier.weight(1f)) {
             snap.group?.let { g ->
                 ZxBanner("群聊 · ${g.memberNames.joinToString("、")}", ZxTone.Info)
@@ -85,7 +84,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
             }
             ConversationMessages(snap.identity, snap.messages, reading, history, Modifier.weight(1f),
                 onMessage = { m -> snap.identity?.let { onMessage(it, m.id) } },
-                onBranch = { m, index -> snap.identity?.let { chat.submit(ChatUiCommand.SelectVariant(it, m.id, index)) } })
+                onBranch = { m, index -> snap.identity?.let { receipt = chat.submit(ChatUiCommand.SelectVariant(it, m.id, index)) } })
             if (snap.phase == UiExecutionPhase.RUNNING) ZxTypingIndicator()
             if (snap.queuedInputCount > 0)
                 ZxBanner("⇄ 已排队 ${snap.queuedInputCount} 条 · 队列满时将拒收", ZxTone.Warn)
@@ -94,16 +93,11 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
             draft = draft, onDraftChange = ::writeDraft,
             send = snap.send,
             running = snap.phase == UiExecutionPhase.RUNNING,
-            onStop = { snap.identity?.let { id -> chat.submit(ChatUiCommand.Stop(id)) } },
+            onStop = { snap.identity?.let { id -> receipt = chat.submit(ChatUiCommand.Stop(id)) } },
             onSend = {
                 val id = snap.identity
-                if (id == null) {
-                    rejection = UiCommandRejection.UNCONFIGURED  // 未激活：保留草稿
-                } else when (val r = sendZhaoxiDraft(drafts, id) { text, files -> chat.submit(ChatUiCommand.SendMessage(id, text, files)) }) {
-                    UiCommandReceipt.Accepted, UiCommandReceipt.Queued -> { rejection = null }
-                    is UiCommandReceipt.Rejected -> rejection = r.reason  // 拒收：保留草稿
-                    else -> rejection = UiCommandRejection.UNSUPPORTED
-                }
+                receipt = if (id == null) UiCommandReceipt.Rejected(UiCommandRejection.UNCONFIGURED)
+                else sendZhaoxiDraft(drafts, id) { text, files -> chat.submit(ChatUiCommand.SendMessage(id, text, files)) }
             },
             placeholder = "问点什么",
         )
@@ -118,14 +112,13 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
     val sessionId = snap.identity?.sessionId.orEmpty()
     val draft = storedDrafts[sessionId].orEmpty()
     fun writeDraft(text: String) { if (sessionId.isNotBlank()) drafts.updateDraft(sessionId, text) }
-    var rejection by remember { mutableStateOf<UiCommandRejection?>(null) }
+    var receipt by remember(sessionId) { mutableStateOf<UiCommandReceipt?>(null) }
     var questionAnswer by remember { mutableStateOf("") }
     Column(Modifier.fillMaxWidth().fillMaxSize().imePadding()) {
         ZxConversationRoutes(scope, menu)
-        rejection?.let { r ->
-            ZxBanner("未送达 · ${rejectionHint(r)} · 草稿已保留", ZxTone.Err)
-            Spacer(Modifier.height(4.dp))
-        }
+        CommandFeedback(receipt)
+        snap.error?.let { ZxBanner(it, ZxTone.Err) }
+        if (snap.status == UiSceneStatus.LOADING) com.labteto.dshmobile.uipack.zhaoxi.components.ZxProgressBar(null)
         Column(Modifier.weight(1f)) {
             ConversationMessages(snap.identity, snap.messages, reading, history, Modifier.weight(1f),
                 onMessage = { m -> snap.identity?.let { onMessage(it, m.id) } })
@@ -133,7 +126,7 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
                 Spacer(Modifier.height(6.dp))
                 ZxApprovalCard(ap, expired = snap.phase == UiExecutionPhase.IDLE && ap.pendingId.isBlank()) { approved ->
                     snap.identity?.let { id ->
-                        work.submit(WorkConversationUiCommand.AnswerApproval(id, ap.pendingId, approved))
+                        receipt = work.submit(WorkConversationUiCommand.AnswerApproval(id, ap.pendingId, approved))
                     }
                 }
             }
@@ -142,11 +135,9 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
                 ZxQuestionCard(q, questionAnswer, { questionAnswer = it }) { answer ->
                     val id = snap.identity
                     if (id != null) {
-                        when (val r = work.submit(WorkConversationUiCommand.AnswerQuestion(id, q.pendingId, answer))) {
-                            UiCommandReceipt.Accepted, UiCommandReceipt.Queued -> questionAnswer = ""
-                            is UiCommandReceipt.Rejected -> rejection = r.reason
-                            else -> rejection = UiCommandRejection.UNSUPPORTED
-                        }
+                        val result = work.submit(WorkConversationUiCommand.AnswerQuestion(id, q.pendingId, answer))
+                        receipt = result
+                        if (result.admitted()) questionAnswer = ""
                     }
                 }
             }
@@ -158,16 +149,11 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
             draft = draft, onDraftChange = ::writeDraft,
             send = snap.send,
             running = snap.phase == UiExecutionPhase.RUNNING,
-            onStop = { snap.identity?.let { id -> work.submit(WorkConversationUiCommand.Stop(id)) } },
+            onStop = { snap.identity?.let { id -> receipt = work.submit(WorkConversationUiCommand.Stop(id)) } },
             onSend = {
                 val id = snap.identity
-                if (id == null) {
-                    rejection = UiCommandRejection.UNCONFIGURED
-                } else when (val r = sendZhaoxiDraft(drafts, id) { text, files -> work.submit(WorkConversationUiCommand.SendMessage(id, text, files)) }) {
-                    UiCommandReceipt.Accepted, UiCommandReceipt.Queued -> { rejection = null }
-                    is UiCommandReceipt.Rejected -> rejection = r.reason
-                    else -> rejection = UiCommandRejection.UNSUPPORTED
-                }
+                receipt = if (id == null) UiCommandReceipt.Rejected(UiCommandRejection.UNCONFIGURED)
+                else sendZhaoxiDraft(drafts, id) { text, files -> work.submit(WorkConversationUiCommand.SendMessage(id, text, files)) }
             },
             placeholder = "描述任务目标",
         )
