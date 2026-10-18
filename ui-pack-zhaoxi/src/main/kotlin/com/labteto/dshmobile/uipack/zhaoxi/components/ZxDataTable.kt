@@ -73,7 +73,10 @@ fun ZxDataTable(
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             if (limit < minOf(rows.size, 500)) {
                 val nextCount = minOf(60, minOf(rows.size, 500) - limit)
                 ZxChip("加载更多 · ${nextCount} 行", false) {
