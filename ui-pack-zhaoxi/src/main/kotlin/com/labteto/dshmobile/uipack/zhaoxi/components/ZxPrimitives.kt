@@ -109,7 +109,7 @@ fun ZxButton(
                 enabled = enabled && !loading,
                 role = Role.Button,
                 interactionSource = interaction,
-                indication = androidx.compose.material.ripple.rememberRipple(),
+                indication = androidx.compose.foundation.LocalIndication.current,
                 onClick = onClick,
             )
             .semantics {
@@ -151,7 +151,7 @@ fun ZxIconButton(
             .clickable(
                 enabled = enabled, onClick = onClick, role = Role.Button,
                 interactionSource = interaction,
-                indication = androidx.compose.material.ripple.rememberRipple())
+                indication = androidx.compose.foundation.LocalIndication.current)
             .semantics { this.contentDescription = contentDescription }
             .alpha(if (enabled) 1f else .45f)
             .padding(8.dp),
@@ -215,7 +215,7 @@ fun ZxSwitch(
 ) {
     val c = ZhaoxiTheme.colors
     val spec = ZhaoxiMotion.spec<androidx.compose.ui.graphics.Color>(ZhaoxiDuration.FAST)
-    val track by animateColorAsState(if (checked) c.ok else c.bg2, spec, label = "zxSwTrack")
+    val track by animateColorAsState(if (checked) c.accent else c.bg2, spec, label = "zxSwTrack")
     Box(
         modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
@@ -279,12 +279,17 @@ fun ZxChip(
     onClick: () -> Unit,
 ) {
     val c = ZhaoxiTheme.colors
+    val source = remember { MutableInteractionSource() }
     Box(
         modifier
             .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+            .zxPressSurface(source)
             .clip(RoundedCornerShape(999.dp))
             .background(if (selected) c.ink else c.bg2)
-            .selectable(selected = selected, onClick = onClick, role = role)
+            .selectable(
+                selected = selected, onClick = onClick, role = role,
+                interactionSource = source,
+                indication = androidx.compose.foundation.LocalIndication.current)
             .padding(horizontal = 14.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center,
     ) {
