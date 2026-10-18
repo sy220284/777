@@ -10,7 +10,8 @@ data class UiSessionsSnapshot(val identity: UiSessionIdentity?, val usageMode: L
 sealed interface SessionUiCommand {
     /** Navigation has an explicit target and does not retarget a domain mutation. */
     data class Open(val sessionId: String) : SessionUiCommand
-    data class SelectMode(val mode: LocalUsageMode) : SessionUiCommand
+    /** A drawer-mode switch need not request conversation navigation. */
+    data class SelectMode(val mode: LocalUsageMode, val openConversation: Boolean = true) : SessionUiCommand
     data class Create(val identity: UiSessionIdentity?, val mode: LocalConversationMode,
         val usageMode: LocalUsageMode, val handoffSummary: String? = null) : SessionUiCommand
 }

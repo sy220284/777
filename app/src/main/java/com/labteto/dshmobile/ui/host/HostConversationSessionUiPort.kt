@@ -17,7 +17,8 @@ internal class HostConversationSessionUiPort(
 ) : SessionUiPort by business {
     override fun submit(command: SessionUiCommand): UiCommandReceipt {
         val result = business.submit(command)
-        if (result == UiCommandReceipt.Accepted || result == UiCommandReceipt.Queued)
+        if ((result == UiCommandReceipt.Accepted || result == UiCommandReceipt.Queued) &&
+            (command !is SessionUiCommand.SelectMode || command.openConversation))
             onConversationRequested(command)
         return result
     }
@@ -39,6 +40,7 @@ internal class HostConversationSessionUiPort(
 internal fun activatedConversationScene(command: SessionUiCommand?, snapshot: UiSessionsSnapshot): String? {
     val identity = snapshot.identity ?: return null
     if (snapshot.loading || command == null) return null
+    if (command is SessionUiCommand.SelectMode && !command.openConversation) return null
     val matches = when (command) {
         is SessionUiCommand.Open -> identity.sessionId == command.sessionId
         is SessionUiCommand.Create -> identity.sessionId != command.identity?.sessionId && snapshot.usageMode == command.usageMode

@@ -23,6 +23,14 @@ class ZhaoxiSessionNavigationTest {
         assertNull(activatedConversationScene(command, target))
         assertEquals("conversation.work", activatedConversationScene(command, target.copy(usageMode = LocalUsageMode.WORK)))
     }
+    @Test fun drawerSelectionDoesNotTriggerConversationNavigation() {
+        val selection = SessionUiCommand.SelectMode(LocalUsageMode.WORK, openConversation = false)
+        assertNull(activatedConversationScene(selection, snapshot.copy(usageMode = LocalUsageMode.WORK)))
+        assertEquals("conversation.work",
+            activatedConversationScene(SessionUiCommand.SelectMode(LocalUsageMode.WORK),
+                snapshot.copy(usageMode = LocalUsageMode.WORK)))
+    }
+
     @Test fun rejectedOrAbsentIntentDoesNotHijackStartupOrSettingsNavigation() {
         assertNull(activatedConversationScene(null, snapshot))
         assertNull(activatedConversationScene(SessionUiCommand.SelectMode(LocalUsageMode.WORK), snapshot))

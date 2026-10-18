@@ -150,6 +150,7 @@ fun ZhaoxiHomeScene(
                     ZxModeSwitch(workMode, onChange = { selectedWork ->
                         val receipt = sessions?.submit(SessionUiCommand.SelectMode(
                             if (selectedWork) LocalUsageMode.WORK else LocalUsageMode.CHAT,
+                            openConversation = false,
                         )) ?: UiCommandReceipt.NotAdmitted
                         commandReceipt = receipt
                     })
