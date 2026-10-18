@@ -124,7 +124,7 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
         } else {
             secondary?.sessions?.let { sessions ->
                 val chatSnapshot by ports.chat.snapshots.collectAsState(initial = ports.chat.snapshot())
-                val historyOwner = ports.history ?: secondary.transcript
+                val historyOwner = ports.history ?: secondary?.transcript
                 if (chatSnapshot.identity != null) {
                     ZxNavRow("将聊天资料交给 Work", "选取具体消息并编辑任务目标，确认后创建关联的新工作会话") {
                         showHandoff = !showHandoff
