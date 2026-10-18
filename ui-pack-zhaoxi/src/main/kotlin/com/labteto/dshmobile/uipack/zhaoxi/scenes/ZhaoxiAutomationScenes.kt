@@ -163,6 +163,18 @@ fun ZhaoxiAutomationTasksScene(
                     "${if (task.mode == AutomationMode.CHAT) "聊天" else "工作"} · ${task.status.zxAutomationStatusLabel()} · ${task.scheduleType.zxAutomationScheduleLabel()}",
                     onClick = { onOpenEditor(task.id) },
                 )
+                if (task.nextRunAt > 0L) {
+                    val scheduledTime = java.text.DateFormat.getDateTimeInstance(
+                        java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT,
+                    ).format(java.util.Date(task.nextRunAt))
+                    val timeLabel = when (task.status) {
+                        AutomationStatus.SCHEDULED -> "下次执行"
+                        AutomationStatus.PAUSED -> "暂停前计划时间"
+                        AutomationStatus.RUNNING -> "本轮计划时间"
+                        else -> "计划时间"
+                    }
+                    ZxValueRow(timeLabel, value = scheduledTime)
+                }
                 task.lastError?.takeIf(String::isNotBlank)?.let { error ->
                     com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
                         "上次执行失败：${error.take(160)}",
