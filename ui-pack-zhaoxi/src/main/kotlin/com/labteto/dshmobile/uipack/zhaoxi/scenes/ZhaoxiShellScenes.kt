@@ -461,18 +461,20 @@ fun ZhaoxiWorkspaceScene(
 /** workspace.preview — 使用 Owner 提供的实际预览与截断标记，不再截断调试字符串。 */
 @Composable
 fun ZhaoxiWorkspacePreviewScene(files: FilesUiPort?, path: String, scope: UiSceneRenderScope) {
-    val preview by produceState<com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview?>(null, files, path) {
-        value = if (files == null || path.isBlank()) null
+    val previewState by produceState<Pair<Boolean, com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview?>>(false to null, files, path) {
+        val result = if (files == null || path.isBlank()) null
             else runCatching { files.previewWorkspaceFile(path) }.getOrNull()
+        value = true to result
     }
     ZxPage("文件预览", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         when {
             path.isBlank() -> ZxEmpty("尚未选择文件", "请先从工作区选择文件")
             files == null -> ZxEmpty("文件能力未连接", "当前无法读取文件")
-            preview == null -> ZxEmpty("文件预览不可用", "请核实文件是否仍存在")
+            !previewState.first -> ZxSection("正在读取文件…")
+            previewState.second == null -> ZxEmpty("文件预览不可用", "请核实文件是否仍存在")
             else -> {
-                val item = preview!!
+                val item = requireNotNull(previewState.second)
                 ZxSection("文件信息")
                 ZxValueRow("文件名", value = item.file.path.substringAfterLast('/'))
                 ZxValueRow("大小", value = "${item.file.bytes} 字节")
