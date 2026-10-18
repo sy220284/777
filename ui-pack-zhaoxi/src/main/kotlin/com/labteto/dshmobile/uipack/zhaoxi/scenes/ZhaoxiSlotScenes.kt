@@ -177,8 +177,10 @@ fun ZhaoxiBranchesScene(
 @Composable
 fun ZhaoxiApprovalScene(work: WorkConversationUiPort, scope: UiSceneRenderScope) {
     val snap by work.snapshots.collectAsState(initial = work.snapshot())
-    var receipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
-    var expiredPendingId by remember { mutableStateOf<String?>(null) }
+    var receipt by remember(snap.approval?.pendingId, snap.identity) {
+        mutableStateOf<UiCommandReceipt?>(null)
+    }
+    var expiredPendingId by remember(snap.identity) { mutableStateOf<String?>(null) }
     ZxPage("审批", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         CommandFeedback(receipt)
@@ -204,8 +206,10 @@ fun ZhaoxiApprovalScene(work: WorkConversationUiPort, scope: UiSceneRenderScope)
 @Composable
 fun ZhaoxiQuestionScene(work: WorkConversationUiPort, scope: UiSceneRenderScope) {
     val snap by work.snapshots.collectAsState(initial = work.snapshot())
-    var answer by remember { mutableStateOf("") }
-    var receipt by remember(snap.question?.pendingId) { mutableStateOf<UiCommandReceipt?>(null) }
+    var answer by remember(snap.question?.pendingId, snap.identity) { mutableStateOf("") }
+    var receipt by remember(snap.question?.pendingId, snap.identity) {
+        mutableStateOf<UiCommandReceipt?>(null)
+    }
     ZxPage("提问", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         CommandFeedback(receipt)
