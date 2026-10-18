@@ -9,7 +9,7 @@ internal fun UiCommandReceipt.userHint(): String = when (this) {
     UiCommandReceipt.Accepted -> "请求已受理"
     UiCommandReceipt.Queued -> "请求已排队"
     is UiCommandReceipt.Rejected -> rejectionHint(reason)
-    is UiCommandReceipt.Failed -> message
+    is UiCommandReceipt.Failed -> message.takeIf(String::isNotBlank) ?: "操作失败，请重试"
     UiCommandReceipt.OutcomeUnknown -> "结果尚未确认，请先查看当前状态，避免重复提交"
     is UiCommandReceipt.MessageEdited -> when (result) {
         UiMessageEditOutcome.SENT -> "已提交修改并开始回复"
@@ -26,7 +26,12 @@ internal fun UiCommandReceipt.userHint(): String = when (this) {
     }
     UiCommandReceipt.NotAdmitted -> "操作未被受理"
 }
+/** Message edits may commit without starting a reply; that is not a rejection. */
+internal fun UiCommandReceipt.positiveFeedback(): Boolean =
+    admitted() || (this is UiCommandReceipt.MessageEdited &&
+        (result == UiMessageEditOutcome.SENT || result == UiMessageEditOutcome.COMMITTED_NOT_STARTED))
+
 @Composable
 internal fun CommandFeedback(receipt: UiCommandReceipt?) {
-    receipt?.let { ZxBanner(it.userHint(), if (it.admitted()) ZxTone.Info else ZxTone.Warn) }
+    receipt?.let { ZxBanner(it.userHint(), if (it.positiveFeedback()) ZxTone.Info else ZxTone.Warn) }
 }
