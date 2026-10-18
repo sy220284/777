@@ -83,10 +83,11 @@ fun ZhaoxiRequirementEvidenceScene(
                 }
                 ZxSection("证据引用")
                 if (r.snapshot.references.isEmpty()) {
-                    com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("还没有关联证据", "在运行详情里把产物关联到需求")
+                    com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("暂无关联证据", "关联文件后会显示在这里")
                 }
                 r.snapshot.references.forEach { link ->
-                    ZxRow(link.toString().take(64), "")
+                    ZxRow(link.artifactPath.substringAfterLast('/'),
+                        "需求 #${link.requirementIndex} · ${if (link.versionNow == null) "文件不可用" else if (link.versionNow == link.versionAtLink) "版本一致" else "文件已变化"}")
                 }
                 r.snapshot.machine?.let { m ->
                     ZxSection("机器核验")
@@ -98,7 +99,7 @@ fun ZhaoxiRequirementEvidenceScene(
             is UiWorkEvidenceReadReceipt.Failed ->
                 com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner("读取失败 · ${r.message ?: "未知"}", com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err)
         }
-        ZxFooterNote("状态由 Work Owner 上报 · 选中引用 ≠ 核验通过")
+
     }
 }
 
@@ -130,7 +131,7 @@ fun ZhaoxiWorkTeamScene(team: WorkTeamUiPort, scope: UiSceneRenderScope) {
                     }
                 })
         }
-        ZxFooterNote("成员状态由 WorkTeamUiPort 投影 · 子任务完成 ≠ 需求核验通过")
+
     }
 }
 
@@ -150,7 +151,7 @@ fun ZhaoxiWorkCapabilitiesScene(items: List<Triple<String, String, Int>>, scope:
                 )
             }
         }
-        ZxFooterNote("条件配置按钮按状态出现 · 配置入口跳对应设置页")
+
     }
 }
 
@@ -162,6 +163,6 @@ fun ZhaoxiSteeringScene(scope: UiSceneRenderScope) {
         com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner("运行中直接发送即插队纠偏（steer）", com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Info)
         ZxRow("发送即纠偏", "不等当前步骤结束 · 指令进入当前执行上下文")
         ZxRow("排队语义", "队列满时拒收并提示 · 草稿保留")
-        ZxFooterNote("回执矩阵见 朝夕-R4接入设计 §4")
+
     }
 }
