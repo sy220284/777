@@ -60,17 +60,12 @@ fun ZhaoxiTimelineScene(
     media: MediaUiPort? = null,
 ) {
     val snap by chat.snapshots.collectAsState(initial = chat.snapshot())
-    var selectedMessage by remember { mutableStateOf<UiMessageSnapshot?>(null) }
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
-        selectedMessage?.let { message ->
-            androidx.compose.foundation.text.selection.SelectionContainer {
-                com.labteto.dshmobile.uipack.zhaoxi.components.ZxRichReply(message.text)
-            }
-        }
         if (snap.messages.isEmpty() && snap.phase != UiExecutionPhase.RUNNING)
             ZxEmpty("还没有消息", "从下方输入框开始")
         ConversationMessages(snap.identity, snap.messages, reading, history,
-            Modifier.weight(1f), onMessage = { selectedMessage = it },
+            Modifier.weight(1f), onMessage = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(it.text)) },
             onBranch = { m, index -> snap.identity?.let {
                 chat.submit(ChatUiCommand.SelectVariant(it, m.id, index))
             } }, preview = snap.livePreview,
