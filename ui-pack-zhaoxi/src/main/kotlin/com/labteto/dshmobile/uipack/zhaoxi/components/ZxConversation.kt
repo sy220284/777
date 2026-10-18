@@ -1,5 +1,10 @@
 package com.labteto.dshmobile.uipack.zhaoxi.components
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -20,8 +25,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -68,7 +76,7 @@ fun ZxMessageRow(
         modifier
             .fillMaxWidth()
             .pointerInput(msg.id) { detectTapGestures(onLongPress = { onLongPress(msg) }) }
-            .padding(vertical = 6.dp),
+            .padding(vertical = if (msg.progressive) 2.dp else 6.dp),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
     ) {
         if (!isUser && !msg.progressive) {
@@ -274,9 +282,26 @@ fun ZxQuestionCard(
 /** 三点输入指示。 */
 @Composable
 fun ZxTypingIndicator(modifier: Modifier = Modifier) {
-    Row(modifier.padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        repeat(3) {
-            Box(Modifier.size(5.dp).clip(CircleShape).background(ZhaoxiTheme.colors.ink3))
+    // Subtle phase motion; Compose animation clocks honor the platform duration scale.
+    val transition = rememberInfiniteTransition(label = "zhaoxi-reply-progress")
+    val ink = ZhaoxiTheme.colors.ink3
+    Row(
+        modifier.padding(vertical = 6.dp)
+            .semantics { stateDescription = "正在生成回复" },
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(3) { index ->
+            val opacity by transition.animateFloat(
+                initialValue = 0.35f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 620, delayMillis = index * 120),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+                label = "reply-progress-dot-$index",
+            )
+            Box(Modifier.size(5.dp).alpha(opacity).clip(CircleShape).background(ink))
         }
     }
 }
