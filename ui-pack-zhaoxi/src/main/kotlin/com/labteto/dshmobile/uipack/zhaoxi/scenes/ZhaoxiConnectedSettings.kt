@@ -7,6 +7,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.local.model.*
 import com.labteto.dshmobile.local.memory.*
 import com.labteto.dshmobile.uicontract.*
@@ -130,7 +131,7 @@ fun ZhaoxiQuotaScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         when (val data = result) {
             is MiniMaxProviderUsage.AccountBalance -> {
                 ZxSection("账户金额")
-                Text(data.available, fontSize = androidx.compose.ui.unit.TextUnit.Unspecified,
+                Text(data.available, fontSize = 24.sp,
                     color = ZhaoxiTheme.colors.ink)
                 ZxValueRow("现金余额", value = data.cash)
                 ZxValueRow("代金券", value = data.voucher)
