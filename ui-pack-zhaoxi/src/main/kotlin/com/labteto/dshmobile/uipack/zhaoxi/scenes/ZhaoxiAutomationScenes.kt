@@ -1,16 +1,28 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import java.util.Calendar
+import androidx.compose.ui.platform.LocalContext
+import android.text.format.DateFormat
+import android.app.TimePickerDialog
+import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import com.labteto.dshmobile.automation.AutomationStatus
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
+import com.labteto.dshmobile.uicontract.UiAutomationRejection
 import com.labteto.dshmobile.uicontract.AutomationUiReceipt
 import com.labteto.dshmobile.uicontract.UiAutomationSchedule
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxField
 import kotlinx.coroutines.CancellationException
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import com.labteto.dshmobile.uicontract.ToolsUiCommand
+import com.labteto.dshmobile.uicontract.ToolsUiReceipt
+import com.labteto.dshmobile.uicontract.UiToolError
+import com.labteto.dshmobile.uicontract.UiMcpHealth
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -47,6 +59,19 @@ import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 import com.labteto.dshmobile.uihost.UiSceneRenderScope
 import kotlinx.coroutines.launch
 
+/** Admission is not execution completion; never display Kotlin enum names as errors. */
+internal fun zxAutomationReceiptText(action: String, receipt: AutomationUiReceipt): String = when (receipt) {
+    is AutomationUiReceipt.Applied -> if (action == "立即运行") "运行请求已提交" else "${action}已提交"
+    is AutomationUiReceipt.Rejected -> when (receipt.reason) {
+        UiAutomationRejection.STALE_CONTEXT -> "会话已变化，请返回刷新"
+        UiAutomationRejection.STALE_TASK -> "任务已更新，请重新载入"
+        UiAutomationRejection.INVALID_INPUT -> "输入不符合调度条件"
+        UiAutomationRejection.MISSING -> "任务已不存在"
+        UiAutomationRejection.OWNER_REJECTED -> "调度操作未被接受"
+    }
+    is AutomationUiReceipt.Failed -> receipt.message ?: "${action}失败"
+}
+
 /**
  * 自动化与工具/媒体域场景（E8.14 实装）。
  * 启停/删除/立即运行只经 AutomationUiPort.submit；任务详情展示快照投影。
@@ -69,8 +94,6 @@ fun ZhaoxiAutomationTasksScene(
                 "已计划" -> task.status == com.labteto.dshmobile.automation.AutomationStatus.SCHEDULED
                 "运行中" -> task.status == com.labteto.dshmobile.automation.AutomationStatus.RUNNING
                 "已暂停" -> task.status == com.labteto.dshmobile.automation.AutomationStatus.PAUSED
-                "失败/受阻" -> task.status in setOf(com.labteto.dshmobile.automation.AutomationStatus.FAILED,
-                    com.labteto.dshmobile.automation.AutomationStatus.BLOCKED)
                 else -> true
             }
         }
@@ -78,9 +101,8 @@ fun ZhaoxiAutomationTasksScene(
     ZxPage("自动化", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("任务状态")
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("全部", "已计划", "运行中", "已暂停", "失败/受阻").forEach { label ->
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("全部", "已计划", "运行中", "已暂停").forEach { label ->
                 ZxChip(label, filter == label) { filter = label }
             }
         }
@@ -89,14 +111,10 @@ fun ZhaoxiAutomationTasksScene(
         if (filtered.isEmpty()) ZxEmpty("没有符合条件的任务", "可切换状态筛选或创建新任务")
         filtered.forEach { task ->
             val paused = task.status == com.labteto.dshmobile.automation.AutomationStatus.PAUSED
-            val mayRetry = task.status in setOf(
-                com.labteto.dshmobile.automation.AutomationStatus.FAILED,
-                com.labteto.dshmobile.automation.AutomationStatus.PAUSED,
-                com.labteto.dshmobile.automation.AutomationStatus.SCHEDULED,
-            )
-            val canChangeScheduleState = task.status in setOf(
-                com.labteto.dshmobile.automation.AutomationStatus.SCHEDULED,
-                com.labteto.dshmobile.automation.AutomationStatus.PAUSED,
+            val actionAvailable = task.status !in setOf(
+                com.labteto.dshmobile.automation.AutomationStatus.CANCELLED,
+                com.labteto.dshmobile.automation.AutomationStatus.COMPLETED,
+                com.labteto.dshmobile.automation.AutomationStatus.BLOCKED,
             )
             androidx.compose.foundation.layout.Column(
                 Modifier.fillMaxWidth().padding(vertical = 6.dp),
@@ -107,61 +125,22 @@ fun ZhaoxiAutomationTasksScene(
                     "${if (task.mode == AutomationMode.CHAT) "聊天" else "工作"} · ${task.status.zxAutomationStatusLabel()} · ${task.scheduleType.zxAutomationScheduleLabel()}",
                     onClick = { onOpenEditor(task.id) },
                 )
-                task.lastError?.takeIf(String::isNotBlank)?.let { error ->
-                    com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
-                        "上次执行失败：${error.take(160)}",
-                        com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Warn)
-                }
-                task.runReceipts.takeLast(3).asReversed().forEachIndexed { index, receipt ->
-                    val result = receipt.errorPreview?.take(120)
-                        ?: receipt.resultPreview?.take(120) ?: "未提供运行摘要"
-                    ZxValueRow(if (index == 0) "最近执行" else "较早执行 ${index + 1}",
-                        value = receipt.status.zxAutomationStatusLabel(), sub = result)
-                }
-                if (task.failureStreak > 0) {
-                    val policy = when {
-                        task.mode == AutomationMode.CHAT && task.recurringMinutes != null ->
-                            "聊天周期任务连续失败 3 次会由后台自动暂停"
-                        task.recurringMinutes != null -> "后台会按原周期继续排程"
-                        else -> "单次任务失败后需人工重试"
-                    }
-                    ZxFooterNote("连续失败 ${task.failureStreak} 次 · $policy")
-                }
-                if (task.status == com.labteto.dshmobile.automation.AutomationStatus.BLOCKED) {
-                    ZxFooterNote("任务已阻断，请先检查所属会话、授权或调度配置")
-                    ZxChip("检查任务配置", false) { onOpenEditor(task.id) }
-                }
-                if (mayRetry || canChangeScheduleState) {
+                if (actionAvailable) {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 10.dp),
                         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        if (mayRetry) ZxChip(
-                            if (task.status == com.labteto.dshmobile.automation.AutomationStatus.FAILED)
-                                "重新执行" else "立即运行", false
-                        ) {
-                            feedback = when (val result = automation.submit(AutomationUiCommand.RunNow(task.id))) {
-                                is AutomationUiReceipt.Applied -> "已提交执行；完成情况以运行记录为准"
-                                is AutomationUiReceipt.Rejected -> "执行未被接受：${result.reason}"
-                                is AutomationUiReceipt.Failed -> result.message ?: "执行失败"
-                            }
+                        ZxChip("立即运行", false) {
+                            feedback = zxAutomationReceiptText("立即运行", automation.submit(AutomationUiCommand.RunNow(task.id)))
                         }
                         androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
-                        Text(when (task.status) {
-                            com.labteto.dshmobile.automation.AutomationStatus.FAILED -> "失败待处理"
-                            com.labteto.dshmobile.automation.AutomationStatus.PAUSED -> "已暂停"
-                            else -> "按计划运行"
-                        }, color = ZhaoxiTheme.colors.ink2)
-                        if (canChangeScheduleState) ZxSwitch(checked = !paused, onCheckedChange = { enabled ->
-                            feedback = when (val result = automation.submit(
+                        Text(if (paused) "已暂停" else "已启用", color = ZhaoxiTheme.colors.ink2)
+                        ZxSwitch(checked = !paused, onCheckedChange = { enabled ->
+                            feedback = zxAutomationReceiptText(if (enabled) "启用任务" else "暂停任务", automation.submit(
                                 if (enabled) AutomationUiCommand.Resume(task.id)
                                 else AutomationUiCommand.Pause(task.id)
-                            )) {
-                                is AutomationUiReceipt.Applied -> if (enabled) "任务已恢复" else "任务已暂停"
-                                is AutomationUiReceipt.Rejected -> "修改未被接受：${result.reason}"
-                                is AutomationUiReceipt.Failed -> result.message ?: "状态修改失败"
-                            }
+                            ))
                         }, contentDescription = "${task.prompt.take(20)} · 启用状态")
                     }
                 }
@@ -199,6 +178,31 @@ fun ZhaoxiAutomationEditorScene(
     var firstRun by remember(editingTaskId, editing?.id) {
         mutableStateOf(formatter.format(java.util.Date(editing?.nextRunAt ?: (System.currentTimeMillis() + 3_600_000L))))
     }
+    val androidContext = LocalContext.current
+    fun chooseFirstRun() {
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = runCatching { formatter.parse(firstRun)?.time }.getOrNull()
+                ?: (System.currentTimeMillis() + 3_600_000L)
+        }
+        DatePickerDialog(
+            androidContext,
+            { _, year, month, day ->
+                calendar.set(Calendar.YEAR, year)
+                calendar.set(Calendar.MONTH, month)
+                calendar.set(Calendar.DAY_OF_MONTH, day)
+                TimePickerDialog(androidContext, { _, hour, minute ->
+                    calendar.set(Calendar.HOUR_OF_DAY, hour)
+                    calendar.set(Calendar.MINUTE, minute)
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
+                    firstRun = formatter.format(calendar.time)
+                }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE),
+                    DateFormat.is24HourFormat(androidContext)).show()
+            },
+            calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH),
+        ).apply { datePicker.minDate = System.currentTimeMillis() - 86_400_000L }.show()
+    }
     var interval by remember(editingTaskId, editing?.id) {
         mutableStateOf((editing?.recurringMinutes ?: 60L).toString())
     }
@@ -216,7 +220,6 @@ fun ZhaoxiAutomationEditorScene(
     var busy by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<String?>(null) }
     var firstRunError by remember(editingTaskId) { mutableStateOf<String?>(null) }
-    val context = androidx.compose.ui.platform.LocalContext.current
     fun minuteOfDay(value: String): Int? {
         val pieces = value.trim().split(":")
         if (pieces.size != 2) return null
@@ -225,17 +228,7 @@ fun ZhaoxiAutomationEditorScene(
         return if (h in 0..23 && m in 0..59) h * 60 + m else null
     }
     fun showReceipt(receipt: AutomationUiReceipt) {
-        feedback = when (receipt) {
-            is AutomationUiReceipt.Applied -> "已保存"
-            is AutomationUiReceipt.Rejected -> when (receipt.reason) {
-                com.labteto.dshmobile.uicontract.UiAutomationRejection.STALE_TASK -> "任务已在其他位置修改，请返回列表重新进入"
-                com.labteto.dshmobile.uicontract.UiAutomationRejection.STALE_CONTEXT -> "会话已变化，请切回任务所属会话"
-                com.labteto.dshmobile.uicontract.UiAutomationRejection.INVALID_INPUT -> "调度参数无效，请检查时间和间隔"
-                com.labteto.dshmobile.uicontract.UiAutomationRejection.MISSING -> "任务已不存在，请返回列表"
-                com.labteto.dshmobile.uicontract.UiAutomationRejection.OWNER_REJECTED -> "当前运行状态不允许该修改"
-            }
-            is AutomationUiReceipt.Failed -> receipt.message ?: "调度请求失败"
-        }
+        feedback = zxAutomationReceiptText("任务", receipt)
     }
     ZxPage(if (editingTaskId == null) "新建自动化" else "编辑自动化", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
@@ -278,53 +271,23 @@ fun ZhaoxiAutomationEditorScene(
                     ZxField(firstRun, {
                         firstRun = it
                         firstRunError = null
-                    }, Modifier.fillMaxWidth(),
-                        placeholder = "YYYY-MM-DD HH:mm",
-                        error = firstRunError != null)
-                    firstRunError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
-                    ZxButton("选择日期和时间", {
-                        // Android native pickers follow the device locale, 12/24h preference,
-                        // accessibility, and IME conventions. Keep text input as a fallback.
-                        val initial = java.util.Calendar.getInstance()
-                        runCatching { formatter.parse(firstRun) }.getOrNull()?.let {
-                            initial.time = it
-                        }
-                        android.app.DatePickerDialog(
-                            context,
-                            { _, year, month, day ->
-                                android.app.TimePickerDialog(
-                                    context,
-                                    { _, hour, minute ->
-                                        firstRun = String.format(
-                                            java.util.Locale.US,
-                                            "%04d-%02d-%02d %02d:%02d",
-                                            year, month + 1, day, hour, minute,
-                                        )
-                                        firstRunError = null
-                                    },
-                                    initial.get(java.util.Calendar.HOUR_OF_DAY),
-                                    initial.get(java.util.Calendar.MINUTE),
-                                    android.text.format.DateFormat.is24HourFormat(context),
-                                ).show()
-                            },
-                            initial.get(java.util.Calendar.YEAR),
-                            initial.get(java.util.Calendar.MONTH),
-                            initial.get(java.util.Calendar.DAY_OF_MONTH),
-                        ).apply {
-                            datePicker.minDate = System.currentTimeMillis() - 86_400_000L
-                        }.show()
-                    }, Modifier.fillMaxWidth(), enabled = !busy)
-                    ZxFooterNote("采用设备本地时区；运行时间必须晚于当前时间")
+                    }, Modifier.fillMaxWidth(), placeholder = "YYYY-MM-DD HH:mm",
+                        error = firstRunError != null, errorMessage = firstRunError)
+                    ZxButton("选择日期与时间", { chooseFirstRun() },
+                        Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline)
+                    ZxFooterNote("设备本地时间")
                 }
                 if (selected == AutomationScheduleType.INTERVAL) {
                     ZxSection("重复间隔（分钟）")
                     ZxField(interval, { interval = it }, Modifier.fillMaxWidth(),
-                        placeholder = if (chatMode) "最短 60 分钟" else "最短 15 分钟")
+                        placeholder = if (chatMode) "最短 60 分钟" else "最短 15 分钟",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 }
                 if (selected == AutomationScheduleType.SILENCE) {
                     ZxSection("沉默触发（分钟）")
                     ZxField(silence, { silence = it }, Modifier.fillMaxWidth(),
-                        placeholder = "至少 60 分钟")
+                        placeholder = "至少 60 分钟",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 }
                 if (selected == AutomationScheduleType.WINDOW) {
                     ZxSection("活动时段")
@@ -336,22 +299,8 @@ fun ZhaoxiAutomationEditorScene(
                     }
                 }
             }
-            ZxSection("通知与失败处理")
-            ZxSwitchRow("运行通知", "执行结束后根据系统通知权限提醒", notify) { notify = it }
-            if (editing != null) {
-                ZxValueRow("连续失败", value = "${editing.failureStreak} 次")
-                editing.lastError?.takeIf(String::isNotBlank)?.let {
-                    ZxFooterNote("最近失败：${it.take(160)}")
-                }
-                ZxFooterNote(
-                    if (editing.mode == AutomationMode.CHAT && editing.recurringMinutes != null)
-                        "当前策略：聊天周期任务连续失败 3 次后自动暂停，任务列表可手动重新执行或恢复。"
-                    else if (editing.recurringMinutes != null)
-                        "当前策略：失败后仍按原定周期排程，可在任务列表查看回执并立即运行。"
-                    else "当前策略：单次任务失败后保留错误记录，可从任务列表手动重新执行。"
-                )
-                ZxFooterNote("以上为后台已生效策略；目前不支持为单个任务单独覆盖。")
-            }
+            ZxSection("通知")
+            ZxSwitchRow("运行通知", "", notify) { notify = it }
             feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
             Spacer(Modifier.height(12.dp))
             ZxButton(if (editingTaskId == null) "创建任务" else "保存修改", {
@@ -390,12 +339,11 @@ fun ZhaoxiAutomationEditorScene(
                         else -> null
                     }
                     val timed = selected !in setOf(AutomationScheduleType.SILENCE, AutomationScheduleType.WINDOW)
-                    val minGap = if (chatMode) 60L else 15L
                     firstRunError = if (timed && (date == null || date <= System.currentTimeMillis()))
-                        "请选择晚于当前时间的有效日期和时间" else null
+                        "请选择有效且晚于当前时间的日期" else null
+                    val minGap = if (chatMode) 60L else 15L
                     feedback = when {
-                        timed && firstRunError != null ->
-                            "请输入晚于当前时间的有效本地日期"
+                        timed && firstRunError != null -> firstRunError
                         selected == AutomationScheduleType.INTERVAL && (duration == null || duration < minGap) ->
                             "间隔不得小于 ${minGap} 分钟"
                         selected == AutomationScheduleType.SILENCE && (silenceDuration == null || silenceDuration < 60L) ->
@@ -424,7 +372,7 @@ fun ZhaoxiAutomationEditorScene(
                                 AutomationUiCommand.Update(editing.id, editing.scheduleGeneration, schedule)
                             }))
                         } catch (failure: Exception) {
-                            feedback = failure.message ?: "保存未完成，请确认任务状态后重试"
+                            feedback = failure.message ?: "保存未完成，请先确认任务状态"
                         } finally {
                             busy = false
                         }
@@ -466,6 +414,28 @@ fun ZhaoxiPersonaInteractionScene(
     }
 }
 
+/** Map management facts to human-readable feedback; Applied never means tools were authorized or executed. */
+internal fun zxToolReceiptText(receipt: ToolsUiReceipt): String = when (receipt) {
+    is ToolsUiReceipt.Applied -> "设置已保存"
+    is ToolsUiReceipt.Failed -> when (receipt.reason) {
+        UiToolError.DNS -> "无法解析服务器地址"
+        UiToolError.TIMEOUT -> "连接超时，请重试"
+        UiToolError.UNREACHABLE -> "无法连接服务器"
+        UiToolError.PERMISSION -> "缺少连接权限，请检查授权"
+        UiToolError.CONFIGURATION -> "连接配置无效"
+        UiToolError.UNKNOWN -> "操作失败，请检查配置后重试"
+    }
+}
+
+/** A responded ping proves only this one health check, not access to a tool. */
+internal fun zxMcpHealthText(health: UiMcpHealth): String = when (health) {
+    UiMcpHealth.RESPONDED -> "连接已响应"
+    UiMcpHealth.BUSY -> "服务器忙，请稍后检查"
+    UiMcpHealth.NOT_CONNECTED -> "尚未建立连接"
+    UiMcpHealth.UNCONFIRMED -> "无法确认当前连接状态"
+    UiMcpHealth.UNSUPPORTED -> "不支持连接检查"
+}
+
 /** 按 E8.18 独立场景分派工具中心、MCP、插件和 GitHub；所有状态来自 ToolsUiPort。 */
 @Composable
 fun ZhaoxiToolsScene(
@@ -477,7 +447,26 @@ fun ZhaoxiToolsScene(
     var feedback by remember { mutableStateOf<String?>(null) }
     var endpoint by remember { mutableStateOf("") }
     var serverId by remember { mutableStateOf("") }
+    var githubToken by remember { mutableStateOf("") }
+    var pendingClearGitHub by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
     var refresh by remember { mutableStateOf(0) }
+    fun submitConfiguration(command: ToolsUiCommand, clearTokenOnSuccess: Boolean = false) {
+        if (busy) return
+        co.launch {
+            busy = true
+            try {
+                val receipt = tools.submit(command)
+                feedback = zxToolReceiptText(receipt)
+                if (clearTokenOnSuccess && receipt is ToolsUiReceipt.Applied) githubToken = ""
+                refresh++
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } finally {
+                busy = false
+            }
+        }
+    }
     val catalogue = remember(tools) { tools.capabilityCatalogue() }
     val plugins = remember(tools, refresh) { tools.pluginLifecycleSnapshots() }
     val installedIds = remember(tools, refresh) { tools.installedPluginIds() }
@@ -507,27 +496,24 @@ fun ZhaoxiToolsScene(
                     serverId, { serverId = it }, Modifier.fillMaxWidth(), placeholder = "服务器名称")
                 com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
                     endpoint, { endpoint = it }, Modifier.fillMaxWidth(), placeholder = "HTTP 地址")
-                ZxButton("连接服务器", { co.launch {
-                    feedback = tools.submit(
-                        com.labteto.dshmobile.uicontract.ToolsUiCommand.ConnectHttp(serverId, endpoint)
-                    ).toString()
-                    refresh++
-                } }, enabled = serverId.isNotBlank() && endpoint.isNotBlank())
+                ZxButton("连接服务器", {
+                    submitConfiguration(ToolsUiCommand.ConnectHttp(serverId.trim(), endpoint.trim()))
+                }, enabled = !busy && serverId.isNotBlank() &&
+                    (endpoint.trim().startsWith("https://") || endpoint.trim().startsWith("http://")),
+                    loading = busy)
                 ZxSection("已登记服务器")
                 if (servers.isEmpty()) ZxEmpty("尚未添加 MCP 服务器", "填写名称和地址后连接")
                 servers.forEach { server ->
                     ZxRow(server.id, "${server.transport} · ${server.connection} · ${server.tools.size} 个工具")
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ZxChip("检查连接", false) { co.launch {
-                            feedback = tools.checkServerHealth(server.id).toString()
-                            refresh++
+                        ZxChip("检查连接", false) { if (!busy) co.launch {
+                            busy = true
+                            try { feedback = zxMcpHealthText(tools.checkServerHealth(server.id)); refresh++ }
+                            catch (cancelled: CancellationException) { throw cancelled }
+                            catch (failure: Exception) { feedback = "检查失败，请稍后重试" }
+                            finally { busy = false }
                         } }
-                        ZxChip("断开", false) { co.launch {
-                            feedback = tools.submit(
-                                com.labteto.dshmobile.uicontract.ToolsUiCommand.Disconnect(server.id)
-                            ).toString()
-                            refresh++
-                        } }
+                        ZxChip("断开", false) { submitConfiguration(ToolsUiCommand.Disconnect(server.id)) }
                     }
                 }
 
@@ -545,12 +531,9 @@ fun ZhaoxiToolsScene(
                 }
                 plugins.filter { it.state == com.labteto.dshmobile.uicontract.UiPluginLifecycleState.FAILED }
                     .forEach { item ->
-                        ZxButton("恢复 ${item.id}", { co.launch {
-                            feedback = tools.submit(
-                                com.labteto.dshmobile.uicontract.ToolsUiCommand.RecoverFailedPlugin(item.id)
-                            ).toString()
-                            refresh++
-                        } })
+                        ZxButton("恢复 ${item.id}", {
+                            submitConfiguration(ToolsUiCommand.RecoverFailedPlugin(item.id))
+                        }, enabled = !busy, loading = busy)
                     }
 
             }
@@ -560,7 +543,30 @@ fun ZhaoxiToolsScene(
                 ZxSection("可用能力")
                 catalogue.filter { it.family.contains("github", ignoreCase = true) }
                     .forEach { cap -> ZxRow(cap.name, "${cap.access} · ${cap.approval}") }
-                if (!githubConfigured) ZxEmpty("未连接 GitHub", "请先完成授权")
+                if (!githubConfigured) {
+                    ZxSection("连接账户")
+                    com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
+                        githubToken, { githubToken = it }, Modifier.fillMaxWidth(),
+                        placeholder = "GitHub 访问令牌",
+                        visualTransformation = PasswordVisualTransformation(),
+                    )
+                    ZxButton("保存 GitHub 授权", {
+                        val submittedToken = githubToken.trim()
+                        if (submittedToken.isNotBlank()) submitConfiguration(
+                            ToolsUiCommand.ConfigureGitHub(submittedToken), clearTokenOnSuccess = true)
+                    }, enabled = !busy && githubToken.isNotBlank(), loading = busy)
+                } else {
+                    ZxButton("解除 GitHub 连接", { pendingClearGitHub = true },
+                        variant = ZxButtonVariant.Outline)
+                }
+                if (pendingClearGitHub) ZxDialog(
+                    "解除 GitHub 连接？", "连接设置将被清除，现有仓库内容不会删除。", "解除连接",
+                    {
+                        pendingClearGitHub = false
+                        submitConfiguration(ToolsUiCommand.ClearGitHub)
+                    },
+                    { pendingClearGitHub = false },
+                )
             }
             "work.capabilities" -> {
                 val grouped = catalogue.groupBy { it.family }
@@ -593,7 +599,6 @@ fun ZhaoxiToolsScene(
         }
     }
 }
-
 
 /** Display-only labels. Decisions and status transitions remain owned by AutomationUiPort. */
 internal fun AutomationStatus.zxAutomationStatusLabel(): String = when (this) {
