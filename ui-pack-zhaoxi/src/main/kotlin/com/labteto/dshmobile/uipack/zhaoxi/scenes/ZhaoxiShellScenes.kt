@@ -2,6 +2,8 @@ package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.labteto.dshmobile.uipack.zhaoxi.components.zxPressSurface
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
@@ -91,12 +93,17 @@ fun ZhaoxiHomeScene(
             session.summaryPreview.orEmpty().contains(drawerQuery.trim(), ignoreCase = true)
     }
     fun create(mode: LocalUsageMode) {
-        commandReceipt = sessions?.submit(SessionUiCommand.Create(snap.identity, LocalConversationMode.INDEPENDENT, mode))
-        drawerScope.launch { drawerState.close() }
+        val receipt = sessions?.submit(SessionUiCommand.Create(
+            snap.identity, LocalConversationMode.INDEPENDENT, mode,
+        )) ?: UiCommandReceipt.NotAdmitted
+        commandReceipt = receipt
+        if (receipt.admitted()) drawerScope.launch { drawerState.close() }
     }
     fun openSession(id: String) {
-        commandReceipt = sessions?.submit(SessionUiCommand.Open(id))
-        drawerScope.launch { drawerState.close() }
+        val receipt = sessions?.submit(SessionUiCommand.Open(id))
+            ?: UiCommandReceipt.NotAdmitted
+        commandReceipt = receipt
+        if (receipt.admitted()) drawerScope.launch { drawerState.close() }
     }
     fun navigate(target: String) {
         scope.onNavigate(UiSceneId(target))
@@ -133,12 +140,16 @@ fun ZhaoxiHomeScene(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = "筛选会话标题或内容",
                     )
-                    ZxHomeDrawerEntry("search", "搜索全部人物、任务、文件",
+                    ZxHomeDrawerEntry("search", "搜索会话、人物、任务、文件",
                         onClick = { navigate("shell.search") })
+                    CommandFeedback(commandReceipt)
                     Spacer(Modifier.height(12.dp))
                     ZxModeSwitch(workMode, onChange = { selectedWork ->
-                        commandReceipt = sessions?.submit(SessionUiCommand.SelectMode(if (selectedWork) LocalUsageMode.WORK else LocalUsageMode.CHAT))
-                        drawerScope.launch { drawerState.close() }
+                        val receipt = sessions?.submit(SessionUiCommand.SelectMode(
+                            if (selectedWork) LocalUsageMode.WORK else LocalUsageMode.CHAT,
+                        )) ?: UiCommandReceipt.NotAdmitted
+                        commandReceipt = receipt
+                        if (receipt.admitted()) drawerScope.launch { drawerState.close() }
                     })
                     Spacer(Modifier.height(14.dp))
                     LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -245,6 +256,9 @@ fun ZhaoxiHomeScene(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ZxHomeShortcut("people", "人物") { navigate("route.persona_gallery") }
                 ZxHomeShortcut("files", "文件") { navigate("route.workspace") }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ZxHomeShortcut("tools", "工具") { navigate("route.tools") }
                 ZxHomeShortcut("settings", "设置") { navigate("route.settings") }
             }
@@ -262,11 +276,14 @@ private fun ZxHomeDrawerEntry(
     onClick: () -> Unit,
 ) {
     val c = ZhaoxiTheme.colors
+    val interaction = remember { MutableInteractionSource() }
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+        Modifier.fillMaxWidth().zxPressSurface(interaction).clip(RoundedCornerShape(12.dp))
             .background(if (selected) c.bg2 else Color.Transparent)
-            .clickable(role = Role.Button, onClick = onClick)
-            .heightIn(min = 48.dp).padding(horizontal = 12.dp, vertical = 10.dp),
+            .clickable(role = Role.Button, onClick = onClick,
+                interactionSource = interaction,
+                indication = androidx.compose.foundation.LocalIndication.current)
+            .heightIn(min = 56.dp).padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -290,10 +307,13 @@ private fun ZxHomeAction(
     onClick: () -> Unit,
 ) {
     val c = ZhaoxiTheme.colors
+    val interaction = remember { MutableInteractionSource() }
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
+        Modifier.fillMaxWidth().zxPressSurface(interaction).clip(RoundedCornerShape(20.dp))
             .background(if (prominent) c.tint else c.glass)
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(role = Role.Button, onClick = onClick,
+                interactionSource = interaction,
+                indication = androidx.compose.foundation.LocalIndication.current)
             .testTag(tag)
             .heightIn(min = 76.dp).padding(horizontal = 18.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -316,10 +336,13 @@ private fun androidx.compose.foundation.layout.RowScope.ZxHomeShortcut(
     onClick: () -> Unit,
 ) {
     val c = ZhaoxiTheme.colors
+    val interaction = remember { MutableInteractionSource() }
     Column(
-        Modifier.weight(1f).clip(RoundedCornerShape(14.dp))
+        Modifier.weight(1f).zxPressSurface(interaction).clip(RoundedCornerShape(14.dp))
             .background(c.glass)
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(role = Role.Button, onClick = onClick,
+                interactionSource = interaction,
+                indication = androidx.compose.foundation.LocalIndication.current)
             .heightIn(min = 72.dp).padding(vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
