@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.text.input.KeyboardType
@@ -608,6 +609,7 @@ fun ZhaoxiMemoryManagementScene(memory: MemoryUiPort, scope: UiSceneRenderScope,
             revision++; cursor = null; selectedRecordId = null; editingDirty = false
         }
     }
+    BackHandler(enabled = editingDirty) { status = "请先保存或关闭正在编辑的记忆" }
     ZxPage("记忆管理", onBack = {
         if (editingDirty) status = "请先保存或关闭正在编辑的记忆"
         else scope.onBack()
