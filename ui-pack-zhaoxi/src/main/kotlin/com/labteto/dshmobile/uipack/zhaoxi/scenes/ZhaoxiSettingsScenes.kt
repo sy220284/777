@@ -182,6 +182,7 @@ fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneR
     val snap by preferences.snapshots.collectAsState(initial = UiHostPreferences())
     val jobs = rememberCoroutineScope()
     var status by remember { mutableStateOf<String?>(null) }
+    var triedQuietSave by remember { mutableStateOf(false) }
     var startTime by remember(snap.quietStartMinute) {
         mutableStateOf("%02d:%02d".format(snap.quietStartMinute / 60, snap.quietStartMinute % 60))
     }
@@ -215,7 +216,6 @@ fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneR
             status = null
         }, current / 60, current % 60, DateFormat.is24HourFormat(deviceContext)).show()
     }
-    var triedQuietSave by remember { mutableStateOf(false) }
     val quietError = if (triedQuietSave) zxQuietHoursError(startTime, endTime) else null
     ZxPage("通知", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
