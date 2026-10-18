@@ -8,6 +8,8 @@ import com.labteto.dshmobile.uicontract.UiAutomationSchedule
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxField
 import kotlinx.coroutines.CancellationException
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -75,7 +77,8 @@ fun ZhaoxiAutomationTasksScene(
     ZxPage("自动化", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("任务状态")
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("全部", "已计划", "运行中", "已暂停", "失败/受阻").forEach { label ->
                 ZxChip(label, filter == label) { filter = label }
             }
@@ -85,10 +88,14 @@ fun ZhaoxiAutomationTasksScene(
         if (filtered.isEmpty()) ZxEmpty("没有符合条件的任务", "可切换状态筛选或创建新任务")
         filtered.forEach { task ->
             val paused = task.status == com.labteto.dshmobile.automation.AutomationStatus.PAUSED
-            val actionAvailable = task.status !in setOf(
-                com.labteto.dshmobile.automation.AutomationStatus.CANCELLED,
-                com.labteto.dshmobile.automation.AutomationStatus.COMPLETED,
-                com.labteto.dshmobile.automation.AutomationStatus.BLOCKED,
+            val mayRetry = task.status in setOf(
+                com.labteto.dshmobile.automation.AutomationStatus.FAILED,
+                com.labteto.dshmobile.automation.AutomationStatus.PAUSED,
+                com.labteto.dshmobile.automation.AutomationStatus.SCHEDULED,
+            )
+            val canChangeScheduleState = task.status in setOf(
+                com.labteto.dshmobile.automation.AutomationStatus.SCHEDULED,
+                com.labteto.dshmobile.automation.AutomationStatus.PAUSED,
             )
             androidx.compose.foundation.layout.Column(
                 Modifier.fillMaxWidth().padding(vertical = 6.dp),
@@ -104,20 +111,34 @@ fun ZhaoxiAutomationTasksScene(
                         "上次执行失败：${error.take(160)}",
                         com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Warn)
                 }
-                task.runReceipts.lastOrNull()?.let { last ->
-                    ZxValueRow("最近执行", value = last.status.wireValue,
-                        sub = last.errorPreview?.take(100) ?: last.resultPreview?.take(100) ?: "无摘要")
+                task.runReceipts.takeLast(3).asReversed().forEachIndexed { index, receipt ->
+                    val result = receipt.errorPreview?.take(120)
+                        ?: receipt.resultPreview?.take(120) ?: "未提供运行摘要"
+                    ZxValueRow(if (index == 0) "最近执行" else "较早执行 ${index + 1}",
+                        value = receipt.status.wireValue, sub = result)
+                }
+                if (task.failureStreak > 0) {
+                    val policy = when {
+                        task.mode == AutomationMode.CHAT && task.recurringMinutes != null ->
+                            "聊天周期任务连续失败 3 次会由后台自动暂停"
+                        task.recurringMinutes != null -> "后台会按原周期继续排程"
+                        else -> "单次任务失败后需人工重试"
+                    }
+                    ZxFooterNote("连续失败 ${task.failureStreak} 次 · $policy")
                 }
                 if (task.status == com.labteto.dshmobile.automation.AutomationStatus.BLOCKED) {
                     ZxFooterNote("任务已阻断；请先检查所属会话、授权或编辑任务配置")
                 }
-                if (actionAvailable || task.status == com.labteto.dshmobile.automation.AutomationStatus.FAILED) {
+                if (mayRetry || canChangeScheduleState) {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 10.dp),
                         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        ZxChip("立即运行", false) {
+                        if (mayRetry) ZxChip(
+                            if (task.status == com.labteto.dshmobile.automation.AutomationStatus.FAILED)
+                                "重新执行" else "立即运行", false
+                        ) {
                             feedback = when (val result = automation.submit(AutomationUiCommand.RunNow(task.id))) {
                                 is AutomationUiReceipt.Applied -> "已提交执行；完成情况以运行记录为准"
                                 is AutomationUiReceipt.Rejected -> "执行未被接受：${result.reason}"
@@ -125,8 +146,12 @@ fun ZhaoxiAutomationTasksScene(
                             }
                         }
                         androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
-                        Text(if (paused) "已暂停" else "已启用", color = ZhaoxiTheme.colors.ink2)
-                        ZxSwitch(checked = !paused, onCheckedChange = { enabled ->
+                        Text(when (task.status) {
+                            com.labteto.dshmobile.automation.AutomationStatus.FAILED -> "失败待处理"
+                            com.labteto.dshmobile.automation.AutomationStatus.PAUSED -> "已暂停"
+                            else -> "按计划运行"
+                        }, color = ZhaoxiTheme.colors.ink2)
+                        if (canChangeScheduleState) ZxSwitch(checked = !paused, onCheckedChange = { enabled ->
                             feedback = when (val result = automation.submit(
                                 if (enabled) AutomationUiCommand.Resume(task.id)
                                 else AutomationUiCommand.Pause(task.id)
@@ -277,7 +302,14 @@ fun ZhaoxiAutomationEditorScene(
                 editing.lastError?.takeIf(String::isNotBlank)?.let {
                     ZxFooterNote("最近失败：${it.take(160)}")
                 }
-                ZxFooterNote("失败后的重试与调度由任务引擎控制；当前版本不支持单独配置失败重试策略")
+                ZxFooterNote(
+                    if (editing.mode == AutomationMode.CHAT && editing.recurringMinutes != null)
+                        "当前策略：聊天周期任务连续失败 3 次后自动暂停，任务列表可手动重新执行或恢复。"
+                    else if (editing.recurringMinutes != null)
+                        "当前策略：失败后仍按原定周期排程，可在任务列表查看回执并立即运行。"
+                    else "当前策略：单次任务失败后保留错误记录，可从任务列表手动重新执行。"
+                )
+                ZxFooterNote("以上为后台已生效策略；目前不支持为单个任务单独覆盖。")
             }
             feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
             Spacer(Modifier.height(12.dp))
