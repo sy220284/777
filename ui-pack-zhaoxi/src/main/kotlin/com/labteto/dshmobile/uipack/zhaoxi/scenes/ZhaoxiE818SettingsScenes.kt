@@ -263,7 +263,7 @@ fun ZhaoxiMemoryOverviewScene(memory: MemoryUiPort, settings: SettingsUiPort?, s
         ZxButton("刷新记忆统计", { refresh++ }, variant = ZxButtonVariant.Outline)
         ZxSection("管理与策略")
         if (settings != null) {
-            ZxNavRow("自动召回与自动记忆设置", sub = "当前设置直接读取现有 Owner") {
+            ZxNavRow("记忆设置", sub = "自动召回与自动记忆 · 读取当前保存状态") {
                 scope.onNavigate(UiSceneId("settings.memory_settings"))
             }
         }
