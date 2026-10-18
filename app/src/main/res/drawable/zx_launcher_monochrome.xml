@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Monochrome butterfly derived from the red-black hair ornament in the launcher portrait. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M52,53 C41,37 28,30 23,37 C18,45 30,56 49,59 Z
+                          M56,53 C67,37 80,30 85,37 C90,45 78,56 59,59 Z
+                          M49,59 C36,57 29,61 32,70 C36,79 45,74 52,62 Z
+                          M59,59 C72,57 79,61 76,70 C72,79 63,74 56,62 Z
+                          M53,50 C52,42 48,38 45,35
+                          M55,50 C56,42 60,38 63,35"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"/>
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M52,50 C53,49 55,49 56,50 L57,65 C55,69 53,69 51,65 Z" />
+</vector>
