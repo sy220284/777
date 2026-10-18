@@ -374,7 +374,8 @@ class ZhaoxiApplicationScenePack(
                         onOpenPersona = { galleryId ->
                             targets.galleryId = galleryId
                             scope.onNavigate(UiSceneId(if (galleryId == "new") "chat.persona_editor" else "chat.gallery_profile"))
-                        }, authoring = sec?.authoring, transfer = sec?.transfer)
+                        }, authoring = sec?.authoring, transfer = sec?.transfer,
+                        portraits = sec?.portraits)
                 }
             // 人物子页的图集 id 合法来源 = CurrentPersonaUiPort.read() 的 target.personaId；
             // 端口未注入或无当前人物时显式空态，不伪造目标。

@@ -1,6 +1,10 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
@@ -52,6 +56,31 @@ fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile
         if (plan == null) {
             com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("没有进行中的计划", "计划由工作运行时提供")
         } else {
+            val reported = plan.todos.count { it.ownerStatus.isNotBlank() }
+            val done = plan.todos.count {
+                it.ownerStatus.trim().lowercase() in setOf("completed", "done", "success", "finished", "已完成", "完成")
+            }
+            ZxSection("实际步骤状态")
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                if (plan.plan.isNotEmpty() && reported > 0) {
+                    CircularProgressIndicator(
+                        progress = { done.toFloat() / plan.plan.size },
+                        modifier = Modifier.height(54.dp),
+                        color = ZhaoxiTheme.colors.accent,
+                    )
+                }
+                Column {
+                    Text("$done / ${plan.plan.size} 步已报告完成", color = ZhaoxiTheme.colors.ink,
+                        fontSize = 16.sp)
+                    Text(
+                        if (reported == 0) "工作尚未提供步骤完成状态" else "仅统计明确完成的步骤，不代表任务整体成功",
+                        color = ZhaoxiTheme.colors.ink2, fontSize = 12.sp,
+                    )
+                }
+            }
             ZxSection("执行步骤")
             if (plan.plan.isEmpty()) ZxEmpty("暂无计划步骤", "运行时更新后会显示")
             plan.plan.forEachIndexed { index, step ->
@@ -68,6 +97,26 @@ fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile
                 snapshot.approval?.let { ZxNavRow("处理审批") {
                     scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.approval"))
                 } }
+            }
+            val history = remember(sessionId, snapshot) { workReads.historyPageForUi(sessionId, null) }
+            ZxSection("运行事件 · 最近 ${history.records.size} 条")
+            if (history.invalidated) {
+                ZxFooterNote("运行记录已发生变化，请返回后重新进入以获取最新事件")
+            }
+            if (history.records.isEmpty()) ZxEmpty("尚无运行事件", "开始执行后会显示真实工作事件")
+            history.records.takeLast(24).asReversed().forEach { event ->
+                val label = event.name.ifBlank { event.type }
+                ZxRow(label, "#${event.sequence} · " + (event.phase?.name ?: event.type) +
+                    (event.content.takeIf(String::isNotBlank)?.let { " · ${it.take(100)}" } ?: ""))
+            }
+            val tools = remember(sessionId, snapshot) { workReads.toolActivitiesForUi(sessionId) }
+            if (tools.isNotEmpty()) {
+                ZxSection("工具执行 · ${tools.size}")
+                tools.takeLast(16).asReversed().forEach { item ->
+                    ZxRow(item.name, item.phase.name +
+                        (item.errorCode?.let { " · 错误 ${it}" } ?: "") +
+                        (item.resultPreview?.let { " · ${it.take(90)}" } ?: ""))
+                }
             }
             if (canOpenEvidence) ZxNavRow("需求与证据") {
                 scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.requirement_evidence"))
