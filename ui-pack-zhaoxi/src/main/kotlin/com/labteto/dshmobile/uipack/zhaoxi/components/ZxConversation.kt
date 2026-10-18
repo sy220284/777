@@ -5,6 +5,11 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -130,15 +135,29 @@ data class ZxCap(val key: String, val label: String, val active: Boolean)
 @Composable
 fun ZxCapBar(caps: List<ZxCap>, onOpen: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = ZhaoxiTheme.colors
-    Row(modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(
+        modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         caps.forEach { cap ->
+            val interaction = remember(cap.key) { MutableInteractionSource() }
             Box(
                 Modifier
+                    .zxPressSurface(interaction)
                     .clip(RoundedCornerShape(999.dp))
                     .background(if (cap.active) c.tint else c.bg2)
-                    .clickable { onOpen(cap.key) }
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-            ) { Text(cap.label, fontSize = 12.sp, color = if (cap.active) c.accent else c.ink2) }
+                    .clickable(
+                        interactionSource = interaction,
+                        indication = androidx.compose.foundation.LocalIndication.current,
+                        role = Role.Button) { onOpen(cap.key) }
+                    .heightIn(min = 48.dp)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(cap.label, fontSize = 12.sp,
+                    color = if (cap.active) c.accentInk else c.ink2)
+            }
         }
     }
 }
