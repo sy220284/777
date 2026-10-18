@@ -57,12 +57,12 @@ fun ZhaoxiHomeScene(
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ZxChip("＋ 新会话", false) {
-                val receipt = sessions?.submit(SessionUiCommand.Create(null, LocalConversationMode.INDEPENDENT, LocalUsageMode.CHAT))
-                if (receipt == UiCommandReceipt.Accepted) scope.onNavigate(UiSceneId("conversation.chat"))
+                val receipt = sessions?.submit(SessionUiCommand.Create(snap.identity, LocalConversationMode.INDEPENDENT, LocalUsageMode.CHAT))
+                // The Host opens the requested route after the Session owner activates it.
             }
             ZxChip("＋ 工作", false) {
-                val receipt = sessions?.submit(SessionUiCommand.Create(null, LocalConversationMode.INDEPENDENT, LocalUsageMode.WORK))
-                if (receipt == UiCommandReceipt.Accepted) scope.onNavigate(UiSceneId("conversation.work"))
+                val receipt = sessions?.submit(SessionUiCommand.Create(snap.identity, LocalConversationMode.INDEPENDENT, LocalUsageMode.WORK))
+                // Route after activation through the Host.
             }
             ZxChip("搜索", false) { scope.onNavigate(UiSceneId("shell.search")) }
         }
@@ -79,7 +79,7 @@ fun ZhaoxiHomeScene(
         if (snap.sessions.isEmpty() && !snap.loading) ZxEmpty("还没有会话", "从一次新会话开始")
         snap.sessions.forEach { s ->
             ZxRow(s.title.take(40), s.summaryPreview.orEmpty().take(56),
-                onClick = { if (sessions?.submit(SessionUiCommand.Open(s.id)) == UiCommandReceipt.Accepted) scope.onNavigate(UiSceneId(if (s.usageMode == LocalUsageMode.WORK) "conversation.work" else "conversation.chat")) })
+                onClick = { sessions?.submit(SessionUiCommand.Open(s.id)) })
         }
     }
 }
@@ -110,9 +110,7 @@ fun ZhaoxiSearchScene(sessions: SessionUiPort?, scope: UiSceneRenderScope) {
         results.forEach { item ->
             ZxRow(item.title.take(60), item.summaryPreview.orEmpty().take(80),
                 onClick = {
-                    if (sessions?.submit(SessionUiCommand.Open(item.id)) == UiCommandReceipt.Accepted)
-                        scope.onNavigate(UiSceneId(if (item.usageMode == LocalUsageMode.WORK)
-                            "conversation.work" else "conversation.chat"))
+                    sessions?.submit(SessionUiCommand.Open(item.id))
                 })
         }
     }

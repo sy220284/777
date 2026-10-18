@@ -33,10 +33,15 @@ class ZhaoxiPackCoverageTest {
     }
 
     @Test
-    fun declaredScenesAreSubsetOfCatalog() {
-        // TODO(IMPL)：接入时构造完整端口注入的 ZhaoxiApplicationScenePack，
-        // 断言 manifest.scenes == renderers.keys，且 ⊆ fullSceneIds；
-        // 再经 UiApplicationPackRegistry.inspectArchitectureSlice（开发期探针）
-        // 与 Host 目录做正式准入核对。
+    fun missingFeatureOwnersNeverAdvertiseBusinessScenes() {
+        val preferences = java.lang.reflect.Proxy.newProxyInstance(
+            com.labteto.dshmobile.uicontract.HostPreferencesUiPort::class.java.classLoader,
+            arrayOf(com.labteto.dshmobile.uicontract.HostPreferencesUiPort::class.java),
+        ) { _, method, _ -> error("No business call expected: ${method.name}") } as com.labteto.dshmobile.uicontract.HostPreferencesUiPort
+        val pack = ZhaoxiApplicationScenePack(preferences)
+        assertEquals(setOf("settings.appearance", "settings.notifications", "settings.permissions").map(::UiSceneId).toSet(), pack.manifest.scenes)
+        assertEquals(pack.manifest.scenes, pack.renderers.keys)
+        assertTrue(pack.manifest.requiredCapabilities.isEmpty())
+        assertTrue(ZhaoxiUiPackManifest.fullSceneIds.containsAll(pack.manifest.scenes))
     }
 }

@@ -46,10 +46,14 @@ import com.labteto.dshmobile.uihost.UiSceneRenderScope
 @Composable
 fun ZhaoxiTimelineScene(chat: ChatUiPort, authorName: String) {
     val snap by chat.snapshots.collectAsState(initial = chat.snapshot())
+    var selectedMessage by remember { mutableStateOf<UiMessageSnapshot?>(null) }
+    selectedMessage?.let { message ->
+        androidx.compose.foundation.text.selection.SelectionContainer { Text(message.text, color = ZhaoxiTheme.colors.ink) }
+    }
     if (snap.messages.isEmpty()) ZxEmpty("还没有消息", "从下方输入框开始")
     snap.messages.forEach { m ->
         com.labteto.dshmobile.uipack.zhaoxi.components.ZxMessageRow(
-            m, authorName, onLongPress = {}, onBranchSelect = {},
+            m, authorName, onLongPress = { selectedMessage = it }, onBranchSelect = { index -> snap.identity?.let { chat.submit(ChatUiCommand.SelectVariant(it, m.id, index)) } },
         )
     }
 }
@@ -68,6 +72,7 @@ fun ZhaoxiMessageActionsScene(
         Spacer(Modifier.height(10.dp))
         if (message.editableText != null) ZxNavRow("修改并重发", sub = "编辑后作为新分支提交") { onEdit() }
         ZxNavRow("重新生成", sub = "从这条重试回复") { onRegenerate() }
+        ZxNavRow("阅读文本") { scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("conversation.reader")) }
         val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
         ZxNavRow("复制文本", sub = "") {
             clipboard.setText(androidx.compose.ui.text.AnnotatedString(message.text))

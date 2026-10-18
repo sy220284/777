@@ -53,8 +53,8 @@ fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile
         } else {
             plan.plan.forEachIndexed { index, step -> ZxRow(step, plan.todos.getOrNull(index)?.ownerStatus.orEmpty()) }
             // Approval and questions carry the actual Owner-issued pending identifier.
-            snapshot.question?.let { ZhaoxiQuestionScene(work, scope) }
-            snapshot.approval?.let { ZhaoxiApprovalScene(work, scope) }
+            snapshot.question?.let { ZxNavRow("回答计划问题") { scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.question")) } }
+            snapshot.approval?.let { ZxNavRow("处理审批") { scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.approval")) } }
         }
     }
 }

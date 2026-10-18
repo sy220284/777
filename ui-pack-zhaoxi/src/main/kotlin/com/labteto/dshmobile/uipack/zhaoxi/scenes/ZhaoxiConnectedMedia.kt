@@ -23,7 +23,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
     val offers = remember(settingsSnap.modelProfiles) { media.offers(settingsSnap.modelProfiles) }
     var offerId by rememberSaveable { mutableStateOf<String?>(null) }
     val offer = offers.firstOrNull { it.id == offerId } ?: offers.firstOrNull()
-    var prompt by rememberSaveable(sessionId) { mutableStateOf("") }
+    var prompt by rememberUiPrivateText("zhaoxi.media.$sessionId") { "" }
     var ratio by rememberSaveable { mutableStateOf("1:1") }
     var voice by rememberSaveable { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }

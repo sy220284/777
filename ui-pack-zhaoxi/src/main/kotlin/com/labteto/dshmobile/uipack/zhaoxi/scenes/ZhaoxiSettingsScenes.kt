@@ -112,21 +112,6 @@ fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneR
     }
 }
 
-/** settings.model / settings.behavior — 模型与行为（SettingsUiPort）。 */
-@Composable
-fun ZhaoxiModelSettingsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
-    val snap by settings.state.collectAsState(initial = null)
-    ZxPage("模型", onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(8.dp))
-        ZxSection("当前")
-        ZxValueRow("模型", value = snap?.toString()?.substringAfter("model=")?.take(32) ?: "—")
-        ZxNavRow("供应商与密钥", sub = "配置经 SettingsUiPort.configure*") {}
-        ZxSection("采样默认")
-        ZxValueRow("温度", value = "全局默认", sub = "人物级覆盖在人物编辑器 · 行为调节")
-        ZxFooterNote("保存为 suspend 写路径 · 失败以回执呈现")
-    }
-}
-
 /** settings.usage — 用量（UsageUiPort 只读）。 */
 @Composable
 fun ZhaoxiUsageScene(usage: com.labteto.dshmobile.uicontract.UsageUiPort, scope: UiSceneRenderScope) {

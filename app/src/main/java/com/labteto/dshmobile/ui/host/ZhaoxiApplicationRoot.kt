@@ -66,9 +66,11 @@ internal fun ZhaoxiApplicationRoot(
         configuration.screenWidthDp >= 600 -> UiWindowClass.MEDIUM
         else -> UiWindowClass.COMPACT
     }
-    val pack = remember(owner, app, preferences) {
+    val targets = androidx.compose.runtime.saveable.rememberSaveable(saver = com.labteto.dshmobile.uipack.zhaoxi.ZhaoxiSceneTargets.Saver) { com.labteto.dshmobile.uipack.zhaoxi.ZhaoxiSceneTargets() }
+    val pack = remember(owner, app, preferences, targets) {
         ZhaoxiApplicationScenePack(
             preferences = preferences,
+            targets = targets,
             settings = owner.settingsUiPort,
             conversations = ZhaoxiConversationPorts(
                 chat = owner.chat,
@@ -141,6 +143,7 @@ internal fun ZhaoxiApplicationRoot(
     val systemOperations = remember { com.labteto.dshmobile.uihost.UiHostSystemOperationOwner() }
     androidx.compose.runtime.CompositionLocalProvider(
         com.labteto.dshmobile.uihost.LocalUiHostSystemOperationOwner provides systemOperations,
+        com.labteto.dshmobile.uihost.LocalUiPrivateTextCipher provides owner.privateTextCipher,
     ) {
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().systemBarsPadding()) {
     when (val result = selected) {
@@ -155,13 +158,19 @@ internal fun ZhaoxiApplicationRoot(
                     admission.pack.manifest, UiSceneId("route.home"), links)
             }
             val snapshot by owner.sessions.snapshots.collectAsState(initial = owner.sessions.snapshot())
+            val conversationRequest by owner.conversationNavigation.collectAsState()
+            val conversationScene = activatedConversationScene(conversationRequest, snapshot)
             val requested by owner.sceneRequest.collectAsState()
             val request = requested?.takeIf { id -> id in LocalUiSceneCatalog.requirements.map { it.id.value } }
             val access = admission.RenderHostedScene(
                 navigation = navigation,
                 onAtRootBack = onAtRootBack,
-                requestedDeepLinkKey = request,
-                onDeepLinkProcessed = { key, _ -> owner.consumeSceneRequest(key) },
+                requestedDeepLinkKey = conversationScene ?: request,
+                onDeepLinkProcessed = { key, _ ->
+                    if (key == conversationScene && owner.conversationNavigation.value == conversationRequest)
+                        owner.conversationNavigation.value = null
+                    else owner.consumeSceneRequest(key)
+                },
                 navigationStateScope = snapshot.identity?.sessionId.orEmpty() + ":" + snapshot.usageMode.name,
             )
             if (access !is com.labteto.dshmobile.uihost.UiSceneRenderAccess.Ready)

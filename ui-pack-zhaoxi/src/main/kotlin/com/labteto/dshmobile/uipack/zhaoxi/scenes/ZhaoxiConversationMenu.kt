@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
 import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Text
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.uicontract.*
@@ -11,7 +14,8 @@ import com.labteto.dshmobile.uihost.*
 import kotlinx.coroutines.launch
 
 @Composable
-fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSecondaryPorts?, scope: UiSceneRenderScope) {
+fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSecondaryPorts?, scope: UiSceneRenderScope, renderSlot: @Composable (UiSceneId) -> Unit = {}) {
+    var selectedSlot by remember { mutableStateOf<UiSceneId?>(null) }
     var receipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
     var feedback by remember { mutableStateOf<String?>(null) }
     val jobs = rememberCoroutineScope()
@@ -21,7 +25,7 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
         val snap by sessions.snapshots.collectAsState(initial = sessions.snapshot())
         ZxSwitchRow("工作模式", "切换当前会话模式", snap.usageMode == LocalUsageMode.WORK) { work ->
             receipt = sessions.submit(SessionUiCommand.SelectMode(if (work) LocalUsageMode.WORK else LocalUsageMode.CHAT))
-            if (receipt?.admitted() == true) scope.onNavigate(UiSceneId(if (work) "conversation.work" else "conversation.chat"))
+            // Wait for the Session owner activation before Host navigation.
         }
     }
     conv?.let { ports ->
@@ -59,11 +63,20 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
             ZxNavRow("待回答") { scope.onNavigate(UiSceneId("work.question")) }
         } else {
             ZxNavRow("选择人物") { scope.onNavigate(UiSceneId("chat.persona_picker")) }
+            ZxNavRow("当前人物采样") { scope.onNavigate(UiSceneId("chat.character_tuning")) }
             ZxNavRow("群成员") { scope.onNavigate(UiSceneId("chat.group_members")) }
             ZxNavRow("群公告") { scope.onNavigate(UiSceneId("chat.group_announcement")) }
             ZxNavRow("回复建议") { scope.onNavigate(UiSceneId("chat.reply_suggestions")) }
         }
     }
+    val slotChoices = if (conv?.workMode() == true) listOf(
+        "conversation.ui_document" to "交互文档", "work.plan_review" to "计划审查", "work.team" to "团队运行",
+        "work.requirement_evidence" to "需求与证据", "work.capabilities" to "能力清单",
+    ) else listOf("conversation.ui_document" to "交互文档")
+    slotChoices.forEach { (id, label) -> ZxNavRow(label) {
+        selectedSlot = if (selectedSlot?.value == id) null else UiSceneId(id)
+    } }
+    selectedSlot?.let { id -> Box(Modifier.fillMaxWidth().height(340.dp)) { renderSlot(id) } }
     ZxNavRow("生成文档") { scope.onNavigate(UiSceneId("conversation.ui_document_generate")) }
     ZxNavRow("媒体生成与结果") { scope.onNavigate(UiSceneId("media.creation")) }
     ZxNavRow("工作区") { scope.onNavigate(UiSceneId("route.workspace")) }

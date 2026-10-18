@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -72,7 +73,7 @@ fun ZxButton(
     Box(
         modifier
             .widthIn(min = 64.dp)
-            .height(44.dp)
+            .heightIn(min = 48.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(bg)
             .then(
@@ -99,7 +100,7 @@ fun ZxIconButton(
     val c = ZhaoxiTheme.colors
     Box(
         modifier
-            .size(38.dp)
+            .size(48.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick, role = Role.Button)
             .semantics { this.contentDescription = contentDescription }

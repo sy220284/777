@@ -135,6 +135,10 @@ fun ZhaoxiToolsScene(
     tools: com.labteto.dshmobile.uicontract.ToolsUiPort,
     scope: UiSceneRenderScope,
 ) {
+    val co = rememberCoroutineScope()
+    var feedback by remember { mutableStateOf<String?>(null) }
+    var endpoint by remember { mutableStateOf("") }
+    var serverId by remember { mutableStateOf("") }
     val skills by produceState(initialValue = emptyList<com.labteto.dshmobile.uicontract.UiSkillSnapshot>(), tools) {
         value = runCatching { tools.installedSkills() }.getOrDefault(emptyList())
     }
@@ -143,6 +147,9 @@ fun ZhaoxiToolsScene(
     }
     ZxPage("工具", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
+        feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
+        ZxSection("可用能力")
+        tools.capabilityCatalogue().forEach { capability -> ZxRow(capability.name, "${capability.family} · ${capability.access} · ${capability.approval}") }
         ZxSection("技能")
         skills.forEach { s ->
             ZxRow(s.toString().substringBefore(',').substringAfter('=').take(40), "已安装")
@@ -152,8 +159,17 @@ fun ZhaoxiToolsScene(
             ZxRow(p.toString().substringBefore(',').substringAfter('=').take(40), "生命周期快照")
         }
         ZxSection("MCP 服务器")
+        com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(serverId, { serverId = it }, placeholder = "服务器名称")
+        com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(endpoint, { endpoint = it }, placeholder = "HTTP 地址")
+        ZxButton("连接 HTTP 服务器", { co.launch {
+            try { feedback = tools.connectHttp(serverId, endpoint) }
+            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (failure: Exception) { feedback = failure.message ?: "连接失败" }
+        } }, enabled = serverId.isNotBlank() && endpoint.isNotBlank())
         servers.forEach { s ->
-            ZxRow(s.toString().take(48), "")
+            ZxRow(s.id, "${s.connection} · ${s.tools.size} 个工具")
+            ZxButton("检查连接", { co.launch { feedback = tools.checkServerHealth(s.id).toString() } })
+            ZxButton("断开", { co.launch { feedback = tools.disconnect(s.id) } })
         }
         ZxFooterNote("变更经 ToolsUiPort.submit · Applied/Failed 回执呈现")
     }

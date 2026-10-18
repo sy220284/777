@@ -67,6 +67,7 @@ import kotlinx.coroutines.flow.StateFlow
  */
 class ZhaoxiApplicationScenePack(
     private val preferences: HostPreferencesUiPort,
+    private val targets: ZhaoxiSceneTargets = ZhaoxiSceneTargets(),
     private val settings: SettingsUiPort? = null,
     private val conversations: ZhaoxiConversationPorts? = null,
     private val usageOwner: UsageUiPort? = null,
@@ -91,9 +92,7 @@ class ZhaoxiApplicationScenePack(
     }
 
     // Ephemeral selection only: the FilesUiPort remains the data and authorization owner.
-    private var workspacePreviewPath by mutableStateOf("")
-    private var selectedMessage by mutableStateOf<Pair<UiSessionIdentity, String>?>(null)
-    private var selectedGalleryId by mutableStateOf<String?>(null)
+
 
     // ---- 条件场景集合（镜像 V6ApplicationScenePack）----
 
@@ -284,14 +283,14 @@ class ZhaoxiApplicationScenePack(
             // ---- 会话域 ----
             "conversation.chat" -> conv?.let {
                 ZhaoxiChatScene(it.chat, it.drafts, it.reading, it.history, authorName = "助手", scope,
-                    onMessage = { identity, id -> selectedMessage = identity to id; scope.onNavigate(UiSceneId("conversation.message_actions")) },
-                    menu = { ZhaoxiConversationMenu(conversations, secondary, scope) })
+                    onMessage = { identity, id -> targets.message = identity to id; scope.onNavigate(UiSceneId("conversation.message_actions")) },
+                    menu = { ZhaoxiConversationMenu(conversations, secondary, scope, renderSlot = { RenderScene(it, scope) }) })
             }
             "conversation.work" -> conv?.let { ZhaoxiWorkScene(it.work, it.drafts, it.reading, it.history, scope,
-                onMessage = { identity, id -> selectedMessage = identity to id; scope.onNavigate(UiSceneId("conversation.message_actions")) },
-                menu = { ZhaoxiConversationMenu(conversations, secondary, scope) }) }
+                onMessage = { identity, id -> targets.message = identity to id; scope.onNavigate(UiSceneId("conversation.message_actions")) },
+                menu = { ZhaoxiConversationMenu(conversations, secondary, scope, renderSlot = { RenderScene(it, scope) }) }) }
             "conversation.header" -> conv?.let {
-                ZhaoxiConversationMenu(conversations, secondary, scope)
+                ZhaoxiConversationMenu(conversations, secondary, scope, renderSlot = { RenderScene(it, scope) })
             }
             "conversation.timeline" -> conv?.let { ZhaoxiTimelineScene(it.chat, authorName = "助手") }
             "conversation.composer" -> conv?.let {
@@ -318,7 +317,7 @@ class ZhaoxiApplicationScenePack(
                 val workMode = conv?.workMode() == true
                 val activeIdentity = if (workMode) conv?.work?.snapshot()?.identity else conv?.chat?.snapshot()?.identity
                 val messages = if (workMode) conv?.work?.snapshot()?.messages else conv?.chat?.snapshot()?.messages
-                val msg = selectedMessage?.takeIf { it.first == activeIdentity }?.second?.let { id -> messages?.firstOrNull { it.id == id } }
+                val msg = targets.message?.takeIf { it.first == activeIdentity }?.second?.let { id -> messages?.firstOrNull { it.id == id } }
                 if (msg == null) ZxEmpty("没有消息", "会话为空") else when (scene.value) {
                     "conversation.edit" -> ZhaoxiEditScene(msg, conv!!.chat, scope, if (workMode) conv.work else null)
                     "chat.branches" -> ZhaoxiBranchesScene(msg, conv!!.chat, scope)
@@ -362,23 +361,23 @@ class ZhaoxiApplicationScenePack(
                 (conv?.gallery ?: sec?.gallery)?.let {
                     ZhaoxiPersonaGalleryScene(it, scope,
                         onOpenPersona = { galleryId ->
-                            selectedGalleryId = galleryId
+                            targets.galleryId = galleryId
                             scope.onNavigate(UiSceneId(if (galleryId == "new") "chat.persona_editor" else "chat.gallery_profile"))
                         }, authoring = sec?.authoring, transfer = sec?.transfer)
                 }
             // 人物子页的图集 id 合法来源 = CurrentPersonaUiPort.read() 的 target.personaId；
             // 端口未注入或无当前人物时显式空态，不伪造目标。
-            "chat.gallery_profile", "chat.persona_editor", "chat.world_book", "chat.character_tuning",
+            "chat.gallery_profile", "chat.persona_editor", "chat.world_book",
             "chat.gallery_portrait", "chat.gallery_delete", "chat.diary", "route.diary" -> {
                 val personaTarget = (sec?.currentPersona?.read() as?
                     com.labteto.dshmobile.uicontract.UiCurrentPersonaReceipt.Loaded)
                     ?.snapshot?.target
-                val gid = selectedGalleryId ?: personaTarget?.personaId
+                val gid = targets.galleryId ?: personaTarget?.personaId
                 if (gid == null) ZxEmpty("未指定人物", "请从人物图集进入 · 目标由宿主导航提案携带")
                 else when (scene.value) {
                     "chat.gallery_profile" -> ZhaoxiPersonaProfileScene(gid, sec?.gallery ?: conv?.gallery,
                         conv?.selection ?: sec?.selection, conv?.stories, sec?.transfer, scope)
-                    "chat.persona_editor", "chat.world_book", "chat.character_tuning" ->
+                    "chat.persona_editor", "chat.world_book" ->
                         if (sec?.authoring != null) ZhaoxiPersonaEditorScene(sec.authoring, gid, scope)
                         else ZxEmpty("端口未注入", "chat.persona_authoring 能力未连接")
                     "chat.gallery_portrait" ->
@@ -386,15 +385,14 @@ class ZhaoxiApplicationScenePack(
                         else ZxEmpty("端口未注入", "chat.gallery_portrait 能力未连接")
                     "chat.gallery_delete" ->
                         if (conv?.galleryDeletion != null)
-                            if (personaTarget != null && personaTarget.personaId == gid)
-                                ZxGalleryDeleteScene(conv.galleryDeletion, gid, "当前人物", personaTarget.identity, scope)
-                            else ZxEmpty("需先选择当前人物", "删除前需取得原业务 Owner 的人物身份授权")
+                            ZxGalleryDeleteScene(conv.galleryDeletion, gid, "所选人物", identity, scope, sec?.gallery ?: conv.gallery)
                         else ZxEmpty("端口未注入", "图集删除能力未连接")
                     else ->
                         if (sec?.diary != null) ZhaoxiDiaryScene(sec.diary, gid, scope)
                         else ZxEmpty("端口未注入", "chat.diary_manage 能力未连接")
                 }
             }
+            "chat.character_tuning" -> sec?.currentPersona?.let { ZhaoxiCurrentPersonaTuning(it, scope) }
             "chat.group_members" -> conv?.groups?.let { ZxGroupMembersScene(it, scope) }
             "chat.group_announcement" -> conv?.groups?.let { ZxGroupAnnouncementScene(it, scope) }
 
@@ -410,11 +408,11 @@ class ZhaoxiApplicationScenePack(
 
             // ---- 工作区 ----
             "route.workspace" -> ZhaoxiWorkspaceScene(sec?.files ?: conv?.files, scope) { filePath ->
-                workspacePreviewPath = filePath
+                targets.workspacePath = filePath
                 scope.onNavigate(UiSceneId("workspace.preview"))
             }
             "workspace.preview" -> ZhaoxiWorkspacePreviewScene(
-                sec?.files ?: conv?.files, workspacePreviewPath, scope)
+                sec?.files ?: conv?.files, targets.workspacePath, scope)
 
             // ---- 设置 ----
             "settings.root", "route.settings" -> ZhaoxiSettingsHomeScene(scope)
@@ -440,7 +438,7 @@ class ZhaoxiApplicationScenePack(
 
     /**
      * 朝夕场景转场层（E8.16 实装）：ZhaoxiTheme + ZhaoxiBackground 实绘
-     * （底色纵向渐变 + 环境光双径向）+ AnimatedContent 场景转场
+     * （底色纵向渐变 + 环境光双径向）+ 单一内容树入场转场
      * （淡入 + 16dp 上移，经 ZhaoxiMotion.spec 走 reduced-motion 降级）。
      * Host 仍是唯一导航提交方，本层只做呈现，不保留旧场景。
      */
@@ -465,7 +463,11 @@ class ZhaoxiApplicationScenePack(
         val reduced = android.provider.Settings.Global.getFloat(
             context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f
         ) == 0f
-        ZhaoxiTheme(hue = hue, dark = dark, reducedMotion = reduced) {
+        val windowDensity = androidx.compose.ui.platform.LocalDensity.current
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(windowDensity.density, windowDensity.fontScale * appearance.textScale),
+        ) {
+        ZhaoxiTheme(hue = hue, dark = dark, reducedMotion = reduced || appearance.motionScale == 0f) {
             Box(Modifier.fillMaxSize()) {
                 ZhaoxiBackground(Modifier.fillMaxSize())
                 // Only the incoming content is live; do not retain an outgoing command tree.
@@ -480,6 +482,7 @@ class ZhaoxiApplicationScenePack(
                     translationY = (1f - progress.value) * 16f * density
                 }) { content() }
             }
+        }
         }
     }
 }

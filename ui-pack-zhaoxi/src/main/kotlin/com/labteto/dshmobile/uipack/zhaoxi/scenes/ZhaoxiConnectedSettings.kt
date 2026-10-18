@@ -119,7 +119,7 @@ fun ZhaoxiRuntimeSettingsScene(settings: SettingsUiPort, scope: UiSceneRenderSco
     var main by rememberSaveable(snap.mainMaxSteps) { mutableStateOf(snap.mainMaxSteps.toString()) }
     var sub by rememberSaveable(snap.subagentMaxSteps) { mutableStateOf(snap.subagentMaxSteps.toString()) }
     var attempts by rememberSaveable(snap.modelAttempts) { mutableStateOf(snap.modelAttempts.toString()) }
-    var rules by rememberSaveable(snap.userRules) { mutableStateOf(snap.userRules) }
+    var rules by rememberUiPrivateText("zhaoxi.rules", snap.userRules) { snap.userRules }
     var status by remember { mutableStateOf<String?>(null) }
     ZxPage("行为与运行", onBack = { scope.onBack() }) {
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
@@ -205,7 +205,7 @@ fun ZhaoxiMemoryManagementScene(memory: MemoryUiPort, scope: UiSceneRenderScope)
         ZxField(query, { query = it }, placeholder = "搜索记忆")
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
         page.records.forEach { record ->
-            var text by rememberSaveable(record.id, record.updatedAt) { mutableStateOf(record.content) }
+            var text by rememberUiPrivateText("zhaoxi.memory.${record.id}", record.updatedAt) { record.content }
             ZxField(text, { text = it }, Modifier.fillMaxWidth())
             ZxButton("保存", { status = memory.submit(MemoryUiCommand.Update(record, text, record.pinned)).toString(); revision++ })
             ZxButton("遗忘", { status = memory.submit(MemoryUiCommand.Forget(record)).toString(); revision++ })

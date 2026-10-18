@@ -19,12 +19,19 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
-private val PersonaDraftSaver = Saver<UiPersonaDraft, String>(
-    save = { Json.encodeToString(it) }, restore = { Json.decodeFromString<UiPersonaDraft>(it) })
-
 @Composable
 fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAuthoringSnapshot?, scope: UiSceneRenderScope) {
-    var draft by rememberSaveable(snapshot?.galleryId, snapshot?.revision, stateSaver = PersonaDraftSaver) { mutableStateOf(snapshot?.draft ?: UiPersonaDraft()) }
+    var encodedDraft by rememberUiPrivateText("zhaoxi.persona.${snapshot?.galleryId ?: "new"}", snapshot?.revision) {
+        Json.encodeToString(snapshot?.draft ?: UiPersonaDraft())
+    }
+    val draftState = object : MutableState<UiPersonaDraft> {
+        override var value: UiPersonaDraft
+            get() = Json.decodeFromString(encodedDraft)
+            set(value) { encodedDraft = Json.encodeToString(value) }
+        override fun component1(): UiPersonaDraft = value
+        override fun component2(): (UiPersonaDraft) -> Unit = { value = it }
+    }
+    var draft by draftState
     var status by remember { mutableStateOf<String?>(null) }
     var revision by remember(snapshot?.revision) { mutableStateOf(snapshot?.revision) }
     var galleryId by remember(snapshot?.galleryId) { mutableStateOf(snapshot?.galleryId) }
@@ -55,14 +62,14 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
         ZxChip("添加世界书条目", false) { draft = draft.copy(lore = draft.lore + UiPersonaLore(java.util.UUID.randomUUID().toString(), "", "")) }
         ZxSection("行为调节")
         ZxField(draft.samplingTemperaturePosition?.toString().orEmpty(), { value ->
-            if (value.isEmpty() || value.toIntOrNull() in 0..100) draft = draft.copy(samplingTemperaturePosition = value.toIntOrNull())
+            if (value.isEmpty() || value.toIntOrNull()?.let { it in 0..100 } == true) draft = draft.copy(samplingTemperaturePosition = value.toIntOrNull())
         }, placeholder = "采样位置 0–100，留空沿用全局")
         ZxChip("恢复全局采样", false) { draft = draft.copy(samplingTemperaturePosition = null, legacySamplingPosition = null) }
         ZxButton("保存归档", { jobs.launch {
             val id = galleryId; val rev = revision
             val result = if (id != null && rev != null) authoring.save(id, rev, draft) else authoring.create(draft)
             when (result) {
-                is UiPersonaAuthoringReceipt.Saved -> { galleryId = result.galleryId; revision = result.revision; status = "归档已保存；应用到会话请从人物档案选择" }
+                is UiPersonaAuthoringReceipt.Saved -> { galleryId = result.galleryId; revision = result.revision; status = "归档已保存；应用到会话请从人物档案选择"; scope.onBack() }
                 else -> status = result.toString()
             }
         } }, enabled = draft.name.isNotBlank())
@@ -89,7 +96,7 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
             ZxButton("用于当前聊天", { snap.identity?.let { status = owner.submit(PersonaSelectionUiCommand.SelectForCurrentChat(it, galleryId)).userHint() } }, enabled = snap.canSelectForCurrentChat)
             ZxButton("开始新故事", { snap.identity?.let { status = owner.submit(PersonaSelectionUiCommand.StartStory(it, galleryId, null, true)).userHint() } }, enabled = snap.canStartStory)
             entry?.stories?.forEach { story ->
-                var notes by rememberSaveable(story.id, story.notes) { mutableStateOf(story.notes) }
+                var notes by rememberUiPrivateText("zhaoxi.story.$galleryId.${story.id}", story.notes) { story.notes }
                 ZxRow(story.title, "${story.messageCount} 条消息 · ${story.storyStage}")
                 ZxButton("继续故事", { snap.identity?.let { status = owner.submit(PersonaSelectionUiCommand.StartStory(it, galleryId, story.id, false)).userHint() } }, enabled = snap.canStartStory)
                 ZxField(notes, { notes = it }, placeholder = "故事备注")
@@ -121,10 +128,46 @@ fun ZhaoxiPortraitEditor(port: PersonaPortraitUiPort, galleryId: String, scope: 
     }
     ZxPage("人物画像", onBack = { scope.onBack() }) {
         val bytes = (preview as? UiPersonaPortraitPreviewReceipt.Ready)?.bytes
-        val image = remember(bytes) { bytes?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() } }
+        val image by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, bytes) {
+            if (bytes != null) try {
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    android.graphics.ImageDecoder.decodeBitmap(android.graphics.ImageDecoder.createSource(java.nio.ByteBuffer.wrap(bytes))) { decoder, info, _ ->
+                        decoder.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
+                        var sample = 1
+                        while (maxOf(info.size.width, info.size.height) / sample > 1600) sample *= 2
+                        decoder.setTargetSampleSize(sample)
+                    }.asImageBitmap()
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (failure: Exception) { status = failure.message ?: "画像无法解码" }
+        }
         image?.let { Image(it, "人物画像", Modifier.fillMaxWidth().height(280.dp)) }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
         ZxButton("导入画像", { pick(galleryId) })
         ZxButton("移除画像", { jobs.launch { status = port.submit(PersonaPortraitUiCommand.Remove(galleryId)).toString(); revision++ } })
+    }
+}
+
+@Composable
+fun ZhaoxiCurrentPersonaTuning(port: CurrentPersonaUiPort, scope: UiSceneRenderScope) {
+    val initial = remember(port) { port.read() }
+    val snapshot = (initial as? UiCurrentPersonaReceipt.Loaded)?.snapshot
+    val jobs = rememberCoroutineScope()
+    var status by remember { mutableStateOf<String?>(null) }
+    var value by rememberUiPrivateText("zhaoxi.tuning.${snapshot?.target?.personaId}") { snapshot?.samplingPosition?.toString().orEmpty() }
+    ZxPage("当前人物采样", onBack = { scope.onBack() }) {
+        if (snapshot == null) ZxEmpty("当前没有人物", "先在会话中选择人物")
+        else {
+            ZxField(value, { value = it }, placeholder = "采样位置 0–100")
+            ZxButton("应用到当前人物", { jobs.launch {
+                val position = value.toIntOrNull()
+                status = if (position == null || position !in 0..100) "请输入 0–100 的整数"
+                else port.save(snapshot.target, snapshot.draft.copy(samplingTemperaturePosition = position)).toString()
+            } })
+            ZxButton("恢复全局采样", { jobs.launch {
+                status = port.save(snapshot.target, snapshot.draft.copy(samplingTemperaturePosition = null, legacySamplingPosition = null)).toString()
+            } })
+        }
+        status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
     }
 }

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -98,7 +99,7 @@ fun ZhaoxiPersonaGalleryScene(
                     columns = GridCells.Fixed(2),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.height(((r.entries.size + 1) / 2 * 148).dp),
+                    modifier = Modifier.heightIn(min = 148.dp, max = 600.dp),
                 ) {
                     items(r.entries) { e ->
                         ZxPersonaCard(e.name, "${e.stories.size} 段故事", onClick = { onOpenPersona(e.id) })
@@ -127,94 +128,42 @@ fun ZhaoxiPersonaEditorScene(
     }
 }
 
-/** chat.gallery_portrait — 人物画像（含 chat.gallery_save 存图集入口）。 */
-@Composable
-fun ZhaoxiPortraitScene(
-    portraits: PersonaPortraitUiPort,
-    galleryId: String,
-    personaName: String,
-    scope: UiSceneRenderScope,
-) {
-    val co = androidx.compose.runtime.rememberCoroutineScope()
-    ZxPage("$personaName · 画像", onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(8.dp))
-        ZxPortraitCard(
-            personaName = personaName,
-            traits = listOf("气质" to "由日记与相处生成", "画像来源" to "preview($galleryId)"),
-            onRegenerate = { co.launch { portraits.preview(galleryId) } },
-            onSave = { /* PersonaGallerySaveUiPort 由组合根绑定 */ },
-        )
-    }
-}
-
-/** chat.gallery_story — 图集故事章节列表。 */
-@Composable
-fun ZxGalleryStoryScene(
-    entry: UiPersonaGalleryEntry,
-    stories: PersonaStoryUiPort?,
-    scope: UiSceneRenderScope,
-) {
-    ZxPage("${entry.name} · 故事", onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(8.dp))
-        if (entry.stories.isEmpty()) ZxEmpty("还没有故事", "故事由相处事件凝结")
-        entry.stories.forEach { s ->
-            ZxStoryCard(
-                ZxStoryChapter(s.id, s.title, s.notes, "${s.messageCount} 条消息 · ${s.storyStage.ifBlank { "未分章" }}"),
-                onOpen = {}, onContinue = {},
-            )
-            Spacer(Modifier.height(8.dp))
-        }
-        ZxFooterNote("续写消耗一次对话额度")
-    }
-}
-
 /** chat.gallery_delete — 删除人物（确认弹窗，Danger）。 */
 @Composable
 fun ZxGalleryDeleteScene(
     deletion: PersonaGalleryDeletionUiPort,
     galleryId: String,
     personaName: String,
-    identity: com.labteto.dshmobile.uicontract.UiSessionIdentity?,
+    identity: UiSessionIdentity?,
     scope: UiSceneRenderScope,
+    gallery: PersonaGalleryUiPort? = null,
 ) {
-    val co = androidx.compose.runtime.rememberCoroutineScope()
-    var done by remember { mutableStateOf<String?>(null) }
-    ZxPage("删除人物", onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(24.dp))
-        ZxDialog(
-            title = "删除 $personaName？",
-            body = "删除归档、故事与公开日记 · 不可恢复 · 私密日记按策略处理",
-            confirmText = "删除",
-            onConfirm = {
-                co.launch {
-                    val r = deletion.delete(DeletePersonaGalleryCommand(identity, galleryId))
-                    done = r.toString()
-                }
-            },
-            onDismiss = { scope.onBack() },
-        )
-        done?.let { Text(it.take(120), fontSize = 11.sp, color = ZhaoxiTheme.colors.ink3) }
+    val jobs = androidx.compose.runtime.rememberCoroutineScope()
+    val entry by produceState<UiPersonaGalleryEntry?>(null, galleryId) {
+        value = (gallery?.read() as? UiPersonaGalleryReadReceipt.Available)?.entries?.firstOrNull { it.id == galleryId }
     }
-}
-
-/** chat.persona_transfer — 迁移/导出人物。 */
-@Composable
-fun ZxPersonaTransferScene(
-    transfer: PersonaTransferUiPort,
-    galleryId: String,
-    personaName: String,
-    scope: UiSceneRenderScope,
-) {
-    ZxPage("迁移人物 · $personaName", onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(8.dp))
-        ZxTransferSheet(
-            personaName = personaName,
-            onExport = { /* ExportPersonaDocumentCommand(galleryId, format) 由宿主触发 SAF */ },
-            onImport = { /* ImportPersonaDocumentCommand(bytes…) 由宿主文件选择器触发 */ },
-            onCopy = {},
-            onDestructiveMove = {},
-        )
-        ZxFooterNote("导出/导入上限 ${transfer.maxImportBytes} bytes · 由 Owner 校验")
+    var result by remember { mutableStateOf<UiPersonaGalleryDeletionReceipt?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    ZxPage("删除人物", onBack = { scope.onBack() }) {
+        when (val receipt = result) {
+            is UiPersonaGalleryDeletionReceipt.Deleted -> {
+                Text("人物归档已删除", color = ZhaoxiTheme.colors.ink)
+                receipt.portraitCleanupWarning?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
+                if (receipt.sessionSync == UiStorySessionSync.DEFERRED) Text("当前会话将在业务状态允许时同步清理", color = ZhaoxiTheme.colors.ink2)
+                ZxChip("返回图集", false) { scope.onNavigate(UiSceneId("route.persona_gallery")) }
+            }
+            else -> {
+                if (busy) Text("正在删除…", color = ZhaoxiTheme.colors.ink2)
+                else ZxDialog("删除 ${entry?.name ?: personaName}？", "将删除该人物归档、故事与公开日记，无法恢复", "删除", {
+                    jobs.launch {
+                        busy = true
+                        try { result = deletion.delete(DeletePersonaGalleryCommand(identity, galleryId)) }
+                        finally { busy = false }
+                    }
+                }, { scope.onBack() })
+                if (receipt != null) Text(receipt.toString(), color = ZhaoxiTheme.colors.ink2)
+            }
+        }
     }
 }
 
@@ -239,7 +188,7 @@ fun ZxGroupMembersScene(groups: ChatGroupUiPort, scope: UiSceneRenderScope) {
 @Composable
 fun ZxGroupAnnouncementScene(groups: ChatGroupUiPort, scope: UiSceneRenderScope) {
     val snap by groups.snapshots.collectAsState(initial = groups.snapshot())
-    var text by rememberSaveable(snap.identity?.sessionId, snap.announcement) { mutableStateOf(snap.announcement) }
+    var text by com.labteto.dshmobile.uihost.rememberUiPrivateText("zhaoxi.announcement.${snap.identity?.sessionId}", snap.announcement) { snap.announcement }
     var receipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
     ZxPage("群公告", onBack = { scope.onBack() }) {
         CommandFeedback(receipt)
