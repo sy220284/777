@@ -210,9 +210,8 @@ fun ZxRow(
     modifier: Modifier = Modifier,
     mono: Boolean = false,
     onClick: (() -> Unit)? = null,
-    trailing: @Composable () -> Unit = {
-        ZxIcon("chevron-right", modifier = Modifier.width(18.dp), description = null)
-    },
+    trailing: @Composable () -> Unit = {},
+    showChevron: Boolean = true,
 ) {
     val c = ZhaoxiTheme.colors
     val interaction = remember { MutableInteractionSource() }
@@ -237,5 +236,8 @@ fun ZxRow(
                 maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
         trailing()
+        if (onClick != null && showChevron) {
+            ZxIcon("chevron-right", modifier = Modifier.width(18.dp), description = null)
+        }
     }
 }
