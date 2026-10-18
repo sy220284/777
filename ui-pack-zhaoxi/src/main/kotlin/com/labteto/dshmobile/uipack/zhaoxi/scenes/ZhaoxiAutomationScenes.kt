@@ -218,6 +218,8 @@ fun ZhaoxiAutomationEditorScene(
     var firstRun by remember(editingTaskId, editing?.id) {
         mutableStateOf(formatter.format(java.util.Date(editing?.nextRunAt ?: (System.currentTimeMillis() + 3_600_000L))))
     }
+    // Declare before the native picker so a newly chosen valid time clears stale errors.
+    var firstRunError by remember(editingTaskId) { mutableStateOf<String?>(null) }
     val androidContext = LocalContext.current
     fun chooseFirstRun() {
         val calendar = Calendar.getInstance().apply {
@@ -236,6 +238,7 @@ fun ZhaoxiAutomationEditorScene(
                     calendar.set(Calendar.SECOND, 0)
                     calendar.set(Calendar.MILLISECOND, 0)
                     firstRun = formatter.format(calendar.time)
+                    firstRunError = null
                 }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE),
                     DateFormat.is24HourFormat(androidContext)).show()
             },
@@ -259,7 +262,6 @@ fun ZhaoxiAutomationEditorScene(
     var natural by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<String?>(null) }
-    var firstRunError by remember(editingTaskId) { mutableStateOf<String?>(null) }
     fun minuteOfDay(value: String): Int? {
         val pieces = value.trim().split(":")
         if (pieces.size != 2) return null
