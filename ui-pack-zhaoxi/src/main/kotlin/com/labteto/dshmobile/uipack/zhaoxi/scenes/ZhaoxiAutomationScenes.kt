@@ -319,24 +319,33 @@ fun ZhaoxiAutomationEditorScene(
     }
 }
 
-/** automation.persona_interaction — 人物互动编排。 */
+/** Current-chat automation page backed by the real scheduler rather than sample event cards. */
 @Composable
 fun ZhaoxiPersonaInteractionScene(
     automation: AutomationUiPort,
     scope: UiSceneRenderScope,
+    onCreate: () -> Unit,
+    onEdit: (String) -> Unit,
 ) {
-    val co = rememberCoroutineScope()
-    ZxPage("人物互动编排", onBack = { scope.onBack() }) {
+    val snap by automation.snapshots.collectAsState(initial = automation.snapshot())
+    val currentId = snap.context.identity?.sessionId
+    val tasks = snap.tasks.filter {
+        it.mode == AutomationMode.CHAT && it.targetSessionId == currentId
+    }
+    ZxPage("聊天自动化", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        ZxSection("规则")
-        ZxRow("相遇事件 → 生成互动", "事件总线触发 · 双人物会话", trailing = {
-            ZxBadge("示例", ZxBadgeTone.Neutral)
-        })
-
-        Spacer(Modifier.height(10.dp))
-        ZxButton("编排新互动", {
-            scope.onNavigate(UiSceneId("automation.editor"))
-        }, Modifier.fillMaxWidth())
+        if (!snap.context.canPlanChat || currentId == null) {
+            ZxEmpty("请进入单人聊天", "选择会话后可设置互动")
+        } else {
+            ZxSection("互动任务")
+            if (tasks.isEmpty()) ZxEmpty("暂无互动任务", "可以为当前聊天创建提醒或互动")
+            tasks.forEach { task ->
+                ZxRow(task.prompt.take(100),
+                    "${task.status.wireValue} · ${task.scheduleType.name}",
+                    onClick = { onEdit(task.id) })
+            }
+            ZxButton("新建互动", onCreate, Modifier.fillMaxWidth())
+        }
     }
 }
 
