@@ -17,6 +17,26 @@ import com.labteto.dshmobile.uihost.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 
+/** Media Owner states are the single source of truth; OUTCOME_UNKNOWN is never failed/success. */
+internal fun LocalMediaCreationPhase.zxCreationPhaseLabel(): String = when (this) {
+    LocalMediaCreationPhase.PREPARING -> "准备中"
+    LocalMediaCreationPhase.SUBMITTING -> "正在提交"
+    LocalMediaCreationPhase.SAVING -> "保存结果中"
+    LocalMediaCreationPhase.OUTCOME_UNKNOWN -> "执行结果待确认"
+    LocalMediaCreationPhase.FAILED -> "执行失败"
+    LocalMediaCreationPhase.SAVE_FAILED -> "保存失败"
+    LocalMediaCreationPhase.SUCCEEDED -> "已完成"
+}
+
+internal fun LocalMediaVideoPhase.zxVideoPhaseLabel(): String = when (this) {
+    LocalMediaVideoPhase.SUBMITTING -> "正在提交"
+    LocalMediaVideoPhase.OUTCOME_UNKNOWN -> "执行结果待确认"
+    LocalMediaVideoPhase.QUEUED -> "等待处理"
+    LocalMediaVideoPhase.PROCESSING -> "生成中"
+    LocalMediaVideoPhase.SUCCEEDED -> "生成完成"
+    LocalMediaVideoPhase.FAILED -> "生成失败"
+}
+
 /** Owner result, not just a dispatched request: never show imported when storage failed. */
 internal data class ZxPortraitImportFeedback(val message: String, val failure: Boolean, val warning: Boolean = false)
 
@@ -149,9 +169,26 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
             }
         }, enabled = !busy && sessionId.isNotBlank() && offer != null && (prompt.isNotBlank() || offer?.kind == LocalMediaKind.TRANSCRIBE), loading = busy)
         if (page.jobs.isNotEmpty() || page.videos.isNotEmpty()) ZxSection("生成任务")
-        page.jobs.forEach { ZxRow(it.kind, "${it.phase} ${it.error.orEmpty()}") }
+        page.jobs.forEach { job ->
+            val kind = when (job.kind.uppercase()) {
+                "IMAGE" -> "图片"
+                "VIDEO" -> "视频"
+                "SPEECH" -> "语音"
+                "TRANSCRIBE" -> "音频转写"
+                else -> "媒体任务"
+            }
+            ZxRow(kind, listOf(job.phase.zxCreationPhaseLabel(),
+                job.error?.takeIf(String::isNotBlank)?.take(120)).filterNotNull().joinToString(" · "))
+            if (job.phase == LocalMediaCreationPhase.OUTCOME_UNKNOWN) {
+                ZxBanner("上次请求的远端执行结果尚不确定，请先核对记录，避免重复付费生成", ZxTone.Warn)
+            }
+        }
         page.videos.forEach { task ->
-            ZxRow(task.model, "${task.phase} ${task.lastError.orEmpty()}")
+            ZxRow(task.model, listOf(task.phase.zxVideoPhaseLabel(),
+                task.lastError?.takeIf(String::isNotBlank)?.take(120)).filterNotNull().joinToString(" · "))
+            if (task.phase == LocalMediaVideoPhase.OUTCOME_UNKNOWN) {
+                ZxBanner("视频请求结果待确认，请勿直接重复生成；先检查服务端任务状态", ZxTone.Warn)
+            }
             val original = offers.firstOrNull { it.id == task.offerId }
             if (original != null && media.canRefresh(task, original)) ZxButton("查询视频状态", {
                 execute { receiptText(media.submit(MediaUiCommand.PollVideo(original, task.id))) }
