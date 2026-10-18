@@ -145,7 +145,7 @@ fun ZhaoxiPersonaEditorScene(
     when (val result = state) {
         is UiPersonaAuthoringReceipt.Loaded -> ZhaoxiAuthoringForm(authoring, result.snapshot, scope, initialTab)
         null -> if (galleryId == "new") ZhaoxiAuthoringForm(authoring, null, scope, initialTab) else ZxEmpty("加载中", "正在读取人物")
-        else -> ZxEmpty("无法编辑人物", result.toString())
+        else -> ZxEmpty("人物暂不可编辑", "请返回图集重试")
     }
 }
 
