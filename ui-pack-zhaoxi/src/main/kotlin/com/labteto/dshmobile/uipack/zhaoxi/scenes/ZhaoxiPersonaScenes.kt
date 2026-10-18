@@ -20,6 +20,8 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.uicontract.DeletePersonaGalleryCommand
@@ -68,12 +70,14 @@ fun ZhaoxiPersonaGalleryScene(
     onOpenPersona: (String) -> Unit,
     authoring: PersonaAuthoringUiPort? = null,
     transfer: PersonaTransferUiPort? = null,
+    portraits: PersonaPortraitUiPort? = null,
 ) {
     var revision by remember { mutableStateOf(0) }
     var feedback by remember { mutableStateOf<String?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
     var showPresets by rememberSaveable { mutableStateOf(false) }
     val jobs = androidx.compose.runtime.rememberCoroutineScope()
+    val portraitTargetPx = (180f * LocalDensity.current.density).toInt()
     val state by produceState<UiPersonaGalleryReadReceipt?>(null, revision) { value = gallery.read() }
     val importer = transfer?.let { owner ->
         com.labteto.dshmobile.uihost.rememberUiDocumentImporter(owner.maxImportBytes) { result ->
@@ -121,8 +125,40 @@ fun ZhaoxiPersonaGalleryScene(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.heightIn(min = 148.dp, max = 600.dp),
                 ) {
-                    items(visible) { e ->
-                        ZxPersonaCard(e.name, "${e.stories.size} 段故事", onClick = { onOpenPersona(e.id) })
+                    items(visible, key = { it.id }) { e ->
+                        val receipt by produceState<UiPersonaPortraitPreviewReceipt?>(null, e.id, portraits) {
+                            value = portraits?.preview(e.id)
+                        }
+                        val bytes = (receipt as? UiPersonaPortraitPreviewReceipt.Ready)?.bytes
+                        val portrait by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, bytes, portraitTargetPx) {
+                            if (bytes != null) {
+                                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                                    val opts = android.graphics.BitmapFactory.Options().apply {
+                                        inJustDecodeBounds = true
+                                    }
+                                    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+                                    var sample = 1
+                                    while (opts.outWidth / (sample * 2) >= portraitTargetPx) sample *= 2
+                                    val bitmap = android.graphics.BitmapFactory.decodeByteArray(
+                                        bytes, 0, bytes.size,
+                                        android.graphics.BitmapFactory.Options().apply { inSampleSize = sample },
+                                    )
+                                    bitmap?.asImageBitmap()
+                                }
+                            }
+                        }
+                        val stage = e.stories.lastOrNull()?.storyStage?.takeIf(String::isNotBlank)
+                        ZxPersonaCard(
+                            e.name,
+                            "${e.stories.size} 段故事" + (stage?.let { " · ${it}" } ?: ""),
+                            onClick = { onOpenPersona(e.id) },
+                            portrait = portrait,
+                            portraitHint = when (receipt) {
+                                is UiPersonaPortraitPreviewReceipt.Failed -> "画像暂不可用"
+                                UiPersonaPortraitPreviewReceipt.Missing -> "暂无画像"
+                                else -> null
+                            },
+                        )
                     }
                 }
 

@@ -17,6 +17,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.platform.LocalContext
 import com.labteto.dshmobile.uicontract.UiHostPreferences
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiHue
+import com.labteto.dshmobile.uipack.zhaoxi.theme.resolveZhaoxiWallpaper
 import androidx.compose.ui.Modifier
 import com.labteto.dshmobile.uicontract.ChatUiCommand
 import com.labteto.dshmobile.uicontract.HostPreferencesUiPort
@@ -402,7 +403,8 @@ class ZhaoxiApplicationScenePack(
                         onOpenPersona = { galleryId ->
                             targets.galleryId = galleryId
                             scope.onNavigate(UiSceneId(if (galleryId == "new") "chat.persona_editor" else "chat.gallery_profile"))
-                        }, authoring = sec?.authoring, transfer = sec?.transfer)
+                        }, authoring = sec?.authoring, transfer = sec?.transfer,
+                        portraits = sec?.portraits)
                 }
             // 人物子页的图集 id 合法来源 = CurrentPersonaUiPort.read() 的 target.personaId；
             // 端口未注入或无当前人物时显式空态，不伪造目标。
@@ -562,6 +564,9 @@ class ZhaoxiApplicationScenePack(
             Box(Modifier.fillMaxSize()) {
                 ZhaoxiBackground(
                     Modifier.fillMaxSize(),
+                    wallpaperPreset = resolveZhaoxiWallpaper(
+                        appearance.presetWallpaperEnabled, appearance.selectedWallpaperPreset, hue, dark),
+                    adaptiveContrast = appearance.adaptiveContrast,
                     intensity = appearance.ambientGlow *
                         (if (state.stack.lastOrNull()?.value in setOf("route.home", "conversation.chat", "conversation.work")) 1f else .45f),
                     workMode = state.stack.lastOrNull()?.value == "conversation.work",

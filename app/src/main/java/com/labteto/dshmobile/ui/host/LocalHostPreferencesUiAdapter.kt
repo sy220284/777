@@ -56,6 +56,8 @@ internal class LocalHostPreferencesUiAdapter @Inject constructor(
             transparency = prefs.wallpaperSurfaceTransparency, ambientGlow = prefs.ambientGlow,
             componentEmphasis = prefs.componentEmphasis, motionScale = prefs.motionDurationScale,
             adaptiveContrast = prefs.backgroundAdaptiveContrast,
+            presetWallpaperEnabled = prefs.presetWallpaperEnabled,
+            selectedWallpaperPreset = prefs.selectedWallpaperPreset,
             notifyJobs = prefs.notifyLocalJobs, notifyResults = prefs.notifyJobResults,
             notifyFailures = prefs.notifyJobFailures, notifyNeedsAction = prefs.notifyNeedsAction,
             notifyChat = prefs.notifyChatMessages,
@@ -67,19 +69,24 @@ internal class LocalHostPreferencesUiAdapter @Inject constructor(
 
     override suspend fun submit(command: UiHostPreferencesCommand): Boolean {
         hosts.setSetting { current -> when (command) {
+            is UiHostPreferencesCommand.SelectWallpaperPreset -> {
+                require(command.preset == "auto" || Regex("w[0-9]\\.webp").matches(command.preset))
+                current.copy(selectedWallpaperPreset = command.preset, presetWallpaperEnabled = true)
+            }
             is UiHostPreferencesCommand.Appearance -> {
                 require(command.theme in setOf("light", "dark", "matte_black", "system"))
                 require(command.accent.matches(Regex("[a-z0-9_-]{2,50}")))
                 require(command.textScale in .9f..1.5f)
                 require(command.textWeight in 0..2)
                 require(command.transparency in 0f..1f && command.ambientGlow in 0f..1f &&
-                    command.componentEmphasis in 0f..1f && command.motionScale in .7f..1.3f)
+                    command.componentEmphasis in 0f..1f && command.motionScale in 0f..1.3f)
                 current.copy(themePreference = command.theme, accentTheme = command.accent,
                     textScale = command.textScale, textWeightAdjustment = command.textWeight,
                     wallpaperSurfaceTransparency = command.transparency,
                     ambientGlow = command.ambientGlow, componentEmphasis = command.componentEmphasis,
                     motionDurationScale = command.motionScale,
-                    backgroundAdaptiveContrast = command.adaptiveContrast)
+                    backgroundAdaptiveContrast = command.adaptiveContrast,
+                    presetWallpaperEnabled = command.presetWallpaperEnabled)
             }
             is UiHostPreferencesCommand.Notifications -> {
                 require(command.quietStartMinute in 0..1439 && command.quietEndMinute in 0..1439)
