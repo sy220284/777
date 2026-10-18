@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -20,12 +21,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.uicontract.UiSceneStatus
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxIcon
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxSkeleton
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxSkeletonVariant
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone
@@ -97,8 +100,9 @@ fun ZxSettingsGroup(modifier: Modifier = Modifier, content: @Composable ColumnSc
 fun ZxNavRow(label: String, sub: String = "", value: String = "", onClick: () -> Unit) {
     val c = ZhaoxiTheme.colors
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick)
-            .padding(vertical = 11.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 48.dp).padding(vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val designIcon = when {
@@ -122,8 +126,12 @@ fun ZxNavRow(label: String, sub: String = "", value: String = "", onClick: () ->
             Text(label, fontSize = 13.5.sp, color = c.ink)
             if (sub.isNotEmpty()) Text(sub, fontSize = 11.sp, color = c.ink3, lineHeight = 16.sp)
         }
-        Text(if (value.isEmpty()) "›" else "$value ›", fontSize = 12.sp, color = c.ink3,
-            fontFamily = FontFamily.Monospace)
+        if (value.isNotEmpty()) {
+            Text(value, fontSize = 12.sp, color = c.ink2,
+                fontFamily = FontFamily.Monospace)
+            androidx.compose.foundation.layout.Spacer(Modifier.width(6.dp))
+        }
+        ZxIcon("chevron-right", modifier = Modifier.width(18.dp), description = null)
     }
 }
 
@@ -159,15 +167,16 @@ fun ZxValueRow(label: String, sub: String = "", value: String, mono: Boolean = f
 fun ZxDangerRow(label: String, sub: String, onClick: () -> Unit) {
     val c = ZhaoxiTheme.colors
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick)
-            .padding(vertical = 11.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 48.dp).padding(vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
             Text(label, fontSize = 13.5.sp, color = c.err)
             if (sub.isNotEmpty()) Text(sub, fontSize = 11.sp, color = c.ink3, lineHeight = 16.sp)
         }
-        Text("›", fontSize = 12.sp, color = c.ink3)
+        ZxIcon("chevron-right", modifier = Modifier.width(18.dp), description = null)
     }
 }
 
@@ -186,8 +195,8 @@ fun ZxRow(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+            .heightIn(min = 48.dp).padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
