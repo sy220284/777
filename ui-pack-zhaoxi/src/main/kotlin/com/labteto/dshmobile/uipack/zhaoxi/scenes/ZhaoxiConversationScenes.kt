@@ -107,7 +107,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
                 preview = snap.livePreview, running = snap.phase == UiExecutionPhase.RUNNING,
                 documents = documents, knownScenes = knownScenes, media = media,
                 showEmpty = snap.status != UiSceneStatus.LOADING && snap.error == null,
-                missingSession = snap.identity == null
+                missingSession = snap.identity == null)
             if (snap.queuedInputCount > 0)
                 ZxBanner("⇄ 已排队 ${snap.queuedInputCount} 条 · 队列满时将拒收", ZxTone.Warn)
         }
@@ -150,7 +150,7 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
                 documents = documents, knownScenes = knownScenes, pendingApprovalId = snap.approval?.pendingId,
                 media = media, workMode = true,
                 showEmpty = snap.status != UiSceneStatus.LOADING && snap.error == null,
-                missingSession = snap.identity == null
+                missingSession = snap.identity == null)
             snap.approval?.let { ap ->
                 Spacer(Modifier.height(6.dp))
                 ZxApprovalCard(ap, expired = snap.phase == UiExecutionPhase.IDLE && ap.pendingId.isBlank()) { approved ->
