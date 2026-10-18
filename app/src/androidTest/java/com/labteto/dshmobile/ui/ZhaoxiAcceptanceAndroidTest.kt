@@ -79,13 +79,13 @@ class ZhaoxiAcceptanceAndroidTest {
         screenshot.recycle()
     }
 
-    @Test fun all75RenderersAndThreeAppearanceMatrixUseProductionOwners() {
+    @Test fun all76RenderersAndThreeAppearanceMatrixUseProductionOwners() {
         val ports = ready()
         val saved = runBlocking { ports.personaAuthoringUiPort.create(UiPersonaDraft(name = "本地验收人物", coreIdentity = "验收夹具")) }
         assertTrue(saved is UiPersonaAuthoringReceipt.Saved)
         val targets = ZhaoxiSceneTargets().apply { galleryId = (saved as UiPersonaAuthoringReceipt.Saved).galleryId }
         val pack = createZhaoxiApplicationPack(ports, ports.hostPreferencesUiPort, targets, MutableStateFlow(null)) { error("Renderer must not check updates implicitly") }
-        assertEquals(75, pack.manifest.scenes.size)
+        assertEquals(76, pack.manifest.scenes.size)
         val requirements = LocalUiSceneCatalog.requirements.filter { it.id in pack.manifest.scenes }
         var current by mutableStateOf(requirements.first())
         val root = UiSceneId("route.home")
@@ -124,7 +124,7 @@ class ZhaoxiAcceptanceAndroidTest {
                 }
             }
         } finally { appearance(ports, "system", 1f) }
-        assertEquals(106, index.readLines().size) // 75 light + 15 dark + 15 at 130%.
+        assertEquals(107, index.readLines().size) // 76 light + 15 dark + 15 at 130% + header.
     }
 
 
