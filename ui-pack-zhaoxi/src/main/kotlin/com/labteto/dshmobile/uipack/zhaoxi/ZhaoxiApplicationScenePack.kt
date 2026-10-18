@@ -408,8 +408,22 @@ class ZhaoxiApplicationScenePack(
             "chat.group_announcement" -> conv?.groups?.let { ZxGroupAnnouncementScene(it, scope) }
 
             // ---- 自动化 / 工具 / 媒体 ----
-            "route.tasks", "automation.tasks" -> sec?.automation?.let { ZhaoxiAutomationTasksScene(it, scope) }
-            "automation.editor" -> sec?.automation?.let { ZhaoxiAutomationEditorScene(it, scope) }
+            "route.tasks", "automation.tasks" -> sec?.automation?.let { automation ->
+                ZhaoxiAutomationTasksScene(
+                    automation, scope,
+                    onOpenEditor = { id ->
+                        targets.automationTaskId = id
+                        scope.onNavigate(UiSceneId("automation.editor"))
+                    },
+                    onCreate = {
+                        targets.automationTaskId = null
+                        scope.onNavigate(UiSceneId("automation.editor"))
+                    },
+                )
+            }
+            "automation.editor" -> sec?.automation?.let {
+                ZhaoxiAutomationEditorScene(it, scope, targets.automationTaskId)
+            }
             "automation.persona_interaction" -> sec?.automation?.let { ZhaoxiPersonaInteractionScene(it, scope) }
             "route.tools", "tools.mcp", "tools.github", "tools.plugins" ->
                 sec?.tools?.let { ZhaoxiToolsScene(it, scope, scene.value) }
