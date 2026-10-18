@@ -55,8 +55,10 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
     val jobs = rememberCoroutineScope()
     fun execute(action: suspend () -> String) {
         if (busy) return
+        // Claim the action before coroutine dispatch so two rapid taps cannot enqueue
+        // duplicate provider operations (including possibly billable requests).
+        busy = true
         jobs.launch {
-            busy = true
             try {
                 statusTone = ZxTone.Info
                 status = action()
@@ -151,7 +153,9 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
         page.videos.forEach { task ->
             ZxRow(task.model, "${task.phase} ${task.lastError.orEmpty()}")
             val original = offers.firstOrNull { it.id == task.offerId }
-            if (original != null && media.canRefresh(task, original)) ZxButton("查询视频状态", { execute { receiptText(media.submit(MediaUiCommand.PollVideo(original, task.id))) } })
+            if (original != null && media.canRefresh(task, original)) ZxButton("查询视频状态", {
+                execute { receiptText(media.submit(MediaUiCommand.PollVideo(original, task.id))) }
+            }, enabled = !busy)
         }
         } else {
         ZxNavRow("新建生成", sub = "图像 · 视频 · 语音与转写") {
@@ -200,7 +204,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
                 if (kind != null) UiOwnedMediaPlayback(path, kind, Modifier.fillMaxWidth().heightIn(max = 400.dp))
             }
             ZxSection("作品操作")
-            ZxButton("保存到文件", { export(result.id to sessionId) })
+            ZxButton("保存到文件", { export(result.id to sessionId) }, enabled = !busy)
             ZxButton("分享", { execute { shareUiMedia(context, media, result.id, sessionId); "系统分享界面已打开，是否分享成功由目标应用决定" } }, enabled = !busy)
             ZxButton("再次生成", { pendingRegenerate = result.id }, enabled = !busy)
             if (result.kind.uppercase() == "IMAGE" && gallery != null && portraits != null) {
@@ -211,7 +215,11 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
                 }
             }
             if (galleryPicker && gallery != null && portraits != null) {
-                val entries by produceState<UiPersonaGalleryReadReceipt?>(null) { value = gallery.read() }
+                val entries by produceState<UiPersonaGalleryReadReceipt?>(null) {
+                    value = try { gallery.read() }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (failure: Exception) { UiPersonaGalleryReadReceipt.Failed(failure.message) }
+                }
                 when (val galleryResult = entries) {
                     is UiPersonaGalleryReadReceipt.Available -> {
                         if (galleryResult.entries.isEmpty()) ZxFooterNote("暂无可选人物，请先创建人物")
@@ -238,7 +246,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
             }
             ZxSection("管理")
             ZxButton("删除结果", { pendingDelete = result.id },
-                variant = ZxButtonVariant.Danger)
+                variant = ZxButtonVariant.Danger, enabled = !busy)
         }
         }
         pendingRegenerate?.let { resultId ->
