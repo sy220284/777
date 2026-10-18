@@ -14,6 +14,7 @@ package com.labteto.dshmobile.uipack.zhaoxi.theme
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -264,29 +265,71 @@ fun Modifier.zxMaterial(m: ZhaoxiMaterial): Modifier = composed {
     }
 }
 
-/** 场景背景实绘（E8.16）：底色纵向渐变 + 环境光 ambA 左上 / ambB 右下径向。 */
+/**
+ * E8.18 可选内置壁纸：十张高保真原稿 WebP 归档到 assets；
+ * 默认不开启，启用后按五主题×明暗确定唯一资产。
+ */
 @Composable
 fun ZhaoxiBackground(
     modifier: Modifier = Modifier,
     intensity: Float = 1f,
     workMode: Boolean = false,
+    wallpaperPreset: String? = null,
+    adaptiveContrast: Boolean = true,
 ) {
     val c = ZhaoxiTheme.colors
-    val glow = intensity.coerceIn(0f, 1f)
-    androidx.compose.foundation.layout.Box(modifier.drawBehind {
-        drawRect(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(c.bg, c.bg2)))
-        if (glow > 0f) {
-            // E8.17 work surface mirrors the light sources; secondary pages use a softer glow.
-            drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
-                listOf(c.ambA.copy(alpha = c.ambA.alpha * glow), Color.Transparent),
-                center = if (workMode) androidx.compose.ui.geometry.Offset(size.width * .84f, 0f)
-                    else androidx.compose.ui.geometry.Offset(size.width * .22f, size.height * .06f),
-                radius = size.maxDimension * .78f))
-            drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
-                listOf(c.ambB.copy(alpha = c.ambB.alpha * glow), Color.Transparent),
-                center = if (workMode) androidx.compose.ui.geometry.Offset(size.width * .1f, size.height * .98f)
-                    else androidx.compose.ui.geometry.Offset(size.width * .85f, size.height * .98f),
-                radius = size.maxDimension * .78f))
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val wallpaper by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wallpaperPreset) {
+        value = if (wallpaperPreset == null) null else
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                context.assets.open("e818_wallpapers.zip").use { stream ->
+                    java.util.zip.ZipInputStream(stream).use { zip ->
+                        var candidate: java.util.zip.ZipEntry?
+                        var decoded: androidx.compose.ui.graphics.ImageBitmap? = null
+                        while (zip.nextEntry.also { candidate = it } != null) {
+                            if (candidate?.name == wallpaperPreset) {
+                                val bytes = zip.readBytes()
+                                decoded = android.graphics.BitmapFactory.decodeByteArray(
+                                    bytes, 0, bytes.size)?.let { bitmap ->
+                                    androidx.compose.ui.graphics.asImageBitmap(bitmap)
+                                }
+                                break
+                            }
+                        }
+                        decoded
+                    }
+                }
+            }
+    }
+    val glow = intensity.coerceIn(0f, 1f) * (if (wallpaper != null) 0.16f else 1f)
+    androidx.compose.foundation.layout.Box(modifier) {
+        wallpaper?.let {
+            androidx.compose.foundation.Image(
+                bitmap = it,
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
-    })
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().drawBehind {
+            if (wallpaper == null) {
+                drawRect(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(c.bg, c.bg2)))
+            } else {
+                // Only the surface is veiled; controls and text above this layer remain sharp.
+                drawRect(c.bg.copy(alpha = if (adaptiveContrast) 0.68f else 0.36f))
+            }
+            if (glow > 0f) {
+                drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
+                    listOf(c.ambA.copy(alpha = c.ambA.alpha * glow), Color.Transparent),
+                    center = if (workMode) androidx.compose.ui.geometry.Offset(size.width * .84f, 0f)
+                        else androidx.compose.ui.geometry.Offset(size.width * .22f, size.height * .06f),
+                    radius = size.maxDimension * .78f))
+                drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
+                    listOf(c.ambB.copy(alpha = c.ambB.alpha * glow), Color.Transparent),
+                    center = if (workMode) androidx.compose.ui.geometry.Offset(size.width * .1f, size.height * .98f)
+                        else androidx.compose.ui.geometry.Offset(size.width * .85f, size.height * .98f),
+                    radius = size.maxDimension * .78f))
+            }
+        })
+    }
 }

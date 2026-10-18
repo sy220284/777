@@ -41,6 +41,8 @@ data class AppSettings(
      * Defaults on so existing users benefit immediately after upgrading.
      */
     val backgroundAdaptiveContrast: Boolean = true,
+    /** Optional E8.18 packaged wallpapers follow the selected hue and effective dark mode. */
+    val presetWallpaperEnabled: Boolean = false,
     /** User reading scale layered on top of Android's system font scale. */
     val textScale: Float = 1.0f,
     /** 0=standard, 1=slightly bold, 2=bold. Applied across semantic app text roles while preserving hierarchy. */

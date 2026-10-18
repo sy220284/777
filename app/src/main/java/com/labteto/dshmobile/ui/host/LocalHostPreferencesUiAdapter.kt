@@ -56,6 +56,7 @@ internal class LocalHostPreferencesUiAdapter @Inject constructor(
             transparency = prefs.wallpaperSurfaceTransparency, ambientGlow = prefs.ambientGlow,
             componentEmphasis = prefs.componentEmphasis, motionScale = prefs.motionDurationScale,
             adaptiveContrast = prefs.backgroundAdaptiveContrast,
+            presetWallpaperEnabled = prefs.presetWallpaperEnabled,
             notifyJobs = prefs.notifyLocalJobs, notifyResults = prefs.notifyJobResults,
             notifyFailures = prefs.notifyJobFailures, notifyNeedsAction = prefs.notifyNeedsAction,
             notifyChat = prefs.notifyChatMessages,
@@ -79,7 +80,8 @@ internal class LocalHostPreferencesUiAdapter @Inject constructor(
                     wallpaperSurfaceTransparency = command.transparency,
                     ambientGlow = command.ambientGlow, componentEmphasis = command.componentEmphasis,
                     motionDurationScale = command.motionScale,
-                    backgroundAdaptiveContrast = command.adaptiveContrast)
+                    backgroundAdaptiveContrast = command.adaptiveContrast,
+                    presetWallpaperEnabled = command.presetWallpaperEnabled)
             }
             is UiHostPreferencesCommand.Notifications -> {
                 require(command.quietStartMinute in 0..1439 && command.quietEndMinute in 0..1439)
