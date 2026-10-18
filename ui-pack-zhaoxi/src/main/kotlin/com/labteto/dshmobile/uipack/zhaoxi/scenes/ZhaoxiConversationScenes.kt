@@ -1,5 +1,11 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.verticalScroll
@@ -12,6 +18,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -57,6 +69,7 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.ZxQuestionCard
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTimeSeparator
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTypingIndicator
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxIcon
 import com.labteto.dshmobile.uipack.zhaoxi.components.rejectionHint
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 import com.labteto.dshmobile.uihost.UiSceneRenderScope
@@ -92,7 +105,9 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
                 onMessage = { m -> snap.identity?.let { onMessage(it, m) } },
                 onBranch = { m, index -> snap.identity?.let { receipt = chat.submit(ChatUiCommand.SelectVariant(it, m.id, index)) } },
                 preview = snap.livePreview, running = snap.phase == UiExecutionPhase.RUNNING,
-                documents = documents, knownScenes = knownScenes, media = media)
+                documents = documents, knownScenes = knownScenes, media = media,
+                showEmpty = snap.status != UiSceneStatus.LOADING && snap.error == null,
+                missingSession = snap.identity == null)
             if (snap.queuedInputCount > 0)
                 ZxBanner("⇄ 已排队 ${snap.queuedInputCount} 条 · 队列满时将拒收", ZxTone.Warn)
         }
@@ -133,7 +148,9 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
                 onMessage = { m -> snap.identity?.let { onMessage(it, m) } },
                 preview = snap.livePreview, running = snap.phase == UiExecutionPhase.RUNNING,
                 documents = documents, knownScenes = knownScenes, pendingApprovalId = snap.approval?.pendingId,
-                media = media)
+                media = media, workMode = true,
+                showEmpty = snap.status != UiSceneStatus.LOADING && snap.error == null,
+                missingSession = snap.identity == null)
             snap.approval?.let { ap ->
                 Spacer(Modifier.height(6.dp))
                 ZxApprovalCard(ap, expired = snap.phase == UiExecutionPhase.IDLE && ap.pendingId.isBlank()) { approved ->
@@ -254,15 +271,79 @@ fun ZhaoxiComposerSlotScene(
     }
 }
 
+/** A calm, thumb-safe conversation app bar; the content/action ports stay in the Host. */
+@Composable
+private fun ZxHeaderAction(label: String, symbol: String, active: Boolean = false, onClick: () -> Unit) {
+    val colors = ZhaoxiTheme.colors
+    Box(
+        Modifier.size(48.dp).clip(CircleShape)
+            .background(if (active) colors.bg2 else colors.bg)
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        when (symbol) {
+            "‹" -> ZxIcon("back")
+            "···", "×" -> ZxIcon("dots")
+            else -> Text(symbol, fontSize = 12.sp, color = colors.ink,
+                fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+/** No fake prompts or disabled suggestion chips; the existing composer is the sole primary CTA. */
+@Composable
+private fun ZxConversationEmpty(workMode: Boolean, missingSession: Boolean, modifier: Modifier = Modifier) {
+    val colors = ZhaoxiTheme.colors
+    Column(modifier.padding(horizontal = 20.dp, vertical = 32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(52.dp).clip(CircleShape).background(colors.bg2),
+            contentAlignment = Alignment.Center) {
+            Text("朝", fontSize = 23.sp, fontWeight = FontWeight.Medium, color = colors.accent)
+        }
+        Spacer(Modifier.height(20.dp))
+        Text(if (missingSession) "还没有打开会话" else if (workMode) "准备开始一项工作？" else "今天想聊些什么？",
+            fontSize = 22.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold,
+            color = colors.ink)
+        Spacer(Modifier.height(8.dp))
+        Text(if (missingSession) "返回会话列表，选择已有对话或创建新会话。"
+            else if (workMode) "描述目标，过程与结果会在同一条回复中逐步展开。"
+            else "写下问题、分享想法，或者从一个小目标开始。",
+            fontSize = 14.sp, lineHeight = 22.sp, color = colors.ink2,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    }
+}
+
 @Composable
 private fun ZxConversationRoutes(scope: UiSceneRenderScope, menu: @Composable () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip("返回", false) { scope.onBack() }
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip("模型", false) { scope.onNavigate(UiSceneId("conversation.model_picker")) }
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip("更多", false) { expanded = !expanded }
+    Column {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ZxHeaderAction("返回会话列表", "‹") { scope.onBack() }
+            Text("朝夕", Modifier.weight(1f).padding(start = 6.dp), fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold, color = ZhaoxiTheme.colors.ink)
+            ZxHeaderAction("选择模型", "模型") {
+                scope.onNavigate(UiSceneId("conversation.model_picker"))
+            }
+            ZxHeaderAction(if (expanded) "关闭更多操作" else "更多操作",
+                if (expanded) "×" else "···", active = expanded) { expanded = !expanded }
+        }
+        if (expanded) {
+            Box(
+                Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+                    .clip(RoundedCornerShape(ZhaoxiTheme.shapes.card))
+                    .background(ZhaoxiTheme.colors.bg2).padding(8.dp),
+            ) {
+                Column(Modifier.heightIn(max = 320.dp).verticalScroll(
+                    androidx.compose.foundation.rememberScrollState()
+                )) { menu() }
+            }
+        }
     }
-    if (expanded) Column(Modifier.heightIn(max = 320.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) { menu() }
 }
 
 /** Internal Work event projections are retained for audit, never pinned into the reply stream. */
@@ -275,7 +356,9 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
     onMessage: (UiMessageSnapshot) -> Unit, onBranch: (UiMessageSnapshot, Int) -> Unit = { _, _ -> },
     preview: UiStreamingReplyPreview? = null, running: Boolean = false,
     documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet(),
-    pendingApprovalId: String? = null, media: MediaUiPort? = null) {
+    pendingApprovalId: String? = null, media: MediaUiPort? = null,
+    showEmpty: Boolean = true, workMode: Boolean = false,
+    missingSession: Boolean = false) {
     val sessionId = identity?.sessionId.orEmpty()
     var older by remember(sessionId) { mutableStateOf(emptyList<UiMessageSnapshot>()) }
     var cursor by remember(sessionId) { mutableStateOf<UiTranscriptCursor?>(null) }
@@ -378,11 +461,11 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
         }
     }
     Column(modifier) {
-        LazyColumn(Modifier.weight(1f), state = state) {
+        LazyColumn(Modifier.weight(1f).padding(horizontal = 16.dp), state = state) {
         item(key = "history") {
             error?.let { ZxBanner(it, ZxTone.Err) }
-            if (history != null && (!loaded || cursor != null))
-                com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton(if (loading) "加载中…" else "加载更早消息", {
+            if (history != null && all.isNotEmpty() && (!loaded || cursor != null))
+                TextButton(onClick = {
                     if (sessionId.isNotBlank()) jobs.launch {
                         loading = true
                         try {
@@ -402,7 +485,13 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
                         catch (failure: Exception) { error = failure.message ?: "历史加载失败" }
                         finally { loading = false }
                     }
-                }, enabled = !loading)
+                }, enabled = !loading) {
+                    Text(if (loading) "加载中…" else "↑ 查看更早消息",
+                        fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2)
+                }
+        }
+        if (showEmpty && all.isEmpty() && !running) item(key = "empty") {
+            ZxConversationEmpty(workMode, missingSession, Modifier.fillParentMaxSize())
         }
         items(timeline, key = { it.key }) { entry ->
             when (entry) {

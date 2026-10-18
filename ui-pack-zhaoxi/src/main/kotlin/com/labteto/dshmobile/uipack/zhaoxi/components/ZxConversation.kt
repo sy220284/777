@@ -43,6 +43,7 @@ import com.labteto.dshmobile.uicontract.UiMessageRole
 import com.labteto.dshmobile.uicontract.UiMessageSnapshot
 import com.labteto.dshmobile.uicontract.UiQuestionSnapshot
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
+import com.labteto.dshmobile.uipack.zhaoxi.theme.LocalReducedMotion
 
 /**
  * Zx 会话域组件（E8.14 实装）。规格：实施规格 §1.3。
@@ -158,9 +159,10 @@ fun ZxComposer(
     Row(
         modifier
             .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(c.glass)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -171,9 +173,14 @@ fun ZxComposer(
             modifier = Modifier.weight(1f),
         )
         if (running) {
-            ZxButton("■", onStop, variant = ZxButtonVariant.Outline)
+            ZxIconButton(onClick = onStop, contentDescription = "停止生成回复") {
+                ZxIcon("stop")
+            }
         } else {
-            ZxButton("↑", onSend, enabled = send.available && draft.isNotBlank())
+            ZxIconButton(onClick = onSend, contentDescription = "发送消息",
+                enabled = send.available && draft.isNotBlank()) {
+                ZxIcon("send")
+            }
         }
     }
 }
@@ -284,7 +291,8 @@ fun ZxQuestionCard(
 @Composable
 fun ZxTypingIndicator(modifier: Modifier = Modifier) {
     // Subtle phase motion; Compose animation clocks honor the platform duration scale.
-    val transition = rememberInfiniteTransition(label = "zhaoxi-reply-progress")
+    val reducedMotion = LocalReducedMotion.current
+    val transition = if (reducedMotion) null else rememberInfiniteTransition(label = "zhaoxi-reply-progress")
     val ink = ZhaoxiTheme.colors.ink3
     Row(
         modifier.padding(vertical = 6.dp)
@@ -293,15 +301,19 @@ fun ZxTypingIndicator(modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         repeat(3) { index ->
-            val opacity by transition.animateFloat(
-                initialValue = 0.35f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 620, delayMillis = index * 120),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-                label = "reply-progress-dot-$index",
-            )
+            // Respect the UI pack's reduced-motion token: no indefinite animation in this mode.
+            val opacity = if (transition == null) 0.75f else {
+                val animated by transition.animateFloat(
+                    initialValue = 0.35f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 480, delayMillis = index * 90),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                    label = "reply-progress-dot-$index",
+                )
+                animated
+            }
             Box(Modifier.size(5.dp).alpha(opacity).clip(CircleShape).background(ink))
         }
     }
