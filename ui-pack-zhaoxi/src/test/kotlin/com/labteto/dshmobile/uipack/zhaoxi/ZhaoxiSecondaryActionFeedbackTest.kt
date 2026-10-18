@@ -5,6 +5,11 @@ import com.labteto.dshmobile.uicontract.UiStorySessionSync
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxGalleryDeletionFailure
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import com.labteto.dshmobile.uicontract.UiPersonaImportReceipt
+import com.labteto.dshmobile.uicontract.UiAttachmentReceipt
+import com.labteto.dshmobile.uicontract.UiCommandRejection
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxImportFeedback
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxAttachmentFeedback
 import org.junit.Test
 
 /** Keep user-visible archive messages independent of Kotlin sealed-class formatting. */
@@ -22,4 +27,20 @@ class ZhaoxiSecondaryActionFeedbackTest {
         assertEquals("人物已删除", feedback)
         assertFalse(feedback.contains("Deleted"))
     }
+    @Test fun personaImportOnlyClaimsSuccessForCommittedArchives() {
+        assertEquals("人物已导入", UiPersonaImportReceipt.Imported("persona-1").zxImportFeedback())
+        assertEquals("导入状态不确定，请先刷新人物图集",
+            UiPersonaImportReceipt.Failed(null).zxImportFeedback())
+        assertEquals("存储不足", UiPersonaImportReceipt.Failed("存储不足").zxImportFeedback())
+    }
+
+    @Test fun attachmentImportReportsRevokedPermissionAndRejectionSafely() {
+        assertEquals("文件读取权限已失效，请重新选择",
+            UiAttachmentReceipt.GrantRevoked.zxAttachmentFeedback())
+        assertEquals("附件导入失败", UiAttachmentReceipt.Failed(null).zxAttachmentFeedback())
+        assertEquals("文件已损坏", UiAttachmentReceipt.Failed("文件已损坏").zxAttachmentFeedback())
+        val rejected = UiAttachmentReceipt.Rejected(UiCommandRejection.UNSUPPORTED).zxAttachmentFeedback()
+        assertFalse(rejected.contains("UiAttachmentReceipt"))
+    }
+
 }
