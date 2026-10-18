@@ -99,19 +99,70 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
 @Composable
 fun ZhaoxiQuotaScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val snap by settings.state.collectAsState(initial = settings.initialState)
-    var result by remember { mutableStateOf<String?>(null) }
+    val profile = snap.miniMaxQuotaProfile
+    var result by remember { mutableStateOf<MiniMaxProviderUsage?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
     val jobs = rememberCoroutineScope()
-    ZxPage("套餐额度", onBack = { scope.onBack() }) {
-        snap.modelProfiles.forEach { profile ->
-            ZxButton("查询 ${profile.displayName ?: profile.model}", { jobs.launch {
-                try { result = settings.queryMiniMaxQuota(profile).toString() }
-                catch (cancelled: CancellationException) { throw cancelled }
-                catch (failure: Exception) { result = failure.message ?: "查询失败" }
-            } })
+    ZxPage("MiniMax 套餐额度", onBack = { scope.onBack() }) {
+        Spacer(Modifier.height(8.dp))
+        if (profile == null) {
+            ZxEmpty("当前没有可查询的额度", "请先选择支持套餐额度查询的 MiniMax 模型配置")
+        } else {
+            ZxValueRow("查询模型", value = profile.displayName ?: profile.model)
+            ZxButton(if (busy) "查询中…" else "刷新额度", {
+                jobs.launch {
+                    busy = true
+                    error = null
+                    try {
+                        result = settings.queryMiniMaxQuota(profile)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        error = failure.message ?: "查询失败"
+                    } finally {
+                        busy = false
+                    }
+                }
+            }, enabled = !busy)
         }
-        result?.let { Text(it, color = ZhaoxiTheme.colors.ink) }
+        error?.let { ZxBanner(it, ZxTone.Err) }
+        when (val data = result) {
+            is MiniMaxProviderUsage.AccountBalance -> {
+                ZxSection("账户金额")
+                Text(data.available, fontSize = androidx.compose.ui.unit.TextUnit.Unspecified,
+                    color = ZhaoxiTheme.colors.ink)
+                ZxValueRow("现金余额", value = data.cash)
+                ZxValueRow("代金券", value = data.voucher)
+                ZxValueRow("授信额度", value = data.credit)
+            }
+            is MiniMaxProviderUsage.TokenPlan -> {
+                ZxSection("模型套餐")
+                if (data.models.isEmpty()) ZxEmpty("暂无套餐数据", "当前账户没有返回可显示的模型窗口")
+                data.models.forEach { model ->
+                    ZxSection(model.name)
+                    ZxValueRow("本周期", value = quotaWindowLabel(model.interval))
+                    ZxValueRow("本周", value = quotaWindowLabel(model.weekly))
+                    model.intervalResetMillis?.let { ZxValueRow("周期重置", value = quotaResetLabel(it)) }
+                    model.weeklyResetMillis?.let { ZxValueRow("每周重置", value = quotaResetLabel(it)) }
+                }
+            }
+            null -> if (profile != null && !busy && error == null) ZxFooterNote("点击刷新额度，查询结果将按金额或 Token 套餐结构展示")
+        }
     }
 }
+
+private fun quotaWindowLabel(value: MiniMaxProviderUsage.Window): String = when {
+    value.notInPlan -> "不在套餐内"
+    value.unlimited -> "无限额"
+    value.remaining != null && value.total != null -> "${value.remaining} / ${value.total}"
+    value.remainingPercent != null -> "${"%.1f".format(value.remainingPercent)}%"
+    else -> "暂无可用数据"
+}
+
+private fun quotaResetLabel(timestampMillis: Long): String =
+    java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
+        .format(java.util.Date(timestampMillis))
 
 @Composable
 fun ZhaoxiRuntimeSettingsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
