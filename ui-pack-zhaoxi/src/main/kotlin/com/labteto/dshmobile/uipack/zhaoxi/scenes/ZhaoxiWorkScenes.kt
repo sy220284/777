@@ -72,6 +72,7 @@ fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile
         mutableStateOf(history.older)
     }
     var historyExpired by remember(sessionId, historyRefresh) { mutableStateOf(false) }
+    var expandedLatest by remember(sessionId, historyRefresh) { mutableStateOf(false) }
     ZxPage("计划审查", onBack = { scope.onBack() }) {
         if (plan == null) {
             com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("没有进行中的计划", "计划由工作运行时提供")
@@ -129,8 +130,15 @@ fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile
             } else {
                 if (history.records.isEmpty() && olderEvents.isEmpty())
                     ZxEmpty("尚无运行事件", "执行开始后显示真实工作事件")
-                history.records.takeLast(24).asReversed().forEach { event ->
+                val latestVisible = if (expandedLatest) history.records else history.records.takeLast(24)
+                latestVisible.asReversed().forEach { event ->
                     ZhaoxiWorkEventTimelineItem(event)
+                }
+                if (history.records.size > 24) {
+                    ZxChip(
+                        if (expandedLatest) "收起当前记录" else "展开本页其余 ${history.records.size - 24} 条",
+                        expandedLatest,
+                    ) { expandedLatest = !expandedLatest }
                 }
                 if (olderEvents.isNotEmpty()) {
                     ZxSection("较早记录 · ${olderEvents.size} 条")
@@ -138,7 +146,8 @@ fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile
                         ZhaoxiWorkEventTimelineItem(event)
                     }
                 }
-                if (olderCursor != null) ZxChip("加载较早事件", false) {
+                if (olderCursor != null && (expandedLatest || history.records.size <= 24))
+                    ZxChip("加载较早事件", false) {
                     val page = workReads.historyPageForUi(sessionId, olderCursor)
                     if (page.invalidated) {
                         historyExpired = true
