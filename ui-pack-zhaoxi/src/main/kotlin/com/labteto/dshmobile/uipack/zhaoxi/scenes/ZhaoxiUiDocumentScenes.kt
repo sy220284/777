@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.uicontract.*
 import com.labteto.dshmobile.uipack.zhaoxi.components.*
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
+import com.labteto.dshmobile.uihost.UiOwnedMediaPlayback
 import com.labteto.dshmobile.uihost.UiSceneRenderScope
 import kotlinx.coroutines.launch
 
@@ -49,6 +51,7 @@ fun ZhaoxiUiDocumentScene(
     context: () -> ZhaoxiDocumentContext?,
     knownScenes: Set<UiSceneId>,
     pendingApprovalId: () -> String?,
+    media: MediaUiPort? = null,
 ) {
     val snap by port.snapshots.collectAsState(initial = port.snapshot())
     ZxPage("文档", onBack = { scope.onBack() }) {
@@ -66,6 +69,7 @@ fun ZhaoxiUiDocumentScene(
                 bindings = item.bindings,
                 knownScenes = knownScenes,
                 pendingApprovalId = pendingApprovalId(),
+                media = media,
                 onAction = { actionId, fields ->
                     // Commands are admitted again by the original Feature Owner.
                     val live = context()
@@ -148,6 +152,7 @@ fun ZxDocumentCard(
     knownScenes: Set<UiSceneId>,
     pendingApprovalId: String?,
     onAction: (String, Map<String, String>) -> UiDocumentReceipt,
+    media: MediaUiPort? = null,
 ) {
     val defaults = remember(document) { documentDefaults(document.nodes) }
     // A new revision must never erase the user's unfinished form entry.
@@ -181,10 +186,10 @@ fun ZxDocumentCard(
                 if (detailsExpanded) document.nodes.filterNot {
                     it.id == "work_turn_status" || it.id == "work_scope"
                 }.forEach { node ->
-                    ZxDocumentNodeView(node, bindings, fields) { actionId -> onAction(actionId, fields.toMap()) }
+                    ZxDocumentNodeView(node, bindings, fields, { actionId -> onAction(actionId, fields.toMap()) }, media, document.source.sessionId)
                 }
             } else document.nodes.forEach { node ->
-                ZxDocumentNodeView(node, bindings, fields) { actionId -> onAction(actionId, fields.toMap()) }
+                ZxDocumentNodeView(node, bindings, fields, { actionId -> onAction(actionId, fields.toMap()) }, media, document.source.sessionId)
             }
         }
     }
@@ -196,6 +201,8 @@ private fun ZxDocumentNodeView(
     bindings: Map<UiDocumentBinding, UiDocumentBoundValue>,
     fields: MutableMap<String, String>,
     onAction: (String) -> Unit,
+    media: MediaUiPort?,
+    sessionId: String,
 ) {
     when (node) {
         is UiDocumentNode.Text -> Text(node.text, fontSize = 13.sp, color = ZhaoxiTheme.colors.ink)
@@ -228,7 +235,7 @@ private fun ZxDocumentNodeView(
                 ZxRow(node.title, if (expanded) "收起" else "展开",
                     onClick = { expanded = !expanded })
                 if (expanded) node.children.forEach {
-                    ZxDocumentNodeView(it, bindings, fields, onAction)
+                    ZxDocumentNodeView(it, bindings, fields, onAction, media, sessionId)
                 }
             }
         }
@@ -282,12 +289,30 @@ private fun ZxDocumentNodeView(
                     color = ZhaoxiTheme.colors.ink2)
             }
         }
-        is UiDocumentNode.Media -> ZxRow("媒体", node.label.take(48))
+        is UiDocumentNode.Media -> {
+            val owned = media?.assetForSession(node.assetId, sessionId)
+            Column {
+                Text(node.label, color = ZhaoxiTheme.colors.ink)
+                if (owned == null) {
+                    Text("媒体结果暂不可用", fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2)
+                } else {
+                    owned.textOutput?.let { Text(it, color = ZhaoxiTheme.colors.ink) }
+                    owned.localPath?.let { path ->
+                        val kind = when (node.kind) {
+                            UiDocumentMediaKind.IMAGE -> UiAttachmentMediaKind.IMAGE
+                            UiDocumentMediaKind.AUDIO -> UiAttachmentMediaKind.AUDIO
+                            UiDocumentMediaKind.VIDEO -> UiAttachmentMediaKind.VIDEO
+                        }
+                        UiOwnedMediaPlayback(path, kind, Modifier.fillMaxWidth().heightIn(max = 360.dp))
+                    }
+                }
+            }
+        }
         is UiDocumentNode.Column -> Column {
-            node.children.forEach { ZxDocumentNodeView(it, bindings, fields, onAction) }
+            node.children.forEach { ZxDocumentNodeView(it, bindings, fields, onAction, media, sessionId) }
         }
         is UiDocumentNode.Row -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            node.children.forEach { ZxDocumentNodeView(it, bindings, fields, onAction) }
+            node.children.forEach { ZxDocumentNodeView(it, bindings, fields, onAction, media, sessionId) }
         }
     }
 }
