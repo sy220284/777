@@ -543,14 +543,34 @@ fun ZhaoxiStorageScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
 }
 
 @Composable
-fun ZhaoxiMemoryManagementScene(memory: MemoryUiPort, scope: UiSceneRenderScope) {
+fun ZhaoxiMemoryManagementScene(memory: MemoryUiPort, scope: UiSceneRenderScope,
+    settings: SettingsUiPort? = null) {
     var query by rememberSaveable { mutableStateOf("") }
     var revision by remember { mutableStateOf(0) }
-    var cursor by remember(query) { mutableStateOf<MemoryManagementCursor?>(null) }
-    val page = remember(memory, query, revision, cursor) {
-        memory.memoryPage(MemoryManagementQuery(setOf(MemoryScope.GLOBAL), text = query, cursor = cursor))
+    var kindFilter by rememberSaveable { mutableStateOf<MemoryKind?>(null) }
+    var scopeFilter by rememberSaveable { mutableStateOf(MemoryScope.GLOBAL) }
+    val context = remember(settings, revision) { settings?.memoryContext() }
+    val available = listOfNotNull(
+        MemoryScope.GLOBAL,
+        MemoryScope.LINEAGE.takeIf { !context?.lineageId.isNullOrBlank() },
+        MemoryScope.PROJECT.takeIf { !context?.projectId.isNullOrBlank() },
+    )
+    val selectedScope = scopeFilter.takeIf { it in available } ?: MemoryScope.GLOBAL
+    var cursor by remember(query, kindFilter, selectedScope) { mutableStateOf<MemoryManagementCursor?>(null) }
+    val page = remember(memory, query, selectedScope, kindFilter, revision, cursor, context) {
+        memory.memoryPage(MemoryManagementQuery(
+            scopes = setOf(selectedScope), text = query,
+            lineageId = if (selectedScope == MemoryScope.LINEAGE) context?.lineageId else null,
+            projectId = if (selectedScope == MemoryScope.PROJECT) context?.projectId else null,
+            kinds = kindFilter?.let(::setOf) ?: MemoryKind.entries.toSet(), cursor = cursor))
     }
+    var selectedRecordId by remember { mutableStateOf<String?>(null) }
+    var editingDirty by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
+    fun changeFilter(change: () -> Unit) {
+        if (editingDirty) status = "请先保存或关闭正在编辑的记忆"
+        else { change(); cursor = null; selectedRecordId = null }
+    }
     var pendingForget by remember { mutableStateOf<MemoryRecord?>(null) }
     fun applyReceipt(receipt: MemoryUiReceipt) {
         status = when (receipt) {
@@ -562,29 +582,89 @@ fun ZhaoxiMemoryManagementScene(memory: MemoryUiPort, scope: UiSceneRenderScope)
         }
         if (receipt is MemoryUiReceipt.Updated ||
             receipt == MemoryUiReceipt.Forgotten ||
-            receipt is MemoryUiReceipt.CommittedWithWarning) revision++
+            receipt is MemoryUiReceipt.CommittedWithWarning) {
+            revision++; cursor = null; selectedRecordId = null; editingDirty = false
+        }
     }
-    ZxPage("记忆管理", onBack = { scope.onBack() }) {
+    ZxPage("记忆管理", onBack = {
+        if (editingDirty) status = "请先保存或关闭正在编辑的记忆"
+        else scope.onBack()
+    }) {
         Spacer(Modifier.height(8.dp))
-        ZxField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = "搜索全局记忆")
+        ZxSection("可见范围")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            available.forEach { target ->
+                ZxChip(when (target) {
+                    MemoryScope.GLOBAL -> "全局"
+                    MemoryScope.LINEAGE -> "当前会话线"
+                    MemoryScope.PROJECT -> "当前项目"
+                }, selectedScope == target) { changeFilter { scopeFilter = target } }
+            }
+        }
+        ZxField(query, { value -> changeFilter { query = value } },
+            Modifier.fillMaxWidth(), placeholder = "搜索所有当前可见记忆")
+        ZxSection("按类型")
+        androidx.compose.foundation.layout.Row(
+            Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ZxChip("全部", kindFilter == null) { changeFilter { kindFilter = null } }
+            MemoryKind.entries.forEach { kind ->
+                ZxChip(kind.name, kindFilter == kind) { changeFilter { kindFilter = kind } }
+            }
+        }
+        ZxValueRow("符合条件", value = "${page.totalMatching} 条")
+        if (kindFilter == null) page.kindCounts.filterValues { it > 0 }.forEach { (kind, count) ->
+            ZxValueRow(kind.name, value = count.toString())
+        }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
         if (page.records.isEmpty()) ZxEmpty("没有匹配的记忆", "可以调整搜索条件")
         page.records.forEach { record ->
-            var text by rememberUiPrivateText("zhaoxi.memory.${record.id}", record.updatedAt) { record.content }
-            ZxSettingsGroup {
-                ZxValueRow("记忆类型", value = record.kind.name)
-                ZxField(text, { text = it }, Modifier.fillMaxWidth())
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ZxButton("保存", { applyReceipt(memory.submit(
-                        MemoryUiCommand.Update(record, text, record.pinned))) },
-                        Modifier.weight(1f))
-                    ZxButton("遗忘", { pendingForget = record }, Modifier.weight(1f),
-                        ZxButtonVariant.Danger)
+            val opened = selectedRecordId == record.id
+            ZxRow(record.kind.name, record.content.take(95) +
+                if (record.pinned) " · 已置顶" else "", onClick = {
+                    if (editingDirty && !opened) status = "请先保存当前编辑"
+                    else { selectedRecordId = if (opened) null else record.id; editingDirty = false }
+                }, trailing = {
+                    ZxChip(if (opened) "收起" else "详情", opened) {
+                        if (editingDirty && !opened) status = "请先保存当前编辑"
+                        else { selectedRecordId = if (opened) null else record.id; editingDirty = false }
+                    }
+                })
+            if (opened) {
+                var text by rememberUiPrivateText("zhaoxi.memory.${record.id}", record.updatedAt) { record.content }
+                ZxSettingsGroup {
+                    ZxValueRow("记忆类型", value = record.kind.name)
+                    ZxValueRow("披露范围", value = record.disclosure.name)
+                    ZxField(text, { text = it; editingDirty = it != record.content },
+                        Modifier.fillMaxWidth().heightIn(min = 112.dp))
+                    ZxSwitchRow("置顶", "只改变这条记忆的置顶状态", record.pinned) { checked ->
+                        if (editingDirty) status = "请先保存正在编辑的正文"
+                        else applyReceipt(memory.submit(
+                            MemoryUiCommand.Update(record, record.content, checked)))
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ZxButton("保存修改", {
+                            if (text.isBlank()) status = "请填写正文；删除请使用遗忘"
+                            else applyReceipt(memory.submit(
+                                MemoryUiCommand.Update(record, text, record.pinned)))
+                        }, Modifier.weight(1f), enabled = editingDirty && text.isNotBlank())
+                        ZxButton("遗忘", { pendingForget = record }, Modifier.weight(1f),
+                            ZxButtonVariant.Danger)
+                    }
+                    ZxButton("关闭编辑", { selectedRecordId = null; editingDirty = false },
+                        variant = ZxButtonVariant.Outline)
                 }
             }
         }
-        page.next?.let { next -> ZxButton("下一页", { cursor = next }) }
-        if (cursor != null) ZxButton("回到首页", { cursor = null })
+        page.next?.let { next -> ZxButton("下一页", {
+            if (editingDirty) status = "请先保存当前编辑"
+            else { cursor = next; selectedRecordId = null }
+        }) }
+        if (cursor != null) ZxButton("回到首页", {
+            if (editingDirty) status = "请先保存当前编辑"
+            else { cursor = null; selectedRecordId = null }
+        })
+        ZxFooterNote("先检索全部有权查看的活跃记录，再分页；已遗忘的记录不会在当前页面恢复。")
     }
     pendingForget?.let { record ->
         ZxDialog("遗忘这条记忆？", "删除后无法直接恢复。", "遗忘", {
