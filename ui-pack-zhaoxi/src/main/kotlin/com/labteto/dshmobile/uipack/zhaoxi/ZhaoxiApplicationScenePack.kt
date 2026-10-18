@@ -287,12 +287,12 @@ class ZhaoxiApplicationScenePack(
                 ZhaoxiChatScene(it.chat, it.drafts, it.reading, it.history, authorName = "助手", scope,
                     onMessage = { identity, message -> targets.message = identity to message.id; messagePreview = identity to message; scope.onNavigate(UiSceneId("conversation.message_actions")) },
                     menu = { ZhaoxiConversationMenu(conversations, secondary, scope, renderSlot = { RenderScene(it, scope) }) },
-                    documents = conv.documents, knownScenes = manifest.scenes)
+                    documents = conv.documents, knownScenes = manifest.scenes, media = conv.media)
             }
             "conversation.work" -> conv?.let { ZhaoxiWorkScene(it.work, it.drafts, it.reading, it.history, scope,
                 onMessage = { identity, message -> targets.message = identity to message.id; messagePreview = identity to message; scope.onNavigate(UiSceneId("conversation.message_actions")) },
                 menu = { ZhaoxiConversationMenu(conversations, secondary, scope, renderSlot = { RenderScene(it, scope) }) },
-                    documents = conv.documents, knownScenes = manifest.scenes) }
+                    documents = conv.documents, knownScenes = manifest.scenes, media = conv.media) }
             "conversation.header" -> conv?.let {
                 ZhaoxiConversationMenu(conversations, secondary, scope, renderSlot = { RenderScene(it, scope) })
             }
@@ -347,7 +347,7 @@ class ZhaoxiApplicationScenePack(
                 }, { modelOwner.submit(SettingsUiCommand.SelectModel(it)); scope.onBack() },
                     { scope.onNavigate(UiSceneId("settings.models")) }, scope)
             }
-            "conversation.ui_document" -> conv?.documents?.let { ZhaoxiUiDocumentScene(it, scope, ::currentDocumentContext, manifest.scenes, { conversations?.work?.snapshot()?.approval?.pendingId }) }
+            "conversation.ui_document" -> conv?.documents?.let { ZhaoxiUiDocumentScene(it, scope, ::currentDocumentContext, manifest.scenes, { conversations?.work?.snapshot()?.approval?.pendingId }, conv?.media) }
             "conversation.ui_document_generate" -> conv?.documents?.let { ZhaoxiUiDocumentGenerateScene(it, scope, ::currentDocumentContext) }
             "work.approval" -> conv?.let { ZhaoxiApprovalScene(it.work, scope) }
             "work.question" -> conv?.let { ZhaoxiQuestionScene(it.work, scope) }
