@@ -89,7 +89,7 @@ if __name__ == '__main__':
     if args.self_test:
         assert normalize_path('M5 4h11l3 3v13a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z') == 'M 5 4 h 11 l 3 3 v 13 a 1 1 0 0 1 -1 1 H 5 a 1 1 0 0 1 -1 -1 V 5 a 1 1 0 0 1 1 -1 z'
         assert normalize_path('M0 0 1 2A1 2 30 103.5-.5 2 2 0 01-1-2') == 'M 0 0 L 1 2 A 1 2 30 1 0 3.5 -.5 A 2 2 0 0 1 -1 -2'
-        assert normalize_path('M1e-3 -.2L.5+2') == 'M 1e-3 -.2 L .5 +2' 
+        assert normalize_path('M1e-3 -.2L.5+2') == 'M 1e-3 -.2 L .5 +2'
     outputs = generate()
     changed = [path for path,content in outputs.items() if not path.exists() or path.read_text() != content]
     if args.check and changed: raise SystemExit('Generated icon resources differ: ' + ', '.join(str(x.relative_to(ROOT)) for x in changed))
