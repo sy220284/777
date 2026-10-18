@@ -98,6 +98,8 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
     }
     var glow by remember(snap.ambientGlow) { mutableFloatStateOf(snap.ambientGlow) }
     var glass by remember(snap.transparency) { mutableFloatStateOf(snap.transparency) }
+    var wallpaperSaving by remember { mutableStateOf(false) }
+    var wallpaperError by remember { mutableStateOf<String?>(null) }
     ZxPage("外观", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("主题")
@@ -134,9 +136,28 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
         ZxSwitchRow("启用主题壁纸", "开启后显示选中的壁纸；自动模式随主题和明暗切换",
             snap.presetWallpaperEnabled) { writeAppearance(presetWallpaperEnabled = it) }
         ZxSection("选择壁纸")
-        ZhaoxiWallpaperPicker(snap.selectedWallpaperPreset) { preset ->
-            jobs.launch { preferences.submit(UiHostPreferencesCommand.SelectWallpaperPreset(preset)) }
+        ZhaoxiWallpaperPicker(
+            selectedPreset = snap.selectedWallpaperPreset,
+            saving = wallpaperSaving,
+        ) { preset ->
+            if (!wallpaperSaving && (preset != snap.selectedWallpaperPreset || !snap.presetWallpaperEnabled)) {
+                wallpaperSaving = true
+                wallpaperError = null
+                jobs.launch {
+                    try {
+                        if (!preferences.submit(UiHostPreferencesCommand.SelectWallpaperPreset(preset))) {
+                            wallpaperError = "壁纸保存失败，请重试"
+                        }
+                    } catch (error: Exception) {
+                        wallpaperError = "壁纸保存失败，请重试"
+                    } finally {
+                        wallpaperSaving = false
+                    }
+                }
+            }
         }
+        if (wallpaperSaving) ZxFooterNote("正在保存壁纸")
+        wallpaperError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
         ZxSwitchRow("智能对比度", "根据壁纸与明暗模式保持文字可读",
             snap.adaptiveContrast) { writeAppearance(adaptiveContrast = it) }
         Text("环境光强度 · ${(glow * 100).toInt()}%", fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2)
