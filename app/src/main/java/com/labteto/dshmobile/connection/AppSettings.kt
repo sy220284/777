@@ -43,6 +43,8 @@ data class AppSettings(
     val backgroundAdaptiveContrast: Boolean = true,
     /** Optional E8.18 packaged wallpapers follow the selected hue and effective dark mode. */
     val presetWallpaperEnabled: Boolean = false,
+    /** "auto" follows the theme; w0.webp–w9.webp pins a selected artwork. */
+    val selectedWallpaperPreset: String = "auto",
     /** User reading scale layered on top of Android's system font scale. */
     val textScale: Float = 1.0f,
     /** 0=standard, 1=slightly bold, 2=bold. Applied across semantic app text roles while preserving hierarchy. */
