@@ -168,16 +168,22 @@ fun ZhaoxiBranchesScene(
 fun ZhaoxiApprovalScene(work: WorkConversationUiPort, scope: UiSceneRenderScope) {
     val snap by work.snapshots.collectAsState(initial = work.snapshot())
     var receipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
+    var expiredPendingId by remember { mutableStateOf<String?>(null) }
     ZxPage("审批", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         CommandFeedback(receipt)
         val approval = snap.approval
         if (approval == null) ZxEmpty("没有待审批", "工具调用需要批准时会出现在这里")
-        else ZxApprovalCard(approval, expired = false) { approved ->
+        else ZxApprovalCard(approval,
+            expired = snap.identity == null || snap.phase != UiExecutionPhase.WAITING_FOR_USER ||
+                expiredPendingId == approval.pendingId,
+        ) { approved ->
             snap.identity?.let { id ->
                 val result = work.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.AnswerApproval(
                     id, approval.pendingId, approved))
                 receipt = result
+                if (result is UiCommandReceipt.Rejected &&
+                    result.reason == UiCommandRejection.APPROVAL_EXPIRED) expiredPendingId = approval.pendingId
                 if (result.admitted()) scope.onBack()
             }
         }
