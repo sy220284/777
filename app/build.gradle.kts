@@ -253,6 +253,8 @@ android {
         jniLibs.srcDir(generatedGitRuntime.get().dir("jniLibs").asFile)
         jniLibs.srcDir(generatedUpdatePatcher.get().dir("jniLibs").asFile)
         assets.srcDir(generatedBundledRuntimeAssets.get().dir("assets").asFile)
+        // Package original E8.17 SVG icon assets from the design system in the App APK.
+        assets.srcDir(rootProject.file("docs/design/zhaoxi/E8.17"))
     }
 
     packaging {
