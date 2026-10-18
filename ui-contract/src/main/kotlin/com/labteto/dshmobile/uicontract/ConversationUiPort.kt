@@ -53,6 +53,8 @@ enum class UiMessageEditOutcome {
 }
 enum class UiMessageRole { USER, ASSISTANT, SYSTEM, TOOL }
 data class UiMessageBranch(val index: Int, val count: Int)
+/** Transient owner-scoped model text. Durable transcript replaces it when committed. */
+data class UiStreamingReplyPreview(val requestId: String, val text: String)
 data class UiMessageSnapshot(val id: String, val role: UiMessageRole, val text: String, val createdAt: Long,
     val editableText: String? = null, val branch: UiMessageBranch? = null, val proactive: Boolean = false)
 
@@ -68,6 +70,7 @@ data class ChatSceneSnapshot(
     val send: UiActionAvailability,
     val error: String?,
     val group: UiChatGroupSummary? = null,
+    val livePreview: UiStreamingReplyPreview? = null,
 )
 
 sealed interface ChatUiCommand {
@@ -108,6 +111,7 @@ data class WorkConversationSceneSnapshot(
     val approval: UiApprovalSnapshot?,
     val error: String?,
     val question: UiQuestionSnapshot? = null,
+    val livePreview: UiStreamingReplyPreview? = null,
 )
 
 sealed interface WorkConversationUiCommand {
