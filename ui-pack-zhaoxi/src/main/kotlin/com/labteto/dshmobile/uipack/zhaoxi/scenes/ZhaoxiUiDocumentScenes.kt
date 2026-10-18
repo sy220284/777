@@ -255,18 +255,7 @@ private fun ZxDocumentNodeView(
                 }
             }
         }
-        is UiDocumentNode.Table -> {
-            var showAll by remember(node.id) { mutableStateOf(false) }
-            Column(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                Text(node.headers.joinToString("  │  "), fontSize = 12.sp, color = ZhaoxiTheme.colors.ink)
-                (if (showAll) node.rows else node.rows.take(16)).forEach { row ->
-                    Text(row.joinToString("  │  "), fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2)
-                }
-                if (node.rows.size > 16) ZxRow(
-                    if (showAll) "收起表格" else "查看全部 ${node.rows.size} 行", "",
-                    onClick = { showAll = !showAll })
-            }
-        }
+        is UiDocumentNode.Table -> ZxDataTable(node.headers, node.rows)
         is UiDocumentNode.BarChart -> {
             val maximum = node.points.maxOfOrNull { it.value }?.takeIf { it > 0.0 } ?: 1.0
             Column {
