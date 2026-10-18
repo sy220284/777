@@ -57,6 +57,7 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
     var handoffGoal by remember(handoffSourceId) { mutableStateOf("") }
     var selectedHandoffIds by remember(handoffSourceId) { mutableStateOf(emptySet<String>()) }
     var handoffMessages by remember(handoffSourceId) { mutableStateOf(emptyList<UiMessageSnapshot>()) }
+    var handoffVisibleLimit by remember(handoffSourceId) { mutableStateOf(80) }
     var handoffCursor by remember(handoffSourceId) { mutableStateOf<UiTranscriptCursor?>(null) }
     var handoffHasMore by remember(handoffSourceId) { mutableStateOf(true) }
     var handoffLoading by remember(handoffSourceId) { mutableStateOf(false) }
@@ -130,6 +131,7 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
                         if (showHandoff) {
                             selectedHandoffIds = emptySet()
                             handoffMessages = chatSnapshot.messages
+                            handoffVisibleLimit = 80
                             handoffCursor = null
                             handoffHasMore = historyOwner != null
                             handoffProblem = null
@@ -142,9 +144,9 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
                     ZxFooterNote("仅交接你勾选的用户/助手可见文字，系统消息、工具日志与附件不会转移；创建后需自行发送任务。")
                     ZxField(handoffGoal, { handoffGoal = it }, Modifier.fillMaxWidth(),
                         placeholder = "工作目标：例如整理这次讨论并给出执行方案")
-                    val ordered = zxShareableChatHistory(handoffMessages).distinctBy { it.id }.takeLast(240)
+                    val ordered = zxShareableChatHistory(handoffMessages).distinctBy { it.id }
                     if (ordered.isEmpty()) ZxEmpty("暂无可交接消息", "仅展示可以明确选择的聊天正文")
-                    else ordered.takeLast(80).forEach { message ->
+                    else ordered.takeLast(handoffVisibleLimit).forEach { message ->
                         val picked = message.id in selectedHandoffIds
                         val label = if (message.role == UiMessageRole.USER) "我" else
                             if (message.role == UiMessageRole.ASSISTANT) "助手" else message.role.name
@@ -159,14 +161,18 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
                                 }
                             })
                     }
-                    if (historyOwner != null && handoffHasMore) {
+                    if (ordered.size > handoffVisibleLimit) {
+                        ZxButton("显示更早的消息", {
+                            handoffVisibleLimit = (handoffVisibleLimit + 60).coerceAtMost(ordered.size)
+                        }, variant = ZxButtonVariant.Outline)
+                    } else if (historyOwner != null && handoffHasMore) {
                         ZxButton("加载更多历史消息", {
                             if (!handoffLoading) jobs.launch {
                                 handoffLoading = true
                                 try {
                                     val page = historyOwner.messagePage(origin.sessionId, handoffCursor, 60)
-                                    handoffMessages = (page.messages + handoffMessages)
-                                        .distinctBy { it.id }.takeLast(500)
+                                    handoffMessages = (page.messages + handoffMessages).distinctBy { it.id }
+                                    handoffVisibleLimit += page.messages.size
                                     handoffCursor = page.nextCursor
                                     handoffHasMore = page.nextCursor != null
                                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
