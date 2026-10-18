@@ -429,8 +429,10 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
                             historyLoading = true
                             jobs.launch {
                                 try {
-                                    when (val page = gallery.history(galleryId, activeStory.id)) {
+                                    val storyId = activeStory.id
+                                    when (val page = gallery.history(galleryId, storyId)) {
                                         is UiPersonaGalleryHistoryReceipt.Available -> {
+                                            if (activeStoryId != storyId) return@launch
                                             historyMessages = page.page.messages
                                             historyCursor = page.page.olderCursor
                                             historyHasMore = page.page.olderCursor != null
@@ -469,8 +471,11 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
                                     historyLoading = true
                                     jobs.launch {
                                         try {
-                                            when (val page = gallery.history(galleryId, activeStory.id, historyCursor)) {
+                                            val storyId = activeStory.id
+                                            val cursor = historyCursor
+                                            when (val page = gallery.history(galleryId, storyId, cursor)) {
                                                 is UiPersonaGalleryHistoryReceipt.Available -> {
+                                                    if (activeStoryId != storyId || historyCursor != cursor) return@launch
                                                     historyMessages = (page.page.messages + historyMessages)
                                                         .distinctBy { it.id }.takeLast(160)
                                                     historyCursor = page.page.olderCursor
@@ -583,7 +588,8 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
                                 inspectionBusy = true
                                 try {
                                     val refreshed = authoring.read(galleryId)
-                                    if (refreshed is UiPersonaAuthoringReceipt.Loaded) {
+                                    if (refreshed is UiPersonaAuthoringReceipt.Loaded &&
+                                        refreshed.snapshot.revision == result.revision) {
                                         val resultSave = authoring.applySuggestions(galleryId, refreshed.snapshot.revision,
                                             result.suggestions.filterIndexed { i, _ -> i in chosenSuggestionFields })
                                         status = resultSave.zxAuthoringFeedback()
@@ -591,7 +597,7 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
                                             inspection = null
                                             revision++
                                         }
-                                    } else status = "人物档案已变化，建议没有应用"
+                                    } else status = "人物档案已变化，请重新检查后再采纳建议"
                                 } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
                                 catch (failure: Exception) { status = "追加建议失败，请检查档案后重试" }
                                 finally { inspectionBusy = false }
