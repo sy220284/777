@@ -148,7 +148,7 @@ fun ZxOnboardingFlow(
     val s = steps[current.coerceIn(steps.indices)]
     Column(modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(64.dp))
-        Text(s.kicker, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = c.accent, letterSpacing = 2.sp)
+        Text(s.kicker, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = c.accentInk, letterSpacing = 2.sp)
         Spacer(Modifier.height(8.dp))
         Text(s.title, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = c.ink, textAlign = TextAlign.Center)
         Spacer(Modifier.height(12.dp))
