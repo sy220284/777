@@ -191,10 +191,17 @@ fun ZhaoxiTheme(
     hue: ZhaoxiHue = ZhaoxiHue.STONE,
     dark: Boolean = isSystemInDarkTheme(),
     reducedMotion: Boolean = false,
+    transparency: Float = .5f,
     content: @Composable () -> Unit,
 ) {
+    val base = zhaoxiColors(hue, dark)
+    val level = transparency.coerceIn(0f, 1f)
+    val colors = base.copy(
+        glass = base.glass.copy(alpha = .95f - level * .20f),
+        glass2 = base.glass2.copy(alpha = 1f - level * .12f),
+    )
     CompositionLocalProvider(
-        LocalZhaoxiColors provides zhaoxiColors(hue, dark),
+        LocalZhaoxiColors provides colors,
         LocalReducedMotion provides reducedMotion,
     ) { content() }
 }
