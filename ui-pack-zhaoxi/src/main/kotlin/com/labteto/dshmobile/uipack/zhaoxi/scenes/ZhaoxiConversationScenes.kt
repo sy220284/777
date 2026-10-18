@@ -26,6 +26,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.produceState
@@ -317,11 +318,29 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
             documentId = card.document.documentId, revision = card.document.revision,
             source = card.document.source, actionId = actionId, fields = fields))
     }
-    val streamText = preview?.text?.takeIf { it.isNotBlank() &&
-        all.lastOrNull { message -> message.role == UiMessageRole.ASSISTANT }?.text != it }
+    // A cumulative model snapshot must not repeat already committed intermediate messages.
+    val activeReply = timeline.lastOrNull { it is ZxTimelineEntry.Reply } as? ZxTimelineEntry.Reply
+    val streamText = uncommittedReplyPreview(preview?.text, activeReply?.stages.orEmpty())
     val state = rememberLazyListState()
     var restored by remember(sessionId) { mutableStateOf(false) }
     var followTail by remember(sessionId) { mutableStateOf(true) }
+    val readerDragging by state.interactionSource.collectIsDraggedAsState()
+    val latestStageSignature = activeReply?.stages?.map { it.id to it.text.hashCode() }
+    suspend fun moveToLiveTail() {
+        val last = (state.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+        // Avoid resetting an already-visible growing reply to the top on every token.
+        var tail = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == last }
+        if (tail == null) {
+            state.scrollToItem(last)
+            androidx.compose.runtime.withFrameNanos { }
+            tail = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == last }
+        }
+        tail?.let { item ->
+            val overflow = (item.offset + item.size - state.layoutInfo.viewportEndOffset)
+                .coerceAtLeast(0)
+            if (overflow > 0) state.scrollBy(overflow.toFloat())
+        }
+    }
     LaunchedEffect(sessionId, all.firstOrNull()?.id) {
         if (!restored && all.isNotEmpty()) {
             val anchor = reading.anchor(sessionId)
@@ -343,30 +362,19 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
                             is ZxTimelineEntry.Message -> entry.message.id
                             is ZxTimelineEntry.Reply -> entry.stages.firstOrNull()?.id ?: entry.anchorId
                         }
-                    }, offset, !state.canScrollForward))
+                    }, offset, followTail))
             }
     }
-    // Follow new output only while the reader has chosen the live tail.
-    LaunchedEffect(state, sessionId) {
-        snapshotFlow { state.isScrollInProgress to !state.canScrollForward }
-            .distinctUntilChanged().collect { (scrolling, atTail) ->
-                if (scrolling) followTail = atTail
-            }
+    // Distinguish the reader's drag gesture from our programmatic scroll operations.
+    LaunchedEffect(state, sessionId, readerDragging) {
+        if (readerDragging) snapshotFlow { !state.canScrollForward }
+            .distinctUntilChanged().collect { atTail -> followTail = atTail }
     }
-    LaunchedEffect(timeline.size, streamText, running,
+    LaunchedEffect(timeline.size, latestStageSignature, streamText, running, readerDragging,
         currentDocuments.map { it.document.documentId to it.document.revision }) {
-        if (restored && followTail) {
+        if (restored && followTail && !readerDragging) {
             androidx.compose.runtime.withFrameNanos { }
-            val last = (state.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-            state.scrollToItem(last)
-            // A growing streamed answer may exceed one screen: keep its final line visible.
-            androidx.compose.runtime.withFrameNanos { }
-            val tail = state.layoutInfo.visibleItemsInfo.lastOrNull { it.index == last }
-            if (tail != null) {
-                val overflow = (tail.offset + tail.size - state.layoutInfo.viewportEndOffset)
-                    .coerceAtLeast(0)
-                if (overflow > 0) state.scrollBy(overflow.toFloat())
-            }
+            moveToLiveTail()
         }
     }
     Column(modifier) {
@@ -424,9 +432,7 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
                                 }
                         }
                         if (isCurrent) {
-                            val currentText = streamText?.takeUnless {
-                                entry.stages.lastOrNull()?.text == it
-                            }
+                            val currentText = streamText
                             if (currentText != null) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     ZxTypingIndicator()
@@ -458,8 +464,7 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
                 "↓ 查看最新回复", false, onClick = {
                     followTail = true
                     jobs.launch {
-                        val last = (state.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                        state.scrollToItem(last)
+                        moveToLiveTail()
                     }
                 })
         }
