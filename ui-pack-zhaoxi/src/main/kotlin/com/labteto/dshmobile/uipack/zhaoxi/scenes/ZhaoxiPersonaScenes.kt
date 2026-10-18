@@ -185,7 +185,14 @@ fun ZhaoxiPersonaEditorScene(
     }
 }
 
-/** chat.gallery_delete — 删除人物（确认弹窗，Danger）。 */
+/** Convert archive errors to readable product copy, never Kotlin data-class output. */
+internal fun zxGalleryDeletionFailure(receipt: UiPersonaGalleryDeletionReceipt): String = when (receipt) {
+    UiPersonaGalleryDeletionReceipt.Missing -> "人物已经不存在"
+    is UiPersonaGalleryDeletionReceipt.Failed -> receipt.message?.takeIf(String::isNotBlank) ?: "删除失败"
+    is UiPersonaGalleryDeletionReceipt.Deleted -> "人物已删除"
+}
+
+/** chat.gallery_delete — 人物归档删除，危险操作有明确确认、取消与失败恢复。 */
 @Composable
 fun ZxGalleryDeleteScene(
     deletion: PersonaGalleryDeletionUiPort,
@@ -197,28 +204,65 @@ fun ZxGalleryDeleteScene(
 ) {
     val jobs = androidx.compose.runtime.rememberCoroutineScope()
     val entry by produceState<UiPersonaGalleryEntry?>(null, galleryId) {
-        value = (gallery?.read() as? UiPersonaGalleryReadReceipt.Available)?.entries?.firstOrNull { it.id == galleryId }
+        value = (gallery?.read() as? UiPersonaGalleryReadReceipt.Available)
+            ?.entries?.firstOrNull { it.id == galleryId }
     }
-    var result by remember { mutableStateOf<UiPersonaGalleryDeletionReceipt?>(null) }
-    var busy by remember { mutableStateOf(false) }
+    var result by remember(galleryId) { mutableStateOf<UiPersonaGalleryDeletionReceipt?>(null) }
+    var busy by remember(galleryId) { mutableStateOf(false) }
+    var confirmDelete by remember(galleryId) { mutableStateOf(true) }
     ZxPage("删除人物", onBack = { scope.onBack() }) {
         when (val receipt = result) {
             is UiPersonaGalleryDeletionReceipt.Deleted -> {
-                Text("人物归档已删除", color = ZhaoxiTheme.colors.ink)
-                receipt.portraitCleanupWarning?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-                if (receipt.sessionSync == UiStorySessionSync.DEFERRED) Text("当前会话将在业务状态允许时同步清理", color = ZhaoxiTheme.colors.ink2)
-                ZxChip("返回图集", false) { scope.onNavigate(UiSceneId("route.persona_gallery")) }
+                Text("人物已删除", color = ZhaoxiTheme.colors.ink)
+                receipt.portraitCleanupWarning?.let {
+                    com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
+                        it, com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Warn)
+                }
+                if (receipt.sessionSync == UiStorySessionSync.DEFERRED) {
+                    ZxFooterNote("当前会话稍后同步")
+                }
+                ZxChip("返回图集", false) {
+                    scope.onNavigate(UiSceneId("route.persona_gallery"))
+                }
+            }
+            UiPersonaGalleryDeletionReceipt.Missing -> {
+                ZxEmpty("人物已不存在", "可返回图集查看",
+                    actionLabel = "返回图集",
+                    onAction = { scope.onNavigate(UiSceneId("route.persona_gallery")) })
             }
             else -> {
-                if (busy) Text("正在删除…", color = ZhaoxiTheme.colors.ink2)
-                else ZxDialog("删除 ${entry?.name ?: personaName}？", "将删除该人物归档、故事与公开日记，无法恢复", "删除", {
-                    jobs.launch {
-                        busy = true
-                        try { result = deletion.delete(DeletePersonaGalleryCommand(identity, galleryId)) }
-                        finally { busy = false }
+                if (busy) {
+                    Text("正在删除…", color = ZhaoxiTheme.colors.ink2)
+                } else {
+                    if (receipt is UiPersonaGalleryDeletionReceipt.Failed) {
+                        com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
+                            zxGalleryDeletionFailure(receipt),
+                            com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err)
+                        ZxButton("重新尝试", { confirmDelete = true })
                     }
-                }, { scope.onBack() })
-                if (receipt != null) Text(receipt.toString(), color = ZhaoxiTheme.colors.ink2)
+                    if (!confirmDelete) ZxButton("返回", { scope.onBack() })
+                }
+                if (confirmDelete && !busy) ZxDialog(
+                    "删除 ${entry?.name ?: personaName}？",
+                    "将删除人物归档、故事及公开日记，无法恢复。",
+                    "确认删除",
+                    {
+                        confirmDelete = false
+                        if (!busy) jobs.launch {
+                            busy = true
+                            try {
+                                result = deletion.delete(DeletePersonaGalleryCommand(identity, galleryId))
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                throw cancelled
+                            } catch (failure: Exception) {
+                                result = UiPersonaGalleryDeletionReceipt.Failed(failure.message)
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    },
+                    { confirmDelete = false; scope.onBack() },
+                )
             }
         }
     }
