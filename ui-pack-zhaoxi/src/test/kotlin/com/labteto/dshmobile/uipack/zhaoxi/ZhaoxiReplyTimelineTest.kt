@@ -73,4 +73,22 @@ class ZhaoxiReplyTimelineTest {
         assertEquals(null, uncommittedReplyPreview("  ", stages))
     }
 
+    @Test fun toolOnlyEventsStillReserveStableLiveReplySlot() {
+        val user = msg("user-a", UiMessageRole.USER, "请核查")
+        val tool = msg("tool-1", UiMessageRole.TOOL, "internal command payload")
+        val first = projectZxReplyTimeline(listOf(user), running = true)
+            .last() as ZxTimelineEntry.Reply
+        val toolPending = projectZxReplyTimeline(listOf(user, tool), running = true)
+            .last() as ZxTimelineEntry.Reply
+        assertEquals(first.key, toolPending.key)
+        assertTrue(toolPending.stages.isEmpty())
+        assertFalse(projectZxReplyTimeline(listOf(user, tool), true)
+            .any { it.containsMessage(tool.id) })
+        val finished = projectZxReplyTimeline(
+            listOf(user, tool, msg("answer", UiMessageRole.ASSISTANT, "核查完成")),
+            running = false,
+        ).last() as ZxTimelineEntry.Reply
+        assertEquals(first.key, finished.key)
+    }
+
 }
