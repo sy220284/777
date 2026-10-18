@@ -44,6 +44,7 @@ fun ZxDataTable(
     val clipboard = LocalClipboardManager.current
     val fontScale = LocalDensity.current.fontScale
     var visibleRows by remember(headers, rows) { mutableStateOf(24) }
+    var copied by remember(headers, rows) { mutableStateOf(false) }
     val widths = remember(headers, rows, fontScale) {
         headers.indices.map { column ->
             zxTableColumnWidthDp(
@@ -86,11 +87,12 @@ fun ZxDataTable(
             if (visibleRows > 24) {
                 ZxChip("收起", false) { visibleRows = 24 }
             }
-            ZxChip("复制表格", false) {
+            ZxChip(if (copied) "已复制" else "复制表格", copied) {
                 val csv = (listOf(headers) + rows).joinToString("\n") { record ->
                     record.joinToString(",") { cell -> "\"" + cell.replace("\"", "\"\"") + "\"" }
                 }
                 clipboard.setText(AnnotatedString(csv))
+                copied = true
             }
         }
         if (rows.size > 500 && visibleRows >= 500)
