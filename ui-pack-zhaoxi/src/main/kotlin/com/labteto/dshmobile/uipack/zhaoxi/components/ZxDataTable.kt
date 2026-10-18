@@ -17,6 +17,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,6 +34,10 @@ internal fun zxTableColumnWidthDp(header: String, values: List<String>, fontScal
         .maxOrNull() ?: 12
     return widest.coerceIn(12, 36) * 7f * fontScale.coerceAtLeast(1f)
 }
+
+/** 读屏逐格播报列名，避免长表格单元格脱离表头而失去上下文。 */
+internal fun zxTableCellReadingLabel(header: String, value: String): String =
+    "$header：${value.ifBlank { "空白" }}"
 
 /** The sole table renderer for both streamed Markdown and versioned UiDocument nodes. */
 @Composable
@@ -69,7 +75,11 @@ fun ZxDataTable(
             rows.take(limit).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     headers.indices.forEach { i ->
-                        Text(row.getOrElse(i) { "" }, Modifier.width(widths[i]),
+                        val value = row.getOrElse(i) { "" }
+                        Text(value,
+                            Modifier.width(widths[i]).semantics {
+                                contentDescription = zxTableCellReadingLabel(headers[i], value)
+                            },
                             color = colors.ink2, fontSize = 12.sp)
                     }
                 }
@@ -88,7 +98,7 @@ fun ZxDataTable(
             if (visibleRows > 24) {
                 ZxChip("收起", false) { visibleRows = 24 }
             }
-            ZxChip(if (copied) "已复制" else "复制表格", copied) {
+            ZxChip(if (copied) "已复制" else "复制表格", false) {
                 val csv = (listOf(headers) + rows).joinToString("\n") { record ->
                     record.joinToString(",") { cell -> "\"" + cell.replace("\"", "\"\"") + "\"" }
                 }
