@@ -81,10 +81,11 @@ class LocalSessionUiFacade @Inject constructor(
 internal fun projectTranscriptHistoryMessage(message: LocalHarnessMessage): UiMessageSnapshot =
     UiMessageSnapshot(message.id, when (message.role) {
         "user" -> UiMessageRole.USER
-        "assistant" -> UiMessageRole.ASSISTANT
+        "assistant", "progress" -> UiMessageRole.ASSISTANT
         "tool" -> UiMessageRole.TOOL
         else -> UiMessageRole.SYSTEM
-    }, message.content, message.createdAt, proactive = message.proactive)
+    }, message.content, message.createdAt, proactive = message.proactive,
+        progressive = message.role == "progress")
 
 
 @dagger.Module
