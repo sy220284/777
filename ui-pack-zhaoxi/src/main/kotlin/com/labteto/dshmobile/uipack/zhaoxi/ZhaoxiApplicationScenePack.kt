@@ -534,8 +534,11 @@ class ZhaoxiApplicationScenePack(
             "settings.memory" -> sec?.memory?.let { ZhaoxiMemoryOverviewScene(it, settings ?: sec.settings, scope) }
             "settings.memory_management" -> sec?.memory?.let { ZhaoxiMemoryManagementScene(it, scope, settings ?: sec.settings) }
             "settings.session_storage" -> settings?.let { ZhaoxiStorageScene(it, scope) }
-            "settings.diagnostics", "settings.update" ->
-                ZhaoxiDiagnosticsScene(updateStatus, checkForUpdate, scope)
+            "settings.diagnostics" -> (settings ?: sec?.settings)?.let {
+                ZhaoxiDiagnosticsSettingsScene(it, scope)
+            } ?: ZxEmpty("诊断暂不可用", "设置 Owner 未接入",
+                actionLabel = "返回", onAction = { scope.onBack() })
+            "settings.update" -> ZhaoxiDiagnosticsScene(updateStatus, checkForUpdate, scope)
 
             else -> ZxEmpty("页面暂不可用", "请返回重试")
         }
