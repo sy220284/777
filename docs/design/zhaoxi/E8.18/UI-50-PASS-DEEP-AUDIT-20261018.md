@@ -33,3 +33,18 @@
 | 18 | 工作审批拒绝回执 | 静态通过 | 只有命令被接收才退出，拒绝应保留页面；需要失效 pendingId 测试。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSlotScenes.kt:160 |
 | 19 | 工作计划步骤与待办分组 | 静态通过 | 步骤和审批分组已存在，真实长步骤溢出/执行中态和多任务的布局需截图复验。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiWorkScenes.kt:55 |
 | 20 | 需求证据版本及对象文本泄漏 | 静态通过 | 文件/需求状态与版本变化从结构字段展示；需核实实际成功/过期样本，不得把版本一致当功能核验通过。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiWorkScenes.kt:107 |
+
+## 第 3 组：人物、日记、自动化与媒体（21—30）
+
+| # | 检查项 | 结果 | 事实/缺陷 | 证据位置 |
+|---|---|---|---|---|
+| 21 | 人物预设导入结果 | 问题 P2 | Preset 安装回执直接字符串化，失败/冲突时暴露程序类型；应区分保存、冲突与拒绝。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiPersonaScenes.kt:104 |
+| 22 | 人物画像移除是否确认 | 问题 P1 | 当前移除画像直接执行 Owner 命令，未见相邻确认 Dialog；误触后不可恢复时有数据损失风险。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedPersona.kt:192 |
+| 23 | 日记保密视图分域 | 静态通过 | 公开日记投影有独立展示且明确私密内容边界，但必须从 Owner 证实私密字段不会误注入。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSlotScenes.kt:228 |
+| 24 | 日记更正和停用调用版本栅栏 | 待核对 | 存在更正与停用回执，需旧 revision 及跨人物案例；当前仅证实代码有版本参数。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSlotScenes.kt:318 |
+| 25 | 自动化月调度按自然日历 | 问题 P1 | “每月”被转为固定 30 天间隔；月底、闰年、DST 与用户期待的自然月可能偏离。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiAutomationScenes.kt:281 |
+| 26 | 自动化表单真实任务身份 | 问题 P1 | 更新使用 taskId 和 generation fence；仍需测试别的会话编辑拒绝。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiAutomationScenes.kt:312 |
+| 27 | 自动化首次运行输入方式 | 问题 P2 | 时间输入是自由文本 `YYYY-MM-DD HH:mm`，无日历/时间选择器与键盘类型；时区/格式易错。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiAutomationScenes.kt:221 |
+| 28 | 图片生成比例校验 | 问题 P1 | 比例允许任意字符串直接传入 Image 命令；未见提交前的比例合法性反馈。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedMedia.kt:88 |
+| 29 | 付费媒体再次生成确认 | 静态通过 | 已在模型再次调用前增加明确确认，仍须断言取消不会提交命令。 | ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedMedia.kt:182 |
+| 30 | 媒体失败结果的非付费重试入口 | 问题 P1 | MediaUiPort 提供不再次计费的图片下载恢复方法，但当前媒体结果页未接入；失败文件仅显示不可用。 | ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/MediaUiPort.kt:53 |
