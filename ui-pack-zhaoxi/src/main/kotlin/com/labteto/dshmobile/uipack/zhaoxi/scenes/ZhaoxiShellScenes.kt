@@ -117,10 +117,10 @@ fun ZhaoxiHomeScene(
                     ZxHomeDrawerEntry("tasks", "新工作", onClick = { create(LocalUsageMode.WORK) })
                     ZxHomeDrawerEntry("search", "搜索人物、会话、任务、文件", onClick = { navigate("shell.search") })
                     Spacer(Modifier.height(12.dp))
-                    ZxModeSwitch(workMode) { selectedWork ->
+                    ZxModeSwitch(workMode, onChange = { selectedWork ->
                         commandReceipt = sessions?.submit(SessionUiCommand.SelectMode(if (selectedWork) LocalUsageMode.WORK else LocalUsageMode.CHAT))
                         drawerScope.launch { drawerState.close() }
-                    }
+                    })
                     Spacer(Modifier.height(14.dp))
                     LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         item {
@@ -167,9 +167,9 @@ fun ZhaoxiHomeScene(
             menu = true,
             onBack = { drawerScope.launch { drawerState.open() } },
             topRight = {
-                ZxModeSwitch(workMode) { selectedWork ->
+                ZxModeSwitch(workMode, onChange = { selectedWork ->
                     commandReceipt = sessions?.submit(SessionUiCommand.SelectMode(if (selectedWork) LocalUsageMode.WORK else LocalUsageMode.CHAT))
-                }
+                })
             },
         ) {
             CommandFeedback(commandReceipt)
