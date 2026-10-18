@@ -32,6 +32,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 
 /**
  * Application composition adapter for conversation commands and real interaction waiters. All writes still go to
@@ -51,8 +52,19 @@ class LocalConversationUiPortComposition @Inject internal constructor(
         identity(stateStore.state.value)
     }
 
+    /** Live preview is strictly request/mode/session fenced and never written as a transcript item. */
+    private fun liveConversationPreview(state: LocalHarnessState, mode: LocalUsageMode):
+        com.labteto.dshmobile.uicontract.UiStreamingReplyPreview? {
+        if (state.loading || stateStore.sessionTransitioning || !state.kernel.running ||
+            state.usageMode != mode) return null
+        val preview = stateStore.streamingPreviewStore.state.value
+        return preview.takeIf { it.sessionId == state.sessionId &&
+            it.usageMode == mode && it.requestId.isNotBlank() && it.assistant.isNotBlank()
+        }?.let { com.labteto.dshmobile.uicontract.UiStreamingReplyPreview(it.requestId, it.assistant) }
+    }
+
     val chat: ChatUiPort = object : ChatUiPort {
-        override val snapshots: Flow<ChatSceneSnapshot> = stateStore.state.map { snapshot() }.distinctUntilChanged()
+        override val snapshots: Flow<ChatSceneSnapshot> = combine(stateStore.state, stateStore.streamingPreviewStore.state) { _, _ -> snapshot() }.distinctUntilChanged()
         override fun snapshot(): ChatSceneSnapshot = synchronized(stateStore.foregroundRunHandle.lock) {
             val state = stateStore.state.value
             val active = state.usageMode == LocalUsageMode.CHAT
@@ -69,6 +81,7 @@ class LocalConversationUiPortComposition @Inject internal constructor(
                         memberNames = group.members.map { it.displayName },
                     )
                 },
+                livePreview = liveConversationPreview(state, LocalUsageMode.CHAT),
             )
         }
         override fun submit(command: ChatUiCommand): UiCommandReceipt = synchronized(stateStore.foregroundRunHandle.lock) {
@@ -90,7 +103,7 @@ class LocalConversationUiPortComposition @Inject internal constructor(
     }
 
     val work: WorkConversationUiPort = object : WorkConversationUiPort {
-        override val snapshots: Flow<WorkConversationSceneSnapshot> = stateStore.state.map { snapshot() }.distinctUntilChanged()
+        override val snapshots: Flow<WorkConversationSceneSnapshot> = combine(stateStore.state, stateStore.streamingPreviewStore.state) { _, _ -> snapshot() }.distinctUntilChanged()
         override fun snapshot(): WorkConversationSceneSnapshot = synchronized(stateStore.foregroundRunHandle.lock) {
             val state = stateStore.state.value
             val active = state.usageMode == LocalUsageMode.WORK
@@ -121,6 +134,7 @@ class LocalConversationUiPortComposition @Inject internal constructor(
                 },
                 error = state.error.takeIf { active },
                 question = question?.let { com.labteto.dshmobile.uicontract.UiQuestionSnapshot(requireNotNull(it.requestId), it.question, it.options.toList()) },
+                livePreview = liveConversationPreview(state, LocalUsageMode.WORK),
             )
         }
         override fun submit(command: WorkConversationUiCommand): UiCommandReceipt = synchronized(stateStore.foregroundRunHandle.lock) {
