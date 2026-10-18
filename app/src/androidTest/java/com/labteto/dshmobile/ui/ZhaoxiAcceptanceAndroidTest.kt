@@ -217,8 +217,17 @@ class ZhaoxiAcceptanceAndroidTest {
         compose.onNodeWithText("大").assertIsSelected()
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("大").assertIsSelected()
-        compose.onNodeWithText("标准").performClick()
-        compose.onNodeWithText("标准").assertIsSelected()
+        // 字号和字重都可能名为“标准”；只选字号 RadioButton。
+        val standardTextScale = hasText("标准") and SemanticsMatcher.expectValue(
+            androidx.compose.ui.semantics.SemanticsProperties.Role,
+            androidx.compose.ui.semantics.Role.RadioButton,
+        )
+        compose.onNode(standardTextScale).performClick()
+        // 写入 DataStore 与 Compose 观察更新异步进行，按真实 Owner 状态等待。
+        compose.waitUntil(10_000) {
+            runBlocking { ports.hostPreferencesUiPort.snapshots.first().textScale == 1f }
+        }
+        compose.onNode(standardTextScale).assertIsSelected()
         val snapshot = runBlocking { ports.hostPreferencesUiPort.snapshots.first() }
         assertEquals(1f, snapshot.textScale, .001f)
         compose.onNodeWithText("暮橙").performScrollTo().assertIsDisplayed().performClick()
