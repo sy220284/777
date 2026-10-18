@@ -93,7 +93,7 @@ fun ZhaoxiMessageActionsScene(
         ZxNavRow("复制文本", sub = "") {
             clipboard.setText(androidx.compose.ui.text.AnnotatedString(message.text))
         }
-        ZxFooterNote("操作经 ChatUiCommand · 乐观更新由 Owner 决定")
+
     }
 }
 
@@ -127,7 +127,7 @@ fun ZhaoxiEditScene(
                 else -> rejection = UiCommandRejection.UNSUPPORTED
             }
         }, Modifier.fillMaxWidth(), enabled = text.isNotBlank())
-        ZxFooterNote("重发产生新分支 · 旧分支保留可切换")
+
     }
 }
 
