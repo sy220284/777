@@ -302,9 +302,11 @@ private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<Ui
         all.lastOrNull { message -> message.role == UiMessageRole.ASSISTANT }?.text != it }
     val state = rememberLazyListState()
     var restored by remember(sessionId) { mutableStateOf(false) }
+    var followTail by remember(sessionId) { mutableStateOf(true) }
     LaunchedEffect(sessionId, all.firstOrNull()?.id) {
         if (!restored && all.isNotEmpty()) {
             val anchor = reading.anchor(sessionId)
+            followTail = anchor?.followingTail ?: true
             val index = all.indexOfFirst { it.id == anchor?.messageId }
             state.scrollToItem(if (index >= 0) index + 1 else all.size, if (index >= 0) anchor?.offsetPx ?: 0 else 0)
             restored = true
@@ -317,7 +319,23 @@ private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<Ui
                     UiReadingAnchor(all.getOrNull(index - 1)?.id, offset, !state.canScrollForward))
             }
     }
-    LazyColumn(modifier, state = state) {
+    // Follow new output only while the reader has chosen the live tail.
+    LaunchedEffect(state, sessionId) {
+        snapshotFlow { state.isScrollInProgress to !state.canScrollForward }
+            .distinctUntilChanged().collect { (scrolling, atTail) ->
+                if (scrolling) followTail = atTail
+            }
+    }
+    LaunchedEffect(all.size, streamText, running,
+        currentDocuments.map { it.document.documentId to it.document.revision }) {
+        if (restored && followTail) {
+            androidx.compose.runtime.withFrameNanos { }
+            val last = (state.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+            state.scrollToItem(last)
+        }
+    }
+    Column(modifier) {
+        LazyColumn(Modifier.weight(1f), state = state) {
         item(key = "history") {
             error?.let { ZxBanner(it, ZxTone.Err) }
             if (history != null && (!loaded || cursor != null))
@@ -370,6 +388,17 @@ private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<Ui
                         color = ZhaoxiTheme.colors.ink)
                 }
             } else ZxTypingIndicator()
+        }
+        }
+        if (!followTail && all.isNotEmpty()) {
+            com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip(
+                "↓ 查看最新回复", false, onClick = {
+                    followTail = true
+                    jobs.launch {
+                        val last = (state.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                        state.scrollToItem(last)
+                    }
+                })
         }
     }
 }
