@@ -18,6 +18,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -105,7 +107,10 @@ fun ZhaoxiHomeScene(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                modifier = Modifier.width(296.dp),
+                modifier = Modifier.width(296.dp).then(
+                    if (drawerState.targetValue == DrawerValue.Open) Modifier
+                    else Modifier.clearAndSetSemantics { }
+                ),
                 drawerContainerColor = c.side,
             ) {
                 Column(Modifier.fillMaxHeight().padding(horizontal = 12.dp)) {
@@ -204,6 +209,7 @@ fun ZhaoxiHomeScene(
                 title = if (workMode) "新工作" else "新会话",
                 detail = if (workMode) "创建新的工作会话" else "开始新的聊天会话",
                 prominent = true,
+                tag = if (workMode) "zhaoxi.home.create_work" else "zhaoxi.home.create_chat",
             ) { create(if (workMode) LocalUsageMode.WORK else LocalUsageMode.CHAT) }
             Spacer(Modifier.height(10.dp))
             ZxHomeAction(
@@ -211,6 +217,7 @@ fun ZhaoxiHomeScene(
                 title = if (workMode) "新会话" else "新工作",
                 detail = if (workMode) "创建普通聊天会话" else "开始一项新任务",
                 prominent = false,
+                tag = if (workMode) "zhaoxi.home.create_chat" else "zhaoxi.home.create_work",
             ) { create(if (workMode) LocalUsageMode.CHAT else LocalUsageMode.WORK) }
             Spacer(Modifier.height(30.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -279,6 +286,7 @@ private fun ZxHomeAction(
     title: String,
     detail: String,
     prominent: Boolean,
+    tag: String,
     onClick: () -> Unit,
 ) {
     val c = ZhaoxiTheme.colors
@@ -286,6 +294,7 @@ private fun ZxHomeAction(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
             .background(if (prominent) c.tint else c.glass)
             .clickable(role = Role.Button, onClick = onClick)
+            .testTag(tag)
             .heightIn(min = 76.dp).padding(horizontal = 18.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
