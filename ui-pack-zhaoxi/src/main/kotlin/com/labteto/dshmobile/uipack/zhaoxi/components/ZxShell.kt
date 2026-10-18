@@ -71,7 +71,7 @@ fun ZxTopBar(
     }
 }
 
-/** CHAT⇄WORK 模式分段。 */
+/** CHAT⇄WORK 模式切换：280ms 选中态过渡、可打断按压及减弱动效降级。 */
 @Composable
 fun ZxModeSwitch(workMode: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     val c = ZhaoxiTheme.colors
@@ -81,15 +81,37 @@ fun ZxModeSwitch(workMode: Boolean, onChange: (Boolean) -> Unit, modifier: Modif
     ) {
         listOf(false to "聊天", true to "工作").forEach { (w, label) ->
             val on = w == workMode
+            val interaction = remember(w) { MutableInteractionSource() }
+            val bg by androidx.compose.animation.animateColorAsState(
+                targetValue = if (on) c.ink else c.bg2,
+                animationSpec = com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiMotion.spec(
+                    com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiDuration.NORMAL),
+                label = "zxModeBackground",
+            )
+            val fg by androidx.compose.animation.animateColorAsState(
+                targetValue = if (on) c.onInk else c.ink2,
+                animationSpec = com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiMotion.spec(
+                    com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiDuration.NORMAL),
+                label = "zxModeForeground",
+            )
             Box(
                 Modifier
+                    .zxPressSurface(interaction)
                     .clip(RoundedCornerShape(999.dp))
-                    .background(if (on) c.ink else c.bg2)
-                    .clickable(role = Role.Tab) { onChange(w) }
+                    .background(bg)
+                    .clickable(
+                        role = Role.Tab,
+                        interactionSource = interaction,
+                        indication = androidx.compose.foundation.LocalIndication.current,
+                        onClick = { if (!on) onChange(w) },
+                    )
                     .semantics { selected = on }
                     .heightIn(min = 48.dp)
                     .padding(horizontal = 14.dp, vertical = 5.dp),
-            ) { Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (on) c.onInk else c.ink2) }
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = fg)
+            }
         }
     }
 }
