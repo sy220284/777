@@ -333,37 +333,178 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
     val receipt by produceState<UiPersonaGalleryReadReceipt?>(null, galleryId, revision) { value = gallery?.read() }
     val entry = (receipt as? UiPersonaGalleryReadReceipt.Available)?.entries?.firstOrNull { it.id == galleryId }
     val jobs = rememberCoroutineScope()
+    val snap = selection?.let { owner -> owner.snapshots.collectAsState(initial = owner.snapshot()).value }
     var status by remember { mutableStateOf<String?>(null) }
-    val save = rememberUiDocumentSaver("application/octet-stream") { status = if (it == UiDocumentWriteReceipt.Saved) "导出完成" else "导出失败" }
-    ZxPage(entry?.name ?: "人物档案", onBack = { scope.onBack() }) {
-        status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        if (receipt is UiPersonaGalleryReadReceipt.Failed) Text((receipt as UiPersonaGalleryReadReceipt.Failed).message ?: "读取失败")
-        ZxNavRow("编辑人物与世界书") { scope.onNavigate(UiSceneId("chat.persona_editor")) }
-        ZxNavRow("画像") { scope.onNavigate(UiSceneId("chat.gallery_portrait")) }
-        ZxNavRow("日记") { scope.onNavigate(UiSceneId("chat.diary")) }
-        selection?.let { owner ->
-            val snap by owner.snapshots.collectAsState(initial = owner.snapshot())
-            ZxButton("用于当前聊天", { snap.identity?.let { status = owner.submit(PersonaSelectionUiCommand.SelectForCurrentChat(it, galleryId)).userHint() } }, enabled = snap.canSelectForCurrentChat)
-            ZxButton("开始新故事", { snap.identity?.let { status = owner.submit(PersonaSelectionUiCommand.StartStory(it, galleryId, null, true)).userHint() } }, enabled = snap.canStartStory)
-            entry?.stories?.forEach { story ->
-                var notes by rememberUiPrivateText("zhaoxi.story.$galleryId.${story.id}", story.notes) { story.notes }
-                ZxRow(story.title, "${story.messageCount} 条消息 · ${story.storyStage}")
-                ZxButton("继续故事", { snap.identity?.let { status = owner.submit(PersonaSelectionUiCommand.StartStory(it, galleryId, story.id, false)).userHint() } }, enabled = snap.canStartStory)
-                ZxField(notes, { notes = it }, placeholder = "故事备注")
-                if (stories != null) ZxButton("保存备注", { jobs.launch {
-                    status = stories.submit(PersonaStoryUiCommand.SaveDetails(snap.identity, galleryId, story.id, notes, story.storyStage)).zxStoryFeedback(); revision++
-                } })
+    var busy by remember { mutableStateOf(false) }
+    var more by remember { mutableStateOf(false) }
+    var activeStoryId by remember(galleryId) { mutableStateOf<String?>(null) }
+    var confirmDeleteStory by remember { mutableStateOf<String?>(null) }
+    var pendingSwitch by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val activeStory = entry?.stories?.firstOrNull { it.id == activeStoryId }
+    var title by remember(galleryId, activeStoryId) { mutableStateOf(activeStory?.title.orEmpty()) }
+    var stage by remember(galleryId, activeStoryId) { mutableStateOf(activeStory?.storyStage.orEmpty()) }
+    var notes by rememberUiPrivateText("zhaoxi.story.${galleryId}.${activeStoryId}", activeStory?.notes) {
+        activeStory?.notes.orEmpty()
+    }
+    val changed = activeStory != null && (title != activeStory.title ||
+        stage != activeStory.storyStage || notes != activeStory.notes)
+    fun protectThen(action: () -> Unit) {
+        if (changed) pendingSwitch = action else action()
+    }
+    val save = rememberUiDocumentSaver("application/octet-stream") { result ->
+        status = if (result == UiDocumentWriteReceipt.Saved) "导出完成" else "导出结果未确认，请检查文件"
+    }
+    ZxPage(entry?.name ?: "人物档案", onBack = { protectThen { scope.onBack() } }) {
+        Spacer(Modifier.height(8.dp))
+        status?.let { ZxFooterNote(it) }
+        if (receipt is UiPersonaGalleryReadReceipt.Failed)
+            ZxBanner((receipt as UiPersonaGalleryReadReceipt.Failed).message ?: "人物档案读取失败", ZxTone.Err)
+        if (entry == null && receipt == null) ZxFooterNote("正在读取人物档案…")
+        if (entry != null) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ZxAvatar(entry.name, Modifier.size(70.dp), accent = true)
+                Column {
+                    Text(entry.name, color = ZhaoxiTheme.colors.ink, fontSize = 20.sp)
+                    ZxFooterNote("${entry.stories.size} 条故事线 · 档案已归档")
+                    if (activeStory != null) ZxBadge("正在查看：${activeStory.title}")
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            ZxSection("开始或继续")
+            ZxButton("用于当前聊天", {
+                snap?.identity?.let { status = selection?.submit(
+                    PersonaSelectionUiCommand.SelectForCurrentChat(it, galleryId))?.userHint() }
+            }, enabled = snap?.canSelectForCurrentChat == true && !busy)
+            ZxButton("开启新故事", {
+                protectThen {
+                    snap?.identity?.let { status = selection?.submit(
+                        PersonaSelectionUiCommand.StartStory(it, galleryId, null, true))?.userHint() }
+                }
+            }, variant = ZxButtonVariant.Outline, enabled = snap?.canStartStory == true && !busy)
+            ZxSection("故事线")
+            if (entry.stories.isEmpty()) ZxEmpty("尚无故事线", "可以从此人物开始一个新的故事")
+            entry.stories.forEach { story ->
+                ZxRow(story.title.ifBlank { "未命名故事" },
+                    "${story.messageCount} 条对话 · ${story.storyStage.ifBlank { "暂无阶段" }}"+
+                        if (story.notes.isNotBlank()) " · ${story.notes.take(38)}" else "",
+                    onClick = { protectThen {
+                        activeStoryId = if (activeStoryId == story.id) null else story.id
+                    } },
+                    trailing = {
+                        ZxChip(if (activeStoryId == story.id) "正在查看" else "详情",
+                            activeStoryId == story.id) {
+                            protectThen { activeStoryId = story.id }
+                        }
+                    })
+            }
+            if (activeStory != null) {
+                ZxSection("故事详情 · ${activeStory.title}")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ZxButton("继续这条故事", {
+                        protectThen {
+                            snap?.identity?.let { status = selection?.submit(
+                                PersonaSelectionUiCommand.StartStory(it, galleryId, activeStory.id, false))?.userHint() }
+                        }
+                    }, enabled = snap?.canStartStory == true && !busy)
+                    ZxButton("返回故事列表", { protectThen { activeStoryId = null } },
+                        variant = ZxButtonVariant.Outline)
+                }
+                ZhaoxiPersonaField("故事标题", title) { title = it }
+                ZhaoxiPersonaField("剧情阶段", stage) { stage = it }
+                ZxField(notes, { notes = it }, Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                    placeholder = "故事摘要、未完线索或当前关系")
+                if (changed) ZxBadge("故事修改尚未保存")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ZxButton("保存故事详情", {
+                        if (!busy && stories != null && gallery != null) jobs.launch {
+                            busy = true
+                            try {
+                                if (title.isBlank()) {
+                                    status = "请填写故事标题"
+                                } else {
+                                    val rename = if (title != activeStory.title)
+                                        gallery.submit(PersonaGalleryUiCommand.RenameStory(galleryId, activeStory.id, title.trim()))
+                                        else UiCommandReceipt.Accepted
+                                    if (!rename.admitted()) {
+                                        status = rename.userHint()
+                                    } else {
+                                        val result = stories.submit(PersonaStoryUiCommand.SaveDetails(
+                                            snap?.identity, galleryId, activeStory.id, notes, stage))
+                                        status = result.zxStoryFeedback()
+                                        if (result is UiPersonaStoryReceipt.Saved) revision++
+                                    }
+                                }
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                            catch (failure: Exception) {
+                                status = failure.message ?: "故事保存状态不确定，请刷新核对后重试"
+                            } finally { busy = false }
+                        }
+                    }, enabled = changed && !busy && stories != null && gallery != null && title.isNotBlank(),
+                        loading = busy)
+                    ZxButton("删除故事", { confirmDeleteStory = activeStory.id },
+                        variant = ZxButtonVariant.Danger, enabled = stories != null && !busy)
+                }
+            }
+            ZxSection("人物档案操作")
+            ZxRow("编辑核心身份与世界书", "13 项主档案 · 可扩展事实 · 世界书条目",
+                onClick = { protectThen { scope.onNavigate(UiSceneId("chat.persona_editor")) } })
+            ZxChip(if (more) "收起更多" else "更多管理", more) { more = !more }
+            if (more) {
+                ZxNavRow("人物画像") { protectThen { scope.onNavigate(UiSceneId("chat.gallery_portrait")) } }
+                ZxNavRow("日记") { protectThen { scope.onNavigate(UiSceneId("chat.diary")) } }
+                transfer?.let { owner ->
+                    PersonaTransferFormat.entries.forEach { format ->
+                        ZxButton("导出 ${format.extension.uppercase()}", {
+                            if (!busy) jobs.launch {
+                                busy = true
+                                try {
+                                    when (val result = owner.export(ExportPersonaDocumentCommand(galleryId, format))) {
+                                        is UiPersonaExportReceipt.Ready -> save(UiExportFile(
+                                            "persona.${format.extension}", result.document.bytes))
+                                        is UiPersonaExportReceipt.Failed -> status = result.message ?: "人物导出失败"
+                                    }
+                                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                                catch (failure: Exception) { status = "导出失败，请核实人物状态" }
+                                finally { busy = false }
+                            }
+                        }, variant = ZxButtonVariant.Outline, enabled = !busy)
+                    }
+                }
+                ZxNavRow("删除人物档案") {
+                    protectThen { scope.onNavigate(UiSceneId("chat.gallery_delete")) }
+                }
             }
         }
-        transfer?.let { owner ->
-            PersonaTransferFormat.entries.forEach { format -> ZxButton("导出 ${format.extension}", { jobs.launch {
-                when (val result = owner.export(ExportPersonaDocumentCommand(galleryId, format))) {
-                    is UiPersonaExportReceipt.Ready -> save(UiExportFile("persona.${format.extension}", result.document.bytes))
-                    is UiPersonaExportReceipt.Failed -> status = result.message ?: "导出失败"
+    }
+    if (pendingSwitch != null) ZxDialog("有未保存的故事修改",
+        "切换故事或离开将放弃本次修改。保存故事详情后可以继续。",
+        "放弃修改", {
+            val next = pendingSwitch
+            pendingSwitch = null
+            next?.invoke()
+        }, { pendingSwitch = null })
+    confirmDeleteStory?.let { storyId ->
+        ZxDialog("确认删除这条故事？",
+            "故事及相关对话可能无法恢复。仅删除选定故事，不影响同一人物的其他故事。",
+            "删除故事", {
+                confirmDeleteStory = null
+                if (!busy && stories != null) jobs.launch {
+                    busy = true
+                    try {
+                        when (val result = stories.submit(PersonaStoryUiCommand.Delete(
+                            snap?.identity, galleryId, storyId))) {
+                            is UiPersonaStoryReceipt.Saved -> {
+                                status = result.zxStoryFeedback()
+                                if (activeStoryId == storyId) activeStoryId = null
+                                revision++
+                            }
+                            else -> status = result.zxStoryFeedback()
+                        }
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                    catch (failure: Exception) { status = "删除结果未确认，请刷新再核实" }
+                    finally { busy = false }
                 }
-            } }) }
-        }
-        ZxNavRow("删除人物") { scope.onNavigate(UiSceneId("chat.gallery_delete")) }
+            }, { confirmDeleteStory = null })
     }
 }
 
