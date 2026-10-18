@@ -97,6 +97,23 @@ fun ZxNavRow(label: String, sub: String = "", value: String = "", onClick: () ->
             .padding(vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val designIcon = when {
+            label.contains("模型") -> "sparkle"
+            label.contains("通知") -> "alert"
+            label.contains("外观") -> "palette"
+            label.contains("用量") || label.contains("费用") -> "usage"
+            label.contains("记忆") -> "diary"
+            label.contains("备份") || label.contains("迁移") -> "files"
+            label.contains("诊断") || label.contains("更新") -> "info"
+            label.contains("工具") -> "tools"
+            label.contains("任务") -> "tasks"
+            label.contains("人物") -> "user"
+            else -> null
+        }
+        if (designIcon != null) {
+            com.labteto.dshmobile.uipack.zhaoxi.components.ZxIcon(designIcon)
+            androidx.compose.foundation.layout.Spacer(Modifier.width(10.dp))
+        }
         Column(Modifier.weight(1f)) {
             Text(label, fontSize = 13.5.sp, color = c.ink)
             if (sub.isNotEmpty()) Text(sub, fontSize = 11.sp, color = c.ink3, lineHeight = 16.sp)

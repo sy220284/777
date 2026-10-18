@@ -10,6 +10,8 @@ android {
     buildToolsVersion = "37.0.0"
     defaultConfig { minSdk = 36 }
     buildFeatures { compose = true }
+    // Original E8.17 SVG icons are runtime assets, not merely archived design docs.
+    sourceSets.getByName("main").assets.srcDir(rootProject.file("docs/design/zhaoxi/E8.17"))
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
