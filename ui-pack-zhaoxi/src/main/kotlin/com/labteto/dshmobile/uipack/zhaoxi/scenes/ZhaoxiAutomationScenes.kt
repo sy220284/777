@@ -580,7 +580,7 @@ fun ZhaoxiToolsScene(
     }
     val heading = when (destination) {
         "tools.mcp" -> "MCP 连接"
-        "tools.plugins" -> "插件与技能"
+        "tools.plugins" -> "插件与技能管理"
         "tools.github" -> "GitHub"
         "work.capabilities" -> "能力目录"
         else -> "工具中心"
@@ -714,9 +714,13 @@ fun ZhaoxiToolsScene(
                         item.description.contains(skillQuery.trim(), ignoreCase = true)
                 }
                 if (skills == null) ZxFooterNote("正在读取已安装技能…")
-                else if (skills.orEmpty().isEmpty()) ZxEmpty("暂无已安装技能", "可在工具连接与扩展中管理支持的能力")
+                else if (skills.orEmpty().isEmpty()) ZxEmpty("暂无已安装技能", "打开插件与技能管理，可上传 SKILL.md 或创建技能")
                 else if (matchedSkills.isEmpty()) ZxEmpty("没有匹配的技能", "可修改名称或说明关键词")
-                matchedSkills.forEach { item -> ZxRow(item.displayName, item.description) }
+                matchedSkills.forEach { item ->
+                    ZxRow(item.displayName, item.description, onClick = {
+                        scope.onNavigate(UiSceneId("tools.plugins"))
+                    })
+                }
                 ZxSection("连接与扩展")
                 ZxRow("MCP 服务器", "${servers.size} 个已登记连接",
                     onClick = { scope.onNavigate(UiSceneId("tools.mcp")) })
