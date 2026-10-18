@@ -34,7 +34,6 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDivider
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxField
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxFooterNote
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxSection
-import com.labteto.dshmobile.uipack.zhaoxi.components.ZxSwitchRow
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 import com.labteto.dshmobile.uicontract.UiSceneId
 import kotlinx.coroutines.launch
