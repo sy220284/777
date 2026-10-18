@@ -10,6 +10,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -215,8 +220,23 @@ fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneR
 /** settings.permissions — 呈现真实系统权限事实，跳转系统授权页而不伪造开关。 */
 @Composable
 fun ZhaoxiPermissionsScene(preferences: HostPreferencesUiPort, scope: UiSceneRenderScope, settings: SettingsUiPort? = null) {
-    val notification = preferences.notificationPermissionGranted()
-    val media = preferences.mediaPermissionSnapshot()
+    // Android permissions may change outside this process in system Settings.
+    // Invalidate the read-only Host snapshot on every foreground resume.
+    val owner = LocalLifecycleOwner.current
+    var permissionRevision by remember { mutableIntStateOf(0) }
+    DisposableEffect(owner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) permissionRevision++
+        }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
+    }
+    val notification = remember(preferences, permissionRevision) {
+        preferences.notificationPermissionGranted()
+    }
+    val media = remember(preferences, permissionRevision) {
+        preferences.mediaPermissionSnapshot()
+    }
     ZxPage("权限与设备", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         settings?.let { ZhaoxiApprovalModeSelector(it) }
