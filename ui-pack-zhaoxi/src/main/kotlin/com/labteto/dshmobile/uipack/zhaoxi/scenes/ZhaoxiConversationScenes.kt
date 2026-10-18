@@ -68,7 +68,8 @@ import com.labteto.dshmobile.uihost.UiSceneRenderScope
 /** conversation.chat — 聊天会话主场景。 */
 @Composable
 fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: ConversationReadingUiPort, history: UiMessageHistoryPort?, authorName: String, scope: UiSceneRenderScope, onMessage: (UiSessionIdentity, UiMessageSnapshot) -> Unit, menu: @Composable () -> Unit,
-    documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet()) {
+    documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet(),
+    media: MediaUiPort? = null) {
     val snap by chat.snapshots.collectAsState(initial = chat.snapshot())
     val storedDrafts by drafts.drafts.collectAsState()
     val sessionId = snap.identity?.sessionId.orEmpty()
@@ -89,7 +90,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
                 onMessage = { m -> snap.identity?.let { onMessage(it, m) } },
                 onBranch = { m, index -> snap.identity?.let { receipt = chat.submit(ChatUiCommand.SelectVariant(it, m.id, index)) } },
                 preview = snap.livePreview, running = snap.phase == UiExecutionPhase.RUNNING,
-                documents = documents, knownScenes = knownScenes)
+                documents = documents, knownScenes = knownScenes, media = media)
             if (snap.queuedInputCount > 0)
                 ZxBanner("⇄ 已排队 ${snap.queuedInputCount} 条 · 队列满时将拒收", ZxTone.Warn)
         }
@@ -111,7 +112,8 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
 /** conversation.work — 工作会话主场景（审批卡/提问卡槽位 + 计划入口）。 */
 @Composable
 fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPort, reading: ConversationReadingUiPort, history: UiMessageHistoryPort?, scope: UiSceneRenderScope, onMessage: (UiSessionIdentity, UiMessageSnapshot) -> Unit, menu: @Composable () -> Unit,
-    documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet()) {
+    documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet(),
+    media: MediaUiPort? = null) {
     val snap by work.snapshots.collectAsState(initial = work.snapshot())
     val storedDrafts by drafts.drafts.collectAsState()
     val sessionId = snap.identity?.sessionId.orEmpty()
@@ -128,7 +130,8 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
             ConversationMessages(snap.identity, snap.messages, reading, history, Modifier.weight(1f),
                 onMessage = { m -> snap.identity?.let { onMessage(it, m) } },
                 preview = snap.livePreview, running = snap.phase == UiExecutionPhase.RUNNING,
-                documents = documents, knownScenes = knownScenes, pendingApprovalId = snap.approval?.pendingId)
+                documents = documents, knownScenes = knownScenes, pendingApprovalId = snap.approval?.pendingId,
+                media = media)
             snap.approval?.let { ap ->
                 Spacer(Modifier.height(6.dp))
                 ZxApprovalCard(ap, expired = snap.phase == UiExecutionPhase.IDLE && ap.pendingId.isBlank()) { approved ->
@@ -273,7 +276,7 @@ private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<Ui
     onMessage: (UiMessageSnapshot) -> Unit, onBranch: (UiMessageSnapshot, Int) -> Unit = { _, _ -> },
     preview: UiStreamingReplyPreview? = null, running: Boolean = false,
     documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet(),
-    pendingApprovalId: String? = null) {
+    pendingApprovalId: String? = null, media: MediaUiPort? = null) {
     val sessionId = identity?.sessionId.orEmpty()
     var older by remember(sessionId) { mutableStateOf(emptyList<UiMessageSnapshot>()) }
     var cursor by remember(sessionId) { mutableStateOf<UiTranscriptCursor?>(null) }
@@ -351,7 +354,7 @@ private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<Ui
                                     documentId = card.document.documentId,
                                     revision = card.document.revision, source = card.document.source,
                                     actionId = actionId, fields = fields))
-                            })
+                            }, media = media)
                     }
                 }
             }
