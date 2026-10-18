@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
@@ -112,6 +113,7 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
     var selectedLoreId by remember { mutableStateOf<String?>(null) }
     var proposalSource by remember { mutableStateOf<String?>(null) }
     fun leave() { if (draft != original) confirmLeave = true else scope.onBack() }
+    BackHandler(enabled = draft != original) { confirmLeave = true }
     ZxPage(if (galleryId == null) "新建人物" else "人物编辑", onBack = ::leave) {
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
         ZxSection("人物档案")
@@ -355,6 +357,7 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
     fun protectThen(action: () -> Unit) {
         if (changed) pendingSwitch = action else action()
     }
+    BackHandler(enabled = changed) { pendingSwitch = { scope.onBack() } }
     val save = rememberUiDocumentSaver("application/octet-stream") { result ->
         status = if (result == UiDocumentWriteReceipt.Saved) "导出完成" else "导出结果未确认，请检查文件"
     }
