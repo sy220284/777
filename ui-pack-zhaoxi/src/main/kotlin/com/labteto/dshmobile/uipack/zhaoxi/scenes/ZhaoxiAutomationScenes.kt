@@ -49,31 +49,58 @@ fun ZhaoxiAutomationTasksScene(
     scope: UiSceneRenderScope,
     onOpenEditor: (String) -> Unit = {},
 ) {
-    val co = rememberCoroutineScope()
-    val snap by automation.snapshots.collectAsState(initial = UiAutomationSnapshot(automation.context(), emptyList()))
+    val snap by automation.snapshots.collectAsState(initial = automation.snapshot())
+    var filter by remember { mutableStateOf("全部") }
+    var feedback by remember { mutableStateOf<String?>(null) }
+    val filtered = remember(snap.tasks, filter) {
+        snap.tasks.filter { task ->
+            when (filter) {
+                "已计划" -> task.status == com.labteto.dshmobile.automation.AutomationStatus.SCHEDULED
+                "运行中" -> task.status == com.labteto.dshmobile.automation.AutomationStatus.RUNNING
+                "已暂停" -> task.status == com.labteto.dshmobile.automation.AutomationStatus.PAUSED
+                else -> true
+            }
+        }
+    }
     ZxPage("自动化", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        if (snap.tasks.isEmpty()) ZxEmpty("还没有自动化", "新建定时提醒、任务或人物互动编排")
-        snap.tasks.forEach { t ->
-            val name = runCatching { t.toString().substringBefore(',').substringAfter('=').trim() }
-                .getOrDefault("任务")
-            ZxRow(name, "", onClick = { onOpenEditor(name) }, trailing = {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    ZxChip("运行", false) { co.launch { automation.submit(AutomationUiCommand.RunNow(t.id)) } }
-                    ZxSwitch(
-                        checked = true,
-                        onCheckedChange = { on ->
-                            co.launch {
-                                automation.submit(if (on) AutomationUiCommand.Resume(t.id) else AutomationUiCommand.Pause(t.id))
-                            }
-                        },
-                    )
-                }
-            })
+        ZxSection("任务状态")
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("全部", "已计划", "运行中", "已暂停").forEach { label ->
+                ZxChip(label, filter == label) { filter = label }
+            }
+        }
+        ZxValueRow("当前列表", value = "${filtered.size} / ${snap.tasks.size}")
+        feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
+        if (filtered.isEmpty()) ZxEmpty("没有符合条件的任务", "可切换状态筛选或创建新任务")
+        filtered.forEach { task ->
+            val paused = task.status == com.labteto.dshmobile.automation.AutomationStatus.PAUSED
+            val actionAvailable = task.status !in setOf(
+                com.labteto.dshmobile.automation.AutomationStatus.CANCELLED,
+                com.labteto.dshmobile.automation.AutomationStatus.COMPLETED,
+                com.labteto.dshmobile.automation.AutomationStatus.BLOCKED,
+            )
+            ZxRow(task.prompt.take(80),
+                "${if (task.mode == com.labteto.dshmobile.automation.AutomationMode.CHAT) "聊天" else "工作"} · ${task.status.wireValue} · ${task.scheduleType.name}",
+                trailing = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ZxChip("立即运行", false) {
+                            feedback = automation.submit(AutomationUiCommand.RunNow(task.id)).toString()
+                        }
+                        if (actionAvailable) {
+                            ZxSwitch(checked = !paused, onCheckedChange = { on ->
+                                feedback = automation.submit(
+                                    if (on) AutomationUiCommand.Resume(task.id) else AutomationUiCommand.Pause(task.id)
+                                ).toString()
+                            }, contentDescription = "${task.prompt.take(20)} · 启用状态")
+                        }
+                    }
+                },
+            )
         }
         Spacer(Modifier.height(8.dp))
-        ZxButton("＋ 新建自动化", { scope.onNavigate(UiSceneId("automation.editor")) }, Modifier.fillMaxWidth())
-        ZxFooterNote("启停与运行均经 Owner 命令 · 结果以 receipt 呈现")
+        ZxButton("新建自动化", { scope.onNavigate(UiSceneId("automation.editor")) }, Modifier.fillMaxWidth())
+        ZxFooterNote("任务状态和开关来自 Automation Owner；立即运行仅代表提交请求，不代表执行成功")
     }
 }
 
