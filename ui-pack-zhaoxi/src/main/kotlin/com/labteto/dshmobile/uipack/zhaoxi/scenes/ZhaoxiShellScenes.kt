@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -121,7 +122,7 @@ fun ZhaoxiHomeScene(
                 ),
                 drawerContainerColor = c.side,
             ) {
-                Column(Modifier.fillMaxHeight().padding(horizontal = 12.dp)) {
+                Column(Modifier.fillMaxHeight().navigationBarsPadding().padding(horizontal = 12.dp)) {
                     Row(
                         Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -516,6 +517,25 @@ fun ZhaoxiErrorDemoScene(scope: UiSceneRenderScope) {
     }
 }
 
+/** 列表使用可读单位，原始字节数仍由 Owner 保存。 */
+internal fun zxHumanFileSize(bytes: Long): String {
+    if (bytes < 1024) return "$bytes 字节"
+    var value = bytes.toDouble()
+    var unit = 0
+    val units = listOf("字节", "KB", "MB", "GB", "TB")
+    while (value >= 1024 && unit < units.lastIndex) {
+        value /= 1024.0
+        unit++
+    }
+    return String.format(java.util.Locale.CHINA, "%.1f %s", value, units[unit])
+}
+
+internal fun zxWorkspaceFileVisible(path: String, query: String, showInternal: Boolean): Boolean {
+    val hidden = path.split('/').any { it.length > 1 && it.startsWith(".") }
+    return (showInternal || !hidden) &&
+        (query.isBlank() || path.contains(query.trim(), ignoreCase = true))
+}
+
 /** route.workspace — 分离工作区文件和当前会话产物，均读取真实 FilesUiPort。 */
 @Composable
 fun ZhaoxiWorkspaceScene(
@@ -525,13 +545,17 @@ fun ZhaoxiWorkspaceScene(
     onPreview: (String) -> Unit,
 ) {
     var selectedDomain by rememberSaveable { mutableStateOf(0) }
-    val workspace by produceState(initialValue = emptyList<com.labteto.dshmobile.local.tools.LocalWorkspaceFile>(), files) {
+    var fileQuery by rememberSaveable { mutableStateOf("") }
+    var showInternalFiles by rememberSaveable { mutableStateOf(false) }
+    var refreshFiles by remember { mutableStateOf(0) }
+    val workspace by produceState(initialValue = emptyList<com.labteto.dshmobile.local.tools.LocalWorkspaceFile>(), files, refreshFiles) {
         value = runCatching { files?.workspaceFiles() }.getOrNull().orEmpty()
     }
     val conversation by produceState(
         initialValue = com.labteto.dshmobile.local.session.LocalConversationFiles(),
         files,
         sessionId,
+        refreshFiles,
     ) {
         value = if (files == null || sessionId.isBlank()) {
             com.labteto.dshmobile.local.session.LocalConversationFiles()
@@ -546,12 +570,24 @@ fun ZhaoxiWorkspaceScene(
             ZxChip("工作区", selectedDomain == 0) { selectedDomain = 0 }
             ZxChip("会话产物", selectedDomain == 1) { selectedDomain = 1 }
         }
+        ZxField(fileQuery, { fileQuery = it }, Modifier.fillMaxWidth(),
+            placeholder = "搜索文件名或路径")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (selectedDomain == 0) {
+                ZxChip("常用文件", !showInternalFiles) { showInternalFiles = false }
+                ZxChip("含内部文件", showInternalFiles) { showInternalFiles = true }
+            }
+            ZxChip("刷新", false) { refreshFiles++ }
+        }
         if (selectedDomain == 0) {
-            ZxSection("工作区文件")
+            val visible = workspace.filter { zxWorkspaceFileVisible(it.path, fileQuery, showInternalFiles) }
+            ZxSection("工作区文件 · ${visible.size}")
             if (files == null) ZxEmpty("工作区不可用", "暂时无法读取文件")
             else if (workspace.isEmpty()) ZxEmpty("工作区是空的", "执行过程中产生的文件会出现在这里")
-            workspace.forEach { file ->
-                ZxRow(file.path.substringAfterLast('/'), "${file.bytes} 字节 · ${file.path}",
+            else if (visible.isEmpty()) ZxEmpty("没有匹配的文件", "可调整搜索条件，或选择包含内部文件")
+            visible.forEach { file ->
+                ZxRow(file.path.substringAfterLast('/'),
+                    "${zxHumanFileSize(file.bytes.toLong())} · ${file.path}",
                     onClick = { onPreview(file.path) })
             }
         } else {
@@ -560,12 +596,12 @@ fun ZhaoxiWorkspaceScene(
             else if (conversation.isEmpty) ZxEmpty("暂无会话产物", "当前会话尚未产生可查看的文件")
             if (conversation.artifacts.isNotEmpty()) ZxSection("产物")
             conversation.artifacts.forEach { file ->
-                ZxRow(file.path.substringAfterLast('/'), "${file.bytes} 字节 · ${file.path}",
+                ZxRow(file.path.substringAfterLast('/'), "${zxHumanFileSize(file.bytes.toLong())} · ${file.path}",
                     onClick = { onPreview(file.path) })
             }
             if (conversation.involved.isNotEmpty()) ZxSection("关联文件")
             conversation.involved.forEach { file ->
-                ZxRow(file.path.substringAfterLast('/'), "${file.bytes} 字节 · ${file.path}",
+                ZxRow(file.path.substringAfterLast('/'), "${zxHumanFileSize(file.bytes.toLong())} · ${file.path}",
                     onClick = { onPreview(file.path) })
             }
         }

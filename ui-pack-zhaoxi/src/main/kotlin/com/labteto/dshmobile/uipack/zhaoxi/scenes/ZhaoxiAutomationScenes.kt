@@ -478,6 +478,19 @@ internal fun zxMcpHealthText(health: UiMcpHealth): String = when (health) {
     UiMcpHealth.UNSUPPORTED -> "不支持连接检查"
 }
 
+/** 分类标签不改变工具 ID、授权规则或调用方式。 */
+internal fun zxToolFamilyLabel(name: String): String = when (name.lowercase()) {
+    "android" -> "设备操作"
+    "runtime" -> "运行环境"
+    "lsp" -> "代码分析"
+    "agent" -> "智能体"
+    "network" -> "网络"
+    "media" -> "媒体创作"
+    "files" -> "文件"
+    "tasks" -> "任务"
+    else -> name
+}
+
 /** 按 E8.18 独立场景分派工具中心、MCP、插件和 GitHub；所有状态来自 ToolsUiPort。 */
 @Composable
 fun ZhaoxiToolsScene(
@@ -493,6 +506,7 @@ fun ZhaoxiToolsScene(
     var pendingClearGitHub by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var refresh by remember { mutableStateOf(0) }
+    var expandedFamily by rememberSaveable { mutableStateOf<String?>(null) }
     fun submitConfiguration(command: ToolsUiCommand, clearTokenOnSuccess: Boolean = false) {
         if (busy) return
         co.launch {
@@ -614,7 +628,7 @@ fun ZhaoxiToolsScene(
                 val grouped = catalogue.groupBy { it.family }
                 if (grouped.isEmpty()) ZxEmpty("暂无能力", "已注册的能力会在这里出现")
                 grouped.forEach { (group, items) ->
-                    ZxSection(group)
+                    ZxSection(zxToolFamilyLabel(group))
                     items.forEach { cap ->
                         ZxRow(cap.name, "${cap.access} · ${cap.approval}")
                     }
@@ -623,8 +637,13 @@ fun ZhaoxiToolsScene(
             else -> {
                 ZxSection("可用能力")
                 catalogue.groupBy { it.family }.forEach { (family, items) ->
-                    ZxRow(family, "${items.size} 项已登记能力",
-                        onClick = { scope.onNavigate(UiSceneId("work.capabilities")) })
+                    ZxRow(zxToolFamilyLabel(family), "${items.size} 项已登记能力",
+                        onClick = { expandedFamily = if (expandedFamily == family) null else family })
+                    if (expandedFamily == family) {
+                        items.forEach { cap ->
+                            ZxRow(cap.name, "${cap.access} · ${cap.approval}")
+                        }
+                    }
                 }
                 ZxSection("技能")
                 if (skills.isEmpty()) ZxRow("暂无已安装技能", "当前未读取到技能")

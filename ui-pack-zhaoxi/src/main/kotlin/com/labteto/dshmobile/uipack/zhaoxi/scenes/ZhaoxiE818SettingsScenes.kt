@@ -66,6 +66,9 @@ fun ZhaoxiUsageOverviewScene(usage: UsageUiPort, scope: UiSceneRenderScope, mode
             }
         }
         ZxValueRow("输入 / 输出", value = "${snapshot.tracked.inputTokens} / ${snapshot.tracked.outputTokens}", mono = true)
+        if (snapshot.tracked.requestCount.toLong() == 0L) {
+            ZxFooterNote("这里只统计已记录的模型请求；已有会话不一定保留旧请求的用量明细。")
+        }
         if (snapshot.tracked.unreportedRequestCount > 0) {
             ZxFooterNote("${snapshot.tracked.unreportedRequestCount} 次请求未上报精确用量，统计仅反映可追踪事实")
         }

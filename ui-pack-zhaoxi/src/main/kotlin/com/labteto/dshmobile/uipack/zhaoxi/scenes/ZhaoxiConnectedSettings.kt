@@ -40,6 +40,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val snap by settings.state.collectAsState(initial = settings.initialState)
     val jobs = rememberCoroutineScope()
     var profileId by rememberSaveable { mutableStateOf<String?>(null) }
+    var expandedModelId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingRemoveModel by remember { mutableStateOf<String?>(null) }
     var model by rememberSaveable { mutableStateOf("") }
     var baseUrl by rememberSaveable { mutableStateOf("https://api.deepseek.com") }
@@ -62,19 +63,23 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         ZxSection("已配置模型 · ${snap.modelProfiles.size}")
         if (snap.modelProfiles.isEmpty()) ZxEmpty("还没有模型", "填写下方表单添加可用模型")
         snap.modelProfiles.sortedByDescending { snap.modelSelection.isActive(it) }.forEach { p ->
+            val active = snap.modelSelection.isActive(p)
             ZxRow(p.displayName ?: p.model,
-                if (snap.modelSelection.isActive(p)) "当前使用 · ${p.model}" else p.model,
-                onClick = { status = when (val receipt = settings.submit(SettingsUiCommand.SelectModel(p.id))) {
-                    SettingsUiReceipt.Applied -> "已切换模型"
-                    SettingsUiReceipt.Submitted -> "切换已提交"
-                    SettingsUiReceipt.Rejected -> "当前无法切换"
-                    is SettingsUiReceipt.Failed -> receipt.message ?: "切换失败"
-                } })
-            ZxValueRow("接口", value = p.baseUrl)
-            ZxValueRow("协议", value = p.protocol.name)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ZxChip("编辑", false) { profileId = p.id; model = p.model; baseUrl = p.baseUrl; protocol = p.protocol; apiKey = "" }
-                ZxChip("移除", false) { pendingRemoveModel = p.id }
+                if (active) "当前使用 · ${p.model}" else p.model,
+                onClick = { expandedModelId = if (expandedModelId == p.id) null else p.id })
+            if (expandedModelId == p.id) {
+                ZxValueRow("接口", value = p.baseUrl)
+                ZxValueRow("协议", value = p.protocol.name)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!active) ZxChip("使用此模型", false) {
+                        status = settings.submit(SettingsUiCommand.SelectModel(p.id)).zxUserMessage("切换模型")
+                    }
+                    ZxChip("编辑", false) {
+                        profileId = p.id; model = p.model; baseUrl = p.baseUrl
+                        protocol = p.protocol; apiKey = ""
+                    }
+                    ZxChip("移除", false) { pendingRemoveModel = p.id }
+                }
             }
         }
         pendingRemoveModel?.let { id ->
@@ -87,6 +92,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                     is SettingsUiReceipt.Failed -> receipt.message ?: "移除失败"
                 }
                 if (profileId == id) profileId = null
+                if (expandedModelId == id) expandedModelId = null
             }, { pendingRemoveModel = null })
         }
         ZxSection(if (profileId == null) "添加模型" else "编辑模型")
@@ -252,14 +258,18 @@ fun ZhaoxiRuntimeSettingsScene(
             }, Modifier.fillMaxWidth())
         } else {
             ZxSection("执行限制")
+            ZxFooterNote("限制单次运行的步骤与尝试次数，不修改历史工作记录。")
+            ZxSection("主任务最大步数（4–512）")
             ZxField(main, { main = it }, Modifier.fillMaxWidth(), placeholder = "主任务步数",
                 error = mainError != null, errorMessage = mainError,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             mainError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
+            ZxSection("子任务最大步数（1–512）")
             ZxField(sub, { sub = it }, Modifier.fillMaxWidth(), placeholder = "子任务步数",
                 error = subError != null, errorMessage = subError,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             subError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
+            ZxSection("模型尝试次数（1–5）")
             ZxField(attempts, { attempts = it }, Modifier.fillMaxWidth(), placeholder = "模型尝试次数",
                 error = attemptError != null, errorMessage = attemptError,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
@@ -344,7 +354,12 @@ fun ZhaoxiStorageScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         settings.exportSessionStorage(output); UiDocumentWriteReceipt.Saved
     }, { _, r -> status = if (r == UiDocumentWriteReceipt.Saved) "备份已保存" else "备份失败" }, { status = it.message })
     ZxPage("会话存储", onBack = { scope.onBack() }) {
-        storage?.let { ZxValueRow("${it.sessionCount} 个会话", value = "${it.totalBytes} 字节", sub = "剩余空间 ${it.freeBytes} 字节") }
+        ZxSection("存储概览")
+        storage?.let {
+            ZxValueRow("已保存会话", value = "${it.sessionCount} 个")
+            ZxValueRow("会话占用", value = zxHumanFileSize(it.totalBytes.toLong()))
+            ZxValueRow("设备剩余空间", value = zxHumanFileSize(it.freeBytes.toLong()))
+        }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
         ZxSection("维护与备份")
         ZxFooterNote("压缩会整理本地会话文件。建议先导出备份，维护期间不要退出应用。")
