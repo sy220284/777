@@ -77,10 +77,9 @@ fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile
         if (plan == null) {
             com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("没有进行中的计划", "计划由工作运行时提供")
         } else {
-            val visibleStatuses = plan.todos.take(plan.plan.size).map { it.ownerStatus }
-            val reported = visibleStatuses.count(String::isNotBlank)
-            val done = visibleStatuses.count(::zxWorkStepIsDone)
-            ZxSection("实际步骤状态")
+            // Plan and Todo lists are separate Owner projections: their positions are not related.
+            val progress = zxWorkTodoProgress(plan)
+            ZxSection("实际待办进度")
             Row(
                 Modifier.fillMaxWidth()
                     .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
@@ -89,38 +88,44 @@ fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (plan.plan.isNotEmpty() && reported > 0) {
+                if (progress.total > 0 && progress.reported > 0) {
                     Box(Modifier.size(66.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(
-                            progress = { done.toFloat() / plan.plan.size },
+                            progress = { progress.done.toFloat() / progress.total },
                             modifier = Modifier.size(66.dp),
                             color = ZhaoxiTheme.colors.accent,
                             trackColor = ZhaoxiTheme.colors.line,
                             strokeWidth = 5.dp,
                         )
-                        Text("${done * 100 / plan.plan.size}%",
+                        Text("${progress.done * 100 / progress.total}%",
                             color = ZhaoxiTheme.colors.ink, fontSize = 14.sp)
                     }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text("$done / ${plan.plan.size} 步已完成",
+                    Text("${progress.done} / ${progress.total} 项待办已完成",
                         color = ZhaoxiTheme.colors.ink, fontSize = 16.sp)
                     Text(
-                        if (reported == 0) "等待运行时报告步骤状态"
-                        else "已更新 $reported 步 · 以实际步骤回执为准",
+                        if (progress.total == 0) "暂无待办执行记录"
+                        else if (progress.reported == 0) "等待运行时报告待办状态"
+                        else "已更新 ${progress.reported} 项 · 以实际待办回执为准",
                         color = ZhaoxiTheme.colors.ink2, fontSize = 12.sp,
                     )
-                    Text("步骤进度不代表任务整体成功",
+                    Text("待办进度不代表任务整体成功",
                         color = ZhaoxiTheme.colors.ink3, fontSize = 11.sp)
                 }
             }
-            ZxSection("执行步骤")
+            ZxSection("计划步骤")
             if (plan.plan.isEmpty()) ZxEmpty("暂无计划步骤", "运行时更新后会显示")
             plan.plan.forEachIndexed { index, step ->
-                val state = plan.todos.getOrNull(index)?.ownerStatus.orEmpty()
-                ZxRow("${index + 1}. $step", "", trailing = {
-                    ZxBadge(zxWorkStepLabel(state), zxWorkStepTone(state))
-                })
+                ZxRow("${index + 1}. $step", "")
+            }
+            if (plan.todos.isNotEmpty()) {
+                ZxSection("待办执行状态")
+                plan.todos.forEachIndexed { index, todo ->
+                    ZxRow("${index + 1}. ${todo.content}", "", trailing = {
+                        ZxBadge(zxWorkStepLabel(todo.ownerStatus), zxWorkStepTone(todo.ownerStatus))
+                    })
+                }
             }
             if (snapshot.question != null || snapshot.approval != null) {
                 ZxSection("需要操作")
@@ -370,6 +375,16 @@ fun ZhaoxiSteeringScene(scope: UiSceneRenderScope) {
 
     }
 }
+
+/** Only count the separate Todo Owner list, never assign its statuses to Plan positions. */
+internal data class ZxWorkTodoProgress(val done: Int, val reported: Int, val total: Int)
+
+internal fun zxWorkTodoProgress(plan: UiWorkPlanSnapshot): ZxWorkTodoProgress =
+    ZxWorkTodoProgress(
+        done = plan.todos.count { zxWorkStepIsDone(it.ownerStatus) },
+        reported = plan.todos.count { it.ownerStatus.isNotBlank() },
+        total = plan.todos.size,
+    )
 
 /** The Work Owner status is authoritative; only explicit terminal-success states count as done. */
 internal fun zxWorkStepIsDone(status: String): Boolean =
