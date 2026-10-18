@@ -121,6 +121,17 @@ fun ZhaoxiUsageOverviewScene(
     }
 }
 
+/** Time filtering only affects locally retained records; never implies backend pagination. */
+internal fun zxUsageWindowRecords(
+    records: List<com.labteto.dshmobile.local.TokenUsageRecord>,
+    nowMillis: Long, days: Int,
+): List<com.labteto.dshmobile.local.TokenUsageRecord> {
+    require(days >= 0)
+    val cutoff = if (days == 0) Long.MIN_VALUE else
+        nowMillis - days.toLong() * 24L * 60L * 60L * 1000L
+    return records.filter { it.timestamp >= cutoff }.sortedByDescending { it.timestamp }
+}
+
 /** Distinct request ledger page, rather than rendering the overview again. */
 @Composable
 fun ZhaoxiUsageLogScene(
@@ -131,7 +142,13 @@ fun ZhaoxiUsageLogScene(
     val revision by usage.revision.collectAsState()
     val source = remember(usage, revision) { usage.snapshot() }
     var selectedModel by rememberSaveable { mutableStateOf<String?>(null) }
-    val current = selectedModel?.let { source.byModel[it] } ?: source
+    var timeWindowDays by rememberSaveable { mutableIntStateOf(0) }
+    var visibleLimit by rememberSaveable { mutableIntStateOf(25) }
+    val nowMillis = remember(revision) { System.currentTimeMillis() }
+    val selectedRecords = zxUsageWindowRecords(
+        (selectedModel?.let { source.byModel[it] } ?: source).recentRecords,
+        nowMillis, timeWindowDays,
+    )
     ZxPage("用量日志", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("模型筛选")
@@ -144,14 +161,28 @@ fun ZhaoxiUsageLogScene(
                 ZxChip(model, selectedModel == model) { selectedModel = model }
             }
         }
-        ZxSection("最近请求")
-        if (current.recentRecords.isEmpty()) ZxEmpty("暂无请求记录", "完成模型请求后可查看明细")
-        current.recentRecords.forEach { record ->
-            ZxRow(record.model, "${record.context.action.name} · ${record.totalTokens} Token · ¥${"%.4f".format(record.estimatedCostCny)}",
+        ZxSection("时间范围")
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(0 to "所有已保留", 1 to "近 24 小时", 7 to "近 7 天", 30 to "近 30 天")
+                .forEach { (days, label) ->
+                    ZxChip(label, days == timeWindowDays) { timeWindowDays = days; visibleLimit = 25 }
+                }
+        }
+        ZxSection("请求记录 · ${selectedRecords.size}")
+        ZxFooterNote("以下仅包含本机 Owner 保留的最近请求，早期明细可能已经不可用。")
+        if (selectedRecords.isEmpty()) ZxEmpty("所选条件没有请求记录", "可以调整模型或时间范围")
+        selectedRecords.take(visibleLimit).forEach { record ->
+            ZxRow(record.model,
+                "${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(record.timestamp))} · ${record.context.action.name} · ${record.totalTokens} Token · ¥${"%.4f".format(record.estimatedCostCny)}" +
+                    if (record.reported) "" else " · 用量未完整上报",
                 onClick = { openRequest(record.requestId) })
         }
-        if (current.tracked.unreportedRequestCount > 0) {
-            ZxFooterNote("部分请求未上报准确用量")
+        if (selectedRecords.size > visibleLimit)
+            ZxButton("显示更多本地记录", { visibleLimit += 25 },
+                variant = com.labteto.dshmobile.uipack.zhaoxi.components.ZxButtonVariant.Outline)
+        if (source.tracked.unreportedRequestCount > 0) {
+            ZxFooterNote("部分请求未上报准确用量，费用仅是估算值。")
         }
     }
 }
