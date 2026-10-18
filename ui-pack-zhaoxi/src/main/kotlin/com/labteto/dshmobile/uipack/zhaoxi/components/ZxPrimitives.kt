@@ -3,6 +3,9 @@ package com.labteto.dshmobile.uipack.zhaoxi.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +15,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -82,7 +86,7 @@ fun ZxButton(
                 else Modifier,
             )
             .clickable(enabled = enabled && !loading, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = 18.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
         // loading 宽度锁定：标签与指示同槽位，不换布局
@@ -124,6 +128,7 @@ fun ZxField(
     val c = ZhaoxiTheme.colors
     Box(
         modifier
+            .heightIn(min = 48.dp)
             .clip(RoundedCornerShape(ZhaoxiTheme.shapes.field))
             .background(c.bg2)
             .padding(horizontal = 14.dp, vertical = 11.dp),
@@ -134,7 +139,9 @@ fun ZxField(
             textStyle = textStyle.copy(color = c.ink),
             visualTransformation = visualTransformation,
             cursorBrush = SolidColor(c.accent),
-            modifier = Modifier.widthIn(min = 120.dp),
+            modifier = Modifier.widthIn(min = 120.dp).semantics {
+                if (placeholder.isNotEmpty()) contentDescription = placeholder
+            },
         ) { inner ->
             if (value.isEmpty()) Text(placeholder, color = c.ink3, fontSize = textStyle.fontSize)
             inner()
@@ -153,16 +160,16 @@ fun ZxSwitch(
     val spec = ZhaoxiMotion.spec<androidx.compose.ui.graphics.Color>(ZhaoxiDuration.FAST)
     val track by animateColorAsState(if (checked) c.ok else c.bg2, spec, label = "zxSwTrack")
     Box(
-        modifier
-            .size(width = 44.dp, height = 26.dp)
-            .clip(RoundedCornerShape(13.dp))
-            .background(track)
-            .clickable(role = Role.Switch) { onCheckedChange(!checked) }
-            .semantics { contentDescription?.let { this.contentDescription = it } }
-            .padding(3.dp),
-        contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart,
+        modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
+            .semantics { contentDescription?.let { this.contentDescription = it } },
+        contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.size(20.dp).clip(CircleShape).background(c.card))
+        Box(Modifier.size(width = 44.dp, height = 26.dp)
+            .clip(RoundedCornerShape(13.dp)).background(track).padding(3.dp),
+            contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart) {
+            Box(Modifier.size(20.dp).clip(CircleShape).background(c.card))
+        }
     }
 }
 
@@ -176,7 +183,7 @@ fun ZxDetentSlider(
     modifier: Modifier = Modifier,
 ) {
     val c = ZhaoxiTheme.colors
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         labels.take(steps).forEachIndexed { i, label ->
             val selected = i == value
             val spec = ZhaoxiMotion.spec<androidx.compose.ui.graphics.Color>(ZhaoxiDuration.FAST)
@@ -184,13 +191,13 @@ fun ZxDetentSlider(
             Box(
                 Modifier
                     .weight(1f)
-                    .height(40.dp)
+                    .heightIn(min = 48.dp)
                     .clip(RoundedCornerShape(10.dp))
                     .background(bg)
-                    .clickable { onChange(i) },
+                    .selectable(selected = selected, role = Role.RadioButton, onClick = { onChange(i) }),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(label, fontSize = 12.sp, color = if (selected) c.accent else c.ink2,
+                Text(label, fontSize = 12.sp, color = if (selected) c.ink else c.ink2,
                     fontFamily = FontFamily.Monospace)
             }
         }
@@ -207,10 +214,12 @@ fun ZxChip(
     val c = ZhaoxiTheme.colors
     Box(
         modifier
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .clip(RoundedCornerShape(999.dp))
             .background(if (selected) c.ink else c.bg2)
-            .clickable(onClick = onClick, role = Role.Tab)
+            .selectable(selected = selected, onClick = onClick, role = Role.Tab)
             .padding(horizontal = 14.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Text(label, fontSize = 12.sp,
             color = if (selected) c.onInk else c.ink2,

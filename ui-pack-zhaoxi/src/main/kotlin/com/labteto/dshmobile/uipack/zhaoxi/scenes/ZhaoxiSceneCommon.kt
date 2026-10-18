@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -44,7 +45,7 @@ fun ZxPage(
     topRight: @Composable () -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(modifier.fillMaxSize().background(ZhaoxiTheme.colors.bg)) {
+    Column(modifier.fillMaxSize().imePadding().background(ZhaoxiTheme.colors.bg)) {
         ZxTopBar(title, onNav = { onBack?.invoke() }, canBack = onBack != null) { topRight() }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
             content()

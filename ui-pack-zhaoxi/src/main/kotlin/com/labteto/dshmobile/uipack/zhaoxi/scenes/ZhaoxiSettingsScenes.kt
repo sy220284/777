@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -74,7 +75,7 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
     ZxPage("外观", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("主题")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("system" to "跟随系统", "light" to "浅色", "dark" to "深色").forEach { (k, l) ->
                 ZxChip(l, snap.theme == k) {
                     writeAppearance(theme = k)
@@ -82,7 +83,7 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
             }
         }
         ZxSection("强调色")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("stone" to "石灰", "sage" to "鼠尾草", "steel" to "钢蓝", "mauve" to "藕紫", "dusk" to "暮橙")
                 .forEach { (k, l) ->
                     ZxChip(l, snap.accent == k) {
@@ -92,10 +93,10 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
         }
         ZxSection("字号")
         ZxDetentSlider(
-            value = ((snap.textScale - 0.9f) / 0.3f).toInt().coerceIn(0, 2),
+            value = listOf(0.9f, 1f, 1.3f).indices.minBy { kotlin.math.abs(listOf(0.9f, 1f, 1.3f)[it] - snap.textScale) },
             steps = 3,
             labels = listOf("小", "标准", "大"),
-            onChange = { v -> writeAppearance(textScale = 0.9f + v * 0.3f) },
+            onChange = { v -> writeAppearance(textScale = listOf(0.9f, 1f, 1.3f)[v]) },
         )
         ZxFooterNote("外观偏好即时生效 · 写入宿主偏好存储")
     }

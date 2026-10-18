@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1452,
+  "repository_code_file_count": 1453,
   "production_source_count": 861,
-  "test_code_file_count": 469,
+  "test_code_file_count": 470,
   "workflow_files": [
     ".github/workflows/ci.yml",
     ".github/workflows/cleanup-old-releases.yml",
@@ -2641,7 +2641,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/ZhaoxiApplicationRoot.kt",
-      "sha256": "6ad1face7de68642"
+      "sha256": "4bf7e8548a6d900c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/sidebar/SidebarAvatarSource.kt",
@@ -3397,7 +3397,7 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxPrimitives.kt",
-      "sha256": "3871260a090a69ac"
+      "sha256": "d54139c1415599e4"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxShell.kt",
@@ -3437,11 +3437,11 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSceneCommon.kt",
-      "sha256": "4f91746cdf8c1cdd"
+      "sha256": "12257dc3ed68fe7b"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSettingsScenes.kt",
-      "sha256": "ee7e164c648c6983"
+      "sha256": "0f8db11865349578"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiShellScenes.kt",
@@ -3461,7 +3461,7 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/theme/ZhaoxiTheme.kt",
-      "sha256": "3042677e95651b4a"
+      "sha256": "5a063c94f1fe8942"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/theme/ZhaoxiTokens.kt",
@@ -3469,9 +3469,9 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "75d5e28914cc",
+  "source_snapshot": "cdac1a7c80be",
   "observed_delta": {
-    "baseline": "6a1401a2a4bf",
+    "baseline": "b57142d9b10f",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [],

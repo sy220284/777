@@ -53,7 +53,7 @@ data class ZhaoxiColors(
     val card: Color,        // 卡片底
     val ink: Color,         // 主文字 / 墨色按钮
     val ink2: Color,        // 次级文字（≥4.5:1）
-    val ink3: Color,        // 辅助文字 / 占位（≥3:1，信息性）
+    val ink3: Color,        // 辅助文字 / 占位（小字按 ≥4.5:1）
     val line: Color,        // 分隔线 / 描边
     val glass: Color,       // M2 轻玻璃底
     val glass2: Color,      // M3 强玻璃底
@@ -73,7 +73,7 @@ fun zhaoxiColors(hue: ZhaoxiHue, dark: Boolean): ZhaoxiColors {
     val a = accentFor(hue, dark)
     return if (dark) ZhaoxiColors(
         bg = Color(0xFF171717), bg2 = Color(0xFF212121), side = Color(0xFF1B1B1B), card = Color(0xFF212121),
-        ink = Color(0xFFECECEC), ink2 = Color(0xFF9B9B9B), ink3 = Color(0xFF6E6E6E),
+        ink = Color(0xFFECECEC), ink2 = Color(0xFF9B9B9B), ink3 = Color(0xFF9B9BA4),
         line = Color(0x17FFFFFF),
         glass = Color(0xD9171717), glass2 = Color(0xF0171717),
         accent = a.accent, tint = a.tint,
@@ -85,7 +85,7 @@ fun zhaoxiColors(hue: ZhaoxiHue, dark: Boolean): ZhaoxiColors {
         ambA = ambFor(hue, dark).first, ambB = ambFor(hue, dark).second,
     ) else ZhaoxiColors(
         bg = Color(0xFFFFFFFF), bg2 = Color(0xFFF7F7F7), side = Color(0xFFF7F7F7), card = Color(0xFFFFFFFF),
-        ink = Color(0xFF0D0D0D), ink2 = Color(0xFF6B7280), ink3 = Color(0xFF94949D),
+        ink = Color(0xFF0D0D0D), ink2 = Color(0xFF6B7280), ink3 = Color(0xFF686872),
         line = Color(0x140D0D0D),
         glass = Color(0xD9FFFFFF), glass2 = Color(0xEBFFFFFF),
         accent = a.accent, tint = a.tint,
