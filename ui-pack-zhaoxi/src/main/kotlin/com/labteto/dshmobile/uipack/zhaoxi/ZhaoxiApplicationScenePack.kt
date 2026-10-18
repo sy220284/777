@@ -360,7 +360,7 @@ class ZhaoxiApplicationScenePack(
                         else ZxEmpty("端口未注入", "chat.gallery_portrait 能力未连接")
                     "chat.gallery_delete" ->
                         if (conv?.galleryDeletion != null)
-                            if (personaTarget?.personaId == gid)
+                            if (personaTarget != null && personaTarget.personaId == gid)
                                 ZxGalleryDeleteScene(conv.galleryDeletion, gid, "当前人物", personaTarget.identity, scope)
                             else ZxEmpty("需先选择当前人物", "删除前需取得原业务 Owner 的人物身份授权")
                         else ZxEmpty("端口未注入", "图集删除能力未连接")
