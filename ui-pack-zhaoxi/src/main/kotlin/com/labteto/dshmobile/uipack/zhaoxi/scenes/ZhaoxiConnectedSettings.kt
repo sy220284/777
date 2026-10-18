@@ -191,6 +191,12 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
 
 @Composable
 /** Dedicated account management, separate from API model configuration. */
+internal fun zxChatGptAccountAuthLabel(account: com.labteto.dshmobile.local.model.chatgpt.ChatGptAccountSummary): String = when {
+    !account.signedIn -> "登录凭据已失效"
+    !account.sharingEnabled -> "已登录 · 套餐尚未授权"
+    else -> "已登录 · 套餐授权已启用"
+}
+
 fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val snap by settings.chatGptState.collectAsState()
     val jobs = rememberCoroutineScope()
@@ -253,7 +259,7 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             val active = snap.selectedAccountId == account.id
             ZxRow(account.displayName ?: account.email ?: account.id,
                 (if (active) "当前使用" else "其他账户") + " · " +
-                    (if (account.signedIn) "已授权" else "授权失效"),
+                    zxChatGptAccountAuthLabel(account),
                 onClick = { expanded = if (expanded == account.id) null else account.id },
                 trailing = {
                     ZxChip(if (expanded == account.id) "收起" else "管理",
@@ -263,7 +269,18 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                 })
             if (expanded == account.id) {
                 ZxValueRow("登录", value = if (account.signedIn) "已登录" else "需要重新授权")
-                ZxValueRow("共享访问", value = if (account.sharingEnabled) "已启用" else "未启用")
+                ZxValueRow("ChatGPT 套餐访问", value = when {
+                    !account.signedIn -> "账户需重新登录"
+                    account.sharingEnabled -> "已取得套餐授权"
+                    else -> "尚未取得套餐授权"
+                })
+                if (account.signedIn && !account.sharingEnabled) {
+                    ZxFooterNote("此账户已登录，但尚未授权套餐模型访问。可单独进行套餐授权；不会自动转为 API Key 计费。")
+                    ZxButton("启用套餐访问", { execute {
+                        settings.connectChatGpt(account.id, requestPlanConsent = true)
+                        "套餐授权已请求，请在浏览器明确确认；完成后刷新账户状态"
+                    } }, Modifier.fillMaxWidth(), enabled = !busy)
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ZxButton("使用此账户", { execute {
                         settings.selectChatGptAccount(account.id)
@@ -282,6 +299,7 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                 }
                 ZxButton("移除本地账户", { removeConfirm = account.id },
                     Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline, enabled = !busy)
+                ZxFooterNote("重新连接只更新此账户的授权状态，不会自动切换到其他付费模型。")
             }
         }
     }
