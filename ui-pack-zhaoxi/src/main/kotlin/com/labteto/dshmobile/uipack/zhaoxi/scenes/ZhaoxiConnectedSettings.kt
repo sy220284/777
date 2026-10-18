@@ -84,9 +84,9 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         ZxSection("模型标识")
         ZxField(model, { model = it }, Modifier.fillMaxWidth(), placeholder = "模型名称")
         ZxSection("接口地址")
-        ZxField(baseUrl, { baseUrl = it }, Modifier.fillMaxWidth(), placeholder = "https://…")
+        ZxField(baseUrl, { baseUrl = it }, Modifier.fillMaxWidth(), placeholder = "接口地址")
         ZxSection("访问凭据")
-        ZxField(apiKey, { apiKey = it }, Modifier.fillMaxWidth(), placeholder = "API Key",
+        ZxField(apiKey, { apiKey = it }, Modifier.fillMaxWidth(), placeholder = "API Key（编辑时留空保留原凭据）",
             visualTransformation = PasswordVisualTransformation())
         ZxFooterNote(if (profileId == null) "凭据仅用于连接该模型" else
             "不填写密钥时保留原凭据；不会在界面中回显已有密钥")

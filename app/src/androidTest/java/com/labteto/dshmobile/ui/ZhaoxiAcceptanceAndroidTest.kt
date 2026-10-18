@@ -164,6 +164,7 @@ class ZhaoxiAcceptanceAndroidTest {
             Triple("light", false, 1f),
             Triple("dark", true, 1f),
             Triple("large", false, 1.3f),
+            Triple("accessibility-200", false, 2f),
         )
         examples.forEach { (label, dark, fontScale) ->
             compose.activityRule.scenario.onActivity { activity ->
@@ -255,4 +256,54 @@ class ZhaoxiAcceptanceAndroidTest {
         capture("interaction-memory-toggle")
         control.performClick()
     }
+    @Test fun bundledWallpapersAndReducedMotionUseDurableHostPreferences() {
+        val ports = ready()
+        val entries = mutableSetOf<String>()
+        compose.activity.assets.open("e818_wallpapers.zip").use { source ->
+            java.util.zip.ZipInputStream(source).use { zip ->
+                while (true) {
+                    val item = zip.nextEntry ?: break
+                    entries += item.name
+                }
+            }
+        }
+        assertEquals((0..9).map { "w$it.webp" }.toSet(), entries)
+        val previous = runBlocking { ports.hostPreferencesUiPort.snapshots.first() }
+        try {
+            runBlocking {
+                assertTrue(ports.hostPreferencesUiPort.submit(UiHostPreferencesCommand.Appearance(
+                    "light", "stone", 1f, 0, .5f, .5f, .5f, 0f, true, true,
+                )))
+                withTimeout(15_000) {
+                    ports.hostPreferencesUiPort.snapshots.first {
+                        it.presetWallpaperEnabled && it.motionScale == 0f
+                    }
+                }
+            }
+            compose.activityRule.scenario.onActivity { activity ->
+                activity.setContent {
+                    ZhaoxiTheme(hue = ZhaoxiHue.STONE, dark = false, reducedMotion = true) {
+                        Box(Modifier.fillMaxSize().testTag("zx-acceptance-wallpaper-fixture")) {
+                            com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiBackground(
+                                Modifier.fillMaxSize(),
+                                wallpaperPreset = "w2.webp",
+                                adaptiveContrast = true,
+                            )
+                        }
+                    }
+                }
+            }
+            capture("fixture-wallpaper-stone-light", "wallpaper-fixture")
+        } finally {
+            runBlocking {
+                assertTrue(ports.hostPreferencesUiPort.submit(UiHostPreferencesCommand.Appearance(
+                    previous.theme, previous.accent, previous.textScale, previous.textWeight,
+                    previous.transparency, previous.ambientGlow, previous.componentEmphasis,
+                    previous.motionScale, previous.adaptiveContrast,
+                    previous.presetWallpaperEnabled,
+                )))
+            }
+        }
+    }
+
 }
