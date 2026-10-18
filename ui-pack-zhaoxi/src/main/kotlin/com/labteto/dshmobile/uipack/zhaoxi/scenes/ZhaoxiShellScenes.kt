@@ -116,6 +116,9 @@ fun ZhaoxiHomeScene(
     var renameTitle by remember { mutableStateOf("") }
     var deleteSessionId by remember { mutableStateOf<String?>(null) }
     var deleting by remember { mutableStateOf(false) }
+    var bulkMode by remember { mutableStateOf(false) }
+    var bulkIds by remember { mutableStateOf(emptySet<String>()) }
+    var confirmBulkDelete by remember { mutableStateOf(false) }
     var managementFeedback by remember { mutableStateOf<String?>(null) }
     val pinnedIds by (conversationShell?.pinnedSessionIds
         ?: kotlinx.coroutines.flow.flowOf(emptySet<String>())).collectAsState(initial = emptySet())
@@ -179,7 +182,7 @@ fun ZhaoxiHomeScene(
                     Spacer(Modifier.height(8.dp))
                     ZxField(
                         value = drawerQuery,
-                        onValueChange = { drawerQuery = it },
+                        onValueChange = { drawerQuery = it; bulkIds = emptySet() },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = if (workMode) "筛选工作会话" else "筛选聊天会话",
                     )
@@ -192,8 +195,27 @@ fun ZhaoxiHomeScene(
                             openConversation = false,
                         )) ?: UiCommandReceipt.NotAdmitted
                         commandReceipt = receipt
+                        bulkIds = emptySet()
+                        bulkMode = false
                     })
                     Spacer(Modifier.height(14.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ZxChip(if (bulkMode) "完成多选" else "管理多选", bulkMode) {
+                            bulkMode = !bulkMode
+                            bulkIds = emptySet()
+                        }
+                        if (bulkMode) {
+                            val shownIds = visibleSessions.map { it.id }.toSet()
+                            val checked = bulkIds.intersect(shownIds)
+                            ZxChip("全选本页", shownIds.isNotEmpty() && checked.size == shownIds.size) {
+                                bulkIds = if (checked.size == shownIds.size) bulkIds - shownIds
+                                    else bulkIds + shownIds
+                            }
+                            ZxChip("删除 ${checked.size} 项", false) {
+                                if (checked.isNotEmpty() && !deleting) confirmBulkDelete = true
+                            }
+                        }
+                    }
                     LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         item {
                             Text("快捷操作", fontSize = 11.sp, color = c.ink2, fontWeight = FontWeight.SemiBold,
@@ -232,14 +254,21 @@ fun ZhaoxiHomeScene(
                         items(visibleSessions, key = { it.id }) { session ->
                             val displayedTitle = renamedTitles[session.id] ?: session.title
                             ZxHomeDrawerEntry(
-                                "diary", displayedTitle.take(40),
-                                selected = snap.identity?.sessionId == session.id,
+                                "diary", (if (bulkMode) {
+                                    if (session.id in bulkIds) "☑ " else "☐ "
+                                } else "") + displayedTitle.take(40),
+                                selected = if (bulkMode) session.id in bulkIds
+                                    else snap.identity?.sessionId == session.id,
                                 detail = listOfNotNull(
                                     "已置顶".takeIf { session.id in pinnedIds },
                                     session.summaryPreview?.take(48)?.takeIf { it.isNotBlank() },
                                 ).joinToString(" · "),
-                                onClick = { openSession(session.id) },
-                                onLongClick = if (conversationShell == null) null else {
+                                onClick = {
+                                    if (bulkMode) bulkIds = if (session.id in bulkIds) bulkIds - session.id
+                                        else bulkIds + session.id
+                                    else openSession(session.id)
+                                },
+                                onLongClick = if (bulkMode) null else if (conversationShell == null) null else {
                                     { selectedSessionAction = session.id }
                                 },
                             )
@@ -320,6 +349,36 @@ fun ZhaoxiHomeScene(
             }
             Spacer(Modifier.height(24.dp))
         }
+    }
+    if (confirmBulkDelete) {
+        val validIds = bulkIds.intersect(visibleSessions.map { it.id }.toSet())
+        ZxDialog("批量删除 ${validIds.size} 条会话？",
+            "所选聊天或工作会话及历史将永久删除，不能恢复。取消不会产生任何更改。",
+            "确认删除", {
+                confirmBulkDelete = false
+                if (validIds.isNotEmpty() && !deleting) {
+                    deleting = true
+                    drawerScope.launch {
+                        try {
+                            when (val result = sessions?.delete(validIds)) {
+                                is UiSessionDeletionReceipt.Deleted -> {
+                                    bulkIds = bulkIds - result.sessionIds
+                                    managementFeedback = "已删除 ${result.sessionIds.size} 条会话" +
+                                        if (validIds.size > result.sessionIds.size) "；其余未删除，请核实后再试" else ""
+                                    if (bulkIds.isEmpty()) bulkMode = false
+                                }
+                                is UiSessionDeletionReceipt.Failed -> {
+                                    managementFeedback = result.message ?: "删除结果不确定，请刷新会话列表后核实"
+                                }
+                                null -> managementFeedback = "无法执行批量删除：会话 Owner 不可用"
+                            }
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                        catch (failure: Exception) {
+                            managementFeedback = "无法确认删除结果，请刷新后核实"
+                        } finally { deleting = false }
+                    }
+                }
+            }, { confirmBulkDelete = false })
     }
     selectedSessionAction?.let { id ->
         val item = snap.sessions.firstOrNull { it.id == id }
