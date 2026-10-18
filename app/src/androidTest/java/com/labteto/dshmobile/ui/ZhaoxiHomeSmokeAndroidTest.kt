@@ -9,8 +9,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.assertTopPositionInRootIsEqualTo
 import androidx.compose.ui.test.onAllNodesWithTag
 import com.labteto.dshmobile.MainActivity
+import androidx.compose.ui.unit.dp
 import org.junit.Rule
 import org.junit.Test
 
@@ -23,6 +25,8 @@ class ZhaoxiHomeSmokeAndroidTest {
         compose.onNodeWithTag("zhaoxi.home.create_chat").assertExists()
         compose.onNodeWithText("人物").assertExists()
         compose.onNodeWithContentDescription("打开侧栏").performClick()
+        compose.onNodeWithTag("zhaoxi.drawer.surface", useUnmergedTree = true)
+            .assertTopPositionInRootIsEqualTo(0.dp)
         compose.onNodeWithContentDescription("全局搜索").assertExists()
         compose.onNodeWithContentDescription("新建会话").assertExists()
         compose.onNodeWithText("人物图集").assertExists()

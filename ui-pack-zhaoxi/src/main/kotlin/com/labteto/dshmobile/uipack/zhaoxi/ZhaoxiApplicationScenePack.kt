@@ -580,8 +580,11 @@ class ZhaoxiApplicationScenePack(
                     progress.snapTo(0f)
                     progress.animateTo(1f, motion)
                 }
-                // Wallpaper covers the whole window; only interactive content avoids system bars.
-                Box(Modifier.fillMaxSize().systemBarsPadding().graphicsLayer {
+                // Modal drawer paints under status/navigation bars; ordinary scenes inset their controls.
+                // Never inset the drawer surface itself, or a black strip appears above it.
+                val drawerScene = state.stack.lastOrNull()?.value in setOf("route.home", "shell.new_session")
+                val insetContent = if (drawerScene) Modifier else Modifier.systemBarsPadding()
+                Box(Modifier.fillMaxSize().then(insetContent).graphicsLayer {
                     alpha = progress.value
                     translationY = (1f - progress.value) * 16f * density
                 }) { content() }

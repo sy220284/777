@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -48,6 +51,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.uicontract.FilesUiPort
@@ -158,13 +162,15 @@ fun ZhaoxiHomeScene(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                modifier = Modifier.width(296.dp).then(
+                modifier = Modifier.width(296.dp).testTag("zhaoxi.drawer.surface").then(
                     if (drawerState.targetValue == DrawerValue.Open) Modifier
                     else Modifier.clearAndSetSemantics { }
                 ),
                 drawerContainerColor = c.side,
+                windowInsets = WindowInsets(0, 0, 0, 0),
             ) {
-                Column(Modifier.fillMaxHeight().navigationBarsPadding().padding(horizontal = 12.dp)) {
+                Column(Modifier.fillMaxHeight().statusBarsPadding().navigationBarsPadding()
+                    .padding(horizontal = 12.dp)) {
                     Row(
                         Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -282,6 +288,7 @@ fun ZhaoxiHomeScene(
     ) {
         ZxPage(
             title = "朝夕",
+            modifier = Modifier.systemBarsPadding(),
             menu = true,
             onBack = { drawerScope.launch { drawerState.open() } },
             topRight = {
