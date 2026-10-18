@@ -84,6 +84,22 @@
 | route.tools | 顶层 | 侧栏→工具 | 真实技能/插件/MCP/GitHub/能力 | **待逐动作验收** |
 | route.settings | 顶层 | 侧栏→设置 | 完整二级导航、恢复来源 | **待逐动作验收** |
 
+## 场景清单外必须验收的九条完整操作链
+
+这九条复用已有 Scene，并非要增加九张顶层页面。
+
+| 用户动作 | 所属已有场景 | 验收重点 |
+|---|---|---|
+| Chat 历史材料交接 Work | conversation.chat、conversation.message_actions、shell.new_session、conversation.work | 多消息/媒体勾选、目标与公开摘要确认、创建关联新 Work，会话/私密资料隔离（#608/#610） |
+| 工作区单选/多选分享 | route.workspace、workspace.preview | 选中/全选当前列表、系统分享、失败保留选择、切目录清除失效选择（#533） |
+| 团队成员管理 | conversation.work、work.team | 状态/负责人/依赖、输出、消息、停止/重派、待 Lead 核验、步数不当完成率（#570/#575/#580/#595/#641） |
+| 本地技能全流程 | route.tools、tools.plugins、conversation.work | SKILL.md/ZIP 上传、带附属文件、对话创建、手动调用/自动调用开关、删除/错误反馈（#562/#571） |
+| 预设连续添加 | chat.gallery、route.persona_gallery | 安装后停留列表，显示“已抱走”，继续添加下一个（#421） |
+| 无模型时发送 | conversation.composer、settings.models | 不自动离开聊天，保留草稿，明确“去连接”按钮（#536） |
+| Android 侧栏与返回手势 | route.home、各二级路由、shell.search | 系统双侧边缘均 Back；非系统边缘内容区右滑开侧栏，抽屉左滑关闭（#492） |
+| 已退役功能不复活 | settings.session、chat.group_announcement、chat.character_tuning、automation.persona_interaction | 无效手动排序、旧群公告 AI、旧统一行为滑杆、打开任务页就生成推荐均已撤销（#614/#615） |
+| 多模型目录及消耗 | settings.models、settings.model_usage、settings.usage_log | API 目录刷新；已配置/历史模型切换，旧用量不足要说明（#625/#653） |
+
 ## 三个宿主场景（必须一并验收）
 
 | Host 场景 | 用户入口 | 完成条件 |
