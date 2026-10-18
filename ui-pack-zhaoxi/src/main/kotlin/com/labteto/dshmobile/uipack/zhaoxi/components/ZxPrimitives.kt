@@ -42,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.SolidColor
@@ -178,6 +179,7 @@ fun ZxField(
     textStyle: TextStyle = TextStyle(fontSize = 14.sp),
     visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    inputTestTag: String? = null,
 ) {
     val c = ZhaoxiTheme.colors
     val source = remember { MutableInteractionSource() }
@@ -200,7 +202,9 @@ fun ZxField(
             keyboardOptions = keyboardOptions,
             interactionSource = source,
             cursorBrush = SolidColor(c.accentInk),
-            modifier = Modifier.fillMaxWidth().semantics {
+            modifier = Modifier.fillMaxWidth()
+                .then(if (inputTestTag != null) Modifier.testTag(inputTestTag) else Modifier)
+                .semantics {
                 if (placeholder.isNotEmpty()) contentDescription = placeholder
                 if (error) this.error(errorMessage ?: "输入值不正确")
             },

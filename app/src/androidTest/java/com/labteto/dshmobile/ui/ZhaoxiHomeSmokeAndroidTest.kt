@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithTag
 import com.labteto.dshmobile.MainActivity
 import org.junit.Rule
 import org.junit.Test
@@ -37,13 +38,21 @@ class ZhaoxiHomeSmokeAndroidTest {
         val owner = androidx.lifecycle.ViewModelProvider(compose.activity)[com.labteto.dshmobile.ui.host.LocalApplicationFeaturePortsOwner::class.java]
         compose.waitUntil(30_000) { owner.sessions.snapshot().identity != null && !owner.sessions.snapshot().loading }
         compose.onNodeWithTag("zhaoxi.home.create_chat").performClick()
-        compose.waitUntil(30_000) { compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNode(hasSetTextAction()).performTextInput("待发送的草稿")
+        // Select the actual composer. The offscreen session drawer has its own
+        // editable search field and must never be mistaken for the conversation draft.
+        compose.waitUntil(30_000) {
+            compose.onAllNodesWithTag("zhaoxi.composer.input", useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("zhaoxi.composer.input", useUnmergedTree = true)
+            .performTextInput("待发送的草稿")
         compose.activityRule.scenario.recreate()
-        compose.onNode(hasSetTextAction(), useUnmergedTree = true).assertTextEquals("待发送的草稿")
+        compose.onNodeWithTag("zhaoxi.composer.input", useUnmergedTree = true)
+            .assertTextEquals("待发送的草稿")
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithText("聊天").performClick()
-        compose.onNode(hasSetTextAction(), useUnmergedTree = true).assertTextEquals("待发送的草稿")
+        compose.onNodeWithTag("zhaoxi.composer.input", useUnmergedTree = true)
+            .assertTextEquals("待发送的草稿")
     }
     @Test fun allE817IconsLoadAsNativeVectors() {
         val names = com.labteto.dshmobile.uipack.zhaoxi.components.ZhaoxiIconResources.all

@@ -190,6 +190,7 @@ fun ZxComposer(
             onValueChange = onDraftChange,
             placeholder = if (send.available) placeholder else rejectionHint(send.reason),
             modifier = Modifier.weight(1f),
+            inputTestTag = "zhaoxi.composer.input",
         )
         if (running) {
             ZxIconButton(onClick = onStop, contentDescription = "停止生成回复") {
