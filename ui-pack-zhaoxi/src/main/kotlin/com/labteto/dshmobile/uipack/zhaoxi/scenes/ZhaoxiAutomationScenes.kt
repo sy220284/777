@@ -5,6 +5,8 @@ import androidx.compose.ui.platform.LocalContext
 import android.text.format.DateFormat
 import android.app.TimePickerDialog
 import android.app.DatePickerDialog
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
@@ -94,6 +96,8 @@ fun ZhaoxiAutomationTasksScene(
                 "已计划" -> task.status == com.labteto.dshmobile.automation.AutomationStatus.SCHEDULED
                 "运行中" -> task.status == com.labteto.dshmobile.automation.AutomationStatus.RUNNING
                 "已暂停" -> task.status == com.labteto.dshmobile.automation.AutomationStatus.PAUSED
+                "失败/受阻" -> task.status in setOf(com.labteto.dshmobile.automation.AutomationStatus.FAILED,
+                    com.labteto.dshmobile.automation.AutomationStatus.BLOCKED)
                 else -> true
             }
         }
@@ -101,8 +105,9 @@ fun ZhaoxiAutomationTasksScene(
     ZxPage("自动化", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("任务状态")
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("全部", "已计划", "运行中", "已暂停").forEach { label ->
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("全部", "已计划", "运行中", "已暂停", "失败/受阻").forEach { label ->
                 ZxChip(label, filter == label) { filter = label }
             }
         }
@@ -111,10 +116,14 @@ fun ZhaoxiAutomationTasksScene(
         if (filtered.isEmpty()) ZxEmpty("没有符合条件的任务", "可切换状态筛选或创建新任务")
         filtered.forEach { task ->
             val paused = task.status == com.labteto.dshmobile.automation.AutomationStatus.PAUSED
-            val actionAvailable = task.status !in setOf(
-                com.labteto.dshmobile.automation.AutomationStatus.CANCELLED,
-                com.labteto.dshmobile.automation.AutomationStatus.COMPLETED,
-                com.labteto.dshmobile.automation.AutomationStatus.BLOCKED,
+            val mayRetry = task.status in setOf(
+                com.labteto.dshmobile.automation.AutomationStatus.FAILED,
+                com.labteto.dshmobile.automation.AutomationStatus.PAUSED,
+                com.labteto.dshmobile.automation.AutomationStatus.SCHEDULED,
+            )
+            val canChangeScheduleState = task.status in setOf(
+                com.labteto.dshmobile.automation.AutomationStatus.SCHEDULED,
+                com.labteto.dshmobile.automation.AutomationStatus.PAUSED,
             )
             androidx.compose.foundation.layout.Column(
                 Modifier.fillMaxWidth().padding(vertical = 6.dp),
@@ -125,18 +134,49 @@ fun ZhaoxiAutomationTasksScene(
                     "${if (task.mode == AutomationMode.CHAT) "聊天" else "工作"} · ${task.status.zxAutomationStatusLabel()} · ${task.scheduleType.zxAutomationScheduleLabel()}",
                     onClick = { onOpenEditor(task.id) },
                 )
-                if (actionAvailable) {
+                task.lastError?.takeIf(String::isNotBlank)?.let { error ->
+                    com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
+                        "上次执行失败：${error.take(160)}",
+                        com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Warn)
+                }
+                task.runReceipts.takeLast(3).asReversed().forEachIndexed { index, receipt ->
+                    val result = receipt.errorPreview?.take(120)
+                        ?: receipt.resultPreview?.take(120) ?: "未提供运行摘要"
+                    ZxValueRow(if (index == 0) "最近执行" else "较早执行 ${index + 1}",
+                        value = receipt.status.zxAutomationStatusLabel(), sub = result)
+                }
+                if (task.failureStreak > 0) {
+                    val policy = when {
+                        task.mode == AutomationMode.CHAT && task.recurringMinutes != null ->
+                            "聊天周期任务连续失败 3 次会由后台自动暂停"
+                        task.recurringMinutes != null -> "后台会按原周期继续排程"
+                        else -> "单次任务失败后需人工重试"
+                    }
+                    ZxFooterNote("连续失败 ${task.failureStreak} 次 · $policy")
+                }
+                if (task.status == com.labteto.dshmobile.automation.AutomationStatus.BLOCKED) {
+                    ZxFooterNote("任务已阻断，请先检查所属会话、授权或调度配置")
+                    ZxChip("检查任务配置", false) { onOpenEditor(task.id) }
+                }
+                if (mayRetry || canChangeScheduleState) {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 10.dp),
                         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        ZxChip("立即运行", false) {
+                        if (mayRetry) ZxChip(
+                            if (task.status == com.labteto.dshmobile.automation.AutomationStatus.FAILED)
+                                "重新执行" else "立即运行", false
+                        ) {
                             feedback = zxAutomationReceiptText("立即运行", automation.submit(AutomationUiCommand.RunNow(task.id)))
                         }
                         androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
-                        Text(if (paused) "已暂停" else "已启用", color = ZhaoxiTheme.colors.ink2)
-                        ZxSwitch(checked = !paused, onCheckedChange = { enabled ->
+                        Text(when (task.status) {
+                            com.labteto.dshmobile.automation.AutomationStatus.FAILED -> "失败待处理"
+                            com.labteto.dshmobile.automation.AutomationStatus.PAUSED -> "已暂停"
+                            else -> "按计划运行"
+                        }, color = ZhaoxiTheme.colors.ink2)
+                        if (canChangeScheduleState) ZxSwitch(checked = !paused, onCheckedChange = { enabled ->
                             feedback = zxAutomationReceiptText(if (enabled) "启用任务" else "暂停任务", automation.submit(
                                 if (enabled) AutomationUiCommand.Resume(task.id)
                                 else AutomationUiCommand.Pause(task.id)
