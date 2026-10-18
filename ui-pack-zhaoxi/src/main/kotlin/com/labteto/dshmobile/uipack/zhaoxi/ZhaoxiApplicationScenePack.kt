@@ -296,7 +296,9 @@ class ZhaoxiApplicationScenePack(
             "conversation.header" -> conv?.let {
                 ZhaoxiConversationMenu(conversations, secondary, scope, renderSlot = { RenderScene(it, scope) })
             }
-            "conversation.timeline" -> conv?.let { ZhaoxiTimelineScene(it.chat, authorName = "助手") }
+            "conversation.timeline" -> conv?.let {
+                ZhaoxiTimelineScene(it.chat, it.reading, it.history, it.documents, manifest.scenes, it.media)
+            }
             "conversation.composer" -> conv?.let {
                 val s = it.chat.snapshot()
                 val stored by it.drafts.drafts.collectAsState()
