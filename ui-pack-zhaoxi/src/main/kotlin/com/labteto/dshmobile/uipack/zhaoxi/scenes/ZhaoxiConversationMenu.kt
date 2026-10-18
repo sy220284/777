@@ -79,26 +79,52 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
                 val plan = snap.identity?.let { reads.planForUi(it.sessionId) }
                 plan?.plan?.forEachIndexed { index, step -> ZxRow(step, plan.todos.getOrNull(index)?.ownerStatus.orEmpty()) }
             }
-            ZxNavRow("待审批") { scope.onNavigate(UiSceneId("work.approval")) }
-            ZxNavRow("待回答") { scope.onNavigate(UiSceneId("work.question")) }
+            val pending = ports.work.snapshot()
+            if (pending.approval != null) ZxNavRow("待审批") {
+                scope.onNavigate(UiSceneId("work.approval"))
+            }
+            if (pending.question != null) ZxNavRow("待回答") {
+                scope.onNavigate(UiSceneId("work.question"))
+            }
         } else {
-            ZxNavRow("选择人物") { scope.onNavigate(UiSceneId("chat.persona_picker")) }
-            ZxNavRow("当前人物采样") { scope.onNavigate(UiSceneId("chat.character_tuning")) }
-            ZxNavRow("群成员") { scope.onNavigate(UiSceneId("chat.group_members")) }
-            ZxNavRow("群公告") { scope.onNavigate(UiSceneId("chat.group_announcement")) }
-            ZxNavRow("回复建议") { scope.onNavigate(UiSceneId("chat.reply_suggestions")) }
+            if (ports.gallery != null && ports.selection != null)
+                ZxNavRow("选择人物") { scope.onNavigate(UiSceneId("chat.persona_picker")) }
+            if (secondary?.currentPersona != null)
+                ZxNavRow("当前人物采样") { scope.onNavigate(UiSceneId("chat.character_tuning")) }
+            if (ports.groups != null) {
+                ZxNavRow("群成员") { scope.onNavigate(UiSceneId("chat.group_members")) }
+                ZxNavRow("群公告") { scope.onNavigate(UiSceneId("chat.group_announcement")) }
+            }
+            if (ports.replySuggestions != null || secondary?.replySuggestions != null)
+                ZxNavRow("回复建议") { scope.onNavigate(UiSceneId("chat.reply_suggestions")) }
         }
     }
-    val slotChoices = if (conv?.workMode() == true) listOf(
-        "conversation.ui_document" to "交互文档", "work.plan_review" to "计划审查", "work.team" to "团队运行",
-        "work.requirement_evidence" to "需求与证据", "work.capabilities" to "能力清单",
-    ) else listOf("conversation.ui_document" to "交互文档")
-    slotChoices.forEach { (id, label) -> ZxNavRow(label) {
-        selectedSlot = if (selectedSlot?.value == id) null else UiSceneId(id)
-    } }
-    selectedSlot?.let { id -> Box(Modifier.fillMaxWidth().height(340.dp)) { renderSlot(id) } }
-    ZxNavRow("生成文档") { scope.onNavigate(UiSceneId("conversation.ui_document_generate")) }
-    ZxNavRow("媒体生成与结果") { scope.onNavigate(UiSceneId("media.creation")) }
-    ZxNavRow("工作区") { scope.onNavigate(UiSceneId("route.workspace")) }
-    ZxNavRow("设置") { scope.onNavigate(UiSceneId("route.settings")) }
+    val availableSlots = buildList {
+        if (conv?.documents != null && conv.forms != null)
+            add("conversation.ui_document" to "交互文档")
+        if (conv?.workMode() == true) {
+            if (conv.workReads != null && conv.workPolicy != null)
+                add("work.plan_review" to "计划审查")
+            if (conv.workTeam != null) add("work.team" to "团队运行")
+            if (conv.evidence != null) add("work.requirement_evidence" to "需求与证据")
+            if (secondary?.tools != null) add("work.capabilities" to "能力清单")
+        }
+    }
+    availableSlots.forEach { (id, label) ->
+        ZxNavRow(label) {
+            selectedSlot = if (selectedSlot?.value == id) null else UiSceneId(id)
+        }
+    }
+    selectedSlot?.takeIf { selected -> availableSlots.any { it.first == selected.value } }?.let { id ->
+        Box(Modifier.fillMaxWidth().height(340.dp)) { renderSlot(id) }
+    }
+    if (conv?.documents != null && conv.forms != null)
+        ZxNavRow("生成文档") { scope.onNavigate(UiSceneId("conversation.ui_document_generate")) }
+    if (secondary?.media != null && secondary.settings != null)
+        ZxNavRow("媒体生成") { scope.onNavigate(UiSceneId("media.creation")) }
+    if (secondary?.files != null)
+        ZxNavRow("工作区") { scope.onNavigate(UiSceneId("route.workspace")) }
+    if (secondary?.settings != null)
+        ZxNavRow("设置") { scope.onNavigate(UiSceneId("route.settings")) }
+
 }
