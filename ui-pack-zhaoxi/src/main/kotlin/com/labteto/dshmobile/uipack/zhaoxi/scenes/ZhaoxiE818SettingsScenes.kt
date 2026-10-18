@@ -1,0 +1,229 @@
+package com.labteto.dshmobile.uipack.zhaoxi.scenes
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
+import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.TokenUsageGroupKind
+import com.labteto.dshmobile.local.memory.MemoryManagementQuery
+import com.labteto.dshmobile.local.memory.MemoryScope
+import com.labteto.dshmobile.local.interaction.LocalApprovalMode
+import com.labteto.dshmobile.uicontract.*
+import com.labteto.dshmobile.uipack.zhaoxi.components.*
+import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
+import com.labteto.dshmobile.uihost.UiSceneRenderScope
+
+/** All totals here are rendered from the existing Usage Owner; no locally computed billing facts. */
+@Composable
+fun ZhaoxiUsageOverviewScene(usage: UsageUiPort, scope: UiSceneRenderScope, modelOnly: Boolean = false) {
+    val revision by usage.revision.collectAsState()
+    val source = remember(revision, usage) { usage.snapshot() }
+    var selectedModel by rememberSaveable { mutableStateOf<String?>(null) }
+    val snapshot = source.byModel[selectedModel] ?: source
+    var selectedGroup by remember { mutableStateOf<String?>(null) }
+    ZxPage(if (modelOnly) "模型用量" else "用量统计", onBack = { scope.onBack() }) {
+        Spacer(Modifier.height(8.dp))
+        ZxSection("按模型")
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ZxChip("全部", selectedModel == null) { selectedModel = null; selectedGroup = null }
+        }
+        source.byModel.keys.sorted().forEach { id ->
+            ZxChip(id, selectedModel == id) { selectedModel = id; selectedGroup = null }
+        }
+        ZxSection("用量总览")
+        ZxValueRow("Token 总量", value = snapshot.tracked.totalTokens.toString(), mono = true)
+        ZxValueRow("请求次数", value = snapshot.tracked.requestCount.toString(), mono = true)
+        ZxValueRow("估算费用", value = "¥" + "%.4f".format(snapshot.tracked.estimatedCostCny), mono = true)
+        ZxValueRow("输入 / 输出", value = "${snapshot.tracked.inputTokens} / ${snapshot.tracked.outputTokens}", mono = true)
+        if (snapshot.tracked.unreportedRequestCount > 0) {
+            ZxFooterNote("${snapshot.tracked.unreportedRequestCount} 次请求未上报精确用量，统计仅反映可追踪事实")
+        }
+        if (snapshot.modelHistoryPartial || source.modelHistoryPartial) {
+            ZxFooterNote("部分较早用量记录未保留，单模型历史统计可能不完整")
+        }
+        ZxSection("会话与任务")
+        if (snapshot.sessions.isEmpty() && snapshot.tasks.isEmpty()) {
+            ZxEmpty("暂无用量分组", "完成聊天或工作请求后将在这里显示")
+        }
+        snapshot.sessions.forEach { item ->
+            ZxRow(item.title, "${item.aggregate.totalTokens} Token · ${item.aggregate.requestCount} 次请求",
+                onClick = { selectedGroup = item.key })
+        }
+        snapshot.tasks.forEach { item ->
+            ZxRow(item.title, "${item.aggregate.totalTokens} Token · ${item.aggregate.requestCount} 次请求")
+        }
+        selectedGroup?.let { key ->
+            usage.groupDetail(TokenUsageGroupKind.SESSION, key, selectedModel)?.let { detail ->
+                ZxSection(detail.title)
+                ZxValueRow("汇总", value = "${detail.aggregate.totalTokens} Token")
+                ZxValueRow("请求", value = detail.aggregate.requestCount.toString())
+            }
+        }
+        ZxNavRow("用量日志", sub = "逐次请求记录与用量明细") {
+            scope.onNavigate(UiSceneId("settings.usage_log"))
+        }
+    }
+}
+
+/** Distinct request ledger page, rather than rendering the overview again. */
+@Composable
+fun ZhaoxiUsageLogScene(
+    usage: UsageUiPort,
+    scope: UiSceneRenderScope,
+    openRequest: (String) -> Unit,
+) {
+    val revision by usage.revision.collectAsState()
+    val source = remember(usage, revision) { usage.snapshot() }
+    var selectedModel by rememberSaveable { mutableStateOf<String?>(null) }
+    val current = source.byModel[selectedModel] ?: source
+    ZxPage("用量日志", onBack = { scope.onBack() }) {
+        Spacer(Modifier.height(8.dp))
+        ZxSection("模型筛选")
+        ZxChip("全部", selectedModel == null) { selectedModel = null }
+        source.byModel.keys.sorted().forEach { model ->
+            ZxChip(model, selectedModel == model) { selectedModel = model }
+        }
+        ZxSection("最近请求")
+        if (current.recentRecords.isEmpty()) ZxEmpty("暂无请求记录", "只有 Owner 已记录的请求才会出现在这里")
+        current.recentRecords.forEach { record ->
+            ZxRow(record.model, "${record.context.action.name} · ${record.totalTokens} Token · ¥${"%.4f".format(record.estimatedCostCny)}",
+                onClick = { openRequest(record.requestId) })
+        }
+        if (current.tracked.unreportedRequestCount > 0) {
+            ZxFooterNote("未上报的请求不会被推测为已知用量")
+        }
+    }
+}
+
+/** Show only an Owner-resolved request ID; no prompt content is exposed or reconstructed. */
+@Composable
+fun ZhaoxiUsageDetailScene(usage: UsageUiPort, requestId: String?, scope: UiSceneRenderScope) {
+    val revision by usage.revision.collectAsState()
+    val record = remember(usage, requestId, revision) { requestId?.let(usage::requestDetail) }
+    ZxPage("单次请求", onBack = { scope.onBack() }) {
+        Spacer(Modifier.height(8.dp))
+        if (record == null) {
+            ZxEmpty("没有可查看的请求", "从用量日志选择一条仍有效的请求")
+        } else {
+            ZxSection("请求归属")
+            ZxValueRow("模型", value = record.model)
+            ZxValueRow("行为", value = record.context.action.name)
+            record.context.sessionTitle?.let { ZxValueRow("会话", value = it) }
+            record.context.taskLabel?.let { ZxValueRow("任务", value = it) }
+            ZxSection("Token 用量")
+            ZxValueRow("输入", value = record.inputTokens.toString(), mono = true)
+            ZxValueRow("输出", value = record.outputTokens.toString(), mono = true)
+            ZxValueRow("缓存命中", value = record.cacheHitTokens.toString(), mono = true)
+            ZxValueRow("推理", value = record.reasoningTokens.toString(), mono = true)
+            ZxSection("费用")
+            ZxValueRow("估算金额", value = "¥" + "%.4f".format(record.estimatedCostCny), mono = true)
+            ZxFooterNote(if (record.reported) "模型已上报用量" else "当前为未上报/估算用量")
+        }
+    }
+}
+
+/** Memory overview deliberately says global scope; other scopes require their own authorized context. */
+@Composable
+fun ZhaoxiMemoryOverviewScene(memory: MemoryUiPort, settings: SettingsUiPort?, scope: UiSceneRenderScope) {
+    val page = remember(memory) { memory.memoryPage(MemoryManagementQuery(setOf(MemoryScope.GLOBAL))) }
+    val snap by (settings?.state ?: kotlinx.coroutines.flow.flowOf(UiSettingsSnapshot()))
+        .collectAsState(initial = settings?.initialState ?: UiSettingsSnapshot())
+    ZxPage("记忆", onBack = { scope.onBack() }) {
+        Spacer(Modifier.height(8.dp))
+        ZxSection("全局记忆概览")
+        ZxValueRow("有效记忆", value = page.totalMatching.toString(), mono = true)
+        ZxValueRow("记忆分类", value = page.kindCounts.count { it.value > 0 }.toString())
+        page.kindCounts.filterValues { it > 0 }.forEach { (kind, count) ->
+            ZxValueRow(kind.name, value = count.toString())
+        }
+        ZxSection("记忆设置")
+        if (settings != null) {
+            ZxSwitchRow("自动召回", "在允许范围内检索既有记忆", snap.autoRecall) {
+                settings.submit(SettingsUiCommand.Personalization(snap.userRules, it, snap.autoMemory))
+            }
+            ZxSwitchRow("自动记忆", "按现有 Owner 规则保存可记住的事实", snap.autoMemory) {
+                settings.submit(SettingsUiCommand.Personalization(snap.userRules, snap.autoRecall, it))
+            }
+        }
+        ZxNavRow("管理全局记忆", sub = "搜索 · 修改 · 遗忘") {
+            scope.onNavigate(UiSceneId("settings.memory_management"))
+        }
+        ZxFooterNote("这里只显示全局作用域统计；人物/项目记忆不会被混入全局数字")
+    }
+}
+
+@Composable
+fun ZhaoxiChatGuardScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
+    val snap by settings.state.collectAsState(initial = settings.initialState)
+    var draft by rememberSaveable { mutableStateOf("") }
+    var result by remember { mutableStateOf<String?>(null) }
+    var confirmClear by remember { mutableStateOf(false) }
+    ZxPage("聊天风格守卫", onBack = { scope.onBack() }) {
+        Spacer(Modifier.height(8.dp))
+        ZxSwitchRow("启用风格守卫", "在原有模型与人物规则边界内生效", snap.chatStyleGuardEnabled) {
+            result = settings.submit(SettingsUiCommand.StyleGuard(it)).toString()
+        }
+        ZxSection("自定义过滤词")
+        ZxValueRow("已配置", value = "${snap.chatStyleGuardCustomPhrases.size} 项")
+        ZxField(draft, { draft = it }, Modifier.fillMaxWidth(), placeholder = "输入过滤词")
+        ZxButton("添加过滤词", {
+            result = settings.submit(SettingsUiCommand.AddStylePhrase(draft.trim())).toString()
+            if (result == SettingsUiReceipt.Applied.toString()) draft = ""
+        }, enabled = draft.isNotBlank())
+        snap.chatStyleGuardCustomPhrases.forEach { phrase ->
+            ZxRow(phrase, "自定义", trailing = {
+                ZxChip("移除", false) {
+                    result = settings.submit(SettingsUiCommand.RemoveStylePhrase(phrase)).toString()
+                }
+            })
+        }
+        ZxSection("人物过滤词")
+        if (snap.personaBannedPhrases.isEmpty()) ZxFooterNote("当前人物没有单独设置的过滤词")
+        else snap.personaBannedPhrases.forEach { ZxRow(it, "人物资料来源") }
+        ZxSection("最近命中")
+        if (snap.styleGuardHits.isEmpty()) ZxFooterNote("暂无命中记录")
+        snap.styleGuardHits.forEach { Text(it, color = ZhaoxiTheme.colors.ink2) }
+        if (snap.styleGuardHits.isNotEmpty()) {
+            ZxButton(if (confirmClear) "确认清空记录" else "清空命中记录", {
+                if (confirmClear) {
+                    result = settings.submit(SettingsUiCommand.ClearStyleHits).toString()
+                    confirmClear = false
+                } else confirmClear = true
+            })
+        }
+        result?.let { ZxFooterNote(it) }
+    }
+}
+
+@Composable
+fun ZhaoxiApprovalModeScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
+    val mode by settings.approvalMode.collectAsState()
+    var status by remember { mutableStateOf<String?>(null) }
+    ZxPage("审批模式", onBack = { scope.onBack() }) {
+        Spacer(Modifier.height(8.dp))
+        ZxSection("工具与任务审批")
+        LocalApprovalMode.entries.forEach { candidate ->
+            ZxChip(when (candidate) {
+                LocalApprovalMode.DEFAULT -> "默认"
+                LocalApprovalMode.MANUAL -> "手动审批"
+                LocalApprovalMode.AUTO -> "自动审批"
+            }, mode == candidate) {
+                status = settings.submit(SettingsUiCommand.ApprovalMode(candidate)).toString()
+            }
+        }
+        ZxFooterNote("审批模式仍由原 Owner 解释和执行；切换不授予新的设备或服务权限")
+        status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
+    }
+}
