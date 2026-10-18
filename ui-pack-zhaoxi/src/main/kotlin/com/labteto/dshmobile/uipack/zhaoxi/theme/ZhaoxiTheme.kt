@@ -264,17 +264,27 @@ fun Modifier.zxMaterial(m: ZhaoxiMaterial): Modifier = composed {
 
 /** 场景背景实绘（E8.16）：底色纵向渐变 + 环境光 ambA 左上 / ambB 右下径向。 */
 @Composable
-fun ZhaoxiBackground(modifier: Modifier = Modifier) {
+fun ZhaoxiBackground(
+    modifier: Modifier = Modifier,
+    intensity: Float = 1f,
+    workMode: Boolean = false,
+) {
     val c = ZhaoxiTheme.colors
+    val glow = intensity.coerceIn(0f, 1f)
     androidx.compose.foundation.layout.Box(modifier.drawBehind {
         drawRect(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(c.bg, c.bg2)))
-        drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
-            listOf(c.ambA, Color.Transparent),
-            center = androidx.compose.ui.geometry.Offset(0f, 0f),
-            radius = size.maxDimension * 0.9f))
-        drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
-            listOf(c.ambB, Color.Transparent),
-            center = androidx.compose.ui.geometry.Offset(size.width, size.height),
-            radius = size.maxDimension * 0.9f))
+        if (glow > 0f) {
+            // E8.17 work surface mirrors the light sources; secondary pages use a softer glow.
+            drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
+                listOf(c.ambA.copy(alpha = c.ambA.alpha * glow), Color.Transparent),
+                center = if (workMode) androidx.compose.ui.geometry.Offset(size.width * .84f, 0f)
+                    else androidx.compose.ui.geometry.Offset(size.width * .22f, size.height * .06f),
+                radius = size.maxDimension * .78f))
+            drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
+                listOf(c.ambB.copy(alpha = c.ambB.alpha * glow), Color.Transparent),
+                center = if (workMode) androidx.compose.ui.geometry.Offset(size.width * .1f, size.height * .98f)
+                    else androidx.compose.ui.geometry.Offset(size.width * .85f, size.height * .98f),
+                radius = size.maxDimension * .78f))
+        }
     })
 }
