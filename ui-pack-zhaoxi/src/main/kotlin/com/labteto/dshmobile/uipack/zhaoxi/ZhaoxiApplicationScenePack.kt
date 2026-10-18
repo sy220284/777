@@ -428,7 +428,8 @@ class ZhaoxiApplicationScenePack(
             // ---- 设置 ----
             "settings.root", "route.settings" -> ZhaoxiSettingsHomeScene(scope)
             "settings.appearance" -> ZhaoxiAppearanceScene(preferences, scope)
-            "settings.notifications", "settings.permissions" -> ZhaoxiNotificationsScene(preferences, scope)
+            "settings.notifications" -> ZhaoxiNotificationsScene(preferences, scope)
+            "settings.permissions" -> ZhaoxiPermissionsScene(preferences, scope)
             "settings.models" -> settings?.let { ZhaoxiModelsScene(it, scope) }
             "settings.session", "settings.chat", "settings.advanced", "settings.memory_settings" ->
                 settings?.let { ZhaoxiRuntimeSettingsScene(it, scope) }
