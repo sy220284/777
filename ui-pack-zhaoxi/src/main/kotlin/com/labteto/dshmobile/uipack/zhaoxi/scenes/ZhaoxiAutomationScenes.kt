@@ -214,6 +214,8 @@ fun ZhaoxiAutomationEditorScene(
     var natural by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<String?>(null) }
+    var firstRunError by remember(editingTaskId) { mutableStateOf<String?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     fun minuteOfDay(value: String): Int? {
         val pieces = value.trim().split(":")
         if (pieces.size != 2) return null
@@ -272,9 +274,45 @@ fun ZhaoxiAutomationEditorScene(
                 }
                 if (selected !in setOf(AutomationScheduleType.SILENCE, AutomationScheduleType.WINDOW)) {
                     ZxSection("首次运行时间")
-                    ZxField(firstRun, { firstRun = it }, Modifier.fillMaxWidth(),
-                        placeholder = "YYYY-MM-DD HH:mm")
-                    ZxFooterNote("按设备本地时区设置；必须晚于当前时间")
+                    ZxField(firstRun, {
+                        firstRun = it
+                        firstRunError = null
+                    }, Modifier.fillMaxWidth(),
+                        placeholder = "YYYY-MM-DD HH:mm",
+                        error = firstRunError != null, errorMessage = firstRunError)
+                    ZxButton("选择日期和时间", {
+                        // Android native pickers follow the device locale, 12/24h preference,
+                        // accessibility, and IME conventions. Keep text input as a fallback.
+                        val initial = java.util.Calendar.getInstance()
+                        runCatching { formatter.parse(firstRun) }.getOrNull()?.let {
+                            initial.time = it
+                        }
+                        android.app.DatePickerDialog(
+                            context,
+                            { _, year, month, day ->
+                                android.app.TimePickerDialog(
+                                    context,
+                                    { _, hour, minute ->
+                                        firstRun = String.format(
+                                            java.util.Locale.US,
+                                            "%04d-%02d-%02d %02d:%02d",
+                                            year, month + 1, day, hour, minute,
+                                        )
+                                        firstRunError = null
+                                    },
+                                    initial.get(java.util.Calendar.HOUR_OF_DAY),
+                                    initial.get(java.util.Calendar.MINUTE),
+                                    android.text.format.DateFormat.is24HourFormat(context),
+                                ).show()
+                            },
+                            initial.get(java.util.Calendar.YEAR),
+                            initial.get(java.util.Calendar.MONTH),
+                            initial.get(java.util.Calendar.DAY_OF_MONTH),
+                        ).apply {
+                            datePicker.minDate = System.currentTimeMillis() - 86_400_000L
+                        }.show()
+                    }, Modifier.fillMaxWidth(), enabled = !busy)
+                    ZxFooterNote("采用设备本地时区；运行时间必须晚于当前时间")
                 }
                 if (selected == AutomationScheduleType.INTERVAL) {
                     ZxSection("重复间隔（分钟）")
@@ -351,8 +389,10 @@ fun ZhaoxiAutomationEditorScene(
                     }
                     val timed = selected !in setOf(AutomationScheduleType.SILENCE, AutomationScheduleType.WINDOW)
                     val minGap = if (chatMode) 60L else 15L
+                    firstRunError = if (timed && (date == null || date <= System.currentTimeMillis()))
+                        "请选择晚于当前时间的有效日期和时间" else null
                     feedback = when {
-                        timed && (date == null || date <= System.currentTimeMillis()) ->
+                        timed && firstRunError != null ->
                             "请输入晚于当前时间的有效本地日期"
                         selected == AutomationScheduleType.INTERVAL && (duration == null || duration < minGap) ->
                             "间隔不得小于 ${minGap} 分钟"
@@ -374,11 +414,18 @@ fun ZhaoxiAutomationEditorScene(
                             windowEndMinuteOfDay = if (selected == AutomationScheduleType.WINDOW) end else null,
                             notify = notify,
                         )
-                        showReceipt(automation.submit(if (editing == null) {
-                            AutomationUiCommand.Create(snap.context.identity, schedule)
-                        } else {
-                            AutomationUiCommand.Update(editing.id, editing.scheduleGeneration, schedule)
-                        }))
+                        busy = true
+                        try {
+                            showReceipt(automation.submit(if (editing == null) {
+                                AutomationUiCommand.Create(snap.context.identity, schedule)
+                            } else {
+                                AutomationUiCommand.Update(editing.id, editing.scheduleGeneration, schedule)
+                            }))
+                        } catch (failure: Exception) {
+                            feedback = failure.message ?: "保存未完成，请确认任务状态后重试"
+                        } finally {
+                            busy = false
+                        }
                     }
                 }
             }, Modifier.fillMaxWidth(), enabled = !busy && prompt.isNotBlank(), loading = busy)
