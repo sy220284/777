@@ -92,8 +92,10 @@ internal class LocalModelRequestCoordinator @Inject constructor(
     private val historyCompactor = LocalHistoryCompactor(summaries = summaries)
     private val promptCacheBaselines = LocalPromptCacheBaselineStore()
     private val promptCacheContinuity = LocalPromptCacheContinuityStore()
-    private val maxStreamPreviewChars: Int = 4_096
-    private val streamPreviewIntervalMs: Long = 50L
+    // Retain a full ordinary reply while limiting memory and Compose parsing cost.
+    // Extremely long tool sessions still rely on durable stage messages, not this buffer.
+    private val maxStreamPreviewChars: Int = 65_536
+    private val streamPreviewIntervalMs: Long = 100L
     private val requestRuntime = LocalAgentModelRequestRuntime(modelGateway, resourceScheduler)
     private val modelStepRuntime = LocalAgentModelStepRuntime()
     // EventLog owns the actual model request evidence. This helper only memoizes
