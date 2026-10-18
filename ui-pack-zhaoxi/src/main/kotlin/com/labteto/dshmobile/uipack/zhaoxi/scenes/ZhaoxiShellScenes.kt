@@ -175,10 +175,17 @@ fun ZhaoxiHomeScene(
                         if (visibleSessions.isEmpty()) {
                             item {
                                 Text(
-                                    if (drawerQuery.isBlank()) "尚无会话，点击上方「新会话」开始"
-                                    else "没有找到匹配的会话",
+                                    if (drawerQuery.isBlank()) "暂无会话，可从上方新建"
+                                    else "没有匹配的会话",
                                     fontSize = 12.sp, color = c.ink2, modifier = Modifier.padding(12.dp),
                                 )
+                            }
+                            if (drawerQuery.isNotBlank()) {
+                                item {
+                                    ZxButton("清除筛选", { drawerQuery = "" },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        variant = ZxButtonVariant.Outline)
+                                }
                             }
                         }
                         items(visibleSessions, key = { it.id }) { session ->
@@ -290,9 +297,10 @@ private fun ZxHomeDrawerEntry(
     ) {
         ZxIcon(icon)
         Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 13.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                color = c.ink, maxLines = 1)
-            if (detail.isNotBlank()) Text(detail, fontSize = 11.sp, color = c.ink2, maxLines = 1)
+            Text(title, fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = c.ink, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            if (detail.isNotBlank()) Text(detail, fontSize = 12.sp, color = c.ink2, maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }
         if (selected) ZxIcon("check")
     }
