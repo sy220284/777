@@ -277,8 +277,12 @@ fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRender
             revision++
         }, Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ZxChip("有效", filter == "有效") { filter = "有效"; editing = false }
-            ZxChip("已停用", filter == "已停用") { filter = "已停用"; editing = false }
+            ZxChip("有效", filter == "有效") {
+                filter = "有效"; editing = false; stale = false; feedback = null
+            }
+            ZxChip("已停用", filter == "已停用") {
+                filter = "已停用"; editing = false; stale = false; feedback = null
+            }
         }
         val visible = entries.filter { if (filter == "有效") it.active else !it.active }
         if (visible.isEmpty()) {
@@ -290,6 +294,8 @@ fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRender
                 onClick = {
                     selectedId = entry.id
                     editing = false
+                    stale = false
+                    feedback = null
                 })
         }
         val selected = visible.firstOrNull { it.id == selectedId }
