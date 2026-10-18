@@ -181,6 +181,11 @@ internal class LocalWorkUiDocumentPublisher @Inject constructor(
                             com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair(content, 4000)))))
                 }
         }
+        // The Agent may emit multiple hooks before facts change. Avoid adding a
+        // durable revision and redrawing the whole timeline for an identical snapshot.
+        if (previous != null && previous.nodes == nodes &&
+            previous.title == "Work 渐进成果" && previous.fallbackText ==
+            "工具回执与阶段输出已保存；当前结果未经独立核验。") return true
         val revision = previous?.revision?.let { Math.addExact(it, 1L) } ?: 0L
         val document = UiDocument(
             1, docId,
