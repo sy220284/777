@@ -331,7 +331,7 @@ class ZhaoxiApplicationScenePack(
                 }
                 if (msg == null) ZxEmpty("没有消息", "会话为空") else when (scene.value) {
                     "conversation.edit" -> ZhaoxiEditScene(msg, conv!!.chat, scope, if (workMode) conv.work else null)
-                    "chat.branches" -> ZhaoxiBranchesScene(msg, conv!!.chat, scope)
+                    "chat.branches" -> if (workMode) ZxEmpty("暂不支持工作分支切换", "返回工作会话继续") else ZhaoxiBranchesScene(msg, conv!!.chat, scope)
                     "conversation.reader" -> ZhaoxiReaderScene("阅读", msg.text, scope)
                     else -> ZhaoxiMessageActionsScene(msg, scope,
                         onEdit = { scope.onNavigate(UiSceneId("conversation.edit")) },
