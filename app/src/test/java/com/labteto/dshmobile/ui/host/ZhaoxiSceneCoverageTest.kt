@@ -14,6 +14,12 @@ class ZhaoxiSceneCoverageTest {
         assertEquals("Zhaoxi pack scene inventory and the live Host catalog diverged",
             hostScenes, ZhaoxiUiPackManifest.fullSceneIds)
         assertEquals(76, hostScenes.size)
+        assertTrue("Agent 审批策略必须是独立页面，不能与 Android 设备授权合并",
+            LocalUiSceneCatalog.requirements.any {
+                it.id == UiSceneId("settings.approval_mode") && !it.hostProvided
+            })
+        assertTrue(hostScenes.contains(UiSceneId("settings.approval_mode")))
+        assertTrue(hostScenes.contains(UiSceneId("settings.permissions")))
     }
 
     @Test fun oldV6AndHostSystemServicesNeverBecomePackScenes() {
