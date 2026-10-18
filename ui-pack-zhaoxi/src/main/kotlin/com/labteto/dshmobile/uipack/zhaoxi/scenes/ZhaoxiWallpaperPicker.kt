@@ -11,7 +11,9 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -72,9 +74,12 @@ internal fun ZhaoxiWallpaperPicker(selectedPreset: String, onSelect: (String) ->
     }
     val c = ZhaoxiTheme.colors
     val entries = listOf("auto" to "跟随主题") + zhaoxiWallpaperPresets.map { it.key to it.label }
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        entries.forEach { (key, name) ->
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(entries, key = { it.first }) { (key, name) ->
             val active = selectedPreset == key
             val interaction = remember(key) { MutableInteractionSource() }
             Column(
