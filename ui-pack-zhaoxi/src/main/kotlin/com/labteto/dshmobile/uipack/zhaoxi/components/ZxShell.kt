@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.uipack.zhaoxi.components
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -83,9 +87,9 @@ fun ZxModeSwitch(workMode: Boolean, onChange: (Boolean) -> Unit, modifier: Modif
                     .background(if (on) c.ink else c.bg2)
                     .clickable(role = Role.Tab) { onChange(w) }
                     .semantics { selected = on }
-                    .heightIn(min = 42.dp)
+                    .heightIn(min = 48.dp)
                     .padding(horizontal = 14.dp, vertical = 5.dp),
-            ) { Text(label, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = if (on) c.onInk else c.ink2) }
+            ) { Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (on) c.onInk else c.ink2) }
         }
     }
 }
@@ -106,19 +110,26 @@ fun ZxDrawer(
     Column(modifier.background(c.side).padding(12.dp)) {
         ZxField(query, onQuery, Modifier.fillMaxWidth(), placeholder = "搜索人物、会话、任务、文件")
         Spacer(Modifier.height(8.dp))
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             groups.forEach { (group, entries) ->
                 ZxSection(group)
                 entries.forEach { e ->
+                    val interaction = remember(e.id) { MutableInteractionSource() }
                     Row(
                         Modifier
                             .fillMaxWidth()
+                            .zxPressSurface(interaction)
                             .clip(RoundedCornerShape(10.dp))
-                            .clickable { onOpen(e.id) }
-                            .padding(horizontal = 10.dp, vertical = 9.dp),
+                            .clickable(
+                                interactionSource = interaction,
+                                indication = androidx.compose.foundation.LocalIndication.current,
+                                role = Role.Button) { onOpen(e.id) }
+                            .heightIn(min = 56.dp)
+                            .padding(horizontal = 10.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(e.label, Modifier.weight(1f), fontSize = 13.5.sp, color = c.ink)
+                        Text(e.label, Modifier.weight(1f), fontSize = 14.sp, color = c.ink)
                         e.badge?.let { ZxBadge(it, ZxBadgeTone.Accent) }
                     }
                 }
