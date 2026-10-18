@@ -127,7 +127,8 @@ fun ZhaoxiAutomationTasksScene(
                     ZxFooterNote("连续失败 ${task.failureStreak} 次 · $policy")
                 }
                 if (task.status == com.labteto.dshmobile.automation.AutomationStatus.BLOCKED) {
-                    ZxFooterNote("任务已阻断；请先检查所属会话、授权或编辑任务配置")
+                    ZxFooterNote("任务已阻断，请先检查所属会话、授权或调度配置")
+                    ZxChip("检查任务配置", false) { onOpenEditor(task.id) }
                 }
                 if (mayRetry || canChangeScheduleState) {
                     Row(
