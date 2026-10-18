@@ -91,6 +91,7 @@ fun ZhaoxiAutomationTasksScene(
             ZxRow(task.prompt.take(80),
                 "${if (task.mode == AutomationMode.CHAT) "聊天" else "工作"} · ${task.status.wireValue} · ${task.scheduleType.name}",
                 onClick = { onOpenEditor(task.id) },
+                showChevron = false,
                 trailing = {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         if (actionAvailable) ZxChip("立即运行", false) {
