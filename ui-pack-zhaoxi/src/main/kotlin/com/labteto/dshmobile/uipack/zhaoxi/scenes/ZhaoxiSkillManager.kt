@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.uicontract.ToolsUiCommand
 import com.labteto.dshmobile.uicontract.ToolsUiPort
 import com.labteto.dshmobile.uicontract.ToolsUiReceipt
+import com.labteto.dshmobile.uicontract.UiToolError
 import com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot
 import com.labteto.dshmobile.uicontract.UiSkillSnapshot
 import com.labteto.dshmobile.uicontract.submit
@@ -62,6 +63,17 @@ internal fun zxReadLimitedSkillPackage(stream: java.io.InputStream, limit: Int =
     }
     require(size > 0) { "技能文件为空" }
     return result.toByteArray()
+}
+
+internal fun zxSkillReceiptText(receipt: ToolsUiReceipt, done: String): String = when (receipt) {
+    is ToolsUiReceipt.Applied -> done
+    is ToolsUiReceipt.Failed -> when (receipt.reason) {
+        UiToolError.CONFIGURATION -> "技能格式、名称或规则无效，请检查后重试"
+        UiToolError.PERMISSION -> "没有读取或修改技能所需的权限"
+        UiToolError.TIMEOUT -> "技能操作超时，请核实当前状态再重试"
+        UiToolError.DNS, UiToolError.UNREACHABLE -> "网络不可用，无法完成远程技能操作"
+        UiToolError.UNKNOWN -> "技能操作失败，请检查是否冲突或重名"
+    }
 }
 
 /** UI for existing ToolsUiPort skills, without inventing a second installation or execution path. */
@@ -102,7 +114,7 @@ internal fun ZhaoxiSkillManager(tools: ToolsUiPort) {
             busy = true
             try {
                 val receipt = tools.submit(command)
-                feedback = if (receipt is ToolsUiReceipt.Applied) success else zxToolReceiptText(receipt)
+                feedback = zxSkillReceiptText(receipt, success)
                 if (receipt is ToolsUiReceipt.Applied) {
                     onSuccess()
                     generation++
@@ -128,7 +140,7 @@ internal fun ZhaoxiSkillManager(tools: ToolsUiPort) {
                             ?: throw IllegalArgumentException("无法读取技能文件")
                     }
                     val receipt = tools.submit(ToolsUiCommand.ImportSkill(fileName, data))
-                    feedback = if (receipt is ToolsUiReceipt.Applied) "技能已安装，可在列表查看" else zxToolReceiptText(receipt)
+                    feedback = zxSkillReceiptText(receipt, "技能已安装，可在列表查看")
                     if (receipt is ToolsUiReceipt.Applied) generation++
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
