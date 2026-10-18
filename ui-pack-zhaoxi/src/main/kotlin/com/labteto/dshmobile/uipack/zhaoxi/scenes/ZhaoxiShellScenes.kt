@@ -1,5 +1,29 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxIcon
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxIconButton
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxModeSwitch
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -44,7 +68,7 @@ import com.labteto.dshmobile.uihost.UiSceneRenderScope
  * shell.onboarding/empty/error 为静态壳页。
  */
 
-/** route.home / shell.new_session — 会话列表。 */
+/** route.home / shell.new_session — E8.17 navigation hierarchy: conversation entry + drawer. */
 @Composable
 fun ZhaoxiHomeScene(
     sessions: SessionUiPort?,
@@ -54,35 +78,228 @@ fun ZhaoxiHomeScene(
         ?: kotlinx.coroutines.flow.flowOf(UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null)))
         .collectAsState(initial = UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null))
     var commandReceipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
-    ZxPage("朝夕", onBack = { scope.onBack() }) {
-        CommandFeedback(commandReceipt)
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ZxChip("＋ 新会话", false) {
-                commandReceipt = sessions?.submit(SessionUiCommand.Create(snap.identity, LocalConversationMode.INDEPENDENT, LocalUsageMode.CHAT))
-                // The Host opens the requested route after the Session owner activates it.
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val drawerScope = rememberCoroutineScope()
+    val c = ZhaoxiTheme.colors
+    val workMode = snap.usageMode == LocalUsageMode.WORK
+    fun create(mode: LocalUsageMode) {
+        commandReceipt = sessions?.submit(SessionUiCommand.Create(snap.identity, LocalConversationMode.INDEPENDENT, mode))
+        drawerScope.launch { drawerState.close() }
+    }
+    fun openSession(id: String) {
+        commandReceipt = sessions?.submit(SessionUiCommand.Open(id))
+        drawerScope.launch { drawerState.close() }
+    }
+    fun navigate(target: String) {
+        scope.onNavigate(UiSceneId(target))
+        drawerScope.launch { drawerState.close() }
+    }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
+                modifier = Modifier.width(296.dp),
+                drawerContainerColor = c.side,
+            ) {
+                Column(Modifier.fillMaxHeight().padding(horizontal = 12.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("朝夕", Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
+                        ZxIconButton(
+                            onClick = { drawerScope.launch { drawerState.close() } },
+                            contentDescription = "关闭侧栏",
+                        ) { ZxIcon("back") }
+                    }
+                    ZxHomeDrawerEntry("plus", "新会话", onClick = { create(LocalUsageMode.CHAT) })
+                    ZxHomeDrawerEntry("tasks", "新工作", onClick = { create(LocalUsageMode.WORK) })
+                    ZxHomeDrawerEntry("search", "搜索人物、会话、任务、文件", onClick = { navigate("shell.search") })
+                    Spacer(Modifier.height(12.dp))
+                    ZxModeSwitch(workMode) { selectedWork ->
+                        commandReceipt = sessions?.submit(SessionUiCommand.SelectMode(if (selectedWork) LocalUsageMode.WORK else LocalUsageMode.CHAT))
+                        drawerScope.launch { drawerState.close() }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        item {
+                            Text("快捷操作", fontSize = 11.sp, color = c.ink2, fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+                        }
+                        if (workMode) {
+                            item { ZxHomeDrawerEntry("files", "工作区文件", onClick = { navigate("route.workspace") }) }
+                            item { ZxHomeDrawerEntry("tasks", "定时任务", onClick = { navigate("route.tasks") }) }
+                            item { ZxHomeDrawerEntry("tools", "工具", onClick = { navigate("route.tools") }) }
+                        } else {
+                            item { ZxHomeDrawerEntry("people", "人物图集", onClick = { navigate("route.persona_gallery") }) }
+                            item { ZxHomeDrawerEntry("diary", "日记", onClick = { navigate("route.diary") }) }
+                            item { ZxHomeDrawerEntry("tasks", "聊天任务", onClick = { navigate("route.tasks") }) }
+                        }
+                        item {
+                            Spacer(Modifier.height(10.dp))
+                            Text("最近会话", fontSize = 11.sp, color = c.ink2, fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+                        }
+                        if (snap.sessions.isEmpty()) {
+                            item {
+                                Text("尚无会话，点击上方「新会话」开始",
+                                    fontSize = 12.sp, color = c.ink2, modifier = Modifier.padding(12.dp))
+                            }
+                        }
+                        items(snap.sessions, key = { it.id }) { session ->
+                            ZxHomeDrawerEntry(
+                                "diary", session.title.take(40),
+                                selected = snap.identity?.sessionId == session.id,
+                                detail = session.summaryPreview.orEmpty().take(48),
+                                onClick = { openSession(session.id) },
+                            )
+                        }
+                    }
+                    ZxHomeDrawerEntry("settings", "设置", onClick = { navigate("route.settings") })
+                    Spacer(Modifier.height(12.dp))
+                }
             }
-            ZxChip("＋ 工作", false) {
-                commandReceipt = sessions?.submit(SessionUiCommand.Create(snap.identity, LocalConversationMode.INDEPENDENT, LocalUsageMode.WORK))
-                // Route after activation through the Host.
+        },
+    ) {
+        ZxPage(
+            title = "朝夕",
+            menu = true,
+            onBack = { drawerScope.launch { drawerState.open() } },
+            topRight = {
+                ZxModeSwitch(workMode) { selectedWork ->
+                    commandReceipt = sessions?.submit(SessionUiCommand.SelectMode(if (selectedWork) LocalUsageMode.WORK else LocalUsageMode.CHAT))
+                }
+            },
+        ) {
+            CommandFeedback(commandReceipt)
+            Spacer(Modifier.height(28.dp))
+            Text(if (workMode) "开始一项工作" else "开启一段对话",
+                fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                if (workMode) "描述目标，朝夕会带着上下文继续执行。" else "选择一段会话继续，或从这里开始新的聊天。",
+                fontSize = 13.sp, color = c.ink2, lineHeight = 20.sp,
+            )
+            Spacer(Modifier.height(24.dp))
+            ZxHomeAction(
+                icon = if (workMode) "tasks" else "plus",
+                title = if (workMode) "新工作" else "新会话",
+                detail = if (workMode) "创建新的工作会话" else "开始新的聊天会话",
+                prominent = true,
+            ) { create(if (workMode) LocalUsageMode.WORK else LocalUsageMode.CHAT) }
+            Spacer(Modifier.height(10.dp))
+            ZxHomeAction(
+                icon = if (workMode) "plus" else "tasks",
+                title = if (workMode) "新会话" else "新工作",
+                detail = if (workMode) "创建普通聊天会话" else "开始一项新任务",
+                prominent = false,
+            ) { create(if (workMode) LocalUsageMode.CHAT else LocalUsageMode.WORK) }
+            Spacer(Modifier.height(30.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("最近会话", Modifier.weight(1f), fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold, color = c.ink)
+                ZxIconButton(
+                    onClick = { drawerScope.launch { drawerState.open() } },
+                    contentDescription = "查看全部会话",
+                ) { ZxIcon("menu") }
             }
-            ZxChip("搜索", false) { scope.onNavigate(UiSceneId("shell.search")) }
+            Spacer(Modifier.height(8.dp))
+            if (snap.sessions.isEmpty() && !snap.loading) {
+                ZxEmpty("还没有会话", "点击「新会话」开始")
+            }
+            snap.sessions.take(6).forEach { session ->
+                ZxHomeDrawerEntry(
+                    icon = "diary",
+                    title = session.title.take(40),
+                    detail = session.summaryPreview.orEmpty().take(56),
+                    selected = snap.identity?.sessionId == session.id,
+                    onClick = { openSession(session.id) },
+                )
+            }
+            Spacer(Modifier.height(24.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ZxHomeShortcut("people", "人物") { navigate("route.persona_gallery") }
+                ZxHomeShortcut("files", "文件") { navigate("route.workspace") }
+                ZxHomeShortcut("tools", "工具") { navigate("route.tools") }
+                ZxHomeShortcut("settings", "设置") { navigate("route.settings") }
+            }
+            Spacer(Modifier.height(24.dp))
         }
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            ZxChip("聊天", false) { commandReceipt = sessions?.submit(SessionUiCommand.SelectMode(LocalUsageMode.CHAT)) }
-            ZxChip("人物", false) { scope.onNavigate(UiSceneId("route.persona_gallery")) }
-            ZxChip("任务", false) { scope.onNavigate(UiSceneId("route.tasks")) }
-            ZxChip("文件", false) { scope.onNavigate(UiSceneId("route.workspace")) }
-            ZxChip("工具", false) { scope.onNavigate(UiSceneId("route.tools")) }
-            ZxChip("设置", false) { scope.onNavigate(UiSceneId("route.settings")) }
+    }
+}
+
+@Composable
+private fun ZxHomeDrawerEntry(
+    icon: String,
+    title: String,
+    detail: String = "",
+    selected: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val c = ZhaoxiTheme.colors
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .background(if (selected) c.bg2 else Color.Transparent)
+            .clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 48.dp).padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ZxIcon(icon)
+        Column(Modifier.weight(1f)) {
+            Text(title, fontSize = 13.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = c.ink, maxLines = 1)
+            if (detail.isNotBlank()) Text(detail, fontSize = 11.sp, color = c.ink2, maxLines = 1)
         }
-        Spacer(Modifier.height(8.dp))
-        if (snap.sessions.isEmpty() && !snap.loading) ZxEmpty("还没有会话", "从一次新会话开始")
-        snap.sessions.forEach { s ->
-            ZxRow(s.title.take(40), s.summaryPreview.orEmpty().take(56),
-                onClick = { commandReceipt = sessions?.submit(SessionUiCommand.Open(s.id)) })
+        if (selected) ZxIcon("check")
+    }
+}
+
+@Composable
+private fun ZxHomeAction(
+    icon: String,
+    title: String,
+    detail: String,
+    prominent: Boolean,
+    onClick: () -> Unit,
+) {
+    val c = ZhaoxiTheme.colors
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
+            .background(if (prominent) c.tint else c.glass)
+            .clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 76.dp).padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        ZxIcon(icon)
+        Column(Modifier.weight(1f)) {
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
+            Spacer(Modifier.height(4.dp))
+            Text(detail, fontSize = 12.sp, color = c.ink2)
         }
+        ZxIcon("chevron-right")
+    }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.ZxHomeShortcut(
+    icon: String,
+    title: String,
+    onClick: () -> Unit,
+) {
+    val c = ZhaoxiTheme.colors
+    Column(
+        Modifier.weight(1f).clip(RoundedCornerShape(14.dp))
+            .background(c.glass)
+            .clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 72.dp).padding(vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        ZxIcon(icon)
+        Text(title, fontSize = 11.sp, color = c.ink)
     }
 }
 
