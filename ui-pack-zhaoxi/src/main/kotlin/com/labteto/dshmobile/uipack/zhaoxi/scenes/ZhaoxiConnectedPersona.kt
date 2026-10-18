@@ -20,7 +20,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 @Composable
-fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAuthoringSnapshot?, scope: UiSceneRenderScope) {
+fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAuthoringSnapshot?, scope: UiSceneRenderScope, initialTab: Int = 0) {
     var encodedDraft by rememberUiPrivateText("zhaoxi.persona.${snapshot?.galleryId ?: "new"}", snapshot?.revision) {
         Json.encodeToString(snapshot?.draft ?: UiPersonaDraft())
     }
@@ -36,8 +36,20 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
     var revision by remember(snapshot?.revision) { mutableStateOf(snapshot?.revision) }
     var galleryId by remember(snapshot?.galleryId) { mutableStateOf(snapshot?.galleryId) }
     val jobs = rememberCoroutineScope()
+    var selectedTab by rememberSaveable(snapshot?.galleryId, initialTab) { mutableIntStateOf(initialTab) }
     ZxPage("人物编辑", onBack = { scope.onBack() }) {
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
+        ZxSection("人物档案")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ZxAvatar(draft.name.ifBlank { "人" }, Modifier.size(48.dp), accent = true)
+            Column {
+                Text(draft.name.ifBlank { "未命名人物" }, color = ZhaoxiTheme.colors.ink)
+                Text(if (galleryId == null) "新建人物 · 尚未归档" else "已关联人物归档", color = ZhaoxiTheme.colors.ink2)
+            }
+        }
+        ZxTabRow(listOf("核心身份", "事实", "世界书", "行为调节"), selectedTab) { selectedTab = it }
+        when (selectedTab) {
+            0 -> {
         ZxField(draft.name, { draft = draft.copy(name = it) }, Modifier.fillMaxWidth(), placeholder = "姓名")
         ZxField(draft.coreIdentity, { draft = draft.copy(coreIdentity = it) }, Modifier.fillMaxWidth(), placeholder = "核心身份")
         ZxField(draft.franchise, { draft = draft.copy(franchise = it) }, Modifier.fillMaxWidth(), placeholder = "作品 / 世界")
@@ -45,14 +57,16 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
             ZxField(draft.fields[field].orEmpty(), { draft = draft.copy(fields = draft.fields + (field to it)) },
                 Modifier.fillMaxWidth(), placeholder = field)
         }
-        ZxSection("事实")
+            }
+            1 -> {
         draft.facts.forEach { fact ->
             ZxField(fact.category, { value -> draft = draft.copy(facts = draft.facts.map { if (it.id == fact.id) it.copy(category = value) else it }) }, placeholder = "类别")
             ZxField(fact.content, { value -> draft = draft.copy(facts = draft.facts.map { if (it.id == fact.id) it.copy(content = value) else it }) }, Modifier.fillMaxWidth(), placeholder = "事实内容")
             ZxChip("移除事实", false) { draft = draft.copy(facts = draft.facts.filterNot { it.id == fact.id }) }
         }
         ZxChip("添加事实", false) { draft = draft.copy(facts = draft.facts + UiPersonaFact(java.util.UUID.randomUUID().toString(), "customFacts", "")) }
-        ZxSection("世界书")
+            }
+            2 -> {
         draft.lore.forEach { lore ->
             ZxField(lore.title, { value -> draft = draft.copy(lore = draft.lore.map { if (it.id == lore.id) it.copy(title = value) else it }) }, placeholder = "标题")
             ZxField(lore.content, { value -> draft = draft.copy(lore = draft.lore.map { if (it.id == lore.id) it.copy(content = value) else it }) }, Modifier.fillMaxWidth(), placeholder = "内容")
@@ -60,11 +74,14 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
             ZxChip("移除条目", false) { draft = draft.copy(lore = draft.lore.filterNot { it.id == lore.id }) }
         }
         ZxChip("添加世界书条目", false) { draft = draft.copy(lore = draft.lore + UiPersonaLore(java.util.UUID.randomUUID().toString(), "", "")) }
-        ZxSection("行为调节")
+            }
+            3 -> {
         ZxField(draft.samplingTemperaturePosition?.toString().orEmpty(), { value ->
             if (value.isEmpty() || value.toIntOrNull()?.let { it in 0..100 } == true) draft = draft.copy(samplingTemperaturePosition = value.toIntOrNull())
         }, placeholder = "采样位置 0–100，留空沿用全局")
         ZxChip("恢复全局采样", false) { draft = draft.copy(samplingTemperaturePosition = null, legacySamplingPosition = null) }
+            }
+        }
         ZxButton("保存归档", { jobs.launch {
             val id = galleryId; val rev = revision
             val result = if (id != null && rev != null) authoring.save(id, rev, draft) else authoring.create(draft)
