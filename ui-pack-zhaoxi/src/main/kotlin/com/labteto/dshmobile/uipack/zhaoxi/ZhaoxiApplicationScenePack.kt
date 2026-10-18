@@ -87,6 +87,7 @@ class ZhaoxiApplicationScenePack(
 
     // Ephemeral selection only: the FilesUiPort remains the data and authorization owner.
     private var workspacePreviewPath by mutableStateOf("")
+    private var selectedGalleryId by mutableStateOf<String?>(null)
 
     // ---- 条件场景集合（镜像 V6ApplicationScenePack）----
 
@@ -336,7 +337,10 @@ class ZhaoxiApplicationScenePack(
             "chat.persona_picker", "chat.gallery", "route.persona_gallery" ->
                 (conv?.gallery ?: sec?.gallery)?.let {
                     ZhaoxiPersonaGalleryScene(it, scope,
-                        onOpenPersona = { scope.onNavigate(UiSceneId("chat.persona_editor")) })
+                        onOpenPersona = { galleryId ->
+                            selectedGalleryId = galleryId
+                            scope.onNavigate(UiSceneId("chat.persona_editor"))
+                        })
                 }
             // 人物子页的图集 id 合法来源 = CurrentPersonaUiPort.read() 的 target.personaId；
             // 端口未注入或无当前人物时显式空态，不伪造目标。
@@ -345,7 +349,7 @@ class ZhaoxiApplicationScenePack(
                 val personaTarget = (sec?.currentPersona?.read() as?
                     com.labteto.dshmobile.uicontract.UiCurrentPersonaReceipt.Loaded)
                     ?.snapshot?.target
-                val gid = personaTarget?.personaId
+                val gid = selectedGalleryId ?: personaTarget?.personaId
                 if (gid == null) ZxEmpty("未指定人物", "请从人物图集进入 · 目标由宿主导航提案携带")
                 else when (scene.value) {
                     "chat.persona_editor", "chat.world_book", "chat.character_tuning" ->
@@ -356,7 +360,9 @@ class ZhaoxiApplicationScenePack(
                         else ZxEmpty("端口未注入", "chat.gallery_portrait 能力未连接")
                     "chat.gallery_delete" ->
                         if (conv?.galleryDeletion != null)
-                            ZxGalleryDeleteScene(conv.galleryDeletion, gid, "当前人物", personaTarget.identity, scope)
+                            if (personaTarget?.personaId == gid)
+                                ZxGalleryDeleteScene(conv.galleryDeletion, gid, "当前人物", personaTarget.identity, scope)
+                            else ZxEmpty("需先选择当前人物", "删除前需取得原业务 Owner 的人物身份授权")
                         else ZxEmpty("端口未注入", "图集删除能力未连接")
                     else ->
                         if (sec?.diary != null) ZhaoxiDiaryScene(sec.diary, gid, scope)
