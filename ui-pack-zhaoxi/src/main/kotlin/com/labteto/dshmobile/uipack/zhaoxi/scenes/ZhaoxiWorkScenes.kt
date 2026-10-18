@@ -92,7 +92,8 @@ fun ZhaoxiRequirementEvidenceScene(
         when (val r = snap) {
             null -> repeat(3) { com.labteto.dshmobile.uipack.zhaoxi.components.ZxSkeleton(com.labteto.dshmobile.uipack.zhaoxi.components.ZxSkeletonVariant.Row, Modifier.padding(vertical = 6.dp)) }
             is UiWorkEvidenceReadReceipt.Available -> {
-                ZxSection("需求清单")
+                ZxSection("需求清单 · ${r.snapshot.requirements.size}")
+                ZxValueRow("已关联证据", value = "${r.snapshot.references.size} 条")
                 r.snapshot.requirements.forEach { req ->
                     ZxRow("「${req.text}」", "需求 #${req.index} · ${req.reportedStatus}") {
                         ZxBadge(req.reportedStatus, ZxBadgeTone.Neutral)
@@ -106,9 +107,30 @@ fun ZhaoxiRequirementEvidenceScene(
                     ZxRow(link.artifactPath.substringAfterLast('/'),
                         "需求 #${link.requirementIndex} · ${if (link.versionNow == null) "文件不可用" else if (link.versionNow == link.versionAtLink) "版本一致" else "文件已变化"}")
                 }
+                if (r.snapshot.artifacts.isNotEmpty()) {
+                    ZxSection("运行产物 · ${r.snapshot.artifacts.size}")
+                    r.snapshot.artifacts.forEach { item ->
+                        ZxRow(item.reference.substringAfterLast('/').ifBlank { item.reference },
+                            "${item.category} · " + when (item.currentlyAvailable) {
+                                true -> "可访问"
+                                false -> "已不可访问"
+                                null -> "未核对当前可用性"
+                            })
+                    }
+                }
                 r.snapshot.machine?.let { m ->
-                    ZxSection("机器核验")
-                    ZxRow("状态", "${m.status} · 缺失 ${m.missing.size} 项")
+                    ZxSection("机器条件核验")
+                    val status = when (m.status) {
+                        com.labteto.dshmobile.uicontract.UiWorkMachineVerificationStatus.NO_MACHINE_CONDITIONS -> "没有可自动核验的条件"
+                        com.labteto.dshmobile.uicontract.UiWorkMachineVerificationStatus.UNSATISFIED -> "仍有未满足的条件"
+                        com.labteto.dshmobile.uicontract.UiWorkMachineVerificationStatus.VERIFIED_CONDITIONS -> "可机检条件已满足"
+                    }
+                    ZxRow("状态", status)
+                    ZxRow("检查范围", "文件条件 ${m.artifactConditionCount} · 命令条件 ${m.commandConditionCount}")
+                    if (m.missing.isNotEmpty()) {
+                        ZxSection("缺失条件 · ${m.missing.size}")
+                        m.missing.forEach { item -> ZxRow(item, "") }
+                    }
                 }
             }
             is UiWorkEvidenceReadReceipt.Rejected ->

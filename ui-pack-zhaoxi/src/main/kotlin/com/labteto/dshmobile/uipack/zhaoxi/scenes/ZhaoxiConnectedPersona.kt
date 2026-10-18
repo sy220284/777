@@ -9,6 +9,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.uicontract.*
 import com.labteto.dshmobile.uipack.zhaoxi.components.*
@@ -18,6 +19,30 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+
+/** 设计包 E8.18：字段标签始终可见，存储键保持原契约不变。 */
+private fun personaFieldTitle(key: String): String = when (key) {
+    "opening" -> "开场对白"
+    "personality" -> "性格特征"
+    "valuesAndTradeoffs" -> "价值取向与取舍"
+    "selfNarrative" -> "自我认知"
+    "subjectiveBeliefs" -> "主观信念"
+    "identityGap" -> "身份认知差异"
+    "preferencesAndHabits" -> "喜好与习惯"
+    "voiceStyle" -> "说话风格"
+    "biography" -> "人物经历"
+    "relationships" -> "人物关系"
+    "customFacts" -> "补充事实"
+    else -> key
+}
+
+@Composable
+private fun ZhaoxiPersonaField(title: String, value: String, onChange: (String) -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, color = ZhaoxiTheme.colors.ink2, fontSize = 13.sp)
+        ZxField(value, onChange, Modifier.fillMaxWidth(), placeholder = "填写$title")
+    }
+}
 
 @Composable
 fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAuthoringSnapshot?, scope: UiSceneRenderScope, initialTab: Int = 0) {
@@ -50,16 +75,18 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
         ZxTabRow(listOf("核心身份", "事实", "世界书", "行为调节"), selectedTab) { selectedTab = it }
         when (selectedTab) {
             0 -> {
-        ZxField(draft.name, { draft = draft.copy(name = it) }, Modifier.fillMaxWidth(), placeholder = "姓名")
-        ZxField(draft.coreIdentity, { draft = draft.copy(coreIdentity = it) }, Modifier.fillMaxWidth(), placeholder = "核心身份")
-        ZxField(draft.franchise, { draft = draft.copy(franchise = it) }, Modifier.fillMaxWidth(), placeholder = "作品 / 世界")
+        ZhaoxiPersonaField("姓名", draft.name) { draft = draft.copy(name = it) }
+        ZhaoxiPersonaField("核心身份", draft.coreIdentity) { draft = draft.copy(coreIdentity = it) }
+        ZhaoxiPersonaField("作品 / 世界", draft.franchise) { draft = draft.copy(franchise = it) }
         (listOf("opening") + UI_PERSONA_FACT_FIELDS + draft.fields.keys).distinct().forEach { field ->
-            ZxField(draft.fields[field].orEmpty(), { draft = draft.copy(fields = draft.fields + (field to it)) },
-                Modifier.fillMaxWidth(), placeholder = field)
+            ZhaoxiPersonaField(personaFieldTitle(field), draft.fields[field].orEmpty()) { value ->
+                draft = draft.copy(fields = draft.fields + (field to value))
+            }
         }
             }
             1 -> {
-        draft.facts.forEach { fact ->
+        draft.facts.forEachIndexed { index, fact ->
+            ZxSection("事实 ${index + 1}")
             ZxField(fact.category, { value -> draft = draft.copy(facts = draft.facts.map { if (it.id == fact.id) it.copy(category = value) else it }) }, placeholder = "类别")
             ZxField(fact.content, { value -> draft = draft.copy(facts = draft.facts.map { if (it.id == fact.id) it.copy(content = value) else it }) }, Modifier.fillMaxWidth(), placeholder = "事实内容")
             ZxChip("移除事实", false) { draft = draft.copy(facts = draft.facts.filterNot { it.id == fact.id }) }
@@ -67,7 +94,8 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
         ZxChip("添加事实", false) { draft = draft.copy(facts = draft.facts + UiPersonaFact(java.util.UUID.randomUUID().toString(), "customFacts", "")) }
             }
             2 -> {
-        draft.lore.forEach { lore ->
+        draft.lore.forEachIndexed { index, lore ->
+            ZxSection("世界书条目 ${index + 1}")
             ZxField(lore.title, { value -> draft = draft.copy(lore = draft.lore.map { if (it.id == lore.id) it.copy(title = value) else it }) }, placeholder = "标题")
             ZxField(lore.content, { value -> draft = draft.copy(lore = draft.lore.map { if (it.id == lore.id) it.copy(content = value) else it }) }, Modifier.fillMaxWidth(), placeholder = "内容")
             ZxField(lore.keywords.joinToString("、"), { value -> draft = draft.copy(lore = draft.lore.map { if (it.id == lore.id) it.copy(keywords = value.split("、").filter(String::isNotBlank)) else it }) }, placeholder = "关键词（顿号分隔）")

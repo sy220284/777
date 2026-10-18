@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -36,11 +38,14 @@ fun ZhaoxiUsageOverviewScene(usage: UsageUiPort, scope: UiSceneRenderScope, mode
     ZxPage(if (modelOnly) "模型用量" else "用量统计", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("按模型")
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             ZxChip("全部", selectedModel == null) { selectedModel = null; selectedGroup = null }
-        }
-        source.byModel.keys.sorted().forEach { id ->
-            ZxChip(id, selectedModel == id) { selectedModel = id; selectedGroup = null }
+            source.byModel.keys.sorted().forEach { id ->
+                ZxChip(id, selectedModel == id) { selectedModel = id; selectedGroup = null }
+            }
         }
         ZxSection("用量总览")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -105,9 +110,14 @@ fun ZhaoxiUsageLogScene(
     ZxPage("用量日志", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("模型筛选")
-        ZxChip("全部", selectedModel == null) { selectedModel = null }
-        source.byModel.keys.sorted().forEach { model ->
-            ZxChip(model, selectedModel == model) { selectedModel = model }
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ZxChip("全部", selectedModel == null) { selectedModel = null }
+            source.byModel.keys.sorted().forEach { model ->
+                ZxChip(model, selectedModel == model) { selectedModel = model }
+            }
         }
         ZxSection("最近请求")
         if (current.recentRecords.isEmpty()) ZxEmpty("暂无请求记录", "完成模型请求后可查看明细")
