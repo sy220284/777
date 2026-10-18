@@ -57,6 +57,7 @@ internal class LocalHostPreferencesUiAdapter @Inject constructor(
             componentEmphasis = prefs.componentEmphasis, motionScale = prefs.motionDurationScale,
             adaptiveContrast = prefs.backgroundAdaptiveContrast,
             presetWallpaperEnabled = prefs.presetWallpaperEnabled,
+            selectedWallpaperPreset = prefs.selectedWallpaperPreset,
             notifyJobs = prefs.notifyLocalJobs, notifyResults = prefs.notifyJobResults,
             notifyFailures = prefs.notifyJobFailures, notifyNeedsAction = prefs.notifyNeedsAction,
             notifyChat = prefs.notifyChatMessages,
@@ -68,6 +69,10 @@ internal class LocalHostPreferencesUiAdapter @Inject constructor(
 
     override suspend fun submit(command: UiHostPreferencesCommand): Boolean {
         hosts.setSetting { current -> when (command) {
+            is UiHostPreferencesCommand.SelectWallpaperPreset -> {
+                require(command.preset == "auto" || Regex("w[0-9]\\.webp").matches(command.preset))
+                current.copy(selectedWallpaperPreset = command.preset, presetWallpaperEnabled = true)
+            }
             is UiHostPreferencesCommand.Appearance -> {
                 require(command.theme in setOf("light", "dark", "matte_black", "system"))
                 require(command.accent.matches(Regex("[a-z0-9_-]{2,50}")))
