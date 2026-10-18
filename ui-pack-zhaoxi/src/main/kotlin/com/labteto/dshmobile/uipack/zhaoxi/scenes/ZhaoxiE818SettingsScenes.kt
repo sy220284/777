@@ -36,6 +36,7 @@ internal fun zxUsageModelNames(configured: List<String>, recorded: Set<String>):
 fun ZhaoxiUsageOverviewScene(
     usage: UsageUiPort, scope: UiSceneRenderScope, modelOnly: Boolean = false,
     settings: SettingsUiPort? = null,
+    onOpenLog: ((String?) -> Unit)? = null,
 ) {
     val revision by usage.revision.collectAsState()
     val source = remember(revision, usage) { usage.snapshot() }
@@ -115,8 +116,9 @@ fun ZhaoxiUsageOverviewScene(
                 ZxValueRow("请求", value = detail.aggregate.requestCount.toString())
             }
         }
-        ZxNavRow("用量日志", sub = "逐次请求记录与用量明细") {
-            scope.onNavigate(UiSceneId("settings.usage_log"))
+        ZxNavRow("用量日志", sub = "逐次请求记录与用量明细，保留当前模型筛选") {
+            if (onOpenLog != null) onOpenLog(selectedModel)
+            else scope.onNavigate(UiSceneId("settings.usage_log"))
         }
     }
 }
@@ -138,15 +140,16 @@ fun ZhaoxiUsageLogScene(
     usage: UsageUiPort,
     scope: UiSceneRenderScope,
     openRequest: (String) -> Unit,
+    initialModel: String? = null,
 ) {
     val revision by usage.revision.collectAsState()
     val source = remember(usage, revision) { usage.snapshot() }
-    var selectedModel by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedModel by rememberSaveable(initialModel) { mutableStateOf(initialModel) }
     var timeWindowDays by rememberSaveable { mutableIntStateOf(0) }
     var visibleLimit by rememberSaveable { mutableIntStateOf(25) }
     val nowMillis = remember(revision) { System.currentTimeMillis() }
     val selectedRecords = zxUsageWindowRecords(
-        (selectedModel?.let { source.byModel[it] } ?: source).recentRecords,
+        (selectedModel?.let { source.byModel[it] ?: TokenUsageAnalyticsSnapshot() } ?: source).recentRecords,
         nowMillis, timeWindowDays,
     )
     ZxPage("用量日志", onBack = { scope.onBack() }) {
