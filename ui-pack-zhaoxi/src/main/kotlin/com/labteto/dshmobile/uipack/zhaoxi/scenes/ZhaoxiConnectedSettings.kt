@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
@@ -542,6 +543,29 @@ fun ZhaoxiStorageScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     }
 }
 
+/** Scope-qualified search is resolved by the Memory Owner before any UI pagination. */
+internal fun zxScopedMemoryQuery(
+    scope: MemoryScope,
+    context: com.labteto.dshmobile.local.presentation.LocalSettingsMemoryContext?,
+    text: String,
+    kind: MemoryKind?,
+    cursor: MemoryManagementCursor?,
+): MemoryManagementQuery {
+    require(scope != MemoryScope.LINEAGE || !context?.lineageId.isNullOrBlank()) {
+        "当前没有可访问的会话线记忆"
+    }
+    require(scope != MemoryScope.PROJECT || !context?.projectId.isNullOrBlank()) {
+        "当前没有可访问的项目记忆"
+    }
+    return MemoryManagementQuery(
+        scopes = setOf(scope), text = text,
+        lineageId = if (scope == MemoryScope.LINEAGE) context?.lineageId else null,
+        projectId = if (scope == MemoryScope.PROJECT) context?.projectId else null,
+        kinds = kind?.let(::setOf) ?: MemoryKind.entries.toSet(),
+        cursor = cursor,
+    )
+}
+
 @Composable
 fun ZhaoxiMemoryManagementScene(memory: MemoryUiPort, scope: UiSceneRenderScope,
     settings: SettingsUiPort? = null) {
@@ -558,11 +582,8 @@ fun ZhaoxiMemoryManagementScene(memory: MemoryUiPort, scope: UiSceneRenderScope,
     val selectedScope = scopeFilter.takeIf { it in available } ?: MemoryScope.GLOBAL
     var cursor by remember(query, kindFilter, selectedScope) { mutableStateOf<MemoryManagementCursor?>(null) }
     val page = remember(memory, query, selectedScope, kindFilter, revision, cursor, context) {
-        memory.memoryPage(MemoryManagementQuery(
-            scopes = setOf(selectedScope), text = query,
-            lineageId = if (selectedScope == MemoryScope.LINEAGE) context?.lineageId else null,
-            projectId = if (selectedScope == MemoryScope.PROJECT) context?.projectId else null,
-            kinds = kindFilter?.let(::setOf) ?: MemoryKind.entries.toSet(), cursor = cursor))
+        memory.memoryPage(zxScopedMemoryQuery(
+            selectedScope, context, query, kindFilter, cursor))
     }
     var selectedRecordId by remember { mutableStateOf<String?>(null) }
     var editingDirty by remember { mutableStateOf(false) }
