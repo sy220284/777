@@ -129,35 +129,116 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
 }
 
 @Composable
+/** Dedicated account management, separate from API model configuration. */
 fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val snap by settings.chatGptState.collectAsState()
     val jobs = rememberCoroutineScope()
     var status by remember { mutableStateOf<String?>(null) }
-    var pendingRemoveAccount by remember { mutableStateOf<String?>(null) }
-    fun execute(action: suspend () -> Unit) { jobs.launch {
-        try { action() } catch (cancelled: CancellationException) { throw cancelled }
-        catch (failure: Exception) { status = failure.message ?: "账户操作失败" }
-    } }
-    ZxPage("ChatGPT 账户", onBack = { scope.onBack() }) {
-        Text(snap.phase.name, color = ZhaoxiTheme.colors.ink)
+    var busy by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf<String?>(null) }
+    var removeConfirm by remember { mutableStateOf<String?>(null) }
+    var disconnectConfirm by remember { mutableStateOf<String?>(null) }
+    fun execute(action: suspend () -> String?) {
+        if (busy) return
+        busy = true
+        jobs.launch {
+            try { status = action() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { status = failure.message ?: "账户操作未完成，请核对状态后重试" }
+            finally { busy = false }
+        }
+    }
+    ZxPage("账户管理", onBack = { scope.onBack() }) {
+        Spacer(Modifier.height(8.dp))
+        ZxSection("连接状态")
+        val phaseLabel = when (snap.phase) {
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.DISCONNECTED -> "未连接"
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.PREPARING -> "准备授权"
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.WAITING_FOR_BROWSER -> "等待浏览器授权"
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.EXCHANGING_CODE -> "正在验证登录"
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.VALIDATING_IDENTITY -> "正在核实账户"
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.LOADING_MODELS -> "正在读取可用模型"
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.CONNECTED -> "已连接"
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.UNVERIFIED -> "账户待验证"
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.ERROR -> "连接失败"
+        }
+        ZxValueRow("ChatGPT 连接", value = phaseLabel)
+        ZxValueRow("已保存账户", value = "${snap.accounts.size} 个")
+        snap.selectedAccount?.let { ZxValueRow("当前账户", value =
+            it.displayName ?: it.email ?: "已选账户") }
         (status ?: snap.error)?.let { ZxBanner(it, ZxTone.Warn) }
+        if (busy) ZxFooterNote("正在请求账户 Owner，完成前不会重复提交")
+        ZxSection("账户操作")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ZxButton("添加账户", { execute {
+                settings.connectChatGpt()
+                "授权流程已发起，请在系统浏览器完成操作"
+            } }, Modifier.weight(1f), enabled = !busy)
+            ZxButton("刷新账户", { execute {
+                settings.refreshChatGpt()
+                "已重新读取账户状态"
+            } }, Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
+        }
+        ZxNavRow("查看本地模型用量",
+            sub = "查看已记录的 Token 和估算费用；此处不代表 ChatGPT 平台套餐剩余额度") {
+            scope.onNavigate(UiSceneId("settings.model_usage"))
+        }
+        if (snap.pendingAccountId != null) ZxButton("取消进行中的授权", {
+            execute { settings.cancelChatGptAuthorization(); "取消授权请求已发出" }
+        }, variant = ZxButtonVariant.Outline, enabled = !busy)
+        ZxSection("已有账户")
+        if (snap.accounts.isEmpty()) ZxEmpty("还没有账户", "点击添加账户，使用浏览器完成授权")
         snap.accounts.forEach { account ->
+            val active = snap.selectedAccountId == account.id
             ZxRow(account.displayName ?: account.email ?: account.id,
-                if (snap.selectedAccountId == account.id) "当前账户" else "",
-                onClick = { execute { settings.selectChatGptAccount(account.id) } })
-            ZxButton("测试连接", { execute { status = settings.testChatGptAccount(account.id) } })
-            ZxButton("断开连接", { execute { status = settings.disconnectChatGptAccount(account.id) } })
-            ZxButton("移除账户", { pendingRemoveAccount = account.id }, variant = ZxButtonVariant.Danger)
+                (if (active) "当前使用" else "其他账户") + " · " +
+                    (if (account.signedIn) "已授权" else "授权失效"),
+                onClick = { expanded = if (expanded == account.id) null else account.id },
+                trailing = {
+                    ZxChip(if (expanded == account.id) "收起" else "管理",
+                        expanded == account.id) {
+                        expanded = if (expanded == account.id) null else account.id
+                    }
+                })
+            if (expanded == account.id) {
+                ZxValueRow("登录", value = if (account.signedIn) "已登录" else "需要重新授权")
+                ZxValueRow("共享访问", value = if (account.sharingEnabled) "已启用" else "未启用")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ZxButton("使用此账户", { execute {
+                        settings.selectChatGptAccount(account.id)
+                        "已提交账户切换，请以当前账户标记为准"
+                    } }, Modifier.weight(1f), enabled = !busy && !active)
+                    ZxButton("重新连接", { execute {
+                        settings.restartChatGptAuthorization(account.id)
+                        "重新授权流程已发起"
+                    } }, Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ZxButton("测试连接", { execute { settings.testChatGptAccount(account.id) } },
+                        Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
+                    ZxButton("断开连接", { disconnectConfirm = account.id },
+                        Modifier.weight(1f), variant = ZxButtonVariant.Danger, enabled = !busy)
+                }
+                ZxButton("移除本地账户", { removeConfirm = account.id },
+                    Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline, enabled = !busy)
+            }
         }
-        pendingRemoveAccount?.let { id ->
-            ZxDialog("移除账户？", "将解除此账户的本地连接。", "移除", {
-                pendingRemoveAccount = null
-                execute { status = settings.removeChatGptAccount(id) }
-            }, { pendingRemoveAccount = null })
-        }
-        ZxButton("连接 ChatGPT", { execute { settings.connectChatGpt() } })
-        ZxButton("刷新账户与模型", { execute { settings.refreshChatGpt() } })
-        if (snap.pendingAccountId != null) ZxButton("取消授权", { execute { settings.cancelChatGptAuthorization() } })
+    }
+    disconnectConfirm?.let { id ->
+        ZxDialog("断开账户连接？",
+            "此账户将失去当前的可用授权，其他本地账户仍然保留。",
+            "断开", {
+                disconnectConfirm = null
+                execute { settings.disconnectChatGptAccount(id) ?: "已提交断开请求" }
+            }, { disconnectConfirm = null })
+    }
+    removeConfirm?.let { id ->
+        ZxDialog("移除本地账户？",
+            "移除后需要再次添加和授权；不会删除 ChatGPT 平台上的账户。",
+            "移除", {
+                removeConfirm = null
+                execute { settings.removeChatGptAccount(id) ?: "已提交移除请求" }
+            }, { removeConfirm = null })
     }
 }
 
