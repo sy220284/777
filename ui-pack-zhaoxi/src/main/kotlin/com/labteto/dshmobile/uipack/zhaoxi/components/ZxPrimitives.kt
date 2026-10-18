@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -176,6 +177,7 @@ fun ZxField(
     errorMessage: String? = null,
     textStyle: TextStyle = TextStyle(fontSize = 14.sp),
     visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
 ) {
     val c = ZhaoxiTheme.colors
     val source = remember { MutableInteractionSource() }
@@ -195,6 +197,7 @@ fun ZxField(
             onValueChange = onValueChange,
             textStyle = textStyle.copy(color = c.ink),
             visualTransformation = visualTransformation,
+            keyboardOptions = keyboardOptions,
             interactionSource = source,
             cursorBrush = SolidColor(c.accentInk),
             modifier = Modifier.fillMaxWidth().semantics {
