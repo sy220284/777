@@ -366,7 +366,7 @@ class ZhaoxiApplicationScenePack(
                 val snapshot by modelOwner.state.collectAsState(initial = modelOwner.initialState)
                 ZhaoxiModelPickerScene(snapshot.modelProfiles.map { profile ->
                     Triple(profile.id, profile.displayName ?: profile.model, snapshot.modelSelection.isActive(profile))
-                }, { modelOwner.submit(SettingsUiCommand.SelectModel(it)); scope.onBack() },
+                }, { modelOwner.submit(SettingsUiCommand.SelectModel(it)) },
                     { scope.onNavigate(UiSceneId("settings.models")) }, scope)
             }
             "conversation.ui_document" -> conv?.documents?.let { ZhaoxiUiDocumentScene(it, scope, ::currentDocumentContext, manifest.scenes, { conversations?.work?.snapshot()?.approval?.pendingId }, conv?.media) }
