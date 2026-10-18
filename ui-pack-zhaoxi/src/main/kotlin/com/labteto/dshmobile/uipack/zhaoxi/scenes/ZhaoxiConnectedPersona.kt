@@ -345,6 +345,12 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
     var chosenSuggestionFields by remember { mutableStateOf(emptySet<Int>()) }
     var activeStoryId by remember(galleryId) { mutableStateOf<String?>(null) }
     var confirmDeleteStory by remember { mutableStateOf<String?>(null) }
+    var showStoryHistory by remember(activeStoryId) { mutableStateOf(false) }
+    var historyMessages by remember(activeStoryId) { mutableStateOf(emptyList<UiMessageSnapshot>()) }
+    var historyCursor by remember(activeStoryId) { mutableStateOf<String?>(null) }
+    var historyLoadStarted by remember(activeStoryId) { mutableStateOf(false) }
+    var historyHasMore by remember(activeStoryId) { mutableStateOf(true) }
+    var historyLoading by remember(activeStoryId) { mutableStateOf(false) }
     var pendingSwitch by remember { mutableStateOf<(() -> Unit)?>(null) }
     val activeStory = entry?.stories?.firstOrNull { it.id == activeStoryId }
     var title by remember(galleryId, activeStoryId) { mutableStateOf(activeStory?.title.orEmpty()) }
@@ -415,6 +421,80 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
                     }, enabled = snap?.canStartStory == true && !busy)
                     ZxButton("返回故事列表", { protectThen { activeStoryId = null } },
                         variant = ZxButtonVariant.Outline)
+                }
+                if (gallery != null) {
+                    ZxButton(if (showStoryHistory) "收起对话历史" else "查看这条故事的对话历史", {
+                        showStoryHistory = !showStoryHistory
+                        if (showStoryHistory && !historyLoadStarted && !historyLoading) {
+                            historyLoading = true
+                            jobs.launch {
+                                try {
+                                    when (val page = gallery.history(galleryId, activeStory.id)) {
+                                        is UiPersonaGalleryHistoryReceipt.Available -> {
+                                            historyMessages = page.page.messages
+                                            historyCursor = page.page.olderCursor
+                                            historyHasMore = page.page.olderCursor != null
+                                            historyLoadStarted = true
+                                        }
+                                        UiPersonaGalleryHistoryReceipt.Missing -> status = "故事历史已经不存在"
+                                        UiPersonaGalleryHistoryReceipt.Stale -> status = "故事记录已变化，请重新打开查看"
+                                        is UiPersonaGalleryHistoryReceipt.Failed -> status = page.message ?: "故事历史读取失败"
+                                    }
+                                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                                catch (failure: Exception) { status = "读取故事对话失败" }
+                                finally { historyLoading = false }
+                            }
+                        }
+                    }, variant = ZxButtonVariant.Outline, enabled = !historyLoading)
+                    if (showStoryHistory) {
+                        ZxSection("此故事的历史对话")
+                        if (historyLoading) ZxFooterNote("正在读取真实历史记录…")
+                        if (!historyLoading && historyLoadStarted && historyMessages.isEmpty())
+                            ZxEmpty("没有历史对白", "这条故事尚无保存的消息")
+                        historyMessages.takeLast(80).forEach { message ->
+                            ZxRow(
+                                when (message.role) {
+                                    UiMessageRole.USER -> "用户"
+                                    UiMessageRole.ASSISTANT -> "人物 / 助手"
+                                    UiMessageRole.SYSTEM -> "系统"
+                                    UiMessageRole.TOOL -> "工具"
+                                },
+                                message.text.take(500).ifBlank { "此消息没有可展示的文本" },
+                                showChevron = false,
+                            )
+                        }
+                        if (historyLoadStarted && historyHasMore) {
+                            ZxButton("加载更早的对话", {
+                                if (!historyLoading) {
+                                    historyLoading = true
+                                    jobs.launch {
+                                        try {
+                                            when (val page = gallery.history(galleryId, activeStory.id, historyCursor)) {
+                                                is UiPersonaGalleryHistoryReceipt.Available -> {
+                                                    historyMessages = (page.page.messages + historyMessages)
+                                                        .distinctBy { it.id }.takeLast(160)
+                                                    historyCursor = page.page.olderCursor
+                                                    historyHasMore = page.page.olderCursor != null
+                                                }
+                                                UiPersonaGalleryHistoryReceipt.Stale -> {
+                                                    status = "故事历史发生变化，请关闭后重新读取"
+                                                    historyHasMore = false
+                                                }
+                                                UiPersonaGalleryHistoryReceipt.Missing -> {
+                                                    status = "故事已经不存在，请刷新"
+                                                    historyHasMore = false
+                                                }
+                                                is UiPersonaGalleryHistoryReceipt.Failed ->
+                                                    status = page.message ?: "加载更早记录失败"
+                                            }
+                                        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                                        catch (failure: Exception) { status = "历史分页失败，可再次重试" }
+                                        finally { historyLoading = false }
+                                    }
+                                }
+                            }, enabled = !historyLoading, loading = historyLoading)
+                        }
+                    }
                 }
                 ZhaoxiPersonaField("故事标题", title) { title = it }
                 ZhaoxiPersonaField("剧情阶段", stage) { stage = it }
