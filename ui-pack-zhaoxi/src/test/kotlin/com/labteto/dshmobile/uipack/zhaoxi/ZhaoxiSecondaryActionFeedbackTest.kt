@@ -10,6 +10,10 @@ import com.labteto.dshmobile.uicontract.UiAttachmentReceipt
 import com.labteto.dshmobile.uicontract.UiCommandRejection
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxImportFeedback
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxAttachmentFeedback
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxGroupMemberCountError
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxAnnouncementLengthError
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 /** Keep user-visible archive messages independent of Kotlin sealed-class formatting. */
@@ -41,6 +45,19 @@ class ZhaoxiSecondaryActionFeedbackTest {
         assertEquals("文件已损坏", UiAttachmentReceipt.Failed("文件已损坏").zxAttachmentFeedback())
         val rejected = UiAttachmentReceipt.Rejected(UiCommandRejection.UNSUPPORTED).zxAttachmentFeedback()
         assertFalse(rejected.contains("UiAttachmentReceipt"))
+    }
+
+    @Test fun groupMemberSelectionUsesExactOwnerMinMax() {
+        assertNotNull(zxGroupMemberCountError(1, 2, 6))
+        assertNull(zxGroupMemberCountError(2, 2, 6))
+        assertNull(zxGroupMemberCountError(6, 2, 6))
+        assertNotNull(zxGroupMemberCountError(7, 2, 6))
+    }
+
+    @Test fun groupAnnouncementRespectsOwnerCharacterLimit() {
+        assertNull(zxAnnouncementLengthError(0, 2000))
+        assertNull(zxAnnouncementLengthError(2000, 2000))
+        assertEquals("公告不能超过 2000 字", zxAnnouncementLengthError(2001, 2000))
     }
 
 }
