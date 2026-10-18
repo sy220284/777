@@ -548,6 +548,8 @@ fun ZhaoxiToolsScene(
     var busy by remember { mutableStateOf(false) }
     var refresh by remember { mutableStateOf(0) }
     var expandedFamily by rememberSaveable { mutableStateOf<String?>(null) }
+    var skillQuery by rememberSaveable { mutableStateOf("") }
+    var pluginQuery by rememberSaveable { mutableStateOf("") }
     fun submitConfiguration(command: ToolsUiCommand, clearTokenOnSuccess: Boolean = false) {
         if (busy) return
         co.launch {
@@ -567,7 +569,7 @@ fun ZhaoxiToolsScene(
     val catalogue = remember(tools) { tools.capabilityCatalogue() }
     val plugins = remember(tools, refresh) { tools.pluginLifecycleSnapshots() }
     val installedIds = remember(tools, refresh) { tools.installedPluginIds() }
-    val skills by produceState(initialValue = emptyList<com.labteto.dshmobile.uicontract.UiSkillSnapshot>(), tools) {
+    val skills by produceState<List<com.labteto.dshmobile.uicontract.UiSkillSnapshot>?>(null, tools) {
         value = tools.installedSkills()
     }
     val servers by produceState(initialValue = emptyList<com.labteto.dshmobile.uicontract.UiMcpServerSnapshot>(), tools, refresh) {
@@ -618,15 +620,31 @@ fun ZhaoxiToolsScene(
             "tools.plugins" -> {
                 ZxSection("已安装插件")
                 ZxValueRow("已安装数量", value = installedIds.size.toString())
-                if (installedIds.isEmpty() && plugins.isEmpty()) ZxEmpty("尚无已安装插件", "插件由当前工具管理能力提供")
-                installedIds.forEach { id ->
+                ZxField(pluginQuery, { pluginQuery = it }, Modifier.fillMaxWidth(),
+                    placeholder = "搜索插件名称或运行状态")
+                val matchingInstalled = installedIds.filter { id ->
+                    val state = plugins.firstOrNull { it.id == id }?.state?.name.orEmpty()
+                    pluginQuery.isBlank() || id.contains(pluginQuery.trim(), ignoreCase = true) ||
+                        state.contains(pluginQuery.trim(), ignoreCase = true)
+                }
+                val matchingOthers = plugins.filter { it.id !in installedIds &&
+                    (pluginQuery.isBlank() ||
+                        it.id.contains(pluginQuery.trim(), ignoreCase = true) ||
+                        it.state.name.contains(pluginQuery.trim(), ignoreCase = true)) }
+                if (installedIds.isEmpty() && plugins.isEmpty())
+                    ZxEmpty("尚无插件", "当前工具服务尚未提供已安装插件")
+                else if (matchingInstalled.isEmpty() && matchingOthers.isEmpty())
+                    ZxEmpty("没有匹配的插件", "尝试搜索其他名称或状态")
+                matchingInstalled.forEach { id ->
                     val lifecycle = plugins.firstOrNull { it.id == id }
                     ZxRow(id, lifecycle?.state?.name ?: "已安装 · 未提供生命周期状态")
                 }
-                plugins.filter { it.id !in installedIds }.forEach { item ->
+                matchingOthers.forEach { item ->
                     ZxRow(item.id, item.state.name)
                 }
-                plugins.filter { it.state == com.labteto.dshmobile.uicontract.UiPluginLifecycleState.FAILED }
+                plugins.filter { it.state == com.labteto.dshmobile.uicontract.UiPluginLifecycleState.FAILED &&
+                        (pluginQuery.isBlank() ||
+                            it.id.contains(pluginQuery.trim(), ignoreCase = true)) }
                     .forEach { item ->
                         ZxButton("恢复 ${item.id}", {
                             submitConfiguration(ToolsUiCommand.RecoverFailedPlugin(item.id))
@@ -687,8 +705,17 @@ fun ZhaoxiToolsScene(
                     }
                 }
                 ZxSection("技能")
-                if (skills.isEmpty()) ZxRow("暂无已安装技能", "当前未读取到技能")
-                skills.forEach { item -> ZxRow(item.displayName, item.description) }
+                ZxField(skillQuery, { skillQuery = it }, Modifier.fillMaxWidth(),
+                    placeholder = "搜索已安装技能及说明")
+                val matchedSkills = skills.orEmpty().filter { item ->
+                    skillQuery.isBlank() ||
+                        item.displayName.contains(skillQuery.trim(), ignoreCase = true) ||
+                        item.description.contains(skillQuery.trim(), ignoreCase = true)
+                }
+                if (skills == null) ZxFooterNote("正在读取已安装技能…")
+                else if (skills.orEmpty().isEmpty()) ZxEmpty("暂无已安装技能", "可在工具连接与扩展中管理支持的能力")
+                else if (matchedSkills.isEmpty()) ZxEmpty("没有匹配的技能", "可修改名称或说明关键词")
+                matchedSkills.forEach { item -> ZxRow(item.displayName, item.description) }
                 ZxSection("连接与扩展")
                 ZxRow("MCP 服务器", "${servers.size} 个已登记连接",
                     onClick = { scope.onNavigate(UiSceneId("tools.mcp")) })
