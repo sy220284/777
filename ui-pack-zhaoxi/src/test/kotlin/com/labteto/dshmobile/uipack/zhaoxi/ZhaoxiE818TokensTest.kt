@@ -3,7 +3,9 @@ package com.labteto.dshmobile.uipack.zhaoxi
 import androidx.compose.ui.graphics.Color
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiHue
 import com.labteto.dshmobile.uipack.zhaoxi.theme.accentFor
+import com.labteto.dshmobile.uipack.zhaoxi.theme.wallpaperVeilAlpha
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** E8.18 设计包 tokens.css 是深色强调色的唯一视觉验收基准。 */
@@ -24,4 +26,16 @@ class ZhaoxiE818TokensTest {
         assertEquals(Color(0xFFA896A7), accentFor(ZhaoxiHue.MAUVE, dark = true).accentInk)
         assertEquals(Color(0xFFB29C86), accentFor(ZhaoxiHue.DUSK, dark = true).accentInk)
     }
+    @Test
+    fun wallpaperVeilAdaptsToRealImageBrightness() {
+        assertEquals(.36f, wallpaperVeilAlpha(.1f, lightMode = true, adaptive = false), .0001f)
+        assertTrue(wallpaperVeilAlpha(.1f, lightMode = true, adaptive = true) >
+            wallpaperVeilAlpha(.9f, lightMode = true, adaptive = true))
+        assertTrue(wallpaperVeilAlpha(.9f, lightMode = false, adaptive = true) >
+            wallpaperVeilAlpha(.1f, lightMode = false, adaptive = true))
+        for (light in listOf(true, false)) for (brightness in listOf(0f, .5f, 1f)) {
+            assertTrue(wallpaperVeilAlpha(brightness, light, adaptive = true) in .38f..0.88f)
+        }
+    }
+
 }
