@@ -313,6 +313,15 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
     val workByTurn = allCardsBySource.mapValues { (_, items) ->
         items.firstOrNull { it.document.isInlineWorkTaskCard() }
     }
+    fun submitDocumentAction(
+        card: UiDocumentSnapshot, actionId: String, fields: Map<String, String>,
+    ): UiDocumentReceipt {
+        if (documents == null || identity == null || card.actions[actionId]?.available != true)
+            return UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+        return documents.submit(identity, UiDocumentActionRequest(
+            documentId = card.document.documentId, revision = card.document.revision,
+            source = card.document.source, actionId = actionId, fields = fields))
+    }
     val streamText = preview?.text?.takeIf { it.isNotBlank() &&
         all.lastOrNull { message -> message.role == UiMessageRole.ASSISTANT }?.text != it }
     val state = rememberLazyListState()
@@ -411,13 +420,7 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
                                     androidx.compose.runtime.key(card.document.documentId) {
                                         ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
                                             onAction = { actionId, fields ->
-                                                if (documents == null || identity == null ||
-                                                    card.actions[actionId]?.available != true)
-                                                    UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
-                                                else documents.submit(identity, UiDocumentActionRequest(
-                                                    documentId = card.document.documentId,
-                                                    revision = card.document.revision, source = card.document.source,
-                                                    actionId = actionId, fields = fields))
+                                                submitDocumentAction(card, actionId, fields)
                                             }, media = media)
                                     }
                                 }
@@ -437,14 +440,14 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
                         // The single compact, collapsible Work status shares the reply slot.
                         entry.anchorId?.let { anchor -> workByTurn[anchor] }?.let { card ->
                             ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
-                                onAction = { _, _ -> UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED) },
+                                onAction = { actionId, fields -> submitDocumentAction(card, actionId, fields) },
                                 media = media)
                         }
                         entry.anchorId?.let { allCardsBySource[it] }.orEmpty()
                             .filterNot { it.document.isInlineWorkTaskCard() }
                             .forEach { card ->
                                 ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
-                                    onAction = { _, _ -> UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED) },
+                                    onAction = { actionId, fields -> submitDocumentAction(card, actionId, fields) },
                                     media = media)
                             }
                     }
