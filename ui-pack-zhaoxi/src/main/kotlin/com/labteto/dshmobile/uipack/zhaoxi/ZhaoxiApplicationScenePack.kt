@@ -4,6 +4,12 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.platform.LocalContext
+import com.labteto.dshmobile.uicontract.UiHostPreferences
+import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiHue
 import androidx.compose.ui.Modifier
 import com.labteto.dshmobile.uicontract.ChatUiCommand
 import com.labteto.dshmobile.uicontract.HostPreferencesUiPort
@@ -397,7 +403,26 @@ class ZhaoxiApplicationScenePack(
      */
     @Composable
     override fun SceneFrame(state: UiSceneNavigationState, content: @Composable () -> Unit) {
-        ZhaoxiTheme {
+        val appearance by preferences.snapshots.collectAsState(initial = UiHostPreferences())
+        val systemDark = isSystemInDarkTheme()
+        val dark = when (appearance.theme) {
+            "dark", "matte_black" -> true
+            "light" -> false
+            else -> systemDark
+        }
+        val hue = when (appearance.accent) {
+            "sage", "celadon" -> ZhaoxiHue.SAGE
+            "steel" -> ZhaoxiHue.STEEL
+            "mauve" -> ZhaoxiHue.MAUVE
+            "dusk" -> ZhaoxiHue.DUSK
+            else -> ZhaoxiHue.STONE
+        }
+        // Android's animator duration scale 0 is an explicit reduced-motion preference.
+        val context = LocalContext.current
+        val reduced = android.provider.Settings.Global.getFloat(
+            context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f
+        ) == 0f
+        ZhaoxiTheme(hue = hue, dark = dark, reducedMotion = reduced) {
             Box(Modifier.fillMaxSize()) {
                 ZhaoxiBackground(Modifier.fillMaxSize())
                 // Motion settings are resolved in a composable scope; transitionSpec itself
