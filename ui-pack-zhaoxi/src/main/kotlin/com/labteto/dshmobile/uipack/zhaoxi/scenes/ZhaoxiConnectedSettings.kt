@@ -165,29 +165,44 @@ private fun quotaResetLabel(timestampMillis: Long): String =
     java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
         .format(java.util.Date(timestampMillis))
 
+/** Separate runtime limits from personal instructions; both use the current Settings Owner. */
 @Composable
-fun ZhaoxiRuntimeSettingsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
+fun ZhaoxiRuntimeSettingsScene(
+    settings: SettingsUiPort,
+    scope: UiSceneRenderScope,
+    sessionOnly: Boolean = false,
+) {
     val snap by settings.state.collectAsState(initial = settings.initialState)
     var main by rememberSaveable(snap.mainMaxSteps) { mutableStateOf(snap.mainMaxSteps.toString()) }
     var sub by rememberSaveable(snap.subagentMaxSteps) { mutableStateOf(snap.subagentMaxSteps.toString()) }
     var attempts by rememberSaveable(snap.modelAttempts) { mutableStateOf(snap.modelAttempts.toString()) }
     var rules by rememberUiPrivateText("zhaoxi.rules", snap.userRules) { snap.userRules }
     var status by remember { mutableStateOf<String?>(null) }
-    ZxPage("行为与运行", onBack = { scope.onBack() }) {
-        status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        ZxField(main, { main = it }, placeholder = "主任务步数")
-        ZxField(sub, { sub = it }, placeholder = "子任务步数")
-        ZxField(attempts, { attempts = it }, placeholder = "模型尝试次数")
-        ZxButton("保存运行设置", {
-            val m = main.toIntOrNull(); val s = sub.toIntOrNull(); val a = attempts.toIntOrNull()
-            status = if (m == null || s == null || a == null) "请输入整数" else
-                settings.submit(SettingsUiCommand.RuntimeLimits(m, s, a, snap.modelSelection.workerProfileId)).toString()
-        })
-        ZxField(rules, { rules = it }, Modifier.fillMaxWidth(), placeholder = "长期规则")
-        ZxButton("保存规则", { status = settings.submit(SettingsUiCommand.Personalization(rules, snap.autoRecall, snap.autoMemory)).toString() })
-        ZxSwitchRow("自动召回", "", snap.autoRecall) { status = settings.submit(SettingsUiCommand.Personalization(snap.userRules, it, snap.autoMemory)).toString() }
-        ZxSwitchRow("自动记忆", "", snap.autoMemory) { status = settings.submit(SettingsUiCommand.Personalization(snap.userRules, snap.autoRecall, it)).toString() }
-        ZxSwitchRow("对话风格约束", "", snap.chatStyleGuardEnabled) { status = settings.submit(SettingsUiCommand.StyleGuard(it)).toString() }
+    ZxPage(if (sessionOnly) "个人规则" else "高级设置", onBack = { scope.onBack() }) {
+        Spacer(Modifier.height(8.dp))
+        if (sessionOnly) {
+            ZxSection("对话规则")
+            ZxField(rules, { rules = it }, Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                placeholder = "输入希望助手遵循的规则")
+            ZxButton("保存规则", {
+                status = settings.submit(SettingsUiCommand.Personalization(
+                    rules, snap.autoRecall, snap.autoMemory)).toString()
+            }, Modifier.fillMaxWidth())
+        } else {
+            ZxSection("执行限制")
+            ZxField(main, { main = it }, Modifier.fillMaxWidth(), placeholder = "主任务步数")
+            ZxField(sub, { sub = it }, Modifier.fillMaxWidth(), placeholder = "子任务步数")
+            ZxField(attempts, { attempts = it }, Modifier.fillMaxWidth(), placeholder = "模型尝试次数")
+            ZxButton("保存运行设置", {
+                val m = main.toIntOrNull()
+                val n = sub.toIntOrNull()
+                val a = attempts.toIntOrNull()
+                status = if (m == null || n == null || a == null) "请输入有效整数"
+                else settings.submit(SettingsUiCommand.RuntimeLimits(
+                    m, n, a, snap.modelSelection.workerProfileId)).toString()
+            }, Modifier.fillMaxWidth())
+        }
+        status?.let { ZxFooterNote(it) }
     }
 }
 
