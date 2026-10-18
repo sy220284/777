@@ -35,11 +35,11 @@ data class ZhaoxiAccent(val accent: Color, val tint: Color, val accentInk: Color
 
 /** light 取值与 tokens.css [data-hue] 一致；dark 严格以 E8.18 tokens.css 的强调色与安全文字色为准。 */
 fun accentFor(hue: ZhaoxiHue, dark: Boolean): ZhaoxiAccent = when (hue) {
-    ZhaoxiHue.STONE -> if (dark) ZhaoxiAccent(Color(0xFF938D89), Color(0x1F938D89)) else ZhaoxiAccent(Color(0xFF78716C), Color(0x1F78716C))
-    ZhaoxiHue.SAGE  -> if (dark) ZhaoxiAccent(Color(0xFF7C9483), Color(0x247C9483)) else ZhaoxiAccent(Color(0xFF7C9483), Color(0x247C9483), Color(0xFF65796B))
-    ZhaoxiHue.STEEL -> if (dark) ZhaoxiAccent(Color(0xFF6E88A0), Color(0x246E88A0), Color(0xFF8FA5BC)) else ZhaoxiAccent(Color(0xFF6E88A0), Color(0x246E88A0), Color(0xFF60778C))
-    ZhaoxiHue.MAUVE -> if (dark) ZhaoxiAccent(Color(0xFF967F95), Color(0x24967F95), Color(0xFFA896A7)) else ZhaoxiAccent(Color(0xFF967F95), Color(0x24967F95), Color(0xFF846F83))
-    ZhaoxiHue.DUSK  -> if (dark) ZhaoxiAccent(Color(0xFFA08A76), Color(0x24A08A76), Color(0xFFB29C86)) else ZhaoxiAccent(Color(0xFFA08A76), Color(0x24A08A76), Color(0xFF867363))
+    ZhaoxiHue.STONE -> if (dark) ZhaoxiAccent(Color(0xFF938D89), Color(0x1F938D89)) else ZhaoxiAccent(Color(0xFF78716C), Color(0x1F78716C), Color(0xFF706963))
+    ZhaoxiHue.SAGE  -> if (dark) ZhaoxiAccent(Color(0xFF7C9483), Color(0x247C9483)) else ZhaoxiAccent(Color(0xFF7C9483), Color(0x247C9483), Color(0xFF526D5A))
+    ZhaoxiHue.STEEL -> if (dark) ZhaoxiAccent(Color(0xFF6E88A0), Color(0x246E88A0), Color(0xFF8FA5BC)) else ZhaoxiAccent(Color(0xFF6E88A0), Color(0x246E88A0), Color(0xFF4F687D))
+    ZhaoxiHue.MAUVE -> if (dark) ZhaoxiAccent(Color(0xFF967F95), Color(0x24967F95), Color(0xFFA896A7)) else ZhaoxiAccent(Color(0xFF967F95), Color(0x24967F95), Color(0xFF715B70))
+    ZhaoxiHue.DUSK  -> if (dark) ZhaoxiAccent(Color(0xFFA08A76), Color(0x24A08A76), Color(0xFFB29C86)) else ZhaoxiAccent(Color(0xFFA08A76), Color(0x24A08A76), Color(0xFF786048))
 }
 
 // ---------------------------------------------------------------------------
