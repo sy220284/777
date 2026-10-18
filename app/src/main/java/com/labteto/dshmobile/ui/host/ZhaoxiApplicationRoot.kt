@@ -194,6 +194,7 @@ internal fun createZhaoxiApplicationPack(
             sessionId = { owner.currentSessionId().takeIf(String::isNotBlank) },
             automation = owner.automationUiPort,
             sessions = owner.sessions,
+            conversationShell = owner.conversationShellUiPort,
             transcript = owner.messageHistoryUiPort,
             memory = owner.memoryUiPort,
             diary = owner.diaryUiPort,

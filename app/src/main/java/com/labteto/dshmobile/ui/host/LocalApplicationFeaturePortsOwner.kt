@@ -82,6 +82,7 @@ internal class LocalApplicationFeaturePortsOwner @Inject constructor(
         secureDrafts.read("ui_document_forms"),
     ) { secureDrafts.write("ui_document_forms", it) }
     private val shellPreferences = LocalConversationUiStateStore(context, businessSessions)
+    val conversationShellUiPort: com.labteto.dshmobile.uicontract.ConversationShellUiPort = shellPreferences
     val conversationNavigation = kotlinx.coroutines.flow.MutableStateFlow<SessionUiCommand?>(null)
     val sessions: SessionUiPort = HostConversationSessionUiPort(
         businessSessions, drafts, shellPreferences, readingState, formState,

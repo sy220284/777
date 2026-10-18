@@ -2,6 +2,7 @@ package com.labteto.dshmobile.uipack.zhaoxi
 
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxAutomationTaskMatches
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxUsageModelNames
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxPinnedSessionsFirst
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxHumanFileSize
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxToolFamilyLabel
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkspaceFileVisible
@@ -9,6 +10,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ZhaoxiHistoryUiPresentationTest {
+    @Test fun pinnedHistoryAppearsFirstWithoutReorderingOtherSessions() {
+        val all = listOf("a", "b", "c").mapIndexed { index, id ->
+            com.labteto.dshmobile.local.session.LocalSessionSummary(id, id, index.toLong())
+        }
+        assertEquals(listOf("c", "a", "b"), zxPinnedSessionsFirst(all, setOf("c")).map { it.id })
+        assertEquals(listOf("a", "b", "c"), zxPinnedSessionsFirst(all, emptySet()).map { it.id })
+    }
     @Test fun humanReadableFileSizes() {
         assertEquals("0 字节", zxHumanFileSize(0))
         assertEquals("1.5 KB", zxHumanFileSize(1536))

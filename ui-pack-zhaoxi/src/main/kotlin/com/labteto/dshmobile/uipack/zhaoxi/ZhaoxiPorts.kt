@@ -5,6 +5,7 @@ import com.labteto.dshmobile.uicontract.AutomationUiPort
 import com.labteto.dshmobile.uicontract.ChatGroupUiPort
 import com.labteto.dshmobile.uicontract.ChatUiPort
 import com.labteto.dshmobile.uicontract.ConversationDraftUiPort
+import com.labteto.dshmobile.uicontract.ConversationShellUiPort
 import com.labteto.dshmobile.uicontract.ConversationReadingUiPort
 import com.labteto.dshmobile.uicontract.CurrentPersonaUiPort
 import com.labteto.dshmobile.uicontract.DiaryUiPort
@@ -79,6 +80,7 @@ data class ZhaoxiSecondaryPorts(
     val sessionId: () -> String? = { null },
     val automation: AutomationUiPort? = null,
     val sessions: SessionUiPort? = null,
+    val conversationShell: ConversationShellUiPort? = null,
     val transcript: UiMessageHistoryPort? = null,
     val memory: MemoryUiPort? = null,
     val diary: DiaryUiPort? = null,

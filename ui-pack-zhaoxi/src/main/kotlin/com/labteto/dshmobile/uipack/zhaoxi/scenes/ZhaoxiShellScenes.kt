@@ -2,6 +2,9 @@ package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.labteto.dshmobile.uipack.zhaoxi.components.zxPressSurface
 import androidx.compose.foundation.layout.Column
@@ -52,6 +55,9 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.SessionUiPort
+import com.labteto.dshmobile.uicontract.ConversationShellUiPort
+import com.labteto.dshmobile.uicontract.ConversationShellUiCommand
+import com.labteto.dshmobile.uicontract.UiSessionDeletionReceipt
 import com.labteto.dshmobile.uicontract.SessionUiCommand
 import com.labteto.dshmobile.uicontract.UiSessionsSnapshot
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner
@@ -60,6 +66,7 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.ZxButtonVariant
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxField
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxFooterNote
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxOnboardingFlow
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxOnboardingStep
@@ -75,26 +82,51 @@ import com.labteto.dshmobile.uihost.UiSceneRenderScope
  * shell.onboarding/empty/error 为静态壳页。
  */
 
-/** route.home / shell.new_session — E8.17 navigation hierarchy: conversation entry + drawer. */
+/** 置顶只影响呈现顺序，不改 Session Owner 的历史事实。 */
+internal fun zxPinnedSessionsFirst(
+    sessions: List<com.labteto.dshmobile.local.session.LocalSessionSummary>,
+    pinned: Set<String>,
+): List<com.labteto.dshmobile.local.session.LocalSessionSummary> =
+    sessions.withIndex().sortedWith(
+        compareByDescending<IndexedValue<com.labteto.dshmobile.local.session.LocalSessionSummary>> {
+            it.value.id in pinned
+        }.thenBy { it.index }
+    ).map { it.value }
+
+/** route.home / shell.new_session — 历史侧栏功能与当前 Owner 一一对应。 */
 @Composable
 fun ZhaoxiHomeScene(
     sessions: SessionUiPort?,
     scope: UiSceneRenderScope,
+    conversationShell: ConversationShellUiPort? = null,
 ) {
     val snap by (sessions?.snapshots
         ?: kotlinx.coroutines.flow.flowOf(UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null)))
         .collectAsState(initial = UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null))
     var commandReceipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
     var drawerQuery by rememberSaveable { mutableStateOf("") }
+    var selectedSessionAction by remember { mutableStateOf<String?>(null) }
+    var renameSessionId by remember { mutableStateOf<String?>(null) }
+    var renameTitle by remember { mutableStateOf("") }
+    var deleteSessionId by remember { mutableStateOf<String?>(null) }
+    var deleting by remember { mutableStateOf(false) }
+    var managementFeedback by remember { mutableStateOf<String?>(null) }
+    val pinnedIds by (conversationShell?.pinnedSessionIds
+        ?: kotlinx.coroutines.flow.flowOf(emptySet<String>())).collectAsState(initial = emptySet())
+    val renamedTitles by (conversationShell?.sessionTitleOverrides
+        ?: kotlinx.coroutines.flow.flowOf(emptyMap<String, String>())).collectAsState(initial = emptyMap())
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val drawerScope = rememberCoroutineScope()
     val c = ZhaoxiTheme.colors
     val workMode = snap.usageMode == LocalUsageMode.WORK
     val modeSessions = snap.sessions.filter { it.usageMode == snap.usageMode }
-    val visibleSessions = if (drawerQuery.isBlank()) modeSessions else modeSessions.filter { session ->
-        session.title.contains(drawerQuery.trim(), ignoreCase = true) ||
-            session.summaryPreview.orEmpty().contains(drawerQuery.trim(), ignoreCase = true)
-    }
+    val visibleSessions = zxPinnedSessionsFirst(
+        if (drawerQuery.isBlank()) modeSessions else modeSessions.filter { session ->
+            renamedTitles.getOrDefault(session.id, session.title)
+                .contains(drawerQuery.trim(), ignoreCase = true) ||
+                session.summaryPreview.orEmpty().contains(drawerQuery.trim(), ignoreCase = true)
+        }, pinnedIds,
+    )
     fun create(mode: LocalUsageMode) {
         val receipt = sessions?.submit(SessionUiCommand.Create(
             snap.identity, LocalConversationMode.INDEPENDENT, mode,
@@ -146,6 +178,7 @@ fun ZhaoxiHomeScene(
                         placeholder = if (workMode) "筛选工作会话" else "筛选聊天会话",
                     )
                     CommandFeedback(commandReceipt)
+                    managementFeedback?.let { ZxFooterNote(it) }
                     Spacer(Modifier.height(12.dp))
                     ZxModeSwitch(workMode, onChange = { selectedWork ->
                         val receipt = sessions?.submit(SessionUiCommand.SelectMode(
@@ -191,11 +224,18 @@ fun ZhaoxiHomeScene(
                             }
                         }
                         items(visibleSessions, key = { it.id }) { session ->
+                            val displayedTitle = renamedTitles[session.id] ?: session.title
                             ZxHomeDrawerEntry(
-                                "diary", session.title.take(40),
+                                "diary", displayedTitle.take(40),
                                 selected = snap.identity?.sessionId == session.id,
-                                detail = session.summaryPreview.orEmpty().take(48),
+                                detail = listOfNotNull(
+                                    "已置顶".takeIf { session.id in pinnedIds },
+                                    session.summaryPreview?.take(48)?.takeIf { it.isNotBlank() },
+                                ).joinToString(" · "),
                                 onClick = { openSession(session.id) },
+                                onLongClick = if (conversationShell == null) null else {
+                                    { selectedSessionAction = session.id }
+                                },
                             )
                         }
                     }
@@ -253,10 +293,10 @@ fun ZhaoxiHomeScene(
             if (modeSessions.isEmpty() && !snap.loading) {
                 ZxEmpty("还没有会话", "点击「新会话」开始")
             }
-            modeSessions.take(6).forEach { session ->
+            zxPinnedSessionsFirst(modeSessions, pinnedIds).take(6).forEach { session ->
                 ZxHomeDrawerEntry(
                     icon = "diary",
-                    title = session.title.take(40),
+                    title = (renamedTitles[session.id] ?: session.title).take(40),
                     detail = session.summaryPreview.orEmpty().take(56),
                     selected = snap.identity?.sessionId == session.id,
                     onClick = { openSession(session.id) },
@@ -275,8 +315,94 @@ fun ZhaoxiHomeScene(
             Spacer(Modifier.height(24.dp))
         }
     }
+    selectedSessionAction?.let { id ->
+        val item = snap.sessions.firstOrNull { it.id == id }
+        if (item != null) {
+            Dialog(onDismissRequest = { selectedSessionAction = null }) {
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
+                        .background(c.card).padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(renamedTitles[id] ?: item.title, fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold, color = c.ink,
+                        maxLines = 2)
+                    ZxButton(if (id in pinnedIds) "取消置顶" else "置顶会话", {
+                        commandReceipt = conversationShell?.submit(
+                            ConversationShellUiCommand.SetPinned(id, id !in pinnedIds),
+                        ) ?: UiCommandReceipt.NotAdmitted
+                        selectedSessionAction = null
+                    }, Modifier.fillMaxWidth(), ZxButtonVariant.Outline)
+                    ZxButton("重命名", {
+                        renameTitle = renamedTitles[id] ?: item.title
+                        renameSessionId = id
+                        selectedSessionAction = null
+                    }, Modifier.fillMaxWidth(), ZxButtonVariant.Outline)
+                    ZxButton("删除会话", {
+                        deleteSessionId = id
+                        selectedSessionAction = null
+                    }, Modifier.fillMaxWidth(), ZxButtonVariant.Danger)
+                    ZxButton("关闭", { selectedSessionAction = null },
+                        Modifier.fillMaxWidth(), ZxButtonVariant.Outline)
+                }
+            }
+        }
+    }
+    renameSessionId?.let { id ->
+        Dialog(onDismissRequest = { renameSessionId = null }) {
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
+                    .background(c.card).padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("重命名会话", color = c.ink, fontWeight = FontWeight.SemiBold)
+                ZxField(renameTitle, { renameTitle = it }, Modifier.fillMaxWidth(),
+                    placeholder = "会话标题（最多 80 字）")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ZxButton("取消", { renameSessionId = null }, Modifier.weight(1f),
+                        ZxButtonVariant.Outline)
+                    ZxButton("保存", {
+                        commandReceipt = conversationShell?.submit(
+                            ConversationShellUiCommand.Rename(id, renameTitle.trim()),
+                        ) ?: UiCommandReceipt.NotAdmitted
+                        if (commandReceipt?.admitted() == true) renameSessionId = null
+                    }, Modifier.weight(1f), enabled = renameTitle.isNotBlank())
+                }
+            }
+        }
+    }
+    deleteSessionId?.let { id ->
+        val title = snap.sessions.firstOrNull { it.id == id }?.let {
+            renamedTitles[id] ?: it.title
+        }.orEmpty()
+        ZxDialog("删除会话？", "“${title.take(64)}”及其会话历史将被删除，无法撤销。", "确认删除", {
+            if (!deleting) {
+                deleting = true
+                drawerScope.launch {
+                    try {
+                        val result = sessions?.delete(setOf(id))
+                        managementFeedback = when (result) {
+                            is UiSessionDeletionReceipt.Deleted ->
+                                if (id in result.sessionIds) "会话已删除" else "会话未删除，请刷新后再试"
+                            is UiSessionDeletionReceipt.Failed ->
+                                result.message ?: "删除失败，请重试"
+                            null -> "无法删除会话：会话管理不可用"
+                        }
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        managementFeedback = failure.message ?: "删除失败，请重试"
+                    } finally {
+                        deleting = false
+                        deleteSessionId = null
+                    }
+                }
+            }
+        }, { if (!deleting) deleteSessionId = null })
+    }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ZxHomeDrawerEntry(
     icon: String,
@@ -284,15 +410,25 @@ private fun ZxHomeDrawerEntry(
     detail: String = "",
     selected: Boolean = false,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val c = ZhaoxiTheme.colors
     val interaction = remember { MutableInteractionSource() }
     Row(
         Modifier.fillMaxWidth().zxPressSurface(interaction).clip(RoundedCornerShape(12.dp))
             .background(if (selected) c.bg2 else Color.Transparent)
-            .clickable(role = Role.Button, onClick = onClick,
+            .then(if (onLongClick != null) Modifier.combinedClickable(
+                role = Role.Button,
+                onClick = onClick,
+                onLongClick = onLongClick,
+                onLongClickLabel = "会话操作",
                 interactionSource = interaction,
-                indication = androidx.compose.foundation.LocalIndication.current)
+                indication = androidx.compose.foundation.LocalIndication.current,
+            ) else Modifier.clickable(
+                role = Role.Button, onClick = onClick,
+                interactionSource = interaction,
+                indication = androidx.compose.foundation.LocalIndication.current,
+            ))
             .heightIn(min = 56.dp).padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
