@@ -117,9 +117,13 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
         ambientGlow: Float = snap.ambientGlow,
         transparency: Float = snap.transparency,
         motionScale: Float = snap.motionScale,
+        textWeight: Int = snap.textWeight,
+        adaptiveContrast: Boolean = snap.adaptiveContrast,
+        presetWallpaperEnabled: Boolean = snap.presetWallpaperEnabled,
     ) {
-        jobs.launch { preferences.submit(UiHostPreferencesCommand.Appearance(theme, accent, textScale, snap.textWeight,
-            transparency, ambientGlow, snap.componentEmphasis, motionScale, snap.adaptiveContrast)) }
+        jobs.launch { preferences.submit(UiHostPreferencesCommand.Appearance(theme, accent, textScale, textWeight,
+            transparency, ambientGlow, snap.componentEmphasis, motionScale, adaptiveContrast,
+            presetWallpaperEnabled)) }
     }
     var glow by remember(snap.ambientGlow) { mutableFloatStateOf(snap.ambientGlow) }
     var glass by remember(snap.transparency) { mutableFloatStateOf(snap.transparency) }
