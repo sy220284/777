@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -484,6 +485,48 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
                     }, offset, followTail))
             }
     }
+    // Loading and anchor restoration are shared by the automatic top-edge path and
+    // the explicit retry button. Never create a second history cursor.
+    suspend fun loadOlderPage() {
+        if (history == null || sessionId.isBlank() || loading || (loaded && cursor == null)) return
+        loading = true
+        try {
+            val page = history.messagePage(sessionId, cursor, 60)
+            val prior = timeline.getOrNull((state.firstVisibleItemIndex - 1).coerceAtLeast(0))
+            val previousId = when (prior) {
+                is ZxTimelineEntry.Message -> prior.message.id
+                is ZxTimelineEntry.Reply -> prior.stages.firstOrNull()?.id ?: prior.anchorId
+                else -> null
+            }
+            older = (page.messages + older).distinctBy { it.id }
+            cursor = page.nextCursor
+            loaded = true
+            error = null
+            val index = projectZxReplyTimeline((older + messages).distinctBy { it.id }, running)
+                .indexOfFirst { previousId != null && it.containsMessage(previousId) }
+            if (index >= 0) state.scrollToItem(index + 1)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            error = failure.message ?: "历史加载失败"
+        } finally {
+            loading = false
+        }
+    }
+    // Trigger only after the reader has moved away and returned toward the top.
+    // This prevents short conversations from silently loading the entire history.
+    val nearHistoryTop by remember(state) {
+        derivedStateOf { state.firstVisibleItemIndex <= 2 }
+    }
+    var leftHistoryTop by remember(sessionId) { mutableStateOf(false) }
+    LaunchedEffect(sessionId, restored, nearHistoryTop) {
+        if (restored && !nearHistoryTop) leftHistoryTop = true
+        else if (restored && nearHistoryTop && leftHistoryTop &&
+            history != null && error == null && !loading && (!loaded || cursor != null)) {
+            leftHistoryTop = false
+            loadOlderPage()
+        }
+    }
     // Distinguish the reader's drag gesture from our programmatic scroll operations.
     LaunchedEffect(state, sessionId, readerDragging) {
         if (readerDragging) snapshotFlow { !state.canScrollForward }
@@ -502,25 +545,7 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
             error?.let { ZxBanner(it, ZxTone.Err) }
             if (history != null && all.isNotEmpty() && (!loaded || cursor != null))
                 TextButton(onClick = {
-                    if (sessionId.isNotBlank()) jobs.launch {
-                        loading = true
-                        try {
-                            val page = history.messagePage(sessionId, cursor, 60)
-                            val previousId = timeline.getOrNull(state.firstVisibleItemIndex - 1)?.let { entry ->
-                                when (entry) {
-                                    is ZxTimelineEntry.Message -> entry.message.id
-                                    is ZxTimelineEntry.Reply -> entry.stages.firstOrNull()?.id ?: entry.anchorId
-                                }
-                            }
-                            older = (page.messages + older).distinctBy { it.id }
-                            cursor = page.nextCursor; loaded = true; error = null
-                            val index = projectZxReplyTimeline((older + messages).distinctBy { it.id }, running)
-                                .indexOfFirst { previousId != null && it.containsMessage(previousId) }
-                            if (index >= 0) state.scrollToItem(index + 1)
-                        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-                        catch (failure: Exception) { error = failure.message ?: "历史加载失败" }
-                        finally { loading = false }
-                    }
+                    jobs.launch { loadOlderPage() }
                 }, enabled = !loading) {
                     Text(if (loading) "加载中…" else "↑ 查看更早消息",
                         fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2)
