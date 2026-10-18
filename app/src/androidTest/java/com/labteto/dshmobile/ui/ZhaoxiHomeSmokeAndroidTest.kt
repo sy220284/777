@@ -10,6 +10,8 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.assertTopPositionInRootIsEqualTo
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onAllNodesWithTag
 import com.labteto.dshmobile.MainActivity
 import androidx.compose.ui.unit.dp
@@ -25,8 +27,12 @@ class ZhaoxiHomeSmokeAndroidTest {
         compose.onNodeWithTag("zhaoxi.home.create_chat").assertExists()
         compose.onNodeWithText("人物").assertExists()
         compose.onNodeWithContentDescription("打开侧栏").performClick()
-        compose.onNodeWithTag("zhaoxi.drawer.surface", useUnmergedTree = true)
+        val drawer = compose.onNodeWithTag("zhaoxi.drawer.surface", useUnmergedTree = true)
             .assertTopPositionInRootIsEqualTo(0.dp)
+        val drawerBottom = drawer.getUnclippedBoundsInRoot().bottom
+        val viewportBottom = compose.onRoot(useUnmergedTree = true).getUnclippedBoundsInRoot().bottom
+        org.junit.Assert.assertEquals("侧栏背景必须延伸至导航栏底部",
+            viewportBottom.value, drawerBottom.value, 1f)
         compose.onNodeWithContentDescription("全局搜索").assertExists()
         compose.onNodeWithContentDescription("新建会话").assertExists()
         compose.onNodeWithText("人物图集").assertExists()
