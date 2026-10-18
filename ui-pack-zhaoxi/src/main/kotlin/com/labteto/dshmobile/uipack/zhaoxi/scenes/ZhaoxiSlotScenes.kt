@@ -125,29 +125,27 @@ fun ZhaoxiEditScene(
     scope: UiSceneRenderScope,
     work: WorkConversationUiPort? = null,
 ) {
-    var text by remember { mutableStateOf(message.editableText ?: message.text) }
-    var rejection by remember { mutableStateOf<UiCommandRejection?>(null) }
+    var text by remember(message.id) { mutableStateOf(message.editableText ?: message.text) }
+    var receipt by remember(message.id) { mutableStateOf<UiCommandReceipt?>(null) }
     ZxPage("修改并重发", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        rejection?.let { r ->
-            com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
-                "重发被拒 · ${com.labteto.dshmobile.uipack.zhaoxi.components.rejectionHint(r)} · 内容已保留",
-                com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err)
-            Spacer(Modifier.height(6.dp))
-        }
+        CommandFeedback(receipt)
         ZxField(text, { text = it }, Modifier.fillMaxWidth().height(120.dp))
         Spacer(Modifier.height(10.dp))
         ZxButton("重发", {
-            val id = work?.snapshot()?.identity ?: chat.snapshot().identity
-            if (id == null) rejection = UiCommandRejection.UNCONFIGURED
-            else when (val r = if (work != null) work.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.EditUserMessage(id, message.id, text)) else chat.submit(ChatUiCommand.EditUserMessage(id, message.id, text))) {
-                UiCommandReceipt.Accepted, UiCommandReceipt.Queued,
-                is UiCommandReceipt.MessageEdited -> scope.onBack()
-                is UiCommandReceipt.Rejected -> rejection = r.reason
-                else -> rejection = UiCommandRejection.UNSUPPORTED
+            // Never submit a Work edit under a Chat activation identity.
+            val id = if (work != null) work.snapshot().identity else chat.snapshot().identity
+            val response = if (id == null) {
+                UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+            } else if (work != null) {
+                work.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.EditUserMessage(
+                    id, message.id, text))
+            } else {
+                chat.submit(ChatUiCommand.EditUserMessage(id, message.id, text))
             }
+            if (response.exitsMessageEditor()) scope.onBack()
+            else receipt = response // Never discard an unaccepted edit draft.
         }, Modifier.fillMaxWidth(), enabled = text.isNotBlank())
-
     }
 }
 
