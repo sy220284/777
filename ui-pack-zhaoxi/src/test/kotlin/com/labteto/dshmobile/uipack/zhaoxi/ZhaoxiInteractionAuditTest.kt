@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.uipack.zhaoxi
 
 import com.labteto.dshmobile.uicontract.ToolsUiReceipt
+import com.labteto.dshmobile.uicontract.SettingsUiReceipt
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxModelSubmitFeedback
 import com.labteto.dshmobile.uicontract.UiMcpHealth
 import com.labteto.dshmobile.uicontract.UiToolError
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.ZxRuntimeLimitField
@@ -24,6 +26,21 @@ import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 class ZhaoxiInteractionAuditTest {
+    @Test fun modelPickerWaitsForActualOwnerSelectionInsteadOfTreatingSubmissionAsSuccess() {
+        for (receipt in listOf(SettingsUiReceipt.Submitted, SettingsUiReceipt.Applied)) {
+            val result = zxModelSubmitFeedback(receipt)
+            assertEquals(true, result.waitForSelection)
+            assertEquals(false, result.error)
+        }
+        val rejected = zxModelSubmitFeedback(SettingsUiReceipt.Rejected)
+        assertEquals(false, rejected.waitForSelection)
+        assertEquals(true, rejected.error)
+        val failed = zxModelSubmitFeedback(SettingsUiReceipt.Failed("认证失败"))
+        assertEquals(false, failed.waitForSelection)
+        assertEquals(true, failed.error)
+        assertEquals(true, failed.message.contains("认证失败"))
+    }
+
     @Test fun runtimeLimitsMatchExistingOwnersRatherThanSilentlyClamping() {
         assertNull(zxRuntimeLimitError(ZxRuntimeLimitField.MAIN_STEPS, "4"))
         assertNull(zxRuntimeLimitError(ZxRuntimeLimitField.MAIN_STEPS, "512"))
