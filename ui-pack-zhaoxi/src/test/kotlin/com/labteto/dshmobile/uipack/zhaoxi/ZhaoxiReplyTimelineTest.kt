@@ -60,8 +60,8 @@ class ZhaoxiReplyTimelineTest {
             msg("step1", UiMessageRole.ASSISTANT, "已找到文件"),
             msg("step2", UiMessageRole.ASSISTANT, "已完成分析"),
         )
-        assertEquals("进一步核对", uncommittedReplyPreview(
-            "已找到文件\\n\\n已完成分析\\n\\n进一步核对".replace("\\\\n", "\\n"), stages))
+        val cumulative = listOf("已找到文件", "已完成分析", "进一步核对").joinToString("\n\n")
+        assertEquals("进一步核对", uncommittedReplyPreview(cumulative, stages))
         assertEquals(null, uncommittedReplyPreview("已完成分析", stages))
         assertEquals(null, uncommittedReplyPreview("已完成分析的前缀".take(5), stages))
     }
