@@ -319,10 +319,9 @@ fun ZxGroupMembersScene(groups: ChatGroupUiPort, scope: UiSceneRenderScope) {
                 onClick = {
                     selected = if (picked) selected - choice.galleryId
                         else if (selected.size < snap.maximumMembers) selected + choice.galleryId else selected
-                }, trailing = { ZxChip(if (picked) "已选" else "选择", picked) {
-                    selected = if (picked) selected - choice.galleryId
-                        else if (selected.size < snap.maximumMembers) selected + choice.galleryId else selected
-                } })
+                }, trailing = {
+                    ZxBadge(if (picked) "已选" else "未选", ZxBadgeTone.Neutral)
+                })
         }
         Text("${selected.size} / ${snap.maximumMembers} 位成员", color = ZhaoxiTheme.colors.ink2)
         selectionError?.let { Text(it, color = ZhaoxiTheme.colors.err) }
