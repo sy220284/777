@@ -13,6 +13,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -107,6 +108,15 @@ internal fun ZhaoxiApplicationRoot(
                     admission.pack.manifest, UiSceneId("route.home"), links)
             }
             val snapshot by owner.sessions.snapshots.collectAsState(initial = owner.sessions.snapshot())
+            // Activity recreation may briefly expose an unbound/loading Session projection.
+            // Keep the last *real* session identity so the restored Host back stack is not
+            // discarded before the Owner has finished restoring the same conversation.
+            // Mode alone never invalidates a settings/file navigation stack.
+            var stableSessionScope by rememberSaveable { mutableStateOf("") }
+            val restoredScope = snapshot.identity?.sessionId?.takeIf { it.isNotBlank() }
+            if (restoredScope != null && stableSessionScope != restoredScope) {
+                stableSessionScope = restoredScope
+            }
             val conversationRequest by owner.conversationNavigation.collectAsState()
             val conversationScene = activatedConversationScene(conversationRequest, snapshot)
             val requested by owner.sceneRequest.collectAsState()
@@ -120,7 +130,7 @@ internal fun ZhaoxiApplicationRoot(
                         owner.conversationNavigation.value = null
                     else owner.consumeSceneRequest(key)
                 },
-                navigationStateScope = snapshot.identity?.sessionId.orEmpty() + ":" + snapshot.usageMode.name,
+                navigationStateScope = stableSessionScope,
             )
             if (access !is com.labteto.dshmobile.uihost.UiSceneRenderAccess.Ready)
                 IntegrationBlocked("朝夕场景导航状态失效。请重启应用以重新建立安全导航栈。", null)

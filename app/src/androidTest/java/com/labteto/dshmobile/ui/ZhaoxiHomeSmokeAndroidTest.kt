@@ -23,9 +23,13 @@ class ZhaoxiHomeSmokeAndroidTest {
         compose.onNodeWithTag("zhaoxi.home.create_chat").assertExists()
         compose.onNodeWithText("人物").assertExists()
         compose.onNodeWithContentDescription("打开侧栏").performClick()
-        compose.onNodeWithText("搜索会话、人物、任务、文件").assertExists()
+        compose.onNodeWithContentDescription("全局搜索").assertExists()
+        compose.onNodeWithContentDescription("新建会话").assertExists()
         compose.onNodeWithText("人物图集").assertExists()
-        compose.onNodeWithContentDescription("关闭侧栏").performClick()
+        // #758: search is a real global page, and the drawer no longer needs a redundant close icon.
+        compose.onNodeWithContentDescription("全局搜索").performClick()
+        compose.onNodeWithText("搜索").assertExists()
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.waitUntil(10_000) {
             compose.onAllNodesWithText("人物图集").fetchSemanticsNodes().isEmpty()
         }
