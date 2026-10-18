@@ -257,7 +257,7 @@ fun ZxBadge(text: String, tone: ZxBadgeTone = ZxBadgeTone.Neutral, modifier: Mod
     val c = ZhaoxiTheme.colors
     val (bg, fg) = when (tone) {
         ZxBadgeTone.Neutral -> c.bg2 to c.ink2
-        ZxBadgeTone.Accent -> c.tint to c.accent
+        ZxBadgeTone.Accent -> c.tint to c.accentInk
         ZxBadgeTone.Warn -> c.warnBg to c.warn
         ZxBadgeTone.Err -> c.errBg to c.err
     }
