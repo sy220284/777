@@ -22,7 +22,7 @@ internal fun UiAttachmentReceipt.zxAttachmentFeedback(): String = when (this) {
 }
 
 @Composable
-fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSecondaryPorts?, scope: UiSceneRenderScope, renderSlot: @Composable (UiSceneId) -> Unit = {}) {
+fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSecondaryPorts?, scope: UiSceneRenderScope, hasSettings: Boolean = false, renderSlot: @Composable (UiSceneId) -> Unit = {}) {
     var selectedSlot by remember { mutableStateOf<UiSceneId?>(null) }
     var receipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
     var feedback by remember { mutableStateOf<String?>(null) }
@@ -124,7 +124,7 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
         ZxNavRow("媒体生成") { scope.onNavigate(UiSceneId("media.creation")) }
     if (secondary?.files != null)
         ZxNavRow("工作区") { scope.onNavigate(UiSceneId("route.workspace")) }
-    if (secondary?.settings != null)
+    if (hasSettings)
         ZxNavRow("设置") { scope.onNavigate(UiSceneId("route.settings")) }
 
 }
