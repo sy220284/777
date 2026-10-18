@@ -1,5 +1,10 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import java.util.Calendar
+import androidx.compose.ui.platform.LocalContext
+import android.text.format.DateFormat
+import android.app.TimePickerDialog
+import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.FlowRow
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
@@ -170,6 +175,31 @@ fun ZhaoxiAutomationEditorScene(
     var firstRun by remember(editingTaskId, editing?.id) {
         mutableStateOf(formatter.format(java.util.Date(editing?.nextRunAt ?: (System.currentTimeMillis() + 3_600_000L))))
     }
+    val androidContext = LocalContext.current
+    fun chooseFirstRun() {
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = runCatching { formatter.parse(firstRun)?.time }.getOrNull()
+                ?: (System.currentTimeMillis() + 3_600_000L)
+        }
+        DatePickerDialog(
+            androidContext,
+            { _, year, month, day ->
+                calendar.set(Calendar.YEAR, year)
+                calendar.set(Calendar.MONTH, month)
+                calendar.set(Calendar.DAY_OF_MONTH, day)
+                TimePickerDialog(androidContext, { _, hour, minute ->
+                    calendar.set(Calendar.HOUR_OF_DAY, hour)
+                    calendar.set(Calendar.MINUTE, minute)
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
+                    firstRun = formatter.format(calendar.time)
+                }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE),
+                    DateFormat.is24HourFormat(androidContext)).show()
+            },
+            calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH),
+        ).apply { datePicker.minDate = System.currentTimeMillis() - 86_400_000L }.show()
+    }
     var interval by remember(editingTaskId, editing?.id) {
         mutableStateOf((editing?.recurringMinutes ?: 60L).toString())
     }
@@ -236,7 +266,9 @@ fun ZhaoxiAutomationEditorScene(
                     ZxSection("首次运行时间")
                     ZxField(firstRun, { firstRun = it }, Modifier.fillMaxWidth(),
                         placeholder = "YYYY-MM-DD HH:mm")
-                    ZxFooterNote("按设备本地时区设置；必须晚于当前时间")
+                    ZxButton("选择日期与时间", { chooseFirstRun() },
+                        Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline)
+                    ZxFooterNote("设备本地时间")
                 }
                 if (selected == AutomationScheduleType.INTERVAL) {
                     ZxSection("重复间隔（分钟）")
