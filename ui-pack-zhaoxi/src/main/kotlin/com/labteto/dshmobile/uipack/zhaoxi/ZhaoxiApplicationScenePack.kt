@@ -142,6 +142,7 @@ class ZhaoxiApplicationScenePack(
         "settings.usage", "settings.model_usage", "settings.usage_log",
         "settings.usage_detail", "settings.memory", "settings.memory_settings",
         "settings.advanced", "settings.session_storage", "settings.diagnostics",
+        "settings.approval_mode",
     ).map(::UiSceneId).toSet()
 
     private val updateScene = if (settings != null && checkForUpdate != null &&
@@ -496,6 +497,8 @@ class ZhaoxiApplicationScenePack(
             "settings.appearance" -> ZhaoxiAppearanceScene(preferences, scope)
             "settings.notifications" -> ZhaoxiNotificationsScene(preferences, scope)
             "settings.permissions" -> ZhaoxiPermissionsScene(preferences, scope)
+            "settings.approval_mode" -> settings?.let { ZhaoxiApprovalModeScene(it, scope) }
+                ?: ZxEmpty("审批设置不可用", "请返回设置重试", actionLabel = "返回", onAction = { scope.onBack() })
             "settings.models" -> settings?.let { ZhaoxiModelsScene(it, scope) }
             "settings.session" -> settings?.let { ZhaoxiRuntimeSettingsScene(it, scope, sessionOnly = true) }
             "settings.advanced" -> settings?.let { ZhaoxiRuntimeSettingsScene(it, scope) }
