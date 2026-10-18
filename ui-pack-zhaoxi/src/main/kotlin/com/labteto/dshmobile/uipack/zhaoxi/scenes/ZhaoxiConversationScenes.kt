@@ -69,6 +69,7 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.ZxQuestionCard
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTimeSeparator
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTypingIndicator
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxIcon
 import com.labteto.dshmobile.uipack.zhaoxi.components.rejectionHint
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 import com.labteto.dshmobile.uihost.UiSceneRenderScope
@@ -105,7 +106,8 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
                 onBranch = { m, index -> snap.identity?.let { receipt = chat.submit(ChatUiCommand.SelectVariant(it, m.id, index)) } },
                 preview = snap.livePreview, running = snap.phase == UiExecutionPhase.RUNNING,
                 documents = documents, knownScenes = knownScenes, media = media,
-                showEmpty = snap.identity != null && snap.status != UiSceneStatus.LOADING && snap.error == null)
+                showEmpty = snap.status != UiSceneStatus.LOADING && snap.error == null,
+                missingSession = snap.identity == null
             if (snap.queuedInputCount > 0)
                 ZxBanner("⇄ 已排队 ${snap.queuedInputCount} 条 · 队列满时将拒收", ZxTone.Warn)
         }
@@ -147,7 +149,8 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
                 preview = snap.livePreview, running = snap.phase == UiExecutionPhase.RUNNING,
                 documents = documents, knownScenes = knownScenes, pendingApprovalId = snap.approval?.pendingId,
                 media = media, workMode = true,
-                showEmpty = snap.identity != null && snap.status != UiSceneStatus.LOADING && snap.error == null)
+                showEmpty = snap.status != UiSceneStatus.LOADING && snap.error == null,
+                missingSession = snap.identity == null
             snap.approval?.let { ap ->
                 Spacer(Modifier.height(6.dp))
                 ZxApprovalCard(ap, expired = snap.phase == UiExecutionPhase.IDLE && ap.pendingId.isBlank()) { approved ->
@@ -279,8 +282,12 @@ private fun ZxHeaderAction(label: String, symbol: String, active: Boolean = fals
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
-        Text(symbol, fontSize = if (symbol.length <= 1) 25.sp else 12.sp,
-            color = colors.ink, fontWeight = FontWeight.Medium)
+        when (symbol) {
+            "‹" -> ZxIcon("back")
+            "···", "×" -> ZxIcon("dots")
+            else -> Text(symbol, fontSize = 12.sp, color = colors.ink,
+                fontWeight = FontWeight.Medium)
+        }
     }
 }
 
@@ -326,7 +333,8 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
     preview: UiStreamingReplyPreview? = null, running: Boolean = false,
     documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet(),
     pendingApprovalId: String? = null, media: MediaUiPort? = null,
-    showEmpty: Boolean = true, workMode: Boolean = false) {
+    showEmpty: Boolean = true, workMode: Boolean = false,
+    missingSession: Boolean = false) {
     val sessionId = identity?.sessionId.orEmpty()
     var older by remember(sessionId) { mutableStateOf(emptyList<UiMessageSnapshot>()) }
     var cursor by remember(sessionId) { mutableStateOf<UiTranscriptCursor?>(null) }
@@ -459,7 +467,7 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
                 }
         }
         if (showEmpty && all.isEmpty() && !running) item(key = "empty") {
-            ZxConversationEmpty(workMode, Modifier.fillParentMaxSize())
+            ZxConversationEmpty(workMode, missingSession, Modifier.fillParentMaxSize())
         }
         items(timeline, key = { it.key }) { entry ->
             when (entry) {
@@ -530,7 +538,7 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
 
 /** No fake prompts or disabled suggestion chips; the existing composer is the sole primary CTA. */
 @Composable
-private fun ZxConversationEmpty(workMode: Boolean, modifier: Modifier = Modifier) {
+private fun ZxConversationEmpty(workMode: Boolean, missingSession: Boolean, modifier: Modifier = Modifier) {
     val colors = ZhaoxiTheme.colors
     Column(modifier.padding(horizontal = 20.dp, vertical = 32.dp),
         verticalArrangement = Arrangement.Center,
@@ -540,11 +548,12 @@ private fun ZxConversationEmpty(workMode: Boolean, modifier: Modifier = Modifier
             Text("朝", fontSize = 23.sp, fontWeight = FontWeight.Medium, color = colors.accent)
         }
         Spacer(Modifier.height(20.dp))
-        Text(if (workMode) "准备开始一项工作？" else "今天想聊些什么？",
+        Text(if (missingSession) "还没有打开会话" else if (workMode) "准备开始一项工作？" else "今天想聊些什么？",
             fontSize = 22.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold,
             color = colors.ink)
         Spacer(Modifier.height(8.dp))
-        Text(if (workMode) "描述目标，过程与结果会在同一条回复中逐步展开。"
+        Text(if (missingSession) "返回会话列表，选择已有对话或创建新会话。"
+            else if (workMode) "描述目标，过程与结果会在同一条回复中逐步展开。"
             else "写下问题、分享想法，或者从一个小目标开始。",
             fontSize = 14.sp, lineHeight = 22.sp, color = colors.ink2,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center)
