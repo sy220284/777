@@ -2,6 +2,7 @@ package com.labteto.dshmobile.uipack.zhaoxi.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,7 +10,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -112,6 +117,7 @@ private fun richInline(text: String): AnnotatedString = buildAnnotatedString {
 fun ZxRichReply(text: String, modifier: Modifier = Modifier) {
     val blocks = remember(text) { parseZxRichReply(text) }
     val colors = ZhaoxiTheme.colors
+    val clipboard = LocalClipboardManager.current
     Column(modifier, verticalArrangement = Arrangement.spacedBy(9.dp)) {
         blocks.forEach { block ->
             when (block) {
@@ -131,21 +137,49 @@ fun ZxRichReply(text: String, modifier: Modifier = Modifier) {
                     color = colors.ink2, fontSize = 14.sp, lineHeight = 21.sp)
                 is ZxReplyBlock.Code -> Column(Modifier.fillMaxWidth()
                     .background(colors.bg2, RoundedCornerShape(12.dp)).padding(12.dp)) {
-                    if (block.language.isNotBlank()) Text(block.language, color = colors.ink2, fontSize = 11.sp)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(block.language.ifBlank { "代码" }, color = colors.ink2, fontSize = 11.sp)
+                        ZxChip("复制", false) { clipboard.setText(AnnotatedString(block.source)) }
+                    }
                     Text(block.source, fontFamily = FontFamily.Monospace, fontSize = 12.sp,
                         lineHeight = 19.sp, color = colors.ink,
                         modifier = Modifier.horizontalScroll(rememberScrollState()))
                 }
-                is ZxReplyBlock.Table -> Column(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(block.headers.joinToString("    │    "), color = colors.ink,
-                        fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    HorizontalDivider()
-                    block.rows.take(100).forEach { row ->
-                        Text(row.joinToString("    │    "), color = colors.ink2, fontSize = 12.sp)
+                is ZxReplyBlock.Table -> {
+                    var expanded by remember(block) { mutableStateOf(false) }
+                    val widths = block.headers.indices.map { column ->
+                        val longest = (listOf(block.headers[column]) +
+                            block.rows.take(100).map { it.getOrElse(column) { "" } })
+                            .maxOfOrNull { it.length } ?: 8
+                        (longest.coerceIn(8, 28) * 7).dp
                     }
-                    if (block.rows.size > 100) Text("更多表格行请查看原始内容",
-                        color = colors.ink2, fontSize = 11.sp)
+                    Column(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            block.headers.forEachIndexed { col, value ->
+                                Text(value, Modifier.width(widths[col]), color = colors.ink,
+                                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                        HorizontalDivider()
+                        (if (expanded) block.rows.take(500) else block.rows.take(24))
+                            .forEach { row ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                    row.forEachIndexed { col, value ->
+                                        Text(value, Modifier.width(widths[col]),
+                                            color = colors.ink2, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        if (block.rows.size > 24) {
+                            ZxChip(if (expanded) "收起表格" else "展开 ${block.rows.size} 行", false) {
+                                expanded = !expanded
+                            }
+                        }
+                        if (expanded && block.rows.size > 500)
+                            Text("仅显示前 500 行 · 完整内容可复制原回复",
+                                fontSize = 11.sp, color = colors.ink2)
+                    }
                 }
                 ZxReplyBlock.Divider -> HorizontalDivider()
             }
