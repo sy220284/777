@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.lifecycle.ViewModelProvider
@@ -42,10 +44,21 @@ class ZhaoxiAcceptanceAndroidTest {
             theme, "stone", scale, 0, .5f, .5f, .5f, 1f, true)))
     }
 
-    private fun capture(name: String) {
+    private fun capture(name: String, expectedScene: String? = null) {
         compose.waitForIdle()
-        val screenshot = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
-        File(directory, "$name.png").outputStream().use { screenshot.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        val screenshot = if (expectedScene == null)
+            requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+        else {
+            // Compose captures the tagged renderer itself. System overlays / old activity
+            // surfaces must never be mislabeled as the requested scene.
+            val tag = "zhaoxi-acceptance-scene:$expectedScene"
+            compose.onNodeWithTag(tag, useUnmergedTree = true).assertIsDisplayed()
+                .captureToImage().asAndroidBitmap()
+        }
+        File(directory, "$name.png").outputStream().use {
+            assertTrue("Unable to encode screenshot $name",
+                screenshot.compress(Bitmap.CompressFormat.PNG, 100, it))
+        }
         screenshot.recycle()
     }
 
@@ -64,7 +77,8 @@ class ZhaoxiAcceptanceAndroidTest {
         compose.activityRule.scenario.onActivity { activity -> activity.setContent {
             CompositionLocalProvider(LocalUiPrivateTextCipher provides ports.privateTextCipher,
                 LocalUiHostSystemOperationOwner provides systemOperations) {
-                Box(Modifier.fillMaxSize().systemBarsPadding()) {
+                Box(Modifier.fillMaxSize().systemBarsPadding()
+                    .testTag("zhaoxi-acceptance-scene:${current.id.value}")) {
                     // SLOT renderers are embedded here; never proposed as navigation targets.
                     key(current.id) {
                         pack.SceneFrame(UiSceneNavigationState(pack.manifest.id, listOf(root, current.id))) {
@@ -88,7 +102,11 @@ class ZhaoxiAcceptanceAndroidTest {
                     compose.runOnIdle { current = requirement }
                     compose.waitForIdle()
                     compose.onAllNodesWithText("该场景暂无 Zx* 实装映射", substring = true).assertCountEquals(0)
-                    capture("$label-${requirement.id.value}")
+                    compose.waitUntil(10_000) {
+                        compose.onAllNodesWithTag("zhaoxi-acceptance-scene:${requirement.id.value}",
+                            useUnmergedTree = true).fetchSemanticsNodes().size == 1
+                    }
+                    capture("$label-${requirement.id.value}", requirement.id.value)
                     index.appendText("$label\t${requirement.id.value}\t${requirement.kind}\tlocal-session-and-persona; no-external-model; empty-message-and-media-states\n")
                 }
             }

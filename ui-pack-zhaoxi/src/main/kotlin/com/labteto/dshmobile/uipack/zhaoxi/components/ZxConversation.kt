@@ -158,9 +158,10 @@ fun ZxComposer(
     Row(
         modifier
             .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(c.glass)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -171,9 +172,14 @@ fun ZxComposer(
             modifier = Modifier.weight(1f),
         )
         if (running) {
-            ZxButton("■", onStop, variant = ZxButtonVariant.Outline)
+            ZxIconButton(onClick = onStop, contentDescription = "停止生成回复") {
+                ZxIcon("stop")
+            }
         } else {
-            ZxButton("↑", onSend, enabled = send.available && draft.isNotBlank())
+            ZxIconButton(onClick = onSend, contentDescription = "发送消息",
+                enabled = send.available && draft.isNotBlank()) {
+                ZxIcon("send")
+            }
         }
     }
 }

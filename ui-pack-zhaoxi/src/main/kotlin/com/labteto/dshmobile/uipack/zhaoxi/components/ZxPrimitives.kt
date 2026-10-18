@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -99,6 +100,7 @@ fun ZxIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     contentDescription: String,
+    enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val c = ZhaoxiTheme.colors
@@ -106,8 +108,9 @@ fun ZxIconButton(
         modifier
             .size(48.dp)
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick, role = Role.Button)
+            .clickable(enabled = enabled, onClick = onClick, role = Role.Button)
             .semantics { this.contentDescription = contentDescription }
+            .alpha(if (enabled) 1f else 0.4f)
             .padding(8.dp),
         contentAlignment = Alignment.Center,
     ) { androidx.compose.runtime.CompositionLocalProvider(
@@ -209,6 +212,7 @@ fun ZxChip(
     label: String,
     selected: Boolean,
     modifier: Modifier = Modifier,
+    role: Role = Role.Button,
     onClick: () -> Unit,
 ) {
     val c = ZhaoxiTheme.colors
@@ -217,7 +221,7 @@ fun ZxChip(
             .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .clip(RoundedCornerShape(999.dp))
             .background(if (selected) c.ink else c.bg2)
-            .selectable(selected = selected, onClick = onClick, role = Role.Tab)
+            .selectable(selected = selected, onClick = onClick, role = role)
             .padding(horizontal = 14.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -236,7 +240,7 @@ fun ZxTabRow(
     onSelect: (Int) -> Unit,
 ) {
     Row(modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        tabs.forEachIndexed { i, t -> ZxChip(t, i == selected, onClick = { onSelect(i) }) }
+        tabs.forEachIndexed { i, t -> ZxChip(t, i == selected, role = Role.Tab, onClick = { onSelect(i) }) }
         content()
     }
 }

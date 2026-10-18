@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +9,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -56,6 +59,9 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.ZxModeSwitch
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxQuestionCard
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTimeSeparator
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxIcon
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxIconButton
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTypingIndicator
 import com.labteto.dshmobile.uipack.zhaoxi.components.rejectionHint
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
@@ -79,7 +85,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
     fun writeDraft(text: String) { if (sessionId.isNotBlank()) drafts.updateDraft(sessionId, text) }
     var receipt by remember(sessionId) { mutableStateOf<UiCommandReceipt?>(null) }
     Column(Modifier.fillMaxWidth().fillMaxSize().imePadding()) {
-        ZxConversationRoutes(scope, menu)
+        ZxConversationRoutes(scope, menu, modeLabel = "聊天")
         CommandFeedback(receipt)
         snap.error?.let { ZxBanner(it, ZxTone.Err) }
         if (snap.status == UiSceneStatus.LOADING) com.labteto.dshmobile.uipack.zhaoxi.components.ZxProgressBar(null)
@@ -124,7 +130,7 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
     var receipt by remember(sessionId) { mutableStateOf<UiCommandReceipt?>(null) }
     var questionAnswer by remember { mutableStateOf("") }
     Column(Modifier.fillMaxWidth().fillMaxSize().imePadding()) {
-        ZxConversationRoutes(scope, menu)
+        ZxConversationRoutes(scope, menu, modeLabel = "工作")
         CommandFeedback(receipt)
         snap.error?.let { ZxBanner(it, ZxTone.Err) }
         if (snap.status == UiSceneStatus.LOADING) com.labteto.dshmobile.uipack.zhaoxi.components.ZxProgressBar(null)
@@ -254,15 +260,49 @@ fun ZhaoxiComposerSlotScene(
     }
 }
 
+/** Single compact navigation hierarchy for both Chat and Work. All actions remain Host-routed. */
 @Composable
-private fun ZxConversationRoutes(scope: UiSceneRenderScope, menu: @Composable () -> Unit) {
+private fun ZxConversationRoutes(scope: UiSceneRenderScope, menu: @Composable () -> Unit,
+    modeLabel: String) {
     var expanded by remember { mutableStateOf(false) }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip("返回", false) { scope.onBack() }
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip("模型", false) { scope.onNavigate(UiSceneId("conversation.model_picker")) }
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip("更多", false) { expanded = !expanded }
+    val c = ZhaoxiTheme.colors
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        ZxIconButton(onClick = { scope.onBack() }, contentDescription = "返回上一页") {
+            ZxIcon("back")
+        }
+        Column(Modifier.weight(1f).padding(start = 6.dp)) {
+            Text("朝夕", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
+            Text(modeLabel, fontSize = 11.sp, color = c.ink2)
+        }
+        com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip("模型", false) {
+            scope.onNavigate(UiSceneId("conversation.model_picker"))
+        }
+        ZxIconButton(onClick = { expanded = !expanded },
+            contentDescription = if (expanded) "收起会话操作" else "更多会话操作") {
+            ZxIcon("dots")
+        }
     }
-    if (expanded) Column(Modifier.heightIn(max = 320.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) { menu() }
+    androidx.compose.animation.AnimatedVisibility(
+        visible = expanded,
+        enter = androidx.compose.animation.fadeIn(
+            animationSpec = com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiMotion.spec<Float>(
+                com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiDuration.FAST)),
+        exit = androidx.compose.animation.fadeOut(
+            animationSpec = com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiMotion.spec<Float>(
+                com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiDuration.FAST)),
+    ) {
+        Column(Modifier.fillMaxWidth().heightIn(max = 320.dp)
+            .verticalScroll(androidx.compose.foundation.rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Text("会话操作", color = c.ink2, fontSize = 12.sp,
+                modifier = Modifier.padding(bottom = 8.dp))
+            menu()
+        }
+    }
 }
 
 /** Internal Work event projections are retained for audit, never pinned into the reply stream. */
@@ -381,9 +421,11 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
         LazyColumn(Modifier.weight(1f), state = state) {
         item(key = "history") {
             error?.let { ZxBanner(it, ZxTone.Err) }
-            if (history != null && (!loaded || cursor != null))
-                com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton(if (loading) "加载中…" else "加载更早消息", {
-                    if (sessionId.isNotBlank()) jobs.launch {
+            // No prominent history button in a genuinely empty conversation.
+            if (all.isNotEmpty() && history != null && (!loaded || cursor != null))
+                com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip(
+                    if (loading) "加载中…" else "查看更早的消息", false, onClick = {
+                    if (!loading && sessionId.isNotBlank()) jobs.launch {
                         loading = true
                         try {
                             val page = history.messagePage(sessionId, cursor, 60)
@@ -402,7 +444,18 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
                         catch (failure: Exception) { error = failure.message ?: "历史加载失败" }
                         finally { loading = false }
                     }
-                }, enabled = !loading)
+                })
+        }
+        if (all.isEmpty() && !running && !loading) {
+            item(key = "conversation-empty") {
+                Box(
+                    Modifier.fillMaxWidth().heightIn(min = 260.dp)
+                        .padding(horizontal = 18.dp, vertical = 30.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    ZxEmpty("从一句话开始", "可以聊天，也可以交代一项任务。\n回复会在这里连续呈现。")
+                }
+            }
         }
         items(timeline, key = { it.key }) { entry ->
             when (entry) {
