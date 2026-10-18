@@ -129,48 +129,130 @@ fun ZhaoxiPersonaInteractionScene(
     }
 }
 
-/** route.tools / tools.mcp / tools.github / tools.plugins — 工具与插件。 */
+/** 按 E8.18 独立场景分派工具中心、MCP、插件和 GitHub；所有状态来自 ToolsUiPort。 */
 @Composable
 fun ZhaoxiToolsScene(
     tools: com.labteto.dshmobile.uicontract.ToolsUiPort,
     scope: UiSceneRenderScope,
+    destination: String = "route.tools",
 ) {
     val co = rememberCoroutineScope()
     var feedback by remember { mutableStateOf<String?>(null) }
     var endpoint by remember { mutableStateOf("") }
     var serverId by remember { mutableStateOf("") }
+    var refresh by remember { mutableStateOf(0) }
+    val catalogue = remember(tools) { tools.capabilityCatalogue() }
+    val plugins = remember(tools, refresh) { tools.pluginLifecycleSnapshots() }
+    val installedIds = remember(tools, refresh) { tools.installedPluginIds() }
     val skills by produceState(initialValue = emptyList<com.labteto.dshmobile.uicontract.UiSkillSnapshot>(), tools) {
-        value = runCatching { tools.installedSkills() }.getOrDefault(emptyList())
+        value = tools.installedSkills()
     }
-    val servers by produceState(initialValue = emptyList<com.labteto.dshmobile.uicontract.UiMcpServerSnapshot>(), tools) {
-        value = runCatching { tools.servers() }.getOrDefault(emptyList())
+    val servers by produceState(initialValue = emptyList<com.labteto.dshmobile.uicontract.UiMcpServerSnapshot>(), tools, refresh) {
+        value = tools.servers()
     }
-    ZxPage("工具", onBack = { scope.onBack() }) {
+    val githubConfigured by produceState(initialValue = false, tools, refresh) {
+        value = tools.githubConfigured()
+    }
+    val heading = when (destination) {
+        "tools.mcp" -> "MCP 连接"
+        "tools.plugins" -> "插件管理"
+        "tools.github" -> "GitHub"
+        "work.capabilities" -> "能力目录"
+        else -> "工具中心"
+    }
+    ZxPage(heading, onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        ZxSection("可用能力")
-        tools.capabilityCatalogue().forEach { capability -> ZxRow(capability.name, "${capability.family} · ${capability.access} · ${capability.approval}") }
-        ZxSection("技能")
-        skills.forEach { s ->
-            ZxRow(s.toString().substringBefore(',').substringAfter('=').take(40), "已安装")
+        feedback?.let { ZxSection("操作回执"); Text(it, color = ZhaoxiTheme.colors.ink2) }
+        when (destination) {
+            "tools.mcp" -> {
+                ZxSection("连接方式 · HTTP")
+                com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
+                    serverId, { serverId = it }, Modifier.fillMaxWidth(), placeholder = "服务器名称")
+                com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
+                    endpoint, { endpoint = it }, Modifier.fillMaxWidth(), placeholder = "HTTP 地址")
+                ZxButton("连接服务器", { co.launch {
+                    feedback = tools.submit(
+                        com.labteto.dshmobile.uicontract.ToolsUiCommand.ConnectHttp(serverId, endpoint)
+                    ).toString()
+                    refresh++
+                } }, enabled = serverId.isNotBlank() && endpoint.isNotBlank())
+                ZxSection("已登记服务器")
+                if (servers.isEmpty()) ZxEmpty("尚未添加 MCP 服务器", "填写名称和地址后连接")
+                servers.forEach { server ->
+                    ZxRow(server.id, "${server.transport} · ${server.connection} · ${server.tools.size} 个工具")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ZxChip("检查连接", false) { co.launch {
+                            feedback = tools.checkServerHealth(server.id).toString()
+                            refresh++
+                        } }
+                        ZxChip("断开", false) { co.launch {
+                            feedback = tools.submit(
+                                com.labteto.dshmobile.uicontract.ToolsUiCommand.Disconnect(server.id)
+                            ).toString()
+                            refresh++
+                        } }
+                    }
+                }
+                ZxFooterNote("连接状态不代表工具已经授权执行；每次执行仍由原 Owner 验证")
+            }
+            "tools.plugins" -> {
+                ZxSection("已安装插件")
+                ZxValueRow("已安装数量", value = installedIds.size.toString())
+                if (installedIds.isEmpty() && plugins.isEmpty()) ZxEmpty("尚无已安装插件", "插件由当前工具管理能力提供")
+                installedIds.forEach { id ->
+                    val lifecycle = plugins.firstOrNull { it.id == id }
+                    ZxRow(id, lifecycle?.state?.name ?: "已安装 · 未提供生命周期状态")
+                }
+                plugins.filter { it.id !in installedIds }.forEach { item ->
+                    ZxRow(item.id, item.state.name)
+                }
+                plugins.filter { it.state == com.labteto.dshmobile.uicontract.UiPluginLifecycleState.FAILED }
+                    .forEach { item ->
+                        ZxButton("恢复 ${item.id}", { co.launch {
+                            feedback = tools.submit(
+                                com.labteto.dshmobile.uicontract.ToolsUiCommand.RecoverFailedPlugin(item.id)
+                            ).toString()
+                            refresh++
+                        } })
+                    }
+                ZxFooterNote("未提供的启停、安装操作不伪造；插件状态以 Owner 快照为准")
+            }
+            "tools.github" -> {
+                ZxSection("连接状态")
+                ZxValueRow("GitHub", value = if (githubConfigured) "已配置" else "未配置")
+                ZxSection("可用能力")
+                catalogue.filter { it.family.contains("github", ignoreCase = true) }
+                    .forEach { cap -> ZxRow(cap.name, "${cap.access} · ${cap.approval}") }
+                if (!githubConfigured) ZxFooterNote("GitHub 尚未配置；请通过已有授权配置入口连接")
+            }
+            "work.capabilities" -> {
+                val grouped = catalogue.groupBy { it.family }
+                if (grouped.isEmpty()) ZxEmpty("暂无能力", "已注册的能力会在这里出现")
+                grouped.forEach { (group, items) ->
+                    ZxSection(group)
+                    items.forEach { cap ->
+                        ZxRow(cap.name, "${cap.access} · ${cap.approval}")
+                    }
+                }
+            }
+            else -> {
+                ZxSection("可用能力")
+                catalogue.groupBy { it.family }.forEach { (family, items) ->
+                    ZxRow(family, "${items.size} 项已登记能力",
+                        onClick = { scope.onNavigate(UiSceneId("work.capabilities")) })
+                }
+                ZxSection("技能")
+                if (skills.isEmpty()) ZxRow("暂无已安装技能", "当前未读取到技能")
+                skills.forEach { item -> ZxRow(item.displayName, item.description) }
+                ZxSection("连接与扩展")
+                ZxRow("MCP 服务器", "${servers.size} 个已登记连接",
+                    onClick = { scope.onNavigate(UiSceneId("tools.mcp")) })
+                ZxRow("插件", "${installedIds.size} 个已安装插件",
+                    onClick = { scope.onNavigate(UiSceneId("tools.plugins")) })
+                ZxRow("GitHub", if (githubConfigured) "已配置" else "未配置",
+                    onClick = { scope.onNavigate(UiSceneId("tools.github")) })
+                ZxFooterNote("能力登记不等于运行许可；受控操作由原工具 Owner 执行")
+            }
         }
-        ZxSection("插件")
-        runCatching { tools.pluginLifecycleSnapshots() }.getOrDefault(emptyList()).forEach { p ->
-            ZxRow(p.toString().substringBefore(',').substringAfter('=').take(40), "生命周期快照")
-        }
-        ZxSection("MCP 服务器")
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(serverId, { serverId = it }, placeholder = "服务器名称")
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(endpoint, { endpoint = it }, placeholder = "HTTP 地址")
-        ZxButton("连接 HTTP 服务器", { co.launch {
-            try { feedback = tools.connectHttp(serverId, endpoint) }
-            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-            catch (failure: Exception) { feedback = failure.message ?: "连接失败" }
-        } }, enabled = serverId.isNotBlank() && endpoint.isNotBlank())
-        servers.forEach { s ->
-            ZxRow(s.id, "${s.connection} · ${s.tools.size} 个工具")
-            ZxButton("检查连接", { co.launch { feedback = tools.checkServerHealth(s.id).toString() } })
-            ZxButton("断开", { co.launch { feedback = tools.disconnect(s.id) } })
-        }
-        ZxFooterNote("变更经 ToolsUiPort.submit · Applied/Failed 回执呈现")
     }
 }
