@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.platform.LocalContext
 import com.labteto.dshmobile.uicontract.UiHostPreferences
@@ -82,6 +84,9 @@ class ZhaoxiApplicationScenePack(
         val messageId = active.second ?: return null
         return ZhaoxiDocumentContext(identity, workMode, messageId)
     }
+
+    // Ephemeral selection only: the FilesUiPort remains the data and authorization owner.
+    private var workspacePreviewPath by mutableStateOf("")
 
     // ---- 条件场景集合（镜像 V6ApplicationScenePack）----
 
@@ -372,8 +377,12 @@ class ZhaoxiApplicationScenePack(
             "media.result" -> ZhaoxiMediaResultScene("media-asset", scope)
 
             // ---- 工作区 ----
-            "route.workspace" -> ZhaoxiWorkspaceScene(sec?.files ?: conv?.files, scope)
-            "workspace.preview" -> ZhaoxiWorkspacePreviewScene(sec?.files ?: conv?.files, "", scope)
+            "route.workspace" -> ZhaoxiWorkspaceScene(sec?.files ?: conv?.files, scope) { filePath ->
+                workspacePreviewPath = filePath
+                scope.onNavigate(UiSceneId("workspace.preview"))
+            }
+            "workspace.preview" -> ZhaoxiWorkspacePreviewScene(
+                sec?.files ?: conv?.files, workspacePreviewPath, scope)
 
             // ---- 设置 ----
             "settings.root", "route.settings" -> ZhaoxiSettingsHomeScene(scope)

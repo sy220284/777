@@ -156,7 +156,7 @@ fun ZhaoxiErrorDemoScene(scope: UiSceneRenderScope) {
 
 /** route.workspace — 工作区文件。 */
 @Composable
-fun ZhaoxiWorkspaceScene(files: FilesUiPort?, scope: UiSceneRenderScope) {
+fun ZhaoxiWorkspaceScene(files: FilesUiPort?, scope: UiSceneRenderScope, onPreview: (String) -> Unit) {
     ZxPage("工作区", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         val list by produceState(initialValue = emptyList<com.labteto.dshmobile.local.tools.LocalWorkspaceFile>(), files) {
@@ -164,8 +164,8 @@ fun ZhaoxiWorkspaceScene(files: FilesUiPort?, scope: UiSceneRenderScope) {
         }
         if (list.isEmpty()) ZxEmpty("工作区是空的", "产物与附件会出现在这里")
         list.forEach { f ->
-            ZxRow(f.toString().substringBefore(',').substringAfter('=').take(48), "",
-                onClick = { scope.onNavigate(UiSceneId("workspace.preview")) })
+            ZxRow(f.path.substringAfterLast('/').take(48), "${f.bytes} 字节 · ${f.path}".take(92),
+                onClick = { onPreview(f.path) })
         }
     }
 }
