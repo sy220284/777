@@ -51,7 +51,6 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.uicontract.FilesUiPort
@@ -588,21 +587,23 @@ fun ZhaoxiSearchScene(
     onFileOpen: (String) -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
+    var refreshVersion by remember { mutableStateOf(0) }
+    val needle = query.trim()
     var commandReceipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
     val snapshot by (sessions?.snapshots
         ?: kotlinx.coroutines.flow.flowOf(UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null)))
         .collectAsState(initial = sessions?.snapshot() ?: UiSessionsSnapshot(
             null, LocalUsageMode.CHAT, false, emptyList(), null))
-    val galleryRead by produceState<com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt?>(null, gallery) {
+    val galleryRead by produceState<com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt?>(null, gallery, refreshVersion) {
         value = gallery?.read()
     }
     val taskSnapshot by produceState(automation?.snapshot(), automation) {
         automation?.snapshots?.collect { value = it }
     }
-    val fileRead by produceState<Result<List<com.labteto.dshmobile.local.tools.LocalWorkspaceFile>>?>(null, files) {
+    val fileRead by produceState<Result<List<com.labteto.dshmobile.local.tools.LocalWorkspaceFile>>?>(null, files, needle, refreshVersion) {
+        if (needle.isNotEmpty()) kotlinx.coroutines.delay(250)
         value = files?.let { runCatching { it.workspaceFiles() } }
     }
-    val needle = query.trim()
     val sessionResults = if (needle.isEmpty()) emptyList() else snapshot.sessions.filter {
         it.title.contains(needle, ignoreCase = true) ||
             it.summaryPreview.orEmpty().contains(needle, ignoreCase = true)
@@ -630,6 +631,10 @@ fun ZhaoxiSearchScene(
         Spacer(Modifier.height(8.dp))
         ZxField(query, { query = it }, Modifier.fillMaxWidth(),
             placeholder = "搜索会话、人物、任务和工作区文件")
+        if (needle.isNotEmpty()) {
+            ZxButton("刷新搜索结果", { refreshVersion++ }, enabled = !loading,
+                variant = ZxButtonVariant.Outline)
+        }
         CommandFeedback(commandReceipt)
         Spacer(Modifier.height(8.dp))
         if (needle.isEmpty()) {
