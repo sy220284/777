@@ -135,8 +135,9 @@ fun ZhaoxiPersonaGalleryScene(
                                         inJustDecodeBounds = true
                                     }
                                     android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+                                    val thumbnailWidth = (280f * androidx.compose.ui.unit.Density(1f).density).toInt()
                                     var sample = 1
-                                    while (maxOf(opts.outWidth, opts.outHeight) / sample > 360) sample *= 2
+                                    while (opts.outWidth / (sample * 2) >= thumbnailWidth) sample *= 2
                                     val bitmap = android.graphics.BitmapFactory.decodeByteArray(
                                         bytes, 0, bytes.size,
                                         android.graphics.BitmapFactory.Options().apply { inSampleSize = sample },
