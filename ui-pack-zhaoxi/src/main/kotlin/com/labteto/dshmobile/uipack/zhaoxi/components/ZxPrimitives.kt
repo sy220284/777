@@ -118,6 +118,7 @@ fun ZxField(
     placeholder: String = "",
     error: Boolean = false,
     textStyle: TextStyle = TextStyle(fontSize = 14.sp),
+    visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
 ) {
     val c = ZhaoxiTheme.colors
     Box(
@@ -130,6 +131,7 @@ fun ZxField(
             value = value,
             onValueChange = onValueChange,
             textStyle = textStyle.copy(color = c.ink),
+            visualTransformation = visualTransformation,
             cursorBrush = SolidColor(c.accent),
             modifier = Modifier.widthIn(min = 120.dp),
         ) { inner ->

@@ -90,4 +90,5 @@ data class ZhaoxiSecondaryPorts(
     val portraits: PersonaPortraitUiPort? = null,
     val modelPerformance: ModelPerformanceUiPort? = null,
     val pricing: PricingUiPort? = null,
+    val transfer: com.labteto.dshmobile.uicontract.PersonaTransferUiPort? = null,
 )

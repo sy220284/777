@@ -13,6 +13,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
 /** One independent E8.17 Compose entry; all domain owners and data remain in App/Feature Ports. */
+// FEATURE_TREE: {"id":"ui.zhaoxi.e817","path":"第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 朝夕 E8.17 独立界面接入（PR #740，未合并）","entry":"MainActivity","owner":"SHELL","test":"app/src/androidTest/java/com/labteto/dshmobile/ui/ZhaoxiHomeSmokeAndroidTest.kt#homeShowsInteractiveSessionAndMainRoutes"}
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
     @Inject lateinit var notifications: DshNotifications

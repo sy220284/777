@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.ui
 
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithText
 import com.labteto.dshmobile.MainActivity
 import org.junit.Rule
@@ -15,6 +15,9 @@ class ZhaoxiHomeSmokeAndroidTest {
         compose.onNodeWithText("朝夕").assertExists()
         compose.onNodeWithText("＋ 新会话").assertExists()
         compose.onNodeWithText("人物").assertExists()
-        compose.onNodeWithText("设置").assertExists()
+        compose.onNodeWithText("设置").performClick()
+        compose.onNodeWithText("模型与服务").assertExists()
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.onNodeWithText("＋ 新会话").assertExists()
     }
 }

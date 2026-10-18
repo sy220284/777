@@ -82,6 +82,7 @@ fun ZhaoxiEditScene(
     message: UiMessageSnapshot,
     chat: ChatUiPort,
     scope: UiSceneRenderScope,
+    work: WorkConversationUiPort? = null,
 ) {
     var text by remember { mutableStateOf(message.editableText ?: message.text) }
     var rejection by remember { mutableStateOf<UiCommandRejection?>(null) }
@@ -96,9 +97,9 @@ fun ZhaoxiEditScene(
         ZxField(text, { text = it }, Modifier.fillMaxWidth().height(120.dp))
         Spacer(Modifier.height(10.dp))
         ZxButton("重发", {
-            val id = chat.snapshot().identity
+            val id = work?.snapshot()?.identity ?: chat.snapshot().identity
             if (id == null) rejection = UiCommandRejection.UNCONFIGURED
-            else when (val r = chat.submit(ChatUiCommand.EditUserMessage(id, message.id, text))) {
+            else when (val r = if (work != null) work.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.EditUserMessage(id, message.id, text)) else chat.submit(ChatUiCommand.EditUserMessage(id, message.id, text))) {
                 UiCommandReceipt.Accepted, UiCommandReceipt.Queued,
                 is UiCommandReceipt.MessageEdited -> scope.onBack()
                 is UiCommandReceipt.Rejected -> rejection = r.reason
@@ -135,15 +136,18 @@ fun ZhaoxiBranchesScene(
 @Composable
 fun ZhaoxiApprovalScene(work: WorkConversationUiPort, scope: UiSceneRenderScope) {
     val snap by work.snapshots.collectAsState(initial = work.snapshot())
+    var receipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
     ZxPage("审批", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
+        CommandFeedback(receipt)
         val approval = snap.approval
         if (approval == null) ZxEmpty("没有待审批", "工具调用需要批准时会出现在这里")
         else ZxApprovalCard(approval, expired = false) { approved ->
             snap.identity?.let { id ->
-                work.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.AnswerApproval(
+                val result = work.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.AnswerApproval(
                     id, approval.pendingId, approved))
-                scope.onBack()
+                receipt = result
+                if (result.admitted()) scope.onBack()
             }
         }
     }
@@ -167,33 +171,6 @@ fun ZhaoxiQuestionScene(work: WorkConversationUiPort, scope: UiSceneRenderScope)
                 }
             }
         }
-    }
-}
-
-/** media.result — 生成结果。 */
-@Composable
-fun ZhaoxiMediaResultScene(assetLabel: String, scope: UiSceneRenderScope) {
-    ZxPage("生成结果", onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(8.dp))
-        ZxRow(assetLabel, "MediaUiPort.asset(id) 提供内容")
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ZxChip("存图集", false) {}; ZxChip("分享", false) {}
-            ZxChip("再生成", false) {}; ZxChip("删除", false) {}
-        }
-        ZxFooterNote("存图集动作经 Owner 命令 · 删除不可恢复")
-    }
-}
-
-/** chat.gallery_profile — 人物档案摘要页。 */
-@Composable
-fun ZxGalleryProfileScene(name: String, summary: String, scope: UiSceneRenderScope) {
-    ZxPage(name, onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(8.dp))
-        ZxRow("核心身份", summary.take(80))
-        ZxNavRow("画像", sub = "chat.gallery_portrait") {}
-        ZxNavRow("故事", sub = "chat.gallery_story") {}
-        ZxNavRow("迁移", sub = "chat.persona_transfer") {}
     }
 }
 

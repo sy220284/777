@@ -43,31 +43,20 @@ import kotlinx.coroutines.launch
 
 /** work.plan_review — 计划审查（方案呈现 + 逐步确认 + 批准执行）。 */
 @Composable
-fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, sessionId: String, scope: UiSceneRenderScope) {
-    val plan = remember(sessionId) { workReads.planForUi(sessionId) }
+fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile.uicontract.WorkConversationUiPort,
+    sessionId: String, scope: UiSceneRenderScope) {
+    val snapshot by work.snapshots.collectAsState(initial = work.snapshot())
+    val plan = snapshot.let { workReads.planForUi(sessionId) }
     ZxPage("计划审查", onBack = { scope.onBack() }) {
         if (plan == null) {
-            com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("没有进行中的计划", "工作模式开启计划后，方案会先到这里等你确认")
-            return@ZxPage
+            com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("没有进行中的计划", "计划由工作运行时提供")
+        } else {
+            plan.plan.forEachIndexed { index, step -> ZxRow(step, plan.todos.getOrNull(index)?.ownerStatus.orEmpty()) }
+            // Approval and questions carry the actual Owner-issued pending identifier.
+            snapshot.question?.let { ZhaoxiQuestionScene(work, scope) }
+            snapshot.approval?.let { ZhaoxiApprovalScene(work, scope) }
         }
-        Spacer(Modifier.height(8.dp))
-        PlanReviewBody(plan)
     }
-}
-
-@Composable
-private fun PlanReviewBody(plan: UiWorkPlanSnapshot) {
-    var confirmed by remember(plan.sessionId) { mutableStateOf(setOf<Int>()) }
-    val steps = plan.plan.mapIndexed { i, content ->
-        ZxPlanStep(content, plan.todos.getOrNull(i)?.ownerStatus ?: "待确认", i in confirmed)
-    }
-    ZxPlanReviewCard(
-        steps = steps,
-        currentIndex = steps.indexOfFirst { !it.confirmed }.coerceAtLeast(0),
-        onConfirmStep = { confirmed = confirmed + it },
-        onEditStep = { },
-        onApproveAll = { confirmed = steps.indices.toSet() },
-    )
 }
 
 /** work.requirement_evidence — 需求证据关联。 */

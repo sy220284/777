@@ -130,13 +130,24 @@ fun ZhaoxiModelSettingsScene(settings: SettingsUiPort, scope: UiSceneRenderScope
 /** settings.usage — 用量（UsageUiPort 只读）。 */
 @Composable
 fun ZhaoxiUsageScene(usage: com.labteto.dshmobile.uicontract.UsageUiPort, scope: UiSceneRenderScope) {
-    val rev by usage.revision.collectAsState()
-    ZxPage("用量", onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(8.dp))
-        val s = remember(rev) { runCatching { usage.snapshot().toString() }.getOrDefault("不可用") }
-        ZxValueRow("统计快照", value = "rev $rev", sub = s.take(160))
-        ZxNavRow("按会话明细", sub = "groupDetail / requestDetail") {}
-        ZxFooterNote("只读投影 · 不提供重置入口")
+    val revision by usage.revision.collectAsState()
+    val snapshot = remember(revision) { usage.snapshot() }
+    var model by remember { mutableStateOf<String?>(null) }
+    var selectedGroup by remember { mutableStateOf<String?>(null) }
+    val current = model?.let { snapshot.byModel[it] } ?: snapshot
+    ZxPage("模型用量", onBack = { scope.onBack() }) {
+        ZxChip("全部模型", model == null) { model = null }
+        snapshot.byModel.keys.forEach { id -> ZxChip(id, model == id) { model = id } }
+        ZxValueRow("Token 总量", value = "${current.tracked.totalTokens}", sub = "${current.tracked.requestCount} 次请求")
+        ZxValueRow("输入 / 输出", value = "${current.tracked.inputTokens} / ${current.tracked.outputTokens}")
+        ZxValueRow("估算费用（元）", value = "${current.tracked.estimatedCostCny}")
+        current.sessions.forEach { session -> ZxRow(session.title, "${session.aggregate.totalTokens} Token", onClick = { selectedGroup = session.key }) }
+        selectedGroup?.let { id ->
+            usage.groupDetail(com.labteto.dshmobile.local.TokenUsageGroupKind.SESSION, id, model)?.let { detail ->
+                ZxSection(detail.title)
+                detail.records.forEach { record -> Text(record.toString(), color = ZhaoxiTheme.colors.ink2) }
+            }
+        }
     }
 }
 
@@ -164,6 +175,7 @@ fun ZhaoxiDiagnosticsScene(
     checkForUpdate: (() -> Unit)?,
     scope: UiSceneRenderScope,
 ) {
+    var demo by remember { mutableStateOf<String?>(null) }
     val status by (updateStatus ?: kotlinx.coroutines.flow.MutableStateFlow<String?>(null)).collectAsState()
     ZxPage("诊断与更新", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
@@ -171,10 +183,12 @@ fun ZhaoxiDiagnosticsScene(
         ZxValueRow("更新状态", value = status ?: "未检查")
         Spacer(Modifier.height(8.dp))
         ZxButton("检查更新", { checkForUpdate?.invoke() }, Modifier.fillMaxWidth())
+        if (demo == "empty") com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("这里什么都没有", "可以返回继续使用")
+        if (demo == "error") com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner("错误状态示例", com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err)
         ZxSection("界面状态演示")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ZxChip("空态", false) { scope.onNavigate(UiSceneId("shell.empty")) }
-            ZxChip("错误态", false) { scope.onNavigate(UiSceneId("shell.error")) }
+            ZxChip("空态", false) { demo = "empty" }
+            ZxChip("错误态", false) { demo = "error" }
             ZxChip("引导", false) { scope.onNavigate(UiSceneId("shell.onboarding")) }
         }
     }

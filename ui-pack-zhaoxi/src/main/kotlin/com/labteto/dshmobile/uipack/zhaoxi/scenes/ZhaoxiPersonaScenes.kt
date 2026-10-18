@@ -49,6 +49,8 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTransferSheet
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 import com.labteto.dshmobile.uihost.UiSceneRenderScope
 import kotlinx.coroutines.launch
+import com.labteto.dshmobile.uicontract.*
+import androidx.compose.runtime.saveable.rememberSaveable
 
 /**
  * 人物/图集/群聊/日记域场景（E8.14 实装）。
@@ -60,10 +62,31 @@ import kotlinx.coroutines.launch
 fun ZhaoxiPersonaGalleryScene(
     gallery: PersonaGalleryUiPort,
     scope: UiSceneRenderScope,
-    onOpenPersona: (String) -> Unit = {},
+    onOpenPersona: (String) -> Unit,
+    authoring: PersonaAuthoringUiPort? = null,
+    transfer: PersonaTransferUiPort? = null,
 ) {
-    val state by produceState<UiPersonaGalleryReadReceipt?>(null) { value = gallery.read() }
+    var revision by remember { mutableStateOf(0) }
+    var feedback by remember { mutableStateOf<String?>(null) }
+    val jobs = androidx.compose.runtime.rememberCoroutineScope()
+    val state by produceState<UiPersonaGalleryReadReceipt?>(null, revision) { value = gallery.read() }
+    val importer = transfer?.let { owner ->
+        com.labteto.dshmobile.uihost.rememberUiDocumentImporter(owner.maxImportBytes) { result ->
+            if (result is com.labteto.dshmobile.uihost.UiDocumentPickReceipt.Picked) jobs.launch {
+                feedback = owner.import(ImportPersonaDocumentCommand(result.document.bytes, result.document.name, result.document.mimeType)).toString()
+                revision++
+            }
+        }
+    }
     ZxPage("人物图集", onBack = { scope.onBack() }) {
+        feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
+        if (authoring != null) {
+            ZxChip("新建人物", false) { onOpenPersona("new") }
+            authoring.presets().forEach { preset -> ZxChip("添加 ${preset.name}", false) { jobs.launch {
+                feedback = authoring.installPreset(preset.id).toString(); revision++
+            } } }
+        }
+        if (importer != null) ZxChip("导入人物", false) { importer() }
         Spacer(Modifier.height(8.dp))
         when (val r = state) {
             null -> repeat(3) { ZxSkeleton(ZxSkeletonVariant.Card, Modifier.padding(vertical = 6.dp)) }
@@ -81,10 +104,7 @@ fun ZhaoxiPersonaGalleryScene(
                         ZxPersonaCard(e.name, "${e.stories.size} 段故事", onClick = { onOpenPersona(e.id) })
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ZxChip("＋ 添加（预设 / 新建 / 导入）", false) {}
-                    ZxChip("管理", false) {}
-                }
+
             }
         }
     }
@@ -97,38 +117,13 @@ fun ZhaoxiPersonaEditorScene(
     galleryId: String,
     scope: UiSceneRenderScope,
 ) {
-    val state by produceState<UiPersonaAuthoringReceipt?>(null, galleryId) { value = authoring.read(galleryId) }
-    var tab by remember { mutableStateOf(0) }
-    ZxPage("人物", onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(8.dp))
-        when (val r = state) {
-            null -> repeat(3) { ZxSkeleton(ZxSkeletonVariant.Row, Modifier.padding(vertical = 6.dp)) }
-            is UiPersonaAuthoringReceipt.Loaded -> {
-                val draft = r.snapshot.draft
-                Text(draft.name, fontSize = 17.sp, color = ZhaoxiTheme.colors.ink)
-                Text("revision ${r.snapshot.revision} · 亲密与日记数由图集提供", fontSize = 10.5.sp,
-                    color = ZhaoxiTheme.colors.ink3)
-                Spacer(Modifier.height(8.dp))
-                ZxTabRow(listOf("核心身份", "事实 ${draft.facts.size}", "世界书 ${draft.lore.size}", "行为调节"), tab) { tab = it }
-                Spacer(Modifier.height(8.dp))
-                when (tab) {
-                    0 -> {
-                        ZxValueRow("核心身份", value = "", sub = draft.coreIdentity)
-                        ZxValueRow("开场白", value = "", sub = draft.fields["opening"] ?: "未设置")
-                    }
-                    1 -> draft.facts.forEach { f -> ZxRow(f.content.take(40), "${f.category} 类事实 · ${f.provenance}") }
-                    2 -> draft.lore.forEach { l -> ZxRow(l.title, "关键词 ${l.keywords.joinToString()} · 剧透 Lv${l.spoilerLevel} · 优先级 ${l.priority}") }
-                    else -> {
-                        ZxValueRow("表现张力", value = "${draft.samplingTemperaturePosition ?: 50}", sub = "影响采样温度位置 · 仅此人物")
-                        ZxNavRow("恢复默认", sub = "回到全局采样行为") {}
-                    }
-                }
-                ZxFooterNote("保存只写归档 · 应用到当前会话是独立显式动作")
-            }
-            is UiPersonaAuthoringReceipt.Failed ->
-                com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner("读取失败 · ${r.message ?: "未知"}", com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err)
-            else -> ZxEmpty("不可用", "人物归档不存在或已被移除")
-        }
+    val state by produceState<UiPersonaAuthoringReceipt?>(null, galleryId) {
+        value = if (galleryId == "new") null else authoring.read(galleryId)
+    }
+    when (val result = state) {
+        is UiPersonaAuthoringReceipt.Loaded -> ZhaoxiAuthoringForm(authoring, result.snapshot, scope)
+        null -> if (galleryId == "new") ZhaoxiAuthoringForm(authoring, null, scope) else ZxEmpty("加载中", "正在读取人物")
+        else -> ZxEmpty("无法编辑人物", result.toString())
     }
 }
 
@@ -225,31 +220,35 @@ fun ZxPersonaTransferScene(
 
 /** chat.group_members — 群成员。 */
 @Composable
-fun ZxGroupMembersScene(members: List<Pair<String, Boolean>>, scope: UiSceneRenderScope) {
+fun ZxGroupMembersScene(groups: ChatGroupUiPort, scope: UiSceneRenderScope) {
+    val snap by groups.snapshots.collectAsState(initial = groups.snapshot())
+    var selected by remember(snap.identity, snap.memberIds) { mutableStateOf(snap.memberIds) }
+    var receipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
     ZxPage("群成员", onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(8.dp))
-        if (members.isEmpty())
-            ZxEmpty("成员清单未注入", "由 ChatGroupUiPort 投影提供")
-        members.forEach { (name, selected) ->
-            ZxRow(name, "") {
-                ZxBadge(if (selected) "✓ 已选" else "未选", if (selected) ZxBadgeTone.Accent else ZxBadgeTone.Neutral)
-            }
+        CommandFeedback(receipt)
+        snap.available.forEach { choice ->
+            ZxRow(choice.displayName, if (choice.galleryId in selected) "已选" else "未选",
+                onClick = { selected = if (choice.galleryId in selected) selected - choice.galleryId else selected + choice.galleryId })
         }
-        ZxFooterNote("成员变更经 ChatGroupUiPort · 群主语义不变")
+        com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton("保存成员", {
+            snap.identity?.let { receipt = groups.submit(ChatGroupUiCommand.ConfigureMembers(it, selected.toList())) }
+        }, enabled = !snap.busy && snap.identity != null)
     }
 }
 
-/** chat.group_announcement — 群公告编辑。 */
 @Composable
-fun ZxGroupAnnouncementScene(initial: String, scope: UiSceneRenderScope) {
-    var text by remember { mutableStateOf(initial) }
+fun ZxGroupAnnouncementScene(groups: ChatGroupUiPort, scope: UiSceneRenderScope) {
+    val snap by groups.snapshots.collectAsState(initial = groups.snapshot())
+    var text by rememberSaveable(snap.identity?.sessionId, snap.announcement) { mutableStateOf(snap.announcement) }
+    var receipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
     ZxPage("群公告", onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(8.dp))
+        CommandFeedback(receipt)
         com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(text, { text = it },
-            Modifier.fillMaxWidth().height(120.dp), placeholder = "公告卡置顶于群会话顶部")
-        Text("${text.length} / 2000 字", fontSize = 10.sp, color = ZhaoxiTheme.colors.ink3)
-        Spacer(Modifier.height(10.dp))
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton("保存公告", {}, Modifier.fillMaxWidth())
+            Modifier.fillMaxWidth().height(120.dp), placeholder = "公告")
+        Text("${text.length} / ${snap.maximumAnnouncementChars} 字", color = ZhaoxiTheme.colors.ink3)
+        com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton("保存公告", {
+            snap.identity?.let { receipt = groups.submit(ChatGroupUiCommand.SaveAnnouncement(it, text)) }
+        }, enabled = !snap.busy && snap.identity != null)
     }
 }
 

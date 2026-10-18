@@ -158,27 +158,3 @@ fun ZhaoxiToolsScene(
         ZxFooterNote("变更经 ToolsUiPort.submit · Applied/Failed 回执呈现")
     }
 }
-
-/** media.creation / media.result — 媒体生成。 */
-@Composable
-fun ZxMediaCreationScene(
-    media: com.labteto.dshmobile.uicontract.MediaUiPort,
-    scope: UiSceneRenderScope,
-) {
-    val co = rememberCoroutineScope()
-    var prompt by remember { mutableStateOf("") }
-    ZxPage("媒体生成", onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(8.dp))
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
-            prompt, { prompt = it }, Modifier.fillMaxWidth().height(96.dp),
-            placeholder = "描述要生成的图片或视频…")
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ZxChip("图片", true) {}; ZxChip("视频", false) {}
-        }
-        Spacer(Modifier.height(10.dp))
-        ZxButton("生成", { co.launch { /* MediaUiCommand.Submit 由宿主绑定 profile */ } },
-            Modifier.fillMaxWidth(), enabled = prompt.isNotBlank())
-        ZxFooterNote("生成结果经 observe(sessionId) 回流 · 可存图集或分享")
-    }
-}

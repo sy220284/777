@@ -60,6 +60,10 @@ fun ZhaoxiHomeScene(
                 val receipt = sessions?.submit(SessionUiCommand.Create(null, LocalConversationMode.INDEPENDENT, LocalUsageMode.CHAT))
                 if (receipt == UiCommandReceipt.Accepted) scope.onNavigate(UiSceneId("conversation.chat"))
             }
+            ZxChip("＋ 工作", false) {
+                val receipt = sessions?.submit(SessionUiCommand.Create(null, LocalConversationMode.INDEPENDENT, LocalUsageMode.WORK))
+                if (receipt == UiCommandReceipt.Accepted) scope.onNavigate(UiSceneId("conversation.work"))
+            }
             ZxChip("搜索", false) { scope.onNavigate(UiSceneId("shell.search")) }
         }
         Spacer(Modifier.height(8.dp))
@@ -67,6 +71,7 @@ fun ZhaoxiHomeScene(
             ZxChip("聊天", false) { scope.onNavigate(UiSceneId("conversation.chat")) }
             ZxChip("人物", false) { scope.onNavigate(UiSceneId("route.persona_gallery")) }
             ZxChip("任务", false) { scope.onNavigate(UiSceneId("route.tasks")) }
+            ZxChip("文件", false) { scope.onNavigate(UiSceneId("route.workspace")) }
             ZxChip("工具", false) { scope.onNavigate(UiSceneId("route.tools")) }
             ZxChip("设置", false) { scope.onNavigate(UiSceneId("route.settings")) }
         }

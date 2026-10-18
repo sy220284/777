@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.host
 
+import androidx.compose.foundation.layout.systemBarsPadding
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -116,6 +117,7 @@ internal fun ZhaoxiApplicationRoot(
                 portraits = owner.personaPortraitUiPort,
                 modelPerformance = owner.modelPerformance,
                 pricing = owner.pricing,
+                transfer = owner.personaTransferUiPort,
             ),
         )
     }
@@ -136,6 +138,11 @@ internal fun ZhaoxiApplicationRoot(
     var selected by remember(chooser, requirements) {
         mutableStateOf(chooser.restore(requirements))
     }
+    val systemOperations = remember { com.labteto.dshmobile.uihost.UiHostSystemOperationOwner() }
+    androidx.compose.runtime.CompositionLocalProvider(
+        com.labteto.dshmobile.uihost.LocalUiHostSystemOperationOwner provides systemOperations,
+    ) {
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().systemBarsPadding()) {
     when (val result = selected) {
         is UiApplicationPackSelectionResult.Selected -> {
             val admission = result.admission
@@ -168,6 +175,8 @@ internal fun ZhaoxiApplicationRoot(
             IntegrationBlocked("无法持久保存朝夕 UI 选择，请检查本地存储权限。") {
                 selected = chooser.choose("zhaoxi", requirements)
             }
+    }
+    }
     }
 }
 
