@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,6 +23,12 @@ import com.labteto.dshmobile.uicontract.DiaryUiPort
 import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.UiCommandRejection
 import com.labteto.dshmobile.uicontract.UiMessageSnapshot
+import com.labteto.dshmobile.uicontract.ConversationReadingUiPort
+import com.labteto.dshmobile.uicontract.UiMessageHistoryPort
+import com.labteto.dshmobile.uicontract.UiDocumentUiPort
+import com.labteto.dshmobile.uicontract.UiSceneId
+import com.labteto.dshmobile.uicontract.MediaUiPort
+import com.labteto.dshmobile.uicontract.UiExecutionPhase
 import com.labteto.dshmobile.uicontract.WorkConversationUiPort
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxApprovalCard
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadge
@@ -42,19 +49,33 @@ import com.labteto.dshmobile.uihost.UiSceneRenderScope
  * 时间线（只读）、消息操作、编辑、分支、审批/提问独立场景、媒体结果、人物档案、日记。
  */
 
-/** conversation.timeline — 消息时间线（只读槽位）。 */
+/** conversation.timeline: compatibility route delegates to the SAME turn-keyed reply surface. */
 @Composable
-fun ZhaoxiTimelineScene(chat: ChatUiPort, authorName: String) {
+fun ZhaoxiTimelineScene(
+    chat: ChatUiPort,
+    reading: ConversationReadingUiPort,
+    history: UiMessageHistoryPort? = null,
+    documents: UiDocumentUiPort? = null,
+    knownScenes: Set<UiSceneId> = emptySet(),
+    media: MediaUiPort? = null,
+) {
     val snap by chat.snapshots.collectAsState(initial = chat.snapshot())
     var selectedMessage by remember { mutableStateOf<UiMessageSnapshot?>(null) }
-    selectedMessage?.let { message ->
-        androidx.compose.foundation.text.selection.SelectionContainer { Text(message.text, color = ZhaoxiTheme.colors.ink) }
-    }
-    if (snap.messages.isEmpty()) ZxEmpty("还没有消息", "从下方输入框开始")
-    snap.messages.forEach { m ->
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxMessageRow(
-            m, authorName, onLongPress = { selectedMessage = it }, onBranchSelect = { index -> snap.identity?.let { chat.submit(ChatUiCommand.SelectVariant(it, m.id, index)) } },
-        )
+    androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
+        selectedMessage?.let { message ->
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                com.labteto.dshmobile.uipack.zhaoxi.components.ZxRichReply(message.text)
+            }
+        }
+        if (snap.messages.isEmpty() && snap.phase != UiExecutionPhase.RUNNING)
+            ZxEmpty("还没有消息", "从下方输入框开始")
+        ConversationMessages(snap.identity, snap.messages, reading, history,
+            Modifier.weight(1f), onMessage = { selectedMessage = it },
+            onBranch = { m, index -> snap.identity?.let {
+                chat.submit(ChatUiCommand.SelectVariant(it, m.id, index))
+            } }, preview = snap.livePreview,
+            running = snap.phase == UiExecutionPhase.RUNNING,
+            documents = documents, knownScenes = knownScenes, media = media)
     }
 }
 
