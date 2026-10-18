@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -61,19 +63,29 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
     }
     ZxPage(if (resultsOnly) "媒体结果" else "媒体生成", onBack = { scope.onBack() }) {
         status?.let { ZxBanner(it, ZxTone.Info) }
-        if (sessionId.isBlank()) ZxEmpty("请先打开会话", "选择会话后继续")
-        if (!resultsOnly) {
+        if (sessionId.isBlank()) {
+            ZxEmpty("请先打开会话", "选择会话后继续媒体生成和查看结果")
+        } else if (!resultsOnly) {
         ZxNavRow("历史结果", sub = "${page.results.size} 项") {
             scope.onNavigate(UiSceneId("media.result"))
         }
-        ZxSection("模型")
+        ZxSection("生成模型")
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
         offers.forEach { candidate -> ZxChip(candidate.label, candidate.id == offer?.id) { offerId = candidate.id } }
         }
-        if (offers.isEmpty()) ZxNavRow("配置媒体模型") { scope.onNavigate(UiSceneId("settings.models")) }
-        ZxField(prompt, { prompt = it }, Modifier.fillMaxWidth(), placeholder = "生成内容")
-        if (offer?.kind == LocalMediaKind.IMAGE) ZxField(ratio, { ratio = it }, placeholder = "图片比例")
+        if (offers.isEmpty()) ZxNavRow("配置媒体模型", sub = "先添加受支持的图像、语音或视频模型") {
+            scope.onNavigate(UiSceneId("settings.models"))
+        }
+        if (offer?.kind != LocalMediaKind.TRANSCRIBE) {
+            ZxSection("生成描述")
+            ZxField(prompt, { prompt = it }, Modifier.fillMaxWidth().heightIn(min = 96.dp),
+                placeholder = "描述想生成的内容…")
+        }
+        if (offer?.kind == LocalMediaKind.IMAGE) {
+            ZxSection("画面比例")
+            ZxField(ratio, { ratio = it }, Modifier.fillMaxWidth(), placeholder = "例如 1:1")
+        }
         if (offer?.kind == LocalMediaKind.SPEECH) {
             val voices by produceState<List<LocalMediaVoice>>(emptyList(), offer?.id) {
                 val target = offer
@@ -106,19 +118,36 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
             if (original != null && media.canRefresh(task, original)) ZxButton("查询视频状态", { execute { receiptText(media.submit(MediaUiCommand.PollVideo(original, task.id))) } })
         }
         } else {
-        ZxNavRow("新建生成") { scope.onNavigate(UiSceneId("media.creation")) }
-        ZxSection("生成结果")
-        if (page.results.isEmpty()) ZxEmpty("暂无生成结果", "生成完成后会显示在这里")
-        page.results.forEach { result ->
-            ZxRow(result.description?.take(80) ?: result.kind,
-                "${result.model} · ${result.kind}",
-                onClick = { selected = result.id; galleryPicker = false })
+        ZxNavRow("新建生成", sub = "图像 · 视频 · 语音与转写") {
+            scope.onNavigate(UiSceneId("media.creation"))
         }
+        ZxSection("生成结果 · ${page.results.size}")
+        if (page.results.isEmpty()) ZxEmpty("暂无生成结果", "创建任务后，已完成的内容会出现在这里")
+        // 结果选择放在预览前，避免长历史把当前作品推到屏幕下方。
         val result = page.results.firstOrNull { it.id == selected } ?: page.results.firstOrNull()
+        if (page.results.isNotEmpty()) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                page.results.forEachIndexed { index, entry ->
+                    val label = entry.description?.take(14)?.takeIf(String::isNotBlank)
+                        ?: "${entry.kind} ${index + 1}"
+                    ZxChip(label, entry.id == result?.id) {
+                        selected = entry.id
+                        galleryPicker = false
+                    }
+                }
+            }
+        }
+        result?.let { ZxValueRow("模型", value = it.model) }
         val asset = result?.let { media.assetForSession(it.id, sessionId) }
         if (result != null && asset == null) ZxEmpty("内容不可用", "结果文件可能已清理")
         if (result != null && asset != null) {
-            ZxSection("预览")
+            ZxSection("作品预览")
+            result.description?.takeIf(String::isNotBlank)?.let { description ->
+                Text(description, color = ZhaoxiTheme.colors.ink2)
+            }
             asset.textOutput?.let { Text(it, color = ZhaoxiTheme.colors.ink) }
             asset.localPath?.let { path ->
                 val kind = when (result.kind.uppercase()) {
@@ -129,7 +158,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
                 }
                 if (kind != null) UiOwnedMediaPlayback(path, kind, Modifier.fillMaxWidth().heightIn(max = 400.dp))
             }
-            ZxSection("操作")
+            ZxSection("作品操作")
             ZxButton("保存到文件", { export(result.id to sessionId) })
             ZxButton("分享", { execute { shareUiMedia(context, media, result.id, sessionId); "已打开系统分享" } })
             ZxButton("重新生成", {
@@ -159,7 +188,9 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
                     } })
                 }
             }
-            ZxButton("删除结果", { pendingDelete = result.id })
+            ZxSection("管理")
+            ZxButton("删除结果", { pendingDelete = result.id },
+                variant = ZxButtonVariant.Danger)
         }
         }
         pendingDelete?.let { id -> ZxDialog("删除媒体结果？", "删除本地结果无法恢复", "删除", {

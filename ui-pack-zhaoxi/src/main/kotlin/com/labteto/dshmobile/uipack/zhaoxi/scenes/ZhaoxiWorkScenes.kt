@@ -51,7 +51,12 @@ fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile
         if (plan == null) {
             com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("没有进行中的计划", "计划由工作运行时提供")
         } else {
-            plan.plan.forEachIndexed { index, step -> ZxRow(step, plan.todos.getOrNull(index)?.ownerStatus.orEmpty()) }
+            ZxSection("计划步骤 · ${plan.plan.size}")
+            plan.plan.forEachIndexed { index, step ->
+                ZxRow("${index + 1}. $step",
+                    plan.todos.getOrNull(index)?.ownerStatus?.takeIf(String::isNotBlank)
+                        ?: "等待工作运行时更新")
+            }
             // Approval and questions carry the actual Owner-issued pending identifier.
             snapshot.question?.let { ZxNavRow("回答计划问题") { scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.question")) } }
             snapshot.approval?.let { ZxNavRow("处理审批") { scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.approval")) } }
@@ -75,7 +80,9 @@ fun ZhaoxiRequirementEvidenceScene(
         when (val r = snap) {
             null -> repeat(3) { com.labteto.dshmobile.uipack.zhaoxi.components.ZxSkeleton(com.labteto.dshmobile.uipack.zhaoxi.components.ZxSkeletonVariant.Row, Modifier.padding(vertical = 6.dp)) }
             is UiWorkEvidenceReadReceipt.Available -> {
-                ZxSection("需求清单")
+                ZxSection("需求清单 · ${r.snapshot.requirements.size}")
+                com.labteto.dshmobile.uipack.zhaoxi.components.ZxValueRow(
+                    "已关联证据", value = "${r.snapshot.references.size} 条")
                 r.snapshot.requirements.forEach { req ->
                     ZxRow("「${req.text}」", "需求 #${req.index} · ${req.reportedStatus}") {
                         ZxBadge(req.reportedStatus, ZxBadgeTone.Neutral)
@@ -83,14 +90,41 @@ fun ZhaoxiRequirementEvidenceScene(
                 }
                 ZxSection("证据引用")
                 if (r.snapshot.references.isEmpty()) {
-                    com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("还没有关联证据", "在运行详情里把产物关联到需求")
+                    com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("还没有关联证据", "完成工作任务后，可通过真实工作证据操作关联产物")
                 }
                 r.snapshot.references.forEach { link ->
-                    ZxRow(link.toString().take(64), "")
+                    val freshness = when {
+                        link.versionNow == null -> "当前版本未确认"
+                        link.versionNow == link.versionAtLink -> "引用版本未变化"
+                        else -> "文件版本已变化 · 需要复核"
+                    }
+                    ZxRow(link.artifactPath.substringAfterLast('/').ifBlank { link.artifactPath },
+                        "需求 #${link.requirementIndex} · $freshness")
+                }
+                if (r.snapshot.artifacts.isNotEmpty()) {
+                    ZxSection("运行产物 · ${r.snapshot.artifacts.size}")
+                    r.snapshot.artifacts.forEach { item ->
+                        ZxRow(item.reference.substringAfterLast('/').ifBlank { item.reference },
+                            "${item.category} · " + when (item.currentlyAvailable) {
+                                true -> "可访问"
+                                false -> "已不可访问"
+                                null -> "未核对当前可用性"
+                            })
+                    }
                 }
                 r.snapshot.machine?.let { m ->
-                    ZxSection("机器核验")
-                    ZxRow("状态", "${m.status} · 缺失 ${m.missing.size} 项")
+                    ZxSection("机器条件核验")
+                    val status = when (m.status) {
+                        com.labteto.dshmobile.uicontract.UiWorkMachineVerificationStatus.NO_MACHINE_CONDITIONS -> "没有可自动核验的条件"
+                        com.labteto.dshmobile.uicontract.UiWorkMachineVerificationStatus.UNSATISFIED -> "仍有未满足的条件"
+                        com.labteto.dshmobile.uicontract.UiWorkMachineVerificationStatus.VERIFIED_CONDITIONS -> "可机检条件已满足"
+                    }
+                    ZxRow("状态", status)
+                    ZxRow("检查范围", "文件条件 ${m.artifactConditionCount} · 命令条件 ${m.commandConditionCount}")
+                    if (m.missing.isNotEmpty()) {
+                        ZxSection("缺失条件 · ${m.missing.size}")
+                        m.missing.forEach { item -> ZxRow(item, "") }
+                    }
                 }
             }
             is UiWorkEvidenceReadReceipt.Rejected ->
