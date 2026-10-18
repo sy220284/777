@@ -145,42 +145,7 @@ fun ZxRichReply(text: String, modifier: Modifier = Modifier) {
                         lineHeight = 19.sp, color = colors.ink,
                         modifier = Modifier.horizontalScroll(rememberScrollState()))
                 }
-                is ZxReplyBlock.Table -> {
-                    var expanded by remember(block) { mutableStateOf(false) }
-                    val widths = block.headers.indices.map { column ->
-                        val longest = (listOf(block.headers[column]) +
-                            block.rows.take(100).map { it.getOrElse(column) { "" } })
-                            .maxOfOrNull { it.length } ?: 8
-                        (longest.coerceIn(8, 28) * 7).dp
-                    }
-                    Column(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                            block.headers.forEachIndexed { col, value ->
-                                Text(value, Modifier.width(widths[col]), color = colors.ink,
-                                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                        HorizontalDivider()
-                        (if (expanded) block.rows.take(500) else block.rows.take(24))
-                            .forEach { row ->
-                                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                                    row.forEachIndexed { col, value ->
-                                        Text(value, Modifier.width(widths[col]),
-                                            color = colors.ink2, fontSize = 12.sp)
-                                    }
-                                }
-                            }
-                        if (block.rows.size > 24) {
-                            ZxChip(if (expanded) "收起表格" else "展开 ${block.rows.size} 行", false) {
-                                expanded = !expanded
-                            }
-                        }
-                        if (expanded && block.rows.size > 500)
-                            Text("仅显示前 500 行 · 完整内容可复制原回复",
-                                fontSize = 11.sp, color = colors.ink2)
-                    }
-                }
+                is ZxReplyBlock.Table -> ZxDataTable(block.headers, block.rows)
                 ZxReplyBlock.Divider -> HorizontalDivider()
             }
         }
