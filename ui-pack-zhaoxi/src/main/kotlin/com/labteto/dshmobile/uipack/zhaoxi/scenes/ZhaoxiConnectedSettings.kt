@@ -291,16 +291,45 @@ fun ZhaoxiMemoryManagementScene(memory: MemoryUiPort, scope: UiSceneRenderScope)
         memory.memoryPage(MemoryManagementQuery(setOf(MemoryScope.GLOBAL), text = query, cursor = cursor))
     }
     var status by remember { mutableStateOf<String?>(null) }
+    var pendingForget by remember { mutableStateOf<MemoryRecord?>(null) }
+    fun applyReceipt(receipt: MemoryUiReceipt) {
+        status = when (receipt) {
+            is MemoryUiReceipt.Updated -> "已保存"
+            MemoryUiReceipt.Forgotten -> "已遗忘"
+            MemoryUiReceipt.StaleOrMissing -> "记录已变化，请重新加载"
+            is MemoryUiReceipt.CommittedWithWarning -> receipt.message
+            is MemoryUiReceipt.Failed -> receipt.message ?: "操作失败"
+        }
+        if (receipt is MemoryUiReceipt.Updated ||
+            receipt == MemoryUiReceipt.Forgotten ||
+            receipt is MemoryUiReceipt.CommittedWithWarning) revision++
+    }
     ZxPage("记忆管理", onBack = { scope.onBack() }) {
-        ZxField(query, { query = it }, placeholder = "搜索记忆")
+        Spacer(Modifier.height(8.dp))
+        ZxField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = "搜索全局记忆")
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
+        if (page.records.isEmpty()) ZxEmpty("没有匹配的记忆", "可以调整搜索条件")
         page.records.forEach { record ->
             var text by rememberUiPrivateText("zhaoxi.memory.${record.id}", record.updatedAt) { record.content }
-            ZxField(text, { text = it }, Modifier.fillMaxWidth())
-            ZxButton("保存", { status = memory.submit(MemoryUiCommand.Update(record, text, record.pinned)).toString(); revision++ })
-            ZxButton("遗忘", { status = memory.submit(MemoryUiCommand.Forget(record)).toString(); revision++ })
+            ZxSettingsGroup {
+                ZxValueRow("记忆类型", value = record.kind.name)
+                ZxField(text, { text = it }, Modifier.fillMaxWidth())
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ZxButton("保存", { applyReceipt(memory.submit(
+                        MemoryUiCommand.Update(record, text, record.pinned))) },
+                        Modifier.weight(1f))
+                    ZxButton("遗忘", { pendingForget = record }, Modifier.weight(1f),
+                        ZxButtonVariant.Danger)
+                }
+            }
         }
         page.next?.let { next -> ZxButton("下一页", { cursor = next }) }
         if (cursor != null) ZxButton("回到首页", { cursor = null })
+    }
+    pendingForget?.let { record ->
+        ZxDialog("遗忘这条记忆？", "删除后无法直接恢复。", "遗忘", {
+            pendingForget = null
+            applyReceipt(memory.submit(MemoryUiCommand.Forget(record)))
+        }, { pendingForget = null })
     }
 }
