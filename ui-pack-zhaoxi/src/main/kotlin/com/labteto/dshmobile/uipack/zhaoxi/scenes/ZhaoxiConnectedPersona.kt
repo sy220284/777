@@ -167,6 +167,7 @@ fun ZhaoxiPortraitEditor(port: PersonaPortraitUiPort, galleryId: String, scope: 
     val jobs = rememberCoroutineScope()
     var revision by remember { mutableStateOf(0) }
     var status by remember { mutableStateOf<String?>(null) }
+    var confirmRemove by remember { mutableStateOf(false) }
     val preview by produceState<UiPersonaPortraitPreviewReceipt?>(null, galleryId, revision) { value = port.preview(galleryId) }
     val pick = rememberUiAttachmentPickerFor<String>(arrayOf("image/*"), { status = it }) { target, uri ->
         if (uri != null) jobs.launch { status = port.submit(PersonaPortraitUiCommand.Import(target, uri)).toString(); revision++ }
@@ -189,7 +190,18 @@ fun ZhaoxiPortraitEditor(port: PersonaPortraitUiPort, galleryId: String, scope: 
         image?.let { Image(it, "人物画像", Modifier.fillMaxWidth().height(280.dp)) }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
         ZxButton("导入画像", { pick(galleryId) })
-        ZxButton("移除画像", { jobs.launch { status = port.submit(PersonaPortraitUiCommand.Remove(galleryId)).toString(); revision++ } })
+        if (image != null) ZxButton("移除画像", { confirmRemove = true }, variant = ZxButtonVariant.Danger)
+        if (confirmRemove) ZxDialog(
+            "确定移除这张画像？", "移除后无法从当前人物档案恢复。", "确认移除",
+            {
+                confirmRemove = false
+                jobs.launch {
+                    status = port.submit(PersonaPortraitUiCommand.Remove(galleryId)).toString()
+                    revision++
+                }
+            },
+            { confirmRemove = false },
+        )
     }
 }
 
