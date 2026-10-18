@@ -1,6 +1,10 @@
 package com.labteto.dshmobile.uipack.zhaoxi
 
 import com.labteto.dshmobile.uicontract.UiPersonaPortraitReceipt
+import com.labteto.dshmobile.local.model.LocalMediaCreationPhase
+import com.labteto.dshmobile.local.model.LocalMediaVideoPhase
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxCreationPhaseLabel
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxVideoPhaseLabel
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxPortraitImportFeedback
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -23,6 +27,15 @@ class ZhaoxiMediaOwnerFeedbackTest {
         assertFalse(feedback.failure)
         assertTrue(feedback.warning)
         assertTrue(feedback.message.contains("清理旧图片"))
+    }
+
+    @Test fun ownerMediaStatesStayDistinctAndUnknownNeverMeansSuccess() {
+        assertEquals("执行结果待确认", LocalMediaCreationPhase.OUTCOME_UNKNOWN.zxCreationPhaseLabel())
+        assertEquals("执行结果待确认", LocalMediaVideoPhase.OUTCOME_UNKNOWN.zxVideoPhaseLabel())
+        assertEquals("保存失败", LocalMediaCreationPhase.SAVE_FAILED.zxCreationPhaseLabel())
+        assertEquals("生成完成", LocalMediaVideoPhase.SUCCEEDED.zxVideoPhaseLabel())
+        LocalMediaCreationPhase.entries.forEach { assertFalse(it.zxCreationPhaseLabel().isBlank()) }
+        LocalMediaVideoPhase.entries.forEach { assertFalse(it.zxVideoPhaseLabel().isBlank()) }
     }
 
     @Test fun missingAndRejectedImportCannotShowSuccess() {
