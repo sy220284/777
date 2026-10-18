@@ -53,7 +53,8 @@ fun ZhaoxiSettingsHomeScene(scope: UiSceneRenderScope) {
         Spacer(Modifier.height(8.dp))
         ZxSection("对话与体验")
         ZxNavRow("外观", sub = "明暗主题 · 强调色 · 环境光") { scope.onNavigate(UiSceneId("settings.appearance")) }
-        ZxNavRow("聊天偏好", sub = "对话风格 · 个人规则") { scope.onNavigate(UiSceneId("settings.chat")) }
+        ZxNavRow("聊天风格", sub = "过滤词 · 命中记录") { scope.onNavigate(UiSceneId("settings.chat")) }
+        ZxNavRow("个人规则") { scope.onNavigate(UiSceneId("settings.session")) }
         ZxNavRow("记忆", sub = "记忆概览 · 管理") { scope.onNavigate(UiSceneId("settings.memory")) }
         ZxNavRow("通知", sub = "提醒种类 · 免打扰") { scope.onNavigate(UiSceneId("settings.notifications")) }
 
@@ -69,8 +70,8 @@ fun ZhaoxiSettingsHomeScene(scope: UiSceneRenderScope) {
         ZxSection("数据与系统")
         ZxNavRow("用量统计", sub = "模型消耗 · 请求记录") { scope.onNavigate(UiSceneId("settings.usage")) }
         ZxNavRow("会话存储", sub = "占用空间 · 压缩 · 导出") { scope.onNavigate(UiSceneId("settings.session_storage")) }
-        ZxNavRow("高级与运行", sub = "运行限制 · 规则") { scope.onNavigate(UiSceneId("settings.advanced")) }
-        ZxNavRow("诊断与更新", sub = "版本 · 检查更新") { scope.onNavigate(UiSceneId("settings.diagnostics")) }
+        ZxNavRow("高级设置", sub = "运行限制") { scope.onNavigate(UiSceneId("settings.advanced")) }
+        ZxNavRow("检查更新") { scope.onNavigate(UiSceneId("settings.diagnostics")) }
     }
 }
 
