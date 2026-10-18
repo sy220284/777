@@ -264,22 +264,10 @@ fun ZhaoxiModelPickerScene(
                     if (current) {
                         scope.onBack()
                     } else if (pendingModelId == null) {
-                        when (val receipt = onSelect(id)) {
-                            SettingsUiReceipt.Applied, SettingsUiReceipt.Submitted -> {
-                                pendingModelId = id
-                                failed = false
-                                feedback = "已提交切换请求，等待模型状态确认"
-                            }
-                            SettingsUiReceipt.Rejected -> {
-                                failed = true
-                                feedback = "模型切换未被受理，请检查配置后重试"
-                            }
-                            is SettingsUiReceipt.Failed -> {
-                                failed = true
-                                feedback = receipt.message?.takeIf(String::isNotBlank)
-                                    ?.let { "切换失败：$it" } ?: "模型切换失败，请重试"
-                            }
-                        }
+                        val result = zxModelSubmitFeedback(onSelect(id))
+                        pendingModelId = if (result.waitForSelection) id else null
+                        failed = result.error
+                        feedback = result.message
                     }
                 },
             ) {
