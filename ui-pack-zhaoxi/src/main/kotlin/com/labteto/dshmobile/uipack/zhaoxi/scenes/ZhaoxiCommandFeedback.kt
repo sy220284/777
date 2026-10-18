@@ -26,6 +26,14 @@ internal fun UiCommandReceipt.userHint(): String = when (this) {
     }
     UiCommandReceipt.NotAdmitted -> "操作未被受理"
 }
+/** An editor closes only on an admitted edit, never on BUSY/FAILED or an uncertain result. */
+internal fun UiCommandReceipt.exitsMessageEditor(): Boolean = when (this) {
+    UiCommandReceipt.Accepted, UiCommandReceipt.Queued -> true
+    is UiCommandReceipt.MessageEdited ->
+        result == UiMessageEditOutcome.SENT || result == UiMessageEditOutcome.COMMITTED_NOT_STARTED
+    else -> false
+}
+
 /** Message edits may commit without starting a reply; that is not a rejection. */
 internal fun UiCommandReceipt.positiveFeedback(): Boolean =
     admitted() || (this is UiCommandReceipt.MessageEdited &&
