@@ -509,8 +509,8 @@ class ZhaoxiApplicationScenePack(
             "settings.memory_settings" -> settings?.let { ZhaoxiMemorySettingsScene(it, scope) }
             "settings.account" -> settings?.let { ZhaoxiAccountScene(it, scope) }
             "settings.minimax_quota" -> settings?.let { ZhaoxiQuotaScene(it, scope) }
-            "settings.usage" -> usageOwner?.let { ZhaoxiUsageOverviewScene(it, scope) }
-            "settings.model_usage" -> usageOwner?.let { ZhaoxiUsageOverviewScene(it, scope, modelOnly = true) }
+            "settings.usage" -> usageOwner?.let { ZhaoxiUsageOverviewScene(it, scope, settings = settings) }
+            "settings.model_usage" -> usageOwner?.let { ZhaoxiUsageOverviewScene(it, scope, modelOnly = true, settings = settings) }
             "settings.usage_log" -> usageOwner?.let { usage ->
                 ZhaoxiUsageLogScene(usage, scope) { requestId ->
                     targets.usageRequestId = requestId

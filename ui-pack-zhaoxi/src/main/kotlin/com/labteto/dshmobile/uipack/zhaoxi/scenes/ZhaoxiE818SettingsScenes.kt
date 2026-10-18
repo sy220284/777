@@ -27,13 +27,27 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.*
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 import com.labteto.dshmobile.uihost.UiSceneRenderScope
 
+/** 先列出真实保存的配置，再补齐曾有请求记录但现在未保存的历史模型。 */
+internal fun zxUsageModelNames(configured: List<String>, recorded: Set<String>): List<String> =
+    (configured + recorded).distinct().sorted()
+
 /** All totals here are rendered from the existing Usage Owner; no locally computed billing facts. */
 @Composable
-fun ZhaoxiUsageOverviewScene(usage: UsageUiPort, scope: UiSceneRenderScope, modelOnly: Boolean = false) {
+fun ZhaoxiUsageOverviewScene(
+    usage: UsageUiPort, scope: UiSceneRenderScope, modelOnly: Boolean = false,
+    settings: SettingsUiPort? = null,
+) {
     val revision by usage.revision.collectAsState()
     val source = remember(revision, usage) { usage.snapshot() }
+    val configured = settings?.state?.collectAsState(initial = settings.initialState)?.value?.modelProfiles.orEmpty()
+    val modelNames = zxUsageModelNames(configured.map { it.model }, source.byModel.keys)
+    val modelLabels = configured.associate { it.model to (it.displayName ?: it.model) }
     var selectedModel by rememberSaveable { mutableStateOf<String?>(null) }
-    val snapshot = selectedModel?.let { source.byModel[it] } ?: source
+    LaunchedEffect(modelNames) {
+        if (selectedModel != null && selectedModel !in modelNames) selectedModel = null
+    }
+    val selectedHasRecords = selectedModel == null || selectedModel in source.byModel
+    val snapshot = selectedModel?.let { source.byModel[it] ?: TokenUsageAnalyticsSnapshot() } ?: source
     var selectedGroup by remember { mutableStateOf<String?>(null) }
     ZxPage(if (modelOnly) "模型用量" else "用量统计", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
@@ -43,9 +57,15 @@ fun ZhaoxiUsageOverviewScene(usage: UsageUiPort, scope: UiSceneRenderScope, mode
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ZxChip("全部", selectedModel == null) { selectedModel = null; selectedGroup = null }
-            source.byModel.keys.sorted().forEach { id ->
-                ZxChip(id, selectedModel == id) { selectedModel = id; selectedGroup = null }
+            modelNames.forEach { model ->
+                ZxChip(modelLabels[model] ?: model, selectedModel == model) {
+                    selectedModel = model
+                    selectedGroup = null
+                }
             }
+        }
+        if (!selectedHasRecords) {
+            ZxFooterNote("该模型尚无保留的请求用量记录，下面显示的是零记录统计，并非所有模型总和。")
         }
         ZxSection("用量总览")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

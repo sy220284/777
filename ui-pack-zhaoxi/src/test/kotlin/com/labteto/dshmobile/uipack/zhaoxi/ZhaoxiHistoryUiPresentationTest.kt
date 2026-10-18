@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.uipack.zhaoxi
 
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxAutomationTaskMatches
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxUsageModelNames
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxHumanFileSize
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxToolFamilyLabel
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkspaceFileVisible
@@ -19,6 +20,11 @@ class ZhaoxiHistoryUiPresentationTest {
         assertTrue(zxWorkspaceFileVisible(".dsh/skills/code-review/SKILL.md", "", true))
         assertTrue(zxWorkspaceFileVisible("reports/result.md", "result", false))
         assertFalse(zxWorkspaceFileVisible("reports/result.md", "other", true))
+    }
+    @Test fun configuredModelsRemainSelectableBeforeFirstRequest() {
+        assertEquals(listOf("gpt-alpha", "minimax", "old-model"),
+            zxUsageModelNames(listOf("minimax", "gpt-alpha", "minimax"), setOf("old-model")))
+        assertEquals(emptyList<String>(), zxUsageModelNames(emptyList(), emptySet()))
     }
     @Test fun automationSearchUsesRealPromptActorAndSchedule() {
         assertTrue(zxAutomationTaskMatches("提醒", "明天提醒写稿", null, "每日"))
