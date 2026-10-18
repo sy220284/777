@@ -214,7 +214,7 @@ class ZhaoxiAcceptanceAndroidTest {
     @Test fun switchSemanticsExposeRealStateAndToggleOwner() {
         val ports = ready()
         compose.onNodeWithText("设置").performClick()
-        compose.onNodeWithText("行为与采样").performClick()
+        compose.onNodeWithText("记忆").performClick()
         val old = runBlocking { ports.settingsUiPort.state.first { !it.loading }.autoMemory }
         val control = compose.onNodeWithContentDescription("自动记忆")
         control.performScrollTo()
