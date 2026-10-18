@@ -117,7 +117,7 @@ fun ZxBranchSwitcher(index: Int, count: Int, modifier: Modifier = Modifier, onSe
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         ZxChip("‹", false, onClick = { if (index > 0) onSelect(index - 1) })
-        Text("${index + 1} / $count", fontSize = 10.5.sp, color = c.accent,
+        Text("${index + 1} / $count", fontSize = 10.5.sp, color = c.accentInk,
             fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
         ZxChip("›", false, onClick = { if (index < count - 1) onSelect(index + 1) })
         Text("分支 · 变体可切换", fontSize = 10.sp, color = c.ink3)
