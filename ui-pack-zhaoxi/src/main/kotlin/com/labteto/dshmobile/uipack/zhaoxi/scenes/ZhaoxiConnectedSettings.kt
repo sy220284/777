@@ -17,6 +17,14 @@ import com.labteto.dshmobile.uihost.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 
+/** Render typed Settings receipts without exposing Kotlin data-class names. */
+internal fun SettingsUiReceipt.zxUserMessage(action: String = "操作"): String = when (this) {
+    SettingsUiReceipt.Applied -> "${action}成功"
+    SettingsUiReceipt.Submitted -> "已提交，等待生效"
+    SettingsUiReceipt.Rejected -> "${action}不可用"
+    is SettingsUiReceipt.Failed -> message ?: "${action}失败"
+}
+
 /** Credentials exist only in the current form; all writes stay with the existing Model owner. */
 @Composable
 fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
@@ -46,8 +54,9 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             ZxRow(p.displayName ?: p.model, if (snap.modelSelection.isActive(p)) "当前模型" else p.baseUrl,
                 onClick = { status = when (val receipt = settings.submit(SettingsUiCommand.SelectModel(p.id))) {
                     SettingsUiReceipt.Applied -> "已切换模型"
+                    SettingsUiReceipt.Submitted -> "切换已提交"
+                    SettingsUiReceipt.Rejected -> "当前无法切换"
                     is SettingsUiReceipt.Failed -> receipt.message ?: "切换失败"
-                    else -> "切换未完成"
                 } })
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ZxChip("编辑", false) { profileId = p.id; model = p.model; baseUrl = p.baseUrl; protocol = p.protocol; apiKey = "" }
@@ -59,8 +68,9 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                 pendingRemoveModel = null
                 status = when (val receipt = settings.submit(SettingsUiCommand.RemoveModel(id))) {
                     SettingsUiReceipt.Applied -> "模型已移除"
+                    SettingsUiReceipt.Submitted -> "移除已提交"
+                    SettingsUiReceipt.Rejected -> "当前无法移除"
                     is SettingsUiReceipt.Failed -> receipt.message ?: "移除失败"
-                    else -> "移除未完成"
                 }
                 if (profileId == id) profileId = null
             }, { pendingRemoveModel = null })
@@ -75,8 +85,9 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         ZxButton("保存模型", { execute {
             when (val result = settings.save(SettingsUiCommand.SaveModel(apiKey, model, baseUrl, protocol, profileId))) {
                 SettingsUiReceipt.Applied -> { apiKey = ""; profileId = null; "模型已保存" }
+                SettingsUiReceipt.Submitted -> "保存已提交"
+                SettingsUiReceipt.Rejected -> "无法保存模型"
                 is SettingsUiReceipt.Failed -> result.message ?: "保存失败"
-                else -> "保存未完成"
             }
         } }, enabled = !busy && model.isNotBlank())
         ZxChip("新建", false) { profileId = null; model = ""; apiKey = "" }
@@ -209,7 +220,7 @@ fun ZhaoxiRuntimeSettingsScene(
                 placeholder = "输入希望助手遵循的规则")
             ZxButton("保存规则", {
                 status = settings.submit(SettingsUiCommand.Personalization(
-                    rules, snap.autoRecall, snap.autoMemory)).toString()
+                    rules, snap.autoRecall, snap.autoMemory)).zxUserMessage("保存规则")
             }, Modifier.fillMaxWidth())
         } else {
             ZxSection("执行限制")
@@ -222,7 +233,7 @@ fun ZhaoxiRuntimeSettingsScene(
                 val a = attempts.toIntOrNull()
                 status = if (m == null || n == null || a == null) "请输入有效整数"
                 else settings.submit(SettingsUiCommand.RuntimeLimits(
-                    m, n, a, snap.modelSelection.workerProfileId)).toString()
+                    m, n, a, snap.modelSelection.workerProfileId)).zxUserMessage("保存运行设置")
             }, Modifier.fillMaxWidth())
         }
         status?.let { ZxFooterNote(it) }
@@ -269,7 +280,7 @@ fun ZhaoxiStorageScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     LaunchedEffect(settings) { storage = settings.sessionStorageStatus() }
     val export = rememberUiStreamDocumentSaver<Unit>("application/zip", { "777-sessions.zip" }, { _, output ->
         settings.exportSessionStorage(output); UiDocumentWriteReceipt.Saved
-    }, { _, r -> status = r.toString() }, { status = it.message })
+    }, { _, r -> status = if (r == UiDocumentWriteReceipt.Saved) "备份已保存" else "备份失败" }, { status = it.message })
     ZxPage("会话存储", onBack = { scope.onBack() }) {
         storage?.let { ZxValueRow("${it.sessionCount} 个会话", value = "${it.totalBytes} 字节", sub = "剩余空间 ${it.freeBytes} 字节") }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
