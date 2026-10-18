@@ -271,6 +271,10 @@ private fun ZxConversationRoutes(scope: UiSceneRenderScope, menu: @Composable ()
     if (expanded) Column(Modifier.heightIn(max = 320.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) { menu() }
 }
 
+/** Internal Work event projections are retained for audit, never pinned into the reply stream. */
+internal fun UiDocument.isInlineWorkTaskCard(): Boolean =
+    source.workMode && documentId == "work-live:${source.messageId}"
+
 @Composable
 private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<UiMessageSnapshot>,
     reading: ConversationReadingUiPort, history: UiMessageHistoryPort?, modifier: Modifier,
@@ -288,14 +292,18 @@ private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<Ui
     val all = (older + messages).distinctBy { it.id }
     val documentsState = if (documents != null) documents.snapshots.collectAsState(initial = documents.snapshot())
         else null
+    // Work execution events remain in the Owner ledger, but the reply timeline is prose-first.
+    // Its auto-published work-live projection must not appear as a persistent task card.
     val currentDocuments = documentsState?.value?.takeIf { it.sessionId == sessionId }
-        ?.documents.orEmpty()
+        ?.documents.orEmpty().filterNot { it.document.isInlineWorkTaskCard() }
     // Historical document reads have no privileges; newer active snapshots always win by ID.
     val olderIds = older.map { it.id }.toSet()
     val historical by produceState<Map<String, List<UiDocumentSnapshot>>>(emptyMap(), sessionId,
         olderIds, documents, identity) {
         value = if (documents != null && identity != null && olderIds.isNotEmpty())
-            documents.documentsForMessages(identity, olderIds).groupBy { it.document.source.messageId }
+            documents.documentsForMessages(identity, olderIds)
+                .filterNot { it.document.isInlineWorkTaskCard() }
+                .groupBy { it.document.source.messageId }
         else emptyMap()
     }
     val activeByMessage = currentDocuments.groupBy { it.document.source.messageId }
