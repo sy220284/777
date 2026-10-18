@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
 import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.TokenUsageGroupKind
+import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryManagementQuery
 import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
