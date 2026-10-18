@@ -321,9 +321,10 @@ fun ZhaoxiBackground(
                 }
             }
     }
-    val glow = intensity.coerceIn(0f, 1f) * (if (wallpaper != null) 0.16f else 1f)
+    val currentWallpaper = wallpaper
+    val glow = intensity.coerceIn(0f, 1f) * (if (currentWallpaper != null) 0.16f else 1f)
     androidx.compose.foundation.layout.Box(modifier) {
-        wallpaper?.let {
+        currentWallpaper?.let {
             androidx.compose.foundation.Image(
                 bitmap = it.first,
                 contentDescription = null,
@@ -332,12 +333,12 @@ fun ZhaoxiBackground(
             )
         }
         androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().drawBehind {
-            if (wallpaper == null) {
+            if (currentWallpaper == null) {
                 drawRect(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(c.bg, c.bg2)))
             } else {
                 // Only the surface is veiled; controls and text above this layer remain sharp.
                 drawRect(c.bg.copy(alpha = wallpaperVeilAlpha(
-                    wallpaper.second, c.bg.red > 0.5f, adaptiveContrast)))
+                    currentWallpaper.second, c.bg.red > 0.5f, adaptiveContrast)))
             }
             if (glow > 0f) {
                 drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
