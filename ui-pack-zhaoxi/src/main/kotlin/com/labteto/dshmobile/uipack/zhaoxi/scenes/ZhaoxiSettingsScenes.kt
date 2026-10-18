@@ -46,23 +46,31 @@ import com.labteto.dshmobile.uihost.UiSceneRenderScope
  * 只读诊断（usage/performance/pricing/memory）只呈现快照。
  */
 
-/** route.settings — 设置主页。 */
+/** route.settings — 按 E8.18 四大信息域组织设置入口。 */
 @Composable
 fun ZhaoxiSettingsHomeScene(scope: UiSceneRenderScope) {
     ZxPage("设置", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        ZxSection("模型与服务")
-        ZxNavRow("模型", sub = "当前模型 · 供应商 · 路由") { scope.onNavigate(UiSceneId("settings.models")) }
-        ZxNavRow("行为与采样", sub = "温度 · 上下文 · 全局默认") { scope.onNavigate(UiSceneId("settings.advanced")) }
-        ZxSection("外观与通知")
-        ZxNavRow("外观", sub = "主题 · 字级 · 强调色") { scope.onNavigate(UiSceneId("settings.appearance")) }
-        ZxNavRow("通知与权限", sub = "系统级开关") { scope.onNavigate(UiSceneId("settings.notifications")) }
-        ZxSection("数据")
-        ZxNavRow("用量", sub = "token 与费用") { scope.onNavigate(UiSceneId("settings.usage")) }
-        ZxNavRow("记忆与日记", sub = "长期记忆 · 回顾") { scope.onNavigate(UiSceneId("settings.memory")) }
-        ZxNavRow("备份与迁移", sub = "导出 · 导入") { scope.onNavigate(UiSceneId("settings.session_storage")) }
-        ZxSection("关于")
-        ZxNavRow("诊断与更新", sub = "版本 · 状态演示") { scope.onNavigate(UiSceneId("settings.diagnostics")) }
+        ZxSection("对话与体验")
+        ZxNavRow("外观", sub = "明暗主题 · 强调色 · 环境光") { scope.onNavigate(UiSceneId("settings.appearance")) }
+        ZxNavRow("聊天偏好", sub = "对话风格 · 个人规则") { scope.onNavigate(UiSceneId("settings.chat")) }
+        ZxNavRow("记忆", sub = "记忆概览 · 管理") { scope.onNavigate(UiSceneId("settings.memory")) }
+        ZxNavRow("通知", sub = "提醒种类 · 免打扰") { scope.onNavigate(UiSceneId("settings.notifications")) }
+
+        ZxSection("模型与账户")
+        ZxNavRow("模型", sub = "当前模型 · API Key · 协议") { scope.onNavigate(UiSceneId("settings.models")) }
+        ZxNavRow("模型性能", sub = "推理强度 · 温度") { scope.onNavigate(UiSceneId("settings.model_performance")) }
+        ZxNavRow("ChatGPT 账户", sub = "授权与登录状态") { scope.onNavigate(UiSceneId("settings.account")) }
+        ZxNavRow("套餐额度", sub = "MiniMax 模型额度") { scope.onNavigate(UiSceneId("settings.minimax_quota")) }
+
+        ZxSection("Agent 与安全")
+        ZxNavRow("权限与设备", sub = "通知与媒体权限状态") { scope.onNavigate(UiSceneId("settings.permissions")) }
+
+        ZxSection("数据与系统")
+        ZxNavRow("用量统计", sub = "模型消耗 · 请求记录") { scope.onNavigate(UiSceneId("settings.usage")) }
+        ZxNavRow("会话存储", sub = "占用空间 · 压缩 · 导出") { scope.onNavigate(UiSceneId("settings.session_storage")) }
+        ZxNavRow("高级与运行", sub = "运行限制 · 规则") { scope.onNavigate(UiSceneId("settings.advanced")) }
+        ZxNavRow("诊断与更新", sub = "版本 · 检查更新") { scope.onNavigate(UiSceneId("settings.diagnostics")) }
     }
 }
 
@@ -137,14 +145,93 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
     }
 }
 
-/** settings.notifications — 通知与系统权限入口。 */
+/** settings.notifications — 五类通知和免打扰均使用现有真实 HostPreferences。 */
 @Composable
 fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneRenderScope) {
-    ZxPage("通知与权限", onBack = { scope.onBack() }) {
+    val snap by preferences.snapshots.collectAsState(initial = UiHostPreferences())
+    val jobs = rememberCoroutineScope()
+    var status by remember { mutableStateOf<String?>(null) }
+    var startTime by remember(snap.quietStartMinute) {
+        mutableStateOf("%02d:%02d".format(snap.quietStartMinute / 60, snap.quietStartMinute % 60))
+    }
+    var endTime by remember(snap.quietEndMinute) {
+        mutableStateOf("%02d:%02d".format(snap.quietEndMinute / 60, snap.quietEndMinute % 60))
+    }
+    fun update(
+        jobsEnabled: Boolean = snap.notifyJobs,
+        resultsEnabled: Boolean = snap.notifyResults,
+        failuresEnabled: Boolean = snap.notifyFailures,
+        actionEnabled: Boolean = snap.notifyNeedsAction,
+        chatEnabled: Boolean = snap.notifyChat,
+        quietEnabled: Boolean = snap.quietEnabled,
+        start: Int = snap.quietStartMinute,
+        end: Int = snap.quietEndMinute,
+    ) {
+        jobs.launch {
+            status = if (preferences.submit(UiHostPreferencesCommand.Notifications(
+                jobsEnabled, resultsEnabled, failuresEnabled, actionEnabled,
+                chatEnabled, quietEnabled, start, end,
+            ))) "已保存" else "未能保存通知设置"
+        }
+    }
+    fun minutes(text: String): Int? {
+        val match = Regex("^(\\d{1,2}):(\\d{2})$").matchEntire(text.trim()) ?: return null
+        val h = match.groupValues[1].toInt()
+        val m = match.groupValues[2].toInt()
+        return if (h in 0..23 && m in 0..59) h * 60 + m else null
+    }
+    ZxPage("通知", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        ZxNavRow("系统通知设置", sub = "跳转系统页") { preferences.openSystemNotifications() }
-        ZxNavRow("系统权限管理", sub = "通知 · 媒体 · 文件") { preferences.openSystemPermissions() }
-        ZxFooterNote("shell.notifications 为宿主直供场景 · 不在本包渲染")
+        ZxSection("提醒类型")
+        ZxSwitchRow("任务执行", "定时任务和自动化事件", snap.notifyJobs) { update(jobsEnabled = it) }
+        ZxSwitchRow("执行结果", "任务完成后的结果提示", snap.notifyResults) { update(resultsEnabled = it) }
+        ZxSwitchRow("失败提醒", "任务或工具运行失败", snap.notifyFailures) { update(failuresEnabled = it) }
+        ZxSwitchRow("需要操作", "待审批与待确认项目", snap.notifyNeedsAction) { update(actionEnabled = it) }
+        ZxSwitchRow("聊天消息", "新的聊天消息提醒", snap.notifyChat) { update(chatEnabled = it) }
+        ZxSection("免打扰")
+        ZxSwitchRow("启用免打扰", "在设定时段减少提醒", snap.quietEnabled) { update(quietEnabled = it) }
+        if (snap.quietEnabled) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
+                    startTime, { startTime = it }, Modifier.weight(1f), placeholder = "开始 HH:mm")
+                com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
+                    endTime, { endTime = it }, Modifier.weight(1f), placeholder = "结束 HH:mm")
+            }
+            ZxButton("保存免打扰时间", {
+                val start = minutes(startTime)
+                val end = minutes(endTime)
+                if (start == null || end == null) status = "请输入正确时间（00:00–23:59）"
+                else update(start = start, end = end)
+            })
+        }
+        status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
+        ZxNavRow("系统通知权限", sub = "查看系统授权") { preferences.openSystemNotifications() }
+    }
+}
+
+/** settings.permissions — 呈现真实系统权限事实，跳转系统授权页而不伪造开关。 */
+@Composable
+fun ZhaoxiPermissionsScene(preferences: HostPreferencesUiPort, scope: UiSceneRenderScope) {
+    val notification = preferences.notificationPermissionGranted()
+    val media = preferences.mediaPermissionSnapshot()
+    ZxPage("权限与设备", onBack = { scope.onBack() }) {
+        Spacer(Modifier.height(8.dp))
+        ZxSection("系统通知")
+        ZxValueRow("通知权限", value = when (notification) {
+            true -> "已授权"
+            false -> "未授权"
+            null -> "系统未提供状态"
+        })
+        ZxNavRow("管理通知权限", sub = "前往 Android 系统设置") { preferences.openSystemNotifications() }
+        ZxSection("媒体权限")
+        if (media != null) {
+            ZxValueRow("图片", value = if (media.images) "已授权" else "未授权")
+            ZxValueRow("视频", value = if (media.videos) "已授权" else "未授权")
+            ZxValueRow("音频", value = if (media.audio) "已授权" else "未授权")
+            if (media.selectedVisualOnly) ZxFooterNote("目前仅授予所选图片/视频的访问范围")
+        } else ZxFooterNote("设备权限状态由 Android 系统提供")
+        ZxNavRow("管理设备权限", sub = "前往 Android 系统设置") { preferences.openSystemPermissions() }
+        ZxFooterNote("这里只显示实际授权状态，不直接绕过 Android 权限对话框")
     }
 }
 
