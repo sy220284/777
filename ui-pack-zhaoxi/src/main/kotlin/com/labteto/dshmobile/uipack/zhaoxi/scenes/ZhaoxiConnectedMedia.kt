@@ -28,6 +28,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
     val offer = offers.firstOrNull { it.id == offerId } ?: offers.firstOrNull()
     var prompt by rememberUiPrivateText("zhaoxi.media.$sessionId") { "" }
     var ratio by rememberSaveable { mutableStateOf("1:1") }
+    val validImageRatio = remember(ratio) { Regex("^[1-9][0-9]?:[1-9][0-9]?$").matches(ratio.trim()) }
     var voice by rememberSaveable { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -86,6 +87,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
         if (offer?.kind == LocalMediaKind.IMAGE) {
             ZxSection("画面比例")
             ZxField(ratio, { ratio = it }, Modifier.fillMaxWidth(), placeholder = "例如 1:1")
+            if (!validImageRatio) ZxBanner("比例格式应为正整数:正整数，例如 1:1、16:9", ZxTone.Err)
         }
         if (offer?.kind == LocalMediaKind.SPEECH) {
             val voices by produceState<List<LocalMediaVoice>>(emptyList(), offer?.id) {
@@ -99,7 +101,9 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
         ZxButton(if (offer?.kind == LocalMediaKind.TRANSCRIBE) "选择音频转写" else "开始生成", {
             val target = offer
             if (target != null) {
-                if (target.kind == LocalMediaKind.TRANSCRIBE) transcribe(target to sessionId)
+                if (target.kind == LocalMediaKind.IMAGE && !validImageRatio) {
+                    status = "请输入有效的画面比例，例如 1:1、16:9"
+                } else if (target.kind == LocalMediaKind.TRANSCRIBE) transcribe(target to sessionId)
                 else execute {
                     val command = when (target.kind) {
                         LocalMediaKind.IMAGE -> MediaUiCommand.Image(target, prompt, ratio, sessionId)
@@ -144,6 +148,11 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
         result?.let { ZxValueRow("模型", value = it.model) }
         val asset = result?.let { media.assetForSession(it.id, sessionId) }
         if (result != null && asset == null) ZxEmpty("内容不可用", "结果文件可能已清理")
+        if (result != null && result.kind.uppercase() == "IMAGE" && asset?.localPath == null && asset?.remoteUrl != null) {
+            ZxButton("重新下载原图（不会重新生成或计费）", {
+                execute { receiptText(media.retrySessionImageDownload(result.id, sessionId)) }
+            }, enabled = !busy, loading = busy)
+        }
         if (result != null && asset != null) {
             ZxSection("作品预览")
             result.description?.takeIf(String::isNotBlank)?.let { description ->
