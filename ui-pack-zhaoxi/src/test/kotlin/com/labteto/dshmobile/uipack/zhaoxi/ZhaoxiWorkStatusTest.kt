@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.uipack.zhaoxi
 
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadgeTone
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkTodoProgress
+import com.labteto.dshmobile.uicontract.UiWorkPlanSnapshot
+import com.labteto.dshmobile.uicontract.UiWorkPlanStep
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkStepIsDone
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkStepLabel
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkStepTone
@@ -15,6 +18,25 @@ class ZhaoxiWorkStatusTest {
             assertTrue(status, zxWorkStepIsDone(status))
         for (status in listOf("", "running", "pending", "failed", "blocked", "unknown"))
             assertFalse(status, zxWorkStepIsDone(status))
+    }
+
+    @Test fun independentPlanAndTodosNeverBorrowStatusesByIndex() {
+        val snapshot = UiWorkPlanSnapshot(
+            sessionId = "work",
+            plan = listOf("准备材料", "编写方案", "确认结果"),
+            todos = listOf(
+                UiWorkPlanStep("验证网络", "completed"),
+                UiWorkPlanStep("同步文件", "running"),
+            ),
+            planMode = true,
+        )
+        assertEquals(3, snapshot.plan.size)
+        assertEquals(2, snapshot.todos.size)
+        assertEquals(1, zxWorkTodoProgress(snapshot).done)
+        assertEquals(2, zxWorkTodoProgress(snapshot).reported)
+        assertEquals(2, zxWorkTodoProgress(snapshot).total)
+        val noTodos = snapshot.copy(todos = emptyList())
+        assertEquals(0, zxWorkTodoProgress(noTodos).total)
     }
 
     @Test fun stepsExposeReadableStatusWithoutInventingCompletion() {
