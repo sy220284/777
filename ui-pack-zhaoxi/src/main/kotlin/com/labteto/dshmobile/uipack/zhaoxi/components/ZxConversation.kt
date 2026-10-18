@@ -173,6 +173,7 @@ fun ZxComposer(
     modifier: Modifier = Modifier,
     running: Boolean = false,
     onStop: () -> Unit = {},
+    onConnectModel: (() -> Unit)? = null,
 ) {
     val c = ZhaoxiTheme.colors
     Row(
@@ -196,6 +197,8 @@ fun ZxComposer(
             ZxIconButton(onClick = onStop, contentDescription = "停止生成回复") {
                 ZxIcon("stop")
             }
+        } else if (send.reason == UiCommandRejection.UNCONFIGURED && onConnectModel != null) {
+            ZxButton("去连接", onClick = onConnectModel, variant = ZxButtonVariant.Outline)
         } else {
             ZxIconButton(onClick = onSend, contentDescription = "发送消息",
                 enabled = send.available && draft.isNotBlank()) {

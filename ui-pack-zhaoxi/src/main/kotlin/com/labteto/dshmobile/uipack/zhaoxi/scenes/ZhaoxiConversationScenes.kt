@@ -125,6 +125,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
                 else sendZhaoxiDraft(drafts, id) { text, files -> chat.submit(ChatUiCommand.SendMessage(id, text, files)) }
             },
             placeholder = "问点什么",
+            onConnectModel = { scope.onNavigate(UiSceneId("settings.models")) },
         )
     }
 }
@@ -187,6 +188,7 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
                 else sendZhaoxiDraft(drafts, id) { text, files -> work.submit(WorkConversationUiCommand.SendMessage(id, text, files)) }
             },
             placeholder = "描述任务目标",
+            onConnectModel = { scope.onNavigate(UiSceneId("settings.models")) },
         )
     }
 }
