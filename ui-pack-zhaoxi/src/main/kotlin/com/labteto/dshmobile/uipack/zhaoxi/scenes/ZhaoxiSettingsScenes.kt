@@ -69,7 +69,6 @@ fun ZhaoxiSettingsHomeScene(
 ) {
     val updateFlow = updateStatus ?: remember { kotlinx.coroutines.flow.MutableStateFlow<String?>(null) }
     val currentUpdateStatus by updateFlow.collectAsState()
-    var approvalOpen by remember { mutableStateOf(false) }
     ZxPage("设置", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("对话与体验")
@@ -85,7 +84,7 @@ fun ZhaoxiSettingsHomeScene(
 
         ZxSection("Agent 与安全")
         settingsOwner?.let {
-            ZxNavRow("操作审批模式", sub = "按当前 Agent 权限设置操作确认") { approvalOpen = true }
+            ZxNavRow("操作审批模式") { scope.onNavigate(UiSceneId("settings.approval_mode")) }
         }
         ZxNavRow("权限与设备", sub = "通知与媒体权限状态") { scope.onNavigate(UiSceneId("settings.permissions")) }
         ZxNavRow("通知", sub = "提醒类型 · 免打扰") { scope.onNavigate(UiSceneId("settings.notifications")) }
@@ -99,29 +98,6 @@ fun ZhaoxiSettingsHomeScene(
             currentUpdateStatus?.takeIf(String::isNotBlank)?.let { ZxFooterNote(it) }
         } else {
             ZxFooterNote("当前构建未提供应用内更新检查")
-        }
-    }
-    if (approvalOpen && settingsOwner != null) {
-        // Independent presentation: system back dismisses the modal; the device-permission
-        // page remains reserved for Android permission facts, not Agent policy.
-        Dialog(onDismissRequest = { approvalOpen = false }) {
-            Column(
-                Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(ZhaoxiTheme.colors.card)
-                    .padding(20.dp),
-            ) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("操作审批模式", Modifier.weight(1f), fontSize = 17.sp,
-                        fontWeight = FontWeight.SemiBold, color = ZhaoxiTheme.colors.ink)
-                    ZxButton("完成", { approvalOpen = false })
-                }
-                Spacer(Modifier.height(12.dp))
-                ZhaoxiApprovalModeSelector(settingsOwner)
-            }
         }
     }
 }
