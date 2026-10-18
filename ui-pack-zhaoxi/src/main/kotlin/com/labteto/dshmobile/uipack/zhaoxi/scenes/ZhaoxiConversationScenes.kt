@@ -25,6 +25,7 @@ import com.labteto.dshmobile.uicontract.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.produceState
@@ -332,6 +333,14 @@ private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<Ui
             androidx.compose.runtime.withFrameNanos { }
             val last = (state.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
             state.scrollToItem(last)
+            // A growing streamed answer may exceed one screen: keep its final line visible.
+            androidx.compose.runtime.withFrameNanos { }
+            val tail = state.layoutInfo.visibleItemsInfo.lastOrNull { it.index == last }
+            if (tail != null) {
+                val overflow = (tail.offset + tail.size - state.layoutInfo.viewportEndOffset)
+                    .coerceAtLeast(0)
+                if (overflow > 0) state.scrollBy(overflow.toFloat())
+            }
         }
     }
     Column(modifier) {
@@ -382,10 +391,9 @@ private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<Ui
                 Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ZxTypingIndicator()
-                        Text("正在输出", fontSize = 11.sp, color = ZhaoxiTheme.colors.ink2)
+                        Text("正在输出 · 最新内容预览", fontSize = 11.sp, color = ZhaoxiTheme.colors.ink2)
                     }
-                    Text(streamText, fontSize = 15.sp, lineHeight = 23.sp,
-                        color = ZhaoxiTheme.colors.ink)
+                    com.labteto.dshmobile.uipack.zhaoxi.components.ZxRichReply(streamText)
                 }
             } else ZxTypingIndicator()
         }
