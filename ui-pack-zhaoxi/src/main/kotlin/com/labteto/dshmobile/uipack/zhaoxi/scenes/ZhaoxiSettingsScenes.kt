@@ -88,9 +88,13 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
         ambientGlow: Float = snap.ambientGlow,
         transparency: Float = snap.transparency,
         motionScale: Float = snap.motionScale,
+        textWeight: Int = snap.textWeight,
+        adaptiveContrast: Boolean = snap.adaptiveContrast,
+        presetWallpaperEnabled: Boolean = snap.presetWallpaperEnabled,
     ) {
-        jobs.launch { preferences.submit(UiHostPreferencesCommand.Appearance(theme, accent, textScale, snap.textWeight,
-            transparency, ambientGlow, snap.componentEmphasis, motionScale, snap.adaptiveContrast)) }
+        jobs.launch { preferences.submit(UiHostPreferencesCommand.Appearance(theme, accent, textScale, textWeight,
+            transparency, ambientGlow, snap.componentEmphasis, motionScale, adaptiveContrast,
+            presetWallpaperEnabled)) }
     }
     var glow by remember(snap.ambientGlow) { mutableFloatStateOf(snap.ambientGlow) }
     var glass by remember(snap.transparency) { mutableFloatStateOf(snap.transparency) }
@@ -120,7 +124,17 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
             labels = listOf("小", "标准", "大"),
             onChange = { v -> writeAppearance(textScale = listOf(0.9f, 1f, 1.3f)[v]) },
         )
+        ZxSection("字重")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(0 to "常规字重", 1 to "略粗", 2 to "加粗").forEach { (value, label) ->
+                ZxChip(label, snap.textWeight == value) { writeAppearance(textWeight = value) }
+            }
+        }
         ZxSection("背景与材质")
+        ZxSwitchRow("启用主题壁纸", "可选十张低饱和壁纸，按五主题与明暗自动切换；关闭时保留动态环境光",
+            snap.presetWallpaperEnabled) { writeAppearance(presetWallpaperEnabled = it) }
+        ZxSwitchRow("智能对比度", "根据壁纸与明暗模式保持文字可读",
+            snap.adaptiveContrast) { writeAppearance(adaptiveContrast = it) }
         Text("环境光强度 · ${(glow * 100).toInt()}%", fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2)
         Slider(
             value = glow, onValueChange = { glow = it },

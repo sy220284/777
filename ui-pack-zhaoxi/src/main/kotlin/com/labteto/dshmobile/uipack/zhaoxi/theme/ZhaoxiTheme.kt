@@ -14,12 +14,13 @@ package com.labteto.dshmobile.uipack.zhaoxi.theme
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,13 +33,13 @@ enum class ZhaoxiHue(val key: String) { STONE("stone"), SAGE("sage"), STEEL("ste
 
 data class ZhaoxiAccent(val accent: Color, val tint: Color, val accentInk: Color = accent)
 
-/** light 取值与 tokens.css [data-hue] 一致；dark 严格以 E8.18 tokens.css 的强调色与安全文字色为准。 */
+/** E8.18 保留原点缀色；浅色 accentInk 单独加深，确保白色及次级表面上小字至少 4.5:1。 */
 fun accentFor(hue: ZhaoxiHue, dark: Boolean): ZhaoxiAccent = when (hue) {
-    ZhaoxiHue.STONE -> if (dark) ZhaoxiAccent(Color(0xFF938D89), Color(0x1F938D89)) else ZhaoxiAccent(Color(0xFF78716C), Color(0x1F78716C))
-    ZhaoxiHue.SAGE  -> if (dark) ZhaoxiAccent(Color(0xFF7C9483), Color(0x247C9483)) else ZhaoxiAccent(Color(0xFF7C9483), Color(0x247C9483))
-    ZhaoxiHue.STEEL -> if (dark) ZhaoxiAccent(Color(0xFF6E88A0), Color(0x246E88A0), Color(0xFF8FA5BC)) else ZhaoxiAccent(Color(0xFF6E88A0), Color(0x246E88A0))
-    ZhaoxiHue.MAUVE -> if (dark) ZhaoxiAccent(Color(0xFF967F95), Color(0x24967F95), Color(0xFFA896A7)) else ZhaoxiAccent(Color(0xFF967F95), Color(0x24967F95))
-    ZhaoxiHue.DUSK  -> if (dark) ZhaoxiAccent(Color(0xFFA08A76), Color(0x24A08A76), Color(0xFFB29C86)) else ZhaoxiAccent(Color(0xFFA08A76), Color(0x24A08A76))
+    ZhaoxiHue.STONE -> if (dark) ZhaoxiAccent(Color(0xFF938D89), Color(0x1F938D89)) else ZhaoxiAccent(Color(0xFF78716C), Color(0x1F78716C), Color(0xFF706963))
+    ZhaoxiHue.SAGE  -> if (dark) ZhaoxiAccent(Color(0xFF7C9483), Color(0x247C9483)) else ZhaoxiAccent(Color(0xFF7C9483), Color(0x247C9483), Color(0xFF526D5A))
+    ZhaoxiHue.STEEL -> if (dark) ZhaoxiAccent(Color(0xFF6E88A0), Color(0x246E88A0), Color(0xFF8FA5BC)) else ZhaoxiAccent(Color(0xFF6E88A0), Color(0x246E88A0), Color(0xFF4F687D))
+    ZhaoxiHue.MAUVE -> if (dark) ZhaoxiAccent(Color(0xFF967F95), Color(0x24967F95), Color(0xFFA896A7)) else ZhaoxiAccent(Color(0xFF967F95), Color(0x24967F95), Color(0xFF715B70))
+    ZhaoxiHue.DUSK  -> if (dark) ZhaoxiAccent(Color(0xFFA08A76), Color(0x24A08A76), Color(0xFFB29C86)) else ZhaoxiAccent(Color(0xFFA08A76), Color(0x24A08A76), Color(0xFF786048))
 }
 
 // ---------------------------------------------------------------------------
@@ -226,28 +227,23 @@ val LocalZhaoxiBlurCapability = staticCompositionLocalOf { ZhaoxiBlurCapability.
  * M0 纯色分层 / M1 云母（静态径向渐变，零模糊） / M2 轻玻璃 / M3 强玻璃+噪点。
  * 降级链：blur 不可用（NONE 或 API<31）→ M2/M3 退化为 97% 不透明纯色；
  * REDUCED → 模糊半径减半。判定由 Host 注入 LocalZhaoxiBlurCapability。
- * 说明：Compose Modifier.blur 作用于节点自身内容；真正背景模糊需宿主层
- * RenderEffect，本实现按规格取「半透明层 + 半径模糊」的近似，如实降级。
+ * 内容不能使用 Modifier.blur（会把文字和控件一并模糊）；宿主未提供真正
+ * 背景取样时使用可读的半透明材质，不虚构背景模糊成功。
  */
 fun Modifier.zxMaterial(m: ZhaoxiMaterial): Modifier = composed {
     val c = ZhaoxiTheme.colors
     val capability = LocalZhaoxiBlurCapability.current
     val blurOk = capability != ZhaoxiBlurCapability.NONE &&
         android.os.Build.VERSION.SDK_INT >= 31
-    val radius = when (capability) {
-        ZhaoxiBlurCapability.FULL -> 20.dp
-        ZhaoxiBlurCapability.REDUCED -> 12.dp
-        ZhaoxiBlurCapability.NONE -> 0.dp
-    }
     when (m) {
         ZhaoxiMaterial.M0 -> this.background(c.bg2)
         ZhaoxiMaterial.M1 -> this.background(
             androidx.compose.ui.graphics.Brush.radialGradient(listOf(c.micaA, c.micaB)))
         ZhaoxiMaterial.M2 ->
-            if (blurOk) this.background(c.glass).blur(radius)
+            if (blurOk) this.background(c.glass)
             else this.background(c.glass2.copy(alpha = 0.97f))
         ZhaoxiMaterial.M3 -> {
-            val base = if (blurOk) this.background(c.glass).blur(radius * 1.2f)
+            val base = if (blurOk) this.background(c.glass2)
             else this.background(c.glass2.copy(alpha = 0.97f))
             base.drawBehind {
                 // 噪点：确定性伪随机点阵，alpha 0.022（免 Bitmap 资源）
@@ -270,29 +266,92 @@ fun Modifier.zxMaterial(m: ZhaoxiMaterial): Modifier = composed {
     }
 }
 
-/** 场景背景实绘（E8.16）：底色纵向渐变 + 环境光 ambA 左上 / ambB 右下径向。 */
+/** Brightness-calibrated veil follows the E8.18 wallpaper rule, without blurring foreground text. */
+internal fun wallpaperVeilAlpha(luminance: Float, lightMode: Boolean, adaptive: Boolean): Float =
+    if (!adaptive) 0.36f else (
+        0.55f + ((if (lightMode) 0.5f - luminance else luminance - 0.5f) * 0.55f)
+    ).coerceIn(0.38f, 0.88f)
+
+/**
+ * E8.18 可选内置壁纸：十张高保真原稿 WebP 归档到 assets；
+ * 默认不开启，启用后按五主题×明暗确定唯一资产。
+ */
 @Composable
 fun ZhaoxiBackground(
     modifier: Modifier = Modifier,
     intensity: Float = 1f,
     workMode: Boolean = false,
+    wallpaperPreset: String? = null,
+    adaptiveContrast: Boolean = true,
 ) {
     val c = ZhaoxiTheme.colors
-    val glow = intensity.coerceIn(0f, 1f)
-    androidx.compose.foundation.layout.Box(modifier.drawBehind {
-        drawRect(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(c.bg, c.bg2)))
-        if (glow > 0f) {
-            // E8.17 work surface mirrors the light sources; secondary pages use a softer glow.
-            drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
-                listOf(c.ambA.copy(alpha = c.ambA.alpha * glow), Color.Transparent),
-                center = if (workMode) androidx.compose.ui.geometry.Offset(size.width * .84f, 0f)
-                    else androidx.compose.ui.geometry.Offset(size.width * .22f, size.height * .06f),
-                radius = size.maxDimension * .78f))
-            drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
-                listOf(c.ambB.copy(alpha = c.ambB.alpha * glow), Color.Transparent),
-                center = if (workMode) androidx.compose.ui.geometry.Offset(size.width * .1f, size.height * .98f)
-                    else androidx.compose.ui.geometry.Offset(size.width * .85f, size.height * .98f),
-                radius = size.maxDimension * .78f))
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val wallpaper by produceState<Pair<androidx.compose.ui.graphics.ImageBitmap, Float>?>(null, wallpaperPreset) {
+        value = if (wallpaperPreset == null) null else
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                context.assets.open("e818_wallpapers.zip").use { stream ->
+                    java.util.zip.ZipInputStream(stream).use { zip ->
+                        var candidate: java.util.zip.ZipEntry?
+                        var decoded: Pair<androidx.compose.ui.graphics.ImageBitmap, Float>? = null
+                        while (zip.nextEntry.also { candidate = it } != null) {
+                            if (candidate?.name == wallpaperPreset) {
+                                val bytes = zip.readBytes()
+                                decoded = android.graphics.BitmapFactory.decodeByteArray(
+                                    bytes, 0, bytes.size)?.let { bitmap ->
+                                    val stepX = (bitmap.width / 9).coerceAtLeast(1)
+                                    val stepY = (bitmap.height / 9).coerceAtLeast(1)
+                                    var luminance = 0f
+                                    var count = 0
+                                    for (y in 0 until bitmap.height step stepY) {
+                                        for (x in 0 until bitmap.width step stepX) {
+                                            val pixel = bitmap.getPixel(x, y)
+                                            luminance += (0.2126f * android.graphics.Color.red(pixel) +
+                                                0.7152f * android.graphics.Color.green(pixel) +
+                                                0.0722f * android.graphics.Color.blue(pixel)) / 255f
+                                            count++
+                                        }
+                                    }
+                                    bitmap.asImageBitmap() to luminance / count
+                                }
+                                break
+                            }
+                        }
+                        decoded
+                    }
+                }
+            }
+    }
+    val currentWallpaper = wallpaper
+    val glow = intensity.coerceIn(0f, 1f) * (if (currentWallpaper != null) 0.16f else 1f)
+    androidx.compose.foundation.layout.Box(modifier) {
+        currentWallpaper?.let {
+            androidx.compose.foundation.Image(
+                bitmap = it.first,
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
-    })
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().drawBehind {
+            if (currentWallpaper == null) {
+                drawRect(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(c.bg, c.bg2)))
+            } else {
+                // Only the surface is veiled; controls and text above this layer remain sharp.
+                drawRect(c.bg.copy(alpha = wallpaperVeilAlpha(
+                    currentWallpaper.second, c.bg.red > 0.5f, adaptiveContrast)))
+            }
+            if (glow > 0f) {
+                drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
+                    listOf(c.ambA.copy(alpha = c.ambA.alpha * glow), Color.Transparent),
+                    center = if (workMode) androidx.compose.ui.geometry.Offset(size.width * .84f, 0f)
+                        else androidx.compose.ui.geometry.Offset(size.width * .22f, size.height * .06f),
+                    radius = size.maxDimension * .78f))
+                drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
+                    listOf(c.ambB.copy(alpha = c.ambB.alpha * glow), Color.Transparent),
+                    center = if (workMode) androidx.compose.ui.geometry.Offset(size.width * .1f, size.height * .98f)
+                        else androidx.compose.ui.geometry.Offset(size.width * .85f, size.height * .98f),
+                    radius = size.maxDimension * .78f))
+            }
+        })
+    }
 }

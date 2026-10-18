@@ -345,6 +345,8 @@ fun ZxPersonaCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     pinned: Boolean = false,
+    portrait: androidx.compose.ui.graphics.ImageBitmap? = null,
+    portraitHint: String? = null,
 ) {
     val c = ZhaoxiTheme.colors
     Column(
@@ -357,10 +359,18 @@ fun ZxPersonaCard(
             .padding(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        ZxAvatar(name, Modifier.size(52.dp))
+        if (portrait != null) {
+            androidx.compose.foundation.Image(
+                bitmap = portrait, contentDescription = "$name 的画像",
+                modifier = Modifier.fillMaxWidth().height(90.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            )
+        } else ZxAvatar(name, Modifier.size(52.dp))
         Spacer(Modifier.height(8.dp))
         Text(name + if (pinned) " · 置顶" else "", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
             color = c.ink, maxLines = 2)
         Text(subtitle, fontSize = 12.sp, color = c.ink2, maxLines = 2)
+        portraitHint?.let { Text(it, fontSize = 11.sp, color = c.ink3, maxLines = 1) }
     }
 }

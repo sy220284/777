@@ -56,6 +56,7 @@ internal class LocalHostPreferencesUiAdapter @Inject constructor(
             transparency = prefs.wallpaperSurfaceTransparency, ambientGlow = prefs.ambientGlow,
             componentEmphasis = prefs.componentEmphasis, motionScale = prefs.motionDurationScale,
             adaptiveContrast = prefs.backgroundAdaptiveContrast,
+            presetWallpaperEnabled = prefs.presetWallpaperEnabled,
             notifyJobs = prefs.notifyLocalJobs, notifyResults = prefs.notifyJobResults,
             notifyFailures = prefs.notifyJobFailures, notifyNeedsAction = prefs.notifyNeedsAction,
             notifyChat = prefs.notifyChatMessages,
@@ -73,13 +74,14 @@ internal class LocalHostPreferencesUiAdapter @Inject constructor(
                 require(command.textScale in .9f..1.5f)
                 require(command.textWeight in 0..2)
                 require(command.transparency in 0f..1f && command.ambientGlow in 0f..1f &&
-                    command.componentEmphasis in 0f..1f && command.motionScale in .7f..1.3f)
+                    command.componentEmphasis in 0f..1f && command.motionScale in 0f..1.3f)
                 current.copy(themePreference = command.theme, accentTheme = command.accent,
                     textScale = command.textScale, textWeightAdjustment = command.textWeight,
                     wallpaperSurfaceTransparency = command.transparency,
                     ambientGlow = command.ambientGlow, componentEmphasis = command.componentEmphasis,
                     motionDurationScale = command.motionScale,
-                    backgroundAdaptiveContrast = command.adaptiveContrast)
+                    backgroundAdaptiveContrast = command.adaptiveContrast,
+                    presetWallpaperEnabled = command.presetWallpaperEnabled)
             }
             is UiHostPreferencesCommand.Notifications -> {
                 require(command.quietStartMinute in 0..1439 && command.quietEndMinute in 0..1439)

@@ -13,6 +13,7 @@ data class UiHostPreferences(
     val componentEmphasis: Float = .5f,
     val motionScale: Float = 1f,
     val adaptiveContrast: Boolean = true,
+    val presetWallpaperEnabled: Boolean = false,
     val notifyJobs: Boolean = true,
     val notifyResults: Boolean = true,
     val notifyFailures: Boolean = true,
@@ -27,6 +28,7 @@ sealed interface UiHostPreferencesCommand {
     data class Appearance(val theme: String, val accent: String, val textScale: Float,
         val textWeight: Int, val transparency: Float, val ambientGlow: Float,
         val componentEmphasis: Float, val motionScale: Float, val adaptiveContrast: Boolean,
+        val presetWallpaperEnabled: Boolean = false,
     ) : UiHostPreferencesCommand
     data class Notifications(val notifyJobs: Boolean, val notifyResults: Boolean,
         val notifyFailures: Boolean, val notifyNeedsAction: Boolean,

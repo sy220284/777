@@ -27,6 +27,7 @@ class HostsStore @Inject constructor(
         val BACKGROUND_IMAGE = stringPreferencesKey("background_image_path")
         val SIDEBAR_AVATAR = stringPreferencesKey("sidebar_avatar_source")
         val BACKGROUND_ADAPTIVE_CONTRAST = booleanPreferencesKey("background_adaptive_contrast")
+        val PRESET_WALLPAPER_ENABLED = booleanPreferencesKey("zhaoxi_e818_wallpaper_enabled")
         val TEXT_SCALE = floatPreferencesKey("text_scale")
         val TEXT_WEIGHT_ADJUSTMENT = intPreferencesKey("text_weight_adjustment")
         val WALLPAPER_SURFACE_TRANSPARENCY = floatPreferencesKey("wallpaper_surface_transparency")
@@ -98,13 +99,14 @@ class HostsStore @Inject constructor(
             backgroundImagePath = prefs[Keys.BACKGROUND_IMAGE],
             sidebarAvatarSource = prefs[Keys.SIDEBAR_AVATAR],
             backgroundAdaptiveContrast = prefs[Keys.BACKGROUND_ADAPTIVE_CONTRAST] ?: true,
+            presetWallpaperEnabled = prefs[Keys.PRESET_WALLPAPER_ENABLED] ?: false,
             textScale = (prefs[Keys.TEXT_SCALE] ?: 1.0f).coerceIn(AppDisplayLimits.MIN_READING_SCALE, AppDisplayLimits.MAX_READING_SCALE),
             textWeightAdjustment = (prefs[Keys.TEXT_WEIGHT_ADJUSTMENT] ?: 0).coerceIn(0, 2),
             wallpaperSurfaceTransparency =
                 (prefs[Keys.WALLPAPER_SURFACE_TRANSPARENCY] ?: 0.5f).coerceIn(0f, 1f),
             ambientGlow = (prefs[Keys.AMBIENT_GLOW] ?: .5f).coerceIn(0f, 1f),
             componentEmphasis = (prefs[Keys.COMPONENT_EMPHASIS] ?: .5f).coerceIn(0f, 1f),
-            motionDurationScale = (prefs[Keys.MOTION_DURATION_SCALE] ?: 1f).coerceIn(.7f, 1.3f),
+            motionDurationScale = (prefs[Keys.MOTION_DURATION_SCALE] ?: 1f).coerceIn(0f, 1.3f),
         )
 
     suspend fun setSetting(transform: (AppSettings) -> AppSettings) {
@@ -127,13 +129,14 @@ class HostsStore @Inject constructor(
                 prefs[Keys.SIDEBAR_AVATAR] = it
             } ?: prefs.remove(Keys.SIDEBAR_AVATAR)
             prefs[Keys.BACKGROUND_ADAPTIVE_CONTRAST] = next.backgroundAdaptiveContrast
+            prefs[Keys.PRESET_WALLPAPER_ENABLED] = next.presetWallpaperEnabled
             prefs[Keys.TEXT_SCALE] = next.textScale.coerceIn(AppDisplayLimits.MIN_READING_SCALE, AppDisplayLimits.MAX_READING_SCALE)
             prefs[Keys.TEXT_WEIGHT_ADJUSTMENT] = next.textWeightAdjustment.coerceIn(0, 2)
             prefs[Keys.WALLPAPER_SURFACE_TRANSPARENCY] =
                 next.wallpaperSurfaceTransparency.coerceIn(0f, 1f)
             prefs[Keys.AMBIENT_GLOW] = next.ambientGlow.coerceIn(0f, 1f)
             prefs[Keys.COMPONENT_EMPHASIS] = next.componentEmphasis.coerceIn(0f, 1f)
-            prefs[Keys.MOTION_DURATION_SCALE] = next.motionDurationScale.coerceIn(.7f, 1.3f)
+            prefs[Keys.MOTION_DURATION_SCALE] = next.motionDurationScale.coerceIn(0f, 1.3f)
             committed = next
         }
         // Mirrored out to SharedPreferences as well: the scheme has to be readable before any

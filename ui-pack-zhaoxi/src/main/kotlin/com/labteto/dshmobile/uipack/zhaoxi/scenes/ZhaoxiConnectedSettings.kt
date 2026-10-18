@@ -50,14 +50,19 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     ZxPage("模型", onBack = { scope.onBack() }) {
         snap.error?.let { ZxBanner(it, ZxTone.Err) }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        snap.modelProfiles.forEach { p ->
-            ZxRow(p.displayName ?: p.model, if (snap.modelSelection.isActive(p)) "当前模型" else p.baseUrl,
+        ZxSection("已配置模型 · ${snap.modelProfiles.size}")
+        if (snap.modelProfiles.isEmpty()) ZxEmpty("还没有模型", "填写下方表单添加可用模型")
+        snap.modelProfiles.sortedByDescending { snap.modelSelection.isActive(it) }.forEach { p ->
+            ZxRow(p.displayName ?: p.model,
+                if (snap.modelSelection.isActive(p)) "当前使用 · ${p.model}" else p.model,
                 onClick = { status = when (val receipt = settings.submit(SettingsUiCommand.SelectModel(p.id))) {
                     SettingsUiReceipt.Applied -> "已切换模型"
                     SettingsUiReceipt.Submitted -> "切换已提交"
                     SettingsUiReceipt.Rejected -> "当前无法切换"
                     is SettingsUiReceipt.Failed -> receipt.message ?: "切换失败"
                 } })
+            ZxValueRow("接口", value = p.baseUrl)
+            ZxValueRow("协议", value = p.protocol.name)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ZxChip("编辑", false) { profileId = p.id; model = p.model; baseUrl = p.baseUrl; protocol = p.protocol; apiKey = "" }
                 ZxChip("移除", false) { pendingRemoveModel = p.id }
@@ -76,10 +81,15 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             }, { pendingRemoveModel = null })
         }
         ZxSection(if (profileId == null) "添加模型" else "编辑模型")
+        ZxSection("模型标识")
         ZxField(model, { model = it }, Modifier.fillMaxWidth(), placeholder = "模型名称")
+        ZxSection("接口地址")
         ZxField(baseUrl, { baseUrl = it }, Modifier.fillMaxWidth(), placeholder = "接口地址")
+        ZxSection("访问凭据")
         ZxField(apiKey, { apiKey = it }, Modifier.fillMaxWidth(), placeholder = "API Key（编辑时留空保留原凭据）",
             visualTransformation = PasswordVisualTransformation())
+        ZxFooterNote(if (profileId == null) "凭据仅用于连接该模型" else
+            "不填写密钥时保留原凭据；不会在界面中回显已有密钥")
         LocalModelProtocol.entries.forEach { p -> ZxChip(p.name, p == protocol) { protocol = p } }
         ZxButton("测试连接", { execute { settings.testModel(apiKey, model, baseUrl, protocol, profileId) } }, enabled = !busy && model.isNotBlank())
         ZxButton("保存模型", { execute {
@@ -90,7 +100,12 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                 is SettingsUiReceipt.Failed -> result.message ?: "保存失败"
             }
         } }, enabled = !busy && model.isNotBlank())
-        ZxChip("新建", false) { profileId = null; model = ""; apiKey = "" }
+        ZxChip("新建配置", false) {
+            profileId = null; model = ""; apiKey = ""; status = null
+        }
+        ZxNavRow("查看模型用量", sub = "按模型对照 Token 与估算费用") {
+            scope.onNavigate(UiSceneId("settings.model_usage"))
+        }
         ZxNavRow("ChatGPT 账户") { scope.onNavigate(UiSceneId("settings.account")) }
         ZxNavRow("套餐额度") { scope.onNavigate(UiSceneId("settings.minimax_quota")) }
         ZxNavRow("模型性能") { scope.onNavigate(UiSceneId("settings.model_performance")) }
@@ -277,6 +292,8 @@ fun ZhaoxiStorageScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val jobs = rememberCoroutineScope()
     var status by remember { mutableStateOf<String?>(null) }
     var storage by remember { mutableStateOf<com.labteto.dshmobile.local.session.LocalSessionStorageStatus?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var confirmCompact by remember { mutableStateOf(false) }
     LaunchedEffect(settings) { storage = settings.sessionStorageStatus() }
     val export = rememberUiStreamDocumentSaver<Unit>("application/zip", { "777-sessions.zip" }, { _, output ->
         settings.exportSessionStorage(output); UiDocumentWriteReceipt.Saved
@@ -284,12 +301,24 @@ fun ZhaoxiStorageScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     ZxPage("会话存储", onBack = { scope.onBack() }) {
         storage?.let { ZxValueRow("${it.sessionCount} 个会话", value = "${it.totalBytes} 字节", sub = "剩余空间 ${it.freeBytes} 字节") }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        ZxButton("压缩会话存储", { jobs.launch {
-            try { storage = settings.compactSessionStorage(); status = "压缩完成" }
-            catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { status = failure.message ?: "压缩失败" }
-        } })
-        ZxButton("导出会话备份", { export(Unit) })
+        ZxSection("维护与备份")
+        ZxFooterNote("压缩会整理本地会话文件。建议先导出备份，维护期间不要退出应用。")
+        ZxButton("导出会话备份", { export(Unit) }, enabled = !busy)
+        ZxButton("压缩会话存储", { confirmCompact = true }, enabled = !busy,
+            variant = ZxButtonVariant.Outline)
+        if (confirmCompact) ZxDialog(
+            "压缩会话存储？", "会整理本地会话文件，执行期间请保持应用打开；此操作不是删除全部会话。",
+            "确认压缩", {
+                confirmCompact = false
+                jobs.launch {
+                    busy = true
+                    try { storage = settings.compactSessionStorage(); status = "压缩完成，空间统计已刷新" }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (failure: Exception) { status = failure.message ?: "压缩失败，请检查存储空间" }
+                    finally { busy = false }
+                }
+            }, { confirmCompact = false })
+        if (busy) ZxFooterNote("正在整理会话数据…")
     }
 }
 

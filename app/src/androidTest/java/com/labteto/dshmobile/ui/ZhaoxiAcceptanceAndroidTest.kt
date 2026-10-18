@@ -164,6 +164,7 @@ class ZhaoxiAcceptanceAndroidTest {
             Triple("light", false, 1f),
             Triple("dark", true, 1f),
             Triple("large", false, 1.3f),
+            Triple("accessibility-200", false, 2f),
         )
         examples.forEach { (label, dark, fontScale) ->
             compose.activityRule.scenario.onActivity { activity ->
@@ -217,8 +218,17 @@ class ZhaoxiAcceptanceAndroidTest {
         compose.onNodeWithText("大").assertIsSelected()
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("大").assertIsSelected()
-        compose.onNodeWithText("标准").performClick()
-        compose.onNodeWithText("标准").assertIsSelected()
+        // 字号与字重都有“标准”：以 RadioButton 语义锁定字号档位。
+        val standardTextScale = hasText("标准") and SemanticsMatcher.expectValue(
+            androidx.compose.ui.semantics.SemanticsProperties.Role,
+            androidx.compose.ui.semantics.Role.RadioButton,
+        )
+        compose.onNode(standardTextScale).performScrollTo().performClick()
+        // 设置写入和观察者更新异步进行；等待 Owner 确认后仍检验 UI 选中态。
+        compose.waitUntil(10_000) {
+            runBlocking { ports.hostPreferencesUiPort.snapshots.first().textScale == 1f }
+        }
+        compose.onNode(standardTextScale).assertIsSelected()
         val snapshot = runBlocking { ports.hostPreferencesUiPort.snapshots.first() }
         assertEquals(1f, snapshot.textScale, .001f)
         compose.onNodeWithText("暮橙").performScrollTo().assertIsDisplayed().performClick()
@@ -255,4 +265,89 @@ class ZhaoxiAcceptanceAndroidTest {
         capture("interaction-memory-toggle")
         control.performClick()
     }
+    @Test fun bundledWallpapersAndReducedMotionUseDurableHostPreferences() {
+        val ports = ready()
+        val entries = mutableSetOf<String>()
+        compose.activity.assets.open("e818_wallpapers.zip").use { source ->
+            java.util.zip.ZipInputStream(source).use { zip ->
+                while (true) {
+                    val item = zip.nextEntry ?: break
+                    entries += item.name
+                }
+            }
+        }
+        assertEquals((0..9).map { "w$it.webp" }.toSet(), entries)
+        val previous = runBlocking { ports.hostPreferencesUiPort.snapshots.first() }
+        try {
+            runBlocking {
+                assertTrue(ports.hostPreferencesUiPort.submit(UiHostPreferencesCommand.Appearance(
+                    "light", "stone", 1f, 0, .5f, .5f, .5f, 0f, true, true,
+                )))
+                withTimeout(15_000) {
+                    ports.hostPreferencesUiPort.snapshots.first {
+                        it.presetWallpaperEnabled && it.motionScale == 0f
+                    }
+                }
+            }
+            compose.activityRule.scenario.onActivity { activity ->
+                activity.setContent {
+                    ZhaoxiTheme(hue = ZhaoxiHue.STONE, dark = false, reducedMotion = true) {
+                        Box(Modifier.fillMaxSize().testTag("zx-acceptance-wallpaper-fixture")) {
+                            com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiBackground(
+                                Modifier.fillMaxSize(),
+                                wallpaperPreset = "w2.webp",
+                                adaptiveContrast = true,
+                            )
+                        }
+                    }
+                }
+            }
+            capture("fixture-wallpaper-stone-light", "wallpaper-fixture")
+        } finally {
+            runBlocking {
+                assertTrue(ports.hostPreferencesUiPort.submit(UiHostPreferencesCommand.Appearance(
+                    previous.theme, previous.accent, previous.textScale, previous.textWeight,
+                    previous.transparency, previous.ambientGlow, previous.componentEmphasis,
+                    previous.motionScale, previous.adaptiveContrast,
+                    previous.presetWallpaperEnabled,
+                )))
+            }
+        }
+    }
+
+    /**
+     * Offline typography and scroll fixture: tests long tables/200% text without pretending
+     * to prove network streaming or live approval end-to-end.
+     */
+    @Test fun longTableAtTwoHundredPercentCanReachTailWithoutClipping() {
+        ready()
+        val table = buildString {
+            append("# 长内容验收\n\n| 序号 | 工作结果 | 状态说明 | 路径 |\n")
+            append("| --- | --- | --- | --- |\n")
+            (1..35).forEach { index ->
+                append("| $index | 第 ${index} 项任务 | 等待审批与执行结果均以真实状态为准 | work/artifacts/long-file-$index.md |\n")
+            }
+            append("\n最后一条记录，滚动需要能够到达这里。")
+        }
+        compose.activityRule.scenario.onActivity { activity ->
+            activity.setContent {
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density, density.fontScale * 2f)) {
+                    ZhaoxiTheme(hue = ZhaoxiHue.STONE, dark = false, reducedMotion = true) {
+                        Column(
+                            Modifier.fillMaxSize().testTag("zx-acceptance-longtable")
+                                .verticalScroll(rememberScrollState()).padding(16.dp),
+                        ) {
+                            ZxRichReply(table)
+                            Spacer(Modifier.height(24.dp))
+                            androidx.compose.material3.Text("滚动终点锚点")
+                        }
+                    }
+                }
+            }
+        }
+        compose.onNodeWithText("滚动终点锚点").performScrollTo().assertIsDisplayed()
+        capture("fixture-table-200-percent-scrolled", "longtable")
+    }
+
 }
