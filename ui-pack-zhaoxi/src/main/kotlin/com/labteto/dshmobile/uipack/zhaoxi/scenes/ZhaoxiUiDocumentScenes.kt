@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -32,6 +35,8 @@ import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.uicontract.*
 import com.labteto.dshmobile.uipack.zhaoxi.components.*
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
+import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiMotion
+import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiDuration
 import com.labteto.dshmobile.uihost.UiOwnedMediaPlayback
 import com.labteto.dshmobile.uihost.UiSceneRenderScope
 import kotlinx.coroutines.launch
@@ -184,10 +189,20 @@ fun ZxDocumentCard(
                 }
                 ZxRow("执行详情", if (detailsExpanded) "收起" else "展开",
                     onClick = { detailsExpanded = !detailsExpanded })
-                if (detailsExpanded) document.nodes.filterNot {
-                    it.id == "work_turn_status" || it.id == "work_scope"
-                }.forEach { node ->
-                    ZxDocumentNodeView(node, bindings, fields, { actionId -> onAction(actionId, fields.toMap()) }, media, document.source.sessionId)
+                AnimatedVisibility(
+                    visible = detailsExpanded,
+                    enter = fadeIn(animationSpec = ZhaoxiMotion.spec<Float>(ZhaoxiDuration.FAST)),
+                    exit = fadeOut(animationSpec = ZhaoxiMotion.spec<Float>(ZhaoxiDuration.FAST)),
+                ) {
+                    Column {
+                        document.nodes.filterNot {
+                            it.id == "work_turn_status" || it.id == "work_scope"
+                        }.forEach { node ->
+                            ZxDocumentNodeView(node, bindings, fields,
+                                { actionId -> onAction(actionId, fields.toMap()) },
+                                media, document.source.sessionId)
+                        }
+                    }
                 }
             } else document.nodes.forEach { node ->
                 ZxDocumentNodeView(node, bindings, fields, { actionId -> onAction(actionId, fields.toMap()) }, media, document.source.sessionId)
