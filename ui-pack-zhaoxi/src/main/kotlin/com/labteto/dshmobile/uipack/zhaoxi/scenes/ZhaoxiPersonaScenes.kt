@@ -36,6 +36,7 @@ import com.labteto.dshmobile.uicontract.UiPersonaAuthoringReceipt
 import com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt
 import com.labteto.dshmobile.uicontract.UiPersonaGalleryEntry
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadge
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadgeTone
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog
