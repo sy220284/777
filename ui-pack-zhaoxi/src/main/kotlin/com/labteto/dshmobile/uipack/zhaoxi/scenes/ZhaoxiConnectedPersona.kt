@@ -108,6 +108,8 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
     var aiPrompt by remember { mutableStateOf("") }
     var aiBusy by remember { mutableStateOf(false) }
     var proposed by remember { mutableStateOf<UiPersonaDraft?>(null) }
+    var selectedFactId by remember { mutableStateOf<String?>(null) }
+    var selectedLoreId by remember { mutableStateOf<String?>(null) }
     var proposalSource by remember { mutableStateOf<String?>(null) }
     fun leave() { if (draft != original) confirmLeave = true else scope.onBack() }
     ZxPage(if (galleryId == null) "新建人物" else "人物编辑", onBack = ::leave) {
@@ -197,23 +199,95 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
         }
             }
             1 -> {
-        draft.facts.forEachIndexed { index, fact ->
-            ZxSection("事实 ${index + 1}")
-            ZxField(fact.category, { value -> draft = draft.copy(facts = draft.facts.map { if (it.id == fact.id) it.copy(category = value) else it }) }, placeholder = "类别")
-            ZxField(fact.content, { value -> draft = draft.copy(facts = draft.facts.map { if (it.id == fact.id) it.copy(content = value) else it }) }, Modifier.fillMaxWidth(), placeholder = "事实内容")
-            ZxChip("移除事实", false) { draft = draft.copy(facts = draft.facts.filterNot { it.id == fact.id }) }
-        }
-        ZxChip("添加事实", false) { draft = draft.copy(facts = draft.facts + UiPersonaFact(java.util.UUID.randomUUID().toString(), "customFacts", "")) }
+                ZxSection("独立事实 · ${draft.facts.size} 条")
+                ZxFooterNote("事实来源、时间和主观视角由人物档案真实保存。")
+                draft.facts.forEachIndexed { index, fact ->
+                    ZxRow("事实 ${index + 1} · ${personaFieldTitle(fact.category)}",
+                        fact.content.take(90).ifBlank { "尚未填写" },
+                        onClick = { selectedFactId = if (selectedFactId == fact.id) null else fact.id })
+                }
+                ZxButton("添加人物事实", {
+                    val added = UiPersonaFact(java.util.UUID.randomUUID().toString(), "customFacts", "")
+                    draft = draft.copy(facts = draft.facts + added)
+                    selectedFactId = added.id
+                }, variant = ZxButtonVariant.Outline)
+                draft.facts.firstOrNull { it.id == selectedFactId }?.let { fact ->
+                    ZxSection("编辑当前事实")
+                    ZhaoxiPersonaField("事实类别", fact.category) { value ->
+                        draft = draft.copy(facts = draft.facts.map {
+                            if (it.id == fact.id) it.copy(category = value) else it
+                        })
+                    }
+                    ZxField(fact.content, { value ->
+                        draft = draft.copy(facts = draft.facts.map {
+                            if (it.id == fact.id) it.copy(content = value) else it
+                        })
+                    }, Modifier.fillMaxWidth().heightIn(min = 120.dp), placeholder = "完整事实描述")
+                    ZhaoxiPersonaField("所处时间 / 阶段", fact.stage) { value ->
+                        draft = draft.copy(facts = draft.facts.map {
+                            if (it.id == fact.id) it.copy(stage = value) else it
+                        })
+                    }
+                    ZhaoxiPersonaField("人物的主观视角", fact.perspective) { value ->
+                        draft = draft.copy(facts = draft.facts.map {
+                            if (it.id == fact.id) it.copy(perspective = value) else it
+                        })
+                    }
+                    ZhaoxiPersonaField("信息来源", fact.source) { value ->
+                        draft = draft.copy(facts = draft.facts.map {
+                            if (it.id == fact.id) it.copy(source = value) else it
+                        })
+                    }
+                    ZxFooterNote("原始可信状态：${fact.provenance}")
+                    ZxButton("移除这条事实", {
+                        draft = draft.copy(facts = draft.facts.filterNot { it.id == fact.id })
+                        selectedFactId = null
+                    }, variant = ZxButtonVariant.Danger)
+                }
             }
             2 -> {
-        draft.lore.forEachIndexed { index, lore ->
-            ZxSection("世界书条目 ${index + 1}")
-            ZxField(lore.title, { value -> draft = draft.copy(lore = draft.lore.map { if (it.id == lore.id) it.copy(title = value) else it }) }, placeholder = "标题")
-            ZxField(lore.content, { value -> draft = draft.copy(lore = draft.lore.map { if (it.id == lore.id) it.copy(content = value) else it }) }, Modifier.fillMaxWidth(), placeholder = "内容")
-            ZxField(lore.keywords.joinToString("、"), { value -> draft = draft.copy(lore = draft.lore.map { if (it.id == lore.id) it.copy(keywords = value.split("、").filter(String::isNotBlank)) else it }) }, placeholder = "关键词（顿号分隔）")
-            ZxChip("移除条目", false) { draft = draft.copy(lore = draft.lore.filterNot { it.id == lore.id }) }
-        }
-        ZxChip("添加世界书条目", false) { draft = draft.copy(lore = draft.lore + UiPersonaLore(java.util.UUID.randomUUID().toString(), "", "")) }
+                ZxSection("世界书 · ${draft.lore.size} 条")
+                ZxFooterNote("先选择条目，再查看或修改完整正文。所有更改通过底部保存归档。")
+                if (draft.lore.isEmpty()) ZxEmpty("尚无世界书条目", "添加背景、地点、规则等设定")
+                draft.lore.forEachIndexed { index, lore ->
+                    ZxRow(lore.title.ifBlank { "条目 ${index + 1}" },
+                        lore.content.take(90).ifBlank { "点击完善世界设定" },
+                        onClick = { selectedLoreId = if (selectedLoreId == lore.id) null else lore.id })
+                }
+                ZxButton("添加世界书条目", {
+                    val added = UiPersonaLore(java.util.UUID.randomUUID().toString(), "", "")
+                    draft = draft.copy(lore = draft.lore + added)
+                    selectedLoreId = added.id
+                }, variant = ZxButtonVariant.Outline)
+                draft.lore.firstOrNull { it.id == selectedLoreId }?.let { lore ->
+                    ZxSection("正在编辑的世界书条目")
+                    ZhaoxiPersonaField("名称", lore.title) { value ->
+                        draft = draft.copy(lore = draft.lore.map {
+                            if (it.id == lore.id) it.copy(title = value) else it
+                        })
+                    }
+                    ZxField(lore.content, { value ->
+                        draft = draft.copy(lore = draft.lore.map {
+                            if (it.id == lore.id) it.copy(content = value) else it
+                        })
+                    }, Modifier.fillMaxWidth().heightIn(min = 148.dp), placeholder = "该世界书条目的完整设定")
+                    ZhaoxiPersonaField("关键词（顿号分隔）", lore.keywords.joinToString("、")) { value ->
+                        draft = draft.copy(lore = draft.lore.map {
+                            if (it.id == lore.id) it.copy(keywords = value.split("、")
+                                .map(String::trim).filter(String::isNotBlank)) else it
+                        })
+                    }
+                    ZxSwitchRow("始终启用", "启用后无需关键词触发", lore.alwaysOn) { checked ->
+                        draft = draft.copy(lore = draft.lore.map {
+                            if (it.id == lore.id) it.copy(alwaysOn = checked) else it
+                        })
+                    }
+                    ZxFooterNote("优先级：${lore.priority} · 剧透等级：${lore.spoilerLevel}")
+                    ZxButton("移除当前世界书条目", {
+                        draft = draft.copy(lore = draft.lore.filterNot { it.id == lore.id })
+                        selectedLoreId = null
+                    }, variant = ZxButtonVariant.Danger)
+                }
             }
             3 -> {
         ZxField(draft.samplingTemperaturePosition?.toString().orEmpty(), { value ->
