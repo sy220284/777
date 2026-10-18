@@ -53,7 +53,7 @@ fun ZhaoxiHomeScene(
     val snap by (sessions?.snapshots
         ?: kotlinx.coroutines.flow.flowOf(UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null)))
         .collectAsState(initial = UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null))
-    ZxPage("神言神语", onBack = { scope.onBack() }) {
+    ZxPage("朝夕", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ZxChip("＋ 新会话", false) {
@@ -81,14 +81,35 @@ fun ZhaoxiHomeScene(
 
 /** shell.search — 搜索。 */
 @Composable
-fun ZhaoxiSearchScene(scope: UiSceneRenderScope) {
+fun ZhaoxiSearchScene(sessions: SessionUiPort?, scope: UiSceneRenderScope) {
     var query by remember { mutableStateOf("") }
+    val snapshot by (sessions?.snapshots
+        ?: kotlinx.coroutines.flow.flowOf(UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null)))
+        .collectAsState(initial = sessions?.snapshot() ?: UiSessionsSnapshot(
+            null, LocalUsageMode.CHAT, false, emptyList(), null))
+    val results = remember(query, snapshot.sessions) {
+        val needle = query.trim()
+        if (needle.isEmpty()) emptyList() else snapshot.sessions.filter { session ->
+            session.title.contains(needle, ignoreCase = true) ||
+                session.summaryPreview.orEmpty().contains(needle, ignoreCase = true) ||
+                session.id.contains(needle, ignoreCase = true)
+        }.take(60)
+    }
     ZxPage("搜索", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        ZxField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = "搜会话、人物、文件…")
+        ZxField(query, { query = it }, Modifier.fillMaxWidth(),
+            placeholder = "搜索会话标题及预览…")
         Spacer(Modifier.height(8.dp))
-        if (query.isBlank()) ZxEmpty("输入关键词", "支持会话标题与人物名")
-        else ZxEmpty("没有匹配", "换个关键词试试")
+        if (query.isBlank()) ZxEmpty("输入关键词", "可搜索本地会话标题与最近消息摘要")
+        else if (results.isEmpty()) ZxEmpty("没有匹配的会话", "试试其他关键词")
+        results.forEach { item ->
+            ZxRow(item.title.take(60), item.summaryPreview.orEmpty().take(80),
+                onClick = {
+                    if (sessions?.submit(SessionUiCommand.Open(item.id)) == UiCommandReceipt.Accepted)
+                        scope.onNavigate(UiSceneId(if (item.usageMode == LocalUsageMode.WORK)
+                            "conversation.work" else "conversation.chat"))
+                })
+        }
     }
 }
 

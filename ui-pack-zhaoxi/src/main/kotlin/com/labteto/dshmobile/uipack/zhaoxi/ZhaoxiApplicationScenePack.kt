@@ -264,7 +264,7 @@ class ZhaoxiApplicationScenePack(
         when (scene.value) {
             // ---- 壳层 ----
             "route.home", "shell.new_session" -> ZhaoxiHomeScene(sec?.sessions, scope)
-            "shell.search" -> ZhaoxiSearchScene(scope)
+            "shell.search" -> ZhaoxiSearchScene(sec?.sessions, scope)
             "shell.onboarding" -> ZhaoxiOnboardingScene(scope)
             "shell.empty" -> ZhaoxiEmptyDemoScene(scope)
             "shell.error" -> ZhaoxiErrorDemoScene(scope)
