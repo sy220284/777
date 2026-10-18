@@ -6,6 +6,8 @@ import android.text.format.DateFormat
 import android.app.TimePickerDialog
 import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.uicontract.UiAutomationRejection
@@ -273,12 +275,14 @@ fun ZhaoxiAutomationEditorScene(
                 if (selected == AutomationScheduleType.INTERVAL) {
                     ZxSection("重复间隔（分钟）")
                     ZxField(interval, { interval = it }, Modifier.fillMaxWidth(),
-                        placeholder = if (chatMode) "最短 60 分钟" else "最短 15 分钟")
+                        placeholder = if (chatMode) "最短 60 分钟" else "最短 15 分钟",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 }
                 if (selected == AutomationScheduleType.SILENCE) {
                     ZxSection("沉默触发（分钟）")
                     ZxField(silence, { silence = it }, Modifier.fillMaxWidth(),
-                        placeholder = "至少 60 分钟")
+                        placeholder = "至少 60 分钟",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 }
                 if (selected == AutomationScheduleType.WINDOW) {
                     ZxSection("活动时段")
