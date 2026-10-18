@@ -697,3 +697,65 @@ fun ZhaoxiMemoryManagementScene(memory: MemoryUiPort, scope: UiSceneRenderScope,
         }, { pendingForget = null })
     }
 }
+
+/** Diagnostics is a distinct E8.18 page, backed by Settings Owner's real read operations.
+ * Reports are not generated in the background or posted to external services. */
+@Composable
+fun ZhaoxiDiagnosticsSettingsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
+    val co = rememberCoroutineScope()
+    var loading by remember { mutableStateOf(false) }
+    var reportKind by remember { mutableStateOf<String?>(null) }
+    var report by remember { mutableStateOf<String?>(null) }
+    var feedback by remember { mutableStateOf<String?>(null) }
+    var networkTarget by rememberSaveable { mutableStateOf("") }
+    fun read(label: String, action: suspend () -> String) {
+        if (loading) return
+        loading = true
+        feedback = null
+        co.launch {
+            try {
+                val result = action()
+                reportKind = label
+                report = result.take(40000)
+                feedback = if (result.length > 40000)
+                    "原始报告较长，页面仅展示前 40000 字；诊断未上传" else "读取完成 · 诊断未上传"
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { feedback = failure.message ?: "诊断失败，请核实当前状态" }
+            finally { loading = false }
+        }
+    }
+    ZxPage("诊断与网络", onBack = { scope.onBack() }) {
+        Spacer(Modifier.height(8.dp))
+        ZxSection("设备与运行环境")
+        ZxFooterNote("按需读取真实设备和应用环境；结果只在当前页面显示，请注意其中可能包含本地路径等信息。")
+        ZxButton("读取环境信息", { read("环境信息") { settings.environmentInfo() } },
+            Modifier.fillMaxWidth(), enabled = !loading)
+        ZxSection("诊断报告")
+        ZxFooterNote("报告可能包含模型与应用状态，请自行核对后再决定是否分享。")
+        ZxButton("生成本地诊断报告", { read("诊断报告") { settings.diagnosticReport() } },
+            Modifier.fillMaxWidth(), enabled = !loading, variant = ZxButtonVariant.Outline)
+        ZxSection("网络诊断")
+        ZxField(networkTarget, { networkTarget = it }, Modifier.fillMaxWidth(),
+            placeholder = "目标地址（例如 api.example.com）")
+        ZxButton("检查目标连接", {
+            val target = networkTarget.trim()
+            read("网络诊断 · $target") { settings.diagnoseNetwork(target) }
+        }, Modifier.fillMaxWidth(), enabled = !loading && networkTarget.isNotBlank(),
+            variant = ZxButtonVariant.Outline)
+        if (loading) ZxFooterNote("正在读取 Owner 诊断状态…")
+        feedback?.let { ZxFooterNote(it) }
+        if (report != null) {
+            ZxSection(reportKind ?: "诊断结果")
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(report.orEmpty(), color = ZhaoxiTheme.colors.ink,
+                    fontSize = 12.sp, lineHeight = 19.sp)
+            }
+            ZxButton("清除屏幕上的诊断结果", {
+                report = null
+                reportKind = null
+                feedback = null
+            }, variant = ZxButtonVariant.Outline)
+        }
+        ZxFooterNote("网络检查会向你输入的目标发起连接诊断。诊断不会自动提交故障单。")
+    }
+}
