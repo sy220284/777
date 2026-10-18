@@ -220,7 +220,7 @@ private fun status(state: LocalHarnessState): UiSceneStatus = when {
 private fun messages(state: LocalHarnessState): List<UiMessageSnapshot> = state.messages.map {
     UiMessageSnapshot(it.id, when (it.role) {
         "user" -> UiMessageRole.USER
-        "assistant" -> UiMessageRole.ASSISTANT
+        "assistant", "progress" -> UiMessageRole.ASSISTANT
         "tool" -> UiMessageRole.TOOL
         else -> UiMessageRole.SYSTEM
     }, it.content, it.createdAt,
@@ -228,7 +228,7 @@ private fun messages(state: LocalHarnessState): List<UiMessageSnapshot> = state.
         if (state.usageMode == LocalUsageMode.CHAT && !state.chat.groupChat.enabled)
             com.labteto.dshmobile.local.chat.chatBranchInfo(state.chat.chatBranches, it.id)?.let { info ->
                 com.labteto.dshmobile.uicontract.UiMessageBranch(info.index, info.count)
-            } else null, it.proactive)
+            } else null, it.proactive, it.role == "progress")
 }
 
 internal fun LocalSendResult.toUiReceipt(): UiCommandReceipt = when (disposition) {
