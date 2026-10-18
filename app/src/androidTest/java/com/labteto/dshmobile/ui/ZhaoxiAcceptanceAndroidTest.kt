@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -42,10 +44,19 @@ class ZhaoxiAcceptanceAndroidTest {
             theme, "stone", scale, 0, .5f, .5f, .5f, 1f, true)))
     }
 
-    private fun capture(name: String) {
+    private fun capture(name: String, sceneId: String? = null) {
         compose.waitForIdle()
-        val screenshot = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
-        File(directory, "$name.png").outputStream().use { screenshot.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        // Capture the rendered scene subtree, not whichever Activity window is currently foreground.
+        // This prevents mislabeled setting/tool screenshots from passing for conversation scenes.
+        val screenshot = if (sceneId == null) {
+            requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+        } else {
+            compose.onNodeWithTag("zx-acceptance-$sceneId")
+                .assertIsDisplayed().captureToImage().asAndroidBitmap()
+        }
+        File(directory, "$name.png").outputStream().use {
+            check(screenshot.compress(Bitmap.CompressFormat.PNG, 100, it)) { "Screenshot failed: $name" }
+        }
         screenshot.recycle()
     }
 
@@ -64,7 +75,7 @@ class ZhaoxiAcceptanceAndroidTest {
         compose.activityRule.scenario.onActivity { activity -> activity.setContent {
             CompositionLocalProvider(LocalUiPrivateTextCipher provides ports.privateTextCipher,
                 LocalUiHostSystemOperationOwner provides systemOperations) {
-                Box(Modifier.fillMaxSize().systemBarsPadding()) {
+                Box(Modifier.fillMaxSize().systemBarsPadding().testTag("zx-acceptance-${current.id.value}")) {
                     // SLOT renderers are embedded here; never proposed as navigation targets.
                     key(current.id) {
                         pack.SceneFrame(UiSceneNavigationState(pack.manifest.id, listOf(root, current.id))) {
@@ -88,7 +99,7 @@ class ZhaoxiAcceptanceAndroidTest {
                     compose.runOnIdle { current = requirement }
                     compose.waitForIdle()
                     compose.onAllNodesWithText("该场景暂无 Zx* 实装映射", substring = true).assertCountEquals(0)
-                    capture("$label-${requirement.id.value}")
+                    capture("$label-${requirement.id.value}", requirement.id.value)
                     index.appendText("$label\t${requirement.id.value}\t${requirement.kind}\tlocal-session-and-persona; no-external-model; empty-message-and-media-states\n")
                 }
             }
