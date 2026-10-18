@@ -42,11 +42,13 @@ fun ZxPage(
     title: String,
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
+    menu: Boolean = false,
     topRight: @Composable () -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(modifier.fillMaxSize().imePadding().background(ZhaoxiTheme.colors.bg)) {
-        ZxTopBar(title, onNav = { onBack?.invoke() }, canBack = onBack != null) { topRight() }
+    Column(modifier.fillMaxSize().imePadding()) {
+        // Keep the scene surface transparent so E8.17 ambient light remains visible.
+        ZxTopBar(title, onNav = { onBack?.invoke() }, canBack = !menu, showNav = onBack != null) { topRight() }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
             content()
         }
