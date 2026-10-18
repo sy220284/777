@@ -53,22 +53,24 @@ fun ZhaoxiHomeScene(
     val snap by (sessions?.snapshots
         ?: kotlinx.coroutines.flow.flowOf(UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null)))
         .collectAsState(initial = UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null))
+    var commandReceipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
     ZxPage("朝夕", onBack = { scope.onBack() }) {
+        CommandFeedback(commandReceipt)
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ZxChip("＋ 新会话", false) {
-                val receipt = sessions?.submit(SessionUiCommand.Create(snap.identity, LocalConversationMode.INDEPENDENT, LocalUsageMode.CHAT))
+                commandReceipt = sessions?.submit(SessionUiCommand.Create(snap.identity, LocalConversationMode.INDEPENDENT, LocalUsageMode.CHAT))
                 // The Host opens the requested route after the Session owner activates it.
             }
             ZxChip("＋ 工作", false) {
-                val receipt = sessions?.submit(SessionUiCommand.Create(snap.identity, LocalConversationMode.INDEPENDENT, LocalUsageMode.WORK))
+                commandReceipt = sessions?.submit(SessionUiCommand.Create(snap.identity, LocalConversationMode.INDEPENDENT, LocalUsageMode.WORK))
                 // Route after activation through the Host.
             }
             ZxChip("搜索", false) { scope.onNavigate(UiSceneId("shell.search")) }
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            ZxChip("聊天", false) { scope.onNavigate(UiSceneId("conversation.chat")) }
+            ZxChip("聊天", false) { commandReceipt = sessions?.submit(SessionUiCommand.SelectMode(LocalUsageMode.CHAT)) }
             ZxChip("人物", false) { scope.onNavigate(UiSceneId("route.persona_gallery")) }
             ZxChip("任务", false) { scope.onNavigate(UiSceneId("route.tasks")) }
             ZxChip("文件", false) { scope.onNavigate(UiSceneId("route.workspace")) }
@@ -79,7 +81,7 @@ fun ZhaoxiHomeScene(
         if (snap.sessions.isEmpty() && !snap.loading) ZxEmpty("还没有会话", "从一次新会话开始")
         snap.sessions.forEach { s ->
             ZxRow(s.title.take(40), s.summaryPreview.orEmpty().take(56),
-                onClick = { sessions?.submit(SessionUiCommand.Open(s.id)) })
+                onClick = { commandReceipt = sessions?.submit(SessionUiCommand.Open(s.id)) })
         }
     }
 }

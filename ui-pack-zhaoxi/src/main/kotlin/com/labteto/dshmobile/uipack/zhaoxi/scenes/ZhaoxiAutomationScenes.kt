@@ -88,7 +88,7 @@ fun ZhaoxiAutomationEditorScene(
     ZxPage("自动化 · 编辑", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("触发")
-        ZxNavRow("调度方式", sub = "定时 / 事件 / 手动 —— 由上下文预填") {}
+        ZxRow("执行时间", "在任务描述中写明时间或触发条件，保存时由自动化服务解析")
         ZxSection("动作")
         com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
             draft, { draft = it }, Modifier.fillMaxWidth().height(96.dp),

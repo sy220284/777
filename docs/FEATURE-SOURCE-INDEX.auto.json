@@ -1,8 +1,8 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1407,
-  "production_source_count": 860,
+  "repository_code_file_count": 1452,
+  "production_source_count": 861,
   "test_code_file_count": 469,
   "workflow_files": [
     ".github/workflows/ci.yml",
@@ -3376,6 +3376,10 @@
       "sha256": "5b3789997ae022a7"
     },
     {
+      "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZhaoxiIconResources.kt",
+      "sha256": "c4df27ebd43998a6"
+    },
+    {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxConversation.kt",
       "sha256": "42eb2a0fd98dfc9a"
     },
@@ -3389,7 +3393,7 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxIcon.kt",
-      "sha256": "6b8acdd38074507f"
+      "sha256": "6cea88d63748fea1"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxPrimitives.kt",
@@ -3401,7 +3405,7 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiAutomationScenes.kt",
-      "sha256": "4736089af2f527dd"
+      "sha256": "1c82366cb001a057"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiCommandFeedback.kt",
@@ -3441,7 +3445,7 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiShellScenes.kt",
-      "sha256": "19127ddae31e6052"
+      "sha256": "6f1e902bdfa11d90"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSlotScenes.kt",
@@ -3465,13 +3469,15 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "fbc8920deb50",
+  "source_snapshot": "3a72e81ff00d",
   "observed_delta": {
-    "baseline": "e2e992366ad4",
-    "added_production_files": [],
+    "baseline": "892dd21c5979",
+    "added_production_files": [
+      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZhaoxiIconResources.kt"
+    ],
     "removed_production_files": [],
     "modified_production_files": [
-      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedPersona.kt"
+      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxIcon.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
