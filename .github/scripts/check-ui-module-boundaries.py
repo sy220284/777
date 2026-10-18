@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Backend-only UI boundary: reject every retired visual surface and preserve the new-pack interface."""
+"""E8.17 UI boundary: reject retired V6 visuals and enforce independent pack wiring."""
 from pathlib import Path
 import re
 import sys
@@ -55,8 +55,14 @@ def violations() -> list[str]:
     for symbol in ("ChatUiPort", "WorkConversationUiPort", "ToolsUiPort", "SessionUiPort"):
         if symbol not in owner: errors.append("neutral owner lost port: " + symbol)
     activity = (ROOT / "app/src/main/java/com/labteto/dshmobile/MainActivity.kt").read_text(encoding="utf-8")
-    if any(s in activity for s in ("setContent(", "AppRoot(", "DshTheme(", "V6ApplicationScenePack(")):
-        errors.append("MainActivity renders retired interface")
+    if any(s in activity for s in ("AppRoot(", "DshTheme(", "V6ApplicationScenePack(")):
+        errors.append("MainActivity renders retired V6 interface")
+    if "setContent {" not in activity or "ZhaoxiApplicationRoot(" not in activity:
+        errors.append("E8.17 UI must be composed only from the app entrypoint")
+    if 'include(":ui-pack-zhaoxi")' not in settings or 'project(":ui-pack-zhaoxi")' not in app:
+        errors.append("New Zhaoxi UI pack not registered in application build")
+    if not (ROOT / "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/ZhaoxiApplicationScenePack.kt").is_file():
+        errors.append("New Zhaoxi UI scene pack is missing")
     resources = (ROOT / "app/src/main/res/values/strings.xml").read_text(encoding="utf-8")
     if resources.count('<string name=') > 40:
         errors.append("old UI copy has returned to base Android resources")

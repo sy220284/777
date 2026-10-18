@@ -1,0 +1,472 @@
+package com.labteto.dshmobile.uipack.zhaoxi.scenes
+
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.labteto.dshmobile.uicontract.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.snapshotFlow
+import com.labteto.dshmobile.uipack.zhaoxi.sendZhaoxiDraft
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import com.labteto.dshmobile.uicontract.ChatUiCommand
+import com.labteto.dshmobile.uicontract.ChatUiPort
+import com.labteto.dshmobile.uicontract.UiCommandReceipt
+import com.labteto.dshmobile.uicontract.UiCommandRejection
+import com.labteto.dshmobile.uicontract.UiExecutionPhase
+import com.labteto.dshmobile.uicontract.UiMessageRole
+import com.labteto.dshmobile.uicontract.UiMessageSnapshot
+import com.labteto.dshmobile.uicontract.UiSceneId
+import com.labteto.dshmobile.uicontract.WorkConversationUiCommand
+import com.labteto.dshmobile.uicontract.WorkConversationUiPort
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.ZxDocumentCard
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxApprovalCard
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxCap
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxCapBar
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxComposer
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxMessageRow
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxModeSwitch
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxQuestionCard
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTimeSeparator
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTypingIndicator
+import com.labteto.dshmobile.uipack.zhaoxi.components.rejectionHint
+import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
+import com.labteto.dshmobile.uihost.UiSceneRenderScope
+
+/**
+ * 会话域场景（E8.14 实装）：conversation.chat / work / header / timeline / composer /
+ * reply_status / message_actions / edit / reader / model_picker / branches。
+ * 行为基准 = V6 会话场景：发送/编辑/变体/再生成/停止只经端口 submit，回执呈现不伪造。
+ */
+
+/** conversation.chat — 聊天会话主场景。 */
+@Composable
+fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: ConversationReadingUiPort, history: UiMessageHistoryPort?, authorName: String, scope: UiSceneRenderScope, onMessage: (UiSessionIdentity, UiMessageSnapshot) -> Unit, menu: @Composable () -> Unit,
+    documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet(),
+    media: MediaUiPort? = null) {
+    val snap by chat.snapshots.collectAsState(initial = chat.snapshot())
+    val storedDrafts by drafts.drafts.collectAsState()
+    val sessionId = snap.identity?.sessionId.orEmpty()
+    val draft = storedDrafts[sessionId].orEmpty()
+    fun writeDraft(text: String) { if (sessionId.isNotBlank()) drafts.updateDraft(sessionId, text) }
+    var receipt by remember(sessionId) { mutableStateOf<UiCommandReceipt?>(null) }
+    Column(Modifier.fillMaxWidth().fillMaxSize().imePadding()) {
+        ZxConversationRoutes(scope, menu)
+        CommandFeedback(receipt)
+        snap.error?.let { ZxBanner(it, ZxTone.Err) }
+        if (snap.status == UiSceneStatus.LOADING) com.labteto.dshmobile.uipack.zhaoxi.components.ZxProgressBar(null)
+        Column(Modifier.weight(1f)) {
+            snap.group?.let { g ->
+                ZxBanner("群聊 · ${g.memberNames.joinToString("、")}", ZxTone.Info)
+                Spacer(Modifier.height(6.dp))
+            }
+            ConversationMessages(snap.identity, snap.messages, reading, history, Modifier.weight(1f),
+                onMessage = { m -> snap.identity?.let { onMessage(it, m) } },
+                onBranch = { m, index -> snap.identity?.let { receipt = chat.submit(ChatUiCommand.SelectVariant(it, m.id, index)) } },
+                preview = snap.livePreview, running = snap.phase == UiExecutionPhase.RUNNING,
+                documents = documents, knownScenes = knownScenes, media = media)
+            if (snap.queuedInputCount > 0)
+                ZxBanner("⇄ 已排队 ${snap.queuedInputCount} 条 · 队列满时将拒收", ZxTone.Warn)
+        }
+        ZxComposer(
+            draft = draft, onDraftChange = ::writeDraft,
+            send = snap.send,
+            running = snap.phase == UiExecutionPhase.RUNNING,
+            onStop = { snap.identity?.let { id -> receipt = chat.submit(ChatUiCommand.Stop(id)) } },
+            onSend = {
+                val id = snap.identity
+                receipt = if (id == null) UiCommandReceipt.Rejected(UiCommandRejection.UNCONFIGURED)
+                else sendZhaoxiDraft(drafts, id) { text, files -> chat.submit(ChatUiCommand.SendMessage(id, text, files)) }
+            },
+            placeholder = "问点什么",
+        )
+    }
+}
+
+/** conversation.work — 工作会话主场景（审批卡/提问卡槽位 + 计划入口）。 */
+@Composable
+fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPort, reading: ConversationReadingUiPort, history: UiMessageHistoryPort?, scope: UiSceneRenderScope, onMessage: (UiSessionIdentity, UiMessageSnapshot) -> Unit, menu: @Composable () -> Unit,
+    documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet(),
+    media: MediaUiPort? = null) {
+    val snap by work.snapshots.collectAsState(initial = work.snapshot())
+    val storedDrafts by drafts.drafts.collectAsState()
+    val sessionId = snap.identity?.sessionId.orEmpty()
+    val draft = storedDrafts[sessionId].orEmpty()
+    fun writeDraft(text: String) { if (sessionId.isNotBlank()) drafts.updateDraft(sessionId, text) }
+    var receipt by remember(sessionId) { mutableStateOf<UiCommandReceipt?>(null) }
+    var questionAnswer by remember { mutableStateOf("") }
+    Column(Modifier.fillMaxWidth().fillMaxSize().imePadding()) {
+        ZxConversationRoutes(scope, menu)
+        CommandFeedback(receipt)
+        snap.error?.let { ZxBanner(it, ZxTone.Err) }
+        if (snap.status == UiSceneStatus.LOADING) com.labteto.dshmobile.uipack.zhaoxi.components.ZxProgressBar(null)
+        Column(Modifier.weight(1f)) {
+            ConversationMessages(snap.identity, snap.messages, reading, history, Modifier.weight(1f),
+                onMessage = { m -> snap.identity?.let { onMessage(it, m) } },
+                preview = snap.livePreview, running = snap.phase == UiExecutionPhase.RUNNING,
+                documents = documents, knownScenes = knownScenes, pendingApprovalId = snap.approval?.pendingId,
+                media = media)
+            snap.approval?.let { ap ->
+                Spacer(Modifier.height(6.dp))
+                ZxApprovalCard(ap, expired = snap.phase == UiExecutionPhase.IDLE && ap.pendingId.isBlank()) { approved ->
+                    snap.identity?.let { id ->
+                        receipt = work.submit(WorkConversationUiCommand.AnswerApproval(id, ap.pendingId, approved))
+                    }
+                }
+            }
+            snap.question?.let { q ->
+                Spacer(Modifier.height(6.dp))
+                ZxQuestionCard(q, questionAnswer, { questionAnswer = it }) { answer ->
+                    val id = snap.identity
+                    if (id != null) {
+                        val result = work.submit(WorkConversationUiCommand.AnswerQuestion(id, q.pendingId, answer))
+                        receipt = result
+                        if (result.admitted()) questionAnswer = ""
+                    }
+                }
+            }
+            if (snap.queuedInputCount > 0)
+                ZxBanner("⇄ 已排队 ${snap.queuedInputCount} 条 · 队列满时将拒收", ZxTone.Warn)
+        }
+        ZxComposer(
+            draft = draft, onDraftChange = ::writeDraft,
+            send = snap.send,
+            running = snap.phase == UiExecutionPhase.RUNNING,
+            onStop = { snap.identity?.let { id -> receipt = work.submit(WorkConversationUiCommand.Stop(id)) } },
+            onSend = {
+                val id = snap.identity
+                receipt = if (id == null) UiCommandReceipt.Rejected(UiCommandRejection.UNCONFIGURED)
+                else sendZhaoxiDraft(drafts, id) { text, files -> work.submit(WorkConversationUiCommand.SendMessage(id, text, files)) }
+            },
+            placeholder = "描述任务目标",
+        )
+    }
+}
+
+/** conversation.header — 顶栏槽位（模式分段 + 模型胶囊 + 会话操作）。 */
+@Composable
+fun ZhaoxiConversationHeaderScene(
+    title: String,
+    modelLabel: String,
+    workMode: Boolean,
+    onModeChange: (Boolean) -> Unit,
+    scope: UiSceneRenderScope,
+) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        Text(title, Modifier.weight(1f), fontSize = 15.sp,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = ZhaoxiTheme.colors.ink)
+        ZxModeSwitch(workMode, onModeChange)
+    }
+}
+
+/** conversation.reply_status — 运行/排队/steer 状态条。 */
+@Composable
+fun ZhaoxiReplyStatusScene(phase: UiExecutionPhase, queuedInputCount: Int) {
+    when {
+        queuedInputCount > 0 -> ZxBanner("⇄ 已排队 $queuedInputCount 条 · 队列满时将拒收", ZxTone.Warn)
+        // RUNNING is shown only inside the one reply surface. No second typing row.
+        phase == UiExecutionPhase.WAITING_FOR_USER -> ZxBanner("需要你处理 · 审批与提问待决定", ZxTone.Warn)
+        else -> {}
+    }
+}
+
+/** conversation.reader — 沉浸阅读。 */
+@Composable
+fun ZhaoxiReaderScene(title: String, text: String, scope: UiSceneRenderScope) {
+    ZxPage(title, onBack = { scope.onBack() }) {
+        Spacer(Modifier.height(8.dp))
+        com.labteto.dshmobile.uipack.zhaoxi.components.ZxRichReply(text)
+        com.labteto.dshmobile.uipack.zhaoxi.components.ZxFooterNote("长按可选中复制")
+    }
+}
+
+/** conversation.model_picker — 模型选择层。 */
+@Composable
+fun ZhaoxiModelPickerScene(
+    models: List<Triple<String, String, Boolean>>,
+    onSelect: (String) -> Unit,
+    onOpenModelSettings: () -> Unit,
+    scope: UiSceneRenderScope,
+) {
+    ZxPage("选择模型", onBack = { scope.onBack() }) {
+        if (models.isEmpty())
+            com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty(
+                "模型清单未注入", "到「设置 · 模型」配置供应商与密钥")
+        models.forEach { (id, sub, current) ->
+            ZxRow(id, sub, mono = true, onClick = { onSelect(id) }) {
+                if (current) Text("✓", color = ZhaoxiTheme.colors.accent)
+            }
+        }
+        ZxNavRow("模型设置与 API Key…", onClick = onOpenModelSettings)
+    }
+}
+
+/** conversation.composer 独立槽位（被 conversation.chat/work 内嵌复用）。 */
+@Composable
+fun ZhaoxiComposerSlotScene(
+    send: com.labteto.dshmobile.uicontract.UiActionAvailability,
+    running: Boolean,
+    placeholder: String,
+    /** 返回 true 才清空草稿（回执 Accepted/Queued）；false 保留草稿并提示。 */
+    onSendText: (String) -> Boolean,
+    onStop: () -> Unit,
+    draft: String,
+    onDraftChange: (String) -> Unit,
+) {
+    var rejected by remember { mutableStateOf(false) }
+    Column {
+        if (rejected) {
+            ZxBanner("未送达 · 草稿已保留", ZxTone.Err)
+            Spacer(Modifier.height(4.dp))
+        }
+        // Capability tuning remains in model settings; no inactive duplicate chips.
+        ZxComposer(draft, onDraftChange, send, {
+            if (onSendText(draft)) { onDraftChange(""); rejected = false } else rejected = true
+        }, placeholder, running = running, onStop = onStop)
+    }
+}
+
+@Composable
+private fun ZxConversationRoutes(scope: UiSceneRenderScope, menu: @Composable () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip("返回", false) { scope.onBack() }
+        com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip("模型", false) { scope.onNavigate(UiSceneId("conversation.model_picker")) }
+        com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip("更多", false) { expanded = !expanded }
+    }
+    if (expanded) Column(Modifier.heightIn(max = 320.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) { menu() }
+}
+
+/** Internal Work event projections are retained for audit, never pinned into the reply stream. */
+internal fun UiDocument.isInlineWorkTaskCard(): Boolean =
+    source.workMode && documentId == "work-live:${source.messageId}"
+
+@Composable
+internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<UiMessageSnapshot>,
+    reading: ConversationReadingUiPort, history: UiMessageHistoryPort?, modifier: Modifier,
+    onMessage: (UiMessageSnapshot) -> Unit, onBranch: (UiMessageSnapshot, Int) -> Unit = { _, _ -> },
+    preview: UiStreamingReplyPreview? = null, running: Boolean = false,
+    documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet(),
+    pendingApprovalId: String? = null, media: MediaUiPort? = null) {
+    val sessionId = identity?.sessionId.orEmpty()
+    var older by remember(sessionId) { mutableStateOf(emptyList<UiMessageSnapshot>()) }
+    var cursor by remember(sessionId) { mutableStateOf<UiTranscriptCursor?>(null) }
+    var loaded by remember(sessionId) { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val jobs = androidx.compose.runtime.rememberCoroutineScope()
+    val all = remember(older, messages) { (older + messages).distinctBy { it.id } }
+    // A 100ms model preview changes only the live text, not historic message grouping.
+    val timeline = remember(all, running) { projectZxReplyTimeline(all, running) }
+    val latestReplyKey = timeline.lastOrNull { it is ZxTimelineEntry.Reply }?.key
+    val documentsState = if (documents != null) documents.snapshots.collectAsState(initial = documents.snapshot())
+        else null
+    // Tool events stay durable in the Owner ledger. The timeline shows only a small,
+    // user-expandable status below the corresponding reply, never raw tool commands.
+    val currentDocuments = documentsState?.value?.takeIf { it.sessionId == sessionId }
+        ?.documents.orEmpty()
+    // Historical document reads have no privileges; newer active snapshots always win by ID.
+    val olderIds = older.map { it.id }.toSet()
+    val historical by produceState<Map<String, List<UiDocumentSnapshot>>>(emptyMap(), sessionId,
+        olderIds, documents, identity) {
+        value = if (documents != null && identity != null && olderIds.isNotEmpty())
+            documents.documentsForMessages(identity, olderIds)
+                .groupBy { it.document.source.messageId }
+        else emptyMap()
+    }
+    val allCardsBySource = remember(historical, currentDocuments) {
+        (historical.values.flatten() + currentDocuments)
+            .associateBy { it.document.documentId }.values.groupBy { it.document.source.messageId }
+    }
+    val workByTurn = allCardsBySource.mapValues { (_, items) ->
+        items.firstOrNull { it.document.isInlineWorkTaskCard() }
+    }
+    fun submitDocumentAction(
+        card: UiDocumentSnapshot, actionId: String, fields: Map<String, String>,
+    ): UiDocumentReceipt {
+        if (documents == null || identity == null || card.actions[actionId]?.available != true)
+            return UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+        return documents.submit(identity, UiDocumentActionRequest(
+            documentId = card.document.documentId, revision = card.document.revision,
+            source = card.document.source, actionId = actionId, fields = fields))
+    }
+    // A cumulative model snapshot must not repeat already committed intermediate messages.
+    val activeReply = timeline.lastOrNull { it is ZxTimelineEntry.Reply } as? ZxTimelineEntry.Reply
+    val streamText = uncommittedReplyPreview(preview?.text, activeReply?.stages.orEmpty())
+    val state = rememberLazyListState()
+    var restored by remember(sessionId) { mutableStateOf(false) }
+    var followTail by remember(sessionId) { mutableStateOf(true) }
+    val readerDragging by state.interactionSource.collectIsDraggedAsState()
+    val latestStageSignature = activeReply?.stages?.map { it.id to it.text.hashCode() }
+    suspend fun moveToLiveTail() {
+        val last = (state.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+        // Avoid resetting an already-visible growing reply to the top on every token.
+        var tail = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == last }
+        if (tail == null) {
+            state.scrollToItem(last)
+            androidx.compose.runtime.withFrameNanos { }
+            tail = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == last }
+        }
+        tail?.let { item ->
+            val overflow = (item.offset + item.size - state.layoutInfo.viewportEndOffset)
+                .coerceAtLeast(0)
+            if (overflow > 0) state.scrollBy(overflow.toFloat())
+        }
+    }
+    LaunchedEffect(sessionId, all.firstOrNull()?.id) {
+        if (!restored && all.isNotEmpty()) {
+            val anchor = reading.anchor(sessionId)
+            followTail = anchor?.followingTail ?: true
+            val restoredMessageId = anchor?.messageId
+            val index = timeline.indexOfFirst {
+                restoredMessageId != null && it.containsMessage(restoredMessageId)
+            }
+            state.scrollToItem(if (index >= 0) index + 1 else timeline.size, if (index >= 0) anchor?.offsetPx ?: 0 else 0)
+            restored = true
+        }
+    }
+    LaunchedEffect(state, sessionId, all) {
+        snapshotFlow { state.firstVisibleItemIndex to state.firstVisibleItemScrollOffset }
+            .distinctUntilChanged().collect { (index, offset) ->
+                if (restored && sessionId.isNotBlank()) reading.rememberAnchor(sessionId,
+                    UiReadingAnchor(timeline.getOrNull(index - 1)?.let { entry ->
+                        when (entry) {
+                            is ZxTimelineEntry.Message -> entry.message.id
+                            is ZxTimelineEntry.Reply -> entry.stages.firstOrNull()?.id ?: entry.anchorId
+                        }
+                    }, offset, followTail))
+            }
+    }
+    // Distinguish the reader's drag gesture from our programmatic scroll operations.
+    LaunchedEffect(state, sessionId, readerDragging) {
+        if (readerDragging) snapshotFlow { !state.canScrollForward }
+            .distinctUntilChanged().collect { atTail -> followTail = atTail }
+    }
+    LaunchedEffect(timeline.size, latestStageSignature, streamText, running, readerDragging,
+        currentDocuments.map { it.document.documentId to it.document.revision }) {
+        if (restored && followTail && !readerDragging) {
+            androidx.compose.runtime.withFrameNanos { }
+            moveToLiveTail()
+        }
+    }
+    Column(modifier) {
+        LazyColumn(Modifier.weight(1f), state = state) {
+        item(key = "history") {
+            error?.let { ZxBanner(it, ZxTone.Err) }
+            if (history != null && (!loaded || cursor != null))
+                com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton(if (loading) "加载中…" else "加载更早消息", {
+                    if (sessionId.isNotBlank()) jobs.launch {
+                        loading = true
+                        try {
+                            val page = history.messagePage(sessionId, cursor, 60)
+                            val previousId = timeline.getOrNull(state.firstVisibleItemIndex - 1)?.let { entry ->
+                                when (entry) {
+                                    is ZxTimelineEntry.Message -> entry.message.id
+                                    is ZxTimelineEntry.Reply -> entry.stages.firstOrNull()?.id ?: entry.anchorId
+                                }
+                            }
+                            older = (page.messages + older).distinctBy { it.id }
+                            cursor = page.nextCursor; loaded = true; error = null
+                            val index = projectZxReplyTimeline((older + messages).distinctBy { it.id }, running)
+                                .indexOfFirst { previousId != null && it.containsMessage(previousId) }
+                            if (index >= 0) state.scrollToItem(index + 1)
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                        catch (failure: Exception) { error = failure.message ?: "历史加载失败" }
+                        finally { loading = false }
+                    }
+                }, enabled = !loading)
+        }
+        items(timeline, key = { it.key }) { entry ->
+            when (entry) {
+                is ZxTimelineEntry.Message -> {
+                    ZxMessageRow(entry.message,
+                        if (entry.message.role == UiMessageRole.USER) "我" else "助手",
+                        onLongPress = { onMessage(it) }, onBranchSelect = { onBranch(entry.message, it) })
+                }
+                is ZxTimelineEntry.Reply -> {
+                    val isCurrent = running && entry.key == latestReplyKey
+                    Column {
+                        // Stage and final messages stay in this one keyed reply container.
+                        entry.stages.forEachIndexed { index, stage ->
+                            ZxMessageRow(
+                                if (index == 0) stage else stage.copy(progressive = true),
+                                "助手", onLongPress = { onMessage(stage) },
+                                onBranchSelect = { onBranch(stage, it) })
+                            allCardsBySource[stage.id].orEmpty()
+                                .filterNot { it.document.isInlineWorkTaskCard() }
+                                .forEach { card ->
+                                    androidx.compose.runtime.key(card.document.documentId) {
+                                        ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
+                                            onAction = { actionId, fields ->
+                                                submitDocumentAction(card, actionId, fields)
+                                            }, media = media)
+                                    }
+                                }
+                        }
+                        if (isCurrent) {
+                            val currentText = streamText
+                            if (currentText != null) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    ZxTypingIndicator()
+                                    Text("正在输出", fontSize = 11.sp, color = ZhaoxiTheme.colors.ink2)
+                                }
+                                com.labteto.dshmobile.uipack.zhaoxi.components.ZxRichReply(currentText)
+                            } else if (entry.stages.isEmpty()) ZxTypingIndicator()
+                        }
+                        // The single compact, collapsible Work status shares the reply slot.
+                        entry.anchorId?.let { anchor -> workByTurn[anchor] }?.let { card ->
+                            ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
+                                onAction = { actionId, fields -> submitDocumentAction(card, actionId, fields) },
+                                media = media)
+                        }
+                        entry.anchorId?.let { allCardsBySource[it] }.orEmpty()
+                            .filterNot { it.document.isInlineWorkTaskCard() }
+                            .forEach { card ->
+                                ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
+                                    onAction = { actionId, fields -> submitDocumentAction(card, actionId, fields) },
+                                    media = media)
+                            }
+                    }
+                }
+            }
+        }
+        }
+        if (!followTail && all.isNotEmpty()) {
+            com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip(
+                "↓ 查看最新回复", false, onClick = {
+                    followTail = true
+                    jobs.launch {
+                        moveToLiveTail()
+                    }
+                })
+        }
+    }
+}

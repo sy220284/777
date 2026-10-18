@@ -101,6 +101,27 @@ class LocalConversationUiPortTest {
         })
     }
 
+    @Test fun progressiveTextIsVisibleOnlyToCurrentRunningSessionAndMode() {
+        val f = Fixture(LocalUsageMode.CHAT)
+        f.state.value = f.state.value.copy(kernel = f.state.value.kernel.copy(running = true))
+        val owner = f.store.streamingPreviewStore.newOwner("a", "reply-1", LocalUsageMode.CHAT)
+        f.store.streamingPreviewStore.begin(owner)
+        f.store.streamingPreviewStore.publishAssistant(owner, "正在整理第一部分")
+        assertEquals("正在整理第一部分", f.port.chat.snapshot().livePreview?.text)
+        assertEquals("reply-1", f.port.chat.snapshot().livePreview?.requestId)
+        assertNull(f.port.work.snapshot().livePreview)
+
+        // A mode switch must not reuse the previous request's transient text.
+        f.state.value = f.state.value.copy(usageMode = LocalUsageMode.WORK)
+        assertNull(f.port.work.snapshot().livePreview)
+        val work = f.store.streamingPreviewStore.newOwner("a", "work-2", LocalUsageMode.WORK)
+        f.store.streamingPreviewStore.begin(work)
+        f.store.streamingPreviewStore.publishAssistant(work, "工具返回阶段结论")
+        assertEquals("工具返回阶段结论", f.port.work.snapshot().livePreview?.text)
+        f.state.value = f.state.value.copy(kernel = f.state.value.kernel.copy(running = false))
+        assertNull(f.port.work.snapshot().livePreview)
+    }
+
     @Test fun bootstrapSnapshotDoesNotQueryAnUninitializedWorkOwner() {
         val port = LocalConversationUiPortComposition(LocalRuntimeStateStore(), ChatOwner(), WorkOwner(),
             object : LocalWorkApprovalUiPort {

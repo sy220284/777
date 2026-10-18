@@ -1,6 +1,6 @@
 # 后端保留版：UI 清空及新界面接入
 
-当前源代码**不提供旧聊天、Work、人物、工具或设置页面**。MainActivity 仅作为 Android 宿主入口，不安装 Compose 内容、视觉桥或任何旧 UI。此状态用于重新接入全新 UI；用户无法通过旧页面操作业务，这是有意设计的过渡态。
+当前源代码不提供旧 V6 页面。PR #740 已由 `MainActivity` 安装朝夕 E8.17 独立界面，接线与验证状态以该 PR 最新 Head 为准，尚未代表主线交付。本文同时保留后端清空的边界约束与自动发布拦截标志；完成新界面验收前不解除发布拦截。
 
 ## 保留
 
@@ -16,7 +16,7 @@
 - App `ui/screens`、`ui/components`、`ui/theme`、`ui/shenyan`、侧边栏 UI 实现、字体、图标、旧动画与视觉回归测试。
 - V6 设计源码/图标体系/视觉素材文档与旧截图采集工作流。
 - 任意编译期对 V6 包的依赖，以及旧 UI 的生产装配。
-- 旧页面文案资源（数千条页面标题、按钮与提示）；保留仅供系统通知、业务存储错误与 Android 契约测试使用的字符串。**Gradle 中 AndroidX Compose/Material/Icon/Navigation 的 SDK 依赖仍保留为经过校验的中立编译基座**，并非旧 UI 的页面、组件、素材或活动渲染器，MainActivity 不执行 UI 装配。原安全校验的 Hilt/KSP 依赖图必须保持稳定，新 UI 可在其上接入。
+- 旧页面文案资源（数千条页面标题、按钮与提示）；保留仅供系统通知、业务存储错误与 Android 契约测试使用的字符串。**Gradle 中 AndroidX Compose/Material/Icon/Navigation 的 SDK 依赖仍保留为经过校验的中立编译基座**，并非旧 UI 的页面、组件、素材或活动渲染器；新 Compose 入口只装配独立朝夕包。原安全校验的 Hilt/KSP 依赖图必须保持稳定，新 UI 可在其上接入。
 
 ## 新 UI 接入要求
 
@@ -28,8 +28,13 @@
 
 ## 历史审计快照口径
 
-`docs/FEATURE-SOURCE-INDEX.auto.json`、`FEATURE-REVIEW.auto.json`、`FEATURE-REALITY-AUDIT.auto.json` 等报告产生于旧 UI 代码仍存在时，文件中的 `ui-pack-v6` / `ui/screens` 路径仅是**历史证据**，不是现行源码或当前功能验收结果。当前 UI 实现以本分支实际 Git 树和新的负面边界门禁为准；重建新 UI 后需要重新生成全量功能审计基线，不能复用这些旧截图、页面或证据声明。现行功能来源登记已改指向真实业务端口或 Provider 解析代码。
+旧版功能报告产生于 V6 代码仍存在时，文件中的 `ui-pack-v6` / `ui/screens` 路径仅是**历史证据**，不是现行源码或当前功能验收结果。当前 UI 实现以本分支实际 Git 树和新的负面边界门禁为准；重建新 UI 后需要重新生成全量功能审计基线，不能复用这些旧截图、页面或证据声明。PR #740 已重新生成 `FEATURE-SOURCE-INDEX.auto.json`、`FEATURE-REVIEW.auto.json` 及功能树；未重新生成的其他审计报告仍属于历史证据。当前来源登记指向现存业务端口、宿主与朝夕源码，静态来源存在不代表动作通过验收。
 
 ## 禁止空白 APK 发版
 
-本阶段属于无界面后端基线，即使 CI 构建、Android 设备测试全部通过，也不能对终端用户发布空白客户端。`.github/workflows/release.yml` 在发布检测阶段识别本权威文档作为无界面标志并直接跳过发版；`.github/scripts/check-ci-repository-integrity.py` 强制验证拦截存在。**未来完整接入并验收新 UI 后**，在移除无界面标志和发布拦截时必须重新完成全量主线 CI 与发布证据检查。
+本阶段仍保留后端清空时建立的发布保护。即使新界面已经接入且 CI 构建、Android 设备测试全部通过，也不能以此替代完整行为验收或直接发布客户端。`.github/workflows/release.yml` 在发布检测阶段识别本权威文档作为无界面标志并直接跳过发版；`.github/scripts/check-ci-repository-integrity.py` 强制验证拦截存在。**未来完整接入并验收新 UI 后**，在移除无界面标志和发布拦截时必须重新完成全量主线 CI 与发布证据检查。
+
+
+## 朝夕 E8.17 接入 PR #740
+
+新视觉层在独立 `ui-pack-zhaoxi`；应用 `MainActivity` 现在通过 Hilt 提供的 `LocalApplicationFeaturePortsOwner` 装配真实业务端口，并由 UI Host 做全目录准入、导航历史校验和系统返回。当前仍在 PR 阶段做设备/行为回归，禁止空白 APK/未验收 UI 自动发版的保护仍保持生效。旧 UI 路径与旧资源不可恢复。

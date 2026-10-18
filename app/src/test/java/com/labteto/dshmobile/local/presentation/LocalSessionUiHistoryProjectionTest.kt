@@ -11,6 +11,7 @@ class LocalSessionUiHistoryProjectionTest {
         val cases = listOf(
             "user" to UiMessageRole.USER,
             "assistant" to UiMessageRole.ASSISTANT,
+            "progress" to UiMessageRole.ASSISTANT,
             "tool" to UiMessageRole.TOOL,
             "system" to UiMessageRole.SYSTEM,
             "unexpected-role" to UiMessageRole.SYSTEM,
@@ -25,6 +26,7 @@ class LocalSessionUiHistoryProjectionTest {
             assertNull(projected.editableText)
             assertNull(projected.branch)
             assertEquals(ownerMessage.proactive, projected.proactive)
+            assertEquals(role == "progress", projected.progressive)
         }
     }
 }

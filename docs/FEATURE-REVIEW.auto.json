@@ -1,70 +1,15 @@
 {
   "version": 1,
-  "snapshot": "7bbc92eaad6c",
+  "snapshot": "cdac1a7c80be",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
-  "code_files_scanned": 1771,
-  "production_sources_scanned": 1027,
-  "feature_nodes": 533,
-  "functional_leaves": 440,
-  "existing_executable_test_mappings": 125,
+  "code_files_scanned": 1453,
+  "production_sources_scanned": 861,
+  "feature_nodes": 534,
+  "functional_leaves": 441,
+  "existing_executable_test_mappings": 121,
   "leaf_evidence": [
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 本机聊天／工作模式切换",
-      "verification": "真实测试映射（仅局部）",
-      "test_reference_count": 9,
-      "historical_grade": "测试方法已核",
-      "existing_production_sources": [],
-      "missing_production_sources": [],
-      "named_symbols": [],
-      "explicit_source_anchor": false,
-      "explicit_static_scope": null,
-      "explicit_test_candidates": [],
-      "workflow_evidence": []
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 侧边栏与会话列表",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
-      "historical_grade": "源码入口及处理分支已核（静态）",
-      "existing_production_sources": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt"
-      ],
-      "missing_production_sources": [],
-      "named_symbols": [
-        {
-          "symbol": "LocalModeDrawer",
-          "declaration_found": true
-        }
-      ],
-      "explicit_source_anchor": false,
-      "explicit_static_scope": null,
-      "explicit_test_candidates": [],
-      "workflow_evidence": []
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 功能路由和页面恢复",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
-      "historical_grade": "源码入口及处理分支已核（静态）",
-      "existing_production_sources": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt"
-      ],
-      "missing_production_sources": [],
-      "named_symbols": [
-        {
-          "symbol": "localFeatureRestoreStack",
-          "declaration_found": true
-        }
-      ],
-      "explicit_source_anchor": false,
-      "explicit_static_scope": null,
-      "explicit_test_candidates": [],
-      "workflow_evidence": [],
-      "identity_id": "existing.0103",
-      "identity_status": "静态声明已核，尚未授权自动改树"
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 页面返回、抽屉和浮层管理",
       "verification": "真实测试映射（仅局部）",
       "test_reference_count": 1,
       "historical_grade": "测试方法已核",
@@ -77,12 +22,74 @@
       "workflow_evidence": []
     },
     {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 侧边栏与会话列表",
+      "verification": "旧源码已失效，需核实迁移或退役",
+      "test_reference_count": 0,
+      "historical_grade": "源码入口及处理分支已核（静态）",
+      "existing_production_sources": [],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt"
+      ],
+      "named_symbols": [
+        {
+          "symbol": "LocalModeDrawer",
+          "declaration_found": false
+        }
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "explicit_test_candidates": [],
+      "workflow_evidence": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 功能路由和页面恢复",
+      "verification": "旧源码已失效，需核实迁移或退役",
+      "test_reference_count": 0,
+      "historical_grade": "源码入口及处理分支已核（静态）",
+      "existing_production_sources": [],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt"
+      ],
+      "named_symbols": [
+        {
+          "symbol": "localFeatureRestoreStack",
+          "declaration_found": false
+        }
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "explicit_test_candidates": [],
+      "workflow_evidence": [],
+      "identity_id": "existing.0103",
+      "identity_status": "待复核入口变化"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 页面返回、抽屉和浮层管理",
+      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "test_reference_count": 0,
+      "historical_grade": "测试方法已核",
+      "existing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/host/ZhaoxiApplicationRoot.kt"
+      ],
+      "missing_production_sources": [],
+      "named_symbols": [
+        {
+          "symbol": "ZhaoxiApplicationRoot",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "现行宿主处理系统返回、导航及焦点输入法边界；仅静态实现依据，抽屉、辅助技术和实际设备体验仍待验收。",
+      "explicit_test_candidates": [],
+      "workflow_evidence": []
+    },
+    {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 加号统一能力入口",
       "verification": "具名源码声明存在（静态，待调用链复核）",
       "test_reference_count": 0,
       "historical_grade": "源码入口及处理分支已核（静态）",
       "existing_production_sources": [
-        "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationScene.kt"
+        "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConversationMenu.kt"
       ],
       "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
@@ -93,12 +100,12 @@
           "declaration_found": false
         },
         {
-          "symbol": "V6ConversationScene",
+          "symbol": "ZhaoxiConversationMenu",
           "declaration_found": true
         }
       ],
       "explicit_source_anchor": true,
-      "explicit_static_scope": "R4旧Shell退场后现行入口声明；已迁移源码，尚未运行行为验证",
+      "explicit_static_scope": "现行接口或朝夕场景声明可定位；仅证明静态来源存在，动作、设备及真实账户效果以当前 Head 测试为准，旧 V6 页面证据不作为新界面验收。",
       "explicit_test_candidates": [],
       "workflow_evidence": []
     },
@@ -152,6 +159,26 @@
       }
     },
     {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 朝夕 E8.17 独立界面接入（PR #740，未合并）",
+      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "test_reference_count": 0,
+      "historical_grade": null,
+      "existing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/MainActivity.kt"
+      ],
+      "missing_production_sources": [],
+      "named_symbols": [
+        {
+          "symbol": "MainActivity",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "现行接口或朝夕场景声明可定位；仅证明静态来源存在，动作、设备及真实账户效果以当前 Head 测试为准，旧 V6 页面证据不作为新界面验收。",
+      "explicit_test_candidates": [],
+      "workflow_evidence": []
+    },
+    {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 新建、切换与搜索会话",
       "verification": "具名源码声明存在（静态，待调用链复核）",
       "test_reference_count": 0,
@@ -188,17 +215,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 输入草稿和附件预览",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "源码入口及处理分支已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "LocalConversationSurface",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -208,17 +235,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 消息展示、Markdown 与代码块",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "源码入口及处理分支已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "LocalConversationSurface",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -228,17 +255,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 消息操作和反馈",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "源码入口及处理分支已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "LocalConversationSurface",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -252,7 +279,7 @@
       "test_reference_count": 0,
       "historical_grade": "源码入口及处理分支已核（静态）",
       "existing_production_sources": [
-        "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationScene.kt"
+        "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiCommandFeedback.kt"
       ],
       "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
@@ -263,30 +290,30 @@
           "declaration_found": false
         },
         {
-          "symbol": "describeV6ConversationReceipt",
+          "symbol": "CommandFeedback",
           "declaration_found": true
         }
       ],
       "explicit_source_anchor": true,
-      "explicit_static_scope": "R4旧Shell退场后现行入口声明；已迁移源码，尚未运行行为验证",
+      "explicit_static_scope": "现行接口或朝夕场景声明可定位；仅证明静态来源存在，动作、设备及真实账户效果以当前 Head 测试为准，旧 V6 页面证据不作为新界面验收。",
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0097",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 图片、文件与工作成果查看",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "源码入口及处理分支已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "LocalConversationSurface",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -374,17 +401,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 主题颜色、圆角、字体与间距",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "源码入口及处理分支已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "DsThemeTokens",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -392,21 +419,21 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0101",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 浅色、深色及系统主题适配",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "源码入口及处理分支已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "DshTheme",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -414,18 +441,17 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0099",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 底部弹层、确认框和长表单",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "源码入口及处理分支已核（静态）",
-      "existing_production_sources": [
-        "app/src/main/java/com/labteto/dshmobile/ui/shenyan/SyResponsiveSheet.kt"
-      ],
+      "existing_production_sources": [],
       "missing_production_sources": [
-        "app/src/main/java/com/labteto/dshmobile/ui/components/DsBottomSheet.kt"
+        "app/src/main/java/com/labteto/dshmobile/ui/components/DsBottomSheet.kt",
+        "app/src/main/java/com/labteto/dshmobile/ui/shenyan/SyResponsiveSheet.kt"
       ],
       "named_symbols": [
         {
@@ -434,7 +460,7 @@
         },
         {
           "symbol": "SyResponsiveSheet",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -442,7 +468,7 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0098",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 统一按钮、输入框与列表组件",
@@ -469,21 +495,21 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0100",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 流式回复、状态指示和过渡动效",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "源码入口及处理分支已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "LocalConversationSurface",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -493,14 +519,21 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 触控、无障碍与输入法适配",
-      "verification": "真实测试映射（仅局部）",
-      "test_reference_count": 1,
+      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "test_reference_count": 0,
       "historical_grade": "测试方法已核",
-      "existing_production_sources": [],
+      "existing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/host/ZhaoxiApplicationRoot.kt"
+      ],
       "missing_production_sources": [],
-      "named_symbols": [],
-      "explicit_source_anchor": false,
-      "explicit_static_scope": null,
+      "named_symbols": [
+        {
+          "symbol": "ZhaoxiApplicationRoot",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "现行宿主处理系统返回、导航及焦点输入法边界；仅静态实现依据，抽屉、辅助技术和实际设备体验仍待验收。",
       "explicit_test_candidates": [],
       "workflow_evidence": []
     },
@@ -510,7 +543,7 @@
       "test_reference_count": 0,
       "historical_grade": "源码入口及处理分支已核（静态）",
       "existing_production_sources": [
-        "app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt"
+        "app/src/main/java/com/labteto/dshmobile/ui/host/ZhaoxiApplicationRoot.kt"
       ],
       "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
@@ -521,12 +554,12 @@
           "declaration_found": false
         },
         {
-          "symbol": "AppRoot",
+          "symbol": "ZhaoxiApplicationRoot",
           "declaration_found": true
         }
       ],
       "explicit_source_anchor": true,
-      "explicit_static_scope": "R4旧Shell退场后现行入口声明；已迁移源码，尚未运行行为验证",
+      "explicit_static_scope": "现行接口或朝夕场景声明可定位；仅证明静态来源存在，动作、设备及真实账户效果以当前 Head 测试为准，旧 V6 页面证据不作为新界面验收。",
       "explicit_test_candidates": [],
       "workflow_evidence": []
     },
@@ -576,17 +609,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 个人侧栏头像管理",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "源码入口及处理分支已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "LocalModeDrawer",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -1308,7 +1341,7 @@
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 人物／图集身份隔离",
       "verification": "真实测试映射（仅局部）",
-      "test_reference_count": 5,
+      "test_reference_count": 3,
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -1436,13 +1469,13 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记来源会话及消息标识与跳转",
-      "verification": "历史生产文件仍存在（待入口复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "专属源码路径已核",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryScreen.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [],
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
@@ -2673,17 +2706,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 工作输入区内的集群入口",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "LocalAgentSwarmLaunchEntry",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2691,21 +2724,21 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0041",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 集群运行状态条与任务进度",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "LocalAgentTeamStatusBar",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2713,21 +2746,21 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0042",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 成员列表及当前任务",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "TeamMemberRow",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2759,17 +2792,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 给运行中助手追加消息",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "TeamMemberDetail",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2779,17 +2812,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 停止单个和全部助手",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "LocalAgentTeamSheet",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2799,17 +2832,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 恢复与停止状态反馈",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "TeamMemberRow",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2819,17 +2852,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 输出选择、复制和历史范围说明",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "TeamMemberWorksite",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2837,21 +2870,21 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0044",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 任务负责人、依赖、冲突、完整说明",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "TeamTaskRow",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2859,21 +2892,21 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0043",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 继续处理与异常接管草稿",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "LocalAgentTeamSheet",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2883,17 +2916,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 不能收消息时禁用发送并保留草稿",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "TeamMemberDetail",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -3035,13 +3068,13 @@
       "test_reference_count": 0,
       "historical_grade": null,
       "existing_production_sources": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheet.kt",
+        "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/WorkReadUiPort.kt",
         "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalWorkUiState.kt"
       ],
       "missing_production_sources": [],
       "named_symbols": [
         {
-          "symbol": "LocalWorkEvidenceSheet",
+          "symbol": "WorkReadUiPort",
           "declaration_found": true
         },
         {
@@ -3050,27 +3083,23 @@
         }
       ],
       "explicit_source_anchor": true,
-      "explicit_static_scope": "当前生产声明及消费者已核对；源码存在不等于运行和设备验收通过，行为证据独立记录。",
+      "explicit_static_scope": "现行接口或朝夕场景声明可定位；仅证明静态来源存在，动作、设备及真实账户效果以当前 Head 测试为准，旧 V6 页面证据不作为新界面验收。",
       "explicit_test_candidates": [],
       "workflow_evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
-      "verification": "真实测试映射及具名源码声明（静态）",
-      "test_reference_count": 1,
+      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "test_reference_count": 0,
       "historical_grade": null,
       "existing_production_sources": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheet.kt",
+        "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/WorkReadUiPort.kt",
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjection.kt"
       ],
       "missing_production_sources": [],
       "named_symbols": [
         {
-          "symbol": "LocalWorkEvidenceSheet",
-          "declaration_found": true
-        },
-        {
-          "symbol": "workToolPhaseLabel",
+          "symbol": "WorkReadUiPort",
           "declaration_found": true
         },
         {
@@ -3079,7 +3108,7 @@
         }
       ],
       "explicit_source_anchor": true,
-      "explicit_static_scope": "当前生产声明及消费者已核对；源码存在不等于运行和设备验收通过，行为证据独立记录。",
+      "explicit_static_scope": "现行接口或朝夕场景声明可定位；仅证明静态来源存在，动作、设备及真实账户效果以当前 Head 测试为准，旧 V6 页面证据不作为新界面验收。",
       "explicit_test_candidates": [],
       "workflow_evidence": []
     },
@@ -3099,7 +3128,7 @@
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工作成果清单与逐项操作",
       "verification": "真实测试映射（仅局部）",
-      "test_reference_count": 3,
+      "test_reference_count": 2,
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -3112,7 +3141,7 @@
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 交付要求与真实成果事件来源绑定",
       "verification": "真实测试映射及具名源码声明（静态）",
-      "test_reference_count": 2,
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalRequirementEvidence.kt",
@@ -3421,21 +3450,21 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务操作异常与受理回执",
-      "verification": "真实测试映射及具名源码声明（静态）",
-      "test_reference_count": 2,
+      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "test_reference_count": 0,
       "historical_grade": null,
       "existing_production_sources": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementOperation.kt"
+        "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/AutomationUiPort.kt"
       ],
       "missing_production_sources": [],
       "named_symbols": [
         {
-          "symbol": "runTaskManagementOperation",
+          "symbol": "AutomationUiReceipt",
           "declaration_found": true
         }
       ],
       "explicit_source_anchor": true,
-      "explicit_static_scope": "当前生产声明及消费者已核对；源码存在不等于运行和设备验收通过，行为证据独立记录。",
+      "explicit_static_scope": "现行接口或朝夕场景声明可定位；仅证明静态来源存在，动作、设备及真实账户效果以当前 Head 测试为准，旧 V6 页面证据不作为新界面验收。",
       "explicit_test_candidates": [],
       "workflow_evidence": []
     },
@@ -3846,13 +3875,13 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 工具和插件清单",
-      "verification": "历史生产文件仍存在（待入口复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [],
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
@@ -3861,13 +3890,13 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 分类浏览、配置和状态展示",
-      "verification": "历史生产文件仍存在（待入口复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [],
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
@@ -3876,17 +3905,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 工具可见性与授权状态",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "ToolCapabilityStatus",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -3894,17 +3923,17 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0014",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 工具安装和管理入口",
-      "verification": "历史生产文件仍存在（待入口复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [],
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
@@ -4163,13 +4192,13 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 输入框与历史消息显示中文名",
-      "verification": "历史生产文件仍存在（待入口复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名源码入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [],
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
@@ -5472,34 +5501,22 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / MiniMax 侧边栏套餐额度",
-      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
+      "verification": "具名源码声明存在（静态，待调用链复核）",
       "test_reference_count": 0,
       "historical_grade": null,
       "existing_production_sources": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalSettingsUiContribution.kt",
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MiniMaxQuotaPage.kt"
+        "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedSettings.kt"
       ],
       "missing_production_sources": [],
       "named_symbols": [
         {
-          "symbol": "localSettingsFeatureUiContribution",
-          "declaration_found": true
-        },
-        {
-          "symbol": "MiniMaxQuotaPage",
+          "symbol": "ZhaoxiQuotaScene",
           "declaration_found": true
         }
       ],
       "explicit_source_anchor": true,
-      "explicit_static_scope": "侧边栏入口由设置功能统一负责，额度页与账户查询源码存在；测试方法直接引用导航入口，真实账户及设备效果待验证。",
-      "explicit_test_candidates": [
-        {
-          "path": "app/src/test/java/com/labteto/dshmobile/ui/screens/local/MiniMaxQuotaNavigationTest.kt",
-          "method": "quotaDrawerOpensQuotaDirectlyAndClosesDrawer",
-          "references": "localSettingsFeatureUiContribution",
-          "status": "仅发现测试源码，未验证CI是否执行通过"
-        }
-      ],
+      "explicit_static_scope": "现行接口或朝夕场景声明可定位；仅证明静态来源存在，动作、设备及真实账户效果以当前 Head 测试为准，旧 V6 页面证据不作为新界面验收。",
+      "explicit_test_candidates": [],
       "workflow_evidence": []
     },
     {
@@ -5565,13 +5582,13 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 长期事实来源关联与显式纠正停用",
-      "verification": "历史生产文件仍存在（待入口复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "专属源码路径已核",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsSections.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [],
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
@@ -5595,17 +5612,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 浅色／深色／跟随系统",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "源码入口及处理分支已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "ThemePreference",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -5613,21 +5630,21 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0083",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 主题配色",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "源码入口及处理分支已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "DsTheme",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -5635,21 +5652,21 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0084",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 字体、文字尺寸和排版",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "源码入口及处理分支已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/theme/Type.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "dsTypography",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -5657,17 +5674,17 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0085",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 自定义聊天背景",
-      "verification": "历史生产文件仍存在（待入口复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/theme/AppBackground.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "AppBackground",
@@ -5681,17 +5698,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 背景图片选择、移除和实时预览",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "SettingsScreen",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -5714,17 +5731,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 子代理模型与能力设置",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "SettingsScreen",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -5747,17 +5764,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / Android 设备权限",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "SettingsScreen",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -5812,17 +5829,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 本地会话存储设置",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "旧源码已失效，需核实迁移或退役",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [
+      "existing_production_sources": [],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalSessionStorageCard.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "LocalSessionStorageCard",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -5830,7 +5847,7 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0078",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 日志和故障诊断",
@@ -7262,7 +7279,7 @@
     {
       "path": "第二层｜共享运行能力 / 共享用量和诊断 / Token 请求级账本",
       "verification": "真实测试映射（仅局部）",
-      "test_reference_count": 6,
+      "test_reference_count": 5,
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -8303,20 +8320,29 @@
     }
   ],
   "evidence_grade_summary": {
-    "真实测试映射（仅局部）": 122,
-    "具名源码声明存在（静态，待调用链复核）": 199,
+    "真实测试映射（仅局部）": 120,
+    "旧源码已失效，需核实迁移或退役": 38,
+    "具名源码声明存在（静态，待调用链复核）": 176,
     "没有可确认的现行入口证据": 17,
-    "历史生产文件仍存在（待入口复核）": 74,
-    "旧源码已失效，需核实迁移或退役": 2,
-    "具名源码及仪表测试声明存在（静态，未执行）": 6,
-    "真实测试映射及具名源码声明（静态）": 3,
+    "历史生产文件仍存在（待入口复核）": 67,
+    "具名源码及仪表测试声明存在（静态，未执行）": 5,
+    "真实测试映射及具名源码声明（静态）": 1,
     "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）": 14,
     "候选生产文件仍存在（不足以证明功能）": 3
   },
   "workflow_evidence_features": 14,
-  "declared_unexecuted_test_methods": 6,
+  "declared_unexecuted_test_methods": 5,
   "tracked_legacy_identities": 117,
   "stale_legacy_identities": [
+    {
+      "id": "existing.0014",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 工具可见性与授权状态",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
+      "entry": "ToolCapabilityStatus",
+      "owner": "TOOLS",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "源码文件已消失；须核实迁移"
+    },
     {
       "id": "existing.0034",
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 后台任务与运行结果",
@@ -8325,6 +8351,78 @@
       "owner": "WORK",
       "verification": "静态源码声明，未授权自动变更",
       "problem": "稳定身份关联的功能路径已不在现行树；可能改名或退役"
+    },
+    {
+      "id": "existing.0041",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 工作输入区内的集群入口",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt",
+      "entry": "LocalAgentSwarmLaunchEntry",
+      "owner": "WORK",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "源码文件已消失；须核实迁移"
+    },
+    {
+      "id": "existing.0042",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 集群运行状态条与任务进度",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt",
+      "entry": "LocalAgentTeamStatusBar",
+      "owner": "WORK",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "源码文件已消失；须核实迁移"
+    },
+    {
+      "id": "existing.0043",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 任务负责人、依赖、冲突、完整说明",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt",
+      "entry": "TeamTaskRow",
+      "owner": "WORK",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "源码文件已消失；须核实迁移"
+    },
+    {
+      "id": "existing.0044",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 输出选择、复制和历史范围说明",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt",
+      "entry": "TeamMemberWorksite",
+      "owner": "WORK",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "源码文件已消失；须核实迁移"
+    },
+    {
+      "id": "existing.0078",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 本地会话存储设置",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalSessionStorageCard.kt",
+      "entry": "LocalSessionStorageCard",
+      "owner": "SETTINGS",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "源码文件已消失；须核实迁移"
+    },
+    {
+      "id": "existing.0083",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 浅色／深色／跟随系统",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt",
+      "entry": "ThemePreference",
+      "owner": "SETTINGS",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "源码文件已消失；须核实迁移"
+    },
+    {
+      "id": "existing.0084",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 主题配色",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt",
+      "entry": "DsTheme",
+      "owner": "SETTINGS",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "源码文件已消失；须核实迁移"
+    },
+    {
+      "id": "existing.0085",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 字体、文字尺寸和排版",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/theme/Type.kt",
+      "entry": "dsTypography",
+      "owner": "SETTINGS",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "源码文件已消失；须核实迁移"
     },
     {
       "id": "existing.0086",
@@ -8397,6 +8495,60 @@
       "owner": "PROJECT",
       "verification": "静态源码声明，未授权自动变更",
       "problem": "稳定身份关联的功能路径已不在现行树；可能改名或退役"
+    },
+    {
+      "id": "existing.0097",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 运行中、排队中、拒绝发送的反馈",
+      "source": "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ConversationScene.kt",
+      "entry": "describeV6ConversationReceipt",
+      "owner": "SHELL",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "源码文件已消失；须核实迁移"
+    },
+    {
+      "id": "existing.0098",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 底部弹层、确认框和长表单",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/shenyan/SyResponsiveSheet.kt",
+      "entry": "SyResponsiveSheet",
+      "owner": "SHELL",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "源码文件已消失；须核实迁移"
+    },
+    {
+      "id": "existing.0099",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 浅色、深色及系统主题适配",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt",
+      "entry": "DshTheme",
+      "owner": "SHELL",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "源码文件已消失；须核实迁移"
+    },
+    {
+      "id": "existing.0100",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 统一按钮、输入框与列表组件",
+      "source": "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanBasics.kt",
+      "entry": "SyButton",
+      "owner": "SHELL",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "源码文件已消失；须核实迁移"
+    },
+    {
+      "id": "existing.0101",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 主题颜色、圆角、字体与间距",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt",
+      "entry": "DsThemeTokens",
+      "owner": "SHELL",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "源码文件已消失；须核实迁移"
+    },
+    {
+      "id": "existing.0103",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 功能路由和页面恢复",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "entry": "localFeatureRestoreStack",
+      "owner": "SHELL",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "源码文件已消失；须核实迁移"
     }
   ],
   "ambiguous_named_entry_paths": [
@@ -8417,12 +8569,6 @@
     "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 未完成任务阻止错误完成声明",
     "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队负责人编排与任务分配",
     "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 持久邮箱和重启后补投",
-    "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 不能收消息时禁用发送并保留草稿",
-    "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 停止单个和全部助手",
-    "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 恢复与停止状态反馈",
-    "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 成员列表及当前任务",
-    "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 给运行中助手追加消息",
-    "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 继续处理与异常接管草稿",
     "第一层｜产品功能与界面 / 工作与智能体功能 / 自动化与工作联动 / 后台任务触发和恢复",
     "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 待办事项 / 完成状态和执行关联",
     "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 待办事项 / 待办建立与更新",
@@ -8443,13 +8589,9 @@
     "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / 持久终端会话",
     "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 媒体创作回执与成果恢复",
     "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 媒体档案分页与会话隔离",
-    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 流式回复、状态指示和过渡动效",
-    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 图片、文件与工作成果查看",
-    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 消息展示、Markdown 与代码块",
-    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 消息操作和反馈",
-    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 输入草稿和附件预览",
-    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 个人侧栏头像管理",
-    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 侧边栏与会话列表",
+    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 触控、无障碍与输入法适配",
+    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 应用启动及初始化界面",
+    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 页面返回、抽屉和浮层管理",
     "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 与自动化任务联动",
     "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 人物主动发起互动",
     "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4人物内核与13项人物资料",
@@ -8464,11 +8606,8 @@
     "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 人物身份与背景连续性检查",
     "第一层｜产品功能与界面 / 自动化功能 / 工作自动化 / 后台任务状态与结果结算",
     "第一层｜产品功能与界面 / 自动化功能 / 工作自动化 / 定时发起工作任务",
-    "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 背景图片选择、移除和实时预览",
     "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 日志和故障诊断",
     "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 诊断报告导出",
-    "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / Android 设备权限",
-    "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 子代理模型与能力设置",
     "第三层｜平台与工程保障 / Android 本机运行时 / 原生设备能力及虚拟显示",
     "第三层｜平台与工程保障 / Android 本机运行时 / 持久终端与进程管理",
     "第三层｜平台与工程保障 / 外部互通适配 / MCP HTTP／标准输入输出适配",
@@ -8692,63 +8831,12 @@
       ]
     },
     {
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt",
-      "symbol": "LocalAgentTeamSheet",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/host/ZhaoxiApplicationRoot.kt",
+      "symbol": "ZhaoxiApplicationRoot",
       "features": [
-        "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 停止单个和全部助手",
-        "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 继续处理与异常接管草稿"
-      ]
-    },
-    {
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt",
-      "symbol": "TeamMemberDetail",
-      "features": [
-        "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 不能收消息时禁用发送并保留草稿",
-        "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 给运行中助手追加消息"
-      ]
-    },
-    {
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt",
-      "symbol": "TeamMemberRow",
-      "features": [
-        "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 恢复与停止状态反馈",
-        "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 成员列表及当前任务"
-      ]
-    },
-    {
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "symbol": "LocalConversationSurface",
-      "features": [
-        "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 流式回复、状态指示和过渡动效",
-        "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 图片、文件与工作成果查看",
-        "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 消息展示、Markdown 与代码块",
-        "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 消息操作和反馈",
-        "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 输入草稿和附件预览"
-      ]
-    },
-    {
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt",
-      "symbol": "LocalModeDrawer",
-      "features": [
-        "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 个人侧栏头像管理",
-        "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 侧边栏与会话列表"
-      ]
-    },
-    {
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheet.kt",
-      "symbol": "LocalWorkEvidenceSheet",
-      "features": [
-        "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
-        "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 当前目标、阶段与执行步骤"
-      ]
-    },
-    {
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-      "symbol": "SettingsScreen",
-      "features": [
-        "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 背景图片选择、移除和实时预览",
-        "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / Android 设备权限",
-        "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 子代理模型与能力设置"
+        "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 触控、无障碍与输入法适配",
+        "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 应用启动及初始化界面",
+        "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 页面返回、抽屉和浮层管理"
       ]
     },
     {
@@ -8840,6 +8928,14 @@
         "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / 托管后台进程",
         "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / 持久终端会话",
         "第三层｜平台与工程保障 / Android 本机运行时 / 持久终端与进程管理"
+      ]
+    },
+    {
+      "source": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/WorkReadUiPort.kt",
+      "symbol": "WorkReadUiPort",
+      "features": [
+        "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
+        "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 当前目标、阶段与执行步骤"
       ]
     }
   ],
@@ -9212,29 +9308,31 @@
   "followup_production_or_compatibility": 10,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "36bde3a501e5",
+    "baseline": "b57142d9b10f",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/host/LocalV6StandaloneSelection.kt",
-      "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/V6ApplicationScenePack.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
     "added_ui": [],
     "removed_ui": []
   },
-  "source_verified_registrations": 10,
+  "source_verified_registrations": 11,
   "explicit_retirements": 0,
   "changes_applied": [],
   "pending_changes": [
     {
-      "id": "work.history-evidence-ui",
-      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
-      "status": "拒绝自动合并现有节点",
-      "reason": "目标功能路径已经存在；请先逐项核实合并/拆分及测试归属"
+      "id": "automation.management-receipts",
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务操作异常与受理回执",
+      "status": "待复核，未删除功能树",
+      "reason": "源码登记消失，无法单凭文件删除证明功能已退役；需明确退役声明"
+    },
+    {
+      "id": "settings.minimax.quota",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / MiniMax 侧边栏套餐额度",
+      "status": "待复核，未删除功能树",
+      "reason": "源码登记消失，无法单凭文件删除证明功能已退役；需明确退役声明"
     }
   ],
   "obsolete_historical_evidence_count": 20,
@@ -9494,8 +9592,34 @@
       "assessment": "不在现行树内但原有实现仍存在；可能改名、合并或重新归类"
     }
   ],
-  "current_tree_outdated_source_count": 7,
+  "current_tree_outdated_source_count": 42,
   "current_tree_outdated_sources": [
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 侧边栏与会话列表",
+      "historical_grade": "源码入口及处理分支已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 功能路由和页面恢复",
+      "historical_grade": "源码入口及处理分支已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 加号统一能力入口",
       "historical_grade": "源码入口及处理分支已核（静态）",
@@ -9523,6 +9647,45 @@
       "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
     },
     {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 输入草稿和附件预览",
+      "historical_grade": "源码入口及处理分支已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 消息展示、Markdown 与代码块",
+      "historical_grade": "源码入口及处理分支已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 消息操作和反馈",
+      "historical_grade": "源码入口及处理分支已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 运行中、排队中、拒绝发送的反馈",
       "historical_grade": "源码入口及处理分支已核（静态）",
       "historical_production_sources": [
@@ -9536,6 +9699,45 @@
       "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
     },
     {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 图片、文件与工作成果查看",
+      "historical_grade": "源码入口及处理分支已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 主题颜色、圆角、字体与间距",
+      "historical_grade": "源码入口及处理分支已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 浅色、深色及系统主题适配",
+      "historical_grade": "源码入口及处理分支已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 底部弹层、确认框和长表单",
       "historical_grade": "源码入口及处理分支已核（静态）",
       "historical_production_sources": [
@@ -9543,11 +9745,10 @@
         "app/src/main/java/com/labteto/dshmobile/ui/shenyan/SyResponsiveSheet.kt"
       ],
       "missing_production_sources": [
-        "app/src/main/java/com/labteto/dshmobile/ui/components/DsBottomSheet.kt"
-      ],
-      "remaining_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/components/DsBottomSheet.kt",
         "app/src/main/java/com/labteto/dshmobile/ui/shenyan/SyResponsiveSheet.kt"
       ],
+      "remaining_production_sources": [],
       "historical_test_files": [],
       "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
     },
@@ -9567,6 +9768,19 @@
       "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
     },
     {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 流式回复、状态指示和过渡动效",
+      "historical_grade": "源码入口及处理分支已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 应用启动及初始化界面",
       "historical_grade": "源码入口及处理分支已核（静态）",
       "historical_production_sources": [
@@ -9580,6 +9794,331 @@
       "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
     },
     {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 个人侧栏头像管理",
+      "historical_grade": "源码入口及处理分支已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记来源会话及消息标识与跳转",
+      "historical_grade": "专属源码路径已核",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryScreen.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryScreen.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 工作输入区内的集群入口",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 集群运行状态条与任务进度",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 成员列表及当前任务",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 给运行中助手追加消息",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 停止单个和全部助手",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 恢复与停止状态反馈",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 输出选择、复制和历史范围说明",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 任务负责人、依赖、冲突、完整说明",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 继续处理与异常接管草稿",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 不能收消息时禁用发送并保留草稿",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 工具和插件清单",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 分类浏览、配置和状态展示",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 工具可见性与授权状态",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 工具安装和管理入口",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 输入框与历史消息显示中文名",
+      "historical_grade": "具名源码入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 长期事实来源关联与显式纠正停用",
+      "historical_grade": "专属源码路径已核",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsSections.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsSections.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 浅色／深色／跟随系统",
+      "historical_grade": "源码入口及处理分支已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 主题配色",
+      "historical_grade": "源码入口及处理分支已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 字体、文字尺寸和排版",
+      "historical_grade": "源码入口及处理分支已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/theme/Type.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/theme/Type.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 自定义聊天背景",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/theme/AppBackground.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/theme/AppBackground.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 背景图片选择、移除和实时预览",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 子代理模型与能力设置",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / Android 设备权限",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 无障碍与通知监听实时服务状态提示",
       "historical_grade": "专属源码路径已核",
       "historical_production_sources": [
@@ -9587,6 +10126,19 @@
       ],
       "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeviceCapabilitiesController.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 本地会话存储设置",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalSessionStorageCard.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalSessionStorageCard.kt"
       ],
       "remaining_production_sources": [],
       "historical_test_files": [],

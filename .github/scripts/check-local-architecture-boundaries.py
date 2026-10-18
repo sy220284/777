@@ -947,8 +947,10 @@ if "transportFactory = { endpoint ->" not in plugin_composition or (
 ) or plugin_composition.count("McpPluginWorkerTransport(") < 2:
     die("R4 production MCP HTTP and stdio must both use Binder worker without local fallback")
 main_activity = strip_comments(read("app/src/main/java/com/labteto/dshmobile/MainActivity.kt"))
-if any(token in main_activity for token in ("setContent(", "AppRoot(", "V6VisualBridge(", "DshTheme(")):
-    die("Backend-only MainActivity must not install a visual tree or V6 appearance")
+if any(token in main_activity for token in ("AppRoot(", "V6VisualBridge(", "DshTheme(")):
+    die("E8.17 MainActivity cannot restore the old visual Shell")
+if "setContent {" not in main_activity or "ZhaoxiApplicationRoot(" not in main_activity:
+    die("E8.17 requires the independent Zhaoxi root in MainActivity")
 if not (ROOT / "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiApplicationScenePack.kt").is_file():
     die("Generic UI Host contracts must survive UI removal")
 for retired in ("LocalHarnessViewModel", "LocalHarnessScreen", "LocalLegacyApplicationEntry"):

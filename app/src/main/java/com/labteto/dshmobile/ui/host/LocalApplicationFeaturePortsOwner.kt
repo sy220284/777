@@ -57,6 +57,7 @@ internal class LocalApplicationFeaturePortsOwner @Inject constructor(
     val workPolicyUiPort: com.labteto.dshmobile.uicontract.WorkPolicyUiPort,
 ) : ViewModel() {
     private val secureDrafts = LocalEncryptedUiDraftStore(context)
+    val privateTextCipher: com.labteto.dshmobile.uihost.UiPrivateTextCipher get() = secureDrafts
     init {
         secureDrafts.migrateOldSavedStateOnce("conversation_drafts",
             savedStateHandle.remove<List<String>>("v6_conversation_drafts"))
@@ -81,8 +82,10 @@ internal class LocalApplicationFeaturePortsOwner @Inject constructor(
         secureDrafts.read("ui_document_forms"),
     ) { secureDrafts.write("ui_document_forms", it) }
     private val shellPreferences = LocalConversationUiStateStore(context, businessSessions)
+    val conversationNavigation = kotlinx.coroutines.flow.MutableStateFlow<SessionUiCommand?>(null)
     val sessions: SessionUiPort = HostConversationSessionUiPort(
         businessSessions, drafts, shellPreferences, readingState, formState,
+        onConversationRequested = { conversationNavigation.value = it },
     )
     val documents: UiDocumentUiPort = documentsFactory.create(
         viewModelScope, drafts,
