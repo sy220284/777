@@ -358,7 +358,7 @@ class ZhaoxiApplicationScenePack(
                 ZhaoxiRequirementEvidenceScene(conv.evidence, identity, scope)
             else ZxEmpty("证据不可用", "缺少会话身份")
             "work.team" -> conv?.workTeam?.let { ZhaoxiWorkTeamScene(it, scope) }
-            "work.capabilities" -> sec?.tools?.let { ZhaoxiToolsScene(it, scope) }
+            "work.capabilities" -> sec?.tools?.let { ZhaoxiToolsScene(it, scope, "work.capabilities") }
             "work.steering_choice" -> ZhaoxiSteeringScene(scope)
             "chat.reply_suggestions" -> (conv?.replySuggestions ?: sec?.replySuggestions)?.let {
                 ZxReplySuggestionsScene(it, onPick = { text ->
@@ -412,7 +412,7 @@ class ZhaoxiApplicationScenePack(
             "automation.editor" -> sec?.automation?.let { ZhaoxiAutomationEditorScene(it, scope) }
             "automation.persona_interaction" -> sec?.automation?.let { ZhaoxiPersonaInteractionScene(it, scope) }
             "route.tools", "tools.mcp", "tools.github", "tools.plugins" ->
-                sec?.tools?.let { ZhaoxiToolsScene(it, scope) }
+                sec?.tools?.let { ZhaoxiToolsScene(it, scope, scene.value) }
             "media.creation", "media.result" -> (sec?.media ?: conv?.media)?.let { media ->
                 settings?.let { ZhaoxiConnectedMediaScene(media, it, sessionId, scope, sec?.gallery ?: conv?.gallery, sec?.portraits) }
             }
