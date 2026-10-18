@@ -19,6 +19,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxButtonVariant
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxField
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxMessageRow
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxRichReply
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTypingIndicator
@@ -115,6 +118,7 @@ class ZhaoxiAcceptanceAndroidTest {
                     compose.runOnIdle { current = requirement }
                     compose.waitForIdle()
                     compose.onAllNodesWithText("该场景暂无 Zx* 实装映射", substring = true).assertCountEquals(0)
+                    compose.onAllNodesWithText("页面暂不可用").assertCountEquals(0)
                     capture("$label-${requirement.id.value}", requirement.id.value)
                     index.appendText("$label\t${requirement.id.value}\t${requirement.kind}\tlocal-session-and-persona; no-external-model; empty-message-and-media-states\n")
                 }
@@ -123,6 +127,31 @@ class ZhaoxiAcceptanceAndroidTest {
         assertEquals(106, index.readLines().size) // 75 light + 15 dark + 15 at 130%.
     }
 
+
+    @Test fun commonButtonsExposeRealClickLoadingAndDisabledSemantics() {
+        ready()
+        var clicks = 0
+        compose.activityRule.scenario.onActivity { activity ->
+            activity.setContent {
+                ZhaoxiTheme(hue = ZhaoxiHue.STONE, dark = false, reducedMotion = true) {
+                    Column(Modifier.fillMaxSize().padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ZxButton("主要操作", { clicks++ }, Modifier.fillMaxSize(0.4f))
+                        ZxButton("处理中", { clicks++ }, loading = true)
+                        ZxButton("不可使用", { clicks++ }, enabled = false)
+                        ZxButton("描边操作", { clicks++ }, variant = ZxButtonVariant.Outline)
+                    }
+                }
+            }
+        }
+        compose.onNodeWithContentDescription("主要操作").performClick()
+        compose.runOnIdle { assertEquals(1, clicks) }
+        compose.onNodeWithContentDescription("处理中").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("不可使用").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("描边操作").performClick()
+        compose.runOnIdle { assertEquals(2, clicks) }
+        capture("fixture-controls")
+    }
 
     /**
      * Offline presentation fixture. Unlike owner-backed 75-scene smoke screenshots, this
