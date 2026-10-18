@@ -22,11 +22,10 @@ import org.xmlpull.v1.XmlPullParser
 @Composable
 fun ZxIcon(name: String, modifier: Modifier = Modifier, description: String? = null) {
     val context = LocalContext.current
-    val color = ZhaoxiTheme.colors.ink2
+    val tint = ZhaoxiTheme.colors.ink2
     val path = remember(name, context) {
         require(name.matches(Regex("[a-z][a-z0-9-]{0,40}"))) { "Invalid icon name" }
         val parser = Xml.newPullParser()
-        context.assets.open("icons/$name.svg").bufferedReader().use { parser.setInput(it) }
         // A reader cannot be closed before XML traversal, so load text and parse in memory.
         val xml = context.assets.open("icons/$name.svg").bufferedReader().use { it.readText() }
         parser.setInput(xml.reader())
@@ -61,7 +60,7 @@ fun ZxIcon(name: String, modifier: Modifier = Modifier, description: String? = n
         val factor = size.minDimension / 24f
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            color = color.toArgb()
+            color = tint.toArgb()
             strokeWidth = 1.7f
             strokeCap = Paint.Cap.ROUND
             strokeJoin = Paint.Join.ROUND
