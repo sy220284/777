@@ -479,10 +479,11 @@ fun ZhaoxiWorkspacePreviewScene(files: FilesUiPort?, path: String, scope: UiScen
                 ZxValueRow("文件名", value = item.file.path.substringAfterLast('/'))
                 ZxValueRow("大小", value = "${item.file.bytes} 字节")
                 ZxSection("内容预览")
-                if (item.text == null) {
+                val content = item.text
+                if (content == null) {
                     ZxEmpty("无法预览文本", "二进制文件不会按文字强行解码")
                 } else {
-                    Text(item.text, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    Text(content, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                         fontSize = 12.sp, color = ZhaoxiTheme.colors.ink)
                     if (item.truncated) ZxFooterNote("内容较长，已按文件能力提供的预览范围显示")
                 }
