@@ -419,7 +419,7 @@ class ZhaoxiApplicationScenePack(
                 if (gid == null) ZxEmpty("未指定人物", "请从人物图集进入 · 目标由宿主导航提案携带")
                 else when (scene.value) {
                     "chat.gallery_profile" -> ZhaoxiPersonaProfileScene(gid, sec?.gallery ?: conv?.gallery,
-                        conv?.selection ?: sec?.selection, conv?.stories, sec?.transfer, scope)
+                        conv?.selection ?: sec?.selection, conv?.stories, sec?.transfer, scope, sec?.authoring)
                     "chat.persona_editor", "chat.world_book" ->
                         if (sec?.authoring != null) ZhaoxiPersonaEditorScene(sec.authoring, gid, scope, initialTab = if (scene.value == "chat.world_book") 2 else 0, identity = identity)
                         else ZxEmpty("人物编辑暂不可用", "请返回人物图集",
