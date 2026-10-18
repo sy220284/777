@@ -178,6 +178,7 @@ fun ZhaoxiAutomationEditorScene(
     var firstRun by remember(editingTaskId, editing?.id) {
         mutableStateOf(formatter.format(java.util.Date(editing?.nextRunAt ?: (System.currentTimeMillis() + 3_600_000L))))
     }
+    var firstRunError by remember(editingTaskId) { mutableStateOf<String?>(null) }
     val androidContext = LocalContext.current
     fun chooseFirstRun() {
         val calendar = Calendar.getInstance().apply {
@@ -220,7 +221,6 @@ fun ZhaoxiAutomationEditorScene(
     var natural by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<String?>(null) }
-    var firstRunError by remember(editingTaskId) { mutableStateOf<String?>(null) }
     fun minuteOfDay(value: String): Int? {
         val pieces = value.trim().split(":")
         if (pieces.size != 2) return null
