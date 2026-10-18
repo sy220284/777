@@ -227,6 +227,18 @@ fun ZhaoxiQuestionScene(work: WorkConversationUiPort, scope: UiSceneRenderScope)
     }
 }
 
+/** Diary changes are version fenced: stale drafts must never be silently retried. */
+internal fun zxDiaryReceiptFeedback(result: com.labteto.dshmobile.uicontract.UiDiaryReceipt):
+    Pair<String, com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone> = when (result) {
+    com.labteto.dshmobile.uicontract.UiDiaryReceipt.Applied ->
+        "操作已保存" to com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Info
+    com.labteto.dshmobile.uicontract.UiDiaryReceipt.Stale ->
+        "记录已更新，请重新载入后编辑" to com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Warn
+    is com.labteto.dshmobile.uicontract.UiDiaryReceipt.Failed ->
+        (result.message?.takeIf(String::isNotBlank) ?: "操作失败，请重试") to
+            com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err
+}
+
 /** chat.diary / route.diary — 公开日记阅读、按原版本勘误与停用。私密反思不渲染。 */
 @Composable
 fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRenderScope) {
@@ -245,19 +257,25 @@ fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRender
     var meaningDraft by remember { mutableStateOf("") }
     var echoDraft by remember { mutableStateOf("") }
     var pendingDisable by remember { mutableStateOf<com.labteto.dshmobile.uicontract.UiDiaryEntry?>(null) }
-    var feedback by remember { mutableStateOf<String?>(null) }
+    var feedback by remember(galleryId) {
+        mutableStateOf<Pair<String, com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone>?>(null)
+    }
+    var stale by remember(galleryId) { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     val jobs = androidx.compose.runtime.rememberCoroutineScope()
-    fun describe(result: com.labteto.dshmobile.uicontract.UiDiaryReceipt): String = when (result) {
-        com.labteto.dshmobile.uicontract.UiDiaryReceipt.Applied -> "操作已保存"
-        com.labteto.dshmobile.uicontract.UiDiaryReceipt.Stale -> "记录已经更新，请重新读取后再操作"
-        is com.labteto.dshmobile.uicontract.UiDiaryReceipt.Failed -> result.message ?: "操作失败"
-    }
     ZxPage("日记", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("公开日记")
-        feedback?.let { com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
-            it, com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Info) }
+        feedback?.let { (message, tone) ->
+            com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(message, tone)
+        }
+        if (stale) ZxButton("重新载入记录", {
+            stale = false
+            editing = false
+            selectedId = null
+            feedback = null
+            revision++
+        }, Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ZxChip("有效", filter == "有效") { filter = "有效"; editing = false }
             ZxChip("已停用", filter == "已停用") { filter = "已停用"; editing = false }
@@ -322,7 +340,8 @@ fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRender
                                 galleryId, selected.id, selected.updatedAt,
                                 eventDraft, feelingDraft, thoughtDraft, meaningDraft, echoDraft,
                                 selected.privateReflection))
-                            feedback = describe(result)
+                            feedback = zxDiaryReceiptFeedback(result)
+                            stale = result == com.labteto.dshmobile.uicontract.UiDiaryReceipt.Stale
                             if (result == com.labteto.dshmobile.uicontract.UiDiaryReceipt.Applied) {
                                 revision++
                                 editing = false
@@ -330,10 +349,11 @@ fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRender
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (failure: Exception) {
-                            feedback = failure.message ?: "保存日记失败"
+                            feedback = (failure.message?.takeIf(String::isNotBlank) ?: "保存日记失败") to
+                                com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err
                         } finally { busy = false }
                     }
-                }, enabled = !busy && eventDraft.isNotBlank(), loading = busy)
+                }, enabled = !busy && !stale && eventDraft.isNotBlank(), loading = busy)
                 ZxChip("取消编辑", false) { editing = false }
             }
         }
@@ -348,7 +368,8 @@ fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRender
                         busy = true
                         try {
                             val result = diary.deactivate(galleryId, target.id, target.updatedAt)
-                            feedback = describe(result)
+                            feedback = zxDiaryReceiptFeedback(result)
+                            stale = result == com.labteto.dshmobile.uicontract.UiDiaryReceipt.Stale
                             if (result == com.labteto.dshmobile.uicontract.UiDiaryReceipt.Applied) {
                                 revision++
                                 selectedId = null
@@ -357,7 +378,8 @@ fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRender
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (failure: Exception) {
-                            feedback = failure.message ?: "停用日记失败"
+                            feedback = (failure.message?.takeIf(String::isNotBlank) ?: "停用日记失败") to
+                                com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err
                         } finally { busy = false }
                     }
                 },
