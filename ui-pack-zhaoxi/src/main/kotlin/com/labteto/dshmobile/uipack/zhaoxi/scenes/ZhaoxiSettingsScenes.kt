@@ -97,6 +97,9 @@ fun ZhaoxiSettingsHomeScene(
         ZxNavRow("用量统计", sub = "模型消耗 · 请求记录") { scope.onNavigate(UiSceneId("settings.usage")) }
         ZxNavRow("会话存储", sub = "占用空间 · 压缩 · 导出") { scope.onNavigate(UiSceneId("settings.session_storage")) }
         ZxNavRow("高级设置", sub = "运行限制") { scope.onNavigate(UiSceneId("settings.advanced")) }
+        ZxNavRow("诊断与网络", sub = "环境信息 · 本地诊断报告 · 目标连接检查") {
+            scope.onNavigate(UiSceneId("settings.diagnostics"))
+        }
         if (checkForUpdate != null) {
             ZxNavRow("检查更新", sub = "直接向应用更新服务检查新版本") { checkForUpdate() }
             currentUpdateStatus?.takeIf(String::isNotBlank)?.let { ZxFooterNote(it) }
