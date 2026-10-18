@@ -60,7 +60,9 @@ internal fun projectZxReplyTimeline(
     // Once persisted, its key remains unchanged and Compose can update in place.
     if (running && result.lastOrNull() !is ZxTimelineEntry.Reply) {
         val lastUser = messages.lastOrNull { it.role == UiMessageRole.USER }?.id
-        if (lastUser != null && messages.lastOrNull()?.role == UiMessageRole.USER) {
+        // Tool-only events after the user turn must not consume the initial reply slot.
+        if (lastUser != null &&
+            messages.lastOrNull { it.role != UiMessageRole.TOOL }?.role == UiMessageRole.USER) {
             result += ZxTimelineEntry.Reply(lastUser, emptyList(), "reply:$lastUser:0")
         }
     }
