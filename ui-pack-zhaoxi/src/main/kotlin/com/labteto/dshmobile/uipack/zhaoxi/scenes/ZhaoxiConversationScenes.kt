@@ -293,7 +293,7 @@ private fun ConversationMessages(identity: UiSessionIdentity?, messages: List<Ui
     // Historical document reads have no privileges; newer active snapshots always win by ID.
     val olderIds = older.map { it.id }.toSet()
     val historical by produceState<Map<String, List<UiDocumentSnapshot>>>(emptyMap(), sessionId,
-        olderIds, documents, identity, documentsState?.value?.documents) {
+        olderIds, documents, identity) {
         value = if (documents != null && identity != null && olderIds.isNotEmpty())
             documents.documentsForMessages(identity, olderIds).groupBy { it.document.source.messageId }
         else emptyMap()
