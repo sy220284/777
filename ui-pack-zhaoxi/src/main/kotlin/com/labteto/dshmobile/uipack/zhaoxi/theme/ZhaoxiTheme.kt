@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -291,7 +292,7 @@ fun ZhaoxiBackground(
                                 val bytes = zip.readBytes()
                                 decoded = android.graphics.BitmapFactory.decodeByteArray(
                                     bytes, 0, bytes.size)?.let { bitmap ->
-                                    androidx.compose.ui.graphics.asImageBitmap(bitmap)
+                                    bitmap.asImageBitmap()
                                 }
                                 break
                             }
